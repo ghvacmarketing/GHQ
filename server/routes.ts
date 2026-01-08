@@ -13455,6 +13455,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(crmWorkOrders.id, existingInvoice.workOrderId));
       }
       
+      // Deactivate Stripe payment link if it exists
+      if (existingInvoice.stripePaymentLinkId) {
+        try {
+          const { getUncachableStripeClient } = await import("./stripeClient");
+          const stripe = await getUncachableStripeClient();
+          await stripe.paymentLinks.update(existingInvoice.stripePaymentLinkId, {
+            active: false
+          });
+          console.log(`[Invoice] Deactivated Stripe payment link ${existingInvoice.stripePaymentLinkId} for deleted invoice ${existingInvoice.invoiceNumber}`);
+        } catch (stripeErr) {
+          console.error(`[Invoice] Failed to deactivate Stripe payment link:`, stripeErr);
+          // Don't fail the delete - just log the error
+        }
+      }
+      
       // Delete any auto-created maintenance agreements that reference this invoice
       // Agreements are linked by the notes field containing "Auto-created from Invoice {invoiceNumber}"
       if (existingInvoice.invoiceNumber) {
@@ -14175,6 +14190,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await db.update(crmWorkOrders)
           .set({ billingDisposition: null, invoiceId: null, updatedAt: new Date() })
           .where(eq(crmWorkOrders.id, invoice.workOrderId));
+      }
+      
+      // Deactivate Stripe payment link if it exists
+      if (invoice.stripePaymentLinkId) {
+        try {
+          const { getUncachableStripeClient } = await import("./stripeClient");
+          const stripe = await getUncachableStripeClient();
+          await stripe.paymentLinks.update(invoice.stripePaymentLinkId, {
+            active: false
+          });
+          console.log(`[Invoice] Deactivated Stripe payment link ${invoice.stripePaymentLinkId} for voided invoice ${invoice.invoiceNumber}`);
+        } catch (stripeErr) {
+          console.error(`[Invoice] Failed to deactivate Stripe payment link:`, stripeErr);
+          // Don't fail the void - just log the error
+        }
       }
       
       await logCrmAudit(
