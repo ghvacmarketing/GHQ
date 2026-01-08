@@ -2204,7 +2204,7 @@ export async function runBackgroundSync(): Promise<{
 let backgroundSyncInterval: NodeJS.Timeout | null = null;
 
 /**
- * Start the background sync scheduler (runs every 15 minutes).
+ * Start the background sync scheduler (runs every 3 minutes for more frequent syncing).
  */
 export function startBackgroundSyncScheduler(): void {
   if (backgroundSyncInterval) {
@@ -2212,7 +2212,7 @@ export function startBackgroundSyncScheduler(): void {
     return;
   }
   
-  const SYNC_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+  const SYNC_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes for faster sync
   
   // Run immediately on startup
   setTimeout(() => {
@@ -2227,7 +2227,7 @@ export function startBackgroundSyncScheduler(): void {
     });
   }, SYNC_INTERVAL_MS);
   
-  console.log("[QuickBooks Background] Scheduler started (runs every 15 minutes)");
+  console.log("[QuickBooks Background] Scheduler started (runs every 3 minutes)");
 }
 
 /**
