@@ -18944,7 +18944,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
   // POST /api/admin/trigger-maintenance-reminders - Manually trigger maintenance reminders
   app.post("/api/admin/trigger-maintenance-reminders", requireCrmAuth, async (req, res) => {
-    const user = getCurrentCrmUser(req);
+    const user = await getCurrentCrmUser(req);
     if (!user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -18962,7 +18962,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
   // POST /api/admin/trigger-renewal-processing - Manually trigger agreement renewal processing
   app.post("/api/admin/trigger-renewal-processing", requireCrmAuth, async (req, res) => {
-    const user = getCurrentCrmUser(req);
+    const user = await getCurrentCrmUser(req);
     if (!user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -19002,7 +19002,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // GET /api/quickbooks/status - Get QuickBooks connection status
   app.get("/api/quickbooks/status", requireCrmAuth, async (req, res) => {
     try {
-      const user = getCurrentCrmUser(req);
+      const user = await getCurrentCrmUser(req);
       if (!user || (user.role !== "owner" && user.role !== "admin")) {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -19018,7 +19018,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // GET /api/quickbooks/connect - Initiate OAuth flow
   app.get("/api/quickbooks/connect", requireCrmAuth, async (req, res) => {
     try {
-      const user = getCurrentCrmUser(req);
+      const user = await getCurrentCrmUser(req);
       if (!user || (user.role !== "owner" && user.role !== "admin")) {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -19106,7 +19106,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // POST /api/quickbooks/disconnect - Disconnect from QuickBooks
   app.post("/api/quickbooks/disconnect", requireCrmAuth, async (req, res) => {
     try {
-      const user = getCurrentCrmUser(req);
+      const user = await getCurrentCrmUser(req);
       if (!user || (user.role !== "owner" && user.role !== "admin")) {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -19122,7 +19122,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // POST /api/quickbooks/sync/customers - Sync all customers to QuickBooks
   app.post("/api/quickbooks/sync/customers", requireCrmAuth, async (req, res) => {
     try {
-      const user = getCurrentCrmUser(req);
+      const user = await getCurrentCrmUser(req);
       if (!user || (user.role !== "owner" && user.role !== "admin")) {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -19138,7 +19138,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // POST /api/quickbooks/sync/customer/:customerId - Sync single customer
   app.post("/api/quickbooks/sync/customer/:customerId", requireCrmAuth, async (req, res) => {
     try {
-      const user = getCurrentCrmUser(req);
+      const user = await getCurrentCrmUser(req);
       if (!user || (user.role !== "owner" && user.role !== "admin")) {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -19154,7 +19154,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // POST /api/quickbooks/sync/invoice/:invoiceId - Sync invoice to QuickBooks
   app.post("/api/quickbooks/sync/invoice/:invoiceId", requireCrmAuth, async (req, res) => {
     try {
-      const user = getCurrentCrmUser(req);
+      const user = await getCurrentCrmUser(req);
       if (!user || (user.role !== "owner" && user.role !== "admin")) {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -19170,7 +19170,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // POST /api/quickbooks/sync/payment/:invoiceId - Record payment in QuickBooks
   app.post("/api/quickbooks/sync/payment/:invoiceId", requireCrmAuth, async (req, res) => {
     try {
-      const user = getCurrentCrmUser(req);
+      const user = await getCurrentCrmUser(req);
       if (!user || (user.role !== "owner" && user.role !== "admin")) {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -19195,7 +19195,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // GET /api/quickbooks/sync-logs - Get sync history
   app.get("/api/quickbooks/sync-logs", requireCrmAuth, async (req, res) => {
     try {
-      const user = getCurrentCrmUser(req);
+      const user = await getCurrentCrmUser(req);
       if (!user || (user.role !== "owner" && user.role !== "admin")) {
         return res.status(403).json({ message: "Admin access required" });
       }
