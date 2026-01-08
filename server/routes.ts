@@ -13284,10 +13284,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate invoice number
       const invoiceNumber = await generateInvoiceNumber();
 
-      // Calculate totals from line items
+      // For install/proposal quotes, use the quote's total (sell price) which includes 
+      // overhead, profit margins, etc. Only fall back to summing line items for 
+      // service quotes or if quote total is not set.
       let subtotal = 0;
-      for (const item of quoteLineItems) {
-        subtotal += parseFloat(item.lineTotal || "0");
+      const quoteTotal = parseFloat(quote.total || "0");
+      
+      if (quoteTotal > 0) {
+        // Use the quote's total (sell price) for install quotes
+        subtotal = quoteTotal;
+      } else {
+        // Fall back to summing line items for service quotes
+        for (const item of quoteLineItems) {
+          subtotal += parseFloat(item.lineTotal || "0");
+        }
       }
 
       // Calculate balance due (subtract any deposit already paid)
