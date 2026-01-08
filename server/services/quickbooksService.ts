@@ -534,7 +534,7 @@ export async function syncInvoiceToQuickBooks(
       return { success: false, error: "Failed to get customer sync mapping" };
     }
     
-    // Check if invoice already synced
+    // Check if invoice already synced and determine if we should update or create
     const [existingSync] = await db.select()
       .from(quickbooksInvoiceSync)
       .where(and(
@@ -542,6 +542,28 @@ export async function syncInvoiceToQuickBooks(
         eq(quickbooksInvoiceSync.realmId, conn.realmId)
       ))
       .limit(1);
+    
+    // Determine the sync strategy:
+    // - shouldUpdate = true: We have a valid QB ID to update
+    // - shouldUpdate = false: We need to create a new invoice in QB
+    let shouldUpdate = false;
+    let validQbInvoiceId: string | null = null;
+    let syncRecordId: string | null = existingSync?.id || null;
+    
+    if (existingSync) {
+      // If pending with no QB ID - another process is creating it, bail out
+      if (existingSync.syncStatus === "pending" && !existingSync.quickbooksInvoiceId) {
+        console.log(`[QuickBooks] Invoice ${invoice.invoiceNumber} sync already in progress, skipping`);
+        return { success: true, quickbooksId: undefined };
+      }
+      
+      // If synced with valid QB ID - we should update
+      if (existingSync.quickbooksInvoiceId) {
+        shouldUpdate = true;
+        validQbInvoiceId = existingSync.quickbooksInvoiceId;
+      }
+      // Otherwise (error status or synced without ID) - treat as create path
+    }
     
     const qbo = getQuickBooksClient(conn);
     
@@ -866,13 +888,61 @@ export async function syncInvoiceToQuickBooks(
       }];
     }
     
+    // For new invoices (not updating), claim ownership with a pending record first
+    let pendingSyncId: string | null = syncRecordId;
+    if (!shouldUpdate) {
+      if (!syncRecordId) {
+        // No existing record - try to insert a pending one
+        try {
+          const [pendingRecord] = await db.insert(quickbooksInvoiceSync)
+            .values({
+              crmInvoiceId: invoiceId,
+              quickbooksInvoiceId: "", // Empty until QB returns
+              realmId: conn.realmId,
+              syncStatus: "pending",
+              lastSyncAt: new Date()
+            })
+            .returning();
+          pendingSyncId = pendingRecord?.id;
+        } catch (insertErr: any) {
+          // Unique constraint violation - another process won the race
+          const [existingRecord] = await db.select()
+            .from(quickbooksInvoiceSync)
+            .where(and(
+              eq(quickbooksInvoiceSync.crmInvoiceId, invoiceId),
+              eq(quickbooksInvoiceSync.realmId, conn.realmId)
+            ))
+            .limit(1);
+          
+          if (existingRecord) {
+            if (existingRecord.syncStatus === "synced" && existingRecord.quickbooksInvoiceId) {
+              console.log(`[QuickBooks] Invoice ${invoice.invoiceNumber} already synced (QB ID: ${existingRecord.quickbooksInvoiceId})`);
+              return { success: true, quickbooksId: existingRecord.quickbooksInvoiceId };
+            } else if (existingRecord.syncStatus === "pending") {
+              console.log(`[QuickBooks] Invoice ${invoice.invoiceNumber} sync already in progress, skipping`);
+              return { success: true, quickbooksId: undefined };
+            }
+            // Error status - claim ownership and retry
+            pendingSyncId = existingRecord.id;
+          }
+        }
+      }
+      
+      // Mark the sync record as pending before calling QuickBooks
+      if (pendingSyncId) {
+        await db.update(quickbooksInvoiceSync)
+          .set({ syncStatus: "pending", lastError: null, updatedAt: new Date() })
+          .where(eq(quickbooksInvoiceSync.id, pendingSyncId));
+      }
+    }
+    
     return new Promise((resolve) => {
-      if (existingSync) {
-        // Update existing invoice
-        qbInvoice.Id = existingSync.quickbooksInvoiceId;
+      if (shouldUpdate && validQbInvoiceId) {
+        // Update existing invoice in QuickBooks
+        qbInvoice.Id = validQbInvoiceId;
         qbInvoice.sparse = true;
         
-        qbo.getInvoice(existingSync.quickbooksInvoiceId, async (err: any, existing: any) => {
+        qbo.getInvoice(validQbInvoiceId, async (err: any, existing: any) => {
           if (err) {
             resolve({ success: false, error: err.message || "Failed to fetch invoice" });
             return;
@@ -882,71 +952,64 @@ export async function syncInvoiceToQuickBooks(
           
           qbo.updateInvoice(qbInvoice, async (updateErr: any, updated: any) => {
             if (updateErr) {
-              await db.update(quickbooksInvoiceSync)
-                .set({ 
-                  syncStatus: "error", 
-                  lastError: updateErr.message || "Update failed",
-                  updatedAt: new Date()
-                })
-                .where(eq(quickbooksInvoiceSync.id, existingSync.id));
+              if (syncRecordId) {
+                await db.update(quickbooksInvoiceSync)
+                  .set({ 
+                    syncStatus: "error", 
+                    lastError: updateErr.message || "Update failed",
+                    updatedAt: new Date()
+                  })
+                  .where(eq(quickbooksInvoiceSync.id, syncRecordId));
+              }
               resolve({ success: false, error: updateErr.message || "Failed to update invoice" });
               return;
             }
             
-            await db.update(quickbooksInvoiceSync)
-              .set({ 
-                syncStatus: "synced", 
-                lastSyncAt: new Date(),
-                lastError: null,
-                updatedAt: new Date()
-              })
-              .where(eq(quickbooksInvoiceSync.id, existingSync.id));
+            if (syncRecordId) {
+              await db.update(quickbooksInvoiceSync)
+                .set({ 
+                  syncStatus: "synced", 
+                  lastSyncAt: new Date(),
+                  lastError: null,
+                  updatedAt: new Date()
+                })
+                .where(eq(quickbooksInvoiceSync.id, syncRecordId));
+            }
             
             console.log(`[QuickBooks] Updated invoice ${invoice.invoiceNumber} (QB ID: ${updated.Id})`);
             resolve({ success: true, quickbooksId: updated.Id });
           });
         });
       } else {
-        // Create new invoice
+        // Create new invoice in QuickBooks
         qbo.createInvoice(qbInvoice, async (err: any, created: any) => {
           if (err) {
             console.error("[QuickBooks] Error creating invoice:", err);
-            // Record the failure to prevent infinite retries
-            try {
-              await db.insert(quickbooksInvoiceSync)
-                .values({
-                  crmInvoiceId: invoiceId,
-                  quickbooksInvoiceId: "",
-                  realmId: conn.realmId,
-                  syncStatus: "error",
-                  lastError: err.message || "Failed to create invoice",
-                  lastSyncAt: new Date()
-                });
-            } catch (insertErr) {
-              // Record may already exist, update it
+            if (pendingSyncId) {
               await db.update(quickbooksInvoiceSync)
                 .set({
                   syncStatus: "error",
                   lastError: err.message || "Failed to create invoice",
                   updatedAt: new Date()
                 })
-                .where(and(
-                  eq(quickbooksInvoiceSync.crmInvoiceId, invoiceId),
-                  eq(quickbooksInvoiceSync.realmId, conn.realmId)
-                ));
+                .where(eq(quickbooksInvoiceSync.id, pendingSyncId));
             }
             resolve({ success: false, error: err.message || "Failed to create invoice" });
             return;
           }
           
-          await db.insert(quickbooksInvoiceSync)
-            .values({
-              crmInvoiceId: invoiceId,
-              quickbooksInvoiceId: created.Id,
-              realmId: conn.realmId,
-              syncStatus: "synced",
-              lastSyncAt: new Date()
-            });
+          // Persist the QuickBooks invoice ID
+          if (pendingSyncId) {
+            await db.update(quickbooksInvoiceSync)
+              .set({
+                quickbooksInvoiceId: created.Id,
+                syncStatus: "synced",
+                lastSyncAt: new Date(),
+                lastError: null,
+                updatedAt: new Date()
+              })
+              .where(eq(quickbooksInvoiceSync.id, pendingSyncId));
+          }
           
           console.log(`[QuickBooks] Created invoice ${invoice.invoiceNumber} (QB ID: ${created.Id})`);
           resolve({ success: true, quickbooksId: created.Id });

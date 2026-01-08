@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, timestamp, boolean, json, integer, date } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, decimal, timestamp, boolean, json, integer, date, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -2581,6 +2581,7 @@ export type InsertQuickbooksCustomerSync = z.infer<typeof insertQuickbooksCustom
 export type QuickbooksCustomerSync = typeof quickbooksCustomerSync.$inferSelect;
 
 // Invoice sync mapping - links CRM invoices to QuickBooks invoices
+// Unique constraint on (crmInvoiceId, realmId) prevents race condition duplicates
 export const quickbooksInvoiceSync = pgTable("quickbooks_invoice_sync", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   crmInvoiceId: varchar("crm_invoice_id").notNull().references(() => crmInvoices.id, { onDelete: "cascade" }),
@@ -2591,7 +2592,9 @@ export const quickbooksInvoiceSync = pgTable("quickbooks_invoice_sync", {
   lastError: text("last_error"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("idx_quickbooks_invoice_sync_unique").on(table.crmInvoiceId, table.realmId),
+]);
 
 export const insertQuickbooksInvoiceSyncSchema = createInsertSchema(quickbooksInvoiceSync).omit({
   id: true,
