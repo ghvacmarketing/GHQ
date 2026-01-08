@@ -48,6 +48,7 @@ export default function MobileMessages() {
       if (!res.ok) return [];
       return res.json();
     },
+    refetchInterval: 5000,
   });
 
   const { data: conversationDetail, isLoading: loadingDetail } = useQuery<ConversationDetailResponse>({
@@ -58,6 +59,7 @@ export default function MobileMessages() {
       return res.json();
     },
     enabled: !!selectedConversationId,
+    refetchInterval: 5000,
   });
 
   const { data: contacts, isLoading: loadingContacts } = useQuery<CustomerSearchResult[]>({
