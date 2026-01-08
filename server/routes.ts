@@ -19252,6 +19252,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   });
   
   // POST /api/quickbooks/sync/customers - Sync all customers to QuickBooks
+  // This runs in the background to avoid timeout issues with large datasets
   app.post("/api/quickbooks/sync/customers", requireCrmAuth, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -19259,6 +19260,25 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(403).json({ message: "Admin access required" });
       }
       
+      // Start sync in background and return immediately
+      const backgroundSync = req.query.background === "true";
+      
+      if (backgroundSync) {
+        // Fire and forget - sync runs in background
+        syncAllCustomersToQuickBooks().then(result => {
+          console.log(`[QuickBooks] Background customer sync finished: ${result.succeeded} succeeded, ${result.failed} failed`);
+        }).catch(err => {
+          console.error("[QuickBooks] Background customer sync error:", err);
+        });
+        
+        return res.json({ 
+          success: true, 
+          message: "Customer sync started in background. Refresh status to see progress.",
+          background: true 
+        });
+      }
+      
+      // Synchronous sync (may timeout for large datasets)
       const result = await syncAllCustomersToQuickBooks();
       res.json({ success: result.failed === 0, ...result });
     } catch (error: any) {
@@ -19284,6 +19304,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   });
   
   // POST /api/quickbooks/sync/invoices - Sync all invoices to QuickBooks
+  // This runs in the background to avoid timeout issues
   app.post("/api/quickbooks/sync/invoices", requireCrmAuth, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -19291,6 +19312,25 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(403).json({ message: "Admin access required" });
       }
       
+      // Start sync in background and return immediately
+      const backgroundSync = req.query.background === "true";
+      
+      if (backgroundSync) {
+        // Fire and forget - sync runs in background
+        syncAllInvoicesToQuickBooks().then(result => {
+          console.log(`[QuickBooks] Background invoice sync finished: ${result.succeeded} succeeded, ${result.failed} failed`);
+        }).catch(err => {
+          console.error("[QuickBooks] Background invoice sync error:", err);
+        });
+        
+        return res.json({ 
+          success: true, 
+          message: "Invoice sync started in background. Refresh status to see progress.",
+          background: true 
+        });
+      }
+      
+      // Synchronous sync
       const result = await syncAllInvoicesToQuickBooks();
       res.json({ success: result.failed === 0, ...result });
     } catch (error: any) {

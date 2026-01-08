@@ -163,17 +163,24 @@ export default function CrmSettingsQuickBooks() {
 
   const syncCustomersMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/quickbooks/sync/customers");
+      const response = await apiRequest("POST", "/api/quickbooks/sync/customers?background=true");
       return response.json();
     },
     onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/sync-logs"] });
-      toast({
-        title: result.success ? "Sync Complete" : "Sync Completed with Errors",
-        description: `${result.succeeded} customers synced, ${result.failed} failed`,
-        variant: result.success ? "default" : "destructive",
-      });
+      if (result.background) {
+        toast({
+          title: "Sync Started",
+          description: "Customer sync is running in the background. Refresh status to see progress.",
+        });
+      } else {
+        toast({
+          title: result.success ? "Sync Complete" : "Sync Completed with Errors",
+          description: `${result.succeeded} customers synced, ${result.failed} failed`,
+          variant: result.success ? "default" : "destructive",
+        });
+      }
     },
     onError: (error: any) => {
       toast({
@@ -186,17 +193,24 @@ export default function CrmSettingsQuickBooks() {
 
   const syncInvoicesMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/quickbooks/sync/invoices");
+      const response = await apiRequest("POST", "/api/quickbooks/sync/invoices?background=true");
       return response.json();
     },
     onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/sync-logs"] });
-      toast({
-        title: result.success ? "Sync Complete" : "Sync Completed with Errors",
-        description: `${result.succeeded} invoices synced, ${result.failed} failed`,
-        variant: result.success ? "default" : "destructive",
-      });
+      if (result.background) {
+        toast({
+          title: "Sync Started",
+          description: "Invoice sync is running in the background. Refresh status to see progress.",
+        });
+      } else {
+        toast({
+          title: result.success ? "Sync Complete" : "Sync Completed with Errors",
+          description: `${result.succeeded} invoices synced, ${result.failed} failed`,
+          variant: result.success ? "default" : "destructive",
+        });
+      }
     },
     onError: (error: any) => {
       toast({

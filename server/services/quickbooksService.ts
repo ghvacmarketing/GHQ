@@ -362,10 +362,11 @@ export async function syncAllCustomersToQuickBooks(): Promise<{
   succeeded: number;
   failed: number;
   errors: string[];
+  status: string;
 }> {
   const conn = await getActiveConnection();
   if (!conn) {
-    return { processed: 0, succeeded: 0, failed: 0, errors: ["No active QuickBooks connection"] };
+    return { processed: 0, succeeded: 0, failed: 0, errors: ["No active QuickBooks connection"], status: "error" };
   }
   
   // Log sync start
@@ -379,37 +380,65 @@ export async function syncAllCustomersToQuickBooks(): Promise<{
     .returning();
   
   // Get all CRM customers (all customers, no isActive filter on crmCustomers table)
+  // Process ALL customers (both new and already synced for updates)
   const customers = await db.select()
     .from(crmCustomers);
+  
+  console.log(`[QuickBooks] Starting customer sync: ${customers.length} total customers`);
   
   let succeeded = 0;
   let failed = 0;
   const errors: string[] = [];
   
-  for (const customer of customers) {
-    const result = await syncCustomerToQuickBooks(customer.id, conn);
-    if (result.success) {
-      succeeded++;
-    } else {
-      failed++;
-      errors.push(`${customer.name}: ${result.error}`);
+  // Process in batches to avoid overwhelming the API
+  const BATCH_SIZE = 50;
+  const DELAY_BETWEEN_BATCHES = 1000; // 1 second delay between batches
+  
+  for (let i = 0; i < customers.length; i += BATCH_SIZE) {
+    const batch = customers.slice(i, i + BATCH_SIZE);
+    
+    console.log(`[QuickBooks] Processing customer batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(customers.length / BATCH_SIZE)}`);
+    
+    for (const customer of batch) {
+      try {
+        const result = await syncCustomerToQuickBooks(customer.id, conn);
+        if (result.success) {
+          succeeded++;
+        } else {
+          failed++;
+          if (errors.length < 20) { // Limit error messages stored
+            errors.push(`${customer.name}: ${result.error}`);
+          }
+        }
+      } catch (err: any) {
+        failed++;
+        if (errors.length < 20) {
+          errors.push(`${customer.name}: ${err.message || "Unknown error"}`);
+        }
+      }
+    }
+    
+    // Add delay between batches to avoid rate limiting
+    if (i + BATCH_SIZE < customers.length) {
+      await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
     }
   }
   
-  // Update log
+  // Update log - use 'completed' even with some failures since we processed all
+  const logStatus = failed === 0 ? "completed" : "failed";
   await db.update(quickbooksSyncLog)
     .set({
-      status: failed === 0 ? "completed" : "failed",
+      status: logStatus,
       recordsProcessed: succeeded,
       recordsFailed: failed,
-      errorMessage: errors.length > 0 ? errors.join("; ") : null,
+      errorMessage: errors.length > 0 ? errors.slice(0, 10).join("; ") : null,
       completedAt: new Date()
     })
     .where(eq(quickbooksSyncLog.id, logEntry.id));
   
   console.log(`[QuickBooks] Customer sync complete: ${succeeded} succeeded, ${failed} failed`);
   
-  return { processed: customers.length, succeeded, failed, errors };
+  return { processed: customers.length, succeeded, failed, errors, status: succeeded > 0 ? "completed" : "failed" };
 }
 
 // =============================================
