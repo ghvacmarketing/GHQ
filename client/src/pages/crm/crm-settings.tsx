@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, ClipboardList, ChevronRight, Tags, Clock, CreditCard } from "lucide-react";
+import { Shield, Users, ClipboardList, ChevronRight, Tags, Clock, CreditCard, Wrench } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser } from "@shared/schema";
 
@@ -46,6 +46,12 @@ const settingsItems: SettingsItem[] = [
     description: "Configure default deposit percentage for payment links",
     href: "/crm/settings/payments",
     icon: CreditCard,
+  },
+  {
+    title: "System Tools",
+    description: "Manual triggers for scheduled jobs and system maintenance",
+    href: "/crm/settings/system-tools",
+    icon: Wrench,
   },
 ];
 

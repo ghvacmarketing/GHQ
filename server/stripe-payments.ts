@@ -154,6 +154,14 @@ router.post("/api/stripe/invoice/:invoiceId/payment-link", async (req, res) => {
       return res.status(404).json({ error: "Invoice not found" });
     }
 
+    // Check if invoice is already paid or voided - prevent double payment
+    if (invoice.status === "paid") {
+      return res.status(400).json({ error: "This invoice has already been paid", alreadyPaid: true });
+    }
+    if (invoice.status === "void") {
+      return res.status(400).json({ error: "This invoice has been voided" });
+    }
+
     // Use balance due if available, otherwise use total
     const amountDue = parseFloat(invoice.balanceDue?.toString() || invoice.total?.toString() || "0");
     if (amountDue <= 0) {

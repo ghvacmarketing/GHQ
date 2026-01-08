@@ -13630,6 +13630,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(crmInvoices.id, req.params.id))
         .returning();
       
+      // Deactivate Stripe payment link if invoice is fully paid and has one
+      if (newStatus === "paid" && invoice.stripePaymentLinkId) {
+        try {
+          const { getUncachableStripeClient } = await import("./stripeClient");
+          const stripe = await getUncachableStripeClient();
+          await stripe.paymentLinks.update(invoice.stripePaymentLinkId, {
+            active: false
+          });
+          console.log(`[Invoice] Deactivated Stripe payment link ${invoice.stripePaymentLinkId} for invoice ${invoice.invoiceNumber}`);
+        } catch (stripeErr) {
+          console.error(`[Invoice] Failed to deactivate Stripe payment link:`, stripeErr);
+          // Don't fail the payment - just log the error
+        }
+      }
+      
       await logCrmAudit(
         user.id,
         balanceDue <= 0.01 ? "invoice.paid" : "invoice.payment",
@@ -18926,6 +18941,42 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       res.status(500).json({ message: "Authentication error" });
     }
   }
+
+  // POST /api/admin/trigger-maintenance-reminders - Manually trigger maintenance reminders
+  app.post("/api/admin/trigger-maintenance-reminders", requireCrmAuth, async (req, res) => {
+    const user = getCurrentCrmUser(req);
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    if (user.role !== "owner" && user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    try {
+      const summary = await processMaintenanceReminders();
+      return res.json({ success: true, summary });
+    } catch (error) {
+      console.error("Error triggering maintenance reminders:", error);
+      return res.status(500).json({ message: "Failed to process reminders" });
+    }
+  });
+
+  // POST /api/admin/trigger-renewal-processing - Manually trigger agreement renewal processing
+  app.post("/api/admin/trigger-renewal-processing", requireCrmAuth, async (req, res) => {
+    const user = getCurrentCrmUser(req);
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    if (user.role !== "owner" && user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    try {
+      const summary = await processAgreementRenewals();
+      return res.json({ success: true, summary });
+    } catch (error) {
+      console.error("Error triggering renewal processing:", error);
+      return res.status(500).json({ message: "Failed to process renewals" });
+    }
+  });
 
   // POST /api/admin/portal/generate-link/:customerId - Generate portal login link for a customer
   app.post("/api/admin/portal/generate-link/:customerId", requireCrmAuth, async (req, res) => {

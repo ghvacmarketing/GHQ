@@ -75,6 +75,8 @@ export default function PortalInvoiceDetail() {
   const queryClient = useQueryClient();
   const [paymentVerified, setPaymentVerified] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isGeneratingPayment, setIsGeneratingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   
   const isPaymentSuccess = location.includes("payment=success");
 
@@ -111,6 +113,39 @@ export default function PortalInvoiceDetail() {
         .finally(() => setIsVerifying(false));
     }
   }, [isPaymentSuccess, id, invoice, paymentVerified, isVerifying, refetch]);
+
+  // Handle Pay Now button click - generates payment link and opens in new tab
+  const handlePayNow = async () => {
+    if (!invoice || !id) return;
+    setIsGeneratingPayment(true);
+    setPaymentError(null);
+    try {
+      const res = await fetch(`/api/stripe/invoice/${id}/payment-link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.alreadyPaid) {
+          refetch(); // Refresh to show updated status
+          setPaymentError("This invoice has already been paid.");
+        } else {
+          setPaymentError(data.error || "Failed to generate payment link");
+        }
+        return;
+      }
+      if (data.paymentLinkUrl) {
+        window.open(data.paymentLinkUrl, '_blank');
+      } else {
+        setPaymentError("No payment link returned");
+      }
+    } catch (err) {
+      console.error('Error generating payment link:', err);
+      setPaymentError("Failed to generate payment link. Please try again.");
+    } finally {
+      setIsGeneratingPayment(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -344,6 +379,36 @@ export default function PortalInvoiceDetail() {
                 </div>
               )}
             </div>
+
+            {/* Pay Now Button - only show when invoice is unpaid and has balance */}
+            {invoice.status !== "paid" && invoice.status !== "void" && parseFloat(invoice.balanceDue || "0") > 0 && !isPaymentSuccess && (
+              <div className="mt-6">
+                {paymentError && (
+                  <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                    {paymentError}
+                  </div>
+                )}
+                <Button 
+                  onClick={handlePayNow}
+                  disabled={isGeneratingPayment}
+                  className="w-full text-white"
+                  style={{ backgroundColor: BRAND_COLOR }}
+                  data-testid="button-pay-now"
+                >
+                  {isGeneratingPayment ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating Payment Link...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Pay Now - {formatCurrency(invoice.balanceDue)}
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
 
             {invoice.notes && (
               <>
