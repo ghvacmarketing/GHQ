@@ -13630,7 +13630,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       // Auto-create maintenance agreement if invoice is fully paid and contains maintenance items
-      if (newStatus === "paid" && invoice.customerId) {
+      // BUT skip if invoice is already linked to an existing agreement (to avoid duplication)
+      if (newStatus === "paid" && invoice.customerId && !invoice.agreementId) {
         try {
           // Find maintenance line items by joining with crmItems catalog or checking description
           const lineItemsWithCatalog = await db.select({
