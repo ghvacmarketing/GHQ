@@ -46,13 +46,15 @@ import {
   ClipboardList,
   Zap,
   CalendarIcon,
+  Settings2,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import type { CrmUser, CrmWorkOrder, CrmQuote, CrmQuoteLineItem, CrmItem, CrmCustomer, CrmProperty } from "@shared/schema";
+import type { CrmUser, CrmWorkOrder, CrmQuote, CrmQuoteLineItem, CrmItem, CrmCustomer, CrmProperty, QuickbooksClass } from "@shared/schema";
 import { format } from "date-fns";
 
 const INVOICE_MODES = [
@@ -82,6 +84,7 @@ interface LineItem {
   isDiscountLine?: boolean;
   discountKind?: "promotion" | "maintenance";
   crmItemId?: string;
+  quickbooksClassId?: string;
 }
 
 interface FormData {
@@ -139,6 +142,7 @@ export default function CrmInvoiceCreate() {
   const [itemSearchOpen, setItemSearchOpen] = useState(false);
   const [itemSearchQuery, setItemSearchQuery] = useState("");
   const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<"all" | "install" | "service" | "maintenance">("all");
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
 
   const [showCreateWODialog, setShowCreateWODialog] = useState(false);
   const [newWOCustomerSearch, setNewWOCustomerSearch] = useState("");
@@ -199,6 +203,11 @@ export default function CrmInvoiceCreate() {
   const { data: crmItems } = useQuery<CrmItem[]>({
     queryKey: ["/api/crm/items"],
     enabled: !!currentUser && formData.mode === "manual",
+  });
+
+  const { data: quickbooksClasses } = useQuery<QuickbooksClass[]>({
+    queryKey: ["/api/quickbooks/classes"],
+    enabled: !!currentUser && formData.mode === "manual" && showAdvancedOptions,
   });
 
   const { data: customerSearchResults, isLoading: isSearchingCustomers } = useQuery<{ customers: CrmCustomer[] }>({
@@ -263,6 +272,7 @@ export default function CrmInvoiceCreate() {
         isDiscountLine?: boolean;
         discountKind?: string;
         itemId?: string;
+        quickbooksClassId?: string;
       }>;
       subtotal: string;
       tax: string;
@@ -506,8 +516,9 @@ export default function CrmInvoiceCreate() {
             lineTotal: lineTotal.toFixed(2),
             taxable: !isDiscount && item.taxable !== false,
             isDiscountLine: isDiscount,
-            discountKind: item.discountKind ?? null,
-            itemId: item.crmItemId ?? null,
+            discountKind: item.discountKind || undefined,
+            itemId: item.crmItemId || undefined,
+            quickbooksClassId: item.quickbooksClassId || undefined,
             sortOrder: idx,
           };
         }),
@@ -956,6 +967,26 @@ export default function CrmInvoiceCreate() {
                     </div>
                   </div>
 
+                  <div className="flex items-center justify-between p-3 bg-slate-50 border rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Settings2 className="h-4 w-4 text-slate-500" />
+                      <div>
+                        <Label htmlFor="advanced-toggle" className="text-sm font-medium cursor-pointer">
+                          Show Advanced Options
+                        </Label>
+                        <p className="text-xs text-slate-500">
+                          Enable per-line-item QuickBooks class selection
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      id="advanced-toggle"
+                      checked={showAdvancedOptions}
+                      onCheckedChange={setShowAdvancedOptions}
+                      data-testid="switch-advanced-options"
+                    />
+                  </div>
+
                   {formData.lineItems.length === 0 ? (
                     <div className="border-2 border-dashed rounded-lg p-8 text-center">
                       <Package className="h-12 w-12 text-slate-300 mx-auto mb-3" />
@@ -969,11 +1000,14 @@ export default function CrmInvoiceCreate() {
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-slate-50">
-                            <TableHead className="w-[40%]">Description</TableHead>
-                            <TableHead className="w-[15%]">Type</TableHead>
-                            <TableHead className="w-[10%] text-right">Qty</TableHead>
-                            <TableHead className="w-[15%] text-right">Price</TableHead>
-                            <TableHead className="w-[15%] text-right">Total</TableHead>
+                            <TableHead className={showAdvancedOptions ? "w-[30%]" : "w-[40%]"}>Description</TableHead>
+                            <TableHead className="w-[12%]">Type</TableHead>
+                            {showAdvancedOptions && (
+                              <TableHead className="w-[18%]">QB Class</TableHead>
+                            )}
+                            <TableHead className="w-[8%] text-right">Qty</TableHead>
+                            <TableHead className="w-[12%] text-right">Price</TableHead>
+                            <TableHead className="w-[12%] text-right">Total</TableHead>
                             <TableHead className="w-[5%]"></TableHead>
                           </TableRow>
                         </TableHeader>
@@ -1006,6 +1040,39 @@ export default function CrmInvoiceCreate() {
                                   </SelectContent>
                                 </Select>
                               </TableCell>
+                              {showAdvancedOptions && (
+                                <TableCell>
+                                  <Select
+                                    value={item.quickbooksClassId || "auto"}
+                                    onValueChange={(v) => updateLineItem(item.id, { quickbooksClassId: v === "auto" ? undefined : v })}
+                                  >
+                                    <SelectTrigger className="h-8" data-testid={`select-qb-class-${item.id}`}>
+                                      <SelectValue placeholder="Auto" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="auto">Auto (from property type)</SelectItem>
+                                      {["Service", "Install", "Maintenance", "Discount"].map((classType) => {
+                                        const classesOfType = quickbooksClasses?.filter(
+                                          (c) => c.classType === classType && c.isActive
+                                        );
+                                        if (!classesOfType?.length) return null;
+                                        return (
+                                          <div key={classType}>
+                                            <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50">
+                                              {classType}
+                                            </div>
+                                            {classesOfType.map((qbClass) => (
+                                              <SelectItem key={qbClass.id} value={qbClass.id}>
+                                                {qbClass.classType} - {qbClass.subType}
+                                              </SelectItem>
+                                            ))}
+                                          </div>
+                                        );
+                                      })}
+                                    </SelectContent>
+                                  </Select>
+                                </TableCell>
+                              )}
                               <TableCell>
                                 <Input
                                   type="number"

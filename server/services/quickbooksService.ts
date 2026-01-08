@@ -12,11 +12,16 @@ import {
   crmInvoices,
   crmInvoiceLineItems,
   crmItems,
+  crmProperties,
+  crmWorkOrders,
   type QuickbooksConnection,
   type QuickbooksClass,
   type QuickbooksCategoryClassMap,
   type CrmCustomer,
-  type CrmInvoice
+  type CrmInvoice,
+  type CrmItemCategory,
+  type PropertyType,
+  type DiscountKind
 } from "@shared/schema";
 import { eq, and, isNull, inArray } from "drizzle-orm";
 
@@ -483,7 +488,7 @@ export async function syncInvoiceToQuickBooks(
       .from(crmInvoiceLineItems)
       .where(eq(crmInvoiceLineItems.invoiceId, invoiceId));
     
-    // Prefetch all category mappings and items for efficiency (avoid N+1 queries)
+    // Prefetch all items for efficiency (avoid N+1 queries)
     const itemIds = lineItems.map(li => li.itemId).filter((id): id is string => !!id);
     const itemsById = new Map<string, typeof crmItems.$inferSelect>();
     if (itemIds.length > 0) {
@@ -491,35 +496,88 @@ export async function syncInvoiceToQuickBooks(
       items.forEach(item => itemsById.set(item.id, item));
     }
     
-    // Prefetch category-class mappings for this realm
-    const mappings = await db.select({
-      categoryName: quickbooksCategoryClassMap.categoryName,
-      classId: quickbooksCategoryClassMap.quickbooksClassId
-    })
-      .from(quickbooksCategoryClassMap)
-      .where(eq(quickbooksCategoryClassMap.realmId, conn.realmId));
+    // Get property for determining class subType (residential/commercial)
+    // Priority: invoice.propertyId -> workOrder.propertyId -> null
+    let propertyType: PropertyType | null = null;
     
-    // Build a map of category -> quickbooksClassId for quick lookup
-    const categoryToClassId = new Map<string, string>();
-    for (const mapping of mappings) {
-      if (mapping.classId) {
-        categoryToClassId.set(mapping.categoryName, mapping.classId);
+    if (invoice.propertyId) {
+      const [property] = await db.select()
+        .from(crmProperties)
+        .where(eq(crmProperties.id, invoice.propertyId))
+        .limit(1);
+      if (property?.propertyType) {
+        propertyType = property.propertyType as PropertyType;
+      }
+    } else if (invoice.workOrderId) {
+      const [workOrder] = await db.select()
+        .from(crmWorkOrders)
+        .where(eq(crmWorkOrders.id, invoice.workOrderId))
+        .limit(1);
+      if (workOrder?.propertyId) {
+        const [property] = await db.select()
+          .from(crmProperties)
+          .where(eq(crmProperties.id, workOrder.propertyId))
+          .limit(1);
+        if (property?.propertyType) {
+          propertyType = property.propertyType as PropertyType;
+        }
       }
     }
     
-    // Prefetch class data to get QuickBooks class IDs
-    const classIds = Array.from(new Set(mappings.map(m => m.classId).filter((id): id is string => !!id)));
-    const classIdToQbId = new Map<string, string>();
-    if (classIds.length > 0) {
-      const classes = await db.select({ id: quickbooksClasses.id, qbId: quickbooksClasses.quickbooksClassId })
-        .from(quickbooksClasses)
-        .where(inArray(quickbooksClasses.id, classIds));
-      classes.forEach(cls => {
-        if (cls.qbId) classIdToQbId.set(cls.id, cls.qbId);
-      });
+    // Prefetch all active QuickBooks classes for this realm for efficient lookup
+    const allClasses = await db.select()
+      .from(quickbooksClasses)
+      .where(and(
+        eq(quickbooksClasses.realmId, conn.realmId),
+        eq(quickbooksClasses.isActive, true)
+      ));
+    
+    // Build lookup map: "classType:subType" -> quickbooksClassId (actual QB ID)
+    const classLookup = new Map<string, string>();
+    for (const cls of allClasses) {
+      if (cls.quickbooksClassId) {
+        const key = `${cls.classType}:${cls.subType}`;
+        classLookup.set(key, cls.quickbooksClassId);
+      }
     }
     
-    // Build line items with ClassRef based on cached category mappings
+    // Also map local class IDs to QB IDs (for explicit overrides)
+    const localIdToQbId = new Map<string, string>();
+    for (const cls of allClasses) {
+      if (cls.quickbooksClassId) {
+        localIdToQbId.set(cls.id, cls.quickbooksClassId);
+      }
+    }
+    
+    // Helper function to get classType from item category
+    const categoryToClassType = (category: CrmItemCategory | null): "Service" | "Install" | "Maintenance" | "Discount" | null => {
+      if (!category) return null;
+      switch (category) {
+        case "service": return "Service";
+        case "install": return "Install";
+        case "maintenance": return "Maintenance";
+        case "discount": return "Discount";
+        default: return null;
+      }
+    };
+    
+    // Helper function to get subType for discounts based on discountKind
+    const discountKindToSubType = (kind: DiscountKind | null): "Promotional" | "Maintenance" | null => {
+      if (!kind) return null;
+      switch (kind) {
+        case "promotion": return "Promotional";
+        case "maintenance": return "Maintenance";
+        default: return null;
+      }
+    };
+    
+    // Helper function to capitalize property type for subType matching
+    const propertyTypeToSubType = (pt: PropertyType | null): "Residential" | "Commercial" | null => {
+      if (!pt) return null;
+      return pt === "residential" ? "Residential" : "Commercial";
+    };
+    
+    // Build line items with ClassRef based on hierarchical class assignment
     const qbLineItems: any[] = [];
     for (const item of lineItems) {
       const lineItem: any = {
@@ -532,27 +590,40 @@ export async function syncInvoiceToQuickBooks(
         }
       };
       
-      // Try to get ClassRef from category mapping using cached data
-      if (item.itemId) {
-        const crmItem = itemsById.get(item.itemId);
-        if (crmItem?.category) {
-          const localClassId = categoryToClassId.get(crmItem.category);
-          if (localClassId) {
-            const qbClassId = classIdToQbId.get(localClassId);
-            if (qbClassId) {
-              lineItem.SalesItemLineDetail.ClassRef = { value: qbClassId };
-            }
-          }
+      // Priority 1: Explicit quickbooksClassId override on line item
+      if (item.quickbooksClassId) {
+        const qbClassId = localIdToQbId.get(item.quickbooksClassId);
+        if (qbClassId) {
+          lineItem.SalesItemLineDetail.ClassRef = { value: qbClassId };
+          qbLineItems.push(lineItem);
+          continue;
         }
       }
       
-      // Fallback for discount lines
-      if (item.isDiscountLine && !lineItem.SalesItemLineDetail.ClassRef) {
-        const localClassId = categoryToClassId.get("discount");
-        if (localClassId) {
-          const qbClassId = classIdToQbId.get(localClassId);
+      // Priority 2: Calculate class from item category + property type
+      if (item.isDiscountLine) {
+        // For discount lines, use discountKind to determine subType
+        const discountSubType = discountKindToSubType(item.discountKind as DiscountKind | null);
+        if (discountSubType) {
+          const key = `Discount:${discountSubType}`;
+          const qbClassId = classLookup.get(key);
           if (qbClassId) {
             lineItem.SalesItemLineDetail.ClassRef = { value: qbClassId };
+          }
+        }
+      } else if (item.itemId) {
+        // For regular items, use category + property type
+        const crmItem = itemsById.get(item.itemId);
+        if (crmItem?.category) {
+          const classType = categoryToClassType(crmItem.category as CrmItemCategory);
+          const subType = propertyTypeToSubType(propertyType);
+          
+          if (classType && subType) {
+            const key = `${classType}:${subType}`;
+            const qbClassId = classLookup.get(key);
+            if (qbClassId) {
+              lineItem.SalesItemLineDetail.ClassRef = { value: qbClassId };
+            }
           }
         }
       }
