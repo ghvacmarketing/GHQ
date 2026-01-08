@@ -413,10 +413,21 @@ router.post("/api/stripe/quote/:quoteId/verify-deposit", async (req, res) => {
     if (paymentLinkId) {
       // Find Checkout Sessions created from this specific Payment Link
       // The payment_link filter returns only sessions from this specific link
-      const checkoutSessions = await stripe.checkout.sessions.list({
-        payment_link: paymentLinkId,
-        limit: 100, // Max allowed, typically only 1 session per link
-      });
+      let checkoutSessions;
+      try {
+        checkoutSessions = await stripe.checkout.sessions.list({
+          payment_link: paymentLinkId,
+          limit: 100, // Max allowed, typically only 1 session per link
+        });
+      } catch (paymentLinkError: any) {
+        // Payment link doesn't exist (e.g., from a different Stripe account)
+        // Clear the invalid payment link ID and continue to fallback
+        console.log(`Payment link ${paymentLinkId} not found, clearing and using fallback`);
+        await db.update(crmQuotes)
+          .set({ stripePaymentLinkId: null })
+          .where(eq(crmQuotes.id, quoteId));
+        checkoutSessions = { data: [] };
+      }
 
       // Find a valid paid session (check status and payment status)
       for (const session of checkoutSessions.data) {
