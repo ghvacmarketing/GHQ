@@ -79,7 +79,7 @@ interface LineItem {
   description: string;
   quantity: number;
   unitPrice: number;
-  lineType: "part" | "labor" | "service" | "maintenance" | "other" | "discount";
+  lineType: "service" | "maintenance" | "install" | "discount";
   taxable: boolean;
   isDiscountLine?: boolean;
   discountKind?: "promotion" | "maintenance";
@@ -513,10 +513,9 @@ export default function CrmInvoiceCreate() {
       const category = (item.category || "").toLowerCase();
       const itemType = (item.itemType || "").toLowerCase();
       if (category === "maintenance" || itemType === "maintenance") return "maintenance";
-      if (category === "service" || itemType === "service") return "service";
-      if (category === "labor" || itemType === "labor") return "labor";
-      if (category === "part" || category === "parts" || itemType === "part") return "part";
-      return "service"; // Default to service
+      if (category === "install" || itemType === "install") return "install";
+      // Service is the default for service, labor, parts, and other types
+      return "service";
     };
     
     const newItem: LineItem = {
@@ -1124,9 +1123,7 @@ export default function CrmInvoiceCreate() {
                                   <SelectContent>
                                     <SelectItem value="service">Service</SelectItem>
                                     <SelectItem value="maintenance">Maintenance</SelectItem>
-                                    <SelectItem value="part">Part</SelectItem>
-                                    <SelectItem value="labor">Labor</SelectItem>
-                                    <SelectItem value="other">Other</SelectItem>
+                                    <SelectItem value="install">Install</SelectItem>
                                   </SelectContent>
                                 </Select>
                               </TableCell>
