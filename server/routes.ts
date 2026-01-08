@@ -19893,7 +19893,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(403).json({ message: "Admin access required" });
       }
       
-      const items = await quickbooksService.getQuickbooksItems();
+      const { getQuickbooksItems } = await import("./services/quickbooksService");
+      const items = await getQuickbooksItems();
       res.json(items);
     } catch (error: any) {
       console.error("[QuickBooks] Get items error:", error);
@@ -19909,7 +19910,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(403).json({ message: "Admin access required" });
       }
       
-      const result = await quickbooksService.pullItemsFromQuickBooks();
+      const { pullItemsFromQuickBooks } = await import("./services/quickbooksService");
+      const result = await pullItemsFromQuickBooks();
       if (result.success) {
         res.json(result);
       } else {
@@ -19937,7 +19939,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         });
       }
       
-      const result = await quickbooksService.createQuickbooksItem({
+      const { createQuickbooksItem } = await import("./services/quickbooksService");
+      const result = await createQuickbooksItem({
         name,
         description,
         categoryType,
@@ -19973,7 +19976,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       if (incomeAccountId !== undefined) updates.incomeAccountId = incomeAccountId;
       if (isActive !== undefined) updates.isActive = isActive;
       
-      const result = await quickbooksService.updateQuickbooksItemMapping(
+      const { updateQuickbooksItemMapping } = await import("./services/quickbooksService");
+      const result = await updateQuickbooksItemMapping(
         req.params.itemId,
         updates
       );
