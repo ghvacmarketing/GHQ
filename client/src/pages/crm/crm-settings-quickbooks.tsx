@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { 
   ArrowLeft, 
   BookOpen, 
@@ -25,16 +26,41 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  Loader2
+  Loader2,
+  Plus,
+  Pencil,
+  Trash2
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
-import type { CrmUser, QuickbooksConnection, QuickbooksSyncLog, QuickbooksClass, QuickbooksCategoryClassMap } from "@shared/schema";
+import type { CrmUser, QuickbooksConnection, QuickbooksSyncLog, QuickbooksClass } from "@shared/schema";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FolderTree, Download, Upload, Save } from "lucide-react";
+import { FolderTree, Download, Upload } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
-const ITEM_CATEGORIES = ["install", "service", "maintenance", "discount"] as const;
+const CLASS_TYPES = ["Service", "Install", "Maintenance", "Discount"] as const;
+const SUB_TYPES = ["Residential", "Commercial", "Crawlspace", "Promotional", "Maintenance"] as const;
+
+type ClassType = typeof CLASS_TYPES[number];
+type SubType = typeof SUB_TYPES[number];
 
 interface ConnectionStatus {
   connected: boolean;
@@ -46,11 +72,25 @@ interface ConnectionStatus {
   };
 }
 
+interface ClassFormData {
+  name: string;
+  classType: ClassType;
+  subType: SubType;
+}
+
 export default function CrmSettingsQuickBooks() {
   usePageTitle("QuickBooks Integration");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [environment, setEnvironment] = useState<"sandbox" | "production">("sandbox");
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [editingClass, setEditingClass] = useState<QuickbooksClass | null>(null);
+  const [deleteConfirmClass, setDeleteConfirmClass] = useState<QuickbooksClass | null>(null);
+  const [formData, setFormData] = useState<ClassFormData>({
+    name: "",
+    classType: "Service",
+    subType: "Residential",
+  });
   
   const searchParams = new URLSearchParams(window.location.search);
   const successParam = searchParams.get("success");
@@ -79,26 +119,6 @@ export default function CrmSettingsQuickBooks() {
     enabled: !!currentUser && status?.connected,
   });
 
-  const { data: categoryMappings, isLoading: mappingsLoading, refetch: refetchMappings } = useQuery<QuickbooksCategoryClassMap[]>({
-    queryKey: ["/api/quickbooks/category-mappings"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
-    enabled: !!currentUser && status?.connected,
-  });
-
-  const [localMappings, setLocalMappings] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    if (categoryMappings) {
-      const mappingsMap: Record<string, string> = {};
-      categoryMappings.forEach((mapping) => {
-        if (mapping.quickbooksClassId) {
-          mappingsMap[mapping.categoryName] = mapping.quickbooksClassId;
-        }
-      });
-      setLocalMappings(mappingsMap);
-    }
-  }, [categoryMappings]);
-
   const connectMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("GET", `/api/quickbooks/connect?environment=${environment}`);
@@ -106,7 +126,6 @@ export default function CrmSettingsQuickBooks() {
       return data.authUrl;
     },
     onSuccess: (authUrl: string) => {
-      // Open in new tab to avoid iframe restrictions from QuickBooks/Intuit
       window.open(authUrl, '_blank');
       toast({
         title: "QuickBooks Login Opened",
@@ -207,22 +226,69 @@ export default function CrmSettingsQuickBooks() {
     },
   });
 
-  const saveMappingsMutation = useMutation({
-    mutationFn: async (mappings: { category: string; quickbooksClassId: string | null }[]) => {
-      const response = await apiRequest("POST", "/api/quickbooks/category-mappings/bulk", { mappings });
+  const createClassMutation = useMutation({
+    mutationFn: async (data: ClassFormData) => {
+      const response = await apiRequest("POST", "/api/quickbooks/classes", data);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/category-mappings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/classes"] });
+      setShowAddDialog(false);
+      setFormData({ name: "", classType: "Service", subType: "Residential" });
       toast({
-        title: "Mappings Saved",
-        description: "Category-to-class mappings saved successfully",
+        title: "Class Created",
+        description: "New class created successfully",
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Save Failed",
-        description: error.message || "Failed to save mappings",
+        title: "Create Failed",
+        description: error.message || "Failed to create class",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateClassMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<ClassFormData & { isActive: boolean }> }) => {
+      const response = await apiRequest("PATCH", `/api/quickbooks/classes/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/classes"] });
+      setEditingClass(null);
+      setFormData({ name: "", classType: "Service", subType: "Residential" });
+      toast({
+        title: "Class Updated",
+        description: "Class updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update class",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteClassMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("PATCH", `/api/quickbooks/classes/${id}`, { isActive: false });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/classes"] });
+      setDeleteConfirmClass(null);
+      toast({
+        title: "Class Deleted",
+        description: "Class has been deactivated",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Delete Failed",
+        description: error.message || "Failed to delete class",
         variant: "destructive",
       });
     },
@@ -258,6 +324,48 @@ export default function CrmSettingsQuickBooks() {
     }
   }, [successParam, errorParam, toast, refetchStatus]);
 
+  const handleOpenAddDialog = () => {
+    setFormData({ name: "", classType: "Service", subType: "Residential" });
+    setShowAddDialog(true);
+  };
+
+  const handleOpenEditDialog = (qbClass: QuickbooksClass) => {
+    setFormData({
+      name: qbClass.name,
+      classType: qbClass.classType as ClassType,
+      subType: qbClass.subType as SubType,
+    });
+    setEditingClass(qbClass);
+  };
+
+  const handleSubmitAdd = () => {
+    if (!formData.name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    createClassMutation.mutate(formData);
+  };
+
+  const handleSubmitEdit = () => {
+    if (!editingClass) return;
+    if (!formData.name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateClassMutation.mutate({
+      id: editingClass.id,
+      data: formData,
+    });
+  };
+
   if (authLoading || statusLoading) {
     return (
       <div className="min-h-screen bg-slate-50 p-6">
@@ -289,6 +397,9 @@ export default function CrmSettingsQuickBooks() {
       </CrmLayout>
     );
   }
+
+  const activeClasses = classes?.filter(c => c.isActive) || [];
+  const inactiveClasses = classes?.filter(c => !c.isActive) || [];
 
   return (
     <CrmLayout currentUser={currentUser}>
@@ -508,30 +619,37 @@ export default function CrmSettingsQuickBooks() {
                   <div className="flex items-center gap-3">
                     <FolderTree className="h-6 w-6 text-blue-600" />
                     <div>
-                      <CardTitle>QuickBooks Classes</CardTitle>
-                      <CardDescription>Manage class tracking for invoices</CardDescription>
+                      <CardTitle>Manage Classes</CardTitle>
+                      <CardDescription>Create and manage QuickBooks classes for invoice tracking</CardDescription>
                     </div>
                   </div>
+                  <Button onClick={handleOpenAddDialog} data-testid="btn-add-class">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Class
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent>
                 {classesLoading ? (
                   <Skeleton className="h-48 w-full" />
-                ) : classes && classes.length > 0 ? (
+                ) : activeClasses.length > 0 ? (
                   <div className="space-y-4">
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Name</TableHead>
                           <TableHead>Type</TableHead>
-                          <TableHead>Status</TableHead>
+                          <TableHead>Sub Type</TableHead>
+                          <TableHead>Sync Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {classes.map((qbClass) => (
+                        {activeClasses.map((qbClass) => (
                           <TableRow key={qbClass.id} data-testid={`class-row-${qbClass.id}`}>
                             <TableCell className="font-medium">{qbClass.name}</TableCell>
-                            <TableCell className="capitalize">{qbClass.classType || "—"}</TableCell>
+                            <TableCell>{qbClass.classType}</TableCell>
+                            <TableCell>{qbClass.subType}</TableCell>
                             <TableCell>
                               {qbClass.quickbooksClassId ? (
                                 <Badge className="bg-green-100 text-green-800" data-testid={`status-synced-${qbClass.id}`}>
@@ -541,14 +659,37 @@ export default function CrmSettingsQuickBooks() {
                               ) : (
                                 <Badge className="bg-amber-100 text-amber-800" data-testid={`status-pending-${qbClass.id}`}>
                                   <Clock className="h-3 w-3 mr-1" />
-                                  Pending
+                                  Not Synced
                                 </Badge>
                               )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleOpenEditDialog(qbClass)}
+                                  data-testid={`btn-edit-class-${qbClass.id}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setDeleteConfirmClass(qbClass)}
+                                  data-testid={`btn-delete-class-${qbClass.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
+                    
+                    <Separator />
+                    
                     <div className="flex gap-3">
                       <Button
                         onClick={() => syncClassesMutation.mutate()}
@@ -560,7 +701,7 @@ export default function CrmSettingsQuickBooks() {
                         ) : (
                           <Upload className="h-4 w-4 mr-2" />
                         )}
-                        Sync to QuickBooks
+                        Push to QuickBooks
                       </Button>
                       <Button
                         variant="outline"
@@ -576,77 +717,38 @@ export default function CrmSettingsQuickBooks() {
                         Pull from QuickBooks
                       </Button>
                     </div>
-                  </div>
-                ) : (
-                  <p className="text-slate-500 text-center py-8">No classes configured</p>
-                )}
-              </CardContent>
-            </Card>
-          )}
 
-          {status?.connected && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <FolderTree className="h-6 w-6 text-purple-600" />
-                  <div>
-                    <CardTitle>Category-Class Mappings</CardTitle>
-                    <CardDescription>Map invoice categories to QuickBooks classes</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {mappingsLoading || classesLoading ? (
-                  <Skeleton className="h-32 w-full" />
-                ) : (
-                  <div className="space-y-4">
-                    <div className="grid gap-4">
-                      {ITEM_CATEGORIES.map((category) => (
-                        <div key={category} className="flex items-center justify-between gap-4">
-                          <Label className="capitalize font-medium min-w-[120px]">{category}</Label>
-                          <Select
-                            value={localMappings[category] || "none"}
-                            onValueChange={(value) => {
-                              setLocalMappings((prev) => ({
-                                ...prev,
-                                [category]: value === "none" ? "" : value,
-                              }));
-                            }}
-                            data-testid={`select-mapping-${category}`}
-                          >
-                            <SelectTrigger className="w-[250px]" data-testid={`trigger-mapping-${category}`}>
-                              <SelectValue placeholder="Select a class" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">No mapping</SelectItem>
-                              {classes?.filter(c => c.isActive).map((qbClass) => (
-                                <SelectItem key={qbClass.id} value={qbClass.id}>
-                                  {qbClass.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                    {inactiveClasses.length > 0 && (
+                      <div className="mt-6">
+                        <h4 className="text-sm font-medium text-slate-500 mb-2">Inactive Classes ({inactiveClasses.length})</h4>
+                        <div className="text-sm text-slate-400">
+                          {inactiveClasses.map(c => c.name).join(", ")}
                         </div>
-                      ))}
-                    </div>
-                    <Button
-                      onClick={() => {
-                        const mappings = ITEM_CATEGORIES.map((category) => ({
-                          category,
-                          quickbooksClassId: localMappings[category] || null,
-                        }));
-                        saveMappingsMutation.mutate(mappings);
-                      }}
-                      disabled={saveMappingsMutation.isPending}
-                      data-testid="btn-save-mappings"
-                    >
-                      {saveMappingsMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Save className="h-4 w-4 mr-2" />
-                      )}
-                      Save Mappings
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-slate-500 mb-4">No classes configured yet</p>
+                    <Button onClick={handleOpenAddDialog} variant="outline" data-testid="btn-add-first-class">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Your First Class
                     </Button>
+                    <div className="mt-4 flex justify-center gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={() => pullClassesMutation.mutate()}
+                        disabled={pullClassesMutation.isPending}
+                        data-testid="btn-pull-classes-empty"
+                      >
+                        {pullClassesMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4 mr-2" />
+                        )}
+                        Pull from QuickBooks
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -661,11 +763,184 @@ export default function CrmSettingsQuickBooks() {
               <p><strong>Customer Sync:</strong> CRM customers are automatically synced to QuickBooks when you click "Sync All Customers" or when syncing individual customers.</p>
               <p><strong>Invoice Sync:</strong> When you send an invoice from the CRM, it can be synced to QuickBooks. Use the sync button on individual invoices.</p>
               <p><strong>Payment Sync:</strong> When an invoice is marked as paid in the CRM, the payment is recorded in QuickBooks.</p>
+              <p><strong>Classes:</strong> Classes help categorize invoices for reporting. Create classes here, then sync them to QuickBooks.</p>
               <p className="text-amber-600"><strong>Note:</strong> For testing, use Sandbox mode first. Switch to Production when you're ready to sync real data.</p>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Class</DialogTitle>
+            <DialogDescription>
+              Create a new QuickBooks class for tracking invoices.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., Service - Residential"
+                data-testid="input-class-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="classType">Class Type</Label>
+              <Select
+                value={formData.classType}
+                onValueChange={(value: ClassType) => setFormData({ ...formData, classType: value })}
+              >
+                <SelectTrigger data-testid="select-class-type">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CLASS_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="subType">Sub Type</Label>
+              <Select
+                value={formData.subType}
+                onValueChange={(value: SubType) => setFormData({ ...formData, subType: value })}
+              >
+                <SelectTrigger data-testid="select-sub-type">
+                  <SelectValue placeholder="Select sub type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SUB_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSubmitAdd} 
+              disabled={createClassMutation.isPending}
+              data-testid="btn-submit-add-class"
+            >
+              {createClassMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Create Class
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingClass} onOpenChange={(open) => !open && setEditingClass(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Class</DialogTitle>
+            <DialogDescription>
+              Update the class details.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Name</Label>
+              <Input
+                id="edit-name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., Service - Residential"
+                data-testid="input-edit-class-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-classType">Class Type</Label>
+              <Select
+                value={formData.classType}
+                onValueChange={(value: ClassType) => setFormData({ ...formData, classType: value })}
+              >
+                <SelectTrigger data-testid="select-edit-class-type">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CLASS_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-subType">Sub Type</Label>
+              <Select
+                value={formData.subType}
+                onValueChange={(value: SubType) => setFormData({ ...formData, subType: value })}
+              >
+                <SelectTrigger data-testid="select-edit-sub-type">
+                  <SelectValue placeholder="Select sub type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SUB_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingClass(null)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSubmitEdit} 
+              disabled={updateClassMutation.isPending}
+              data-testid="btn-submit-edit-class"
+            >
+              {updateClassMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deleteConfirmClass} onOpenChange={(open) => !open && setDeleteConfirmClass(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Class</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deleteConfirmClass?.name}"? This will deactivate the class but it can be restored later if needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteConfirmClass && deleteClassMutation.mutate(deleteConfirmClass.id)}
+              className="bg-red-600 hover:bg-red-700"
+              data-testid="btn-confirm-delete-class"
+            >
+              {deleteClassMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </CrmLayout>
   );
 }

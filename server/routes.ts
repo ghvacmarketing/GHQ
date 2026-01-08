@@ -19376,7 +19376,48 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
-  // PATCH /api/quickbooks/classes/:classId - Update class (name, active status)
+  // POST /api/quickbooks/classes - Create a new class
+  app.post("/api/quickbooks/classes", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { name, classType, subType } = req.body;
+      
+      if (!name || !classType || !subType) {
+        return res.status(400).json({ message: "Name, classType, and subType are required" });
+      }
+      
+      const validClassTypes = ["Service", "Install", "Maintenance", "Discount"];
+      const validSubTypes = ["Residential", "Commercial", "Crawlspace", "Promotional", "Maintenance"];
+      
+      if (!validClassTypes.includes(classType)) {
+        return res.status(400).json({ message: `classType must be one of: ${validClassTypes.join(", ")}` });
+      }
+      
+      if (!validSubTypes.includes(subType)) {
+        return res.status(400).json({ message: `subType must be one of: ${validSubTypes.join(", ")}` });
+      }
+      
+      const [created] = await db.insert(quickbooksClasses)
+        .values({
+          name,
+          classType,
+          subType,
+          isActive: true,
+        })
+        .returning();
+      
+      res.status(201).json(created);
+    } catch (error: any) {
+      console.error("[QuickBooks] Create class error:", error);
+      res.status(500).json({ message: "Failed to create class" });
+    }
+  });
+
+  // PATCH /api/quickbooks/classes/:classId - Update class (name, classType, subType, active status)
   app.patch("/api/quickbooks/classes/:classId", requireCrmAuth, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -19384,10 +19425,24 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(403).json({ message: "Admin access required" });
       }
       
-      const { name, isActive } = req.body;
+      const { name, classType, subType, isActive } = req.body;
       const updateData: any = { updatedAt: new Date() };
       
       if (name !== undefined) updateData.name = name;
+      if (classType !== undefined) {
+        const validClassTypes = ["Service", "Install", "Maintenance", "Discount"];
+        if (!validClassTypes.includes(classType)) {
+          return res.status(400).json({ message: `classType must be one of: ${validClassTypes.join(", ")}` });
+        }
+        updateData.classType = classType;
+      }
+      if (subType !== undefined) {
+        const validSubTypes = ["Residential", "Commercial", "Crawlspace", "Promotional", "Maintenance"];
+        if (!validSubTypes.includes(subType)) {
+          return res.status(400).json({ message: `subType must be one of: ${validSubTypes.join(", ")}` });
+        }
+        updateData.subType = subType;
+      }
       if (isActive !== undefined) updateData.isActive = isActive;
       
       const [updated] = await db.update(quickbooksClasses)

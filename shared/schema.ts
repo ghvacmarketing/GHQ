@@ -871,6 +871,10 @@ export const crmCustomers = pgTable("crm_customers", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Property Type Enum - for QuickBooks class determination
+export const propertyTypeEnum = ["residential", "commercial"] as const;
+export type PropertyType = typeof propertyTypeEnum[number];
+
 // CRM Properties (addresses linked to customers)
 export const crmProperties = pgTable("crm_properties", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -896,6 +900,8 @@ export const crmProperties = pgTable("crm_properties", {
   paymentTerms: text("payment_terms"), // e.g., "net_30", "due_on_receipt", "net_15"
   paymentMethod: text("payment_method"), // e.g., "invoice", "credit_card", "check"
   approvalRule: text("approval_rule"), // e.g., "pm_approval_required", "tenant_direct", "auto_approve"
+  // Property type for QuickBooks class determination (defaults from customer type)
+  propertyType: text("property_type").$type<PropertyType>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1182,6 +1188,8 @@ export const crmQuoteLineItems = pgTable("crm_quote_line_items", {
   discountKind: text("discount_kind").$type<DiscountKind>(),
   optionTag: text("option_tag"),
   imageUrl: text("image_url"),
+  // QuickBooks class override - if null, calculated from item category + property type
+  quickbooksClassId: varchar("quickbooks_class_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1268,6 +1276,8 @@ export const crmInvoiceLineItems = pgTable("crm_invoice_line_items", {
   itemId: varchar("item_id").references(() => crmItems.id, { onDelete: "set null" }),
   isDiscountLine: boolean("is_discount_line").default(false),
   discountKind: text("discount_kind").$type<DiscountKind>(),
+  // QuickBooks class override - if null, calculated from item category + property type
+  quickbooksClassId: varchar("quickbooks_class_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
