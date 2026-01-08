@@ -190,6 +190,24 @@ export default function MobileMessages() {
     );
   }
 
+  // Find selected conversation from list for header display
+  const selectedConversation = conversations?.find(c => c.id === selectedConversationId);
+  
+  // Get display name and phone from best available source
+  const getDisplayName = () => {
+    return conversationDetail?.customer?.name 
+      || conversationDetail?.conversation?.customerName 
+      || selectedConversation?.customerName 
+      || "Unknown Contact";
+  };
+  
+  const getDisplayPhone = () => {
+    return conversationDetail?.customer?.phone 
+      || conversationDetail?.conversation?.phoneNumber 
+      || selectedConversation?.phoneNumber 
+      || "";
+  };
+
   if (selectedConversationId) {
     return (
       <MobileShell>
@@ -205,10 +223,10 @@ export default function MobileMessages() {
             </Button>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-slate-800 truncate">
-                {conversationDetail?.customer?.name || conversationDetail?.conversation?.customerName || "Unknown"}
+                {getDisplayName()}
               </p>
               <p className="text-sm text-slate-500 truncate">
-                {conversationDetail?.customer?.phone || conversationDetail?.conversation?.phoneNumber || "No phone"}
+                {getDisplayPhone()}
               </p>
             </div>
           </div>
