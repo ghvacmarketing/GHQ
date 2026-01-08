@@ -441,13 +441,24 @@ class TextlineClient {
     }
 
     try {
-      const response = await fetch(
-        `${TEXTLINE_BASE_URL}/api/conversations/${conversationUuid}.json`,
-        {
-          method: "GET",
-          headers: this.getHeaders(),
-        }
-      );
+      const url = `${TEXTLINE_BASE_URL}/api/conversations/${conversationUuid}.json`;
+      console.log("[Textline] Fetching messages from:", url);
+      
+      const response = await fetch(url, {
+        method: "GET",
+        headers: this.getHeaders(),
+      });
+
+      // Check content type before parsing
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("[Textline] Non-JSON response:", response.status, text.substring(0, 200));
+        return {
+          messages: [],
+          error: `API returned non-JSON response (${response.status}): ${text.substring(0, 100)}`,
+        };
+      }
 
       const data = await response.json();
 
@@ -461,6 +472,7 @@ class TextlineClient {
 
       // Textline returns "posts" array within the conversation
       const posts = data.conversation?.posts || data.posts || [];
+      console.log("[Textline] Fetched", posts.length, "messages for conversation", conversationUuid);
       
       const mappedMessages: TextlineMessage[] = posts.map((post: any) => ({
         uuid: post.uuid,
