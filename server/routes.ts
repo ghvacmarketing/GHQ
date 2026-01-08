@@ -19881,6 +19881,114 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // =============================================
+  // QUICKBOOKS ITEMS (Products & Services)
+  // =============================================
+
+  // GET /api/quickbooks/items - Get all items
+  app.get("/api/quickbooks/items", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const items = await quickbooksService.getQuickbooksItems();
+      res.json(items);
+    } catch (error: any) {
+      console.error("[QuickBooks] Get items error:", error);
+      res.status(500).json({ message: "Failed to get items" });
+    }
+  });
+
+  // POST /api/quickbooks/items/pull - Pull items from QuickBooks
+  app.post("/api/quickbooks/items/pull", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const result = await quickbooksService.pullItemsFromQuickBooks();
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error: any) {
+      console.error("[QuickBooks] Pull items error:", error);
+      res.status(500).json({ message: "Failed to pull items" });
+    }
+  });
+
+  // POST /api/quickbooks/items - Create an item
+  app.post("/api/quickbooks/items", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { name, description, categoryType, propertyType, incomeAccountId, itemType } = req.body;
+      
+      if (!name || !categoryType || !propertyType) {
+        return res.status(400).json({ 
+          message: "name, categoryType, and propertyType are required" 
+        });
+      }
+      
+      const result = await quickbooksService.createQuickbooksItem({
+        name,
+        description,
+        categoryType,
+        propertyType,
+        incomeAccountId,
+        itemType: itemType || "Service"
+      });
+      
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error: any) {
+      console.error("[QuickBooks] Create item error:", error);
+      res.status(500).json({ message: "Failed to create item" });
+    }
+  });
+
+  // PATCH /api/quickbooks/items/:itemId - Update item mapping
+  app.patch("/api/quickbooks/items/:itemId", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { categoryType, propertyType, incomeAccountId, isActive } = req.body;
+      const updates: any = {};
+      
+      if (categoryType !== undefined) updates.categoryType = categoryType;
+      if (propertyType !== undefined) updates.propertyType = propertyType;
+      if (incomeAccountId !== undefined) updates.incomeAccountId = incomeAccountId;
+      if (isActive !== undefined) updates.isActive = isActive;
+      
+      const result = await quickbooksService.updateQuickbooksItemMapping(
+        req.params.itemId,
+        updates
+      );
+      
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error: any) {
+      console.error("[QuickBooks] Update item error:", error);
+      res.status(500).json({ message: "Failed to update item" });
+    }
+  });
+
   // POST /api/admin/portal/generate-link/:customerId - Generate portal login link for a customer
   app.post("/api/admin/portal/generate-link/:customerId", requireCrmAuth, async (req, res) => {
     try {

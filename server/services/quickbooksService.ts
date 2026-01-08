@@ -2407,3 +2407,236 @@ export async function buildAccountLookup(realmId: string): Promise<Map<string, s
   
   return lookup;
 }
+
+// =============================================
+// QUICKBOOKS ITEMS (PRODUCTS & SERVICES)
+// =============================================
+
+import { quickbooksItems, type QuickbooksItem, type InsertQuickbooksItem } from "@shared/schema";
+
+/**
+ * Get all QuickBooks items for a realm
+ */
+export async function getQuickbooksItems(realmId?: string): Promise<QuickbooksItem[]> {
+  if (realmId) {
+    return db.select()
+      .from(quickbooksItems)
+      .where(eq(quickbooksItems.realmId, realmId));
+  }
+  return db.select().from(quickbooksItems);
+}
+
+/**
+ * Get a QuickBooks item by category and property type
+ */
+export async function getQuickbooksItemByMapping(
+  categoryType: string,
+  propertyType: string,
+  realmId: string
+): Promise<QuickbooksItem | null> {
+  const [item] = await db.select()
+    .from(quickbooksItems)
+    .where(and(
+      eq(quickbooksItems.categoryType, categoryType as any),
+      eq(quickbooksItems.propertyType, propertyType as any),
+      eq(quickbooksItems.realmId, realmId),
+      eq(quickbooksItems.isActive, true)
+    ))
+    .limit(1);
+  return item || null;
+}
+
+/**
+ * Create a QuickBooks item in CRM and push to QuickBooks
+ */
+export async function createQuickbooksItem(
+  data: InsertQuickbooksItem
+): Promise<{ success: boolean; item?: QuickbooksItem; error?: string }> {
+  try {
+    const conn = await getActiveConnection();
+    if (!conn) {
+      return { success: false, error: "No active QuickBooks connection" };
+    }
+    
+    // Get the linked income account for IncomeAccountRef
+    let incomeAccountRef: { value: string; name?: string } | null = null;
+    if (data.incomeAccountId) {
+      const [account] = await db.select()
+        .from(quickbooksAccounts)
+        .where(eq(quickbooksAccounts.id, data.incomeAccountId))
+        .limit(1);
+      if (account?.quickbooksAccountId) {
+        incomeAccountRef = { 
+          value: account.quickbooksAccountId,
+          name: account.fullyQualifiedName || account.name
+        };
+      }
+    }
+    
+    const qbo = getQuickBooksClient(conn);
+    
+    // Create the item in QuickBooks
+    const qbItem = {
+      Name: data.name,
+      Description: data.description || "",
+      Type: data.itemType || "Service",
+      ...(incomeAccountRef && { IncomeAccountRef: incomeAccountRef })
+    };
+    
+    return new Promise((resolve) => {
+      // @ts-ignore - createItem exists in node-quickbooks but not in the type definitions
+      qbo.createItem(qbItem, async (err: any, item: any) => {
+        if (err) {
+          console.error("[QuickBooks] Error creating item:", err);
+          resolve({ success: false, error: err.message || "Failed to create item" });
+          return;
+        }
+        
+        // Save to CRM database
+        const [inserted] = await db.insert(quickbooksItems).values({
+          ...data,
+          quickbooksItemId: item.Id,
+          quickbooksIncomeAccountId: incomeAccountRef?.value || null,
+          realmId: conn.realmId,
+          syncToken: item.SyncToken,
+          lastSyncedAt: new Date()
+        }).returning();
+        
+        console.log(`[QuickBooks] Created item: ${item.Name} (QB ID: ${item.Id})`);
+        resolve({ success: true, item: inserted });
+      });
+    });
+  } catch (error: any) {
+    console.error("[QuickBooks] Create item error:", error);
+    return { success: false, error: error.message || "Create failed" };
+  }
+}
+
+/**
+ * Pull existing items from QuickBooks
+ */
+export async function pullItemsFromQuickBooks(): Promise<{ 
+  success: boolean; 
+  imported: number; 
+  error?: string 
+}> {
+  try {
+    const conn = await getActiveConnection();
+    if (!conn) {
+      return { success: false, imported: 0, error: "No active QuickBooks connection" };
+    }
+    
+    const qbo = getQuickBooksClient(conn);
+    
+    return new Promise((resolve) => {
+      // Query all Service and NonInventory items
+      // @ts-ignore - findItems exists in node-quickbooks but not in the type definitions
+      qbo.findItems({ Type: "Service" }, async (err: any, items: any) => {
+        if (err) {
+          console.error("[QuickBooks] Error fetching items:", err);
+          resolve({ success: false, imported: 0, error: err.message || "Failed to fetch items" });
+          return;
+        }
+        
+        const itemList = items?.QueryResponse?.Item || [];
+        console.log(`[QuickBooks] Found ${itemList.length} service items`);
+        
+        let imported = 0;
+        
+        for (const item of itemList) {
+          try {
+            // Check if item already exists
+            const [existing] = await db.select()
+              .from(quickbooksItems)
+              .where(and(
+                eq(quickbooksItems.quickbooksItemId, item.Id),
+                eq(quickbooksItems.realmId, conn.realmId)
+              ))
+              .limit(1);
+            
+            if (existing) {
+              // Update existing item
+              await db.update(quickbooksItems)
+                .set({
+                  name: item.Name,
+                  description: item.Description,
+                  syncToken: item.SyncToken,
+                  quickbooksIncomeAccountId: item.IncomeAccountRef?.value || null,
+                  isActive: item.Active !== false,
+                  unitPrice: item.UnitPrice?.toString(),
+                  lastSyncedAt: new Date(),
+                  updatedAt: new Date()
+                })
+                .where(eq(quickbooksItems.id, existing.id));
+            } else {
+              // Insert new item (with default category/property types that admin can update)
+              await db.insert(quickbooksItems).values({
+                name: item.Name,
+                description: item.Description,
+                categoryType: "Service", // Default - admin can update
+                propertyType: "Residential", // Default - admin can update
+                quickbooksItemId: item.Id,
+                quickbooksIncomeAccountId: item.IncomeAccountRef?.value || null,
+                realmId: conn.realmId,
+                syncToken: item.SyncToken,
+                itemType: item.Type,
+                isActive: item.Active !== false,
+                unitPrice: item.UnitPrice?.toString(),
+                lastSyncedAt: new Date()
+              });
+              imported++;
+            }
+          } catch (insertErr) {
+            console.error(`[QuickBooks] Error saving item ${item.Name}:`, insertErr);
+          }
+        }
+        
+        console.log(`[QuickBooks] Imported ${imported} new items`);
+        resolve({ success: true, imported });
+      });
+    });
+  } catch (error: any) {
+    console.error("[QuickBooks] Pull items error:", error);
+    return { success: false, imported: 0, error: error.message || "Pull failed" };
+  }
+}
+
+/**
+ * Update a QuickBooks item's mapping in CRM
+ */
+export async function updateQuickbooksItemMapping(
+  itemId: string,
+  updates: Partial<InsertQuickbooksItem>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await db.update(quickbooksItems)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(quickbooksItems.id, itemId));
+    return { success: true };
+  } catch (error: any) {
+    console.error("[QuickBooks] Update item error:", error);
+    return { success: false, error: error.message || "Update failed" };
+  }
+}
+
+/**
+ * Build item lookup map for invoice sync: categoryType:propertyType -> quickbooksItemId
+ */
+export async function buildItemLookup(realmId: string): Promise<Map<string, string>> {
+  const items = await db.select()
+    .from(quickbooksItems)
+    .where(and(
+      eq(quickbooksItems.realmId, realmId),
+      eq(quickbooksItems.isActive, true)
+    ));
+  
+  const lookup = new Map<string, string>();
+  for (const item of items) {
+    if (item.categoryType && item.propertyType && item.quickbooksItemId) {
+      const key = `${item.categoryType}:${item.propertyType}`;
+      lookup.set(key, item.quickbooksItemId);
+    }
+  }
+  
+  return lookup;
+}

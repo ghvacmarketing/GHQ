@@ -2723,3 +2723,37 @@ export const insertQuickbooksAccountSchema = createInsertSchema(quickbooksAccoun
 
 export type InsertQuickbooksAccount = z.infer<typeof insertQuickbooksAccountSchema>;
 export type QuickbooksAccount = typeof quickbooksAccounts.$inferSelect;
+
+// QuickBooks Items (Products & Services) - maps to QuickBooks Items for invoice line items
+// Each item is linked to an income account for proper P&L routing
+export const quickbooksItems = pgTable("quickbooks_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 255 }).notNull(), // e.g., "HVAC Service - Residential"
+  description: text("description"), // Item description for invoice lines
+  // Category mapping - which CRM item category this item handles
+  categoryType: text("category_type").$type<"Service" | "Install" | "Maintenance" | "Discount">().notNull(),
+  // Property type mapping - which property type this item handles  
+  propertyType: text("property_type").$type<"Residential" | "Commercial">().notNull(),
+  // Linked income account in CRM (references quickbooksAccounts)
+  incomeAccountId: varchar("income_account_id").references(() => quickbooksAccounts.id),
+  // QuickBooks Item data
+  quickbooksItemId: varchar("quickbooks_item_id"), // QuickBooks Item.Id
+  quickbooksIncomeAccountId: varchar("quickbooks_income_account_id"), // QuickBooks Account.Id for IncomeAccountRef
+  realmId: varchar("realm_id"), // QuickBooks company ID
+  syncToken: varchar("sync_token"), // Required for QuickBooks updates
+  itemType: text("item_type").$type<"Service" | "NonInventory" | "Inventory">().default("Service"),
+  isActive: boolean("is_active").default(true),
+  unitPrice: varchar("unit_price"), // Default unit price
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuickbooksItemSchema = createInsertSchema(quickbooksItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertQuickbooksItem = z.infer<typeof insertQuickbooksItemSchema>;
+export type QuickbooksItem = typeof quickbooksItems.$inferSelect;
