@@ -48,6 +48,14 @@ Preferred communication style: Simple, everyday language.
     -   **Work Order Status**: Automatic SMS when technician status changes to "En Route" or "On Site"
     -   All notifications are recorded in the conversation history for CRM visibility
 -   **Time Tracking System**: Technicians clock in/out from mobile app (`/mobile/time`). Entries stored in `crm_time_entries` table with tech ID, timestamps, optional work order link, and notes. Admins view/edit all entries via CRM Settings > Time Logs (`/crm/settings/time-logs`) with filters, CSV export, and adjustment capabilities.
+-   **QuickBooks Online Integration**: Full bidirectional OAuth 2.0 sync with sandbox/production modes. Syncs customers, invoices, and payments. **QuickBooks Classes** for item categorization with 9 predefined classes:
+    -   Service - Residential, Service - Commercial
+    -   Install - Residential, Install - Commercial, Install - Crawlspace
+    -   Maintenance - Residential, Maintenance - Commercial
+    -   Discount - Promotional, Discount - Maintenance
+    -   Admin can map CRM item categories (install, service, maintenance, discount) to QuickBooks Classes via Settings UI
+    -   Invoice line items automatically include ClassRef when syncing to QuickBooks based on category mappings
+    -   Two-way sync: Pull classes from QuickBooks or push local classes to QuickBooks
 
 ## External Dependencies
 -   **Google Sheets API**: Parts pricing, application settings, customer data sync.

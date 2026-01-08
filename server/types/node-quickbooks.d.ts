@@ -32,6 +32,12 @@ declare module "node-quickbooks" {
     findPayments(query: any, callback: (err: any, result: any) => void): void;
     
     getCompanyInfo(id: string, callback: (err: any, result: any) => void): void;
+    
+    // Class methods for categorization
+    createClass(classObj: any, callback: (err: any, result: any) => void): void;
+    updateClass(classObj: any, callback: (err: any, result: any) => void): void;
+    getClass(id: string, callback: (err: any, result: any) => void): void;
+    findClasses(query: any, callback: (err: any, result: any) => void): void;
   }
   
   export = QuickBooks;

@@ -6,14 +6,19 @@ import {
   quickbooksInvoiceSync,
   quickbooksPaymentSync,
   quickbooksSyncLog,
+  quickbooksClasses,
+  quickbooksCategoryClassMap,
   crmCustomers,
   crmInvoices,
   crmInvoiceLineItems,
+  crmItems,
   type QuickbooksConnection,
+  type QuickbooksClass,
+  type QuickbooksCategoryClassMap,
   type CrmCustomer,
   type CrmInvoice
 } from "@shared/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, inArray } from "drizzle-orm";
 
 const QUICKBOOKS_CLIENT_ID = process.env.QUICKBOOKS_CLIENT_ID || "";
 const QUICKBOOKS_CLIENT_SECRET = process.env.QUICKBOOKS_CLIENT_SECRET || "";
@@ -473,10 +478,87 @@ export async function syncInvoiceToQuickBooks(
     
     const qbo = getQuickBooksClient(conn);
     
-    // Fetch line items from separate table
+    // Fetch line items from separate table with their item details for category lookup
     const lineItems = await db.select()
       .from(crmInvoiceLineItems)
       .where(eq(crmInvoiceLineItems.invoiceId, invoiceId));
+    
+    // Prefetch all category mappings and items for efficiency (avoid N+1 queries)
+    const itemIds = lineItems.map(li => li.itemId).filter((id): id is string => !!id);
+    const itemsById = new Map<string, typeof crmItems.$inferSelect>();
+    if (itemIds.length > 0) {
+      const items = await db.select().from(crmItems).where(inArray(crmItems.id, itemIds));
+      items.forEach(item => itemsById.set(item.id, item));
+    }
+    
+    // Prefetch category-class mappings for this realm
+    const mappings = await db.select({
+      categoryName: quickbooksCategoryClassMap.categoryName,
+      classId: quickbooksCategoryClassMap.quickbooksClassId
+    })
+      .from(quickbooksCategoryClassMap)
+      .where(eq(quickbooksCategoryClassMap.realmId, conn.realmId));
+    
+    // Build a map of category -> quickbooksClassId for quick lookup
+    const categoryToClassId = new Map<string, string>();
+    for (const mapping of mappings) {
+      if (mapping.classId) {
+        categoryToClassId.set(mapping.categoryName, mapping.classId);
+      }
+    }
+    
+    // Prefetch class data to get QuickBooks class IDs
+    const classIds = Array.from(new Set(mappings.map(m => m.classId).filter((id): id is string => !!id)));
+    const classIdToQbId = new Map<string, string>();
+    if (classIds.length > 0) {
+      const classes = await db.select({ id: quickbooksClasses.id, qbId: quickbooksClasses.quickbooksClassId })
+        .from(quickbooksClasses)
+        .where(inArray(quickbooksClasses.id, classIds));
+      classes.forEach(cls => {
+        if (cls.qbId) classIdToQbId.set(cls.id, cls.qbId);
+      });
+    }
+    
+    // Build line items with ClassRef based on cached category mappings
+    const qbLineItems: any[] = [];
+    for (const item of lineItems) {
+      const lineItem: any = {
+        Amount: parseFloat(item.lineTotal || "0"),
+        DetailType: "SalesItemLineDetail",
+        Description: item.description || `Line item`,
+        SalesItemLineDetail: {
+          Qty: parseFloat(item.quantity || "1"),
+          UnitPrice: parseFloat(item.unitPrice || "0"),
+        }
+      };
+      
+      // Try to get ClassRef from category mapping using cached data
+      if (item.itemId) {
+        const crmItem = itemsById.get(item.itemId);
+        if (crmItem?.category) {
+          const localClassId = categoryToClassId.get(crmItem.category);
+          if (localClassId) {
+            const qbClassId = classIdToQbId.get(localClassId);
+            if (qbClassId) {
+              lineItem.SalesItemLineDetail.ClassRef = { value: qbClassId };
+            }
+          }
+        }
+      }
+      
+      // Fallback for discount lines
+      if (item.isDiscountLine && !lineItem.SalesItemLineDetail.ClassRef) {
+        const localClassId = categoryToClassId.get("discount");
+        if (localClassId) {
+          const qbClassId = classIdToQbId.get(localClassId);
+          if (qbClassId) {
+            lineItem.SalesItemLineDetail.ClassRef = { value: qbClassId };
+          }
+        }
+      }
+      
+      qbLineItems.push(lineItem);
+    }
     
     // Build QuickBooks invoice
     const qbInvoice: any = {
@@ -484,15 +566,7 @@ export async function syncInvoiceToQuickBooks(
       DocNumber: invoice.invoiceNumber,
       TxnDate: invoice.createdAt ? new Date(invoice.createdAt).toISOString().split('T')[0] : undefined,
       DueDate: invoice.dueDate ? new Date(invoice.dueDate).toISOString().split('T')[0] : undefined,
-      Line: lineItems.map((item, index) => ({
-        Amount: parseFloat(item.lineTotal || "0"),
-        DetailType: "SalesItemLineDetail",
-        Description: item.description || `Line item ${index + 1}`,
-        SalesItemLineDetail: {
-          Qty: parseFloat(item.quantity || "1"),
-          UnitPrice: parseFloat(item.unitPrice || "0"),
-        }
-      }))
+      Line: qbLineItems
     };
     
     // Add a service line if no line items
@@ -747,4 +821,337 @@ export async function getSyncLogs(limit: number = 20): Promise<any[]> {
     .limit(limit);
   
   return logs;
+}
+
+// =============================================
+// CLASS SYNC
+// =============================================
+
+export async function getLocalClasses(): Promise<QuickbooksClass[]> {
+  return db.select().from(quickbooksClasses).where(eq(quickbooksClasses.isActive, true));
+}
+
+export async function getAllLocalClasses(): Promise<QuickbooksClass[]> {
+  return db.select().from(quickbooksClasses);
+}
+
+export async function pullClassesFromQuickBooks(
+  connection?: QuickbooksConnection
+): Promise<{ success: boolean; classesImported: number; error?: string }> {
+  try {
+    const conn = connection || await getActiveConnection();
+    if (!conn) {
+      return { success: false, classesImported: 0, error: "No active QuickBooks connection" };
+    }
+    
+    const qbo = getQuickBooksClient(conn);
+    
+    return new Promise((resolve) => {
+      qbo.findClasses({}, async (err: any, result: any) => {
+        if (err) {
+          console.error("[QuickBooks] Error fetching classes:", err);
+          resolve({ success: false, classesImported: 0, error: err.message || "Failed to fetch classes" });
+          return;
+        }
+        
+        const qbClasses = result?.QueryResponse?.Class || [];
+        let imported = 0;
+        
+        for (const qbClass of qbClasses) {
+          const existing = await db.select()
+            .from(quickbooksClasses)
+            .where(and(
+              eq(quickbooksClasses.quickbooksClassId, qbClass.Id),
+              eq(quickbooksClasses.realmId, conn.realmId)
+            ))
+            .limit(1);
+          
+          if (existing.length > 0) {
+            await db.update(quickbooksClasses)
+              .set({
+                name: qbClass.Name || qbClass.FullyQualifiedName,
+                syncToken: qbClass.SyncToken,
+                isActive: qbClass.Active !== false,
+                lastSyncedAt: new Date(),
+                updatedAt: new Date()
+              })
+              .where(eq(quickbooksClasses.id, existing[0].id));
+          } else {
+            const classType = parseClassType(qbClass.Name);
+            const subType = parseSubType(qbClass.Name);
+            
+            await db.insert(quickbooksClasses)
+              .values({
+                name: qbClass.Name || qbClass.FullyQualifiedName,
+                classType,
+                subType,
+                quickbooksClassId: qbClass.Id,
+                realmId: conn.realmId,
+                syncToken: qbClass.SyncToken,
+                isActive: qbClass.Active !== false,
+                lastSyncedAt: new Date()
+              });
+            imported++;
+          }
+        }
+        
+        console.log(`[QuickBooks] Pulled ${qbClasses.length} classes, imported ${imported} new`);
+        resolve({ success: true, classesImported: imported });
+      });
+    });
+  } catch (error: any) {
+    console.error("[QuickBooks] Pull classes error:", error);
+    return { success: false, classesImported: 0, error: error.message || "Pull failed" };
+  }
+}
+
+function parseClassType(name: string): "Service" | "Install" | "Maintenance" | "Discount" {
+  const lower = name.toLowerCase();
+  if (lower.includes("service")) return "Service";
+  if (lower.includes("install")) return "Install";
+  if (lower.includes("maintenance")) return "Maintenance";
+  if (lower.includes("discount")) return "Discount";
+  return "Service";
+}
+
+function parseSubType(name: string): "Residential" | "Commercial" | "Crawlspace" | "Promotional" | "Maintenance" {
+  const lower = name.toLowerCase();
+  if (lower.includes("residential")) return "Residential";
+  if (lower.includes("commercial")) return "Commercial";
+  if (lower.includes("crawlspace")) return "Crawlspace";
+  if (lower.includes("promotional")) return "Promotional";
+  if (lower.includes("maintenance") && lower.includes("discount")) return "Maintenance";
+  return "Residential";
+}
+
+export async function pushClassToQuickBooks(
+  classId: string,
+  connection?: QuickbooksConnection
+): Promise<{ success: boolean; quickbooksId?: string; error?: string }> {
+  try {
+    const conn = connection || await getActiveConnection();
+    if (!conn) {
+      return { success: false, error: "No active QuickBooks connection" };
+    }
+    
+    const [localClass] = await db.select()
+      .from(quickbooksClasses)
+      .where(eq(quickbooksClasses.id, classId))
+      .limit(1);
+    
+    if (!localClass) {
+      return { success: false, error: "Class not found" };
+    }
+    
+    const qbo = getQuickBooksClient(conn);
+    
+    const qbClass: any = {
+      Name: localClass.name,
+      Active: localClass.isActive
+    };
+    
+    return new Promise((resolve) => {
+      if (localClass.quickbooksClassId) {
+        qbClass.Id = localClass.quickbooksClassId;
+        qbClass.sparse = true;
+        
+        qbo.getClass(localClass.quickbooksClassId, async (err: any, existing: any) => {
+          if (err) {
+            console.error("[QuickBooks] Error fetching class:", err);
+            resolve({ success: false, error: err.message || "Failed to fetch class" });
+            return;
+          }
+          
+          qbClass.SyncToken = existing.SyncToken;
+          
+          qbo.updateClass(qbClass, async (updateErr: any, updated: any) => {
+            if (updateErr) {
+              console.error("[QuickBooks] Error updating class:", updateErr);
+              resolve({ success: false, error: updateErr.message || "Failed to update class" });
+              return;
+            }
+            
+            await db.update(quickbooksClasses)
+              .set({
+                syncToken: updated.SyncToken,
+                lastSyncedAt: new Date(),
+                updatedAt: new Date()
+              })
+              .where(eq(quickbooksClasses.id, classId));
+            
+            console.log(`[QuickBooks] Updated class ${localClass.name} (QB ID: ${updated.Id})`);
+            resolve({ success: true, quickbooksId: updated.Id });
+          });
+        });
+      } else {
+        qbo.createClass(qbClass, async (err: any, created: any) => {
+          if (err) {
+            console.error("[QuickBooks] Error creating class:", err);
+            resolve({ success: false, error: err.message || "Failed to create class" });
+            return;
+          }
+          
+          await db.update(quickbooksClasses)
+            .set({
+              quickbooksClassId: created.Id,
+              realmId: conn.realmId,
+              syncToken: created.SyncToken,
+              lastSyncedAt: new Date(),
+              updatedAt: new Date()
+            })
+            .where(eq(quickbooksClasses.id, classId));
+          
+          console.log(`[QuickBooks] Created class ${localClass.name} (QB ID: ${created.Id})`);
+          resolve({ success: true, quickbooksId: created.Id });
+        });
+      }
+    });
+  } catch (error: any) {
+    console.error("[QuickBooks] Push class error:", error);
+    return { success: false, error: error.message || "Push failed" };
+  }
+}
+
+export async function syncAllClassesToQuickBooks(
+  connection?: QuickbooksConnection
+): Promise<{ success: boolean; synced: number; errors: number; error?: string }> {
+  try {
+    const conn = connection || await getActiveConnection();
+    if (!conn) {
+      return { success: false, synced: 0, errors: 0, error: "No active QuickBooks connection" };
+    }
+    
+    const classes = await db.select()
+      .from(quickbooksClasses)
+      .where(eq(quickbooksClasses.isActive, true));
+    
+    let synced = 0;
+    let errors = 0;
+    
+    for (const cls of classes) {
+      const result = await pushClassToQuickBooks(cls.id, conn);
+      if (result.success) {
+        synced++;
+      } else {
+        errors++;
+      }
+    }
+    
+    console.log(`[QuickBooks] Synced ${synced} classes, ${errors} errors`);
+    return { success: errors === 0, synced, errors };
+  } catch (error: any) {
+    console.error("[QuickBooks] Sync all classes error:", error);
+    return { success: false, synced: 0, errors: 0, error: error.message || "Sync failed" };
+  }
+}
+
+// =============================================
+// CATEGORY-CLASS MAPPING
+// =============================================
+
+export async function getCategoryClassMappings(realmId?: string): Promise<QuickbooksCategoryClassMap[]> {
+  const conn = await getActiveConnection();
+  const realm = realmId || conn?.realmId;
+  
+  if (!realm) {
+    return [];
+  }
+  
+  return db.select()
+    .from(quickbooksCategoryClassMap)
+    .where(eq(quickbooksCategoryClassMap.realmId, realm));
+}
+
+export async function saveCategoryClassMapping(
+  categoryName: string,
+  classId: string | null,
+  realmId?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const conn = await getActiveConnection();
+    const realm = realmId || conn?.realmId;
+    
+    if (!realm) {
+      return { success: false, error: "No active QuickBooks connection" };
+    }
+    
+    const existing = await db.select()
+      .from(quickbooksCategoryClassMap)
+      .where(and(
+        eq(quickbooksCategoryClassMap.categoryName, categoryName),
+        eq(quickbooksCategoryClassMap.realmId, realm)
+      ))
+      .limit(1);
+    
+    if (existing.length > 0) {
+      if (classId === null) {
+        await db.delete(quickbooksCategoryClassMap)
+          .where(eq(quickbooksCategoryClassMap.id, existing[0].id));
+      } else {
+        await db.update(quickbooksCategoryClassMap)
+          .set({
+            quickbooksClassId: classId,
+            updatedAt: new Date()
+          })
+          .where(eq(quickbooksCategoryClassMap.id, existing[0].id));
+      }
+    } else if (classId !== null) {
+      await db.insert(quickbooksCategoryClassMap)
+        .values({
+          categoryName,
+          quickbooksClassId: classId,
+          realmId: realm
+        });
+    }
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error("[QuickBooks] Save category mapping error:", error);
+    return { success: false, error: error.message || "Save failed" };
+  }
+}
+
+export async function getClassForCategory(categoryName: string, realmId?: string): Promise<QuickbooksClass | null> {
+  const conn = await getActiveConnection();
+  const realm = realmId || conn?.realmId;
+  
+  if (!realm) {
+    return null;
+  }
+  
+  const [mapping] = await db.select()
+    .from(quickbooksCategoryClassMap)
+    .where(and(
+      eq(quickbooksCategoryClassMap.categoryName, categoryName),
+      eq(quickbooksCategoryClassMap.realmId, realm)
+    ))
+    .limit(1);
+  
+  if (!mapping || !mapping.quickbooksClassId) {
+    const [defaultMapping] = await db.select()
+      .from(quickbooksCategoryClassMap)
+      .where(and(
+        eq(quickbooksCategoryClassMap.isDefault, true),
+        eq(quickbooksCategoryClassMap.realmId, realm)
+      ))
+      .limit(1);
+    
+    if (!defaultMapping || !defaultMapping.quickbooksClassId) {
+      return null;
+    }
+    
+    const [defaultClass] = await db.select()
+      .from(quickbooksClasses)
+      .where(eq(quickbooksClasses.id, defaultMapping.quickbooksClassId))
+      .limit(1);
+    
+    return defaultClass || null;
+  }
+  
+  const [cls] = await db.select()
+    .from(quickbooksClasses)
+    .where(eq(quickbooksClasses.id, mapping.quickbooksClassId))
+    .limit(1);
+  
+  return cls || null;
 }

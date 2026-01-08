@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
@@ -19291,6 +19291,209 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error: any) {
       console.error("[QuickBooks] Sync logs error:", error);
       res.status(500).json({ message: "Failed to get sync logs" });
+    }
+  });
+
+  // =============================================
+  // QUICKBOOKS CLASS MANAGEMENT
+  // =============================================
+
+  // GET /api/quickbooks/classes - Get all classes
+  app.get("/api/quickbooks/classes", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { getAllLocalClasses } = await import("./services/quickbooksService");
+      const classes = await getAllLocalClasses();
+      res.json(classes);
+    } catch (error: any) {
+      console.error("[QuickBooks] Get classes error:", error);
+      res.status(500).json({ message: "Failed to get classes" });
+    }
+  });
+
+  // POST /api/quickbooks/classes/pull - Pull classes from QuickBooks
+  app.post("/api/quickbooks/classes/pull", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { pullClassesFromQuickBooks } = await import("./services/quickbooksService");
+      const result = await pullClassesFromQuickBooks();
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Pull classes error:", error);
+      res.status(500).json({ message: "Failed to pull classes" });
+    }
+  });
+
+  // POST /api/quickbooks/classes/sync - Sync all classes to QuickBooks
+  app.post("/api/quickbooks/classes/sync", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { syncAllClassesToQuickBooks } = await import("./services/quickbooksService");
+      const result = await syncAllClassesToQuickBooks();
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Sync classes error:", error);
+      res.status(500).json({ message: "Failed to sync classes" });
+    }
+  });
+
+  // POST /api/quickbooks/classes/:classId/sync - Sync single class to QuickBooks
+  app.post("/api/quickbooks/classes/:classId/sync", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { pushClassToQuickBooks } = await import("./services/quickbooksService");
+      const result = await pushClassToQuickBooks(req.params.classId);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Sync class error:", error);
+      res.status(500).json({ message: "Failed to sync class" });
+    }
+  });
+
+  // PATCH /api/quickbooks/classes/:classId - Update class (name, active status)
+  app.patch("/api/quickbooks/classes/:classId", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { name, isActive } = req.body;
+      const updateData: any = { updatedAt: new Date() };
+      
+      if (name !== undefined) updateData.name = name;
+      if (isActive !== undefined) updateData.isActive = isActive;
+      
+      const [updated] = await db.update(quickbooksClasses)
+        .set(updateData)
+        .where(eq(quickbooksClasses.id, req.params.classId))
+        .returning();
+      
+      if (!updated) {
+        return res.status(404).json({ message: "Class not found" });
+      }
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[QuickBooks] Update class error:", error);
+      res.status(500).json({ message: "Failed to update class" });
+    }
+  });
+
+  // =============================================
+  // CATEGORY-CLASS MAPPING
+  // =============================================
+
+  // GET /api/quickbooks/category-mappings - Get category-to-class mappings
+  app.get("/api/quickbooks/category-mappings", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { getCategoryClassMappings } = await import("./services/quickbooksService");
+      const mappings = await getCategoryClassMappings();
+      res.json(mappings);
+    } catch (error: any) {
+      console.error("[QuickBooks] Get category mappings error:", error);
+      res.status(500).json({ message: "Failed to get category mappings" });
+    }
+  });
+
+  // POST /api/quickbooks/category-mappings - Save category-to-class mapping
+  app.post("/api/quickbooks/category-mappings", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { categoryName, classId } = req.body;
+      if (!categoryName) {
+        return res.status(400).json({ message: "Category name is required" });
+      }
+      
+      const { saveCategoryClassMapping } = await import("./services/quickbooksService");
+      const result = await saveCategoryClassMapping(categoryName, classId || null);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Save category mapping error:", error);
+      res.status(500).json({ message: "Failed to save category mapping" });
+    }
+  });
+
+  // POST /api/quickbooks/category-mappings/bulk - Bulk save category-to-class mappings
+  app.post("/api/quickbooks/category-mappings/bulk", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { mappings } = req.body;
+      if (!Array.isArray(mappings)) {
+        return res.status(400).json({ message: "Mappings array is required" });
+      }
+      
+      // Validate that all mappings have valid class IDs
+      const invalidMappings = mappings.filter(m => m.categoryName && !m.classId);
+      if (invalidMappings.length > 0) {
+        const missingCategories = invalidMappings.map(m => m.categoryName).join(", ");
+        return res.status(400).json({ 
+          message: `All categories must be mapped to a class. Missing mappings for: ${missingCategories}` 
+        });
+      }
+      
+      // Validate that class IDs are valid
+      const classIds = mappings.filter(m => m.classId).map(m => m.classId);
+      if (classIds.length > 0) {
+        const { inArray } = await import("drizzle-orm");
+        const validClasses = await db.select({ id: quickbooksClasses.id })
+          .from(quickbooksClasses)
+          .where(inArray(quickbooksClasses.id, classIds));
+        const validClassIds = new Set(validClasses.map(c => c.id));
+        const invalidClassIds = classIds.filter(id => !validClassIds.has(id));
+        if (invalidClassIds.length > 0) {
+          return res.status(400).json({ 
+            message: "One or more selected classes do not exist" 
+          });
+        }
+      }
+      
+      const { saveCategoryClassMapping } = await import("./services/quickbooksService");
+      let saved = 0;
+      let errors = 0;
+      
+      for (const mapping of mappings) {
+        const result = await saveCategoryClassMapping(mapping.categoryName, mapping.classId || null);
+        if (result.success) {
+          saved++;
+        } else {
+          errors++;
+        }
+      }
+      
+      res.json({ success: errors === 0, saved, errors });
+    } catch (error: any) {
+      console.error("[QuickBooks] Bulk save category mappings error:", error);
+      res.status(500).json({ message: "Failed to save category mappings" });
     }
   });
 

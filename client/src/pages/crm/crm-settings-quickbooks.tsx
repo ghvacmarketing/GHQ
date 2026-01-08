@@ -29,7 +29,12 @@ import {
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
-import type { CrmUser, QuickbooksConnection, QuickbooksSyncLog } from "@shared/schema";
+import type { CrmUser, QuickbooksConnection, QuickbooksSyncLog, QuickbooksClass, QuickbooksCategoryClassMap } from "@shared/schema";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { FolderTree, Download, Upload, Save } from "lucide-react";
+
+const ITEM_CATEGORIES = ["install", "service", "maintenance", "discount"] as const;
 
 interface ConnectionStatus {
   connected: boolean;
@@ -67,6 +72,32 @@ export default function CrmSettingsQuickBooks() {
     queryFn: getQueryFn({ on401: "returnNull" }),
     enabled: !!currentUser && status?.connected,
   });
+
+  const { data: classes, isLoading: classesLoading, refetch: refetchClasses } = useQuery<QuickbooksClass[]>({
+    queryKey: ["/api/quickbooks/classes"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: !!currentUser && status?.connected,
+  });
+
+  const { data: categoryMappings, isLoading: mappingsLoading, refetch: refetchMappings } = useQuery<QuickbooksCategoryClassMap[]>({
+    queryKey: ["/api/quickbooks/category-mappings"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: !!currentUser && status?.connected,
+  });
+
+  const [localMappings, setLocalMappings] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (categoryMappings) {
+      const mappingsMap: Record<string, string> = {};
+      categoryMappings.forEach((mapping) => {
+        if (mapping.quickbooksClassId) {
+          mappingsMap[mapping.categoryName] = mapping.quickbooksClassId;
+        }
+      });
+      setLocalMappings(mappingsMap);
+    }
+  }, [categoryMappings]);
 
   const connectMutation = useMutation({
     mutationFn: async () => {
@@ -124,6 +155,69 @@ export default function CrmSettingsQuickBooks() {
       toast({
         title: "Sync Failed",
         description: error.message || "Failed to sync customers",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const syncClassesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/quickbooks/classes/sync");
+      return response.json();
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/classes"] });
+      toast({
+        title: "Classes Synced",
+        description: result.message || "Classes synced to QuickBooks",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync classes to QuickBooks",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const pullClassesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/quickbooks/classes/pull");
+      return response.json();
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/classes"] });
+      toast({
+        title: "Classes Pulled",
+        description: result.message || "Classes pulled from QuickBooks",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Pull Failed",
+        description: error.message || "Failed to pull classes from QuickBooks",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const saveMappingsMutation = useMutation({
+    mutationFn: async (mappings: { category: string; quickbooksClassId: string | null }[]) => {
+      const response = await apiRequest("POST", "/api/quickbooks/category-mappings/bulk", { mappings });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/category-mappings"] });
+      toast({
+        title: "Mappings Saved",
+        description: "Category-to-class mappings saved successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Save Failed",
+        description: error.message || "Failed to save mappings",
         variant: "destructive",
       });
     },
@@ -397,6 +491,158 @@ export default function CrmSettingsQuickBooks() {
                   </div>
                 ) : (
                   <p className="text-slate-500 text-center py-8">No sync history yet</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {status?.connected && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <FolderTree className="h-6 w-6 text-blue-600" />
+                    <div>
+                      <CardTitle>QuickBooks Classes</CardTitle>
+                      <CardDescription>Manage class tracking for invoices</CardDescription>
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {classesLoading ? (
+                  <Skeleton className="h-48 w-full" />
+                ) : classes && classes.length > 0 ? (
+                  <div className="space-y-4">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {classes.map((qbClass) => (
+                          <TableRow key={qbClass.id} data-testid={`class-row-${qbClass.id}`}>
+                            <TableCell className="font-medium">{qbClass.name}</TableCell>
+                            <TableCell className="capitalize">{qbClass.classType || "—"}</TableCell>
+                            <TableCell>
+                              {qbClass.quickbooksClassId ? (
+                                <Badge className="bg-green-100 text-green-800" data-testid={`status-synced-${qbClass.id}`}>
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Synced
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-amber-100 text-amber-800" data-testid={`status-pending-${qbClass.id}`}>
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  Pending
+                                </Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => syncClassesMutation.mutate()}
+                        disabled={syncClassesMutation.isPending}
+                        data-testid="btn-sync-classes"
+                      >
+                        {syncClassesMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Upload className="h-4 w-4 mr-2" />
+                        )}
+                        Sync to QuickBooks
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => pullClassesMutation.mutate()}
+                        disabled={pullClassesMutation.isPending}
+                        data-testid="btn-pull-classes"
+                      >
+                        {pullClassesMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4 mr-2" />
+                        )}
+                        Pull from QuickBooks
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-slate-500 text-center py-8">No classes configured</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {status?.connected && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <FolderTree className="h-6 w-6 text-purple-600" />
+                  <div>
+                    <CardTitle>Category-Class Mappings</CardTitle>
+                    <CardDescription>Map invoice categories to QuickBooks classes</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {mappingsLoading || classesLoading ? (
+                  <Skeleton className="h-32 w-full" />
+                ) : (
+                  <div className="space-y-4">
+                    <div className="grid gap-4">
+                      {ITEM_CATEGORIES.map((category) => (
+                        <div key={category} className="flex items-center justify-between gap-4">
+                          <Label className="capitalize font-medium min-w-[120px]">{category}</Label>
+                          <Select
+                            value={localMappings[category] || "none"}
+                            onValueChange={(value) => {
+                              setLocalMappings((prev) => ({
+                                ...prev,
+                                [category]: value === "none" ? "" : value,
+                              }));
+                            }}
+                            data-testid={`select-mapping-${category}`}
+                          >
+                            <SelectTrigger className="w-[250px]" data-testid={`trigger-mapping-${category}`}>
+                              <SelectValue placeholder="Select a class" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No mapping</SelectItem>
+                              {classes?.filter(c => c.isActive).map((qbClass) => (
+                                <SelectItem key={qbClass.id} value={qbClass.id}>
+                                  {qbClass.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      onClick={() => {
+                        const mappings = ITEM_CATEGORIES.map((category) => ({
+                          category,
+                          quickbooksClassId: localMappings[category] || null,
+                        }));
+                        saveMappingsMutation.mutate(mappings);
+                      }}
+                      disabled={saveMappingsMutation.isPending}
+                      data-testid="btn-save-mappings"
+                    >
+                      {saveMappingsMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4 mr-2" />
+                      )}
+                      Save Mappings
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>

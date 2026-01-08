@@ -2635,3 +2635,47 @@ export const insertQuickbooksSyncLogSchema = createInsertSchema(quickbooksSyncLo
 
 export type InsertQuickbooksSyncLog = z.infer<typeof insertQuickbooksSyncLogSchema>;
 export type QuickbooksSyncLog = typeof quickbooksSyncLog.$inferSelect;
+
+// QuickBooks Classes - maps to QuickBooks Class entity for item classification
+export const quickbooksClasses = pgTable("quickbooks_classes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 255 }).notNull(), // e.g., "Service - Residential"
+  classType: text("class_type").$type<"Service" | "Install" | "Maintenance" | "Discount">().notNull(),
+  subType: text("sub_type").$type<"Residential" | "Commercial" | "Crawlspace" | "Promotional" | "Maintenance">().notNull(),
+  quickbooksClassId: varchar("quickbooks_class_id"), // QuickBooks Class.Id
+  realmId: varchar("realm_id"), // QuickBooks company ID
+  syncToken: varchar("sync_token"), // Required for QuickBooks updates
+  isActive: boolean("is_active").default(true),
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuickbooksClassSchema = createInsertSchema(quickbooksClasses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertQuickbooksClass = z.infer<typeof insertQuickbooksClassSchema>;
+export type QuickbooksClass = typeof quickbooksClasses.$inferSelect;
+
+// Category to Class mapping - links categories to QuickBooks classes
+export const quickbooksCategoryClassMap = pgTable("quickbooks_category_class_map", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  categoryName: varchar("category_name", { length: 255 }).notNull(), // The category name (e.g., "HVAC Parts")
+  quickbooksClassId: varchar("quickbooks_class_id").references(() => quickbooksClasses.id),
+  realmId: varchar("realm_id").notNull(), // QuickBooks company ID
+  isDefault: boolean("is_default").default(false), // If true, this class applies to all unmapped categories
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuickbooksCategoryClassMapSchema = createInsertSchema(quickbooksCategoryClassMap).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertQuickbooksCategoryClassMap = z.infer<typeof insertQuickbooksCategoryClassMapSchema>;
+export type QuickbooksCategoryClassMap = typeof quickbooksCategoryClassMap.$inferSelect;
