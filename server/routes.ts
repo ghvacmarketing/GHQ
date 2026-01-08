@@ -5886,6 +5886,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create property if provided
       let newProperty = null;
       if (propertyData?.address1 && propertyData?.city && propertyData?.state && propertyData?.zip) {
+        // Auto-set property type based on customer type (unless manually specified)
+        // Property managers require manual selection per-property
+        const custType = (customerData.customerType || "").toLowerCase();
+        const autoPropertyType = (custType === "residential" || custType === "commercial")
+          ? custType
+          : null;
+        
         const [property] = await db.insert(crmProperties).values({
           customerId: newCustomer.id,
           address1: propertyData.address1,
@@ -5894,6 +5901,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           state: propertyData.state,
           zip: propertyData.zip,
           notes: propertyData.notes || null,
+          propertyType: propertyData.propertyType || autoPropertyType,
         }).returning();
         newProperty = property;
       }
@@ -9760,6 +9768,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Get customer to determine auto property type
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId)).limit(1);
+      
+      // Auto-set property type based on customer type (unless manually specified)
+      // Property managers require manual selection per-property
+      let autoPropertyType = null;
+      const custType = customer?.customerType?.toLowerCase();
+      if (custType === "residential" || custType === "commercial") {
+        autoPropertyType = custType;
+      }
+      
+      const { propertyType } = req.body;
+      
       const [newProperty] = await db.insert(crmProperties).values({
         customerId,
         address1: address1.trim(),
@@ -9777,6 +9798,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentTerms: paymentTerms || null,
         paymentMethod: paymentMethod || null,
         approvalRule: approvalRule || null,
+        propertyType: propertyType || autoPropertyType,
       }).returning();
 
       return res.status(201).json(newProperty);
