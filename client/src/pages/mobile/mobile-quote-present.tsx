@@ -249,9 +249,9 @@ export default function MobileQuotePresent() {
         throw new Error(data.error || "Failed to create payment link");
       }
       
-      // Redirect to Stripe payment page
+      // Open Stripe payment page in new tab (avoids Replit webview issues)
       if (data.paymentLinkUrl) {
-        window.location.href = data.paymentLinkUrl;
+        window.open(data.paymentLinkUrl, '_blank');
       }
     } catch (error: any) {
       toast({ 

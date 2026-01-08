@@ -2075,7 +2075,7 @@ function InvoiceTab({
       }
       
       if (result.paymentLinkUrl) {
-        window.location.href = result.paymentLinkUrl;
+        window.open(result.paymentLinkUrl, '_blank');
       } else {
         throw new Error("No payment link received");
       }
