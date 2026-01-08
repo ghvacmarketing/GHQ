@@ -2509,3 +2509,129 @@ export const insertSmsNotificationLogSchema = createInsertSchema(smsNotification
 
 export type InsertSmsNotificationLog = z.infer<typeof insertSmsNotificationLogSchema>;
 export type SmsNotificationLog = typeof smsNotificationLog.$inferSelect;
+
+// =============================================
+// QUICKBOOKS INTEGRATION
+// =============================================
+
+// QuickBooks OAuth state (for CSRF protection during OAuth flow)
+export const quickbooksOauthStates = pgTable("quickbooks_oauth_states", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  state: varchar("state").notNull().unique(),
+  environment: text("environment").$type<"sandbox" | "production">().default("sandbox"),
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+});
+
+// QuickBooks OAuth connection tokens
+export const quickbooksConnection = pgTable("quickbooks_connection", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  realmId: varchar("realm_id").notNull().unique(), // QuickBooks company ID
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  accessTokenExpiresAt: timestamp("access_token_expires_at").notNull(),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at").notNull(),
+  environment: text("environment").$type<"sandbox" | "production">().default("sandbox"),
+  companyName: text("company_name"),
+  isActive: boolean("is_active").default(true),
+  lastSyncAt: timestamp("last_sync_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuickbooksConnectionSchema = createInsertSchema(quickbooksConnection).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertQuickbooksConnection = z.infer<typeof insertQuickbooksConnectionSchema>;
+export type QuickbooksConnection = typeof quickbooksConnection.$inferSelect;
+
+// Customer sync mapping - links CRM customers to QuickBooks customers
+export const quickbooksCustomerSync = pgTable("quickbooks_customer_sync", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  crmCustomerId: varchar("crm_customer_id").notNull().references(() => crmCustomers.id, { onDelete: "cascade" }),
+  quickbooksCustomerId: varchar("quickbooks_customer_id").notNull(),
+  realmId: varchar("realm_id").notNull(),
+  syncStatus: text("sync_status").$type<"synced" | "pending" | "error">().default("synced"),
+  lastSyncAt: timestamp("last_sync_at").defaultNow(),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuickbooksCustomerSyncSchema = createInsertSchema(quickbooksCustomerSync).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertQuickbooksCustomerSync = z.infer<typeof insertQuickbooksCustomerSyncSchema>;
+export type QuickbooksCustomerSync = typeof quickbooksCustomerSync.$inferSelect;
+
+// Invoice sync mapping - links CRM invoices to QuickBooks invoices
+export const quickbooksInvoiceSync = pgTable("quickbooks_invoice_sync", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  crmInvoiceId: varchar("crm_invoice_id").notNull().references(() => crmInvoices.id, { onDelete: "cascade" }),
+  quickbooksInvoiceId: varchar("quickbooks_invoice_id").notNull(),
+  realmId: varchar("realm_id").notNull(),
+  syncStatus: text("sync_status").$type<"synced" | "pending" | "error">().default("synced"),
+  lastSyncAt: timestamp("last_sync_at").defaultNow(),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuickbooksInvoiceSyncSchema = createInsertSchema(quickbooksInvoiceSync).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertQuickbooksInvoiceSync = z.infer<typeof insertQuickbooksInvoiceSyncSchema>;
+export type QuickbooksInvoiceSync = typeof quickbooksInvoiceSync.$inferSelect;
+
+// Payment sync mapping - links CRM payments to QuickBooks payments
+export const quickbooksPaymentSync = pgTable("quickbooks_payment_sync", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  crmInvoiceId: varchar("crm_invoice_id").notNull().references(() => crmInvoices.id, { onDelete: "cascade" }),
+  quickbooksPaymentId: varchar("quickbooks_payment_id").notNull(),
+  realmId: varchar("realm_id").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  syncStatus: text("sync_status").$type<"synced" | "pending" | "error">().default("synced"),
+  lastSyncAt: timestamp("last_sync_at").defaultNow(),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuickbooksPaymentSyncSchema = createInsertSchema(quickbooksPaymentSync).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertQuickbooksPaymentSync = z.infer<typeof insertQuickbooksPaymentSyncSchema>;
+export type QuickbooksPaymentSync = typeof quickbooksPaymentSync.$inferSelect;
+
+// Sync log for tracking all sync operations
+export const quickbooksSyncLog = pgTable("quickbooks_sync_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  realmId: varchar("realm_id").notNull(),
+  syncType: text("sync_type").$type<"customer" | "invoice" | "payment" | "full">().notNull(),
+  direction: text("direction").$type<"push" | "pull">().notNull(),
+  status: text("status").$type<"started" | "completed" | "failed">().notNull(),
+  recordsProcessed: integer("records_processed").default(0),
+  recordsFailed: integer("records_failed").default(0),
+  errorMessage: text("error_message"),
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertQuickbooksSyncLogSchema = createInsertSchema(quickbooksSyncLog).omit({
+  id: true,
+});
+
+export type InsertQuickbooksSyncLog = z.infer<typeof insertQuickbooksSyncLogSchema>;
+export type QuickbooksSyncLog = typeof quickbooksSyncLog.$inferSelect;

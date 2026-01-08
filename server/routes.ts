@@ -18978,6 +18978,237 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // =============================================
+  // QUICKBOOKS INTEGRATION ROUTES
+  // =============================================
+  
+  const {
+    getAuthorizationUrl: getQBAuthUrl,
+    exchangeCodeForTokens: exchangeQBTokens,
+    saveConnection: saveQBConnection,
+    getActiveConnection: getActiveQBConnection,
+    disconnectQuickBooks,
+    getConnectionStatus: getQBConnectionStatus,
+    syncCustomerToQuickBooks,
+    syncAllCustomersToQuickBooks,
+    syncInvoiceToQuickBooks,
+    syncPaymentToQuickBooks,
+    getSyncLogs: getQBSyncLogs
+  } = await import("./services/quickbooksService");
+  
+  // Import QuickBooks OAuth states table for persistent state storage
+  const { quickbooksOauthStates } = await import("@shared/schema");
+  
+  // GET /api/quickbooks/status - Get QuickBooks connection status
+  app.get("/api/quickbooks/status", requireCrmAuth, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const status = await getQBConnectionStatus();
+      res.json(status);
+    } catch (error: any) {
+      console.error("[QuickBooks] Status error:", error);
+      res.status(500).json({ message: "Failed to get QuickBooks status" });
+    }
+  });
+  
+  // GET /api/quickbooks/connect - Initiate OAuth flow
+  app.get("/api/quickbooks/connect", requireCrmAuth, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const environment = (req.query.environment as "sandbox" | "production") || "sandbox";
+      const state = randomUUID();
+      
+      // Store state in database for persistent CSRF protection (survives server restarts)
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+      await db.insert(quickbooksOauthStates).values({
+        state,
+        environment,
+        expiresAt,
+      });
+      
+      // Clean up expired states
+      await db.delete(quickbooksOauthStates)
+        .where(lt(quickbooksOauthStates.expiresAt, new Date()));
+      
+      console.log(`[QuickBooks] Created OAuth state: ${state.substring(0, 8)}... (expires ${expiresAt.toISOString()})`);
+      
+      const authUrl = getQBAuthUrl(state, environment);
+      res.json({ authUrl });
+    } catch (error: any) {
+      console.error("[QuickBooks] Connect error:", error);
+      res.status(500).json({ message: "Failed to initiate QuickBooks connection" });
+    }
+  });
+  
+  // GET /api/quickbooks/callback - OAuth callback
+  app.get("/api/quickbooks/callback", async (req, res) => {
+    try {
+      const { code, state, realmId, error } = req.query;
+      
+      if (error) {
+        console.error("[QuickBooks] OAuth error:", error);
+        return res.redirect("/crm/settings/quickbooks?error=oauth_denied");
+      }
+      
+      if (!code || !state || !realmId) {
+        return res.redirect("/crm/settings/quickbooks?error=missing_params");
+      }
+      
+      // Verify state from database (persisted across server restarts)
+      const [stateRecord] = await db.select()
+        .from(quickbooksOauthStates)
+        .where(and(
+          eq(quickbooksOauthStates.state, state as string),
+          gt(quickbooksOauthStates.expiresAt, new Date())
+        ))
+        .limit(1);
+      
+      if (!stateRecord) {
+        console.error("[QuickBooks] Invalid or expired state:", (state as string).substring(0, 8));
+        return res.redirect("/crm/settings/quickbooks?error=invalid_state");
+      }
+      
+      // Delete the used state
+      await db.delete(quickbooksOauthStates)
+        .where(eq(quickbooksOauthStates.id, stateRecord.id));
+      
+      console.log(`[QuickBooks] Validated OAuth state: ${(state as string).substring(0, 8)}...`);
+      
+      // Exchange code for tokens
+      const tokens = await exchangeQBTokens(code as string, realmId as string);
+      
+      // Save connection
+      await saveQBConnection(
+        realmId as string,
+        tokens.accessToken,
+        tokens.refreshToken,
+        tokens.accessTokenExpiresIn,
+        tokens.refreshTokenExpiresIn,
+        stateRecord.environment || "sandbox"
+      );
+      
+      console.log(`[QuickBooks] Connected to realm ${realmId} (${stateRecord.environment})`);
+      res.redirect("/crm/settings/quickbooks?success=connected");
+    } catch (error: any) {
+      console.error("[QuickBooks] Callback error:", error);
+      res.redirect("/crm/settings/quickbooks?error=token_exchange_failed");
+    }
+  });
+  
+  // POST /api/quickbooks/disconnect - Disconnect from QuickBooks
+  app.post("/api/quickbooks/disconnect", requireCrmAuth, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      await disconnectQuickBooks();
+      res.json({ success: true, message: "Disconnected from QuickBooks" });
+    } catch (error: any) {
+      console.error("[QuickBooks] Disconnect error:", error);
+      res.status(500).json({ message: "Failed to disconnect from QuickBooks" });
+    }
+  });
+  
+  // POST /api/quickbooks/sync/customers - Sync all customers to QuickBooks
+  app.post("/api/quickbooks/sync/customers", requireCrmAuth, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const result = await syncAllCustomersToQuickBooks();
+      res.json({ success: result.failed === 0, ...result });
+    } catch (error: any) {
+      console.error("[QuickBooks] Customer sync error:", error);
+      res.status(500).json({ message: "Failed to sync customers" });
+    }
+  });
+  
+  // POST /api/quickbooks/sync/customer/:customerId - Sync single customer
+  app.post("/api/quickbooks/sync/customer/:customerId", requireCrmAuth, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const result = await syncCustomerToQuickBooks(req.params.customerId);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Customer sync error:", error);
+      res.status(500).json({ message: "Failed to sync customer" });
+    }
+  });
+  
+  // POST /api/quickbooks/sync/invoice/:invoiceId - Sync invoice to QuickBooks
+  app.post("/api/quickbooks/sync/invoice/:invoiceId", requireCrmAuth, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const result = await syncInvoiceToQuickBooks(req.params.invoiceId);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Invoice sync error:", error);
+      res.status(500).json({ message: "Failed to sync invoice" });
+    }
+  });
+  
+  // POST /api/quickbooks/sync/payment/:invoiceId - Record payment in QuickBooks
+  app.post("/api/quickbooks/sync/payment/:invoiceId", requireCrmAuth, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { amount, paymentDate } = req.body;
+      if (!amount) {
+        return res.status(400).json({ message: "Amount is required" });
+      }
+      
+      const result = await syncPaymentToQuickBooks(
+        req.params.invoiceId,
+        amount,
+        paymentDate ? new Date(paymentDate) : undefined
+      );
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Payment sync error:", error);
+      res.status(500).json({ message: "Failed to sync payment" });
+    }
+  });
+  
+  // GET /api/quickbooks/sync-logs - Get sync history
+  app.get("/api/quickbooks/sync-logs", requireCrmAuth, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const limit = parseInt(req.query.limit as string) || 20;
+      const logs = await getQBSyncLogs(limit);
+      res.json(logs);
+    } catch (error: any) {
+      console.error("[QuickBooks] Sync logs error:", error);
+      res.status(500).json({ message: "Failed to get sync logs" });
+    }
+  });
+
   // POST /api/admin/portal/generate-link/:customerId - Generate portal login link for a customer
   app.post("/api/admin/portal/generate-link/:customerId", requireCrmAuth, async (req, res) => {
     try {
