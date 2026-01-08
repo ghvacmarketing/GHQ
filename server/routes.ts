@@ -13672,6 +13672,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           
           if (maintenanceLineItems.length > 0) {
+            // FIRST: Check if there's already an existing agreement for this customer+property
+            // This prevents creating duplicate agreements when invoice is created separately from existing agreement
+            const existingAgreementConditions = [
+              eq(crmAgreements.customerId, invoice.customerId),
+              or(
+                eq(crmAgreements.status, "pending"),
+                eq(crmAgreements.status, "active"),
+                eq(crmAgreements.status, "grace_period")
+              )
+            ];
+            
+            // If invoice has a propertyId, also match on property
+            if (invoice.propertyId) {
+              existingAgreementConditions.push(eq(crmAgreements.propertyId, invoice.propertyId));
+            }
+            
+            const [existingAgreement] = await db.select()
+              .from(crmAgreements)
+              .where(and(...existingAgreementConditions))
+              .limit(1);
+            
+            if (existingAgreement) {
+              // Link this invoice to the existing agreement instead of creating a new one
+              await db.update(crmInvoices)
+                .set({ agreementId: existingAgreement.id, updatedAt: new Date() })
+                .where(eq(crmInvoices.id, req.params.id));
+              
+              console.log(`[Invoice] Linked invoice ${invoice.invoiceNumber} to existing agreement ${existingAgreement.agreementNumber} (skipped duplicate creation)`);
+              
+              // Now trigger agreement activation if needed (same logic as when invoice.agreementId exists)
+              const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
+              
+              if (existingAgreement.status === "pending" && existingAgreement.isInitialCycle) {
+                await db.update(crmAgreements)
+                  .set({
+                    status: "active",
+                    activationDate: todayStr,
+                    isInitialCycle: false,
+                    graceExpiresAt: null,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(crmAgreements.id, existingAgreement.id));
+                
+                console.log(`[Invoice] Activated existing agreement ${existingAgreement.agreementNumber} after linking invoice ${invoice.invoiceNumber}`);
+              }
+            } else {
+              // No existing agreement found - proceed with auto-creation
+            
             // Calculate total maintenance amount from line items (use lineTotal, not total)
             const maintenanceTotal = maintenanceLineItems.reduce((sum, row) => {
               return sum + parseFloat(row.lineItem.lineTotal || "0");
@@ -13847,6 +13895,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 console.log(`[Invoice] Auto-created ${agreementFrequency} maintenance agreement ${agreementNumber} for customer ${customer.name} from invoice ${invoice.invoiceNumber} (${totalQuantity} systems, ${agreementVisitsPerPeriod} visits)`);
               }
             }
+            } // Close the else block for "no existing agreement found"
           }
         } catch (agreementError) {
           console.error("Error auto-creating maintenance agreement:", agreementError);

@@ -162,10 +162,12 @@ export async function processSingleAgreementRenewal(agreement: CrmAgreement): Pr
     // For pending/initial-cycle agreements: keep status as pending (first invoice)
     // For active agreements: move to grace_period (renewal invoice)
     if (agreement.status === "pending" || agreement.isInitialCycle) {
-      // First invoice - keep status as pending, just update nextInvoiceDate
+      // First invoice - keep status as pending, update nextInvoiceDate, and mark firstInvoiceSentAt
       await db.update(crmAgreements)
         .set({
           nextInvoiceDate: format(newNextInvoiceDate, "yyyy-MM-dd"),
+          firstInvoiceSentAt: new Date(),
+          initialInvoiceId: invoice.id,
           updatedAt: new Date(),
         })
         .where(eq(crmAgreements.id, agreement.id));

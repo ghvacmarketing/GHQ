@@ -324,23 +324,8 @@ export default function CrmAgreements() {
     },
   });
 
-  // Check if the selected agreement already has an invoice (for "pending" status)
-  const { data: agreementInvoices, isFetching: invoiceCheckLoading } = useQuery<{ id: string }[]>({
-    queryKey: ["/api/crm/invoices", "agreement", selectedAgreement?.id],
-    queryFn: async () => {
-      const res = await fetch(`/api/crm/invoices?agreementId=${selectedAgreement?.id}`, {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to check invoices");
-      const data = await res.json();
-      return data.invoices || data || [];
-    },
-    enabled: !!selectedAgreement?.id && selectedAgreement.status === "pending",
-  });
-
-  // Hide "Send First Invoice" if an invoice already exists OR still loading (to prevent duplicate sends)
-  const hasExistingInvoice = (agreementInvoices?.length ?? 0) > 0;
-  const shouldHideFirstInvoiceButton = hasExistingInvoice || invoiceCheckLoading;
+  // Hide "Send First Invoice" if first invoice has already been sent (using the firstInvoiceSentAt field)
+  const shouldHideFirstInvoiceButton = !!(selectedAgreement?.firstInvoiceSentAt);
 
   const createAgreementMutation = useMutation({
     mutationFn: async (data: typeof createForm) => {

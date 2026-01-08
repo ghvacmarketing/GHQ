@@ -1560,6 +1560,8 @@ export const crmAgreements = pgTable("crm_agreements", {
   activationDate: date("activation_date"),
   graceExpiresAt: date("grace_expires_at"),
   isInitialCycle: boolean("is_initial_cycle").notNull().default(true),
+  firstInvoiceSentAt: timestamp("first_invoice_sent_at"),
+  initialInvoiceId: varchar("initial_invoice_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
