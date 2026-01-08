@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
@@ -37,6 +37,8 @@ import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession,
 import cookieParser from "cookie-parser";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import stripePaymentsRouter from "./stripe-payments";
+import { getMessagingAdapter } from "./services/messaging/adapters";
+import { textlineClient } from "./textlineClient";
 
 // Simple in-memory token store for admin authentication (works in Replit iframe where cookies fail)
 const adminTokens = new Map<string, { createdAt: number }>();
@@ -17780,13 +17782,19 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       const { body, channel, attachments: msgAttachments } = req.body;
 
+      let customerPhone: string | null = null;
+      if (existing.customerId) {
+        const [customer] = await db.select({ phone: crmCustomers.phone }).from(crmCustomers).where(eq(crmCustomers.id, existing.customerId));
+        customerPhone = customer?.phone || null;
+      }
+
       const messageData = {
         conversationId: id,
         body: body || "",
         channel: channel || "sms",
         attachments: msgAttachments || null,
         direction: "outbound" as const,
-        status: "sent" as const,
+        status: "queued" as const,
         authorUserId: user.id,
         sentAt: new Date(),
       };
@@ -17797,7 +17805,38 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       }
 
       const message = await storage.createMessage(parseResult.data);
-      return res.status(201).json(message);
+
+      const adapter = getMessagingAdapter();
+      const adapterResult = await adapter.sendMessage({
+        conversationId: id,
+        body: body || "",
+        channel: channel || "sms",
+        recipientPhone: customerPhone || undefined,
+        externalConversationId: existing.externalConversationId || undefined,
+      });
+
+      if (adapterResult.success) {
+        const updateData: Record<string, any> = { status: adapterResult.status };
+        if (adapterResult.externalMessageId) {
+          updateData.externalMessageId = adapterResult.externalMessageId;
+        }
+        await storage.updateMessage(message.id, updateData);
+        if (adapterResult.externalConversationId && !existing.externalConversationId) {
+          await storage.updateMessagingConversation(id, { 
+            externalConversationId: adapterResult.externalConversationId,
+            externalSource: "textline" as any
+          });
+        }
+        const updatedMessage = await db.select().from(crmMessagingMessages).where(eq(crmMessagingMessages.id, message.id));
+        return res.status(201).json(updatedMessage[0] || message);
+      } else {
+        await storage.updateMessage(message.id, { 
+          status: "failed" as any, 
+          errorMessage: adapterResult.errorMessage 
+        });
+        const updatedMessage = await db.select().from(crmMessagingMessages).where(eq(crmMessagingMessages.id, message.id));
+        return res.status(201).json(updatedMessage[0] || message);
+      }
     } catch (error) {
       console.error("Error sending message:", error);
       return res.status(500).json({ message: "Failed to send message" });
@@ -17878,6 +17917,147 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error) {
       console.error("Error removing conversation tag:", error);
       return res.status(500).json({ message: "Failed to remove tag" });
+    }
+  });
+
+  // POST /api/webhooks/textline - Textline webhook for inbound messages (no auth)
+  app.post("/api/webhooks/textline", async (req, res) => {
+    try {
+      const payload = req.body;
+      const eventType = payload.event_type;
+      
+      console.log("[Textline Webhook] Received event:", eventType);
+      
+      if (eventType === "message.created" && payload.data?.post?.direction === "inbound") {
+        const conversationUuid = payload.data.conversation?.uuid;
+        const phoneNumber = payload.data.conversation?.phone_number;
+        const contactName = payload.data.conversation?.contact_name;
+        const messageUuid = payload.data.post?.uuid;
+        const messageBody = payload.data.post?.body || "";
+        const createdAt = payload.data.post?.created_at ? new Date(payload.data.post.created_at) : new Date();
+        
+        if (!conversationUuid || !phoneNumber) {
+          console.log("[Textline Webhook] Missing conversation UUID or phone number");
+          return res.status(200).json({ message: "OK - missing data" });
+        }
+        
+        let conversation = await storage.getMessagingConversationByExternalId(conversationUuid, "textline");
+        
+        let customerId: string | undefined;
+        const customer = await storage.getCrmCustomerByPhone(phoneNumber);
+        if (customer) {
+          customerId = customer.id;
+        }
+        
+        if (!conversation) {
+          conversation = await storage.createMessagingConversation({
+            customerId: customerId || null,
+            subject: contactName || phoneNumber,
+            externalSource: "textline" as any,
+            externalConversationId: conversationUuid,
+            status: "open" as any,
+          });
+          console.log("[Textline Webhook] Created new conversation:", conversation.id);
+        } else if (customerId && !conversation.customerId) {
+          await storage.updateMessagingConversation(conversation.id, { customerId });
+        }
+        
+        await storage.createMessage({
+          conversationId: conversation.id,
+          direction: "inbound" as any,
+          channel: "sms" as any,
+          body: messageBody,
+          externalMessageId: messageUuid,
+          status: "delivered" as any,
+          sentAt: createdAt,
+        });
+        
+        console.log("[Textline Webhook] Created inbound message for conversation:", conversation.id);
+      }
+      
+      return res.status(200).json({ message: "OK" });
+    } catch (error) {
+      console.error("[Textline Webhook] Error:", error);
+      return res.status(200).json({ message: "OK - error logged" });
+    }
+  });
+
+  // POST /api/crm/messaging/sync-textline - Sync conversations from Textline
+  app.post("/api/crm/messaging/sync-textline", requireCrmAuth, async (req, res) => {
+    try {
+      if (!textlineClient.isConfigured()) {
+        return res.status(400).json({ message: "Textline API is not configured" });
+      }
+      
+      let created = 0;
+      let updated = 0;
+      let linked = 0;
+      let page = 0;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const result = await textlineClient.getConversations(page, 50);
+        
+        if (result.error) {
+          return res.status(500).json({ message: "Error fetching from Textline: " + result.error });
+        }
+        
+        for (const textlineConvo of result.conversations) {
+          const existingConvo = await storage.getMessagingConversationByExternalId(textlineConvo.uuid, "textline");
+          
+          let customerId: string | undefined;
+          if (textlineConvo.phone_number) {
+            const customer = await storage.getCrmCustomerByPhone(textlineConvo.phone_number);
+            if (customer) {
+              customerId = customer.id;
+            }
+          }
+          
+          if (!existingConvo) {
+            await storage.createMessagingConversation({
+              customerId: customerId || null,
+              subject: textlineConvo.contact_name || textlineConvo.phone_number,
+              externalSource: "textline" as any,
+              externalConversationId: textlineConvo.uuid,
+              status: textlineConvo.status === "resolved" ? "closed" as any : "open" as any,
+              lastMessageAt: textlineConvo.last_message_at ? new Date(textlineConvo.last_message_at) : undefined,
+            });
+            created++;
+            if (customerId) linked++;
+          } else {
+            const updates: Record<string, any> = {};
+            if (customerId && !existingConvo.customerId) {
+              updates.customerId = customerId;
+              linked++;
+            }
+            if (textlineConvo.last_message_at) {
+              updates.lastMessageAt = new Date(textlineConvo.last_message_at);
+            }
+            if (Object.keys(updates).length > 0) {
+              await storage.updateMessagingConversation(existingConvo.id, updates);
+              updated++;
+            }
+          }
+        }
+        
+        hasMore = result.hasMore;
+        page++;
+        
+        if (page > 20) {
+          console.log("[Textline Sync] Stopping after 20 pages");
+          break;
+        }
+      }
+      
+      return res.json({
+        message: "Sync completed",
+        created,
+        updated,
+        linked,
+      });
+    } catch (error) {
+      console.error("Error syncing Textline conversations:", error);
+      return res.status(500).json({ message: "Failed to sync Textline conversations" });
     }
   });
 

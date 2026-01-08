@@ -1,3 +1,5 @@
+import { textlineClient } from "../../textlineClient";
+
 export interface MessageAttachment {
   id: string;
   url: string;
@@ -11,11 +13,13 @@ export interface OutboundMessageRequest {
   channel: "sms" | "mms" | "email";
   attachments?: MessageAttachment[];
   externalConversationId?: string;
+  recipientPhone?: string;
 }
 
 export interface OutboundMessageResult {
   success: boolean;
   externalMessageId?: string;
+  externalConversationId?: string;
   status: "queued" | "sent" | "failed";
   errorMessage?: string;
 }
@@ -49,26 +53,47 @@ export class LocalMessagingAdapter implements MessagingAdapter {
 
 export class TextlineMessagingAdapter implements MessagingAdapter {
   name = "textline";
-  private apiKey: string;
-  
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
-  }
   
   async sendMessage(request: OutboundMessageRequest): Promise<OutboundMessageResult> {
-    throw new Error("Textline integration not yet implemented");
+    if (!request.recipientPhone) {
+      return {
+        success: false,
+        status: "failed",
+        errorMessage: "No recipient phone number provided",
+      };
+    }
+
+    const result = await textlineClient.sendMessage({
+      phoneNumber: request.recipientPhone,
+      body: request.body,
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        status: "failed",
+        errorMessage: result.errorMessage,
+      };
+    }
+
+    return {
+      success: true,
+      status: "sent",
+      externalMessageId: result.messageUuid,
+      externalConversationId: result.conversationUuid,
+    };
   }
   
   async getDeliveryStatus(externalMessageId: string): Promise<"queued" | "sent" | "delivered" | "failed"> {
-    throw new Error("Textline integration not yet implemented");
+    // Textline doesn't provide a direct message status endpoint
+    // Status updates come via webhooks
+    return "sent";
   }
 }
 
 export function getMessagingAdapter(): MessagingAdapter {
-  const textlineApiKey = process.env.TEXTLINE_API_KEY;
-  
-  if (textlineApiKey) {
-    return new TextlineMessagingAdapter(textlineApiKey);
+  if (textlineClient.isConfigured()) {
+    return new TextlineMessagingAdapter();
   }
   
   return new LocalMessagingAdapter();

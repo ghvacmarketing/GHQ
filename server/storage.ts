@@ -258,6 +258,8 @@ export interface IStorage {
   removeConversationTag(conversationId: string, tag: string): Promise<void>;
   getMobileConversations(userId: string, filters?: { status?: string; search?: string }): Promise<(CrmMessagingConversation & { customer: { id: string; name: string; phone: string | null } | null })[]>;
   searchCrmCustomers(search: string, limit?: number): Promise<{ id: string; name: string; phone: string | null; email: string | null }[]>;
+  getMessagingConversationByExternalId(externalConversationId: string, externalSource: string): Promise<CrmMessagingConversation | undefined>;
+  getCrmCustomerByPhone(phone: string): Promise<{ id: string; name: string; phone: string | null; email: string | null } | undefined>;
 
   // Time Entry operations
   getActiveTimeEntry(technicianId: string): Promise<CrmTimeEntry | null>;
@@ -2019,6 +2021,40 @@ export class DatabaseStorage implements IStorage {
     .limit(limit);
 
     return results;
+  }
+
+  async getMessagingConversationByExternalId(externalConversationId: string, externalSource: string): Promise<CrmMessagingConversation | undefined> {
+    const [conversation] = await db.select().from(crmMessagingConversations)
+      .where(and(
+        eq(crmMessagingConversations.externalConversationId, externalConversationId),
+        eq(crmMessagingConversations.externalSource, externalSource as any)
+      ));
+    return conversation || undefined;
+  }
+
+  async getCrmCustomerByPhone(phone: string): Promise<{ id: string; name: string; phone: string | null; email: string | null } | undefined> {
+    const normalizedPhone = phone.replace(/\D/g, '');
+    const phoneVariants = [
+      phone,
+      normalizedPhone,
+      `+${normalizedPhone}`,
+      `+1${normalizedPhone}`,
+      normalizedPhone.slice(-10),
+    ];
+    
+    const [customer] = await db.select({
+      id: crmCustomers.id,
+      name: crmCustomers.name,
+      phone: crmCustomers.phone,
+      email: crmCustomers.email,
+    })
+    .from(crmCustomers)
+    .where(or(
+      ...phoneVariants.map(p => ilike(crmCustomers.phone, `%${p}%`))
+    ))
+    .limit(1);
+    
+    return customer || undefined;
   }
 
   // Time Entry operations
