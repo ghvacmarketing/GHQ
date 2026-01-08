@@ -127,7 +127,12 @@ export default function CrmSettingsQuickBooks() {
       return data.authUrl;
     },
     onSuccess: (authUrl: string) => {
-      window.location.href = authUrl;
+      // Open in new tab to avoid X-Frame-Options issues when embedded in Replit webview
+      const newWindow = window.open(authUrl, '_blank');
+      if (!newWindow) {
+        // Fallback if popup blocked
+        window.location.href = authUrl;
+      }
     },
     onError: (error: any) => {
       toast({
