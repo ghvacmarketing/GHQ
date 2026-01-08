@@ -54,7 +54,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import type { CrmUser, CrmWorkOrder, CrmQuote, CrmQuoteLineItem, CrmItem, CrmCustomer, CrmProperty, QuickbooksClass } from "@shared/schema";
+import type { CrmUser, CrmWorkOrder, CrmQuote, CrmQuoteLineItem, CrmItem, CrmCustomer, CrmProperty, QuickbooksAccount } from "@shared/schema";
 import { format } from "date-fns";
 
 const INVOICE_MODES = [
@@ -84,7 +84,7 @@ interface LineItem {
   isDiscountLine?: boolean;
   discountKind?: "promotion" | "maintenance";
   crmItemId?: string;
-  quickbooksClassId?: string;
+  quickbooksSubAccountId?: string;
 }
 
 interface FormData {
@@ -229,8 +229,8 @@ export default function CrmInvoiceCreate() {
     enabled: !!currentUser && formData.mode === "manual",
   });
 
-  const { data: quickbooksClasses } = useQuery<QuickbooksClass[]>({
-    queryKey: ["/api/quickbooks/classes"],
+  const { data: quickbooksSubAccounts } = useQuery<QuickbooksAccount[]>({
+    queryKey: ["/api/quickbooks/accounts"],
     enabled: !!currentUser && formData.mode === "manual" && showAdvancedOptions,
   });
 
@@ -338,7 +338,7 @@ export default function CrmInvoiceCreate() {
         isDiscountLine?: boolean;
         discountKind?: string;
         itemId?: string;
-        quickbooksClassId?: string;
+        quickbooksSubAccountId?: string;
       }>;
       subtotal: string;
       tax: string;
@@ -608,7 +608,7 @@ export default function CrmInvoiceCreate() {
             isDiscountLine: isDiscount,
             discountKind: item.discountKind || undefined,
             itemId: item.crmItemId || undefined,
-            quickbooksClassId: item.quickbooksClassId || undefined,
+            quickbooksSubAccountId: item.quickbooksSubAccountId || undefined,
             sortOrder: idx,
           };
         }),
@@ -1133,27 +1133,27 @@ export default function CrmInvoiceCreate() {
                               {showAdvancedOptions && (
                                 <TableCell>
                                   <Select
-                                    value={item.quickbooksClassId || "auto"}
-                                    onValueChange={(v) => updateLineItem(item.id, { quickbooksClassId: v === "auto" ? undefined : v })}
+                                    value={item.quickbooksSubAccountId || "auto"}
+                                    onValueChange={(v) => updateLineItem(item.id, { quickbooksSubAccountId: v === "auto" ? undefined : v })}
                                   >
-                                    <SelectTrigger className="h-8" data-testid={`select-qb-class-${item.id}`}>
+                                    <SelectTrigger className="h-8" data-testid={`select-qb-subaccount-${item.id}`}>
                                       <SelectValue placeholder="Auto" />
                                     </SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="auto">Auto (from property type)</SelectItem>
-                                      {["Service", "Install", "Maintenance", "Discount"].map((classType) => {
-                                        const classesOfType = quickbooksClasses?.filter(
-                                          (c) => c.classType === classType && c.isActive
+                                      {["Service", "Install", "Maintenance", "Discount"].map((categoryType) => {
+                                        const accountsOfType = quickbooksSubAccounts?.filter(
+                                          (c) => c.categoryType === categoryType && c.isParent === false && c.isActive
                                         );
-                                        if (!classesOfType?.length) return null;
+                                        if (!accountsOfType?.length) return null;
                                         return (
-                                          <div key={classType}>
+                                          <div key={categoryType}>
                                             <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50">
-                                              {classType}
+                                              {categoryType}
                                             </div>
-                                            {classesOfType.map((qbClass) => (
-                                              <SelectItem key={qbClass.id} value={qbClass.id}>
-                                                {qbClass.classType} - {qbClass.subType}
+                                            {accountsOfType.map((account) => (
+                                              <SelectItem key={account.id} value={account.id}>
+                                                {account.fullyQualifiedName || account.name}
                                               </SelectItem>
                                             ))}
                                           </div>

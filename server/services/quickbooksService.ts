@@ -684,51 +684,47 @@ export async function syncInvoiceToQuickBooks(
       let lineClassType: "Service" | "Install" | "Maintenance" | "Discount" | null = null;
       let lineSubType: "Residential" | "Commercial" | "Promotional" | "Maintenance" | null = null;
       
-      // Priority 1: Explicit quickbooksClassId override on line item
-      // Note: Even with explicit class override, we still determine lineClassType/lineSubType
-      // so ItemRef can be assigned for P&L routing
-      if (item.quickbooksClassId) {
-        const qbClassId = localIdToQbId.get(item.quickbooksClassId);
-        if (qbClassId) {
-          lineItem.SalesItemLineDetail.ClassRef = { value: qbClassId };
+      // Priority 1: Explicit quickbooksSubAccountId override on line item
+      // The sub-account has an associated Item that we'll use for P&L routing
+      if (item.quickbooksSubAccountId) {
+        // Look up the sub-account and its associated QuickBooks Item
+        const [subAccount] = await db.select()
+          .from(quickbooksAccounts)
+          .where(eq(quickbooksAccounts.id, item.quickbooksSubAccountId))
+          .limit(1);
+        
+        if (subAccount) {
+          // Use the sub-account's category and property type for ItemRef lookup
+          lineClassType = subAccount.categoryType as "Service" | "Install" | "Maintenance" | "Discount" | null;
+          lineSubType = subAccount.propertyType as "Residential" | "Commercial" | null;
           
-          // Still need to determine classType/subType for ItemRef assignment
-          if (item.isDiscountLine) {
-            lineClassType = "Discount";
-            const discountSubType = discountKindToSubType(item.discountKind as DiscountKind | null);
-            lineSubType = discountSubType || propertyTypeToSubType(propertyType);
-          } else if (item.itemId) {
-            const crmItem = itemsById.get(item.itemId);
-            if (crmItem?.category) {
-              lineClassType = categoryToClassType(crmItem.category as CrmItemCategory);
-              lineSubType = propertyTypeToSubType(propertyType);
-            }
+          // Find the associated QuickBooks Item for this sub-account
+          const [linkedItem] = await db.select()
+            .from(quickbooksItems)
+            .where(eq(quickbooksItems.incomeAccountId, item.quickbooksSubAccountId))
+            .limit(1);
+          
+          if (linkedItem?.quickbooksItemId) {
+            lineItem.SalesItemLineDetail.ItemRef = { value: linkedItem.quickbooksItemId };
+            console.log(`[QuickBooks SubAccount] Assigned ItemRef ${linkedItem.quickbooksItemId} for sub-account ${subAccount.name}`);
           }
-          // Don't continue - fall through to ItemRef assignment below
         }
       }
       
-      // Priority 2: Calculate class and item from category + property type
-      // Only run if ClassRef was not already set by Priority 1 (explicit override)
-      const hasExplicitClassRef = !!lineItem.SalesItemLineDetail.ClassRef;
+      // Priority 2: Calculate ItemRef from category + property type (if not already set via sub-account)
+      // Only run if ItemRef was not already set by Priority 1 (explicit sub-account override)
+      const hasExplicitItemRef = !!lineItem.SalesItemLineDetail.ItemRef;
       
-      if (item.isDiscountLine && !hasExplicitClassRef) {
+      if (item.isDiscountLine && !hasExplicitItemRef) {
         // For discount lines, use discountKind to determine subType
         const discountSubType = discountKindToSubType(item.discountKind as DiscountKind | null);
         if (discountSubType) {
           lineClassType = "Discount";
           lineSubType = discountSubType;
-          const key = `Discount:${discountSubType}`;
-          const qbClassId = classLookup.get(key);
-          if (qbClassId) {
-            lineItem.SalesItemLineDetail.ClassRef = { value: qbClassId };
-          } else {
-            console.log(`[QuickBooks Class] No class found for discount key: ${key}`);
-          }
         } else {
-          console.log(`[QuickBooks Class] Discount line without discountKind: ${item.description}`);
+          console.log(`[QuickBooks SubAccount] Discount line without discountKind: ${item.description}`);
         }
-      } else if (item.itemId && !hasExplicitClassRef) {
+      } else if (item.itemId && !hasExplicitItemRef) {
         // For regular items, use category + property type
         const crmItem = itemsById.get(item.itemId);
         if (crmItem?.category) {
@@ -737,23 +733,15 @@ export async function syncInvoiceToQuickBooks(
           lineClassType = classType;
           lineSubType = subType;
           
-          if (classType && subType) {
-            const key = `${classType}:${subType}`;
-            const qbClassId = classLookup.get(key);
-            if (qbClassId) {
-              lineItem.SalesItemLineDetail.ClassRef = { value: qbClassId };
-            } else {
-              console.log(`[QuickBooks Class] No class found for key: ${key} (available: ${Array.from(classLookup.keys()).join(", ")})`);
-            }
-          } else {
-            console.log(`[QuickBooks Class] Missing classType (${classType}) or subType (${subType}) for item: ${crmItem.name}`);
+          if (!classType || !subType) {
+            console.log(`[QuickBooks SubAccount] Missing classType (${classType}) or subType (${subType}) for item: ${crmItem.name}`);
           }
         } else {
-          console.log(`[QuickBooks Class] Item ${item.itemId} has no category set`);
+          console.log(`[QuickBooks SubAccount] Item ${item.itemId} has no category set`);
         }
-      } else if (!item.isDiscountLine && !item.itemId && !hasExplicitClassRef) {
+      } else if (!item.isDiscountLine && !item.itemId && !hasExplicitItemRef) {
         // Priority 3: For line items without itemId (e.g., maintenance agreement renewals),
-        // try to infer class type from description
+        // try to infer category from description
         const description = (item.description || "").toLowerCase();
         let inferredClassType: "Service" | "Install" | "Maintenance" | null = null;
         
@@ -768,27 +756,16 @@ export async function syncInvoiceToQuickBooks(
         lineClassType = inferredClassType;
         lineSubType = propertyTypeToSubType(propertyType);
         
-        if (inferredClassType && propertyType) {
-          const subType = propertyTypeToSubType(propertyType);
-          if (subType) {
-            const key = `${inferredClassType}:${subType}`;
-            const qbClassId = classLookup.get(key);
-            if (qbClassId) {
-              lineItem.SalesItemLineDetail.ClassRef = { value: qbClassId };
-            } else {
-              console.log(`[QuickBooks Class] No class found for inferred key: ${key}`);
-            }
-          }
-        } else if (!inferredClassType) {
-          console.log(`[QuickBooks Class] No itemId and couldn't infer class from description: "${item.description}"`);
+        if (!inferredClassType) {
+          console.log(`[QuickBooks SubAccount] No itemId and couldn't infer category from description: "${item.description}"`);
         } else if (!propertyType) {
-          console.log(`[QuickBooks Class] No property type for line item: "${item.description}"`);
+          console.log(`[QuickBooks SubAccount] No property type for line item: "${item.description}"`);
         }
       }
       
       // Add ItemRef for P&L routing based on category + property type
-      // This routes revenue to the correct income account in QuickBooks
-      if (lineClassType && lineSubType) {
+      // Only run if ItemRef wasn't already set via explicit sub-account override
+      if (!hasExplicitItemRef && lineClassType && lineSubType) {
         // For discounts, subType might be "Promotional" or "Maintenance" - map to Residential/Commercial if needed
         const itemSubType = (lineSubType === "Promotional" || lineSubType === "Maintenance") 
           ? propertyTypeToSubType(propertyType) 
@@ -2386,13 +2363,14 @@ async function linkParentAccountIds(realmId: string): Promise<void> {
 
 /**
  * Create a sub-account in QuickBooks under a parent account.
+ * Also auto-provisions a hidden QuickBooks Item that routes revenue to this sub-account.
  */
 export async function createSubAccountInQuickBooks(
   name: string,
   parentAccountId: string,
   categoryType: "Service" | "Install" | "Maintenance" | "Discount",
   propertyType: "Residential" | "Commercial"
-): Promise<{ success: boolean; accountId?: string; error?: string }> {
+): Promise<{ success: boolean; accountId?: string; itemId?: string; error?: string }> {
   try {
     const conn = await getActiveConnection();
     if (!conn) {
@@ -2411,11 +2389,11 @@ export async function createSubAccountInQuickBooks(
     
     const qbo = getQuickBooksClient(conn);
     
-    // Create the sub-account in QuickBooks
+    // Create the sub-account in QuickBooks with ServiceFeeIncome detail type
     const newAccount = {
       Name: name,
       AccountType: "Income",
-      AccountSubType: parentAccount.accountSubType || "ServiceFeeIncome",
+      AccountSubType: "ServiceFeeIncome", // Always use Service/Fee Income as requested
       ParentRef: { value: parentAccount.quickbooksAccountId }
     };
     
@@ -2428,8 +2406,8 @@ export async function createSubAccountInQuickBooks(
           return;
         }
         
-        // Save to CRM database
-        const [inserted] = await db.insert(quickbooksAccounts).values({
+        // Save sub-account to CRM database
+        const [insertedAccount] = await db.insert(quickbooksAccounts).values({
           name: account.Name,
           fullyQualifiedName: account.FullyQualifiedName,
           accountType: "Income",
@@ -2447,7 +2425,53 @@ export async function createSubAccountInQuickBooks(
         }).returning();
         
         console.log(`[QuickBooks] Created sub-account: ${account.FullyQualifiedName} (QB ID: ${account.Id})`);
-        resolve({ success: true, accountId: inserted.id });
+        
+        // Now auto-provision a hidden QuickBooks Item that routes to this sub-account
+        const itemName = `${parentAccount.name}:${name}`;
+        const qbItem = {
+          Name: itemName,
+          Description: `Auto-generated item for ${account.FullyQualifiedName}`,
+          Type: "Service",
+          IncomeAccountRef: { value: account.Id, name: account.FullyQualifiedName }
+        };
+        
+        // @ts-ignore - createItem exists in node-quickbooks but not in the type definitions
+        qbo.createItem(qbItem, async (itemErr: any, item: any) => {
+          if (itemErr) {
+            console.error("[QuickBooks] Error creating auto-provisioned item:", itemErr);
+            // Still return success for sub-account, but note item creation failed
+            resolve({ 
+              success: true, 
+              accountId: insertedAccount.id,
+              error: "Sub-account created but auto-item creation failed"
+            });
+            return;
+          }
+          
+          // Save the hidden item to CRM database
+          // @ts-ignore - TypeScript inference issue inside Promise callback, types are correct
+          const [insertedItem] = await db.insert(quickbooksItems).values({
+            name: item.Name,
+            description: item.Description || null,
+            categoryType,
+            propertyType,
+            incomeAccountId: insertedAccount.id,
+            itemType: "Service",
+            quickbooksItemId: item.Id,
+            quickbooksIncomeAccountId: account.Id,
+            realmId: conn.realmId,
+            syncToken: item.SyncToken,
+            isActive: true,
+            lastSyncedAt: new Date()
+          }).returning();
+          
+          console.log(`[QuickBooks] Auto-provisioned item: ${item.Name} (QB ID: ${item.Id})`);
+          resolve({ 
+            success: true, 
+            accountId: insertedAccount.id,
+            itemId: insertedItem.id
+          });
+        });
       });
     });
   } catch (error: any) {
@@ -2598,21 +2622,21 @@ export async function createQuickbooksItem(
         }
         
         // Save to CRM database
-        const insertData = {
+        // @ts-ignore - TypeScript inference issue inside Promise callback, types are correct
+        const [inserted] = await db.insert(quickbooksItems).values({
           name: data.name,
           description: data.description || null,
           categoryType: data.categoryType,
           propertyType: data.propertyType,
           incomeAccountId: data.incomeAccountId || null,
-          itemType: data.itemType || "Service" as const,
+          itemType: data.itemType || "Service",
           quickbooksItemId: item.Id,
           quickbooksIncomeAccountId: incomeAccountRef?.value || null,
           realmId: conn.realmId,
           syncToken: item.SyncToken,
           isActive: true,
           lastSyncedAt: new Date()
-        };
-        const [inserted] = await db.insert(quickbooksItems).values(insertData).returning();
+        }).returning();
         
         console.log(`[QuickBooks] Created item: ${item.Name} (QB ID: ${item.Id})`);
         resolve({ success: true, item: inserted });

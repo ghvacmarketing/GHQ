@@ -1188,8 +1188,8 @@ export const crmQuoteLineItems = pgTable("crm_quote_line_items", {
   discountKind: text("discount_kind").$type<DiscountKind>(),
   optionTag: text("option_tag"),
   imageUrl: text("image_url"),
-  // QuickBooks class override - if null, calculated from item category + property type
-  quickbooksClassId: varchar("quickbooks_class_id"),
+  // QuickBooks sub-account override - if null, calculated from item category + property type
+  quickbooksSubAccountId: varchar("quickbooks_sub_account_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1276,8 +1276,8 @@ export const crmInvoiceLineItems = pgTable("crm_invoice_line_items", {
   itemId: varchar("item_id").references(() => crmItems.id, { onDelete: "set null" }),
   isDiscountLine: boolean("is_discount_line").default(false),
   discountKind: text("discount_kind").$type<DiscountKind>(),
-  // QuickBooks class override - if null, calculated from item category + property type
-  quickbooksClassId: varchar("quickbooks_class_id"),
+  // QuickBooks sub-account override - if null, calculated from item category + property type
+  quickbooksSubAccountId: varchar("quickbooks_sub_account_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
