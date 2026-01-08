@@ -141,7 +141,7 @@ export default function CrmInvoiceCreate() {
   
   const [itemSearchOpen, setItemSearchOpen] = useState(false);
   const [itemSearchQuery, setItemSearchQuery] = useState("");
-  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<"all" | "install" | "service" | "maintenance">("all");
+  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<"all" | "install" | "service" | "maintenance" | "discount">("all");
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
 
   const [showCreateWODialog, setShowCreateWODialog] = useState(false);
@@ -1384,6 +1384,7 @@ export default function CrmInvoiceCreate() {
                   <SelectItem value="install">Install</SelectItem>
                   <SelectItem value="service">Service</SelectItem>
                   <SelectItem value="maintenance">Maintenance</SelectItem>
+                  <SelectItem value="discount">Discount</SelectItem>
                 </SelectContent>
               </Select>
             </div>

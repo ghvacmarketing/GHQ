@@ -143,7 +143,7 @@ export default function CrmQuoteCreate() {
   // CRM Items catalog state
   const [itemsCatalogOpen, setItemsCatalogOpen] = useState(false);
   const [itemSearch, setItemSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<"all" | "install" | "service" | "maintenance">("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "install" | "service" | "maintenance" | "discount">("all");
 
   // Customer search query
   const { data: customerSearchResults, isLoading: isSearchingCustomers } = useQuery<CrmCustomer[]>({
@@ -1312,7 +1312,7 @@ export default function CrmQuoteCreate() {
                   data-testid="input-item-search"
                 />
               </div>
-              <Select value={categoryFilter} onValueChange={(value) => setCategoryFilter(value as "all" | "install" | "service" | "maintenance")}>
+              <Select value={categoryFilter} onValueChange={(value) => setCategoryFilter(value as "all" | "install" | "service" | "maintenance" | "discount")}>
                 <SelectTrigger className="w-[140px]" data-testid="select-category-filter">
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
@@ -1321,6 +1321,7 @@ export default function CrmQuoteCreate() {
                   <SelectItem value="install">Install</SelectItem>
                   <SelectItem value="service">Service</SelectItem>
                   <SelectItem value="maintenance">Maintenance</SelectItem>
+                  <SelectItem value="discount">Discount</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1354,7 +1355,8 @@ export default function CrmQuoteCreate() {
                               "px-2 py-0.5 rounded text-xs capitalize",
                               item.category === "install" && "bg-blue-100 text-blue-700",
                               item.category === "service" && "bg-green-100 text-green-700",
-                              item.category === "maintenance" && "bg-amber-100 text-amber-700"
+                              item.category === "maintenance" && "bg-amber-100 text-amber-700",
+                              item.category === "discount" && "bg-purple-100 text-purple-700"
                             )}>
                               {item.category || "install"}
                             </span>
