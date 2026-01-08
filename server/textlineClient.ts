@@ -441,9 +441,9 @@ class TextlineClient {
     }
 
     try {
-      // Textline API: GET /api/conversations/{uuid}/comments.json to fetch messages
-      const url = `${TEXTLINE_BASE_URL}/api/conversations/${conversationUuid}/comments.json`;
-      console.log("[Textline] Fetching messages from:", url);
+      // Textline API: GET /api/conversations/{uuid}.json returns conversation with posts
+      const url = `${TEXTLINE_BASE_URL}/api/conversations/${conversationUuid}.json`;
+      console.log("[Textline] Fetching conversation with messages from:", url);
       
       const response = await fetch(url, {
         method: "GET",
@@ -471,8 +471,8 @@ class TextlineClient {
         };
       }
 
-      // Textline /comments.json returns "comments" array directly
-      const posts = data.comments || data.conversation?.posts || data.posts || [];
+      // Textline returns conversation object with posts array
+      const posts = data.conversation?.posts || data.posts || [];
       console.log("[Textline] Fetched", posts.length, "messages for conversation", conversationUuid);
       
       const mappedMessages: TextlineMessage[] = posts.map((post: any) => ({
@@ -517,8 +517,8 @@ class TextlineClient {
         },
       };
 
-      // Textline API: POST /api/conversations/{uuid}/comments.json to send a message
-      const url = `${TEXTLINE_BASE_URL}/api/conversations/${conversationUuid}/comments.json`;
+      // Textline API: POST /api/conversations/{uuid}.json to send a message
+      const url = `${TEXTLINE_BASE_URL}/api/conversations/${conversationUuid}.json`;
       console.log("[Textline] Sending message to:", url);
       
       const response = await fetch(url, {

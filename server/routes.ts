@@ -18044,7 +18044,13 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
             continue;
           }
           
-          const existingConvo = await storage.getMessagingConversationByExternalId(textlineConvo.uuid, "textline");
+          // First check by external ID, then check by phone number to avoid duplicates
+          let existingConvo = await storage.getMessagingConversationByExternalId(textlineConvo.uuid, "textline");
+          
+          // If not found by external ID, check by phone number to link existing conversations
+          if (!existingConvo) {
+            existingConvo = await storage.getMessagingConversationByPhone(textlineConvo.phone_number);
+          }
           
           let customerId: string | undefined;
           const customer = await storage.getCrmCustomerByPhone(textlineConvo.phone_number);
@@ -18073,6 +18079,11 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
             }
             if (textlineConvo.last_message_at) {
               updates.lastMessageAt = new Date(textlineConvo.last_message_at);
+            }
+            // Update external source and ID if missing (link existing local conversation to Textline)
+            if (!existingConvo.externalConversationId || existingConvo.externalSource !== "textline") {
+              updates.externalSource = "textline";
+              updates.externalConversationId = textlineConvo.uuid;
             }
             if (Object.keys(updates).length > 0) {
               await storage.updateMessagingConversation(existingConvo.id, updates);
