@@ -441,7 +441,8 @@ class TextlineClient {
     }
 
     try {
-      const url = `${TEXTLINE_BASE_URL}/api/conversations/${conversationUuid}.json`;
+      // Textline API: GET /api/conversations/{uuid}/comments.json to fetch messages
+      const url = `${TEXTLINE_BASE_URL}/api/conversations/${conversationUuid}/comments.json`;
       console.log("[Textline] Fetching messages from:", url);
       
       const response = await fetch(url, {
@@ -470,8 +471,8 @@ class TextlineClient {
         };
       }
 
-      // Textline returns "posts" array within the conversation
-      const posts = data.conversation?.posts || data.posts || [];
+      // Textline /comments.json returns "comments" array directly
+      const posts = data.comments || data.conversation?.posts || data.posts || [];
       console.log("[Textline] Fetched", posts.length, "messages for conversation", conversationUuid);
       
       const mappedMessages: TextlineMessage[] = posts.map((post: any) => ({
@@ -516,14 +517,26 @@ class TextlineClient {
         },
       };
 
-      const response = await fetch(
-        `${TEXTLINE_BASE_URL}/api/conversations/${conversationUuid}.json`,
-        {
-          method: "POST",
-          headers: this.getHeaders(),
-          body: JSON.stringify(body),
-        }
-      );
+      // Textline API: POST /api/conversations/{uuid}/comments.json to send a message
+      const url = `${TEXTLINE_BASE_URL}/api/conversations/${conversationUuid}/comments.json`;
+      console.log("[Textline] Sending message to:", url);
+      
+      const response = await fetch(url, {
+        method: "POST",
+        headers: this.getHeaders(),
+        body: JSON.stringify(body),
+      });
+
+      // Check content type before parsing
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("[Textline] Send message non-JSON response:", response.status, text.substring(0, 200));
+        return {
+          success: false,
+          errorMessage: `API returned non-JSON response (${response.status})`,
+        };
+      }
 
       const data = await response.json();
 
@@ -535,10 +548,12 @@ class TextlineClient {
         };
       }
 
+      // Response contains the created comment
+      console.log("[Textline] Message sent successfully:", data.comment?.uuid || data.uuid);
       return {
         success: true,
         conversationUuid: data.conversation?.uuid || conversationUuid,
-        messageUuid: data.post?.uuid,
+        messageUuid: data.comment?.uuid || data.uuid,
       };
     } catch (error: any) {
       console.error("[Textline] Send message exception:", error);
