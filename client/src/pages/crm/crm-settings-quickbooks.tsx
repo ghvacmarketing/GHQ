@@ -121,11 +121,7 @@ export default function CrmSettingsQuickBooks() {
       return data.authUrl;
     },
     onSuccess: (authUrl: string) => {
-      window.open(authUrl, '_blank');
-      toast({
-        title: "QuickBooks Login Opened",
-        description: "Complete the login in the new tab, then return here and refresh the page.",
-      });
+      window.location.href = authUrl;
     },
     onError: (error: any) => {
       toast({

@@ -41,7 +41,7 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import stripePaymentsRouter from "./stripe-payments";
 import { getMessagingAdapter } from "./services/messaging/adapters";
 import { textlineClient } from "./textlineClient";
-import { autoSyncCustomer, autoSyncInvoice, autoVoidInvoice } from "./services/quickbooksService";
+import { autoSyncCustomer, autoSyncInvoice, autoVoidInvoice, autoSyncPayment } from "./services/quickbooksService";
 
 // Simple in-memory token store for admin authentication (works in Replit iframe where cookies fail)
 const adminTokens = new Map<string, { createdAt: number }>();
@@ -13679,7 +13679,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .where(eq(crmInvoices.id, req.params.id))
         .returning();
+      
+      // Sync invoice and payment to QuickBooks
       autoSyncInvoice(updatedInvoice.id);
+      autoSyncPayment(updatedInvoice.id, paidAmount.toFixed(2));
       
       // Deactivate Stripe payment link if invoice is fully paid and has one
       if (newStatus === "paid" && invoice.stripePaymentLinkId) {

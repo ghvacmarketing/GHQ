@@ -1074,7 +1074,7 @@ export async function getConnectionStatus(): Promise<{
     return { connected: false };
   }
   
-  // Get sync counts - use try/catch to handle potential query issues
+  // Get sync counts - only count successfully synced records for current realm
   let customerCount = 0;
   let invoiceCount = 0;
   let paymentCount = 0;
@@ -1082,17 +1082,26 @@ export async function getConnectionStatus(): Promise<{
   try {
     const [customerResult] = await db.select({ count: db.$count(quickbooksCustomerSync) })
       .from(quickbooksCustomerSync)
-      .where(eq(quickbooksCustomerSync.realmId, connection.realmId));
+      .where(and(
+        eq(quickbooksCustomerSync.realmId, connection.realmId),
+        eq(quickbooksCustomerSync.syncStatus, "synced")
+      ));
     customerCount = customerResult?.count ?? 0;
     
     const [invoiceResult] = await db.select({ count: db.$count(quickbooksInvoiceSync) })
       .from(quickbooksInvoiceSync)
-      .where(eq(quickbooksInvoiceSync.realmId, connection.realmId));
+      .where(and(
+        eq(quickbooksInvoiceSync.realmId, connection.realmId),
+        eq(quickbooksInvoiceSync.syncStatus, "synced")
+      ));
     invoiceCount = invoiceResult?.count ?? 0;
     
     const [paymentResult] = await db.select({ count: db.$count(quickbooksPaymentSync) })
       .from(quickbooksPaymentSync)
-      .where(eq(quickbooksPaymentSync.realmId, connection.realmId));
+      .where(and(
+        eq(quickbooksPaymentSync.realmId, connection.realmId),
+        eq(quickbooksPaymentSync.syncStatus, "synced")
+      ));
     paymentCount = paymentResult?.count ?? 0;
   } catch (err) {
     console.error("[QuickBooks] Error getting sync counts:", err);
@@ -1636,5 +1645,35 @@ export async function autoVoidInvoice(invoiceId: string): Promise<void> {
     });
   } catch (error) {
     console.error("[QuickBooks Auto] Invoice void trigger error:", error);
+  }
+}
+
+/**
+ * Automatically sync a payment to QuickBooks when an invoice is paid.
+ * This is a fire-and-forget operation - it won't block the main request.
+ */
+export async function autoSyncPayment(invoiceId: string, paymentAmount: string): Promise<void> {
+  try {
+    const conn = await getActiveConnection();
+    if (!conn) {
+      return; // No active connection, skip sync
+    }
+    
+    // Fire and forget
+    (async () => {
+      try {
+        // Sync payment to QuickBooks
+        const result = await syncPaymentToQuickBooks(invoiceId, paymentAmount, new Date());
+        if (result.success) {
+          console.log(`[QuickBooks Auto] Payment for invoice ${invoiceId} synced (QB ID: ${result.quickbooksId})`);
+        } else {
+          console.log(`[QuickBooks Auto] Payment sync failed for invoice ${invoiceId}: ${result.error}`);
+        }
+      } catch (err) {
+        console.error(`[QuickBooks Auto] Payment sync error for invoice ${invoiceId}:`, err);
+      }
+    })();
+  } catch (error) {
+    console.error("[QuickBooks Auto] Payment sync trigger error:", error);
   }
 }
