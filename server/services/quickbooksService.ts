@@ -2598,14 +2598,21 @@ export async function createQuickbooksItem(
         }
         
         // Save to CRM database
-        const [inserted] = await db.insert(quickbooksItems).values({
-          ...data,
+        const insertData = {
+          name: data.name,
+          description: data.description || null,
+          categoryType: data.categoryType,
+          propertyType: data.propertyType,
+          incomeAccountId: data.incomeAccountId || null,
+          itemType: data.itemType || "Service" as const,
           quickbooksItemId: item.Id,
           quickbooksIncomeAccountId: incomeAccountRef?.value || null,
           realmId: conn.realmId,
           syncToken: item.SyncToken,
+          isActive: true,
           lastSyncedAt: new Date()
-        }).returning();
+        };
+        const [inserted] = await db.insert(quickbooksItems).values(insertData).returning();
         
         console.log(`[QuickBooks] Created item: ${item.Name} (QB ID: ${item.Id})`);
         resolve({ success: true, item: inserted });
@@ -2711,7 +2718,14 @@ export async function pullItemsFromQuickBooks(): Promise<{
  */
 export async function updateQuickbooksItemMapping(
   itemId: string,
-  updates: Partial<InsertQuickbooksItem>
+  updates: { 
+    name?: string; 
+    description?: string | null; 
+    categoryType?: "Service" | "Install" | "Maintenance" | "Discount";
+    propertyType?: "Residential" | "Commercial";
+    incomeAccountId?: string | null;
+    isActive?: boolean;
+  }
 ): Promise<{ success: boolean; error?: string }> {
   try {
     await db.update(quickbooksItems)

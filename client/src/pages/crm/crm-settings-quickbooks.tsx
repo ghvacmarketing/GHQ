@@ -33,10 +33,10 @@ import {
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
-import type { CrmUser, QuickbooksConnection, QuickbooksAccount, QuickbooksItem } from "@shared/schema";
+import type { CrmUser, QuickbooksConnection, QuickbooksAccount } from "@shared/schema";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Wallet, Package } from "lucide-react";
+import { Download, Wallet } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -58,11 +58,9 @@ import {
 
 const CATEGORY_TYPES = ["Service", "Install", "Maintenance", "Discount"] as const;
 const PROPERTY_TYPES = ["Residential", "Commercial"] as const;
-const ITEM_TYPES = ["Service", "NonInventory"] as const;
 
 type CategoryType = typeof CATEGORY_TYPES[number];
 type PropertyType = typeof PROPERTY_TYPES[number];
-type ItemType = typeof ITEM_TYPES[number];
 
 interface ConnectionStatus {
   connected: boolean;
@@ -83,15 +81,6 @@ interface AccountFormData {
   propertyType: PropertyType;
 }
 
-interface ItemFormData {
-  name: string;
-  description: string;
-  categoryType: CategoryType;
-  propertyType: PropertyType;
-  incomeAccountId: string;
-  itemType: ItemType;
-}
-
 export default function CrmSettingsQuickBooks() {
   usePageTitle("QuickBooks Integration");
   const [, navigate] = useLocation();
@@ -104,16 +93,6 @@ export default function CrmSettingsQuickBooks() {
     categoryType: "Service",
     propertyType: "Residential",
   });
-  const [showAddItemDialog, setShowAddItemDialog] = useState(false);
-  const [itemFormData, setItemFormData] = useState<ItemFormData>({
-    name: "",
-    description: "",
-    categoryType: "Service",
-    propertyType: "Residential",
-    incomeAccountId: "",
-    itemType: "Service",
-  });
-  
   const searchParams = new URLSearchParams(window.location.search);
   const successParam = searchParams.get("success");
   const errorParam = searchParams.get("error");
@@ -137,12 +116,6 @@ export default function CrmSettingsQuickBooks() {
 
   const { data: parentAccounts } = useQuery<QuickbooksAccount[]>({
     queryKey: ["/api/quickbooks/accounts/parents"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
-    enabled: !!currentUser && status?.connected,
-  });
-
-  const { data: items, isLoading: itemsLoading } = useQuery<QuickbooksItem[]>({
-    queryKey: ["/api/quickbooks/items"],
     queryFn: getQueryFn({ on401: "returnNull" }),
     enabled: !!currentUser && status?.connected,
   });
@@ -336,78 +309,6 @@ export default function CrmSettingsQuickBooks() {
       toast({
         title: "Update Failed",
         description: error.message || "Failed to update account",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const pullItemsMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/quickbooks/items/pull");
-      return response.json();
-    },
-    onSuccess: (result: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/items"] });
-      toast({
-        title: "Items Pulled",
-        description: result.message || "Items pulled from QuickBooks",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Pull Failed",
-        description: error.message || "Failed to pull items from QuickBooks",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const createItemMutation = useMutation({
-    mutationFn: async (data: ItemFormData) => {
-      const response = await apiRequest("POST", "/api/quickbooks/items", data);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/items"] });
-      setShowAddItemDialog(false);
-      setItemFormData({
-        name: "",
-        description: "",
-        categoryType: "Service",
-        propertyType: "Residential",
-        incomeAccountId: "",
-        itemType: "Service",
-      });
-      toast({
-        title: "Item Created",
-        description: "New item created successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Create Failed",
-        description: error.message || "Failed to create item",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updateItemMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { categoryType?: string; propertyType?: string; incomeAccountId?: string; isActive?: boolean } }) => {
-      const response = await apiRequest("PATCH", `/api/quickbooks/items/${id}`, data);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/items"] });
-      toast({
-        title: "Item Updated",
-        description: "Item updated successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Update Failed",
-        description: error.message || "Failed to update item",
         variant: "destructive",
       });
     },
@@ -781,171 +682,6 @@ export default function CrmSettingsQuickBooks() {
             </Card>
           )}
 
-          {status?.connected && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Package className="h-6 w-6 text-purple-600" />
-                    <div>
-                      <CardTitle>Products & Services</CardTitle>
-                      <CardDescription>Manage QuickBooks items that link to income accounts for P&L routing</CardDescription>
-                    </div>
-                  </div>
-                  <Button onClick={() => setShowAddItemDialog(true)} data-testid="btn-add-item">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Item
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {itemsLoading ? (
-                  <Skeleton className="h-48 w-full" />
-                ) : items && items.length > 0 ? (
-                  <div className="space-y-4">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead>Category Type</TableHead>
-                          <TableHead>Property Type</TableHead>
-                          <TableHead>Income Account</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {items.map((item) => (
-                          <TableRow key={item.id} data-testid={`item-row-${item.id}`}>
-                            <TableCell className="font-medium">{item.name}</TableCell>
-                            <TableCell className="text-slate-600 max-w-48 truncate">{item.description || "-"}</TableCell>
-                            <TableCell>
-                              <Select
-                                value={item.categoryType || ""}
-                                onValueChange={(value) => {
-                                  updateItemMutation.mutate({
-                                    id: item.id,
-                                    data: { categoryType: value || undefined },
-                                  });
-                                }}
-                              >
-                                <SelectTrigger className="w-32" data-testid={`select-item-category-${item.id}`}>
-                                  <SelectValue placeholder="Select..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {CATEGORY_TYPES.map((type) => (
-                                    <SelectItem key={type} value={type}>
-                                      {type}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              <Select
-                                value={item.propertyType || ""}
-                                onValueChange={(value) => {
-                                  updateItemMutation.mutate({
-                                    id: item.id,
-                                    data: { propertyType: value || undefined },
-                                  });
-                                }}
-                              >
-                                <SelectTrigger className="w-32" data-testid={`select-item-property-${item.id}`}>
-                                  <SelectValue placeholder="Select..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {PROPERTY_TYPES.map((type) => (
-                                    <SelectItem key={type} value={type}>
-                                      {type}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              <Select
-                                value={item.incomeAccountId || ""}
-                                onValueChange={(value) => {
-                                  updateItemMutation.mutate({
-                                    id: item.id,
-                                    data: { incomeAccountId: value || undefined },
-                                  });
-                                }}
-                              >
-                                <SelectTrigger className="w-40" data-testid={`select-item-account-${item.id}`}>
-                                  <SelectValue placeholder="Select account...">
-                                    {accounts?.find(a => a.id === item.incomeAccountId)?.name || "Select account..."}
-                                  </SelectValue>
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="">None</SelectItem>
-                                  {accounts?.filter(a => !a.isParent).map((account) => (
-                                    <SelectItem key={account.id} value={account.id}>
-                                      {account.fullyQualifiedName || account.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              {item.isActive ? (
-                                <Badge variant="default" className="bg-green-100 text-green-800">Active</Badge>
-                              ) : (
-                                <Badge variant="secondary">Inactive</Badge>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                    
-                    <Separator />
-                    
-                    <div className="flex gap-3">
-                      <Button
-                        variant="outline"
-                        onClick={() => pullItemsMutation.mutate()}
-                        disabled={pullItemsMutation.isPending}
-                        data-testid="btn-pull-items"
-                      >
-                        {pullItemsMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Download className="h-4 w-4 mr-2" />
-                        )}
-                        Pull from QuickBooks
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-slate-500 mb-4">No items configured yet</p>
-                    <div className="flex justify-center gap-3">
-                      <Button onClick={() => setShowAddItemDialog(true)} data-testid="btn-add-first-item">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Your First Item
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => pullItemsMutation.mutate()}
-                        disabled={pullItemsMutation.isPending}
-                        data-testid="btn-pull-items-empty"
-                      >
-                        {pullItemsMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Download className="h-4 w-4 mr-2" />
-                        )}
-                        Pull from QuickBooks
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
           <Card>
             <CardHeader>
               <CardTitle>How It Works</CardTitle>
@@ -955,7 +691,6 @@ export default function CrmSettingsQuickBooks() {
               <p><strong>Invoice Sync:</strong> When you send an invoice from the CRM, it can be synced to QuickBooks. Use the sync button on individual invoices.</p>
               <p><strong>Payment Sync:</strong> When an invoice is marked as paid in the CRM, the payment is recorded in QuickBooks.</p>
               <p><strong>Chart of Accounts:</strong> Pull your income accounts from QuickBooks, then create sub-accounts (e.g., Service:Residential, Install:Commercial) to route revenue for accurate P&L tracking.</p>
-              <p><strong>Products & Services:</strong> Create items that link to income sub-accounts. When invoices sync, revenue is routed to the correct account.</p>
               <p className="text-amber-600"><strong>Note:</strong> For testing, use Sandbox mode first. Switch to Production when you're ready to sync real data.</p>
             </CardContent>
           </Card>
@@ -1076,152 +811,6 @@ export default function CrmSettingsQuickBooks() {
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : null}
               Create Sub-Account
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showAddItemDialog} onOpenChange={setShowAddItemDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create Item</DialogTitle>
-            <DialogDescription>
-              Create a new QuickBooks item for invoice line items.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="item-name">Name *</Label>
-              <Input
-                id="item-name"
-                value={itemFormData.name}
-                onChange={(e) => setItemFormData({ ...itemFormData, name: e.target.value })}
-                placeholder="e.g., HVAC Service - Residential"
-                data-testid="input-item-name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="item-description">Description</Label>
-              <Input
-                id="item-description"
-                value={itemFormData.description}
-                onChange={(e) => setItemFormData({ ...itemFormData, description: e.target.value })}
-                placeholder="Item description for invoice lines"
-                data-testid="input-item-description"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="item-category-type">Category Type *</Label>
-              <Select
-                value={itemFormData.categoryType}
-                onValueChange={(value: CategoryType) => setItemFormData({ ...itemFormData, categoryType: value })}
-              >
-                <SelectTrigger data-testid="select-item-category-type">
-                  <SelectValue placeholder="Select category type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORY_TYPES.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="item-property-type">Property Type *</Label>
-              <Select
-                value={itemFormData.propertyType}
-                onValueChange={(value: PropertyType) => setItemFormData({ ...itemFormData, propertyType: value })}
-              >
-                <SelectTrigger data-testid="select-item-property-type">
-                  <SelectValue placeholder="Select property type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PROPERTY_TYPES.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="item-income-account">Income Account</Label>
-              <Select
-                value={itemFormData.incomeAccountId}
-                onValueChange={(value) => setItemFormData({ ...itemFormData, incomeAccountId: value })}
-              >
-                <SelectTrigger data-testid="select-item-income-account">
-                  <SelectValue placeholder="Select income account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts?.filter(a => !a.isParent).map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.fullyQualifiedName || account.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="item-type">Item Type</Label>
-              <Select
-                value={itemFormData.itemType}
-                onValueChange={(value: ItemType) => setItemFormData({ ...itemFormData, itemType: value })}
-              >
-                <SelectTrigger data-testid="select-item-type">
-                  <SelectValue placeholder="Select item type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ITEM_TYPES.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddItemDialog(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={() => {
-                if (!itemFormData.name.trim()) {
-                  toast({
-                    title: "Validation Error",
-                    description: "Name is required",
-                    variant: "destructive",
-                  });
-                  return;
-                }
-                if (!itemFormData.categoryType) {
-                  toast({
-                    title: "Validation Error",
-                    description: "Category type is required",
-                    variant: "destructive",
-                  });
-                  return;
-                }
-                if (!itemFormData.propertyType) {
-                  toast({
-                    title: "Validation Error",
-                    description: "Property type is required",
-                    variant: "destructive",
-                  });
-                  return;
-                }
-                createItemMutation.mutate(itemFormData);
-              }}
-              disabled={createItemMutation.isPending}
-              data-testid="btn-submit-add-item"
-            >
-              {createItemMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : null}
-              Create Item
             </Button>
           </DialogFooter>
         </DialogContent>
