@@ -47,6 +47,7 @@ import {
   Plus,
   Filter,
   ArrowLeft,
+  RefreshCw,
 } from "lucide-react";
 import type {
   CrmMessagingConversation,
@@ -212,6 +213,23 @@ export default function CrmMessaging() {
     },
   });
 
+  const syncTextlineMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/crm/messaging/sync-textline");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/messaging/conversations"] });
+      toast({
+        title: "Textline Sync Complete",
+        description: `Created: ${data.created}, Updated: ${data.updated}, Linked: ${data.linked} customers`,
+      });
+    },
+    onError: () => {
+      toast({ title: "Failed to sync from Textline", variant: "destructive" });
+    },
+  });
+
   useEffect(() => {
     if (conversationDetail?.conversation?.unreadInboundCount && conversationDetail.conversation.unreadInboundCount > 0) {
       markReadMutation.mutate();
@@ -254,9 +272,20 @@ export default function CrmMessaging() {
                 <MessageSquare className="h-5 w-5 text-[#d3b07d]" />
                 Messages
               </h1>
-              <Button size="sm" variant="outline" data-testid="button-new-conversation">
-                <Plus className="h-4 w-4" />
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => syncTextlineMutation.mutate()}
+                  disabled={syncTextlineMutation.isPending}
+                  data-testid="button-sync-textline"
+                >
+                  <RefreshCw className={`h-4 w-4 ${syncTextlineMutation.isPending ? "animate-spin" : ""}`} />
+                </Button>
+                <Button size="sm" variant="outline" data-testid="button-new-conversation">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
