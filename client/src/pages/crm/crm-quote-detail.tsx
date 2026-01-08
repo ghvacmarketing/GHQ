@@ -191,6 +191,7 @@ export default function CrmQuoteDetail() {
   const [showWhatsIncludedDialog, setShowWhatsIncludedDialog] = useState(false);
   const [editingWhatsIncluded, setEditingWhatsIncluded] = useState<Array<{ category: string; items: string[] }>>([]);
   const [isVerifyingDeposit, setIsVerifyingDeposit] = useState(false);
+  const [isGeneratingPaymentLink, setIsGeneratingPaymentLink] = useState(false);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -495,7 +496,7 @@ export default function CrmQuoteDetail() {
     },
   });
 
-  const handlePresentationAccept = () => {
+  const handlePresentationAccept = async () => {
     if (!presentationSignature) {
       toast({ title: "Signature required", description: "Please have the client sign above.", variant: "destructive" });
       return;
@@ -512,11 +513,55 @@ export default function CrmQuoteDetail() {
       toast({ title: "Selection required", description: "Please select one of the available options.", variant: "destructive" });
       return;
     }
-    acceptInPersonMutation.mutate({
-      signatureImage: presentationSignature,
-      signerName: presentationName.trim(),
-      selectedOption: presentationSelectedOption,
-    });
+
+    // Check if this quote requires a deposit payment (install/proposal quotes)
+    const depositCategories = ["custom install", "proposal builder", "custom service", "install"];
+    const requiresDeposit = depositCategories.includes(quote?.quoteType || "");
+
+    if (requiresDeposit) {
+      // Generate payment link and redirect to Stripe
+      setIsGeneratingPaymentLink(true);
+      try {
+        const response = await fetch(`/api/stripe/quote/${quoteId}/payment-link`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            selectedOption: presentationSelectedOption,
+            signatureImage: presentationSignature,
+            signerName: presentationName.trim(),
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to create payment link");
+        }
+
+        if (data.paymentLinkUrl) {
+          // Open Stripe payment page in new tab
+          window.open(data.paymentLinkUrl, '_blank');
+          toast({ 
+            title: "Payment link opened", 
+            description: "A new tab has been opened for the customer to complete the deposit payment." 
+          });
+        }
+      } catch (error: any) {
+        toast({ 
+          title: "Payment Error", 
+          description: error.message || "Failed to generate payment link", 
+          variant: "destructive" 
+        });
+      } finally {
+        setIsGeneratingPaymentLink(false);
+      }
+    } else {
+      // For non-deposit quotes, accept directly
+      acceptInPersonMutation.mutate({
+        signatureImage: presentationSignature,
+        signerName: presentationName.trim(),
+        selectedOption: presentationSelectedOption,
+      });
+    }
   };
 
   const resetPresentationState = () => {
@@ -2866,15 +2911,15 @@ export default function CrmQuoteDetail() {
 
                     <Button
                       onClick={handlePresentationAccept}
-                      disabled={acceptInPersonMutation.isPending}
+                      disabled={acceptInPersonMutation.isPending || isGeneratingPaymentLink}
                       className="w-full py-6 text-lg"
                       style={{ backgroundColor: BRAND_COLOR }}
                       data-testid="button-presentation-accept"
                     >
-                      {acceptInPersonMutation.isPending ? (
+                      {acceptInPersonMutation.isPending || isGeneratingPaymentLink ? (
                         <>
                           <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                          Processing...
+                          {isGeneratingPaymentLink ? "Opening Payment..." : "Processing..."}
                         </>
                       ) : (
                         <>
