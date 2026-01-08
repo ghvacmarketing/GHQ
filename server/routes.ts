@@ -15645,8 +15645,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Quote not found" });
       }
       
-      if (quote.status !== "draft") {
-        return res.status(400).json({ message: "Can only add line items to draft quotes" });
+      // Allow adding for all statuses except accepted and converted
+      const nonEditableStatuses = ["accepted", "converted"];
+      if (nonEditableStatuses.includes(quote.status)) {
+        return res.status(400).json({ message: "Cannot add line items to accepted or converted quotes" });
       }
       
       // Get existing line items for discount validation
@@ -15699,8 +15701,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Quote not found" });
       }
       
-      if (quote.status !== "draft") {
-        return res.status(400).json({ message: "Can only update line items on draft quotes" });
+      // Allow editing for all statuses except accepted and converted
+      const nonEditableStatuses = ["accepted", "converted"];
+      if (nonEditableStatuses.includes(quote.status)) {
+        return res.status(400).json({ message: "Cannot update line items on accepted or converted quotes" });
       }
       
       const [existingLineItem] = await db.select().from(crmQuoteLineItems)
@@ -15784,8 +15788,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Quote not found" });
       }
       
-      if (quote.status !== "draft") {
-        return res.status(400).json({ message: "Can only delete line items from draft quotes" });
+      // Allow deleting for all statuses except accepted and converted
+      const nonEditableStatuses = ["accepted", "converted"];
+      if (nonEditableStatuses.includes(quote.status)) {
+        return res.status(400).json({ message: "Cannot delete line items from accepted or converted quotes" });
       }
       
       const [existingLineItem] = await db.select().from(crmQuoteLineItems)
