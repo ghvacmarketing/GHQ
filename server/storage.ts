@@ -1865,17 +1865,17 @@ export class DatabaseStorage implements IStorage {
             ? and(...conditions, ilike(crmCustomers.name, `%${filters.search}%`))
             : ilike(crmCustomers.name, `%${filters.search}%`)
         )
-        .orderBy(desc(crmMessagingConversations.lastMessageAt));
+        .orderBy(sql`${crmMessagingConversations.lastMessageAt} DESC NULLS LAST`);
       return searchResults.map(r => r.conversation);
     }
 
     if (conditions.length === 0) {
-      return await db.select().from(crmMessagingConversations).orderBy(desc(crmMessagingConversations.lastMessageAt));
+      return await db.select().from(crmMessagingConversations).orderBy(sql`${crmMessagingConversations.lastMessageAt} DESC NULLS LAST`);
     }
 
     return await db.select().from(crmMessagingConversations)
       .where(and(...conditions))
-      .orderBy(desc(crmMessagingConversations.lastMessageAt));
+      .orderBy(sql`${crmMessagingConversations.lastMessageAt} DESC NULLS LAST`);
   }
 
   async getMessagingConversationById(id: string): Promise<CrmMessagingConversation | undefined> {
@@ -2011,23 +2011,23 @@ export class DatabaseStorage implements IStorage {
       if (statusFilter) {
         results = await baseQuery
           .where(and(statusFilter, searchCondition))
-          .orderBy(desc(crmMessagingConversations.lastMessageAt))
+          .orderBy(sql`${crmMessagingConversations.lastMessageAt} DESC NULLS LAST`)
           .limit(50);
       } else {
         results = await baseQuery
           .where(searchCondition)
-          .orderBy(desc(crmMessagingConversations.lastMessageAt))
+          .orderBy(sql`${crmMessagingConversations.lastMessageAt} DESC NULLS LAST`)
           .limit(50);
       }
     } else {
       if (statusFilter) {
         results = await baseQuery
           .where(statusFilter)
-          .orderBy(desc(crmMessagingConversations.lastMessageAt))
+          .orderBy(sql`${crmMessagingConversations.lastMessageAt} DESC NULLS LAST`)
           .limit(50);
       } else {
         results = await baseQuery
-          .orderBy(desc(crmMessagingConversations.lastMessageAt))
+          .orderBy(sql`${crmMessagingConversations.lastMessageAt} DESC NULLS LAST`)
           .limit(50);
       }
     }
@@ -2083,7 +2083,7 @@ export class DatabaseStorage implements IStorage {
       .where(or(
         ...phoneVariants.map(p => ilike(crmMessagingConversations.phoneNumber, `%${p}%`))
       ))
-      .orderBy(desc(crmMessagingConversations.lastMessageAt))
+      .orderBy(sql`${crmMessagingConversations.lastMessageAt} DESC NULLS LAST`)
       .limit(1);
     
     return conversation || undefined;
