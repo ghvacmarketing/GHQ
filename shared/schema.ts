@@ -2689,3 +2689,37 @@ export const insertQuickbooksCategoryClassMapSchema = createInsertSchema(quickbo
 
 export type InsertQuickbooksCategoryClassMap = z.infer<typeof insertQuickbooksCategoryClassMapSchema>;
 export type QuickbooksCategoryClassMap = typeof quickbooksCategoryClassMap.$inferSelect;
+
+// QuickBooks Accounts - maps to QuickBooks Chart of Accounts for income tracking
+// Supports hierarchical parent/child structure (e.g., Service > Residential, Install > Commercial)
+export const quickbooksAccounts = pgTable("quickbooks_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 255 }).notNull(), // e.g., "Service" or "Residential"
+  fullyQualifiedName: varchar("fully_qualified_name", { length: 500 }), // e.g., "Service:Residential"
+  accountType: text("account_type").$type<"Income" | "Expense" | "Other Income" | "Other Expense">().default("Income"), // QuickBooks account type
+  accountSubType: varchar("account_sub_type", { length: 100 }), // QuickBooks detail type (e.g., "ServiceFeeIncome")
+  // Category mapping - which CRM item category this account handles
+  categoryType: text("category_type").$type<"Service" | "Install" | "Maintenance" | "Discount">(), // null for parent accounts
+  // Property type mapping - which property type this sub-account handles  
+  propertyType: text("property_type").$type<"Residential" | "Commercial">(), // null for parent accounts
+  isParent: boolean("is_parent").default(false), // true for parent accounts (Service, Install, etc.)
+  parentAccountId: varchar("parent_account_id"), // references id of parent account in this table
+  quickbooksAccountId: varchar("quickbooks_account_id"), // QuickBooks Account.Id
+  quickbooksParentAccountId: varchar("quickbooks_parent_account_id"), // QuickBooks parent Account.Id
+  realmId: varchar("realm_id"), // QuickBooks company ID
+  syncToken: varchar("sync_token"), // Required for QuickBooks updates
+  isActive: boolean("is_active").default(true),
+  currentBalance: varchar("current_balance"), // Current balance from QuickBooks
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuickbooksAccountSchema = createInsertSchema(quickbooksAccounts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertQuickbooksAccount = z.infer<typeof insertQuickbooksAccountSchema>;
+export type QuickbooksAccount = typeof quickbooksAccounts.$inferSelect;

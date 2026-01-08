@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
@@ -19717,6 +19717,167 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error: any) {
       console.error("[QuickBooks] Bulk save category mappings error:", error);
       res.status(500).json({ message: "Failed to save category mappings" });
+    }
+  });
+
+  // =============================================
+  // QUICKBOOKS ACCOUNTS (CHART OF ACCOUNTS)
+  // =============================================
+
+  // GET /api/quickbooks/accounts - Get all accounts
+  app.get("/api/quickbooks/accounts", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { getActiveConnection } = await import("./services/quickbooksService");
+      const conn = await getActiveConnection();
+      if (!conn) {
+        return res.json([]);
+      }
+      
+      const accounts = await db.select()
+        .from(quickbooksAccounts)
+        .where(eq(quickbooksAccounts.realmId, conn.realmId));
+      
+      res.json(accounts);
+    } catch (error: any) {
+      console.error("[QuickBooks] Get accounts error:", error);
+      res.status(500).json({ message: "Failed to get accounts" });
+    }
+  });
+
+  // GET /api/quickbooks/accounts/parents - Get parent accounts only
+  app.get("/api/quickbooks/accounts/parents", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { getActiveConnection, getParentAccounts } = await import("./services/quickbooksService");
+      const conn = await getActiveConnection();
+      if (!conn) {
+        return res.json([]);
+      }
+      
+      const parents = await getParentAccounts(conn.realmId);
+      res.json(parents);
+    } catch (error: any) {
+      console.error("[QuickBooks] Get parent accounts error:", error);
+      res.status(500).json({ message: "Failed to get parent accounts" });
+    }
+  });
+
+  // POST /api/quickbooks/accounts/pull - Pull accounts from QuickBooks
+  app.post("/api/quickbooks/accounts/pull", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { pullAccountsFromQuickBooks } = await import("./services/quickbooksService");
+      const result = await pullAccountsFromQuickBooks();
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Pull accounts error:", error);
+      res.status(500).json({ message: "Failed to pull accounts" });
+    }
+  });
+
+  // POST /api/quickbooks/accounts/sub-account - Create a sub-account
+  app.post("/api/quickbooks/accounts/sub-account", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { name, parentAccountId, categoryType, propertyType } = req.body;
+      
+      if (!name || !parentAccountId || !categoryType || !propertyType) {
+        return res.status(400).json({ 
+          message: "name, parentAccountId, categoryType, and propertyType are required" 
+        });
+      }
+      
+      const validCategoryTypes = ["Service", "Install", "Maintenance", "Discount"];
+      if (!validCategoryTypes.includes(categoryType)) {
+        return res.status(400).json({ 
+          message: `categoryType must be one of: ${validCategoryTypes.join(", ")}` 
+        });
+      }
+      
+      const validPropertyTypes = ["Residential", "Commercial"];
+      if (!validPropertyTypes.includes(propertyType)) {
+        return res.status(400).json({ 
+          message: `propertyType must be one of: ${validPropertyTypes.join(", ")}` 
+        });
+      }
+      
+      const { createSubAccountInQuickBooks } = await import("./services/quickbooksService");
+      const result = await createSubAccountInQuickBooks(name, parentAccountId, categoryType, propertyType);
+      
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error: any) {
+      console.error("[QuickBooks] Create sub-account error:", error);
+      res.status(500).json({ message: "Failed to create sub-account" });
+    }
+  });
+
+  // PATCH /api/quickbooks/accounts/:accountId - Update account mapping
+  app.patch("/api/quickbooks/accounts/:accountId", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { categoryType, propertyType, isActive } = req.body;
+      const updateData: any = { updatedAt: new Date() };
+      
+      if (categoryType !== undefined) {
+        const validCategoryTypes = ["Service", "Install", "Maintenance", "Discount", null];
+        if (!validCategoryTypes.includes(categoryType)) {
+          return res.status(400).json({ 
+            message: "categoryType must be one of: Service, Install, Maintenance, Discount, or null" 
+          });
+        }
+        updateData.categoryType = categoryType;
+      }
+      
+      if (propertyType !== undefined) {
+        const validPropertyTypes = ["Residential", "Commercial", null];
+        if (!validPropertyTypes.includes(propertyType)) {
+          return res.status(400).json({ 
+            message: "propertyType must be one of: Residential, Commercial, or null" 
+          });
+        }
+        updateData.propertyType = propertyType;
+      }
+      
+      if (isActive !== undefined) updateData.isActive = isActive;
+      
+      const [updated] = await db.update(quickbooksAccounts)
+        .set(updateData)
+        .where(eq(quickbooksAccounts.id, req.params.accountId))
+        .returning();
+      
+      if (!updated) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[QuickBooks] Update account error:", error);
+      res.status(500).json({ message: "Failed to update account" });
     }
   });
 

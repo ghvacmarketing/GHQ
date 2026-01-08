@@ -8,6 +8,7 @@ import {
   quickbooksSyncLog,
   quickbooksClasses,
   quickbooksCategoryClassMap,
+  quickbooksAccounts,
   crmCustomers,
   crmInvoices,
   crmInvoiceLineItems,
@@ -17,6 +18,7 @@ import {
   type QuickbooksConnection,
   type QuickbooksClass,
   type QuickbooksCategoryClassMap,
+  type QuickbooksAccount,
   type CrmCustomer,
   type CrmInvoice,
   type CrmItemCategory,
@@ -1774,6 +1776,7 @@ export async function deleteInvoiceFromQuickBooks(invoiceId: string): Promise<{ 
           SyncToken: invoice.SyncToken
         };
         
+        // @ts-ignore - deleteInvoice exists in node-quickbooks but not in the type definitions
         qbo.deleteInvoice(deleteInvoiceData, async (deleteErr: any, deleted: any) => {
           if (deleteErr) {
             console.error("[QuickBooks] Error deleting invoice:", deleteErr);
@@ -2129,4 +2132,278 @@ export function stopBackgroundSyncScheduler(): void {
     backgroundSyncInterval = null;
     console.log("[QuickBooks Background] Scheduler stopped");
   }
+}
+
+// =============================================
+// QUICKBOOKS ACCOUNTS (CHART OF ACCOUNTS)
+// =============================================
+
+/**
+ * Pull Income accounts from QuickBooks to populate parent accounts.
+ * This imports existing accounts like Service, Install, Maintenance, Discount.
+ */
+export async function pullAccountsFromQuickBooks(): Promise<{ 
+  success: boolean; 
+  imported: number; 
+  error?: string 
+}> {
+  try {
+    const conn = await getActiveConnection();
+    if (!conn) {
+      return { success: false, imported: 0, error: "No active QuickBooks connection" };
+    }
+    
+    const qbo = getQuickBooksClient(conn);
+    
+    return new Promise((resolve) => {
+      // Query all Income accounts
+      // @ts-ignore - findAccounts exists in node-quickbooks but not in the type definitions
+      qbo.findAccounts({ AccountType: "Income" }, async (err: any, accounts: any) => {
+        if (err) {
+          console.error("[QuickBooks] Error fetching accounts:", err);
+          resolve({ success: false, imported: 0, error: err.message || "Failed to fetch accounts" });
+          return;
+        }
+        
+        const accountList = accounts?.QueryResponse?.Account || [];
+        console.log(`[QuickBooks] Found ${accountList.length} income accounts`);
+        
+        let imported = 0;
+        
+        for (const account of accountList) {
+          try {
+            // Check if account already exists
+            const [existing] = await db.select()
+              .from(quickbooksAccounts)
+              .where(and(
+                eq(quickbooksAccounts.quickbooksAccountId, account.Id),
+                eq(quickbooksAccounts.realmId, conn.realmId)
+              ))
+              .limit(1);
+            
+            if (existing) {
+              // Update existing account
+              await db.update(quickbooksAccounts)
+                .set({
+                  name: account.Name,
+                  fullyQualifiedName: account.FullyQualifiedName,
+                  accountSubType: account.AccountSubType,
+                  syncToken: account.SyncToken,
+                  quickbooksParentAccountId: account.ParentRef?.value || null,
+                  isActive: account.Active !== false,
+                  currentBalance: account.CurrentBalance?.toString(),
+                  lastSyncedAt: new Date(),
+                  updatedAt: new Date()
+                })
+                .where(eq(quickbooksAccounts.id, existing.id));
+            } else {
+              // Determine if this is a parent account (no ParentRef)
+              const isParent = !account.ParentRef;
+              
+              // Try to match category type based on account name
+              let categoryType: "Service" | "Install" | "Maintenance" | "Discount" | null = null;
+              const nameLower = account.Name.toLowerCase();
+              if (nameLower.includes("service")) categoryType = "Service";
+              else if (nameLower.includes("install")) categoryType = "Install";
+              else if (nameLower.includes("maintenance")) categoryType = "Maintenance";
+              else if (nameLower.includes("discount")) categoryType = "Discount";
+              
+              // Try to match property type for sub-accounts
+              let propertyType: "Residential" | "Commercial" | null = null;
+              if (!isParent) {
+                if (nameLower.includes("residential")) propertyType = "Residential";
+                else if (nameLower.includes("commercial")) propertyType = "Commercial";
+              }
+              
+              // Insert new account
+              await db.insert(quickbooksAccounts).values({
+                name: account.Name,
+                fullyQualifiedName: account.FullyQualifiedName,
+                accountType: "Income",
+                accountSubType: account.AccountSubType,
+                categoryType,
+                propertyType,
+                isParent,
+                quickbooksAccountId: account.Id,
+                quickbooksParentAccountId: account.ParentRef?.value || null,
+                realmId: conn.realmId,
+                syncToken: account.SyncToken,
+                isActive: account.Active !== false,
+                currentBalance: account.CurrentBalance?.toString(),
+                lastSyncedAt: new Date()
+              });
+              imported++;
+            }
+          } catch (insertErr) {
+            console.error(`[QuickBooks] Error inserting account ${account.Name}:`, insertErr);
+          }
+        }
+        
+        // Link parent account IDs after all accounts are imported
+        await linkParentAccountIds(conn.realmId);
+        
+        console.log(`[QuickBooks] Imported ${imported} new accounts`);
+        resolve({ success: true, imported });
+      });
+    });
+  } catch (error: any) {
+    console.error("[QuickBooks] Pull accounts error:", error);
+    return { success: false, imported: 0, error: error.message || "Pull failed" };
+  }
+}
+
+/**
+ * Link parent account IDs based on QuickBooks parent references
+ */
+async function linkParentAccountIds(realmId: string): Promise<void> {
+  const allAccounts = await db.select()
+    .from(quickbooksAccounts)
+    .where(eq(quickbooksAccounts.realmId, realmId));
+  
+  const qbIdToLocalId = new Map<string, string>();
+  for (const acc of allAccounts) {
+    if (acc.quickbooksAccountId) {
+      qbIdToLocalId.set(acc.quickbooksAccountId, acc.id);
+    }
+  }
+  
+  for (const acc of allAccounts) {
+    if (acc.quickbooksParentAccountId) {
+      const parentLocalId = qbIdToLocalId.get(acc.quickbooksParentAccountId);
+      if (parentLocalId && parentLocalId !== acc.parentAccountId) {
+        await db.update(quickbooksAccounts)
+          .set({ parentAccountId: parentLocalId, updatedAt: new Date() })
+          .where(eq(quickbooksAccounts.id, acc.id));
+      }
+    }
+  }
+}
+
+/**
+ * Create a sub-account in QuickBooks under a parent account.
+ */
+export async function createSubAccountInQuickBooks(
+  name: string,
+  parentAccountId: string,
+  categoryType: "Service" | "Install" | "Maintenance" | "Discount",
+  propertyType: "Residential" | "Commercial"
+): Promise<{ success: boolean; accountId?: string; error?: string }> {
+  try {
+    const conn = await getActiveConnection();
+    if (!conn) {
+      return { success: false, error: "No active QuickBooks connection" };
+    }
+    
+    // Get parent account
+    const [parentAccount] = await db.select()
+      .from(quickbooksAccounts)
+      .where(eq(quickbooksAccounts.id, parentAccountId))
+      .limit(1);
+    
+    if (!parentAccount || !parentAccount.quickbooksAccountId) {
+      return { success: false, error: "Parent account not found or not synced to QuickBooks" };
+    }
+    
+    const qbo = getQuickBooksClient(conn);
+    
+    // Create the sub-account in QuickBooks
+    const newAccount = {
+      Name: name,
+      AccountType: "Income",
+      AccountSubType: parentAccount.accountSubType || "ServiceFeeIncome",
+      ParentRef: { value: parentAccount.quickbooksAccountId }
+    };
+    
+    return new Promise((resolve) => {
+      // @ts-ignore - createAccount exists in node-quickbooks but not in the type definitions
+      qbo.createAccount(newAccount, async (err: any, account: any) => {
+        if (err) {
+          console.error("[QuickBooks] Error creating sub-account:", err);
+          resolve({ success: false, error: err.message || "Failed to create sub-account" });
+          return;
+        }
+        
+        // Save to CRM database
+        const [inserted] = await db.insert(quickbooksAccounts).values({
+          name: account.Name,
+          fullyQualifiedName: account.FullyQualifiedName,
+          accountType: "Income",
+          accountSubType: account.AccountSubType,
+          categoryType,
+          propertyType,
+          isParent: false,
+          parentAccountId: parentAccountId,
+          quickbooksAccountId: account.Id,
+          quickbooksParentAccountId: parentAccount.quickbooksAccountId,
+          realmId: conn.realmId,
+          syncToken: account.SyncToken,
+          isActive: true,
+          lastSyncedAt: new Date()
+        }).returning();
+        
+        console.log(`[QuickBooks] Created sub-account: ${account.FullyQualifiedName} (QB ID: ${account.Id})`);
+        resolve({ success: true, accountId: inserted.id });
+      });
+    });
+  } catch (error: any) {
+    console.error("[QuickBooks] Create sub-account error:", error);
+    return { success: false, error: error.message || "Create failed" };
+  }
+}
+
+/**
+ * Get all QuickBooks accounts for a realm
+ */
+export async function getQuickBooksAccounts(realmId: string): Promise<QuickbooksAccount[]> {
+  return db.select()
+    .from(quickbooksAccounts)
+    .where(and(
+      eq(quickbooksAccounts.realmId, realmId),
+      eq(quickbooksAccounts.isActive, true)
+    ));
+}
+
+/**
+ * Get parent accounts only
+ */
+export async function getParentAccounts(realmId: string): Promise<QuickbooksAccount[]> {
+  return db.select()
+    .from(quickbooksAccounts)
+    .where(and(
+      eq(quickbooksAccounts.realmId, realmId),
+      eq(quickbooksAccounts.isParent, true),
+      eq(quickbooksAccounts.isActive, true)
+    ));
+}
+
+/**
+ * Get sub-accounts for a parent
+ */
+export async function getSubAccounts(parentAccountId: string): Promise<QuickbooksAccount[]> {
+  return db.select()
+    .from(quickbooksAccounts)
+    .where(eq(quickbooksAccounts.parentAccountId, parentAccountId));
+}
+
+/**
+ * Build account lookup map for invoice sync: categoryType:propertyType -> quickbooksAccountId
+ */
+export async function buildAccountLookup(realmId: string): Promise<Map<string, string>> {
+  const accounts = await db.select()
+    .from(quickbooksAccounts)
+    .where(and(
+      eq(quickbooksAccounts.realmId, realmId),
+      eq(quickbooksAccounts.isActive, true),
+      eq(quickbooksAccounts.isParent, false)
+    ));
+  
+  const lookup = new Map<string, string>();
+  for (const acc of accounts) {
+    if (acc.categoryType && acc.propertyType && acc.quickbooksAccountId) {
+      const key = `${acc.categoryType}:${acc.propertyType}`;
+      lookup.set(key, acc.quickbooksAccountId);
+    }
+  }
+  
+  return lookup;
 }

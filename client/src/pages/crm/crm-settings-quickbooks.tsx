@@ -33,10 +33,10 @@ import {
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
-import type { CrmUser, QuickbooksConnection, QuickbooksClass } from "@shared/schema";
+import type { CrmUser, QuickbooksConnection, QuickbooksClass, QuickbooksAccount } from "@shared/schema";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FolderTree, Download, Upload } from "lucide-react";
+import { FolderTree, Download, Upload, Wallet } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -58,9 +58,13 @@ import {
 
 const CLASS_TYPES = ["Service", "Install", "Maintenance", "Discount"] as const;
 const SUB_TYPES = ["Residential", "Commercial", "Crawlspace", "Promotional", "Maintenance"] as const;
+const CATEGORY_TYPES = ["Service", "Install", "Maintenance", "Discount"] as const;
+const PROPERTY_TYPES = ["Residential", "Commercial"] as const;
 
 type ClassType = typeof CLASS_TYPES[number];
 type SubType = typeof SUB_TYPES[number];
+type CategoryType = typeof CATEGORY_TYPES[number];
+type PropertyType = typeof PROPERTY_TYPES[number];
 
 interface ConnectionStatus {
   connected: boolean;
@@ -80,6 +84,13 @@ interface ClassFormData {
   subType: SubType;
 }
 
+interface AccountFormData {
+  name: string;
+  parentAccountId: string;
+  categoryType: CategoryType;
+  propertyType: PropertyType;
+}
+
 export default function CrmSettingsQuickBooks() {
   usePageTitle("QuickBooks Integration");
   const [, navigate] = useLocation();
@@ -92,6 +103,13 @@ export default function CrmSettingsQuickBooks() {
     name: "",
     classType: "Service",
     subType: "Residential",
+  });
+  const [showAddAccountDialog, setShowAddAccountDialog] = useState(false);
+  const [accountFormData, setAccountFormData] = useState<AccountFormData>({
+    name: "",
+    parentAccountId: "",
+    categoryType: "Service",
+    propertyType: "Residential",
   });
   
   const searchParams = new URLSearchParams(window.location.search);
@@ -112,6 +130,18 @@ export default function CrmSettingsQuickBooks() {
 
   const { data: classes, isLoading: classesLoading, refetch: refetchClasses } = useQuery<QuickbooksClass[]>({
     queryKey: ["/api/quickbooks/classes"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: !!currentUser && status?.connected,
+  });
+
+  const { data: accounts, isLoading: accountsLoading } = useQuery<QuickbooksAccount[]>({
+    queryKey: ["/api/quickbooks/accounts"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: !!currentUser && status?.connected,
+  });
+
+  const { data: parentAccounts } = useQuery<QuickbooksAccount[]>({
+    queryKey: ["/api/quickbooks/accounts/parents"],
     queryFn: getQueryFn({ on401: "returnNull" }),
     enabled: !!currentUser && status?.connected,
   });
@@ -348,6 +378,73 @@ export default function CrmSettingsQuickBooks() {
       toast({
         title: "Delete Failed",
         description: error.message || "Failed to delete class",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const pullAccountsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/quickbooks/accounts/pull");
+      return response.json();
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/accounts/parents"] });
+      toast({
+        title: "Accounts Pulled",
+        description: result.message || "Accounts pulled from QuickBooks",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Pull Failed",
+        description: error.message || "Failed to pull accounts from QuickBooks",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createSubAccountMutation = useMutation({
+    mutationFn: async (data: AccountFormData) => {
+      const response = await apiRequest("POST", "/api/quickbooks/accounts/sub-account", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/accounts/parents"] });
+      setShowAddAccountDialog(false);
+      setAccountFormData({ name: "", parentAccountId: "", categoryType: "Service", propertyType: "Residential" });
+      toast({
+        title: "Sub-Account Created",
+        description: "New sub-account created successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Create Failed",
+        description: error.message || "Failed to create sub-account",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateAccountMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { categoryType?: string; propertyType?: string } }) => {
+      const response = await apiRequest("PATCH", `/api/quickbooks/accounts/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/accounts"] });
+      toast({
+        title: "Account Updated",
+        description: "Account mapping updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update account",
         variant: "destructive",
       });
     },
@@ -767,6 +864,148 @@ export default function CrmSettingsQuickBooks() {
             </Card>
           )}
 
+          {status?.connected && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Wallet className="h-6 w-6 text-green-600" />
+                    <div>
+                      <CardTitle>Chart of Accounts</CardTitle>
+                      <CardDescription>Manage QuickBooks income accounts for invoice line items</CardDescription>
+                    </div>
+                  </div>
+                  <Button onClick={() => setShowAddAccountDialog(true)} data-testid="btn-add-sub-account">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Sub-Account
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {accountsLoading ? (
+                  <Skeleton className="h-48 w-full" />
+                ) : accounts && accounts.length > 0 ? (
+                  <div className="space-y-4">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Category Type</TableHead>
+                          <TableHead>Property Type</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {accounts.filter(a => a.isActive).map((account) => (
+                          <TableRow key={account.id} data-testid={`account-row-${account.id}`}>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                {account.fullyQualifiedName || account.name}
+                                {account.isParent && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    Parent
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>{account.accountType}</TableCell>
+                            <TableCell>
+                              <Select
+                                value={account.categoryType || ""}
+                                onValueChange={(value) => {
+                                  updateAccountMutation.mutate({
+                                    id: account.id,
+                                    data: { categoryType: value || undefined },
+                                  });
+                                }}
+                              >
+                                <SelectTrigger className="w-32" data-testid={`select-category-type-${account.id}`}>
+                                  <SelectValue placeholder="Select..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="">None</SelectItem>
+                                  {CATEGORY_TYPES.map((type) => (
+                                    <SelectItem key={type} value={type}>
+                                      {type}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell>
+                              {!account.isParent ? (
+                                <Select
+                                  value={account.propertyType || ""}
+                                  onValueChange={(value) => {
+                                    updateAccountMutation.mutate({
+                                      id: account.id,
+                                      data: { propertyType: value || undefined },
+                                    });
+                                  }}
+                                >
+                                  <SelectTrigger className="w-32" data-testid={`select-property-type-${account.id}`}>
+                                    <SelectValue placeholder="Select..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="">None</SelectItem>
+                                    {PROPERTY_TYPES.map((type) => (
+                                      <SelectItem key={type} value={type}>
+                                        {type}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <span className="text-slate-400">-</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    
+                    <Separator />
+                    
+                    <div className="flex gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={() => pullAccountsMutation.mutate()}
+                        disabled={pullAccountsMutation.isPending}
+                        data-testid="btn-pull-accounts"
+                      >
+                        {pullAccountsMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4 mr-2" />
+                        )}
+                        Pull from QuickBooks
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-slate-500 mb-4">No accounts configured yet</p>
+                    <div className="flex justify-center gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={() => pullAccountsMutation.mutate()}
+                        disabled={pullAccountsMutation.isPending}
+                        data-testid="btn-pull-accounts-empty"
+                      >
+                        {pullAccountsMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4 mr-2" />
+                        )}
+                        Pull from QuickBooks
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>How It Works</CardTitle>
@@ -953,6 +1192,116 @@ export default function CrmSettingsQuickBooks() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showAddAccountDialog} onOpenChange={setShowAddAccountDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Sub-Account</DialogTitle>
+            <DialogDescription>
+              Create a new sub-account under a parent account for detailed income tracking.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="account-name">Name</Label>
+              <Input
+                id="account-name"
+                value={accountFormData.name}
+                onChange={(e) => setAccountFormData({ ...accountFormData, name: e.target.value })}
+                placeholder="e.g., Residential"
+                data-testid="input-account-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="parent-account">Parent Account</Label>
+              <Select
+                value={accountFormData.parentAccountId}
+                onValueChange={(value) => setAccountFormData({ ...accountFormData, parentAccountId: value })}
+              >
+                <SelectTrigger data-testid="select-parent-account">
+                  <SelectValue placeholder="Select parent account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {parentAccounts?.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="account-category-type">Category Type</Label>
+              <Select
+                value={accountFormData.categoryType}
+                onValueChange={(value: CategoryType) => setAccountFormData({ ...accountFormData, categoryType: value })}
+              >
+                <SelectTrigger data-testid="select-account-category-type">
+                  <SelectValue placeholder="Select category type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORY_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="account-property-type">Property Type</Label>
+              <Select
+                value={accountFormData.propertyType}
+                onValueChange={(value: PropertyType) => setAccountFormData({ ...accountFormData, propertyType: value })}
+              >
+                <SelectTrigger data-testid="select-account-property-type">
+                  <SelectValue placeholder="Select property type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROPERTY_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddAccountDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (!accountFormData.name.trim()) {
+                  toast({
+                    title: "Validation Error",
+                    description: "Name is required",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                if (!accountFormData.parentAccountId) {
+                  toast({
+                    title: "Validation Error",
+                    description: "Parent account is required",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                createSubAccountMutation.mutate(accountFormData);
+              }}
+              disabled={createSubAccountMutation.isPending}
+              data-testid="btn-submit-add-account"
+            >
+              {createSubAccountMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Create Sub-Account
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </CrmLayout>
   );
 }
