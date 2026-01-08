@@ -406,40 +406,53 @@ export default function CrmMessaging() {
             </div>
           ) : (
             <div>
-              {conversations?.map((conv) => (
-                <button
-                  key={conv.id}
-                  className={`w-full text-left p-3 border-b hover:bg-slate-50 transition-colors ${
-                    selectedConversationId === conv.id ? "bg-[#faf6ef] border-l-2 border-l-[#d3b07d]" : ""
-                  }`}
-                  onClick={() => {
-                    setSelectedConversationId(conv.id);
-                    setShowMobileThread(true);
-                  }}
-                  data-testid={`conversation-item-${conv.id}`}
-                >
-                  <div className="flex gap-2">
-                    <Avatar className="h-9 w-9">
-                      <AvatarFallback className="bg-[#d3b07d] text-white text-xs">
-                        {getInitials(conv.customer?.name || conv.customerName || "?")}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-slate-900 truncate text-sm">
-                          {conv.customer?.name || conv.customerName || "Unknown"}
-                        </span>
-                        <span className="text-xs text-slate-400">
-                          {formatMessageTime(conv.lastMessageAt)}
-                        </span>
+              {conversations?.map((conv) => {
+                const hasUnread = (conv.unreadInboundCount || 0) > 0;
+                return (
+                  <button
+                    key={conv.id}
+                    className={`w-full text-left p-3 border-b hover:bg-slate-50 transition-colors ${
+                      selectedConversationId === conv.id ? "bg-[#faf6ef] border-l-2 border-l-[#d3b07d]" : ""
+                    } ${hasUnread && selectedConversationId !== conv.id ? "bg-blue-50" : ""}`}
+                    onClick={() => {
+                      setSelectedConversationId(conv.id);
+                      setShowMobileThread(true);
+                    }}
+                    data-testid={`conversation-item-${conv.id}`}
+                  >
+                    <div className="flex gap-2">
+                      <div className="relative">
+                        <Avatar className="h-9 w-9">
+                          <AvatarFallback className="bg-[#d3b07d] text-white text-xs">
+                            {getInitials(conv.customer?.name || conv.customerName || "?")}
+                          </AvatarFallback>
+                        </Avatar>
+                        {hasUnread && (
+                          <span 
+                            className="absolute -top-1 -right-1 bg-blue-600 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center"
+                            data-testid={`badge-unread-count-${conv.id}`}
+                          >
+                            {conv.unreadInboundCount! > 9 ? "9+" : conv.unreadInboundCount}
+                          </span>
+                        )}
                       </div>
-                      <p className="text-xs text-slate-500 truncate">
-                        {conv.phoneNumber || conv.customer?.phone || ""}
-                      </p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className={`truncate text-sm ${hasUnread ? "font-bold text-slate-900" : "font-medium text-slate-900"}`}>
+                            {conv.customer?.name || conv.customerName || "Unknown"}
+                          </span>
+                          <span className={`text-xs ${hasUnread ? "text-blue-600 font-medium" : "text-slate-400"}`}>
+                            {formatMessageTime(conv.lastMessageAt)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 truncate">
+                          {conv.phoneNumber || conv.customer?.phone || ""}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           )}
         </ScrollArea>
