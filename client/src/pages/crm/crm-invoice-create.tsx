@@ -152,8 +152,32 @@ export default function CrmInvoiceCreate() {
   const [newWODescription, setNewWODescription] = useState("");
   const [newWOVisitType, setNewWOVisitType] = useState<"SERVICE" | "INSTALL" | "MAINTENANCE" | "SALES">("SERVICE");
   const [newWOWorkSubtype, setNewWOWorkSubtype] = useState<string>("No Cool");
-  const [newWOScheduledDate, setNewWOScheduledDate] = useState<Date>(new Date());
+  const [newWOScheduledDate, setNewWOScheduledDate] = useState<Date | undefined>(undefined);
   const [newWOSelectedPropertyId, setNewWOSelectedPropertyId] = useState<string>("");
+  const [newWOPriority, setNewWOPriority] = useState<string>("normal");
+  const [newWOAssignedTechId, setNewWOAssignedTechId] = useState<string>("unassigned");
+  const [newWOStartTime, setNewWOStartTime] = useState<string>("08:00");
+  const [newWOEndTime, setNewWOEndTime] = useState<string>("10:00");
+  const [newWOProjectId, setNewWOProjectId] = useState<string>("");
+  const [newWOMaintenanceSubtypes, setNewWOMaintenanceSubtypes] = useState<string[]>(["Preventative Maintenance"]);
+
+  // Generate 30-minute interval time options from 8 AM to 8 PM
+  const timeOptions = (() => {
+    const options: { value: string; label: string }[] = [];
+    for (let hour = 8; hour <= 20; hour++) {
+      for (let min = 0; min < 60; min += 30) {
+        if (hour === 20 && min > 0) break;
+        const h = hour.toString().padStart(2, "0");
+        const m = min.toString().padStart(2, "0");
+        const value = `${h}:${m}`;
+        const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+        const ampm = hour >= 12 ? "PM" : "AM";
+        const label = `${displayHour}:${m.padStart(2, "0")} ${ampm}`;
+        options.push({ value, label });
+      }
+    }
+    return options;
+  })();
 
   const urlParams = new URLSearchParams(window.location.search);
   const workOrderIdFromUrl = urlParams.get("workOrderId");
@@ -238,6 +262,48 @@ export default function CrmInvoiceCreate() {
   });
 
   const newWOProperties = propertiesData || [];
+
+  // Query for technicians
+  const { data: technicians = [] } = useQuery<{ id: string; name: string; email: string; role: string }[]>({
+    queryKey: ["/api/crm/technicians"],
+    enabled: !!currentUser && showCreateWODialog,
+  });
+
+  // Query for customer's projects
+  const { data: projectsResponse } = useQuery<{ projects: { id: string; name: string; status: string }[]; pagination: any }>({
+    queryKey: ["/api/crm/projects", newWOSelectedCustomer?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/projects?customerId=${newWOSelectedCustomer!.id}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch projects");
+      return res.json();
+    },
+    enabled: !!newWOSelectedCustomer?.id && showCreateWODialog,
+  });
+
+  const newWOProjects = projectsResponse?.projects || [];
+
+  // Fetch maintenance subtypes (includes custom agreement types) when MAINTENANCE is selected
+  useEffect(() => {
+    if (!showCreateWODialog) return;
+    if (newWOVisitType !== "MAINTENANCE") return;
+    
+    fetch("/api/crm/work-subtypes/MAINTENANCE", { credentials: "include" })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setNewWOMaintenanceSubtypes(data);
+          // If we are already on MAINTENANCE, update the subtype to the first item from the fetched list
+          if (newWOVisitType === "MAINTENANCE") {
+            setNewWOWorkSubtype(data[0]);
+          }
+        }
+      })
+      .catch(() => {
+        setNewWOMaintenanceSubtypes(["Preventative Maintenance"]);
+      });
+  }, [newWOVisitType, showCreateWODialog]);
 
   useEffect(() => {
     if (workOrderIdFromUrl && preselectedWorkOrder) {
@@ -336,10 +402,25 @@ export default function CrmInvoiceCreate() {
       if (!newWOTitle.trim()) throw new Error("Title is required");
       if (!newWODescription.trim()) throw new Error("Description is required");
 
-      const scheduledStart = new Date(newWOScheduledDate);
-      scheduledStart.setHours(8, 0, 0, 0);
-      const scheduledEnd = new Date(newWOScheduledDate);
-      scheduledEnd.setHours(10, 0, 0, 0);
+      // Validation: If tech is assigned, date must be set
+      if (newWOAssignedTechId !== "unassigned" && !newWOScheduledDate) {
+        throw new Error("Scheduled date is required when a technician is assigned");
+      }
+
+      // Build scheduled times from date and time selections
+      let scheduledStart: Date | null = null;
+      let scheduledEnd: Date | null = null;
+      
+      if (newWOScheduledDate) {
+        const [startHour, startMin] = newWOStartTime.split(":").map(Number);
+        const [endHour, endMin] = newWOEndTime.split(":").map(Number);
+        
+        scheduledStart = new Date(newWOScheduledDate);
+        scheduledStart.setHours(startHour, startMin, 0, 0);
+        
+        scheduledEnd = new Date(newWOScheduledDate);
+        scheduledEnd.setHours(endHour, endMin, 0, 0);
+      }
 
       const res = await apiRequest("POST", "/api/crm/work-orders", {
         customerId: newWOSelectedCustomer.id,
@@ -348,9 +429,12 @@ export default function CrmInvoiceCreate() {
         description: newWODescription.trim(),
         visitType: newWOVisitType,
         workSubtype: newWOWorkSubtype,
-        scheduledStart: scheduledStart.toISOString(),
-        scheduledEnd: scheduledEnd.toISOString(),
-        status: "scheduled",
+        priority: newWOPriority,
+        assignedTechId: newWOAssignedTechId !== "unassigned" ? newWOAssignedTechId : undefined,
+        projectId: newWOProjectId || undefined,
+        scheduledStart: scheduledStart?.toISOString() || undefined,
+        scheduledEnd: scheduledEnd?.toISOString() || undefined,
+        status: newWOAssignedTechId !== "unassigned" && scheduledStart ? "scheduled" : "pending",
       });
       const data = await res.json();
       return data.workOrder || data;
@@ -367,6 +451,7 @@ export default function CrmInvoiceCreate() {
         customerPhone: newWOSelectedCustomer?.phone || "",
         serviceAddress: newWOSelectedCustomer?.fullAddress || "",
       }));
+      // Reset all form state
       setNewWOCustomerSearch("");
       setNewWOSelectedCustomer(null);
       setNewWOSelectedPropertyId("");
@@ -374,7 +459,12 @@ export default function CrmInvoiceCreate() {
       setNewWODescription("");
       setNewWOVisitType("SERVICE");
       setNewWOWorkSubtype("No Cool");
-      setNewWOScheduledDate(new Date());
+      setNewWOScheduledDate(undefined);
+      setNewWOPriority("normal");
+      setNewWOAssignedTechId("unassigned");
+      setNewWOStartTime("08:00");
+      setNewWOEndTime("10:00");
+      setNewWOProjectId("");
       toast({ title: "Work order created", description: "The work order has been created and selected." });
     },
     onError: (error: Error) => {
@@ -1340,7 +1430,7 @@ export default function CrmInvoiceCreate() {
       </Dialog>
 
       <Dialog open={showCreateWODialog} onOpenChange={setShowCreateWODialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create Work Order</DialogTitle>
           </DialogHeader>
@@ -1407,7 +1497,10 @@ export default function CrmInvoiceCreate() {
             {newWOSelectedCustomer && (
               <div className="space-y-2">
                 <Label>Property *</Label>
-                <Select value={newWOSelectedPropertyId} onValueChange={setNewWOSelectedPropertyId}>
+                <Select value={newWOSelectedPropertyId} onValueChange={(val) => {
+                  setNewWOSelectedPropertyId(val);
+                  setNewWOProjectId("");
+                }}>
                   <SelectTrigger data-testid="select-wo-property">
                     <SelectValue placeholder="Select property..." />
                   </SelectTrigger>
@@ -1425,6 +1518,40 @@ export default function CrmInvoiceCreate() {
                 </Select>
               </div>
             )}
+
+            {/* Priority dropdown */}
+            <div className="space-y-2">
+              <Label>Priority</Label>
+              <Select value={newWOPriority} onValueChange={setNewWOPriority}>
+                <SelectTrigger data-testid="select-wo-priority">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Technician assignment */}
+            <div className="space-y-2">
+              <Label>Assign Technician</Label>
+              <Select value={newWOAssignedTechId} onValueChange={setNewWOAssignedTechId}>
+                <SelectTrigger data-testid="select-wo-technician">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {technicians.map((tech) => (
+                    <SelectItem key={tech.id} value={tech.id}>
+                      {tech.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="wo-title">Title *</Label>
@@ -1452,14 +1579,19 @@ export default function CrmInvoiceCreate() {
             <div className="space-y-2">
               <Label>Visit Type</Label>
               <Select value={newWOVisitType} onValueChange={(val) => {
-                setNewWOVisitType(val as any);
-                const defaultSubtypes: Record<string, string> = {
-                  "INSTALL": "Full System",
-                  "SERVICE": "No Cool",
-                  "MAINTENANCE": "Spring Tune-Up",
-                  "SALES": "Comfort Consultation",
-                };
-                setNewWOWorkSubtype(defaultSubtypes[val] || "Other");
+                const vt = val as any;
+                setNewWOVisitType(vt);
+                
+                if (vt === "MAINTENANCE") {
+                  setNewWOWorkSubtype(newWOMaintenanceSubtypes[0] || "Spring Tune-Up");
+                } else {
+                  const defaultSubtypes: Record<string, string> = {
+                    "INSTALL": "Full System",
+                    "SERVICE": "No Cool",
+                    "SALES": "Comfort Consultation",
+                  };
+                  setNewWOWorkSubtype(defaultSubtypes[vt] || "Other");
+                }
               }}>
                 <SelectTrigger data-testid="select-wo-visit-type">
                   <SelectValue placeholder="Select type" />
@@ -1502,10 +1634,9 @@ export default function CrmInvoiceCreate() {
                   )}
                   {newWOVisitType === "MAINTENANCE" && (
                     <>
-                      <SelectItem value="Spring Tune-Up">Spring Tune-Up</SelectItem>
-                      <SelectItem value="Fall Tune-Up">Fall Tune-Up</SelectItem>
-                      <SelectItem value="Filter Change">Filter Change</SelectItem>
-                      <SelectItem value="Duct Cleaning">Duct Cleaning</SelectItem>
+                      {newWOMaintenanceSubtypes.map((subtype) => (
+                        <SelectItem key={subtype} value={subtype}>{subtype}</SelectItem>
+                      ))}
                       <SelectItem value="Other">Other</SelectItem>
                     </>
                   )}
@@ -1521,13 +1652,14 @@ export default function CrmInvoiceCreate() {
             </div>
 
             <div className="space-y-2">
-              <Label>Scheduled Date</Label>
+              <Label>Scheduled Date {newWOAssignedTechId === "unassigned" && <span className="text-xs text-slate-500">(optional)</span>}</Label>
+              <div className="flex gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       className={cn(
-                        "w-full justify-start text-left font-normal",
+                        "flex-1 justify-start text-left font-normal",
                         !newWOScheduledDate && "text-muted-foreground"
                       )}
                       data-testid="button-wo-scheduled-date"
@@ -1540,12 +1672,80 @@ export default function CrmInvoiceCreate() {
                     <Calendar
                       mode="single"
                       selected={newWOScheduledDate}
-                      onSelect={(date) => date && setNewWOScheduledDate(date)}
+                      onSelect={(date) => setNewWOScheduledDate(date)}
                       initialFocus
                     />
                   </PopoverContent>
                 </Popover>
+                {newWOScheduledDate && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setNewWOScheduledDate(undefined)}
+                    className="text-slate-500"
+                    data-testid="button-wo-clear-date"
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
             </div>
+
+            {/* Start and End Time (only show when date is set) */}
+            {newWOScheduledDate && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Start Time</Label>
+                  <Select value={newWOStartTime} onValueChange={setNewWOStartTime}>
+                    <SelectTrigger data-testid="select-wo-start-time">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {timeOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>End Time</Label>
+                  <Select value={newWOEndTime} onValueChange={setNewWOEndTime}>
+                    <SelectTrigger data-testid="select-wo-end-time">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {timeOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {/* Project linking (only show if customer has projects) */}
+            {newWOSelectedCustomer && newWOProjects.length > 0 && (
+              <div className="space-y-2">
+                <Label>Link to Project <span className="text-xs text-slate-500">(optional)</span></Label>
+                <Select value={newWOProjectId} onValueChange={setNewWOProjectId}>
+                  <SelectTrigger data-testid="select-wo-project">
+                    <SelectValue placeholder="Select project..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {newWOProjects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <DialogFooter className="mt-4">
             <Button
@@ -1559,7 +1759,12 @@ export default function CrmInvoiceCreate() {
                 setNewWODescription("");
                 setNewWOVisitType("SERVICE");
                 setNewWOWorkSubtype("No Cool");
-                setNewWOScheduledDate(new Date());
+                setNewWOScheduledDate(undefined);
+                setNewWOPriority("normal");
+                setNewWOAssignedTechId("unassigned");
+                setNewWOStartTime("08:00");
+                setNewWOEndTime("10:00");
+                setNewWOProjectId("");
               }}
               data-testid="button-wo-cancel"
             >
@@ -1567,7 +1772,14 @@ export default function CrmInvoiceCreate() {
             </Button>
             <Button
               onClick={() => createWorkOrderMutation.mutate()}
-              disabled={!newWOSelectedCustomer || !newWOSelectedPropertyId || !newWOTitle.trim() || !newWODescription.trim() || createWorkOrderMutation.isPending}
+              disabled={
+                !newWOSelectedCustomer || 
+                !newWOSelectedPropertyId || 
+                !newWOTitle.trim() || 
+                !newWODescription.trim() || 
+                (newWOAssignedTechId !== "unassigned" && !newWOScheduledDate) ||
+                createWorkOrderMutation.isPending
+              }
               className="bg-[#711419] hover:bg-[#5a1014] text-white"
               data-testid="button-wo-create"
             >
