@@ -17952,6 +17952,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         if (!conversation) {
           conversation = await storage.createMessagingConversation({
             customerId: customerId || null,
+            phoneNumber: phoneNumber,
+            customerName: contactName || null,
             subject: contactName || phoneNumber,
             externalSource: "textline" as any,
             externalConversationId: conversationUuid,
@@ -18003,23 +18005,29 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         }
         
         for (const textlineConvo of result.conversations) {
+          // Skip conversations without a phone number
+          if (!textlineConvo.phone_number) {
+            console.log("[Textline Sync] Skipping conversation without phone number:", textlineConvo.uuid);
+            continue;
+          }
+          
           const existingConvo = await storage.getMessagingConversationByExternalId(textlineConvo.uuid, "textline");
           
           let customerId: string | undefined;
-          if (textlineConvo.phone_number) {
-            const customer = await storage.getCrmCustomerByPhone(textlineConvo.phone_number);
-            if (customer) {
-              customerId = customer.id;
-            }
+          const customer = await storage.getCrmCustomerByPhone(textlineConvo.phone_number);
+          if (customer) {
+            customerId = customer.id;
           }
           
           if (!existingConvo) {
             await storage.createMessagingConversation({
               customerId: customerId || null,
+              phoneNumber: textlineConvo.phone_number,
+              customerName: textlineConvo.contact_name || null,
               subject: textlineConvo.contact_name || textlineConvo.phone_number,
               externalSource: "textline" as any,
               externalConversationId: textlineConvo.uuid,
-              status: textlineConvo.status === "resolved" ? "closed" as any : "open" as any,
+              status: textlineConvo.status === "resolved" ? "resolved" as any : "open" as any,
               lastMessageAt: textlineConvo.last_message_at ? new Date(textlineConvo.last_message_at) : undefined,
             });
             created++;
@@ -19348,8 +19356,14 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Customer not found" });
       }
 
+      if (!customer.phone) {
+        return res.status(400).json({ message: "Customer has no phone number" });
+      }
+
       const conversationData = {
         customerId,
+        phoneNumber: customer.phone,
+        customerName: customer.name,
         assignedToId: user.id,
         status: "open" as const,
         lastMessageAt: new Date(),
