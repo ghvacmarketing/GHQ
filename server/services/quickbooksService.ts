@@ -701,12 +701,46 @@ export async function syncInvoiceToQuickBooks(
       qbLineItems.push(lineItem);
     }
     
-    // Build QuickBooks invoice
+    // Build QuickBooks invoice with safe date handling
+    let txnDate: string | undefined;
+    let dueDateStr: string | undefined;
+    
+    try {
+      if (invoice.createdAt) {
+        const d = invoice.createdAt instanceof Date ? invoice.createdAt : new Date(invoice.createdAt);
+        if (!isNaN(d.getTime())) {
+          txnDate = d.toISOString().split('T')[0];
+        }
+      }
+    } catch {
+      console.log(`[QuickBooks] Invalid createdAt for invoice ${invoice.invoiceNumber}`);
+    }
+    
+    try {
+      if (invoice.dueDate) {
+        // Handle both Date objects and date strings (with or without time)
+        let d: Date;
+        if (invoice.dueDate instanceof Date) {
+          d = invoice.dueDate;
+        } else if (typeof invoice.dueDate === 'string') {
+          // String format: might be "2026-02-07" or "2026-02-07T00:00:00Z"
+          d = invoice.dueDate.includes('T') ? new Date(invoice.dueDate) : new Date(invoice.dueDate + 'T00:00:00');
+        } else {
+          d = new Date(invoice.dueDate);
+        }
+        if (!isNaN(d.getTime())) {
+          dueDateStr = d.toISOString().split('T')[0];
+        }
+      }
+    } catch {
+      console.log(`[QuickBooks] Invalid dueDate for invoice ${invoice.invoiceNumber}`);
+    }
+    
     const qbInvoice: any = {
       CustomerRef: { value: updatedCustomerSync.quickbooksCustomerId },
       DocNumber: invoice.invoiceNumber,
-      TxnDate: invoice.createdAt ? new Date(invoice.createdAt).toISOString().split('T')[0] : undefined,
-      DueDate: invoice.dueDate ? new Date(invoice.dueDate).toISOString().split('T')[0] : undefined,
+      TxnDate: txnDate,
+      DueDate: dueDateStr,
       Line: qbLineItems
     };
     
