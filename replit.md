@@ -42,6 +42,11 @@ Preferred communication style: Simple, everyday language.
 -   **Security**: Environment variable-based secrets (`SESSION_SECRET`, `ADMIN_API_KEY`, `GLOBAL_PASSWORD`), httpOnly cookies, and strict customer-scoped data filtering.
 -   **Vector Store Knowledge Base**: Optional OpenAI vector store integration for enhanced AI quote generation from uploaded sales documents.
 -   **Messaging Dashboard**: Textline-style three-panel messaging interface for customer communications. Left panel shows conversation inbox with filters/search, center panel displays message thread with chat bubbles and composer, right panel shows contact sidebar with assignment, tags, and quick actions. Built with adapter pattern for future Textline integration via webhooks. Mobile techs can also access messaging via `/mobile/messages` with contact search.
+-   **Automated SMS Notifications**: System for sending automated SMS alerts to customers via Textline with duplicate prevention using `sms_notification_log` table. Notification types include:
+    -   **Maintenance Reminders**: Daily scheduler sends 10-day and 5-day reminders for upcoming maintenance visits to customers with active agreements
+    -   **Invoice SMS**: When invoice email is sent for auto-invoice maintenance agreements, an SMS with payment link is also sent
+    -   **Work Order Status**: Automatic SMS when technician status changes to "En Route" or "On Site"
+    -   All notifications are recorded in the conversation history for CRM visibility
 -   **Time Tracking System**: Technicians clock in/out from mobile app (`/mobile/time`). Entries stored in `crm_time_entries` table with tech ID, timestamps, optional work order link, and notes. Admins view/edit all entries via CRM Settings > Time Logs (`/crm/settings/time-logs`) with filters, CSV export, and adjustment capabilities.
 
 ## External Dependencies
