@@ -95,33 +95,50 @@ export function PerformanceGauge({ sold, quoted, goal, goalTarget, size = 180 }:
       </div>
       
       <svg width={size} height={size * 0.6} viewBox="0 0 180 110">
+        {/* Background arc (missed/remaining) */}
         <path
           d={createArc(0, 180)}
           fill="none"
           stroke="#e2e8f0"
           strokeWidth={strokeWidth}
-          strokeLinecap="round"
+          strokeLinecap="butt"
         />
         
-        {quotedPercent > 0 && (
+        {/* Quoted arc (green) - only show if there's quoted amount */}
+        {quotedPercent > 0 && quotedAngle > 0.5 && (
           <path
             d={createArc(soldAngle, soldAngle + quotedAngle)}
             fill="none"
             stroke="#4ade80"
             strokeWidth={strokeWidth}
-            strokeLinecap="round"
+            strokeLinecap="butt"
           />
         )}
         
-        {soldPercent > 0 && (
+        {/* Sold arc (dark) - only show if there's sold amount */}
+        {soldPercent > 0 && soldAngle > 0.5 && (
           <path
             d={createArc(0, soldAngle)}
             fill="none"
             stroke="#334155"
             strokeWidth={strokeWidth}
-            strokeLinecap="round"
+            strokeLinecap="butt"
           />
         )}
+        
+        {/* Round end caps - only at the actual endpoints to avoid blobs */}
+        <circle 
+          cx={polarToCartesian(0).x} 
+          cy={polarToCartesian(0).y} 
+          r={strokeWidth / 2} 
+          fill={soldPercent > 0 ? "#334155" : quotedPercent > 0 ? "#4ade80" : "#e2e8f0"} 
+        />
+        <circle 
+          cx={polarToCartesian(180).x} 
+          cy={polarToCartesian(180).y} 
+          r={strokeWidth / 2} 
+          fill="#e2e8f0" 
+        />
         
         {showGoalMarker && (
           <line
