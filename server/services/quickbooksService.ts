@@ -2808,3 +2808,136 @@ export async function buildItemLookup(realmId: string): Promise<Map<string, stri
   
   return lookup;
 }
+
+/**
+ * Provision QuickBooks Items for existing sub-accounts that don't have linked Items.
+ * This is needed when sub-accounts were pulled from QuickBooks before the auto-provision logic was added,
+ * or when sub-accounts exist but their Items weren't created properly.
+ */
+export async function provisionItemsForSubAccounts(): Promise<{
+  success: boolean;
+  provisioned: number;
+  skipped: number;
+  errors: string[];
+}> {
+  const errors: string[] = [];
+  let provisioned = 0;
+  let skipped = 0;
+  
+  try {
+    const conn = await getActiveConnection();
+    if (!conn) {
+      return { success: false, provisioned: 0, skipped: 0, errors: ["No active QuickBooks connection"] };
+    }
+    
+    // Get all sub-accounts with category and property type mappings
+    const subAccounts = await db.select()
+      .from(quickbooksAccounts)
+      .where(and(
+        eq(quickbooksAccounts.realmId, conn.realmId),
+        eq(quickbooksAccounts.isActive, true),
+        eq(quickbooksAccounts.isParent, false)
+      ));
+    
+    console.log(`[QuickBooks Provision] Found ${subAccounts.length} sub-accounts to check`);
+    
+    // Get all existing items for this realm
+    const existingItems = await db.select()
+      .from(quickbooksItems)
+      .where(eq(quickbooksItems.realmId, conn.realmId));
+    
+    // Build a lookup by incomeAccountId and by categoryType:propertyType
+    const itemsByAccountId = new Map<string, QuickbooksItem>();
+    const itemsByMapping = new Map<string, QuickbooksItem>();
+    for (const item of existingItems) {
+      if (item.incomeAccountId) {
+        itemsByAccountId.set(item.incomeAccountId, item);
+      }
+      if (item.categoryType && item.propertyType) {
+        itemsByMapping.set(`${item.categoryType}:${item.propertyType}`, item);
+      }
+    }
+    
+    const qbo = getQuickBooksClient(conn);
+    
+    for (const subAccount of subAccounts) {
+      // Skip if no category or property type mapping
+      if (!subAccount.categoryType || !subAccount.propertyType) {
+        console.log(`[QuickBooks Provision] Skipping ${subAccount.name} - no category/property mapping`);
+        skipped++;
+        continue;
+      }
+      
+      // Skip if item already exists for this account
+      if (itemsByAccountId.has(subAccount.id)) {
+        console.log(`[QuickBooks Provision] Skipping ${subAccount.name} - item already linked`);
+        skipped++;
+        continue;
+      }
+      
+      // Skip if item already exists for this category:property combo
+      const mappingKey = `${subAccount.categoryType}:${subAccount.propertyType}`;
+      if (itemsByMapping.has(mappingKey)) {
+        console.log(`[QuickBooks Provision] Skipping ${subAccount.name} - item already exists for ${mappingKey}`);
+        skipped++;
+        continue;
+      }
+      
+      // Create a new Item in QuickBooks for this sub-account
+      const itemName = subAccount.fullyQualifiedName || subAccount.name;
+      const qbItem = {
+        Name: itemName.substring(0, 100), // QB has 100 char limit
+        Description: `Income routing for ${subAccount.fullyQualifiedName || subAccount.name}`,
+        Type: "Service",
+        IncomeAccountRef: { 
+          value: subAccount.quickbooksAccountId, 
+          name: subAccount.fullyQualifiedName || subAccount.name 
+        }
+      };
+      
+      try {
+        const createdItem = await new Promise<any>((resolve, reject) => {
+          // @ts-ignore - createItem exists in node-quickbooks but not in the type definitions
+          qbo.createItem(qbItem, (err: any, item: any) => {
+            if (err) reject(err);
+            else resolve(item);
+          });
+        });
+        
+        // Save to CRM database
+        await db.insert(quickbooksItems).values({
+          name: createdItem.Name,
+          description: createdItem.Description || null,
+          categoryType: subAccount.categoryType as any,
+          propertyType: subAccount.propertyType as any,
+          incomeAccountId: subAccount.id,
+          itemType: "Service",
+          quickbooksItemId: createdItem.Id,
+          quickbooksIncomeAccountId: subAccount.quickbooksAccountId,
+          realmId: conn.realmId,
+          syncToken: createdItem.SyncToken,
+          isActive: true,
+          lastSyncedAt: new Date()
+        });
+        
+        // Add to lookup so we don't create duplicates in this batch
+        itemsByMapping.set(mappingKey, {} as QuickbooksItem);
+        
+        console.log(`[QuickBooks Provision] Created item "${createdItem.Name}" (QB ID: ${createdItem.Id}) for sub-account ${subAccount.name}`);
+        provisioned++;
+        
+      } catch (itemErr: any) {
+        const errMsg = `Failed to create item for ${subAccount.name}: ${itemErr.message || itemErr}`;
+        console.error(`[QuickBooks Provision] ${errMsg}`);
+        errors.push(errMsg);
+      }
+    }
+    
+    console.log(`[QuickBooks Provision] Complete: ${provisioned} provisioned, ${skipped} skipped, ${errors.length} errors`);
+    return { success: true, provisioned, skipped, errors };
+    
+  } catch (error: any) {
+    console.error("[QuickBooks Provision] Error:", error);
+    return { success: false, provisioned, skipped, errors: [error.message || "Provision failed"] };
+  }
+}
