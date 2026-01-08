@@ -19,73 +19,55 @@ function formatCurrency(value: number): string {
 export function PerformanceGauge({ sold, quoted, goal, goalTarget, size = 180 }: PerformanceGaugeProps) {
   const actualGoal = goalTarget ?? goal;
   
-  // Potential is the outstanding quoted amount (quotes with status "draft" or "sent")
-  // If no outstanding quotes, potential equals sold (shows 100% conversion)
   const potential = quoted > 0 ? quoted : sold;
-  
-  // Check if pipeline is empty (no quotes and no sales)
   const isPipelineEmpty = quoted === 0 && sold === 0;
-  
-  // Scale is the max value for the arc - use goal or sold+quoted, whichever is larger
   const scale = Math.max(actualGoal, sold + quoted, 1);
-  
-  const missed = Math.max(0, scale - sold - quoted);
   
   const soldPercent = scale > 0 ? Math.min((sold / scale) * 100, 100) : 0;
   const quotedPercent = scale > 0 ? Math.min((quoted / scale) * 100, 100 - soldPercent) : 0;
-  
-  const soldAngle = Math.min((soldPercent / 100) * 180, 180);
-  const quotedAngle = Math.min((quotedPercent / 100) * 180, 180 - soldAngle);
   
   const radius = 70;
   const strokeWidth = 20;
   const centerX = 90;
   const centerY = 85;
   
-  const polarToCartesian = (angle: number) => {
-    const radians = ((180 - angle) * Math.PI) / 180;
-    return {
-      x: centerX + radius * Math.cos(radians),
-      y: centerY - radius * Math.sin(radians),
-    };
-  };
+  // Calculate arc path for a semicircle (left to right, 180 degrees)
+  const arcLength = Math.PI * radius; // Half circumference
   
-  const createArc = (startAngle: number, endAngle: number) => {
-    if (endAngle <= startAngle) return "";
-    const start = polarToCartesian(startAngle);
-    const end = polarToCartesian(endAngle);
-    const largeArc = endAngle - startAngle > 90 ? 1 : 0;
-    return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y}`;
-  };
+  // Calculate dash lengths for each segment
+  const soldLength = (soldPercent / 100) * arcLength;
+  const quotedLength = (quotedPercent / 100) * arcLength;
+  const missedLength = arcLength - soldLength - quotedLength;
   
-  const needleAngle = Math.min(soldPercent, 100);
-  const needleRadians = ((180 - (needleAngle / 100) * 180) * Math.PI) / 180;
-  const needleLength = radius - 15;
-  const needleX = centerX + needleLength * Math.cos(needleRadians);
-  const needleY = centerY - needleLength * Math.sin(needleRadians);
-
-  // When pipeline is empty (no quotes and no sales), show goal marker in the center of the arc (50% = 90 degrees)
-  // Otherwise, position it based on actual goal vs scale
+  // Create semicircle arc path (from left to right)
+  const arcPath = `M ${centerX - radius} ${centerY} A ${radius} ${radius} 0 0 1 ${centerX + radius} ${centerY}`;
+  
+  // Goal marker position
   const showGoalMarker = actualGoal > 0;
-  const goalMarkerPercent = isPipelineEmpty 
-    ? 50 // Center when pipeline is empty
-    : Math.min((actualGoal / scale) * 100, 100);
+  const goalMarkerPercent = isPipelineEmpty ? 50 : Math.min((actualGoal / scale) * 100, 100);
   const goalMarkerAngle = (goalMarkerPercent / 100) * 180;
   const goalMarkerRadians = ((180 - goalMarkerAngle) * Math.PI) / 180;
   const goalMarkerInnerX = centerX + (radius - strokeWidth/2 - 2) * Math.cos(goalMarkerRadians);
   const goalMarkerInnerY = centerY - (radius - strokeWidth/2 - 2) * Math.sin(goalMarkerRadians);
   const goalMarkerOuterX = centerX + (radius + strokeWidth/2 + 2) * Math.cos(goalMarkerRadians);
   const goalMarkerOuterY = centerY - (radius + strokeWidth/2 + 2) * Math.sin(goalMarkerRadians);
+  
+  // Needle position
+  const needleAngle = Math.min(soldPercent, 100);
+  const needleRadians = ((180 - (needleAngle / 100) * 180) * Math.PI) / 180;
+  const needleLength = radius - 15;
+  const needleX = centerX + needleLength * Math.cos(needleRadians);
+  const needleY = centerY - needleLength * Math.sin(needleRadians);
 
   return (
     <div className="flex flex-col items-center" style={{ width: size }}>
       <div className="flex items-center justify-center gap-4 text-xs mb-2">
         <div className="flex items-center gap-1">
-          <div className="w-2.5 h-2.5 rounded-full bg-slate-700" />
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-700" />
           <span className="text-slate-600">Sold</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
+          <div className="w-2.5 h-2.5 rounded-full bg-green-300" />
           <span className="text-slate-600">Quoted</span>
         </div>
         <div className="flex items-center gap-1">
@@ -95,51 +77,40 @@ export function PerformanceGauge({ sold, quoted, goal, goalTarget, size = 180 }:
       </div>
       
       <svg width={size} height={size * 0.6} viewBox="0 0 180 110">
-        {/* Background arc (missed/remaining) */}
+        {/* Background arc (missed/remaining) - full semicircle */}
         <path
-          d={createArc(0, 180)}
+          d={arcPath}
           fill="none"
           stroke="#e2e8f0"
           strokeWidth={strokeWidth}
-          strokeLinecap="butt"
+          strokeLinecap="round"
         />
         
-        {/* Quoted arc (green) - only show if there's quoted amount */}
-        {quotedPercent > 0 && quotedAngle > 0.5 && (
+        {/* Quoted arc (light green) - layered on top, starts after sold */}
+        {(soldLength + quotedLength) > 0 && (
           <path
-            d={createArc(soldAngle, soldAngle + quotedAngle)}
+            d={arcPath}
             fill="none"
-            stroke="#4ade80"
+            stroke="#86efac"
             strokeWidth={strokeWidth}
-            strokeLinecap="butt"
+            strokeLinecap="round"
+            strokeDasharray={`${soldLength + quotedLength} ${arcLength}`}
           />
         )}
         
-        {/* Sold arc (dark) - only show if there's sold amount */}
-        {soldPercent > 0 && soldAngle > 0.5 && (
+        {/* Sold arc (dark green) - on top, covers sold portion */}
+        {soldLength > 0 && (
           <path
-            d={createArc(0, soldAngle)}
+            d={arcPath}
             fill="none"
-            stroke="#334155"
+            stroke="#166534"
             strokeWidth={strokeWidth}
-            strokeLinecap="butt"
+            strokeLinecap="round"
+            strokeDasharray={`${soldLength} ${arcLength}`}
           />
         )}
         
-        {/* Round end caps - only at the actual endpoints to avoid blobs */}
-        <circle 
-          cx={polarToCartesian(0).x} 
-          cy={polarToCartesian(0).y} 
-          r={strokeWidth / 2} 
-          fill={soldPercent > 0 ? "#334155" : quotedPercent > 0 ? "#4ade80" : "#e2e8f0"} 
-        />
-        <circle 
-          cx={polarToCartesian(180).x} 
-          cy={polarToCartesian(180).y} 
-          r={strokeWidth / 2} 
-          fill="#e2e8f0" 
-        />
-        
+        {/* Goal marker (red line) */}
         {showGoalMarker && (
           <line
             x1={goalMarkerInnerX}
@@ -152,6 +123,7 @@ export function PerformanceGauge({ sold, quoted, goal, goalTarget, size = 180 }:
           />
         )}
         
+        {/* Needle */}
         <line
           x1={centerX}
           y1={centerY}
