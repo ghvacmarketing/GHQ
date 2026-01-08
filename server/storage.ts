@@ -1964,13 +1964,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMobileConversations(userId: string, filters?: { status?: string; search?: string }): Promise<(CrmMessagingConversation & { customer: { id: string; name: string; phone: string | null } | null })[]> {
-    const conditions: any[] = [eq(crmMessagingConversations.assignedToId, userId)];
-    
-    if (filters?.status) {
-      conditions.push(sql`${crmMessagingConversations.status} = ${filters.status}`);
-    }
-
-    const query = db.select({
+    const baseQuery = db.select({
       conversation: crmMessagingConversations,
       customer: {
         id: crmCustomers.id,
@@ -1982,18 +1976,42 @@ export class DatabaseStorage implements IStorage {
     .leftJoin(crmCustomers, eq(crmMessagingConversations.customerId, crmCustomers.id));
 
     let results;
+    
+    const statusFilter = filters?.status && filters.status !== "all" 
+      ? eq(crmMessagingConversations.status, filters.status as any)
+      : (!filters?.status ? eq(crmMessagingConversations.status, "open") : null);
+    
     if (filters?.search) {
       const searchTerm = `%${filters.search}%`;
-      results = await query
-        .where(and(...conditions, or(
-          ilike(crmCustomers.name, searchTerm),
-          ilike(crmCustomers.phone, searchTerm)
-        )))
-        .orderBy(desc(crmMessagingConversations.lastMessageAt));
+      const searchCondition = or(
+        ilike(crmMessagingConversations.customerName, searchTerm),
+        ilike(crmMessagingConversations.phoneNumber, searchTerm),
+        ilike(crmCustomers.name, searchTerm),
+        ilike(crmCustomers.phone, searchTerm)
+      );
+      
+      if (statusFilter) {
+        results = await baseQuery
+          .where(and(statusFilter, searchCondition))
+          .orderBy(desc(crmMessagingConversations.lastMessageAt))
+          .limit(50);
+      } else {
+        results = await baseQuery
+          .where(searchCondition)
+          .orderBy(desc(crmMessagingConversations.lastMessageAt))
+          .limit(50);
+      }
     } else {
-      results = await query
-        .where(and(...conditions))
-        .orderBy(desc(crmMessagingConversations.lastMessageAt));
+      if (statusFilter) {
+        results = await baseQuery
+          .where(statusFilter)
+          .orderBy(desc(crmMessagingConversations.lastMessageAt))
+          .limit(50);
+      } else {
+        results = await baseQuery
+          .orderBy(desc(crmMessagingConversations.lastMessageAt))
+          .limit(50);
+      }
     }
 
     return results.map(r => ({

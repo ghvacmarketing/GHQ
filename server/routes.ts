@@ -19454,10 +19454,6 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Conversation not found" });
       }
 
-      if (conversation.assignedToId !== user.id) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
       const messages = await storage.getMessagesForConversation(id);
       
       let customer = null;
@@ -19542,20 +19538,33 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Conversation not found" });
       }
 
-      if (conversation.assignedToId !== user.id) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
-      const { body, channel } = req.body;
+      const { body } = req.body;
       
       if (!body || typeof body !== "string" || !body.trim()) {
         return res.status(400).json({ message: "Message body is required" });
       }
 
+      const messageBody = body.trim();
+
+      // Send via Textline if configured
+      if (textlineClient.isConfigured()) {
+        try {
+          const sendResult = await textlineClient.sendMessage({
+            phone_number: conversation.phoneNumber,
+            comment: { body: messageBody },
+          });
+          console.log("[Mobile] Textline message sent:", sendResult);
+        } catch (textlineError) {
+          console.error("[Mobile] Textline send failed:", textlineError);
+          return res.status(500).json({ message: "Failed to send SMS via Textline" });
+        }
+      }
+
+      // Store message locally
       const messageData = {
         conversationId: id,
-        body: body.trim(),
-        channel: channel || "sms",
+        body: messageBody,
+        channel: "sms" as const,
         direction: "outbound" as const,
         status: "sent" as const,
         authorUserId: user.id,
@@ -19563,6 +19572,13 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       };
 
       const message = await storage.createMessage(messageData);
+      
+      // Update conversation lastMessageAt
+      await storage.updateMessagingConversation(id, {
+        lastMessageAt: new Date(),
+        lastOutboundAt: new Date(),
+      });
+
       return res.status(201).json(message);
     } catch (error) {
       console.error("Error sending mobile message:", error);

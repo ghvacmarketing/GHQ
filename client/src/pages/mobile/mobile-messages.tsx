@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { 
-  MessageSquare, Search, Send, Loader2, ArrowLeft, User, Phone, Plus, X
+  MessageSquare, Search, Send, Loader2, ArrowLeft, User, Phone, Plus, X, RefreshCw
 } from "lucide-react";
 import { format } from "date-fns";
 import MobileShell from "./mobile-shell";
@@ -14,13 +14,13 @@ import { useToast } from "@/hooks/use-toast";
 import type { CrmMessagingConversation, CrmMessagingMessage, CrmCustomer } from "@shared/schema";
 
 interface ConversationWithCustomer extends CrmMessagingConversation {
-  customerName?: string;
-  customerPhone?: string;
+  customerPhone?: string | null;
 }
 
-interface ConversationDetail extends CrmMessagingConversation {
+interface ConversationDetailResponse {
+  conversation: CrmMessagingConversation;
   messages: CrmMessagingMessage[];
-  customer?: Partial<CrmCustomer>;
+  customer?: Partial<CrmCustomer> | null;
 }
 
 interface CustomerSearchResult {
@@ -50,7 +50,7 @@ export default function MobileMessages() {
     },
   });
 
-  const { data: conversationDetail, isLoading: loadingDetail } = useQuery<ConversationDetail>({
+  const { data: conversationDetail, isLoading: loadingDetail } = useQuery<ConversationDetailResponse>({
     queryKey: ["/api/mobile/messaging/conversations", selectedConversationId],
     queryFn: async () => {
       const res = await fetch(`/api/mobile/messaging/conversations/${selectedConversationId}`, { credentials: "include" });
@@ -107,6 +107,19 @@ export default function MobileMessages() {
   const handleStartConversation = (customerId: string) => {
     startConversationMutation.mutate({ customerId });
   };
+
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/crm/messaging/sync-textline");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/mobile/messaging/conversations"] });
+      toast({ title: "Synced", description: "Conversations updated from Textline" });
+    },
+    onError: () => {
+      toast({ title: "Sync failed", description: "Could not sync with Textline", variant: "destructive" });
+    },
+  });
 
   if (showNewConversation) {
     return (
@@ -190,16 +203,14 @@ export default function MobileMessages() {
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            {conversationDetail?.customer && (
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-slate-800 truncate">
-                  {conversationDetail.customer.name || "Unknown"}
-                </p>
-                {conversationDetail.customer.phone && (
-                  <p className="text-sm text-slate-500 truncate">{conversationDetail.customer.phone}</p>
-                )}
-              </div>
-            )}
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-slate-800 truncate">
+                {conversationDetail?.customer?.name || conversationDetail?.conversation?.customerName || "Unknown"}
+              </p>
+              <p className="text-sm text-slate-500 truncate">
+                {conversationDetail?.customer?.phone || conversationDetail?.conversation?.phoneNumber || "No phone"}
+              </p>
+            </div>
           </div>
 
           <ScrollArea className="flex-1 p-4">
@@ -284,14 +295,25 @@ export default function MobileMessages() {
               <MessageSquare className="h-5 w-5 text-[#711419]" />
               Messages
             </h1>
-            <Button
-              size="icon"
-              variant="outline"
-              onClick={() => setShowNewConversation(true)}
-              data-testid="button-new-conversation"
-            >
-              <Plus className="h-5 w-5" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={() => syncMutation.mutate()}
+                disabled={syncMutation.isPending}
+                data-testid="button-sync-messages"
+              >
+                <RefreshCw className={`h-5 w-5 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+              </Button>
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={() => setShowNewConversation(true)}
+                data-testid="button-new-conversation"
+              >
+                <Plus className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -334,7 +356,7 @@ export default function MobileMessages() {
                       )}
                     </div>
                     <p className="text-sm text-slate-500 truncate">
-                      {conversation.customerPhone || "No phone"}
+                      {conversation.phoneNumber || conversation.customerPhone || "No phone"}
                     </p>
                   </div>
                   {conversation.unreadInboundCount && conversation.unreadInboundCount > 0 && (
