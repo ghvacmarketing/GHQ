@@ -227,16 +227,10 @@ export default function CrmMessaging() {
     },
   });
 
-  // Auto-sync with Textline on page load (once per session)
+  // Auto-sync with Textline on page load
   useEffect(() => {
-    const syncKey = "textline_last_sync";
-    const lastSync = sessionStorage.getItem(syncKey);
-    const now = Date.now();
-    // Sync once per session (or if more than 5 minutes have passed)
-    if (!lastSync || now - parseInt(lastSync) > 5 * 60 * 1000) {
-      syncTextlineMutation.mutate();
-      sessionStorage.setItem(syncKey, now.toString());
-    }
+    // Always sync on page load to get latest messages
+    syncTextlineMutation.mutate();
   }, []);
 
   useEffect(() => {
