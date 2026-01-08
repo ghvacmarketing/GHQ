@@ -496,9 +496,10 @@ export async function syncInvoiceToQuickBooks(
     }
     
     // Don't sync draft invoices - only sync when sent or later
+    // Return success with no quickbooksId so batch sync doesn't treat as error
     if (invoice.status === "draft") {
-      console.log(`[QuickBooks] Skipping draft invoice ${invoice.invoiceNumber}`);
-      return { success: false, error: "Draft invoices are not synced to QuickBooks" };
+      console.log(`[QuickBooks] Skipping draft invoice ${invoice.invoiceNumber} (draft)`);
+      return { success: true, quickbooksId: undefined };
     }
     
     const customerId = invoice.customerId;
@@ -602,6 +603,12 @@ export async function syncInvoiceToQuickBooks(
       }
     }
     
+    // Normalize propertyType to lowercase for consistent lookups
+    // Database may store "Residential" or "residential" - we normalize to lowercase
+    if (propertyType) {
+      propertyType = propertyType.toLowerCase() as PropertyType;
+    }
+    
     // Prefetch all active QuickBooks classes for this realm for efficient lookup
     const allClasses = await db.select()
       .from(quickbooksClasses)
@@ -672,9 +679,11 @@ export async function syncInvoiceToQuickBooks(
     };
     
     // Helper function to capitalize property type for subType matching
+    // Handles both lowercase and capitalized input
     const propertyTypeToSubType = (pt: PropertyType | null): "Residential" | "Commercial" | null => {
       if (!pt) return null;
-      return pt === "residential" ? "Residential" : "Commercial";
+      const normalized = pt.toLowerCase();
+      return normalized === "residential" ? "Residential" : "Commercial";
     };
     
     // Build line items with ClassRef and ItemRef for class assignment and P&L routing
@@ -705,8 +714,12 @@ export async function syncInvoiceToQuickBooks(
         
         if (subAccount) {
           // Use the sub-account's category and property type for ItemRef lookup
+          // Normalize propertyType to ensure consistent capitalization ("Residential" | "Commercial")
           lineClassType = subAccount.categoryType as "Service" | "Install" | "Maintenance" | "Discount" | null;
-          lineSubType = subAccount.propertyType as "Residential" | "Commercial" | null;
+          const normalizedPropType = subAccount.propertyType 
+            ? (subAccount.propertyType.charAt(0).toUpperCase() + subAccount.propertyType.slice(1).toLowerCase()) as "Residential" | "Commercial"
+            : null;
+          lineSubType = normalizedPropType;
           
           // Find the associated QuickBooks Item for this sub-account
           const [linkedItem] = await db.select()
@@ -2027,11 +2040,13 @@ export async function syncAllUnsyncedInvoices(): Promise<{ synced: number; faile
     .from(quickbooksInvoiceSync)
     .where(eq(quickbooksInvoiceSync.realmId, conn.realmId));
   
+  // Only sync invoices that are sent, paid, or void (not drafts)
   const unsyncedInvoices = await db.select({ id: crmInvoices.id, customerId: crmInvoices.customerId })
     .from(crmInvoices)
     .where(and(
       sql`${crmInvoices.id} NOT IN (${existingInvoiceIds})`,
-      isNotNull(crmInvoices.customerId)
+      isNotNull(crmInvoices.customerId),
+      inArray(crmInvoices.status, ["sent", "paid", "void"])
     ))
     .limit(200); // Process up to 200 per run
   
