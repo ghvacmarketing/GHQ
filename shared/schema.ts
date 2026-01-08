@@ -2465,3 +2465,45 @@ export const insertCrmTimeEntrySchema = createInsertSchema(crmTimeEntries).omit(
 
 export type InsertCrmTimeEntry = z.infer<typeof insertCrmTimeEntrySchema>;
 export type CrmTimeEntry = typeof crmTimeEntries.$inferSelect;
+
+// =============================================
+// SMS NOTIFICATION LOG
+// =============================================
+
+// Notification types for tracking sent SMS
+export const smsNotificationTypeEnum = [
+  "maintenance_reminder_10_day",
+  "maintenance_reminder_5_day", 
+  "work_order_en_route",
+  "work_order_on_site",
+  "invoice_sms",
+] as const;
+export type SmsNotificationType = typeof smsNotificationTypeEnum[number];
+
+// SMS Notification Log - tracks all automated SMS notifications to prevent duplicates
+export const smsNotificationLog = pgTable("sms_notification_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => crmCustomers.id, { onDelete: "cascade" }),
+  notificationType: text("notification_type").$type<SmsNotificationType>().notNull(),
+  // Reference IDs based on notification type
+  maintenanceVisitId: varchar("maintenance_visit_id").references(() => maintenanceVisits.id, { onDelete: "cascade" }),
+  workOrderId: varchar("work_order_id").references(() => crmWorkOrders.id, { onDelete: "cascade" }),
+  invoiceId: varchar("invoice_id").references(() => crmInvoices.id, { onDelete: "cascade" }),
+  // Message tracking
+  messageId: varchar("message_id"), // External message ID from Textline
+  conversationId: varchar("conversation_id").references(() => crmMessagingConversations.id),
+  phoneNumber: text("phone_number"),
+  messageBody: text("message_body"),
+  status: text("status").$type<"sent" | "failed" | "pending">().default("pending"),
+  errorMessage: text("error_message"),
+  sentAt: timestamp("sent_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSmsNotificationLogSchema = createInsertSchema(smsNotificationLog).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSmsNotificationLog = z.infer<typeof insertSmsNotificationLogSchema>;
+export type SmsNotificationLog = typeof smsNotificationLog.$inferSelect;
