@@ -17752,6 +17752,20 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // CRM MESSAGING ROUTES
   // ============================================
 
+  // GET /api/crm/messaging/unread-count - Get total unread message count
+  app.get("/api/crm/messaging/unread-count", requireCrmAuth, async (req, res) => {
+    try {
+      const result = await db.select({ 
+        totalUnread: sql<number>`COALESCE(SUM(${crmMessagingConversations.unreadInboundCount}), 0)::int`
+      }).from(crmMessagingConversations);
+      
+      return res.json({ unreadCount: result[0]?.totalUnread || 0 });
+    } catch (error) {
+      console.error("Error fetching unread count:", error);
+      return res.status(500).json({ message: "Failed to fetch unread count" });
+    }
+  });
+
   // GET /api/crm/messaging/conversations - List conversations with filters
   app.get("/api/crm/messaging/conversations", requireCrmAuth, async (req, res) => {
     try {

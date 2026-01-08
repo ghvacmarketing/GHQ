@@ -223,6 +223,7 @@ export default function CrmMessaging() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/messaging/conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/messaging/unread-count"] });
     },
   });
 

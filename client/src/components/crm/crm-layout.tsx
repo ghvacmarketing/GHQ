@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { clearCrmToken } from "@/lib/crmAuth";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,7 @@ type NavItem = {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
+  badgeCount?: number;
 };
 
 type NavSection = {
@@ -116,9 +117,16 @@ function NavItemComponent({
       >
         <Icon className="h-5 w-5 flex-shrink-0" />
         <span className="text-sm font-medium">{item.label}</span>
-        {isActive && (
+        {item.badgeCount && item.badgeCount > 0 ? (
+          <Badge 
+            className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 min-w-[20px] text-center"
+            data-testid={`badge-unread-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+          >
+            {item.badgeCount > 99 ? "99+" : item.badgeCount}
+          </Badge>
+        ) : isActive ? (
           <ChevronRight className="h-4 w-4 ml-auto opacity-70" />
-        )}
+        ) : null}
       </div>
     </Link>
   );
@@ -132,6 +140,12 @@ function SidebarContent({
   onItemClick?: () => void;
 }) {
   const [location] = useLocation();
+
+  // Fetch unread message count with polling
+  const { data: unreadData } = useQuery<{ unreadCount: number }>({
+    queryKey: ["/api/crm/messaging/unread-count"],
+    refetchInterval: 10000, // Poll every 10 seconds
+  });
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
@@ -189,14 +203,20 @@ function SidebarContent({
                 {section.title}
               </p>
               <div className="space-y-1">
-                {section.items.map((item) => (
-                  <NavItemComponent
-                    key={item.href}
-                    item={item}
-                    isActive={isActive(item.href)}
-                    onClick={onItemClick}
-                  />
-                ))}
+                {section.items.map((item) => {
+                  // Add unread count badge to Messaging nav item
+                  const itemWithBadge = item.label === "Messaging" && unreadData?.unreadCount
+                    ? { ...item, badgeCount: unreadData.unreadCount }
+                    : item;
+                  return (
+                    <NavItemComponent
+                      key={item.href}
+                      item={itemWithBadge}
+                      isActive={isActive(item.href)}
+                      onClick={onItemClick}
+                    />
+                  );
+                })}
               </div>
             </div>
           ))}
