@@ -748,7 +748,8 @@ export async function syncInvoiceToQuickBooks(
           d = invoice.dueDate;
         } else if (typeof invoice.dueDate === 'string') {
           // String format: might be "2026-02-07" or "2026-02-07T00:00:00Z"
-          d = invoice.dueDate.includes('T') ? new Date(invoice.dueDate) : new Date(invoice.dueDate + 'T00:00:00');
+          const dueDateStr = invoice.dueDate as string;
+          d = dueDateStr.includes('T') ? new Date(dueDateStr) : new Date(dueDateStr + 'T00:00:00');
         } else {
           d = new Date(invoice.dueDate);
         }
@@ -1634,7 +1635,7 @@ export async function voidInvoiceInQuickBooks(invoiceId: string): Promise<{ succ
       return { success: true }; // Never synced, nothing to do
     }
     
-    const qbo = createQBClient(conn);
+    const qbo = getQuickBooksClient(conn);
     
     return new Promise((resolve) => {
       // First get the invoice to get SyncToken
@@ -1643,7 +1644,7 @@ export async function voidInvoiceInQuickBooks(invoiceId: string): Promise<{ succ
           // If 404, invoice already deleted in QB
           if (err.statusCode === 404 || err.message?.includes('not found')) {
             await db.update(quickbooksInvoiceSync)
-              .set({ syncStatus: "deleted", updatedAt: new Date() })
+              .set({ syncStatus: "error", lastError: "Voided/deleted", updatedAt: new Date() })
               .where(eq(quickbooksInvoiceSync.id, syncRecord.id));
             resolve({ success: true });
             return;
@@ -1653,13 +1654,14 @@ export async function voidInvoiceInQuickBooks(invoiceId: string): Promise<{ succ
         }
         
         // Void the invoice
-        const voidInvoice = {
+        const voidInvoiceData = {
           Id: invoice.Id,
           SyncToken: invoice.SyncToken,
           sparse: true
         };
         
-        qbo.voidInvoice(voidInvoice, async (voidErr: any, voided: any) => {
+        // @ts-ignore - voidInvoice exists in node-quickbooks but not in the type definitions
+        qbo.voidInvoice(voidInvoiceData, async (voidErr: any, voided: any) => {
           if (voidErr) {
             console.error("[QuickBooks] Error voiding invoice:", voidErr);
             resolve({ success: false, error: voidErr.message || "Failed to void invoice" });
@@ -1669,7 +1671,8 @@ export async function voidInvoiceInQuickBooks(invoiceId: string): Promise<{ succ
           // Update sync record
           await db.update(quickbooksInvoiceSync)
             .set({ 
-              syncStatus: "deleted", 
+              syncStatus: "error", 
+              lastError: "Voided in QuickBooks",
               lastSyncAt: new Date(),
               updatedAt: new Date() 
             })
