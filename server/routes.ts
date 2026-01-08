@@ -31,8 +31,8 @@ import { generateQuoteWithAI, createQuoteConversation, getConversationHistory, t
 import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorStore, getOrCreateVectorStore, seedVectorStoreWithSalesBook } from "./services/vector-store";
 import { refreshWeather, scheduleWeatherRefresh, getWeatherData } from "./weather-service";
 import { scheduleWeatherImpactJobs } from "./weather-impact-service";
-import { scheduleAgreementRenewals, processAgreementRenewals } from "./services/agreementRenewalService";
-import { scheduleMaintenanceReminders } from "./services/maintenanceReminderService";
+import { scheduleAgreementRenewals, processAgreementRenewals, processSingleAgreementRenewal } from "./services/agreementRenewalService";
+import { scheduleMaintenanceReminders, processMaintenanceReminders } from "./services/maintenanceReminderService";
 import { sendAutomatedSms, SMS_TEMPLATES, hasNotificationBeenSent } from "./services/smsNotificationService";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
 import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword, isSupervisor } from "./crm-auth";
@@ -18975,6 +18975,91 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error) {
       console.error("Error triggering renewal processing:", error);
       return res.status(500).json({ message: "Failed to process renewals" });
+    }
+  });
+
+  // GET /api/admin/agreements-for-invoice - Get agreements available for manual invoice trigger
+  app.get("/api/admin/agreements-for-invoice", requireCrmAuth, async (req, res) => {
+    const user = await getCurrentCrmUser(req);
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    if (user.role !== "owner" && user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    try {
+      const search = (req.query.search as string) || "";
+      let query = db.select({
+        id: crmAgreements.id,
+        agreementNumber: crmAgreements.agreementNumber,
+        customerName: crmAgreements.customerName,
+        agreementPlan: crmAgreements.agreementPlan,
+        status: crmAgreements.status,
+        price: crmAgreements.price,
+      })
+      .from(crmAgreements)
+      .orderBy(desc(crmAgreements.createdAt))
+      .limit(50);
+      
+      if (search) {
+        query = db.select({
+          id: crmAgreements.id,
+          agreementNumber: crmAgreements.agreementNumber,
+          customerName: crmAgreements.customerName,
+          agreementPlan: crmAgreements.agreementPlan,
+          status: crmAgreements.status,
+          price: crmAgreements.price,
+        })
+        .from(crmAgreements)
+        .where(or(
+          ilike(crmAgreements.customerName, `%${search}%`),
+          ilike(crmAgreements.agreementNumber, `%${search}%`)
+        ))
+        .orderBy(desc(crmAgreements.createdAt))
+        .limit(50);
+      }
+      
+      const agreements = await query;
+      return res.json(agreements);
+    } catch (error) {
+      console.error("Error fetching agreements for invoice:", error);
+      return res.status(500).json({ message: "Failed to fetch agreements" });
+    }
+  });
+
+  // POST /api/admin/trigger-agreement-invoice/:agreementId - Manually send invoice for specific agreement
+  app.post("/api/admin/trigger-agreement-invoice/:agreementId", requireCrmAuth, async (req, res) => {
+    const user = await getCurrentCrmUser(req);
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    if (user.role !== "owner" && user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    try {
+      const { agreementId } = req.params;
+      
+      const [agreement] = await db.select()
+        .from(crmAgreements)
+        .where(eq(crmAgreements.id, agreementId))
+        .limit(1);
+      
+      if (!agreement) {
+        return res.status(404).json({ message: "Agreement not found" });
+      }
+      
+      const result = await processSingleAgreementRenewal(agreement);
+      
+      return res.json({ 
+        success: true, 
+        result,
+        message: result.emailSent 
+          ? `Invoice ${result.invoiceNumber} created and emailed to ${agreement.customerName}`
+          : `Invoice ${result.invoiceNumber} created (no email sent - customer may not have email)`
+      });
+    } catch (error) {
+      console.error("Error triggering agreement invoice:", error);
+      return res.status(500).json({ message: "Failed to send agreement invoice" });
     }
   });
 

@@ -6,7 +6,8 @@ import { getQueryFn } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Bell, RefreshCw, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Bell, RefreshCw, Loader2, CheckCircle2, AlertCircle, FileText, Search, Send } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser } from "@shared/schema";
 
@@ -47,6 +48,22 @@ interface RenewalSummary {
   results: RenewalResult[];
 }
 
+interface AgreementOption {
+  id: string;
+  agreementNumber: string;
+  customerName: string;
+  agreementPlan: string | null;
+  status: string | null;
+  price: string | null;
+}
+
+interface InvoiceTriggerResult {
+  success: boolean;
+  message?: string;
+  result?: RenewalResult;
+  error?: string;
+}
+
 export default function CrmSettingsSystemTools() {
   usePageTitle("System Tools");
   const [, navigate] = useLocation();
@@ -54,6 +71,13 @@ export default function CrmSettingsSystemTools() {
   const [isRunningRenewals, setIsRunningRenewals] = useState(false);
   const [reminderResult, setReminderResult] = useState<{ success: boolean; summary?: ReminderSummary; error?: string } | null>(null);
   const [renewalResult, setRenewalResult] = useState<{ success: boolean; summary?: RenewalSummary; error?: string } | null>(null);
+  
+  const [agreementSearch, setAgreementSearch] = useState("");
+  const [agreements, setAgreements] = useState<AgreementOption[]>([]);
+  const [isLoadingAgreements, setIsLoadingAgreements] = useState(false);
+  const [selectedAgreement, setSelectedAgreement] = useState<AgreementOption | null>(null);
+  const [isSendingInvoice, setIsSendingInvoice] = useState(false);
+  const [invoiceResult, setInvoiceResult] = useState<InvoiceTriggerResult | null>(null);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -107,6 +131,59 @@ export default function CrmSettingsSystemTools() {
       setRenewalResult({ success: false, error: "Network error - please try again" });
     } finally {
       setIsRunningRenewals(false);
+    }
+  };
+
+  const handleSearchAgreements = async (search: string) => {
+    setAgreementSearch(search);
+    if (search.length < 2) {
+      setAgreements([]);
+      return;
+    }
+    setIsLoadingAgreements(true);
+    try {
+      const res = await fetch(`/api/admin/agreements-for-invoice?search=${encodeURIComponent(search)}`, {
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAgreements(data);
+      }
+    } catch (err) {
+      console.error("Failed to search agreements:", err);
+    } finally {
+      setIsLoadingAgreements(false);
+    }
+  };
+
+  const handleSelectAgreement = (agreement: AgreementOption) => {
+    setSelectedAgreement(agreement);
+    setAgreements([]);
+    setAgreementSearch(agreement.customerName + " - " + agreement.agreementNumber);
+  };
+
+  const handleSendInvoice = async () => {
+    if (!selectedAgreement) return;
+    setIsSendingInvoice(true);
+    setInvoiceResult(null);
+    try {
+      const res = await fetch(`/api/admin/trigger-agreement-invoice/${selectedAgreement.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setInvoiceResult({ success: true, message: data.message, result: data.result });
+        setSelectedAgreement(null);
+        setAgreementSearch("");
+      } else {
+        setInvoiceResult({ success: false, error: data.message || "Failed to send invoice" });
+      }
+    } catch (err) {
+      setInvoiceResult({ success: false, error: "Network error - please try again" });
+    } finally {
+      setIsSendingInvoice(false);
     }
   };
 
@@ -299,6 +376,116 @@ export default function CrmSettingsSystemTools() {
                   )}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-green-100">
+                  <FileText className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Manual Agreement Invoice</CardTitle>
+                  <CardDescription>
+                    Search for an agreement and manually send a renewal invoice for testing
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="relative">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      placeholder="Search by customer name or agreement number..."
+                      value={agreementSearch}
+                      onChange={(e) => handleSearchAgreements(e.target.value)}
+                      className="pl-10"
+                      data-testid="input-agreement-search"
+                    />
+                  </div>
+                  
+                  {agreements.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                      {agreements.map((agreement) => (
+                        <button
+                          key={agreement.id}
+                          onClick={() => handleSelectAgreement(agreement)}
+                          className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                          data-testid={`option-agreement-${agreement.id}`}
+                        >
+                          <div className="font-medium text-slate-900">{agreement.customerName}</div>
+                          <div className="text-sm text-slate-500">
+                            {agreement.agreementNumber} - {agreement.agreementPlan || 'N/A'} 
+                            {agreement.price && ` ($${agreement.price})`}
+                            <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
+                              agreement.status === 'active' ? 'bg-green-100 text-green-700' :
+                              agreement.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-slate-100 text-slate-700'
+                            }`}>
+                              {agreement.status || 'unknown'}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {isLoadingAgreements && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg p-4 text-center text-slate-500">
+                      <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                      Searching...
+                    </div>
+                  )}
+                </div>
+
+                {selectedAgreement && (
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <div className="text-sm text-slate-600">Selected Agreement:</div>
+                    <div className="font-medium">{selectedAgreement.customerName} - {selectedAgreement.agreementNumber}</div>
+                    <div className="text-sm text-slate-500">
+                      {selectedAgreement.agreementPlan} {selectedAgreement.price && `($${selectedAgreement.price})`}
+                    </div>
+                  </div>
+                )}
+
+                <Button
+                  onClick={handleSendInvoice}
+                  disabled={!selectedAgreement || isSendingInvoice}
+                  className="w-full"
+                  data-testid="button-send-invoice"
+                >
+                  {isSendingInvoice ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Send Invoice
+                    </>
+                  )}
+                </Button>
+
+                {invoiceResult && (
+                  <div className={`p-4 rounded-lg ${invoiceResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                    {invoiceResult.success ? (
+                      <div className="flex items-center gap-2 text-green-700">
+                        <CheckCircle2 className="h-5 w-5" />
+                        <span>{invoiceResult.message}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-red-700">
+                        <AlertCircle className="h-5 w-5" />
+                        <span>{invoiceResult.error}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
