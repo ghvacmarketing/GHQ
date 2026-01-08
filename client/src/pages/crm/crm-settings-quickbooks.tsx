@@ -106,7 +106,12 @@ export default function CrmSettingsQuickBooks() {
       return data.authUrl;
     },
     onSuccess: (authUrl: string) => {
-      window.location.href = authUrl;
+      // Open in new tab to avoid iframe restrictions from QuickBooks/Intuit
+      window.open(authUrl, '_blank');
+      toast({
+        title: "QuickBooks Login Opened",
+        description: "Complete the login in the new tab, then return here and refresh the page.",
+      });
     },
     onError: (error: any) => {
       toast({
