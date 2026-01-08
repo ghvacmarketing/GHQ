@@ -17953,28 +17953,71 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // DELETE /api/crm/messaging/conversations/:id - Delete a conversation and all its messages
+  app.delete("/api/crm/messaging/conversations/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const existing = await storage.getMessagingConversationById(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      const deleted = await storage.deleteMessagingConversation(id);
+      if (deleted) {
+        return res.json({ message: "Conversation deleted successfully" });
+      } else {
+        return res.status(500).json({ message: "Failed to delete conversation" });
+      }
+    } catch (error) {
+      console.error("Error deleting conversation:", error);
+      return res.status(500).json({ message: "Failed to delete conversation" });
+    }
+  });
+
   // POST /api/webhooks/textline - Textline webhook for inbound messages (no auth)
   app.post("/api/webhooks/textline", async (req, res) => {
     try {
       const payload = req.body;
       const eventType = payload.event_type;
       
-      console.log("[Textline Webhook] Received event:", eventType);
+      console.log("[Textline Webhook] Received event:", eventType, JSON.stringify(payload, null, 2));
       
-      if (eventType === "message.created" && payload.data?.post?.direction === "inbound") {
-        const conversationUuid = payload.data.conversation?.uuid;
-        const phoneNumber = payload.data.conversation?.phone_number;
-        const contactName = payload.data.conversation?.contact_name;
-        const messageUuid = payload.data.post?.uuid;
-        const messageBody = payload.data.post?.body || "";
-        const createdAt = payload.data.post?.created_at ? new Date(payload.data.post.created_at) : new Date();
+      // Handle inbound messages - check multiple possible payload structures
+      const post = payload.data?.post || payload.post;
+      const conversation = payload.data?.conversation || payload.conversation;
+      const direction = post?.direction;
+      
+      if ((eventType === "message.created" || eventType === "post.created") && direction === "inbound") {
+        const conversationUuid = conversation?.uuid;
+        const phoneNumber = conversation?.phone_number || conversation?.customer?.phone_number;
+        const contactName = conversation?.contact_name || conversation?.customer?.name;
+        const messageUuid = post?.uuid;
+        const messageBody = post?.body || "";
+        const createdAt = post?.created_at ? new Date(post.created_at * 1000) : new Date();
         
         if (!conversationUuid || !phoneNumber) {
-          console.log("[Textline Webhook] Missing conversation UUID or phone number");
+          console.log("[Textline Webhook] Missing conversation UUID or phone number", { conversationUuid, phoneNumber });
           return res.status(200).json({ message: "OK - missing data" });
         }
         
-        let conversation = await storage.getMessagingConversationByExternalId(conversationUuid, "textline");
+        console.log("[Textline Webhook] Processing inbound message:", { conversationUuid, phoneNumber, messageBody: messageBody.substring(0, 50) });
+        
+        // First try to find by external ID
+        let localConversation = await storage.getMessagingConversationByExternalId(conversationUuid, "textline");
+        
+        // If not found, try by phone number
+        if (!localConversation) {
+          localConversation = await storage.getMessagingConversationByPhone(phoneNumber);
+          
+          // If found by phone, update to link with Textline
+          if (localConversation && !localConversation.externalConversationId) {
+            await storage.updateMessagingConversation(localConversation.id, {
+              externalSource: "textline" as any,
+              externalConversationId: conversationUuid,
+            });
+          }
+        }
         
         let customerId: string | undefined;
         const customer = await storage.getCrmCustomerByPhone(phoneNumber);
@@ -17982,8 +18025,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           customerId = customer.id;
         }
         
-        if (!conversation) {
-          conversation = await storage.createMessagingConversation({
+        if (!localConversation) {
+          localConversation = await storage.createMessagingConversation({
             customerId: customerId || null,
             phoneNumber: phoneNumber,
             customerName: contactName || null,
@@ -17992,22 +18035,30 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
             externalConversationId: conversationUuid,
             status: "open" as any,
           });
-          console.log("[Textline Webhook] Created new conversation:", conversation.id);
-        } else if (customerId && !conversation.customerId) {
-          await storage.updateMessagingConversation(conversation.id, { customerId });
+          console.log("[Textline Webhook] Created new conversation:", localConversation.id);
+        } else if (customerId && !localConversation.customerId) {
+          await storage.updateMessagingConversation(localConversation.id, { customerId });
         }
         
-        await storage.createMessage({
-          conversationId: conversation.id,
-          direction: "inbound" as any,
-          channel: "sms" as any,
-          body: messageBody,
-          externalMessageId: messageUuid,
-          status: "delivered" as any,
-          sentAt: createdAt,
-        });
+        // Check if message already exists (avoid duplicates)
+        const existingMessages = await storage.getMessagesForConversation(localConversation.id);
+        const isDuplicate = existingMessages.some(m => m.externalMessageId === messageUuid);
         
-        console.log("[Textline Webhook] Created inbound message for conversation:", conversation.id);
+        if (!isDuplicate) {
+          await storage.createMessage({
+            conversationId: localConversation.id,
+            direction: "inbound" as any,
+            channel: "sms" as any,
+            body: messageBody,
+            externalMessageId: messageUuid,
+            status: "delivered" as any,
+            sentAt: createdAt,
+          });
+          
+          console.log("[Textline Webhook] Created inbound message for conversation:", localConversation.id);
+        } else {
+          console.log("[Textline Webhook] Skipped duplicate message:", messageUuid);
+        }
       }
       
       return res.status(200).json({ message: "OK" });

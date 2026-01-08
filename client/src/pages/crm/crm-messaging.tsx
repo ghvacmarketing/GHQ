@@ -14,8 +14,19 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +52,7 @@ import {
   Minimize2,
   Plus,
   User,
+  Trash2,
 } from "lucide-react";
 import type {
   CrmMessagingConversation,
@@ -182,6 +194,24 @@ export default function CrmMessaging() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/messaging/conversations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/messaging/conversations", selectedConversationId] });
+    },
+  });
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  
+  const deleteConversationMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", `/api/crm/messaging/conversations/${selectedConversationId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Conversation deleted" });
+      setSelectedConversationId(null);
+      setShowMobileThread(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/messaging/conversations"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete conversation", variant: "destructive" });
     },
   });
 
@@ -469,6 +499,12 @@ export default function CrmMessaging() {
                   <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "archived" })}>
                     <Archive className="h-4 w-4 mr-2" /> Archive
                   </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className="text-red-600 focus:text-red-600"
+                    onClick={() => setDeleteDialogOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" /> Delete
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -664,11 +700,37 @@ export default function CrmMessaging() {
     </Dialog>
   );
 
+  const deleteConfirmDialog = (
+    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Conversation</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete this conversation? This will permanently remove all messages and cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => deleteConversationMutation.mutate()}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            {deleteConversationMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : null}
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
   if (isFullscreen) {
     return (
       <>
         {messagingContent}
         {newMessageDialog}
+        {deleteConfirmDialog}
       </>
     );
   }
@@ -677,6 +739,7 @@ export default function CrmMessaging() {
     <CrmLayout currentUser={currentUser} disableScroll hideGlobalSearch>
       {messagingContent}
       {newMessageDialog}
+      {deleteConfirmDialog}
     </CrmLayout>
   );
 }

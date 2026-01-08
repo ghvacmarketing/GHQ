@@ -256,6 +256,7 @@ export interface IStorage {
   getConversationTags(conversationId: string): Promise<CrmMessagingConversationTag[]>;
   addConversationTag(conversationId: string, tag: string): Promise<CrmMessagingConversationTag>;
   removeConversationTag(conversationId: string, tag: string): Promise<void>;
+  deleteMessagingConversation(id: string): Promise<boolean>;
   getMobileConversations(userId: string, filters?: { status?: string; search?: string }): Promise<(CrmMessagingConversation & { customer: { id: string; name: string; phone: string | null } | null })[]>;
   searchCrmCustomers(search: string, limit?: number): Promise<{ id: string; name: string; phone: string | null; email: string | null }[]>;
   getMessagingConversationByExternalId(externalConversationId: string, externalSource: string): Promise<CrmMessagingConversation | undefined>;
@@ -1961,6 +1962,23 @@ export class DatabaseStorage implements IStorage {
         eq(crmMessagingConversationTags.conversationId, conversationId),
         eq(crmMessagingConversationTags.tag, tag)
       ));
+  }
+
+  async deleteMessagingConversation(id: string): Promise<boolean> {
+    // First delete all messages for this conversation
+    await db.delete(crmMessagingMessages)
+      .where(eq(crmMessagingMessages.conversationId, id));
+    
+    // Delete all tags for this conversation
+    await db.delete(crmMessagingConversationTags)
+      .where(eq(crmMessagingConversationTags.conversationId, id));
+    
+    // Delete the conversation itself
+    const result = await db.delete(crmMessagingConversations)
+      .where(eq(crmMessagingConversations.id, id))
+      .returning();
+    
+    return result.length > 0;
   }
 
   async getMobileConversations(userId: string, filters?: { status?: string; search?: string }): Promise<(CrmMessagingConversation & { customer: { id: string; name: string; phone: string | null } | null })[]> {
