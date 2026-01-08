@@ -1,6 +1,9 @@
 import { Resend } from "resend";
 import type { CrmInvoice, CrmInvoiceLineItem } from "@shared/schema";
+import { crmInvoices } from "@shared/schema";
 import { getUncachableStripeClient } from "../stripeClient";
+import { db } from "../db";
+import { eq } from "drizzle-orm";
 
 const brandDefaults = {
   name: "Giesbrecht HVAC",
@@ -49,7 +52,7 @@ export interface CrmInvoiceEmailResult {
   paymentLinkUrl?: string;
 }
 
-// Generate a Stripe payment link for an invoice
+// Generate a Stripe payment link for an invoice and store its ID for later deactivation
 async function generatePaymentLink(invoice: CrmInvoice): Promise<string | null> {
   try {
     const balanceDue = parseFloat(invoice.balanceDue?.toString() || invoice.total?.toString() || "0");
@@ -85,6 +88,12 @@ async function generatePaymentLink(invoice: CrmInvoice): Promise<string | null> 
         },
       },
     });
+
+    // Store the payment link ID on the invoice so it can be deactivated when marked as paid
+    await db.update(crmInvoices)
+      .set({ stripePaymentLinkId: paymentLink.id })
+      .where(eq(crmInvoices.id, invoice.id));
+    console.log(`[CRM Invoice Email] Stored payment link ID ${paymentLink.id} on invoice ${invoice.invoiceNumber}`);
 
     return paymentLink.url;
   } catch (error) {
