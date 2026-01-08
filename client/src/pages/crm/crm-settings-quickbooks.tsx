@@ -36,6 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { CrmUser, QuickbooksConnection, QuickbooksAccount } from "@shared/schema";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Download, Wallet } from "lucide-react";
 import {
   Dialog,
@@ -547,19 +548,37 @@ export default function CrmSettingsQuickBooks() {
 
           {status?.connected && (
             <Card>
-              <CardHeader>
+              <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Wallet className="h-6 w-6 text-green-600" />
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <Wallet className="h-5 w-5 text-green-600" />
+                    </div>
                     <div>
                       <CardTitle>Chart of Accounts</CardTitle>
-                      <CardDescription>Manage QuickBooks income accounts and sub-accounts for invoice line items</CardDescription>
+                      <CardDescription>Map income accounts for P&L routing</CardDescription>
                     </div>
                   </div>
-                  <Button onClick={() => setShowAddAccountDialog(true)} data-testid="btn-add-sub-account">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Sub-Account
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => pullAccountsMutation.mutate()}
+                      disabled={pullAccountsMutation.isPending}
+                      data-testid="btn-pull-accounts"
+                    >
+                      {pullAccountsMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
+                      Pull Accounts
+                    </Button>
+                    <Button size="sm" onClick={() => setShowAddAccountDialog(true)} data-testid="btn-add-sub-account">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Sub-Account
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -567,120 +586,246 @@ export default function CrmSettingsQuickBooks() {
                   <Skeleton className="h-48 w-full" />
                 ) : accounts && accounts.length > 0 ? (
                   <div className="space-y-4">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Account Type</TableHead>
-                          <TableHead>Category</TableHead>
-                          <TableHead>Property Type</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {accounts.filter(a => a.isActive).map((account) => (
-                          <TableRow key={account.id} data-testid={`account-row-${account.id}`}>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                {account.fullyQualifiedName || account.name}
-                                {account.isParent && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    Parent
-                                  </Badge>
-                                )}
+                    {(() => {
+                      const activeAccounts = accounts.filter(a => a.isActive);
+                      const parentAccounts = activeAccounts.filter(a => a.isParent);
+                      const subAccounts = activeAccounts.filter(a => !a.isParent);
+                      const mappedSubAccounts = subAccounts.filter(a => a.categoryType && a.propertyType);
+                      
+                      return (
+                        <>
+                          <div className="grid grid-cols-3 gap-4 p-4 bg-slate-50 rounded-lg">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-slate-900">{parentAccounts.length}</div>
+                              <div className="text-xs text-slate-500">Parent Accounts</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-slate-900">{subAccounts.length}</div>
+                              <div className="text-xs text-slate-500">Sub-Accounts</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-green-600">{mappedSubAccounts.length}</div>
+                              <div className="text-xs text-slate-500">Fully Mapped</div>
+                            </div>
+                          </div>
+                          
+                          <Accordion type="multiple" className="w-full" defaultValue={parentAccounts.map(p => p.id)}>
+                            {parentAccounts.map((parent) => {
+                              const children = subAccounts.filter(
+                                s => s.quickbooksParentAccountId === parent.quickbooksAccountId || 
+                                     s.parentAccountId === parent.id ||
+                                     (s.fullyQualifiedName && s.fullyQualifiedName.startsWith(parent.name + ":"))
+                              );
+                              const mappedChildren = children.filter(c => c.categoryType && c.propertyType);
+                              
+                              return (
+                                <AccordionItem key={parent.id} value={parent.id} className="border rounded-lg px-4 mb-2">
+                                  <AccordionTrigger className="hover:no-underline py-3">
+                                    <div className="flex items-center justify-between w-full pr-4">
+                                      <div className="flex items-center gap-3">
+                                        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                                        <span className="font-semibold text-slate-900">{parent.name}</span>
+                                        <Badge variant="outline" className="text-xs">
+                                          {children.length} sub-account{children.length !== 1 ? 's' : ''}
+                                        </Badge>
+                                      </div>
+                                      {children.length > 0 && (
+                                        <Badge 
+                                          variant={mappedChildren.length === children.length ? "default" : "secondary"}
+                                          className={`text-xs ${mappedChildren.length === children.length ? 'bg-green-100 text-green-700 hover:bg-green-100' : ''}`}
+                                        >
+                                          {mappedChildren.length}/{children.length} mapped
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </AccordionTrigger>
+                                  <AccordionContent className="pb-4">
+                                    <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100 mb-3"
+                                      data-testid={`account-row-${parent.id}`}>
+                                      <div className="flex items-center gap-3">
+                                        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                                        <span className="font-medium text-slate-700">{parent.name}</span>
+                                        <Badge variant="outline" className="text-xs bg-white">Parent Account</Badge>
+                                      </div>
+                                      <Select
+                                        value={parent.categoryType || "none"}
+                                        onValueChange={(value) => {
+                                          updateAccountMutation.mutate({
+                                            id: parent.id,
+                                            data: { categoryType: value === "none" ? undefined : value },
+                                          });
+                                        }}
+                                      >
+                                        <SelectTrigger className="w-28 h-8 text-xs" data-testid={`select-category-type-${parent.id}`}>
+                                          <SelectValue placeholder="Category" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="none">None</SelectItem>
+                                          {CATEGORY_TYPES.map((type) => (
+                                            <SelectItem key={type} value={type}>{type}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    {children.length > 0 ? (
+                                      <div className="space-y-2">
+                                        {children.map((child) => (
+                                          <div 
+                                            key={child.id} 
+                                            className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100"
+                                            data-testid={`account-row-${child.id}`}
+                                          >
+                                            <div className="flex items-center gap-3">
+                                              <div className={`w-1.5 h-1.5 rounded-full ${child.categoryType && child.propertyType ? 'bg-green-500' : 'bg-amber-400'}`}></div>
+                                              <span className="font-medium text-slate-700">
+                                                {child.fullyQualifiedName?.replace(parent.name + ":", "") || child.name}
+                                              </span>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                              <Select
+                                                value={child.categoryType || "none"}
+                                                onValueChange={(value) => {
+                                                  updateAccountMutation.mutate({
+                                                    id: child.id,
+                                                    data: { categoryType: value === "none" ? undefined : value },
+                                                  });
+                                                }}
+                                              >
+                                                <SelectTrigger className="w-28 h-8 text-xs" data-testid={`select-category-type-${child.id}`}>
+                                                  <SelectValue placeholder="Category" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  <SelectItem value="none">None</SelectItem>
+                                                  {CATEGORY_TYPES.map((type) => (
+                                                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                                                  ))}
+                                                </SelectContent>
+                                              </Select>
+                                              <Select
+                                                value={child.propertyType || "none"}
+                                                onValueChange={(value) => {
+                                                  updateAccountMutation.mutate({
+                                                    id: child.id,
+                                                    data: { propertyType: value === "none" ? undefined : value },
+                                                  });
+                                                }}
+                                              >
+                                                <SelectTrigger className="w-28 h-8 text-xs" data-testid={`select-property-type-${child.id}`}>
+                                                  <SelectValue placeholder="Property" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  <SelectItem value="none">None</SelectItem>
+                                                  {PROPERTY_TYPES.map((type) => (
+                                                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                                                  ))}
+                                                </SelectContent>
+                                              </Select>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="text-sm text-slate-500 mt-2 pl-5">
+                                        No sub-accounts yet. Click "Create Sub-Account" to add one.
+                                      </p>
+                                    )}
+                                  </AccordionContent>
+                                </AccordionItem>
+                              );
+                            })}
+                          </Accordion>
+                          
+                          {subAccounts.filter(s => {
+                            const hasParent = parentAccounts.some(p => 
+                              s.quickbooksParentAccountId === p.quickbooksAccountId || 
+                              s.parentAccountId === p.id ||
+                              (s.fullyQualifiedName && s.fullyQualifiedName.startsWith(p.name + ":"))
+                            );
+                            return !hasParent;
+                          }).length > 0 && (
+                            <div className="border rounded-lg p-4">
+                              <h4 className="font-semibold text-slate-900 mb-3">Other Accounts</h4>
+                              <div className="space-y-2">
+                                {subAccounts.filter(s => {
+                                  const hasParent = parentAccounts.some(p => 
+                                    s.quickbooksParentAccountId === p.quickbooksAccountId || 
+                                    s.parentAccountId === p.id ||
+                                    (s.fullyQualifiedName && s.fullyQualifiedName.startsWith(p.name + ":"))
+                                  );
+                                  return !hasParent;
+                                }).map((account) => (
+                                  <div 
+                                    key={account.id}
+                                    className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
+                                    data-testid={`account-row-${account.id}`}
+                                  >
+                                    <span className="font-medium text-slate-700">{account.name}</span>
+                                    <div className="flex items-center gap-3">
+                                      <Select
+                                        value={account.categoryType || "none"}
+                                        onValueChange={(value) => {
+                                          updateAccountMutation.mutate({
+                                            id: account.id,
+                                            data: { categoryType: value === "none" ? undefined : value },
+                                          });
+                                        }}
+                                      >
+                                        <SelectTrigger className="w-28 h-8 text-xs" data-testid={`select-category-type-${account.id}`}>
+                                          <SelectValue placeholder="Category" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="none">None</SelectItem>
+                                          {CATEGORY_TYPES.map((type) => (
+                                            <SelectItem key={type} value={type}>{type}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      <Select
+                                        value={account.propertyType || "none"}
+                                        onValueChange={(value) => {
+                                          updateAccountMutation.mutate({
+                                            id: account.id,
+                                            data: { propertyType: value === "none" ? undefined : value },
+                                          });
+                                        }}
+                                      >
+                                        <SelectTrigger className="w-28 h-8 text-xs" data-testid={`select-property-type-${account.id}`}>
+                                          <SelectValue placeholder="Property" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="none">None</SelectItem>
+                                          {PROPERTY_TYPES.map((type) => (
+                                            <SelectItem key={type} value={type}>{type}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
-                            </TableCell>
-                            <TableCell>{account.accountType}</TableCell>
-                            <TableCell>
-                              <Select
-                                value={account.categoryType || "none"}
-                                onValueChange={(value) => {
-                                  updateAccountMutation.mutate({
-                                    id: account.id,
-                                    data: { categoryType: value === "none" ? undefined : value },
-                                  });
-                                }}
-                              >
-                                <SelectTrigger className="w-32" data-testid={`select-category-type-${account.id}`}>
-                                  <SelectValue placeholder="Select..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="none">None</SelectItem>
-                                  {CATEGORY_TYPES.map((type) => (
-                                    <SelectItem key={type} value={type}>
-                                      {type}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              {!account.isParent ? (
-                                <Select
-                                  value={account.propertyType || "none"}
-                                  onValueChange={(value) => {
-                                    updateAccountMutation.mutate({
-                                      id: account.id,
-                                      data: { propertyType: value === "none" ? undefined : value },
-                                    });
-                                  }}
-                                >
-                                  <SelectTrigger className="w-32" data-testid={`select-property-type-${account.id}`}>
-                                    <SelectValue placeholder="Select..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
-                                    {PROPERTY_TYPES.map((type) => (
-                                      <SelectItem key={type} value={type}>
-                                        {type}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              ) : (
-                                <span className="text-slate-400">-</span>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                    
-                    <Separator />
-                    
-                    <div className="flex gap-3">
-                      <Button
-                        variant="outline"
-                        onClick={() => pullAccountsMutation.mutate()}
-                        disabled={pullAccountsMutation.isPending}
-                        data-testid="btn-pull-accounts"
-                      >
-                        {pullAccountsMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Download className="h-4 w-4 mr-2" />
-                        )}
-                        Pull from QuickBooks
-                      </Button>
-                    </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <p className="text-slate-500 mb-4">No accounts configured yet</p>
-                    <div className="flex justify-center gap-3">
-                      <Button
-                        variant="outline"
-                        onClick={() => pullAccountsMutation.mutate()}
-                        disabled={pullAccountsMutation.isPending}
-                        data-testid="btn-pull-accounts-empty"
-                      >
-                        {pullAccountsMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Download className="h-4 w-4 mr-2" />
-                        )}
-                        Pull from QuickBooks
-                      </Button>
-                    </div>
+                  <div className="text-center py-12 bg-slate-50 rounded-lg">
+                    <Wallet className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                    <h3 className="font-semibold text-slate-900 mb-2">No Accounts Yet</h3>
+                    <p className="text-slate-500 mb-4 text-sm">Pull your income accounts from QuickBooks to get started</p>
+                    <Button
+                      onClick={() => pullAccountsMutation.mutate()}
+                      disabled={pullAccountsMutation.isPending}
+                      data-testid="btn-pull-accounts-empty"
+                    >
+                      {pullAccountsMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
+                      Pull from QuickBooks
+                    </Button>
                   </div>
                 )}
               </CardContent>
