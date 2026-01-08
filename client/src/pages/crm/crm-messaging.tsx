@@ -68,9 +68,13 @@ type ConversationWithCustomer = CrmMessagingConversation & {
   customer?: CrmCustomer | null;
 };
 
+type MessageWithAuthor = CrmMessagingMessage & {
+  authorName?: string | null;
+};
+
 type ConversationDetail = {
   conversation: CrmMessagingConversation;
-  messages: CrmMessagingMessage[];
+  messages: MessageWithAuthor[];
   tags: CrmMessagingConversationTag[];
   customer?: CrmCustomer | null;
 };
@@ -546,6 +550,9 @@ export default function CrmMessaging() {
                       <div className={`flex items-center gap-1 mt-1 text-xs ${
                         msg.direction === "outbound" ? "text-white/70 justify-end" : "text-slate-400"
                       }`}>
+                        {msg.direction === "outbound" && msg.authorName && (
+                          <span className="mr-1">Sent by {msg.authorName} &middot;</span>
+                        )}
                         <span>{formatMessageTime(msg.createdAt)}</span>
                         {msg.direction === "outbound" && messageStatusIcons[msg.status || "sent"]}
                       </div>
