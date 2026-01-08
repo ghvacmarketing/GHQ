@@ -679,7 +679,11 @@ export async function syncInvoiceToQuickBooks(
           const qbClassId = classLookup.get(key);
           if (qbClassId) {
             lineItem.SalesItemLineDetail.ClassRef = { value: qbClassId };
+          } else {
+            console.log(`[QuickBooks Class] No class found for discount key: ${key}`);
           }
+        } else {
+          console.log(`[QuickBooks Class] Discount line without discountKind: ${item.description}`);
         }
       } else if (item.itemId) {
         // For regular items, use category + property type
@@ -693,8 +697,14 @@ export async function syncInvoiceToQuickBooks(
             const qbClassId = classLookup.get(key);
             if (qbClassId) {
               lineItem.SalesItemLineDetail.ClassRef = { value: qbClassId };
+            } else {
+              console.log(`[QuickBooks Class] No class found for key: ${key} (available: ${Array.from(classLookup.keys()).join(", ")})`);
             }
+          } else {
+            console.log(`[QuickBooks Class] Missing classType (${classType}) or subType (${subType}) for item: ${crmItem.name}`);
           }
+        } else {
+          console.log(`[QuickBooks Class] Item ${item.itemId} has no category set`);
         }
       } else {
         // Priority 3: For line items without itemId (e.g., maintenance agreement renewals),
@@ -717,8 +727,14 @@ export async function syncInvoiceToQuickBooks(
             const qbClassId = classLookup.get(key);
             if (qbClassId) {
               lineItem.SalesItemLineDetail.ClassRef = { value: qbClassId };
+            } else {
+              console.log(`[QuickBooks Class] No class found for inferred key: ${key}`);
             }
           }
+        } else if (!inferredClassType) {
+          console.log(`[QuickBooks Class] No itemId and couldn't infer class from description: "${item.description}"`);
+        } else if (!propertyType) {
+          console.log(`[QuickBooks Class] No property type for line item: "${item.description}"`);
         }
       }
       
