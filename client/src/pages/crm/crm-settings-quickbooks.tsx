@@ -161,10 +161,17 @@ export default function CrmSettingsQuickBooks() {
     },
     onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/status"] });
-      toast({
-        title: "Sync Complete",
-        description: `Synced ${result.customers?.synced || 0} customers, ${result.invoices?.synced || 0} invoices, ${result.payments?.synced || 0} payments`,
-      });
+      if (result.skipped) {
+        toast({
+          title: "Sync In Progress",
+          description: "A sync is already running. Please wait for it to complete.",
+        });
+      } else {
+        toast({
+          title: "Sync Complete",
+          description: `Synced ${result.customers?.synced || 0} customers, ${result.invoices?.synced || 0} invoices, ${result.payments?.synced || 0} payments`,
+        });
+      }
     },
     onError: (error: any) => {
       toast({
