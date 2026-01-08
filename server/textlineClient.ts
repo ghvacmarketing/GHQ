@@ -184,8 +184,26 @@ class TextlineClient {
         };
       }
 
+      // Debug: log the raw conversation structure
+      if (data.conversations?.length > 0) {
+        console.log("[Textline] Raw conversation sample:", JSON.stringify(data.conversations[0], null, 2));
+      }
+
+      // Map the response - phone_number might be in different locations
+      const mappedConversations = (data.conversations || []).map((conv: any) => ({
+        uuid: conv.uuid,
+        phone_number: conv.phone_number || conv.contact?.phone_number || conv.customer?.phone_number || null,
+        contact_name: conv.contact_name || conv.contact?.name || conv.customer?.name || null,
+        contact_email: conv.contact_email || conv.contact?.email || conv.customer?.email || null,
+        status: conv.status,
+        group_uuid: conv.group_uuid,
+        created_at: conv.created_at,
+        updated_at: conv.updated_at,
+        last_message_at: conv.last_message_at,
+      }));
+
       return {
-        conversations: data.conversations || [],
+        conversations: mappedConversations,
         hasMore: (data.conversations?.length || 0) >= perPage,
       };
     } catch (error: any) {
