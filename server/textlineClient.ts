@@ -427,6 +427,65 @@ class TextlineClient {
       return { success: false, error: error.message || "Network error" };
     }
   }
+
+  /**
+   * Get messages for a conversation
+   * Textline calls messages "comments" in their API
+   */
+  async getConversationMessages(conversationUuid: string): Promise<{
+    messages: TextlineMessage[];
+    error?: string;
+  }> {
+    if (!this.isConfigured()) {
+      return { messages: [], error: "Textline API key not configured" };
+    }
+
+    try {
+      const response = await fetch(
+        `${TEXTLINE_BASE_URL}/api/conversations/${conversationUuid}/comments.json`,
+        {
+          method: "GET",
+          headers: this.getHeaders(),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("[Textline] Get messages error:", data);
+        return {
+          messages: [],
+          error: data.error || "Failed to fetch messages",
+        };
+      }
+
+      // Map the response - Textline returns "comments" array
+      const mappedMessages: TextlineMessage[] = (data.comments || []).map((comment: any) => ({
+        uuid: comment.uuid,
+        body: comment.body || "",
+        direction: comment.direction || (comment.author ? "outbound" : "inbound"),
+        created_at: comment.created_at,
+        delivered_at: comment.delivered_at,
+        read_at: comment.read_at,
+        author: comment.author ? {
+          uuid: comment.author.uuid,
+          name: comment.author.name || comment.author.email,
+          email: comment.author.email,
+        } : undefined,
+        attachments: comment.attachments?.map((att: any) => ({
+          uuid: att.uuid,
+          url: att.url,
+          filename: att.filename,
+          content_type: att.content_type,
+        })),
+      }));
+
+      return { messages: mappedMessages };
+    } catch (error: any) {
+      console.error("[Textline] Get messages exception:", error);
+      return { messages: [], error: error.message || "Network error" };
+    }
+  }
 }
 
 export const textlineClient = new TextlineClient();
