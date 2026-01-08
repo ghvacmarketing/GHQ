@@ -9817,7 +9817,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/crm/properties/:id", requireCrmAuth, async (req, res) => {
     try {
       const propertyId = req.params.id;
-      const { address1, address2, city, state, zip, notes, tenantName, tenantPhone, tenantEmail, preferredPaymentMethod, billingOverride, billedTo, paymentTerms, paymentMethod, approvalRule } = req.body;
+      const { address1, address2, city, state, zip, notes, tenantName, tenantPhone, tenantEmail, preferredPaymentMethod, billingOverride, billedTo, paymentTerms, paymentMethod, approvalRule, propertyType } = req.body;
 
       // Fetch existing property to get customer info
       const [existingProperty] = await db.select().from(crmProperties).where(eq(crmProperties.id, propertyId));
@@ -9871,6 +9871,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (paymentTerms !== undefined) updateData.paymentTerms = paymentTerms || null;
       if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod || null;
       if (approvalRule !== undefined) updateData.approvalRule = approvalRule || null;
+      if (propertyType !== undefined) updateData.propertyType = propertyType || null;
 
       if (Object.keys(updateData).length === 0) {
         return res.status(400).json({ message: "No fields to update" });
