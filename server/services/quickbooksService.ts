@@ -1540,3 +1540,101 @@ export async function isQuickBooksConnected(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Void an invoice in QuickBooks when it's voided/deleted in CRM.
+ * QuickBooks prefers voiding over deleting - deleted invoices cannot be recovered.
+ */
+export async function voidInvoiceInQuickBooks(invoiceId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const conn = await getActiveConnection();
+    if (!conn) {
+      return { success: true }; // No connection, nothing to do
+    }
+    
+    // Check if this invoice was synced to QuickBooks
+    const [syncRecord] = await db.select()
+      .from(quickbooksInvoiceSync)
+      .where(eq(quickbooksInvoiceSync.crmInvoiceId, invoiceId))
+      .limit(1);
+    
+    if (!syncRecord || !syncRecord.quickbooksInvoiceId) {
+      return { success: true }; // Never synced, nothing to do
+    }
+    
+    const qbo = createQBClient(conn);
+    
+    return new Promise((resolve) => {
+      // First get the invoice to get SyncToken
+      qbo.getInvoice(syncRecord.quickbooksInvoiceId, async (err: any, invoice: any) => {
+        if (err) {
+          // If 404, invoice already deleted in QB
+          if (err.statusCode === 404 || err.message?.includes('not found')) {
+            await db.update(quickbooksInvoiceSync)
+              .set({ syncStatus: "deleted", updatedAt: new Date() })
+              .where(eq(quickbooksInvoiceSync.id, syncRecord.id));
+            resolve({ success: true });
+            return;
+          }
+          resolve({ success: false, error: err.message || "Failed to fetch invoice" });
+          return;
+        }
+        
+        // Void the invoice
+        const voidInvoice = {
+          Id: invoice.Id,
+          SyncToken: invoice.SyncToken,
+          sparse: true
+        };
+        
+        qbo.voidInvoice(voidInvoice, async (voidErr: any, voided: any) => {
+          if (voidErr) {
+            console.error("[QuickBooks] Error voiding invoice:", voidErr);
+            resolve({ success: false, error: voidErr.message || "Failed to void invoice" });
+            return;
+          }
+          
+          // Update sync record
+          await db.update(quickbooksInvoiceSync)
+            .set({ 
+              syncStatus: "deleted", 
+              lastSyncAt: new Date(),
+              updatedAt: new Date() 
+            })
+            .where(eq(quickbooksInvoiceSync.id, syncRecord.id));
+          
+          console.log(`[QuickBooks] Voided invoice (QB ID: ${invoice.Id})`);
+          resolve({ success: true });
+        });
+      });
+    });
+  } catch (error: any) {
+    console.error("[QuickBooks] Void invoice error:", error);
+    return { success: false, error: error.message || "Void failed" };
+  }
+}
+
+/**
+ * Auto void invoice in QuickBooks (fire-and-forget)
+ */
+export async function autoVoidInvoice(invoiceId: string): Promise<void> {
+  try {
+    const conn = await getActiveConnection();
+    if (!conn) {
+      return;
+    }
+    
+    // Fire and forget
+    voidInvoiceInQuickBooks(invoiceId).then(result => {
+      if (result.success) {
+        console.log(`[QuickBooks Auto] Invoice ${invoiceId} voided in QuickBooks`);
+      } else {
+        console.log(`[QuickBooks Auto] Invoice ${invoiceId} void failed: ${result.error}`);
+      }
+    }).catch(err => {
+      console.error(`[QuickBooks Auto] Invoice ${invoiceId} void error:`, err);
+    });
+  } catch (error) {
+    console.error("[QuickBooks Auto] Invoice void trigger error:", error);
+  }
+}
