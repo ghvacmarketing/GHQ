@@ -1715,6 +1715,97 @@ export async function autoVoidInvoice(invoiceId: string): Promise<void> {
 }
 
 /**
+ * Delete an invoice from QuickBooks when it's deleted in CRM.
+ * QuickBooks API uses DELETE method with Id and SyncToken.
+ */
+export async function deleteInvoiceFromQuickBooks(invoiceId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const conn = await getActiveConnection();
+    if (!conn) {
+      return { success: true }; // No connection, nothing to do
+    }
+    
+    // Check if this invoice was synced to QuickBooks
+    const [syncRecord] = await db.select()
+      .from(quickbooksInvoiceSync)
+      .where(eq(quickbooksInvoiceSync.crmInvoiceId, invoiceId))
+      .limit(1);
+    
+    if (!syncRecord || !syncRecord.quickbooksInvoiceId) {
+      return { success: true }; // Never synced, nothing to do
+    }
+    
+    const qbo = getQuickBooksClient(conn);
+    
+    return new Promise((resolve) => {
+      // First get the invoice to get SyncToken
+      qbo.getInvoice(syncRecord.quickbooksInvoiceId, async (err: any, invoice: any) => {
+        if (err) {
+          // If 404, invoice already deleted in QB - clean up sync record
+          if (err.statusCode === 404 || err.message?.includes('not found')) {
+            await db.delete(quickbooksInvoiceSync)
+              .where(eq(quickbooksInvoiceSync.id, syncRecord.id));
+            resolve({ success: true });
+            return;
+          }
+          resolve({ success: false, error: err.message || "Failed to fetch invoice" });
+          return;
+        }
+        
+        // Delete the invoice
+        const deleteInvoiceData = {
+          Id: invoice.Id,
+          SyncToken: invoice.SyncToken
+        };
+        
+        qbo.deleteInvoice(deleteInvoiceData, async (deleteErr: any, deleted: any) => {
+          if (deleteErr) {
+            console.error("[QuickBooks] Error deleting invoice:", deleteErr);
+            resolve({ success: false, error: deleteErr.message || "Failed to delete invoice" });
+            return;
+          }
+          
+          // Delete the sync record entirely since the invoice is gone from both systems
+          await db.delete(quickbooksInvoiceSync)
+            .where(eq(quickbooksInvoiceSync.id, syncRecord.id));
+          
+          console.log(`[QuickBooks] Deleted invoice (QB ID: ${invoice.Id})`);
+          resolve({ success: true });
+        });
+      });
+    });
+  } catch (error: any) {
+    console.error("[QuickBooks] Delete invoice error:", error);
+    return { success: false, error: error.message || "Delete failed" };
+  }
+}
+
+/**
+ * Auto delete invoice from QuickBooks (fire-and-forget)
+ */
+export async function autoDeleteInvoice(invoiceId: string): Promise<void> {
+  try {
+    const conn = await getActiveConnection();
+    if (!conn) {
+      return;
+    }
+    
+    // Fire and forget
+    deleteInvoiceFromQuickBooks(invoiceId).then(result => {
+      if (result.success) {
+        console.log(`[QuickBooks Auto] Invoice ${invoiceId} deleted from QuickBooks`);
+      } else {
+        console.log(`[QuickBooks Auto] Invoice ${invoiceId} delete failed: ${result.error}`);
+      }
+    }).catch(err => {
+      console.error(`[QuickBooks Auto] Invoice ${invoiceId} delete error:`, err);
+    });
+  } catch (error) {
+    console.error("[QuickBooks Auto] Invoice delete trigger error:", error);
+  }
+}
+
+/**
  * Automatically sync a payment to QuickBooks when an invoice is paid.
  * This is a fire-and-forget operation - it won't block the main request.
  */

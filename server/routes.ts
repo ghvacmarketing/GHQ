@@ -41,7 +41,7 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import stripePaymentsRouter from "./stripe-payments";
 import { getMessagingAdapter } from "./services/messaging/adapters";
 import { textlineClient } from "./textlineClient";
-import { autoSyncCustomer, autoSyncInvoice, autoVoidInvoice, autoSyncPayment } from "./services/quickbooksService";
+import { autoSyncCustomer, autoSyncInvoice, autoVoidInvoice, autoDeleteInvoice, autoSyncPayment } from "./services/quickbooksService";
 
 // Simple in-memory token store for admin authentication (works in Replit iframe where cookies fail)
 const adminTokens = new Map<string, { createdAt: number }>();
@@ -13518,8 +13518,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Void/delete in QuickBooks if synced
-      autoVoidInvoice(req.params.id);
+      // Delete from QuickBooks if synced (not void - actual delete)
+      autoDeleteInvoice(req.params.id);
       
       await db.delete(crmInvoices).where(eq(crmInvoices.id, req.params.id));
       
