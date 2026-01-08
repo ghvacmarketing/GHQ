@@ -32,6 +32,8 @@ import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorSt
 import { refreshWeather, scheduleWeatherRefresh, getWeatherData } from "./weather-service";
 import { scheduleWeatherImpactJobs } from "./weather-impact-service";
 import { scheduleAgreementRenewals, processAgreementRenewals } from "./services/agreementRenewalService";
+import { scheduleMaintenanceReminders } from "./services/maintenanceReminderService";
+import { sendAutomatedSms, SMS_TEMPLATES, hasNotificationBeenSent } from "./services/smsNotificationService";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
 import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword, isSupervisor } from "./crm-auth";
 import cookieParser from "cookie-parser";
@@ -10760,16 +10762,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Send SMS notifications for status changes to en_route or on_site
+      let smsNotificationSent = false;
+      if (status && (status === "en_route" || status === "on_site") && existingWorkOrder.status !== status) {
+        try {
+          // Get customer phone
+          const customerId = workOrder?.customerId || existingWorkOrder.customerId;
+          if (customerId) {
+            const [customer] = await db.select().from(crmCustomers)
+              .where(eq(crmCustomers.id, customerId)).limit(1);
+            
+            if (customer?.phone) {
+              const notificationType = status === "en_route" ? "work_order_en_route" : "work_order_on_site";
+              
+              // Check if notification was already sent
+              const alreadySent = await hasNotificationBeenSent(notificationType, req.params.id, "work_order");
+              
+              if (!alreadySent) {
+                const messageBody = status === "en_route" 
+                  ? SMS_TEMPLATES.WORK_ORDER_EN_ROUTE 
+                  : SMS_TEMPLATES.WORK_ORDER_ON_SITE;
+                
+                const smsResult = await sendAutomatedSms({
+                  customerId,
+                  phoneNumber: customer.phone,
+                  messageBody,
+                  notificationType,
+                  workOrderId: req.params.id,
+                });
+                
+                smsNotificationSent = smsResult.success;
+                console.log(`[WorkOrder SMS] ${status} notification ${smsNotificationSent ? 'sent' : 'failed'} for work order ${req.params.id}`);
+              }
+            }
+          }
+        } catch (smsError) {
+          console.error("[WorkOrder SMS] Error sending status notification:", smsError);
+        }
+      }
+
       await logCrmAudit(
         user.id,
         "work_order.updated",
         "work_order",
         req.params.id,
-        { updates: Object.keys(updateData) },
+        { updates: Object.keys(updateData), smsNotificationSent },
         req.ip
       );
 
-      return res.json(workOrder);
+      return res.json({ ...workOrder, smsNotificationSent });
     } catch (error) {
       console.error("Error updating work order:", error);
       return res.status(500).json({ message: "Failed to update work order" });
@@ -14182,12 +14223,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(crmInvoices.id, invoice.id));
       }
 
+      // Send SMS for auto-pay maintenance clients
+      let smsSent = false;
+      if (successCount > 0 && invoice.agreementId && invoice.customerId) {
+        try {
+          // Check if this is an auto-pay maintenance agreement
+          const [agreement] = await db.select().from(crmAgreements)
+            .where(eq(crmAgreements.id, invoice.agreementId)).limit(1);
+          
+          if (agreement && agreement.billingPreference === "auto_invoice") {
+            // Get customer phone
+            const [customer] = await db.select().from(crmCustomers)
+              .where(eq(crmCustomers.id, invoice.customerId)).limit(1);
+            
+            if (customer?.phone) {
+              // Check if SMS was already sent for this invoice
+              const alreadySent = await hasNotificationBeenSent("invoice_sms", invoice.id, "invoice");
+              
+              if (!alreadySent) {
+                // Get the first email result's payment link URL (already generated during email send)
+                const emailResult = results.find(r => r.success);
+                // Build payment link from the portal URL
+                const host = req.get('host') || process.env.REPLIT_DOMAINS?.split(',')[0] || 'app.ghvacinc.com';
+                const protocol = req.protocol || 'https';
+                const paymentLink = `${protocol}://${host}/portal/invoice/${invoice.id}`;
+                
+                const smsResult = await sendAutomatedSms({
+                  customerId: invoice.customerId,
+                  phoneNumber: customer.phone,
+                  messageBody: SMS_TEMPLATES.INVOICE_SMS_TEMPLATE(invoice.invoiceNumber, paymentLink),
+                  notificationType: "invoice_sms",
+                  invoiceId: invoice.id,
+                });
+                
+                smsSent = smsResult.success;
+                console.log(`[Invoice SMS] Auto-pay maintenance invoice SMS ${smsSent ? 'sent' : 'failed'} for ${invoice.invoiceNumber}`);
+              }
+            }
+          }
+        } catch (smsError) {
+          console.error("[Invoice SMS] Error sending SMS for invoice:", smsError);
+        }
+      }
+
       await logCrmAudit(
         user.id,
         "invoice.email_sent",
         "invoice",
         invoice.id,
-        { invoiceNumber: invoice.invoiceNumber, recipients: emailList, successCount },
+        { invoiceNumber: invoice.invoiceNumber, recipients: emailList, successCount, smsSent },
         req.ip
       );
 
@@ -14196,6 +14280,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         successCount,
         totalCount: emailList.length,
         results,
+        smsSent,
       });
     } catch (error) {
       console.error("Error sending invoice email:", error);
@@ -20854,6 +20939,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
     // Start agreement renewal job (runs daily, creates invoices for due agreements)
     scheduleAgreementRenewals();
+
+    // Start maintenance reminder job (sends 10-day and 5-day SMS reminders for upcoming visits)
+    scheduleMaintenanceReminders();
 
     // Seed vector store with sales book if empty (async, don't block startup)
     seedVectorStoreWithSalesBook().then(success => {
