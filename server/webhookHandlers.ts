@@ -1,7 +1,7 @@
 import { getStripeSync, getUncachableStripeClient } from './stripeClient';
 import { db } from './db';
-import { crmInvoices, crmQuotes } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { crmInvoices, crmQuotes, crmAgreements, maintenanceVisits } from '@shared/schema';
+import { eq, and, inArray } from 'drizzle-orm';
 
 export class WebhookHandlers {
   static async processWebhook(payload: Buffer, signature: string): Promise<void> {
@@ -76,6 +76,41 @@ export class WebhookHandlers {
               .where(eq(crmInvoices.id, invoiceId));
 
             console.log(`[Webhook] Invoice ${invoice.invoiceNumber} marked as paid - amount: $${amountPaid}`);
+
+            // Check for linked maintenance agreement and activate if this is the initial invoice
+            const [linkedAgreement] = await db.select()
+              .from(crmAgreements)
+              .where(eq(crmAgreements.initialInvoiceId, invoiceId))
+              .limit(1);
+
+            if (linkedAgreement && linkedAgreement.status === "pending" && linkedAgreement.isInitialCycle) {
+              await db.update(crmAgreements)
+                .set({
+                  status: "active",
+                  activationDate: now.toISOString().split('T')[0], // Date column expects YYYY-MM-DD string
+                  isInitialCycle: false,
+                  updatedAt: now
+                })
+                .where(eq(crmAgreements.id, linkedAgreement.id));
+
+              console.log(`[Webhook] Activated maintenance agreement ${linkedAgreement.agreementNumber} after initial invoice payment`);
+
+              // Cancel any pending visits and create new visits for the active cycle
+              const pendingVisits = await db.select()
+                .from(maintenanceVisits)
+                .where(and(
+                  eq(maintenanceVisits.agreementId, linkedAgreement.id),
+                  eq(maintenanceVisits.status, "pending")
+                ));
+
+              if (pendingVisits.length > 0) {
+                await db.update(maintenanceVisits)
+                  .set({ status: "cancelled", updatedAt: now })
+                  .where(inArray(maintenanceVisits.id, pendingVisits.map(v => v.id)));
+
+                console.log(`[Webhook] Cancelled ${pendingVisits.length} pending visits for agreement ${linkedAgreement.agreementNumber}`);
+              }
+            }
           } else if (!invoice) {
             console.log(`[Webhook] Invoice ${invoiceId} not found`);
           } else {
