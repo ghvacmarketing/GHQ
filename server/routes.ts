@@ -17979,16 +17979,26 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   app.post("/api/webhooks/textline", async (req, res) => {
     try {
       const payload = req.body;
+      const webhookType = payload.webhook;
       const eventType = payload.event_type;
       
-      console.log("[Textline Webhook] Received event:", eventType, JSON.stringify(payload, null, 2));
+      console.log("[Textline Webhook] Received event:", webhookType || eventType, JSON.stringify(payload, null, 2));
       
       // Handle inbound messages - check multiple possible payload structures
       const post = payload.data?.post || payload.post;
       const conversation = payload.data?.conversation || payload.conversation;
-      const direction = post?.direction;
       
-      if ((eventType === "message.created" || eventType === "post.created") && direction === "inbound") {
+      // Determine if inbound: check direction field OR creator.type === "customer"
+      const direction = post?.direction;
+      const creatorType = post?.creator?.type;
+      const isInbound = direction === "inbound" || creatorType === "customer";
+      
+      // Check for various webhook event types
+      const isMessageEvent = webhookType === "new_customer_post" || 
+                            eventType === "message.created" || 
+                            eventType === "post.created";
+      
+      if (isMessageEvent && isInbound) {
         const conversationUuid = conversation?.uuid;
         const phoneNumber = conversation?.phone_number || conversation?.customer?.phone_number;
         const contactName = conversation?.contact_name || conversation?.customer?.name;
