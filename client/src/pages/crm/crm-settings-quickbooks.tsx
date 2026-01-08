@@ -592,11 +592,11 @@ export default function CrmSettingsQuickBooks() {
                             <TableCell>{account.accountType}</TableCell>
                             <TableCell>
                               <Select
-                                value={account.categoryType || ""}
+                                value={account.categoryType || "none"}
                                 onValueChange={(value) => {
                                   updateAccountMutation.mutate({
                                     id: account.id,
-                                    data: { categoryType: value || undefined },
+                                    data: { categoryType: value === "none" ? undefined : value },
                                   });
                                 }}
                               >
@@ -604,7 +604,7 @@ export default function CrmSettingsQuickBooks() {
                                   <SelectValue placeholder="Select..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="">None</SelectItem>
+                                  <SelectItem value="none">None</SelectItem>
                                   {CATEGORY_TYPES.map((type) => (
                                     <SelectItem key={type} value={type}>
                                       {type}
@@ -616,11 +616,11 @@ export default function CrmSettingsQuickBooks() {
                             <TableCell>
                               {!account.isParent ? (
                                 <Select
-                                  value={account.propertyType || ""}
+                                  value={account.propertyType || "none"}
                                   onValueChange={(value) => {
                                     updateAccountMutation.mutate({
                                       id: account.id,
-                                      data: { propertyType: value || undefined },
+                                      data: { propertyType: value === "none" ? undefined : value },
                                     });
                                   }}
                                 >
@@ -628,7 +628,7 @@ export default function CrmSettingsQuickBooks() {
                                     <SelectValue placeholder="Select..." />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="">None</SelectItem>
+                                    <SelectItem value="none">None</SelectItem>
                                     {PROPERTY_TYPES.map((type) => (
                                       <SelectItem key={type} value={type}>
                                         {type}
