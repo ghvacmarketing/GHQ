@@ -17725,6 +17725,39 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Conversation not found" });
       }
 
+      // If this is a Textline conversation, fetch messages from Textline and cache them
+      if (conversation.externalSource === "textline" && conversation.externalConversationId && textlineClient.isConfigured()) {
+        const { messages: textlineMessages, error } = await textlineClient.getConversationMessages(conversation.externalConversationId);
+        
+        if (!error && textlineMessages.length > 0) {
+          // Get existing message external IDs to avoid duplicates
+          const existingMessages = await storage.getMessagesForConversation(id);
+          const existingExternalIds = new Set(existingMessages.map(m => m.externalMessageId).filter(Boolean));
+          
+          // Insert new messages from Textline
+          for (const tm of textlineMessages) {
+            if (!existingExternalIds.has(tm.uuid)) {
+              try {
+                await storage.createMessage({
+                  conversationId: id,
+                  body: tm.body,
+                  direction: tm.direction as any,
+                  channel: "sms" as any,
+                  status: "delivered" as any,
+                  externalMessageId: tm.uuid,
+                  sentAt: tm.created_at ? new Date(tm.created_at) : undefined,
+                  deliveredAt: tm.delivered_at ? new Date(tm.delivered_at) : undefined,
+                  readAt: tm.read_at ? new Date(tm.read_at) : undefined,
+                  attachments: tm.attachments?.map(a => ({ url: a.url, filename: a.filename, contentType: a.content_type })) as any,
+                });
+              } catch (e) {
+                console.error("[Textline] Error caching message:", e);
+              }
+            }
+          }
+        }
+      }
+
       const messages = await storage.getMessagesForConversation(id);
       const tags = await storage.getConversationTags(id);
 
@@ -19454,6 +19487,40 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Conversation not found" });
       }
 
+      // If this is a Textline conversation, fetch messages from Textline and cache them
+      if (conversation.externalSource === "textline" && conversation.externalConversationId && textlineClient.isConfigured()) {
+        const { messages: textlineMessages, error } = await textlineClient.getConversationMessages(conversation.externalConversationId);
+        
+        if (!error && textlineMessages.length > 0) {
+          // Get existing message external IDs to avoid duplicates
+          const existingMessages = await storage.getMessagesForConversation(id);
+          const existingExternalIds = new Set(existingMessages.map(m => m.externalMessageId).filter(Boolean));
+          
+          // Insert new messages from Textline
+          for (const tm of textlineMessages) {
+            if (!existingExternalIds.has(tm.uuid)) {
+              try {
+                await storage.createMessage({
+                  conversationId: id,
+                  body: tm.body,
+                  direction: tm.direction as any,
+                  channel: "sms" as any,
+                  status: "delivered" as any,
+                  externalMessageId: tm.uuid,
+                  sentAt: tm.created_at ? new Date(tm.created_at) : undefined,
+                  deliveredAt: tm.delivered_at ? new Date(tm.delivered_at) : undefined,
+                  readAt: tm.read_at ? new Date(tm.read_at) : undefined,
+                  attachments: tm.attachments?.map(a => ({ url: a.url, filename: a.filename, contentType: a.content_type })) as any,
+                });
+              } catch (e) {
+                console.error("[Textline] Error caching message:", e);
+              }
+            }
+          }
+        }
+      }
+
+      // Now fetch all messages (including newly cached ones)
       const messages = await storage.getMessagesForConversation(id);
       
       let customer = null;
