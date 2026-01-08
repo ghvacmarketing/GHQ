@@ -441,15 +441,15 @@ export default function CrmMessaging() {
                 </Button>
                 <Avatar className="h-9 w-9">
                   <AvatarFallback className="bg-[#d3b07d] text-white text-sm">
-                    {getInitials(conversationDetail?.customer?.name || conversationDetail?.conversation?.customerName || "?")}
+                    {getInitials(conversationDetail?.customer?.name || conversationDetail?.conversation?.customerName || selectedConversation?.customerName || "?")}
                   </AvatarFallback>
                 </Avatar>
                 <div>
                   <h2 className="font-medium text-slate-900 text-sm">
-                    {conversationDetail?.customer?.name || conversationDetail?.conversation?.customerName || "Unknown Contact"}
+                    {conversationDetail?.customer?.name || conversationDetail?.conversation?.customerName || selectedConversation?.customerName || "Unknown Contact"}
                   </h2>
                   <p className="text-xs text-slate-500">
-                    {conversationDetail?.customer?.phone || conversationDetail?.conversation?.phoneNumber || "No phone"}
+                    {conversationDetail?.customer?.phone || conversationDetail?.conversation?.phoneNumber || selectedConversation?.phoneNumber || ""}
                   </p>
                 </div>
               </div>
