@@ -69,6 +69,8 @@ interface ConnectionStatus {
     customers: number;
     invoices: number;
     payments: number;
+    totalCustomers: number;
+    totalInvoices: number;
   };
 }
 
@@ -483,12 +485,18 @@ export default function CrmSettingsQuickBooks() {
                   <div className="grid grid-cols-3 gap-4">
                     <div className="text-center p-4 bg-slate-50 rounded-lg">
                       <Users className="h-6 w-6 mx-auto mb-2 text-blue-600" />
-                      <div className="text-2xl font-bold">{status.syncStats?.customers || 0}</div>
+                      <div className="text-2xl font-bold">
+                        {status.syncStats?.customers || 0}
+                        <span className="text-base font-normal text-slate-400"> / {status.syncStats?.totalCustomers || 0}</span>
+                      </div>
                       <div className="text-sm text-slate-500">Customers Synced</div>
                     </div>
                     <div className="text-center p-4 bg-slate-50 rounded-lg">
                       <FileText className="h-6 w-6 mx-auto mb-2 text-amber-600" />
-                      <div className="text-2xl font-bold">{status.syncStats?.invoices || 0}</div>
+                      <div className="text-2xl font-bold">
+                        {status.syncStats?.invoices || 0}
+                        <span className="text-base font-normal text-slate-400"> / {status.syncStats?.totalInvoices || 0}</span>
+                      </div>
                       <div className="text-sm text-slate-500">Invoices Synced</div>
                     </div>
                     <div className="text-center p-4 bg-slate-50 rounded-lg">

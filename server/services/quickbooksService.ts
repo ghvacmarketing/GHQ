@@ -1066,6 +1066,8 @@ export async function getConnectionStatus(): Promise<{
     customers: number;
     invoices: number;
     payments: number;
+    totalCustomers: number;
+    totalInvoices: number;
   };
 }> {
   const connection = await getActiveConnection();
@@ -1078,6 +1080,8 @@ export async function getConnectionStatus(): Promise<{
   let customerCount = 0;
   let invoiceCount = 0;
   let paymentCount = 0;
+  let totalCustomers = 0;
+  let totalInvoices = 0;
   
   try {
     const [customerResult] = await db.select({ count: db.$count(quickbooksCustomerSync) })
@@ -1103,6 +1107,15 @@ export async function getConnectionStatus(): Promise<{
         eq(quickbooksPaymentSync.syncStatus, "synced")
       ));
     paymentCount = paymentResult?.count ?? 0;
+    
+    // Get total CRM records
+    const [totalCustomerResult] = await db.select({ count: db.$count(crmCustomers) })
+      .from(crmCustomers);
+    totalCustomers = totalCustomerResult?.count ?? 0;
+    
+    const [totalInvoiceResult] = await db.select({ count: db.$count(crmInvoices) })
+      .from(crmInvoices);
+    totalInvoices = totalInvoiceResult?.count ?? 0;
   } catch (err) {
     console.error("[QuickBooks] Error getting sync counts:", err);
   }
@@ -1113,7 +1126,9 @@ export async function getConnectionStatus(): Promise<{
     syncStats: {
       customers: customerCount,
       invoices: invoiceCount,
-      payments: paymentCount
+      payments: paymentCount,
+      totalCustomers,
+      totalInvoices
     }
   };
 }
