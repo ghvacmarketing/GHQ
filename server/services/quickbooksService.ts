@@ -790,26 +790,37 @@ export async function getConnectionStatus(): Promise<{
     return { connected: false };
   }
   
-  // Get sync counts
-  const [customerCount] = await db.select({ count: db.$count(quickbooksCustomerSync) })
-    .from(quickbooksCustomerSync)
-    .where(eq(quickbooksCustomerSync.realmId, connection.realmId));
+  // Get sync counts - use try/catch to handle potential query issues
+  let customerCount = 0;
+  let invoiceCount = 0;
+  let paymentCount = 0;
   
-  const [invoiceCount] = await db.select({ count: db.$count(quickbooksInvoiceSync) })
-    .from(quickbooksInvoiceSync)
-    .where(eq(quickbooksInvoiceSync.realmId, connection.realmId));
-  
-  const [paymentCount] = await db.select({ count: db.$count(quickbooksPaymentSync) })
-    .from(quickbooksPaymentSync)
-    .where(eq(quickbooksPaymentSync.realmId, connection.realmId));
+  try {
+    const [customerResult] = await db.select({ count: db.$count(quickbooksCustomerSync) })
+      .from(quickbooksCustomerSync)
+      .where(eq(quickbooksCustomerSync.realmId, connection.realmId));
+    customerCount = customerResult?.count ?? 0;
+    
+    const [invoiceResult] = await db.select({ count: db.$count(quickbooksInvoiceSync) })
+      .from(quickbooksInvoiceSync)
+      .where(eq(quickbooksInvoiceSync.realmId, connection.realmId));
+    invoiceCount = invoiceResult?.count ?? 0;
+    
+    const [paymentResult] = await db.select({ count: db.$count(quickbooksPaymentSync) })
+      .from(quickbooksPaymentSync)
+      .where(eq(quickbooksPaymentSync.realmId, connection.realmId));
+    paymentCount = paymentResult?.count ?? 0;
+  } catch (err) {
+    console.error("[QuickBooks] Error getting sync counts:", err);
+  }
   
   return {
     connected: true,
     connection,
     syncStats: {
-      customers: customerCount.count,
-      invoices: invoiceCount.count,
-      payments: paymentCount.count
+      customers: customerCount,
+      invoices: invoiceCount,
+      payments: paymentCount
     }
   };
 }
