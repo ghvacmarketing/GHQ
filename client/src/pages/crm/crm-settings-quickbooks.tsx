@@ -184,6 +184,29 @@ export default function CrmSettingsQuickBooks() {
     },
   });
 
+  const syncInvoicesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/quickbooks/sync/invoices");
+      return response.json();
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/sync-logs"] });
+      toast({
+        title: result.success ? "Sync Complete" : "Sync Completed with Errors",
+        description: `${result.succeeded} invoices synced, ${result.failed} failed`,
+        variant: result.success ? "default" : "destructive",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync invoices",
+        variant: "destructive",
+      });
+    },
+  });
+
   const syncClassesMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/quickbooks/classes/sync");
@@ -480,7 +503,7 @@ export default function CrmSettingsQuickBooks() {
 
                   <Separator />
 
-                  <div className="flex gap-3">
+                  <div className="flex flex-wrap gap-3">
                     <Button 
                       onClick={() => syncCustomersMutation.mutate()}
                       disabled={syncCustomersMutation.isPending}
@@ -492,6 +515,18 @@ export default function CrmSettingsQuickBooks() {
                         <RefreshCw className="h-4 w-4 mr-2" />
                       )}
                       Sync All Customers
+                    </Button>
+                    <Button 
+                      onClick={() => syncInvoicesMutation.mutate()}
+                      disabled={syncInvoicesMutation.isPending}
+                      data-testid="btn-sync-invoices"
+                    >
+                      {syncInvoicesMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                      )}
+                      Sync All Invoices
                     </Button>
                     <Button 
                       variant="outline"

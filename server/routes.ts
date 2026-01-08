@@ -19123,6 +19123,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     syncCustomerToQuickBooks,
     syncAllCustomersToQuickBooks,
     syncInvoiceToQuickBooks,
+    syncAllInvoicesToQuickBooks,
     syncPaymentToQuickBooks,
     getSyncLogs: getQBSyncLogs
   } = await import("./services/quickbooksService");
@@ -19279,6 +19280,22 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error: any) {
       console.error("[QuickBooks] Customer sync error:", error);
       res.status(500).json({ message: "Failed to sync customer" });
+    }
+  });
+  
+  // POST /api/quickbooks/sync/invoices - Sync all invoices to QuickBooks
+  app.post("/api/quickbooks/sync/invoices", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const result = await syncAllInvoicesToQuickBooks();
+      res.json({ success: result.failed === 0, ...result });
+    } catch (error: any) {
+      console.error("[QuickBooks] Invoice sync error:", error);
+      res.status(500).json({ message: "Failed to sync invoices" });
     }
   });
   

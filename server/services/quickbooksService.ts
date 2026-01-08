@@ -23,7 +23,7 @@ import {
   type PropertyType,
   type DiscountKind
 } from "@shared/schema";
-import { eq, and, isNull, inArray } from "drizzle-orm";
+import { eq, and, isNull, isNotNull, inArray } from "drizzle-orm";
 
 const QUICKBOOKS_CLIENT_ID = process.env.QUICKBOOKS_CLIENT_ID || "";
 const QUICKBOOKS_CLIENT_SECRET = process.env.QUICKBOOKS_CLIENT_SECRET || "";
@@ -720,6 +720,66 @@ export async function syncInvoiceToQuickBooks(
     console.error("[QuickBooks] Invoice sync error:", error);
     return { success: false, error: error.message || "Sync failed" };
   }
+}
+
+// Sync all invoices to QuickBooks
+export async function syncAllInvoicesToQuickBooks(): Promise<{
+  processed: number;
+  succeeded: number;
+  failed: number;
+  errors: string[];
+}> {
+  const conn = await getActiveConnection();
+  if (!conn) {
+    return { processed: 0, succeeded: 0, failed: 0, errors: ["No active QuickBooks connection"] };
+  }
+  
+  // Log sync start
+  const [logEntry] = await db.insert(quickbooksSyncLog)
+    .values({
+      realmId: conn.realmId,
+      syncType: "invoice",
+      direction: "push",
+      status: "started"
+    })
+    .returning();
+  
+  // Get all CRM invoices that have a customer and are not draft (sent, paid, or void)
+  const invoices = await db.select()
+    .from(crmInvoices)
+    .where(and(
+      isNotNull(crmInvoices.customerId),
+      inArray(crmInvoices.status, ["sent", "paid", "void"])
+    ));
+  
+  let succeeded = 0;
+  let failed = 0;
+  const errors: string[] = [];
+  
+  for (const invoice of invoices) {
+    const result = await syncInvoiceToQuickBooks(invoice.id, conn);
+    if (result.success) {
+      succeeded++;
+    } else {
+      failed++;
+      errors.push(`${invoice.invoiceNumber}: ${result.error}`);
+    }
+  }
+  
+  // Update log
+  await db.update(quickbooksSyncLog)
+    .set({
+      status: failed === 0 ? "completed" : "failed",
+      recordsProcessed: succeeded,
+      recordsFailed: failed,
+      errorMessage: errors.length > 0 ? errors.slice(0, 10).join("; ") : null,
+      completedAt: new Date()
+    })
+    .where(eq(quickbooksSyncLog.id, logEntry.id));
+  
+  console.log(`[QuickBooks] Invoice sync complete: ${succeeded} succeeded, ${failed} failed`);
+  
+  return { processed: invoices.length, succeeded, failed, errors };
 }
 
 // =============================================
