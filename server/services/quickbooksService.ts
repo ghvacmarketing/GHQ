@@ -526,8 +526,18 @@ export async function syncInvoiceToQuickBooks(
     }
     
     // Get property for determining class subType (residential/commercial)
-    // Priority: invoice.propertyId -> workOrder.propertyId -> null
+    // Priority: invoice.propertyId -> workOrder.propertyId -> customer type fallback
     let propertyType: PropertyType | null = null;
+    let customerType: string | null = null;
+    
+    // Get customer info for fallback
+    const [customer] = await db.select()
+      .from(crmCustomers)
+      .where(eq(crmCustomers.id, customerId))
+      .limit(1);
+    if (customer?.customerType) {
+      customerType = customer.customerType;
+    }
     
     if (invoice.propertyId) {
       const [property] = await db.select()
@@ -550,6 +560,13 @@ export async function syncInvoiceToQuickBooks(
         if (property?.propertyType) {
           propertyType = property.propertyType as PropertyType;
         }
+      }
+    }
+    
+    // Fall back to customer type if property type not set
+    if (!propertyType && customerType) {
+      if (customerType === "residential" || customerType === "commercial") {
+        propertyType = customerType as PropertyType;
       }
     }
     
@@ -649,6 +666,30 @@ export async function syncInvoiceToQuickBooks(
           
           if (classType && subType) {
             const key = `${classType}:${subType}`;
+            const qbClassId = classLookup.get(key);
+            if (qbClassId) {
+              lineItem.SalesItemLineDetail.ClassRef = { value: qbClassId };
+            }
+          }
+        }
+      } else {
+        // Priority 3: For line items without itemId (e.g., maintenance agreement renewals),
+        // try to infer class type from description
+        const description = (item.description || "").toLowerCase();
+        let inferredClassType: "Service" | "Install" | "Maintenance" | null = null;
+        
+        if (description.includes("maintenance") || description.includes("preventative") || description.includes("agreement")) {
+          inferredClassType = "Maintenance";
+        } else if (description.includes("install") || description.includes("installation")) {
+          inferredClassType = "Install";
+        } else if (description.includes("service") || description.includes("repair") || description.includes("diagnostic")) {
+          inferredClassType = "Service";
+        }
+        
+        if (inferredClassType && propertyType) {
+          const subType = propertyTypeToSubType(propertyType);
+          if (subType) {
+            const key = `${inferredClassType}:${subType}`;
             const qbClassId = classLookup.get(key);
             if (qbClassId) {
               lineItem.SalesItemLineDetail.ClassRef = { value: qbClassId };
