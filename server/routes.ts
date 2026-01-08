@@ -41,6 +41,7 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import stripePaymentsRouter from "./stripe-payments";
 import { getMessagingAdapter } from "./services/messaging/adapters";
 import { textlineClient } from "./textlineClient";
+import { autoSyncCustomer, autoSyncInvoice } from "./services/quickbooksService";
 
 // Simple in-memory token store for admin authentication (works in Replit iframe where cookies fail)
 const adminTokens = new Map<string, { createdAt: number }>();
@@ -5835,6 +5836,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const [customer] = await db.insert(crmCustomers).values(parsed.data).returning();
+      autoSyncCustomer(customer.id);
       
       await logCrmAudit(
         user?.id || null,
@@ -5882,6 +5884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         potentialValue: customerData.potentialValue && !isNaN(Number(customerData.potentialValue)) ? parseInt(String(customerData.potentialValue), 10) : null,
         assignedSalesRepId: customerData.assignedSalesRepId || null,
       }).returning();
+      autoSyncCustomer(newCustomer.id);
 
       // Create property if provided
       let newProperty = null;
@@ -6029,6 +6032,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await db.update(crmCustomers)
           .set(updateData)
           .where(eq(crmCustomers.id, customerId));
+        autoSyncCustomer(customerId);
 
         const auditDetails = name ? { name: name.trim() } : { customerId };
         await logCrmAudit(user.id, "customer.updated", "customer", customerId, auditDetails, req.ip);
@@ -8320,6 +8324,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sourceSystem: "crm_accounts",
         sourceId: newAccount.id,
       }).returning();
+      autoSyncCustomer(newCustomer.id);
 
       // Create sites if provided
       let createdSites: any[] = [];
@@ -11721,6 +11726,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             fullAddress: customerData.fullAddress,
             notes: customerData.notes,
           }).returning();
+          autoSyncCustomer(newCustomer.id);
 
           imported.push(newCustomer);
         } catch (rowError) {
@@ -13137,6 +13143,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const [invoice] = await db.insert(crmInvoices).values(parseResult.data).returning();
+      autoSyncInvoice(invoice.id);
       
       await db.update(crmWorkOrders)
         .set({ 
@@ -13351,6 +13358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const [invoice] = await db.insert(crmInvoices).values(invoiceData).returning();
+      autoSyncInvoice(invoice.id);
 
       // Copy line items to invoice
       const createdLineItems: CrmInvoiceLineItem[] = [];
@@ -13441,6 +13449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .set(updates)
         .where(eq(crmInvoices.id, req.params.id))
         .returning();
+      autoSyncInvoice(updatedInvoice.id);
       
       await logCrmAudit(
         user.id,
@@ -13600,6 +13609,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .where(eq(crmInvoices.id, req.params.id))
         .returning();
+      autoSyncInvoice(updatedInvoice.id);
       
       await logCrmAudit(
         user.id,
@@ -13666,6 +13676,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .where(eq(crmInvoices.id, req.params.id))
         .returning();
+      autoSyncInvoice(updatedInvoice.id);
       
       // Deactivate Stripe payment link if invoice is fully paid and has one
       if (newStatus === "paid" && invoice.stripePaymentLinkId) {
@@ -15103,6 +15114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerStatus: "prospect",
           customerType: "residential",
         }).returning();
+        autoSyncCustomer(createdCustomer.id);
 
         targetCustomerId = createdCustomer.id;
 

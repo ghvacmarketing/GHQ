@@ -518,42 +518,14 @@ export default function CrmSettingsQuickBooks() {
 
                   <Separator />
 
+                  <Alert className="bg-green-50 border-green-200">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-700">
+                      Automatic sync is active. Customers and invoices sync automatically when created or updated.
+                    </AlertDescription>
+                  </Alert>
+
                   <div className="flex flex-wrap gap-3">
-                    <Button 
-                      onClick={() => syncCustomersMutation.mutate()}
-                      disabled={syncCustomersMutation.isPending}
-                      data-testid="btn-sync-customers"
-                    >
-                      {syncCustomersMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                      )}
-                      Sync All Customers
-                    </Button>
-                    <Button 
-                      onClick={() => syncInvoicesMutation.mutate()}
-                      disabled={syncInvoicesMutation.isPending}
-                      data-testid="btn-sync-invoices"
-                    >
-                      {syncInvoicesMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                      )}
-                      Sync All Invoices
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      onClick={() => {
-                        refetchStatus();
-                        refetchLogs();
-                      }}
-                      data-testid="btn-refresh-status"
-                    >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Refresh Status
-                    </Button>
                     <Button 
                       variant="destructive"
                       onClick={() => disconnectMutation.mutate()}

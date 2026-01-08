@@ -1416,3 +1416,93 @@ export async function getClassForCategory(categoryName: string, realmId?: string
   
   return cls || null;
 }
+
+// ============================================
+// AUTOMATIC SYNC TRIGGERS (fire-and-forget)
+// ============================================
+
+/**
+ * Automatically sync a customer to QuickBooks when created/updated.
+ * This is a fire-and-forget operation - it won't block the main request.
+ */
+export async function autoSyncCustomer(customerId: string): Promise<void> {
+  try {
+    const conn = await getActiveConnection();
+    if (!conn) {
+      return; // No active connection, skip sync
+    }
+    
+    // Fire and forget - don't await
+    syncCustomerToQuickBooks(customerId).then(result => {
+      if (result.success) {
+        console.log(`[QuickBooks Auto] Customer ${customerId} synced successfully`);
+      } else {
+        console.log(`[QuickBooks Auto] Customer ${customerId} sync failed: ${result.error}`);
+      }
+    }).catch(err => {
+      console.error(`[QuickBooks Auto] Customer ${customerId} sync error:`, err);
+    });
+  } catch (error) {
+    console.error("[QuickBooks Auto] Customer sync trigger error:", error);
+  }
+}
+
+/**
+ * Automatically sync an invoice to QuickBooks when created/updated.
+ * This is a fire-and-forget operation - it won't block the main request.
+ * Ensures customer is synced first if needed.
+ */
+export async function autoSyncInvoice(invoiceId: string): Promise<void> {
+  try {
+    const conn = await getActiveConnection();
+    if (!conn) {
+      return; // No active connection, skip sync
+    }
+    
+    // Get invoice to find customer
+    const [invoice] = await db.select()
+      .from(crmInvoices)
+      .where(eq(crmInvoices.id, invoiceId))
+      .limit(1);
+    
+    if (!invoice || !invoice.customerId) {
+      return;
+    }
+    
+    // Fire and forget - sync customer first, then invoice
+    (async () => {
+      try {
+        // Ensure customer is synced first
+        const customerResult = await syncCustomerToQuickBooks(invoice.customerId!);
+        if (!customerResult.success) {
+          console.log(`[QuickBooks Auto] Invoice ${invoiceId} skipped - customer sync failed: ${customerResult.error}`);
+          return;
+        }
+        
+        // Now sync the invoice
+        const invoiceResult = await syncInvoiceToQuickBooks(invoiceId);
+        if (invoiceResult.success) {
+          console.log(`[QuickBooks Auto] Invoice ${invoiceId} synced successfully`);
+        } else {
+          console.log(`[QuickBooks Auto] Invoice ${invoiceId} sync failed: ${invoiceResult.error}`);
+        }
+      } catch (err) {
+        console.error(`[QuickBooks Auto] Invoice ${invoiceId} sync error:`, err);
+      }
+    })();
+  } catch (error) {
+    console.error("[QuickBooks Auto] Invoice sync trigger error:", error);
+  }
+}
+
+/**
+ * Check if QuickBooks is connected
+ */
+export async function isQuickBooksConnected(): Promise<boolean> {
+  try {
+    const conn = await getActiveConnection();
+    return !!conn;
+  } catch {
+    return false;
+  }
+}
