@@ -19318,7 +19318,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       if (backgroundSync) {
         // Fire and forget - sync runs in background
         syncAllInvoicesToQuickBooks().then(result => {
-          console.log(`[QuickBooks] Background invoice sync finished: ${result.succeeded} succeeded, ${result.failed} failed`);
+          console.log(`[QuickBooks] Background invoice sync finished: ${result.succeeded} succeeded, ${result.failed} failed, ${result.paymentsSynced || 0} payments synced`);
         }).catch(err => {
           console.error("[QuickBooks] Background invoice sync error:", err);
         });

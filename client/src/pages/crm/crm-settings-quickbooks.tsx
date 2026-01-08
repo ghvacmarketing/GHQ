@@ -205,9 +205,10 @@ export default function CrmSettingsQuickBooks() {
           description: "Invoice sync is running in the background. Refresh status to see progress.",
         });
       } else {
+        const paymentInfo = result.paymentsSynced ? `, ${result.paymentsSynced} payments` : "";
         toast({
           title: result.success ? "Sync Complete" : "Sync Completed with Errors",
-          description: `${result.succeeded} invoices synced, ${result.failed} failed`,
+          description: `${result.succeeded} invoices synced${paymentInfo}, ${result.failed} failed`,
           variant: result.success ? "default" : "destructive",
         });
       }

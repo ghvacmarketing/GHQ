@@ -751,12 +751,13 @@ export async function syncInvoiceToQuickBooks(
   }
 }
 
-// Sync all invoices to QuickBooks
+// Sync all invoices to QuickBooks with batching and payment sync
 export async function syncAllInvoicesToQuickBooks(): Promise<{
   processed: number;
   succeeded: number;
   failed: number;
   errors: string[];
+  paymentsSynced?: number;
 }> {
   const conn = await getActiveConnection();
   if (!conn) {
@@ -781,17 +782,65 @@ export async function syncAllInvoicesToQuickBooks(): Promise<{
       inArray(crmInvoices.status, ["sent", "paid", "void"])
     ));
   
+  console.log(`[QuickBooks] Starting invoice sync: ${invoices.length} total invoices`);
+  
   let succeeded = 0;
   let failed = 0;
+  let paymentsSynced = 0;
   const errors: string[] = [];
   
-  for (const invoice of invoices) {
-    const result = await syncInvoiceToQuickBooks(invoice.id, conn);
-    if (result.success) {
-      succeeded++;
-    } else {
-      failed++;
-      errors.push(`${invoice.invoiceNumber}: ${result.error}`);
+  // Rate limiting constants
+  const BATCH_SIZE = 25; // Smaller batches for invoices (more complex)
+  const DELAY_BETWEEN_BATCHES = 1500; // 1.5 seconds between batches
+  
+  // Process in batches
+  for (let i = 0; i < invoices.length; i += BATCH_SIZE) {
+    const batch = invoices.slice(i, i + BATCH_SIZE);
+    console.log(`[QuickBooks] Processing invoice batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(invoices.length / BATCH_SIZE)}`);
+    
+    for (const invoice of batch) {
+      // Sync the invoice
+      const result = await syncInvoiceToQuickBooks(invoice.id, conn);
+      if (result.success) {
+        succeeded++;
+        
+        // If invoice is paid, also sync the payment (if not already synced)
+        if (invoice.status === "paid" && invoice.total) {
+          // Check if payment already synced
+          const [existingPayment] = await db.select()
+            .from(quickbooksPaymentSync)
+            .where(and(
+              eq(quickbooksPaymentSync.crmInvoiceId, invoice.id),
+              eq(quickbooksPaymentSync.realmId, conn.realmId)
+            ))
+            .limit(1);
+          
+          if (!existingPayment) {
+            // Sync payment
+            const paidDate = invoice.paidAt ? new Date(invoice.paidAt) : undefined;
+            const paymentResult = await syncPaymentToQuickBooks(
+              invoice.id,
+              invoice.total,
+              paidDate,
+              conn
+            );
+            if (paymentResult.success) {
+              paymentsSynced++;
+              console.log(`[QuickBooks] Synced payment for invoice ${invoice.invoiceNumber}`);
+            } else {
+              console.warn(`[QuickBooks] Failed to sync payment for ${invoice.invoiceNumber}: ${paymentResult.error}`);
+            }
+          }
+        }
+      } else {
+        failed++;
+        errors.push(`${invoice.invoiceNumber}: ${result.error}`);
+      }
+    }
+    
+    // Add delay between batches to avoid rate limiting
+    if (i + BATCH_SIZE < invoices.length) {
+      await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
     }
   }
   
@@ -806,9 +855,9 @@ export async function syncAllInvoicesToQuickBooks(): Promise<{
     })
     .where(eq(quickbooksSyncLog.id, logEntry.id));
   
-  console.log(`[QuickBooks] Invoice sync complete: ${succeeded} succeeded, ${failed} failed`);
+  console.log(`[QuickBooks] Invoice sync complete: ${succeeded} succeeded, ${failed} failed, ${paymentsSynced} payments synced`);
   
-  return { processed: invoices.length, succeeded, failed, errors };
+  return { processed: invoices.length, succeeded, failed, errors, paymentsSynced };
 }
 
 // =============================================
