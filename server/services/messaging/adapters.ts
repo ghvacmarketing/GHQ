@@ -55,11 +55,35 @@ export class TextlineMessagingAdapter implements MessagingAdapter {
   name = "textline";
   
   async sendMessage(request: OutboundMessageRequest): Promise<OutboundMessageResult> {
+    // If we have an external conversation ID (from Textline), use the conversation-specific endpoint
+    if (request.externalConversationId) {
+      const result = await textlineClient.sendMessageToConversation(
+        request.externalConversationId,
+        request.body
+      );
+
+      if (!result.success) {
+        return {
+          success: false,
+          status: "failed",
+          errorMessage: result.errorMessage,
+        };
+      }
+
+      return {
+        success: true,
+        status: "sent",
+        externalMessageId: result.messageUuid,
+        externalConversationId: result.conversationUuid,
+      };
+    }
+
+    // Fall back to phone number-based sending (creates new conversation if needed)
     if (!request.recipientPhone) {
       return {
         success: false,
         status: "failed",
-        errorMessage: "No recipient phone number provided",
+        errorMessage: "No recipient phone number or conversation ID provided",
       };
     }
 

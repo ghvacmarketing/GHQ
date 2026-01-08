@@ -19613,32 +19613,41 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       const messageBody = body.trim();
 
-      // Send via Textline if configured
-      if (textlineClient.isConfigured()) {
-        try {
-          const sendResult = await textlineClient.sendMessage({
-            phone_number: conversation.phoneNumber,
-            comment: { body: messageBody },
-          });
-          console.log("[Mobile] Textline message sent:", sendResult);
-        } catch (textlineError) {
-          console.error("[Mobile] Textline send failed:", textlineError);
-          return res.status(500).json({ message: "Failed to send SMS via Textline" });
-        }
-      }
-
-      // Store message locally
+      // Store message locally first
       const messageData = {
         conversationId: id,
         body: messageBody,
         channel: "sms" as const,
         direction: "outbound" as const,
-        status: "sent" as const,
+        status: "queued" as const,
         authorUserId: user.id,
         sentAt: new Date(),
       };
 
       const message = await storage.createMessage(messageData);
+
+      // Send via messaging adapter (Textline if configured, local otherwise)
+      const adapter = getMessagingAdapter();
+      const adapterResult = await adapter.sendMessage({
+        conversationId: id,
+        body: messageBody,
+        channel: "sms",
+        recipientPhone: conversation.phoneNumber || undefined,
+        externalConversationId: conversation.externalConversationId || undefined,
+      });
+
+      if (!adapterResult.success) {
+        console.error("[Mobile] Message send failed:", adapterResult.errorMessage);
+        // Update message status to failed
+        await storage.updateMessage(message.id, { status: "failed" });
+        return res.status(500).json({ message: adapterResult.errorMessage || "Failed to send SMS" });
+      }
+
+      // Update message status and external ID
+      await storage.updateMessage(message.id, { 
+        status: adapterResult.status,
+        externalMessageId: adapterResult.externalMessageId,
+      });
       
       // Update conversation lastMessageAt
       await storage.updateMessagingConversation(id, {

@@ -430,7 +430,7 @@ class TextlineClient {
 
   /**
    * Get messages for a conversation
-   * Textline calls messages "comments" in their API
+   * Textline returns posts when you fetch a single conversation via /api/conversations/{uuid}.json
    */
   async getConversationMessages(conversationUuid: string): Promise<{
     messages: TextlineMessage[];
@@ -442,7 +442,7 @@ class TextlineClient {
 
     try {
       const response = await fetch(
-        `${TEXTLINE_BASE_URL}/api/conversations/${conversationUuid}/comments.json`,
+        `${TEXTLINE_BASE_URL}/api/conversations/${conversationUuid}.json`,
         {
           method: "GET",
           headers: this.getHeaders(),
@@ -452,27 +452,29 @@ class TextlineClient {
       const data = await response.json();
 
       if (!response.ok) {
-        console.error("[Textline] Get messages error:", data);
+        console.error("[Textline] Get conversation/messages error:", data);
         return {
           messages: [],
-          error: data.error || "Failed to fetch messages",
+          error: data.error || data.errors || "Failed to fetch conversation messages",
         };
       }
 
-      // Map the response - Textline returns "comments" array
-      const mappedMessages: TextlineMessage[] = (data.comments || []).map((comment: any) => ({
-        uuid: comment.uuid,
-        body: comment.body || "",
-        direction: comment.direction || (comment.author ? "outbound" : "inbound"),
-        created_at: comment.created_at,
-        delivered_at: comment.delivered_at,
-        read_at: comment.read_at,
-        author: comment.author ? {
-          uuid: comment.author.uuid,
-          name: comment.author.name || comment.author.email,
-          email: comment.author.email,
+      // Textline returns "posts" array within the conversation
+      const posts = data.conversation?.posts || data.posts || [];
+      
+      const mappedMessages: TextlineMessage[] = posts.map((post: any) => ({
+        uuid: post.uuid,
+        body: post.body || "",
+        direction: post.direction || (post.author ? "outbound" : "inbound"),
+        created_at: post.created_at,
+        delivered_at: post.delivered_at,
+        read_at: post.read_at,
+        author: post.author ? {
+          uuid: post.author.uuid,
+          name: post.author.name || post.author.email,
+          email: post.author.email,
         } : undefined,
-        attachments: comment.attachments?.map((att: any) => ({
+        attachments: post.attachments?.map((att: any) => ({
           uuid: att.uuid,
           url: att.url,
           filename: att.filename,
@@ -484,6 +486,51 @@ class TextlineClient {
     } catch (error: any) {
       console.error("[Textline] Get messages exception:", error);
       return { messages: [], error: error.message || "Network error" };
+    }
+  }
+
+  /**
+   * Send a message to an existing conversation by UUID
+   */
+  async sendMessageToConversation(conversationUuid: string, messageBody: string): Promise<SendMessageResult> {
+    if (!this.isConfigured()) {
+      return { success: false, errorMessage: "Textline API key not configured" };
+    }
+
+    try {
+      const body = {
+        comment: {
+          body: messageBody,
+        },
+      };
+
+      const response = await fetch(
+        `${TEXTLINE_BASE_URL}/api/conversations/${conversationUuid}.json`,
+        {
+          method: "POST",
+          headers: this.getHeaders(),
+          body: JSON.stringify(body),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("[Textline] Send message to conversation error:", data);
+        return {
+          success: false,
+          errorMessage: data.error || data.errors?.base?.[0] || "Failed to send message",
+        };
+      }
+
+      return {
+        success: true,
+        conversationUuid: data.conversation?.uuid || conversationUuid,
+        messageUuid: data.post?.uuid,
+      };
+    } catch (error: any) {
+      console.error("[Textline] Send message exception:", error);
+      return { success: false, errorMessage: error.message || "Network error" };
     }
   }
 }
