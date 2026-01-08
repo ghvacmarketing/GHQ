@@ -2,23 +2,13 @@ import { useState, useRef, useEffect } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,22 +20,15 @@ import {
   MessageSquare,
   Search,
   Send,
-  Phone,
-  Mail,
-  User,
   Clock,
   Check,
   CheckCheck,
   MoreVertical,
-  Tag,
-  UserPlus,
   X,
   Archive,
-  Bell,
   BellOff,
   Loader2,
   Plus,
-  Filter,
   ArrowLeft,
   RefreshCw,
 } from "lucide-react";
@@ -56,7 +39,7 @@ import type {
   CrmCustomer,
   CrmUser,
 } from "@shared/schema";
-import { formatDistanceToNow, format } from "date-fns";
+import { format } from "date-fns";
 import { CrmLayout } from "@/components/crm/crm-layout";
 
 type ConversationWithCustomer = CrmMessagingConversation & {
@@ -116,7 +99,6 @@ export default function CrmMessaging() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("open");
   const [messageText, setMessageText] = useState("");
-  const [newTagInput, setNewTagInput] = useState("");
   const [showMobileThread, setShowMobileThread] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -151,10 +133,6 @@ export default function CrmMessaging() {
     enabled: !!selectedConversationId,
   });
 
-  const { data: crmUsers } = useQuery<CrmUser[]>({
-    queryKey: ["/api/crm/users"],
-  });
-
   const sendMessageMutation = useMutation({
     mutationFn: async (body: string) => {
       const res = await apiRequest("POST", `/api/crm/messaging/conversations/${selectedConversationId}/messages`, {
@@ -180,26 +158,6 @@ export default function CrmMessaging() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/messaging/conversations"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/messaging/conversations", selectedConversationId] });
-    },
-  });
-
-  const addTagMutation = useMutation({
-    mutationFn: async (tag: string) => {
-      const res = await apiRequest("POST", `/api/crm/messaging/conversations/${selectedConversationId}/tags`, { tag });
-      return res.json();
-    },
-    onSuccess: () => {
-      setNewTagInput("");
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/messaging/conversations", selectedConversationId] });
-    },
-  });
-
-  const removeTagMutation = useMutation({
-    mutationFn: async (tag: string) => {
-      await apiRequest("DELETE", `/api/crm/messaging/conversations/${selectedConversationId}/tags/${encodeURIComponent(tag)}`);
-    },
-    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/messaging/conversations", selectedConversationId] });
     },
   });
@@ -497,146 +455,6 @@ export default function CrmMessaging() {
           )}
         </div>
 
-        <div className="hidden xl:flex w-64 2xl:w-72 border-l bg-white flex-shrink-0 flex-col">
-          {selectedConversationId && conversationDetail ? (
-            <ScrollArea className="flex-1">
-              <div className="p-4 space-y-6">
-                <div className="text-center">
-                  <Avatar className="h-16 w-16 mx-auto mb-3">
-                    <AvatarFallback className="bg-[#d3b07d] text-white text-xl">
-                      {conversationDetail.customer ? getInitials(conversationDetail.customer.name) : "?"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <h3 className="font-semibold text-lg text-slate-900">
-                    {conversationDetail.customer?.name || "Unknown Contact"}
-                  </h3>
-                  <p className="text-sm text-slate-500">
-                    {conversationDetail.customer?.companyName || ""}
-                  </p>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-3">
-                  <h4 className="font-medium text-sm text-slate-700 flex items-center gap-2">
-                    <User className="h-4 w-4" /> Contact Info
-                  </h4>
-                  {conversationDetail.customer?.phone && (
-                    <a
-                      href={`tel:${conversationDetail.customer.phone}`}
-                      className="flex items-center gap-2 text-sm text-slate-600 hover:text-[#d3b07d]"
-                    >
-                      <Phone className="h-4 w-4" />
-                      {conversationDetail.customer.phone}
-                    </a>
-                  )}
-                  {conversationDetail.customer?.email && (
-                    <a
-                      href={`mailto:${conversationDetail.customer.email}`}
-                      className="flex items-center gap-2 text-sm text-slate-600 hover:text-[#d3b07d]"
-                    >
-                      <Mail className="h-4 w-4" />
-                      {conversationDetail.customer.email}
-                    </a>
-                  )}
-                </div>
-
-                <Separator />
-
-                <div className="space-y-3">
-                  <h4 className="font-medium text-sm text-slate-700 flex items-center gap-2">
-                    <UserPlus className="h-4 w-4" /> Assigned To
-                  </h4>
-                  <Select
-                    value={conversationDetail.conversation.assignedToId || ""}
-                    onValueChange={(value) => updateConversationMutation.mutate({ assignedToId: value || null })}
-                  >
-                    <SelectTrigger data-testid="select-assigned-to">
-                      <SelectValue placeholder="Unassigned" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Unassigned</SelectItem>
-                      {crmUsers?.map((user) => (
-                        <SelectItem key={user.id} value={user.id}>
-                          {user.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-3">
-                  <h4 className="font-medium text-sm text-slate-700 flex items-center gap-2">
-                    <Tag className="h-4 w-4" /> Tags
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {conversationDetail.tags?.map((t) => (
-                      <Badge key={t.id} variant="secondary" className="gap-1">
-                        {t.tag}
-                        <button
-                          onClick={() => removeTagMutation.mutate(t.tag)}
-                          className="hover:text-red-500"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Add tag..."
-                      value={newTagInput}
-                      onChange={(e) => setNewTagInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && newTagInput.trim()) {
-                          addTagMutation.mutate(newTagInput.trim());
-                        }
-                      }}
-                      data-testid="input-new-tag"
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        if (newTagInput.trim()) {
-                          addTagMutation.mutate(newTagInput.trim());
-                        }
-                      }}
-                      disabled={!newTagInput.trim()}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-3">
-                  <h4 className="font-medium text-sm text-slate-700">Quick Actions</h4>
-                  <div className="space-y-2">
-                    {conversationDetail.customer?.id && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-start"
-                        onClick={() => window.open(`/crm/customers/${conversationDetail.customer?.id}`, "_blank")}
-                        data-testid="button-view-customer"
-                      >
-                        <User className="h-4 w-4 mr-2" /> View Customer Profile
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </ScrollArea>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-slate-400">
-              <p className="text-sm">Select a conversation to view details</p>
-            </div>
-          )}
-        </div>
       </div>
     </CrmLayout>
   );

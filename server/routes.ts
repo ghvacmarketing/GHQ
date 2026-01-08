@@ -18051,8 +18051,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         hasMore = result.hasMore;
         page++;
         
-        if (page > 20) {
-          console.log("[Textline Sync] Stopping after 20 pages");
+        if (page > 100) {
+          console.log("[Textline Sync] Stopping after 100 pages (5000 conversations)");
           break;
         }
       }
