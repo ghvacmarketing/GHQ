@@ -55,6 +55,8 @@ Preferred communication style: Simple, everyday language.
     -   **Per-Line Overrides**: Advanced mode in invoice creation allows manual class selection per line item
     -   **9 Predefined Classes**: Service - Residential, Service - Commercial, Install - Residential, Install - Commercial, Install - Crawlspace, Maintenance - Residential, Maintenance - Commercial, Discount - Promotional, Discount - Maintenance
     -   **Admin Class Management**: Add/edit/delete classes in QuickBooks Settings with two-way sync (Pull from/Push to QuickBooks)
+    -   **Chart of Accounts (Income Accounts)**: Hierarchical parent/child income account structure for P&L tracking. Parent accounts (Service, Install, Maintenance, Discount) with sub-accounts (Residential, Commercial) under each. Admin UI to pull accounts from QuickBooks and create sub-accounts.
+    -   **Products & Services (Items)**: QuickBooks items mapped to income accounts for P&L routing. Each item has categoryType (Service/Install/Maintenance/Discount) and propertyType (Residential/Commercial) mapping. Invoice sync assigns ItemRef based on line item category + property type, routing revenue to correct income sub-accounts.
 
 ## External Dependencies
 -   **Google Sheets API**: Parts pricing, application settings, customer data sync.
