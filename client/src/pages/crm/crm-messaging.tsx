@@ -28,9 +28,10 @@ import {
   Archive,
   BellOff,
   Loader2,
-  Plus,
   ArrowLeft,
   RefreshCw,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import type {
   CrmMessagingConversation,
@@ -97,9 +98,9 @@ export default function CrmMessaging() {
   const { toast } = useToast();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("open");
   const [messageText, setMessageText] = useState("");
   const [showMobileThread, setShowMobileThread] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: currentUser } = useQuery<CrmUser | null>({
@@ -108,10 +109,10 @@ export default function CrmMessaging() {
   });
 
   const { data: conversations, isLoading: loadingConversations } = useQuery<ConversationWithCustomer[]>({
-    queryKey: ["/api/crm/messaging/conversations", { status: statusFilter, search: searchQuery }],
+    queryKey: ["/api/crm/messaging/conversations", { status: "open", search: searchQuery }],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (statusFilter && statusFilter !== "all") params.set("status", statusFilter);
+      params.set("status", "open");
       if (searchQuery) params.set("search", searchQuery);
       const res = await fetch(`/api/crm/messaging/conversations?${params.toString()}`, {
         credentials: "include",
@@ -223,239 +224,226 @@ export default function CrmMessaging() {
     );
   }
 
-  return (
-    <CrmLayout currentUser={currentUser} disableScroll>
-      <div className="h-full flex overflow-hidden">
-        <div className={`w-full md:w-64 lg:w-72 xl:w-80 border-r bg-white flex-shrink-0 flex flex-col ${showMobileThread ? "hidden md:flex" : "flex"}`}>
-          <div className="p-4 border-b space-y-3">
-            <div className="flex items-center justify-between">
-              <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-[#d3b07d]" />
-                Messages
-                {syncTextlineMutation.isPending && (
-                  <RefreshCw className="h-4 w-4 animate-spin text-slate-400" />
-                )}
-              </h1>
-              <Button size="sm" variant="outline" data-testid="button-new-conversation">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Search conversations..."
-                className="pl-9"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                data-testid="input-search-conversations"
-              />
-            </div>
-            <div className="flex gap-2">
-              {["open", "snoozed", "resolved", "all"].map((status) => (
-                <Button
-                  key={status}
-                  size="sm"
-                  variant={statusFilter === status ? "default" : "outline"}
-                  className={statusFilter === status ? "bg-[#d3b07d] hover:bg-[#c4a06e]" : ""}
-                  onClick={() => setStatusFilter(status)}
-                  data-testid={`filter-status-${status}`}
-                >
-                  {status.charAt(0).toUpperCase() + status.slice(1)}
-                </Button>
+  const messagingContent = (
+    <div className={`h-full flex overflow-hidden ${isFullscreen ? "fixed inset-0 z-50 bg-white" : ""}`}>
+      <div className={`w-full md:w-56 lg:w-64 border-r bg-white flex-shrink-0 flex flex-col ${showMobileThread ? "hidden md:flex" : "flex"}`}>
+        <div className="p-3 border-b space-y-2">
+          <div className="flex items-center justify-between">
+            <h1 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-[#d3b07d]" />
+              Messages
+              {syncTextlineMutation.isPending && (
+                <RefreshCw className="h-3 w-3 animate-spin text-slate-400" />
+              )}
+            </h1>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="h-8 w-8 p-0"
+              data-testid="button-toggle-fullscreen"
+            >
+              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </Button>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search..."
+              className="pl-8 h-8 text-sm"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              data-testid="input-search-conversations"
+            />
+          </div>
+        </div>
+
+        <ScrollArea className="flex-1">
+          {loadingConversations ? (
+            <div className="p-3 space-y-2">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex gap-2 p-2">
+                  <Skeleton className="h-9 w-9 rounded-full" />
+                  <div className="flex-1 space-y-1">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                </div>
               ))}
             </div>
-          </div>
-
-          <ScrollArea className="flex-1">
-            {loadingConversations ? (
-              <div className="p-4 space-y-3">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className="flex gap-3 p-3">
-                    <Skeleton className="h-10 w-10 rounded-full" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-3/4" />
-                      <Skeleton className="h-3 w-1/2" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : conversations?.length === 0 ? (
-              <div className="p-8 text-center text-slate-500">
-                <MessageSquare className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-                <p>No conversations found</p>
-              </div>
-            ) : (
-              <div>
-                {conversations?.map((conv) => (
-                  <button
-                    key={conv.id}
-                    className={`w-full text-left p-4 border-b hover:bg-slate-50 transition-colors ${
-                      selectedConversationId === conv.id ? "bg-[#faf6ef] border-l-4 border-l-[#d3b07d]" : ""
-                    }`}
-                    onClick={() => {
-                      setSelectedConversationId(conv.id);
-                      setShowMobileThread(true);
-                    }}
-                    data-testid={`conversation-item-${conv.id}`}
-                  >
-                    <div className="flex gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-[#d3b07d] text-white text-sm">
-                          {conv.customer ? getInitials(conv.customer.name) : "?"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-slate-900 truncate">
-                            {conv.customer?.name || "Unknown Contact"}
-                          </span>
-                          <span className="text-xs text-slate-500">
-                            {formatMessageTime(conv.lastMessageAt)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm text-slate-500 truncate flex-1">
-                            {conv.subject || "No subject"}
-                          </p>
-                          {(conv.unreadInboundCount ?? 0) > 0 && (
-                            <Badge className="bg-[#d3b07d] text-white text-xs">
-                              {conv.unreadInboundCount}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </ScrollArea>
-        </div>
-
-        <div className={`flex-1 flex flex-col bg-white ${!showMobileThread ? "hidden md:flex" : "flex"}`}>
-          {!selectedConversationId ? (
-            <div className="flex-1 flex items-center justify-center text-slate-400">
-              <div className="text-center">
-                <MessageSquare className="h-16 w-16 mx-auto mb-4 text-slate-200" />
-                <p className="text-lg">Select a conversation to view messages</p>
-              </div>
-            </div>
-          ) : loadingDetail ? (
-            <div className="flex-1 flex items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-[#d3b07d]" />
+          ) : conversations?.length === 0 ? (
+            <div className="p-6 text-center text-slate-500">
+              <MessageSquare className="h-10 w-10 mx-auto mb-2 text-slate-300" />
+              <p className="text-sm">No conversations</p>
             </div>
           ) : (
-            <>
-              <div className="p-4 border-b flex items-center justify-between bg-white">
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="md:hidden"
-                    onClick={() => setShowMobileThread(false)}
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                  </Button>
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-[#d3b07d] text-white">
-                      {getInitials(conversationDetail?.customer?.name || conversationDetail?.conversation?.customerName || "?")}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <h2 className="font-semibold text-slate-900">
-                      {conversationDetail?.customer?.name || conversationDetail?.conversation?.customerName || "Unknown Contact"}
-                    </h2>
-                    <p className="text-sm text-slate-500">
-                      {conversationDetail?.customer?.phone || conversationDetail?.conversation?.phoneNumber || "No phone"}
-                    </p>
+            <div>
+              {conversations?.map((conv) => (
+                <button
+                  key={conv.id}
+                  className={`w-full text-left p-3 border-b hover:bg-slate-50 transition-colors ${
+                    selectedConversationId === conv.id ? "bg-[#faf6ef] border-l-2 border-l-[#d3b07d]" : ""
+                  }`}
+                  onClick={() => {
+                    setSelectedConversationId(conv.id);
+                    setShowMobileThread(true);
+                  }}
+                  data-testid={`conversation-item-${conv.id}`}
+                >
+                  <div className="flex gap-2">
+                    <Avatar className="h-9 w-9">
+                      <AvatarFallback className="bg-[#d3b07d] text-white text-xs">
+                        {getInitials(conv.customer?.name || conv.customerName || "?")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-slate-900 truncate text-sm">
+                          {conv.customer?.name || conv.customerName || "Unknown"}
+                        </span>
+                        <span className="text-xs text-slate-400">
+                          {formatMessageTime(conv.lastMessageAt)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 truncate">
+                        {conv.phoneNumber || conv.customer?.phone || ""}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge className={statusColors[conversationDetail?.conversation?.status || "open"]}>
-                    {conversationDetail?.conversation?.status || "open"}
-                  </Badge>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "resolved" })}>
-                        <Check className="h-4 w-4 mr-2" /> Mark Resolved
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "snoozed" })}>
-                        <BellOff className="h-4 w-4 mr-2" /> Snooze
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "archived" })}>
-                        <Archive className="h-4 w-4 mr-2" /> Archive
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                </button>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+      </div>
+
+      <div className={`flex-1 flex flex-col bg-white ${!showMobileThread ? "hidden md:flex" : "flex"}`}>
+        {!selectedConversationId ? (
+          <div className="flex-1 flex items-center justify-center text-slate-400">
+            <div className="text-center">
+              <MessageSquare className="h-12 w-12 mx-auto mb-3 text-slate-200" />
+              <p>Select a conversation</p>
+            </div>
+          </div>
+        ) : loadingDetail ? (
+          <div className="flex-1 flex items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-[#d3b07d]" />
+          </div>
+        ) : (
+          <>
+            <div className="p-3 border-b flex items-center justify-between bg-white">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="md:hidden h-8 w-8 p-0"
+                  onClick={() => setShowMobileThread(false)}
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <Avatar className="h-9 w-9">
+                  <AvatarFallback className="bg-[#d3b07d] text-white text-sm">
+                    {getInitials(conversationDetail?.customer?.name || conversationDetail?.conversation?.customerName || "?")}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h2 className="font-medium text-slate-900 text-sm">
+                    {conversationDetail?.customer?.name || conversationDetail?.conversation?.customerName || "Unknown Contact"}
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    {conversationDetail?.customer?.phone || conversationDetail?.conversation?.phoneNumber || "No phone"}
+                  </p>
                 </div>
               </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "resolved" })}>
+                    <Check className="h-4 w-4 mr-2" /> Resolve
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "snoozed" })}>
+                    <BellOff className="h-4 w-4 mr-2" /> Snooze
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "archived" })}>
+                    <Archive className="h-4 w-4 mr-2" /> Archive
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
 
-              <ScrollArea className="flex-1 p-4">
-                <div className="space-y-4">
-                  {conversationDetail?.messages?.map((msg) => (
+            <ScrollArea className="flex-1 p-3">
+              <div className="space-y-3">
+                {conversationDetail?.messages?.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}
+                  >
                     <div
-                      key={msg.id}
-                      className={`flex ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}
+                      className={`max-w-[75%] rounded-xl px-3 py-2 ${
+                        msg.direction === "outbound"
+                          ? "bg-[#d3b07d] text-white"
+                          : msg.direction === "system"
+                          ? "bg-slate-100 text-slate-500 text-xs italic text-center w-full max-w-none"
+                          : "bg-slate-100 text-slate-900"
+                      }`}
+                      data-testid={`message-${msg.id}`}
                     >
-                      <div
-                        className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                          msg.direction === "outbound"
-                            ? "bg-[#d3b07d] text-white"
-                            : msg.direction === "system"
-                            ? "bg-slate-100 text-slate-600 text-sm italic text-center w-full max-w-none"
-                            : "bg-slate-100 text-slate-900"
-                        }`}
-                        data-testid={`message-${msg.id}`}
-                      >
-                        <p className="whitespace-pre-wrap">{msg.body}</p>
-                        <div className={`flex items-center gap-1 mt-1 text-xs ${
-                          msg.direction === "outbound" ? "text-white/70 justify-end" : "text-slate-400"
-                        }`}>
-                          <span>{formatMessageTime(msg.createdAt)}</span>
-                          {msg.direction === "outbound" && messageStatusIcons[msg.status || "sent"]}
-                        </div>
+                      <p className="whitespace-pre-wrap text-sm">{msg.body}</p>
+                      <div className={`flex items-center gap-1 mt-1 text-xs ${
+                        msg.direction === "outbound" ? "text-white/70 justify-end" : "text-slate-400"
+                      }`}>
+                        <span>{formatMessageTime(msg.createdAt)}</span>
+                        {msg.direction === "outbound" && messageStatusIcons[msg.status || "sent"]}
                       </div>
                     </div>
-                  ))}
-                  <div ref={messagesEndRef} />
-                </div>
-              </ScrollArea>
-
-              <div className="p-4 border-t bg-white">
-                <div className="flex gap-2">
-                  <Textarea
-                    placeholder="Type a message..."
-                    value={messageText}
-                    onChange={(e) => setMessageText(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    rows={2}
-                    className="resize-none"
-                    data-testid="input-message-text"
-                  />
-                  <Button
-                    onClick={handleSendMessage}
-                    disabled={!messageText.trim() || sendMessageMutation.isPending}
-                    className="bg-[#d3b07d] hover:bg-[#c4a06e] self-end"
-                    data-testid="button-send-message"
-                  >
-                    {sendMessageMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
               </div>
-            </>
-          )}
-        </div>
+            </ScrollArea>
 
+            <div className="p-3 border-t bg-white">
+              <div className="flex gap-2">
+                <Textarea
+                  placeholder="Type a message..."
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  rows={1}
+                  className="resize-none text-sm min-h-[40px]"
+                  data-testid="input-message-text"
+                />
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={!messageText.trim() || sendMessageMutation.isPending}
+                  className="bg-[#d3b07d] hover:bg-[#c4a06e] h-10 w-10 p-0"
+                  data-testid="button-send-message"
+                >
+                  {sendMessageMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
+    </div>
+  );
+
+  if (isFullscreen) {
+    return messagingContent;
+  }
+
+  return (
+    <CrmLayout currentUser={currentUser} disableScroll>
+      {messagingContent}
     </CrmLayout>
   );
 }
