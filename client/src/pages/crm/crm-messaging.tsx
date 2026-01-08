@@ -358,15 +358,15 @@ export default function CrmMessaging() {
                   </Button>
                   <Avatar className="h-10 w-10">
                     <AvatarFallback className="bg-[#d3b07d] text-white">
-                      {conversationDetail?.customer ? getInitials(conversationDetail.customer.name) : "?"}
+                      {getInitials(conversationDetail?.customer?.name || conversationDetail?.conversation?.customerName || "?")}
                     </AvatarFallback>
                   </Avatar>
                   <div>
                     <h2 className="font-semibold text-slate-900">
-                      {conversationDetail?.customer?.name || "Unknown Contact"}
+                      {conversationDetail?.customer?.name || conversationDetail?.conversation?.customerName || "Unknown Contact"}
                     </h2>
                     <p className="text-sm text-slate-500">
-                      {conversationDetail?.customer?.phone || "No phone"}
+                      {conversationDetail?.customer?.phone || conversationDetail?.conversation?.phoneNumber || "No phone"}
                     </p>
                   </div>
                 </div>
