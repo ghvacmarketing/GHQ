@@ -14369,6 +14369,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             updatedAt: new Date()
           })
           .where(eq(crmInvoices.id, invoice.id));
+        
+        // Trigger instant QuickBooks sync when invoice becomes "sent"
+        autoSyncInvoice(invoice.id);
       }
 
       // Send SMS for auto-pay maintenance clients
