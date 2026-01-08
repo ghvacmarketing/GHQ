@@ -154,6 +154,27 @@ export default function CrmSettingsQuickBooks() {
     },
   });
 
+  const syncAllMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/quickbooks/sync-all");
+      return response.json();
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/status"] });
+      toast({
+        title: "Sync Complete",
+        description: `Synced ${result.customers?.synced || 0} customers, ${result.invoices?.synced || 0} invoices, ${result.payments?.synced || 0} payments`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync all records",
+        variant: "destructive",
+      });
+    },
+  });
+
   const syncCustomersMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/quickbooks/sync/customers?background=true");
@@ -520,11 +541,23 @@ export default function CrmSettingsQuickBooks() {
                   <Alert className="bg-green-50 border-green-200">
                     <CheckCircle className="h-4 w-4 text-green-600" />
                     <AlertDescription className="text-green-700">
-                      Automatic sync is active. Customers and invoices sync automatically when created or updated.
+                      Automatic sync is active. Customers and invoices sync automatically when created or updated. Background sync runs every 15 minutes to catch any unsynced records.
                     </AlertDescription>
                   </Alert>
 
                   <div className="flex flex-wrap gap-3">
+                    <Button 
+                      onClick={() => syncAllMutation.mutate()}
+                      disabled={syncAllMutation.isPending}
+                      data-testid="btn-sync-all"
+                    >
+                      {syncAllMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                      )}
+                      Sync All Now
+                    </Button>
                     <Button 
                       variant="destructive"
                       onClick={() => disconnectMutation.mutate()}

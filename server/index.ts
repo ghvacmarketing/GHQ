@@ -4,6 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
+import { startBackgroundSyncScheduler } from "./services/quickbooksService";
 
 const app = express();
 
@@ -162,5 +163,8 @@ app.use((req, res, next) => {
       console.error("   Session management will not work correctly without it.");
       console.error("   Please set SESSION_SECRET to a secure random string.");
     }
+    
+    // Start QuickBooks background sync scheduler
+    startBackgroundSyncScheduler();
   });
 })();

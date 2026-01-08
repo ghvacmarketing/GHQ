@@ -23,7 +23,7 @@ import {
   type PropertyType,
   type DiscountKind
 } from "@shared/schema";
-import { eq, and, isNull, isNotNull, inArray } from "drizzle-orm";
+import { eq, and, isNull, isNotNull, inArray, notInArray, sql } from "drizzle-orm";
 
 const QUICKBOOKS_CLIENT_ID = process.env.QUICKBOOKS_CLIENT_ID || "";
 const QUICKBOOKS_CLIENT_SECRET = process.env.QUICKBOOKS_CLIENT_SECRET || "";
@@ -332,6 +332,30 @@ export async function syncCustomerToQuickBooks(
         qbo.createCustomer(qbCustomer, async (err: any, created: any) => {
           if (err) {
             console.error("[QuickBooks] Error creating customer:", err);
+            // Record the failure to prevent infinite retries
+            try {
+              await db.insert(quickbooksCustomerSync)
+                .values({
+                  crmCustomerId: customerId,
+                  quickbooksCustomerId: "",
+                  realmId: conn.realmId,
+                  syncStatus: "error",
+                  lastError: err.message || "Failed to create customer",
+                  lastSyncAt: new Date()
+                });
+            } catch (insertErr) {
+              // Record may already exist, update it
+              await db.update(quickbooksCustomerSync)
+                .set({
+                  syncStatus: "error",
+                  lastError: err.message || "Failed to create customer",
+                  updatedAt: new Date()
+                })
+                .where(and(
+                  eq(quickbooksCustomerSync.crmCustomerId, customerId),
+                  eq(quickbooksCustomerSync.realmId, conn.realmId)
+                ));
+            }
             resolve({ success: false, error: err.message || "Failed to create customer" });
             return;
           }
@@ -802,6 +826,30 @@ export async function syncInvoiceToQuickBooks(
         qbo.createInvoice(qbInvoice, async (err: any, created: any) => {
           if (err) {
             console.error("[QuickBooks] Error creating invoice:", err);
+            // Record the failure to prevent infinite retries
+            try {
+              await db.insert(quickbooksInvoiceSync)
+                .values({
+                  crmInvoiceId: invoiceId,
+                  quickbooksInvoiceId: "",
+                  realmId: conn.realmId,
+                  syncStatus: "error",
+                  lastError: err.message || "Failed to create invoice",
+                  lastSyncAt: new Date()
+                });
+            } catch (insertErr) {
+              // Record may already exist, update it
+              await db.update(quickbooksInvoiceSync)
+                .set({
+                  syncStatus: "error",
+                  lastError: err.message || "Failed to create invoice",
+                  updatedAt: new Date()
+                })
+                .where(and(
+                  eq(quickbooksInvoiceSync.crmInvoiceId, invoiceId),
+                  eq(quickbooksInvoiceSync.realmId, conn.realmId)
+                ));
+            }
             resolve({ success: false, error: err.message || "Failed to create invoice" });
             return;
           }
@@ -1690,5 +1738,285 @@ export async function autoSyncPayment(invoiceId: string, paymentAmount: string):
     })();
   } catch (error) {
     console.error("[QuickBooks Auto] Payment sync trigger error:", error);
+  }
+}
+
+// =============================================
+// BACKGROUND SYNC JOB
+// =============================================
+
+const BATCH_SIZE = 50;
+const DELAY_BETWEEN_BATCHES_MS = 2000;
+let isSyncRunning = false;
+
+/**
+ * Sync all unsynced customers to QuickBooks in batches.
+ * Only syncs customers that haven't been synced or haven't failed permanently.
+ */
+export async function syncAllUnsyncedCustomers(): Promise<{ synced: number; failed: number; total: number }> {
+  const conn = await getActiveConnection();
+  if (!conn) {
+    console.log("[QuickBooks Background] No active connection, skipping customer sync");
+    return { synced: 0, failed: 0, total: 0 };
+  }
+  
+  // Find customers that are NOT in the sync table for this realm (including failed ones)
+  // We exclude records that already exist in the sync table (whether synced or failed)
+  const existingCustomerIds = db.select({ id: quickbooksCustomerSync.crmCustomerId })
+    .from(quickbooksCustomerSync)
+    .where(eq(quickbooksCustomerSync.realmId, conn.realmId));
+  
+  const unsyncedCustomers = await db.select({ id: crmCustomers.id })
+    .from(crmCustomers)
+    .where(sql`${crmCustomers.id} NOT IN (${existingCustomerIds})`)
+    .limit(500); // Process up to 500 per run
+  
+  if (unsyncedCustomers.length === 0) {
+    return { synced: 0, failed: 0, total: 0 };
+  }
+  
+  console.log(`[QuickBooks Background] Found ${unsyncedCustomers.length} unsynced customers`);
+  
+  let synced = 0;
+  let failed = 0;
+  
+  for (let i = 0; i < unsyncedCustomers.length; i += BATCH_SIZE) {
+    const batch = unsyncedCustomers.slice(i, i + BATCH_SIZE);
+    
+    for (const customer of batch) {
+      try {
+        const result = await syncCustomerToQuickBooks(customer.id, conn);
+        if (result.success) {
+          synced++;
+        } else {
+          failed++;
+        }
+      } catch (err) {
+        failed++;
+      }
+    }
+    
+    // Delay between batches to avoid rate limiting
+    if (i + BATCH_SIZE < unsyncedCustomers.length) {
+      await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES_MS));
+    }
+  }
+  
+  console.log(`[QuickBooks Background] Customer sync complete: ${synced} synced, ${failed} failed`);
+  return { synced, failed, total: unsyncedCustomers.length };
+}
+
+/**
+ * Sync all unsynced invoices to QuickBooks in batches.
+ * Only syncs invoices that have a customer (required for QB) and haven't been attempted before.
+ */
+export async function syncAllUnsyncedInvoices(): Promise<{ synced: number; failed: number; total: number }> {
+  const conn = await getActiveConnection();
+  if (!conn) {
+    console.log("[QuickBooks Background] No active connection, skipping invoice sync");
+    return { synced: 0, failed: 0, total: 0 };
+  }
+  
+  // Find invoices that are NOT in the sync table for this realm (including failed ones)
+  const existingInvoiceIds = db.select({ id: quickbooksInvoiceSync.crmInvoiceId })
+    .from(quickbooksInvoiceSync)
+    .where(eq(quickbooksInvoiceSync.realmId, conn.realmId));
+  
+  const unsyncedInvoices = await db.select({ id: crmInvoices.id, customerId: crmInvoices.customerId })
+    .from(crmInvoices)
+    .where(and(
+      sql`${crmInvoices.id} NOT IN (${existingInvoiceIds})`,
+      isNotNull(crmInvoices.customerId)
+    ))
+    .limit(200); // Process up to 200 per run
+  
+  if (unsyncedInvoices.length === 0) {
+    return { synced: 0, failed: 0, total: 0 };
+  }
+  
+  console.log(`[QuickBooks Background] Found ${unsyncedInvoices.length} unsynced invoices`);
+  
+  let synced = 0;
+  let failed = 0;
+  
+  for (let i = 0; i < unsyncedInvoices.length; i += BATCH_SIZE) {
+    const batch = unsyncedInvoices.slice(i, i + BATCH_SIZE);
+    
+    for (const invoice of batch) {
+      try {
+        // Ensure customer is synced first
+        if (invoice.customerId) {
+          await syncCustomerToQuickBooks(invoice.customerId, conn);
+        }
+        
+        const result = await syncInvoiceToQuickBooks(invoice.id, conn);
+        if (result.success) {
+          synced++;
+        } else {
+          failed++;
+        }
+      } catch (err) {
+        failed++;
+      }
+    }
+    
+    // Delay between batches
+    if (i + BATCH_SIZE < unsyncedInvoices.length) {
+      await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES_MS));
+    }
+  }
+  
+  console.log(`[QuickBooks Background] Invoice sync complete: ${synced} synced, ${failed} failed`);
+  return { synced, failed, total: unsyncedInvoices.length };
+}
+
+/**
+ * Sync payments for all paid invoices that don't have payment records in QuickBooks.
+ */
+export async function syncAllUnsyncedPayments(): Promise<{ synced: number; failed: number; total: number }> {
+  const conn = await getActiveConnection();
+  if (!conn) {
+    console.log("[QuickBooks Background] No active connection, skipping payment sync");
+    return { synced: 0, failed: 0, total: 0 };
+  }
+  
+  // Find paid invoices that are synced but don't have payment records
+  const invoicesWithPayments = db.select({ id: quickbooksPaymentSync.crmInvoiceId })
+    .from(quickbooksPaymentSync)
+    .where(eq(quickbooksPaymentSync.realmId, conn.realmId));
+  
+  const paidInvoicesWithoutPaymentSync = await db.select({
+    id: crmInvoices.id,
+    total: crmInvoices.total,
+    paidAt: crmInvoices.paidAt
+  })
+    .from(crmInvoices)
+    .innerJoin(quickbooksInvoiceSync, and(
+      eq(quickbooksInvoiceSync.crmInvoiceId, crmInvoices.id),
+      eq(quickbooksInvoiceSync.realmId, conn.realmId),
+      eq(quickbooksInvoiceSync.syncStatus, "synced")
+    ))
+    .where(and(
+      eq(crmInvoices.status, "paid"),
+      sql`${crmInvoices.id} NOT IN (${invoicesWithPayments})`
+    ))
+    .limit(100);
+  
+  if (paidInvoicesWithoutPaymentSync.length === 0) {
+    return { synced: 0, failed: 0, total: 0 };
+  }
+  
+  console.log(`[QuickBooks Background] Found ${paidInvoicesWithoutPaymentSync.length} paid invoices without payment sync`);
+  
+  let synced = 0;
+  let failed = 0;
+  
+  for (const invoice of paidInvoicesWithoutPaymentSync) {
+    try {
+      const result = await syncPaymentToQuickBooks(
+        invoice.id,
+        invoice.total || "0",
+        invoice.paidAt || new Date(),
+        conn
+      );
+      if (result.success) {
+        synced++;
+      } else {
+        failed++;
+      }
+    } catch (err) {
+      failed++;
+    }
+  }
+  
+  console.log(`[QuickBooks Background] Payment sync complete: ${synced} synced, ${failed} failed`);
+  return { synced, failed, total: paidInvoicesWithoutPaymentSync.length };
+}
+
+/**
+ * Run the full background sync job - syncs customers, invoices, and payments.
+ * Uses a mutex to prevent concurrent sync runs.
+ */
+export async function runBackgroundSync(): Promise<{
+  customers: { synced: number; failed: number; total: number };
+  invoices: { synced: number; failed: number; total: number };
+  payments: { synced: number; failed: number; total: number };
+  skipped?: boolean;
+}> {
+  // Prevent concurrent syncs
+  if (isSyncRunning) {
+    console.log("[QuickBooks Background] Sync already in progress, skipping");
+    return {
+      customers: { synced: 0, failed: 0, total: 0 },
+      invoices: { synced: 0, failed: 0, total: 0 },
+      payments: { synced: 0, failed: 0, total: 0 },
+      skipped: true
+    };
+  }
+  
+  isSyncRunning = true;
+  
+  try {
+    console.log("[QuickBooks Background] Starting background sync job...");
+    
+    const conn = await getActiveConnection();
+    if (!conn) {
+      console.log("[QuickBooks Background] No active connection, skipping sync");
+      return {
+        customers: { synced: 0, failed: 0, total: 0 },
+        invoices: { synced: 0, failed: 0, total: 0 },
+        payments: { synced: 0, failed: 0, total: 0 }
+      };
+    }
+    
+    const customers = await syncAllUnsyncedCustomers();
+    const invoices = await syncAllUnsyncedInvoices();
+    const payments = await syncAllUnsyncedPayments();
+    
+    console.log(`[QuickBooks Background] Sync complete - Customers: ${customers.synced}/${customers.total}, Invoices: ${invoices.synced}/${invoices.total}, Payments: ${payments.synced}/${payments.total}`);
+    
+    return { customers, invoices, payments };
+  } finally {
+    isSyncRunning = false;
+  }
+}
+
+let backgroundSyncInterval: NodeJS.Timeout | null = null;
+
+/**
+ * Start the background sync scheduler (runs every 15 minutes).
+ */
+export function startBackgroundSyncScheduler(): void {
+  if (backgroundSyncInterval) {
+    console.log("[QuickBooks Background] Scheduler already running");
+    return;
+  }
+  
+  const SYNC_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+  
+  // Run immediately on startup
+  setTimeout(() => {
+    runBackgroundSync().catch(err => {
+      console.error("[QuickBooks Background] Initial sync error:", err);
+    });
+  }, 10000); // Wait 10 seconds after startup
+  
+  backgroundSyncInterval = setInterval(() => {
+    runBackgroundSync().catch(err => {
+      console.error("[QuickBooks Background] Scheduled sync error:", err);
+    });
+  }, SYNC_INTERVAL_MS);
+  
+  console.log("[QuickBooks Background] Scheduler started (runs every 15 minutes)");
+}
+
+/**
+ * Stop the background sync scheduler.
+ */
+export function stopBackgroundSyncScheduler(): void {
+  if (backgroundSyncInterval) {
+    clearInterval(backgroundSyncInterval);
+    backgroundSyncInterval = null;
+    console.log("[QuickBooks Background] Scheduler stopped");
   }
 }

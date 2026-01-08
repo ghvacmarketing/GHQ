@@ -19439,6 +19439,27 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       res.status(500).json({ message: "Failed to get sync logs" });
     }
   });
+  
+  // POST /api/quickbooks/sync-all - Manually trigger full background sync
+  app.post("/api/quickbooks/sync-all", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { runBackgroundSync } = await import("./services/quickbooksService");
+      const result = await runBackgroundSync();
+      res.json({
+        success: true,
+        message: "Sync completed",
+        ...result
+      });
+    } catch (error: any) {
+      console.error("[QuickBooks] Sync all error:", error);
+      res.status(500).json({ message: "Failed to run sync" });
+    }
+  });
 
   // =============================================
   // QUICKBOOKS CLASS MANAGEMENT
