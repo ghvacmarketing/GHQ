@@ -19050,12 +19050,22 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       
       const result = await processSingleAgreementRenewal(agreement);
       
+      // Build message based on what was sent
+      let message = `Invoice ${result.invoiceNumber} created`;
+      if (result.emailSent && result.smsSent) {
+        message += ` and sent via email and text to ${agreement.customerName}`;
+      } else if (result.emailSent) {
+        message += ` and emailed to ${agreement.customerName}`;
+      } else if (result.smsSent) {
+        message += ` and texted to ${agreement.customerName}`;
+      } else {
+        message += ` (no email or text sent - customer may not have contact info)`;
+      }
+      
       return res.json({ 
         success: true, 
         result,
-        message: result.emailSent 
-          ? `Invoice ${result.invoiceNumber} created and emailed to ${agreement.customerName}`
-          : `Invoice ${result.invoiceNumber} created (no email sent - customer may not have email)`
+        message
       });
     } catch (error) {
       console.error("Error triggering agreement invoice:", error);

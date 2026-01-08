@@ -2,6 +2,7 @@ import { db } from "../db";
 import { crmAgreements, crmInvoices, crmInvoiceLineItems, crmCustomers, invoiceEmailLogs, type CrmAgreement, type CrmInvoice, type CrmInvoiceLineItem } from "@shared/schema";
 import { eq, and, sql, lte, isNotNull } from "drizzle-orm";
 import { sendCrmInvoiceEmail } from "./crmInvoiceEmail";
+import { sendAutomatedSms, SMS_TEMPLATES } from "./smsNotificationService";
 import { toZonedTime, format } from "date-fns-tz";
 import { addYears, addMonths, addWeeks } from "date-fns";
 
@@ -14,6 +15,7 @@ interface RenewalResult {
   invoiceId?: string;
   invoiceNumber?: string;
   emailSent: boolean;
+  smsSent: boolean;
   error?: string;
 }
 
@@ -53,20 +55,25 @@ export async function processSingleAgreementRenewal(agreement: CrmAgreement): Pr
     agreementNumber: agreement.agreementNumber,
     customerName: agreement.customerName,
     emailSent: false,
+    smsSent: false,
   };
 
   try {
     let customerEmail: string | null = null;
+    let customerPhone: string | null = null;
     
     if (agreement.customerId) {
       const customer = await db
-        .select({ email: crmCustomers.email, name: crmCustomers.name })
+        .select({ email: crmCustomers.email, phone: crmCustomers.phone, name: crmCustomers.name })
         .from(crmCustomers)
         .where(eq(crmCustomers.id, agreement.customerId))
         .limit(1);
       
       if (customer[0]?.email) {
         customerEmail = customer[0].email;
+      }
+      if (customer[0]?.phone) {
+        customerPhone = customer[0].phone;
       }
     }
 
@@ -149,11 +156,41 @@ export async function processSingleAgreementRenewal(agreement: CrmAgreement): Pr
           sentBy: "system-auto-renewal",
           sentAt: new Date(),
         });
+        
+        // Send SMS with payment link if customer has phone and payment link was generated
+        if (customerPhone && emailResult.paymentLinkUrl && agreement.customerId) {
+          try {
+            const smsBody = SMS_TEMPLATES.INVOICE_SMS_TEMPLATE(invoiceNumber, emailResult.paymentLinkUrl);
+            const smsResult = await sendAutomatedSms({
+              customerId: agreement.customerId,
+              phoneNumber: customerPhone,
+              messageBody: smsBody,
+              notificationType: "invoice_sms",
+              invoiceId: invoice.id,
+            });
+            
+            if (smsResult.success) {
+              result.smsSent = true;
+              console.log(`[AgreementRenewal] SMS sent to ${customerPhone} for invoice ${invoiceNumber}`);
+            } else {
+              console.error(`[AgreementRenewal] Failed to send SMS for invoice ${invoiceNumber}:`, smsResult.errorMessage);
+            }
+          } catch (smsError) {
+            console.error(`[AgreementRenewal] Error sending SMS for invoice ${invoiceNumber}:`, smsError);
+          }
+        }
       } else {
         console.error(`[AgreementRenewal] Failed to send email for agreement ${agreement.agreementNumber}:`, emailResult.error);
       }
     } else {
       console.log(`[AgreementRenewal] No email on file for agreement ${agreement.agreementNumber} - invoice created but not emailed`);
+    }
+    
+    // Also try to send SMS even if no email (customer may have phone but no email)
+    if (!result.smsSent && customerPhone && agreement.customerId) {
+      // Need to get the payment link separately if email wasn't sent
+      // For now, just log that SMS wasn't sent because no payment link available
+      console.log(`[AgreementRenewal] SMS not sent for ${agreement.agreementNumber} - payment link only generated with email`);
     }
 
     const currentNextInvoiceDate = agreement.nextInvoiceDate ? new Date(agreement.nextInvoiceDate) : new Date();
