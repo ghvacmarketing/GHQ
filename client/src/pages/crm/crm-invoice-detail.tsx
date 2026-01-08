@@ -65,6 +65,10 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   Inbox,
+  Pencil,
+  Check,
+  X,
+  Plus,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -119,6 +123,10 @@ export default function CrmInvoiceDetail() {
   const [sendEmailRecipient, setSendEmailRecipient] = useState("");
   const [sendEmailMessage, setSendEmailMessage] = useState("");
   const [expandedEmailIds, setExpandedEmailIds] = useState<Set<string>>(new Set());
+  const [editingLineItemId, setEditingLineItemId] = useState<string | null>(null);
+  const [editingLineItemData, setEditingLineItemData] = useState<{ description: string; quantity: string; unitPrice: string }>({ description: "", quantity: "", unitPrice: "" });
+  const [showAddLineItemDialog, setShowAddLineItemDialog] = useState(false);
+  const [newLineItemData, setNewLineItemData] = useState<{ description: string; quantity: string; unitPrice: string }>({ description: "", quantity: "1", unitPrice: "" });
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -288,6 +296,97 @@ export default function CrmInvoiceDetail() {
       toast({ title: "Failed to send email", description: error.message, variant: "destructive" });
     },
   });
+
+  const updateLineItemMutation = useMutation({
+    mutationFn: async ({ lineItemId, data }: { lineItemId: string; data: { description: string; quantity: number; unitPrice: string } }) => {
+      const res = await apiRequest("PATCH", `/api/crm/invoices/${invoiceId}/line-items/${lineItemId}`, data);
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || "Failed to update line item");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", invoiceId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      setEditingLineItemId(null);
+      setEditingLineItemData({ description: "", quantity: "", unitPrice: "" });
+      toast({ title: "Line item updated", description: "The line item has been updated successfully." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update line item", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const addLineItemMutation = useMutation({
+    mutationFn: async (data: { description: string; quantity: number; unitPrice: string }) => {
+      const res = await apiRequest("POST", `/api/crm/invoices/${invoiceId}/line-items`, data);
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || "Failed to add line item");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", invoiceId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      setShowAddLineItemDialog(false);
+      setNewLineItemData({ description: "", quantity: "1", unitPrice: "" });
+      toast({ title: "Line item added", description: "The line item has been added successfully." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to add line item", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleStartEditLineItem = (item: CrmInvoiceLineItem) => {
+    setEditingLineItemId(item.id);
+    setEditingLineItemData({
+      description: item.description || "",
+      quantity: String(item.quantity || 1),
+      unitPrice: String(item.unitPrice || "0"),
+    });
+  };
+
+  const handleCancelEditLineItem = () => {
+    setEditingLineItemId(null);
+    setEditingLineItemData({ description: "", quantity: "", unitPrice: "" });
+  };
+
+  const handleSaveLineItem = () => {
+    if (!editingLineItemId) return;
+    const quantity = parseFloat(editingLineItemData.quantity) || 1;
+    const unitPrice = editingLineItemData.unitPrice;
+    updateLineItemMutation.mutate({
+      lineItemId: editingLineItemId,
+      data: {
+        description: editingLineItemData.description,
+        quantity,
+        unitPrice,
+      },
+    });
+  };
+
+  const handleAddLineItem = () => {
+    const quantity = parseFloat(newLineItemData.quantity) || 1;
+    addLineItemMutation.mutate({
+      description: newLineItemData.description,
+      quantity,
+      unitPrice: newLineItemData.unitPrice,
+    });
+  };
+
+  const calculateEditingTotal = () => {
+    const qty = parseFloat(editingLineItemData.quantity) || 0;
+    const price = parseFloat(editingLineItemData.unitPrice) || 0;
+    return qty * price;
+  };
+
+  const calculateNewLineItemTotal = () => {
+    const qty = parseFloat(newLineItemData.quantity) || 0;
+    const price = parseFloat(newLineItemData.unitPrice) || 0;
+    return qty * price;
+  };
 
   const handleVoid = () => {
     setShowVoidConfirm(true);
@@ -711,10 +810,23 @@ export default function CrmInvoiceDetail() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <FileText className="h-4 w-4 text-slate-500" />
-              Line Items
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-4 w-4 text-slate-500" />
+                Line Items
+              </CardTitle>
+              {status === "draft" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAddLineItemDialog(true)}
+                  data-testid="button-add-line-item"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Line Item
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <Table>
@@ -724,21 +836,108 @@ export default function CrmInvoiceDetail() {
                   <TableHead className="font-semibold text-center w-20">Qty</TableHead>
                   <TableHead className="font-semibold text-right w-28">Unit Price</TableHead>
                   <TableHead className="font-semibold text-right w-28">Amount</TableHead>
+                  {status === "draft" && (
+                    <TableHead className="font-semibold text-center w-24">Actions</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {invoice.lineItems && invoice.lineItems.length > 0 ? (
                   invoice.lineItems.map((item, index) => (
                     <TableRow key={item.id || index} data-testid={`row-line-item-${index}`}>
-                      <TableCell className="font-medium">{item.description || "—"}</TableCell>
-                      <TableCell className="text-center">{item.quantity || 1}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(item.lineTotal)}</TableCell>
+                      {editingLineItemId === item.id ? (
+                        <>
+                          <TableCell>
+                            <Input
+                              value={editingLineItemData.description}
+                              onChange={(e) => setEditingLineItemData(prev => ({ ...prev, description: e.target.value }))}
+                              placeholder="Description"
+                              className="w-full"
+                              data-testid={`input-edit-description-${index}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              value={editingLineItemData.quantity}
+                              onChange={(e) => setEditingLineItemData(prev => ({ ...prev, quantity: e.target.value }))}
+                              placeholder="Qty"
+                              className="w-16 text-center"
+                              min="1"
+                              data-testid={`input-edit-quantity-${index}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              value={editingLineItemData.unitPrice}
+                              onChange={(e) => setEditingLineItemData(prev => ({ ...prev, unitPrice: e.target.value }))}
+                              placeholder="Unit Price"
+                              className="w-24 text-right"
+                              step="0.01"
+                              data-testid={`input-edit-unit-price-${index}`}
+                            />
+                          </TableCell>
+                          <TableCell className="text-right font-medium text-slate-500" data-testid={`text-edit-total-${index}`}>
+                            {formatCurrency(calculateEditingTotal())}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                onClick={handleSaveLineItem}
+                                disabled={updateLineItemMutation.isPending}
+                                data-testid={`button-save-line-item-${index}`}
+                              >
+                                {updateLineItemMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Check className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-slate-500 hover:text-slate-700"
+                                onClick={handleCancelEditLineItem}
+                                disabled={updateLineItemMutation.isPending}
+                                data-testid={`button-cancel-edit-line-item-${index}`}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </>
+                      ) : (
+                        <>
+                          <TableCell className="font-medium">{item.description || "—"}</TableCell>
+                          <TableCell className="text-center">{item.quantity || 1}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(item.lineTotal)}</TableCell>
+                          {status === "draft" && (
+                            <TableCell>
+                              <div className="flex items-center justify-center">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-slate-500 hover:text-slate-700"
+                                  onClick={() => handleStartEditLineItem(item)}
+                                  data-testid={`button-edit-line-item-${index}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          )}
+                        </>
+                      )}
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-slate-500 py-8">
+                    <TableCell colSpan={status === "draft" ? 5 : 4} className="text-center text-slate-500 py-8">
                       No line items
                     </TableCell>
                   </TableRow>
@@ -1120,6 +1319,86 @@ export default function CrmInvoiceDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showAddLineItemDialog} onOpenChange={setShowAddLineItemDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Line Item</DialogTitle>
+            <DialogDescription>
+              Add a new line item to invoice {invoice.invoiceNumber}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="newDescription">Description</Label>
+              <Textarea
+                id="newDescription"
+                value={newLineItemData.description}
+                onChange={(e) => setNewLineItemData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Enter item description..."
+                rows={3}
+                data-testid="input-new-line-item-description"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="newQuantity">Quantity</Label>
+                <Input
+                  id="newQuantity"
+                  type="number"
+                  value={newLineItemData.quantity}
+                  onChange={(e) => setNewLineItemData(prev => ({ ...prev, quantity: e.target.value }))}
+                  placeholder="1"
+                  min="1"
+                  data-testid="input-new-line-item-quantity"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="newUnitPrice">Unit Price</Label>
+                <Input
+                  id="newUnitPrice"
+                  type="number"
+                  value={newLineItemData.unitPrice}
+                  onChange={(e) => setNewLineItemData(prev => ({ ...prev, unitPrice: e.target.value }))}
+                  placeholder="0.00"
+                  step="0.01"
+                  data-testid="input-new-line-item-unit-price"
+                />
+              </div>
+            </div>
+            <div className="flex justify-between items-center pt-2 border-t">
+              <span className="text-sm text-slate-600">Calculated Total:</span>
+              <span className="text-lg font-semibold" data-testid="text-new-line-item-total">
+                {formatCurrency(calculateNewLineItemTotal())}
+              </span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowAddLineItemDialog(false);
+                setNewLineItemData({ description: "", quantity: "1", unitPrice: "" });
+              }}
+              data-testid="button-cancel-add-line-item"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddLineItem}
+              disabled={addLineItemMutation.isPending || !newLineItemData.description || !newLineItemData.unitPrice}
+              data-testid="button-submit-add-line-item"
+            >
+              {addLineItemMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4 mr-2" />
+              )}
+              Add Line Item
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </CrmLayout>
   );
 }
