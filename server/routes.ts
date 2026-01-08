@@ -19923,6 +19923,23 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // POST /api/quickbooks/items/provision - Auto-provision items for mapped sub-accounts
+  app.post("/api/quickbooks/items/provision", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { provisionItemsForSubAccounts } = await import("./services/quickbooksService");
+      const result = await provisionItemsForSubAccounts();
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Provision items error:", error);
+      res.status(500).json({ message: "Failed to provision items", error: error.message });
+    }
+  });
+
   // POST /api/quickbooks/items - Create an item
   app.post("/api/quickbooks/items", requireCrmAuth, async (req, res) => {
     try {
