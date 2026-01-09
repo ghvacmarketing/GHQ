@@ -21940,36 +21940,32 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         let isLastVisit = false;
         
         if (agreementByProperty.status === "active") {
-          // Count ALL maintenance work orders for this property (including in-progress)
-          // This represents how many visits have been done/are being done
+          // Count COMPLETED maintenance work orders for this property since activation
+          // to determine current visit number (completed visits + 1)
           const startDate = agreementByProperty.activationDate 
             ? new Date(agreementByProperty.activationDate) 
             : new Date(agreementByProperty.startDate || agreementByProperty.createdAt || '2020-01-01');
           
-          // Count maintenance work orders that are completed OR in progress (not just completed)
-          const maintenanceOrders = await db.select({ count: count() })
+          // Count only COMPLETED maintenance work orders EXCLUDING the current one
+          // This ensures the visit number stays correct even when viewing a completed work order
+          const completedOrders = await db.select({ count: count() })
             .from(crmWorkOrders)
             .where(
               and(
                 eq(crmWorkOrders.propertyId, workOrder.propertyId!),
                 eq(crmWorkOrders.visitType, "MAINTENANCE"),
-                or(
-                  eq(crmWorkOrders.status, "completed"),
-                  eq(crmWorkOrders.status, "on_site"),
-                  eq(crmWorkOrders.status, "en_route"),
-                  eq(crmWorkOrders.status, "dispatched"),
-                  eq(crmWorkOrders.status, "scheduled")
-                ),
-                gte(crmWorkOrders.createdAt, startDate)
+                eq(crmWorkOrders.status, "completed"),
+                gte(crmWorkOrders.createdAt, startDate),
+                sql`${crmWorkOrders.id} != ${workOrderId}` // Exclude current work order
               )
             );
           
-          const orderCount = Number(maintenanceOrders[0]?.count || 0);
-          // Current visit number: cycle through 1, 2, 1, 2, etc.
-          // Use modulo and OR to handle the wrap-around: (2 % 2) = 0, but we want 2
-          currentVisitNumber = (orderCount % totalVisits) || totalVisits;
+          const completedCount = Number(completedOrders[0]?.count || 0);
+          // Current visit = completed visits (before this one) + 1, cycling through totalVisits
+          // e.g., 0 completed before = visit 1, 1 completed before = visit 2, 2 completed before = visit 1 (new cycle)
+          currentVisitNumber = (completedCount % totalVisits) + 1;
           isLastVisit = currentVisitNumber === totalVisits;
-          console.log(`[RenewalInfo] Property ${workOrder.propertyId}: orderCount=${orderCount}, currentVisitNumber=${currentVisitNumber}, totalVisits=${totalVisits}, isLastVisit=${isLastVisit}, agreementStatus=${agreementByProperty.status}`);
+          console.log(`[RenewalInfo] Property ${workOrder.propertyId}: completedCount=${completedCount}, currentVisitNumber=${currentVisitNumber}, totalVisits=${totalVisits}, isLastVisit=${isLastVisit}, agreementStatus=${agreementByProperty.status}`);
         }
         
         // Determine payment type
