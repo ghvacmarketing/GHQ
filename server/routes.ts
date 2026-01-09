@@ -17067,6 +17067,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // PATCH /api/crm/customers/:id/portal-access - Toggle customer portal access
+  app.patch("/api/crm/customers/:id/portal-access", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { enabled } = req.body;
+      if (typeof enabled !== "boolean") {
+        return res.status(400).json({ message: "enabled must be a boolean" });
+      }
+
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, req.params.id)).limit(1);
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      const [updatedCustomer] = await db.update(crmCustomers)
+        .set({
+          portalEnabled: enabled,
+          updatedAt: new Date(),
+        })
+        .where(eq(crmCustomers.id, req.params.id))
+        .returning();
+
+      await logCrmAudit(user.id, "portal_access_toggled", "customer", req.params.id, {
+        customerName: customer.name,
+        portalEnabled: enabled,
+        previousValue: customer.portalEnabled,
+      });
+
+      return res.json(updatedCustomer);
+    } catch (error) {
+      console.error("Error updating customer portal access:", error);
+      return res.status(500).json({ message: "Failed to update portal access" });
+    }
+  });
+
   // ============================================
   // SERVICE CALL CHECKLISTS API
   // ============================================
@@ -20376,6 +20415,10 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       if (!customer) {
         return res.status(401).json({ message: "Customer not found" });
+      }
+
+      if (!customer.portalEnabled) {
+        return res.status(403).json({ message: "Portal access is not enabled for this account" });
       }
 
       const sessionToken = randomUUID();

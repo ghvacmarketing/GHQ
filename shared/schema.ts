@@ -858,6 +858,7 @@ export const crmCustomers = pgTable("crm_customers", {
   leadSource: text("lead_source"),
   tags: json("tags").$type<string[]>().default([]),
   notes: text("notes"),
+  portalEnabled: boolean("portal_enabled").default(false).notNull(),
   sourceSystem: text("source_system"),
   sourceId: text("source_id"),
   // Prospect funnel fields

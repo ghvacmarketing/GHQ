@@ -3712,6 +3712,34 @@ export default function CrmCustomerDetail() {
     },
   });
 
+  const togglePortalMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await fetch(`/api/crm/customers/${customerId}/portal-access`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ enabled }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to update portal access");
+      }
+      return res.json();
+    },
+    onSuccess: (_, enabled) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId] });
+      toast({
+        title: enabled ? "Portal Enabled" : "Portal Disabled",
+        description: enabled 
+          ? "Customer can now access the customer portal." 
+          : "Customer portal access has been disabled.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const openEditDialog = () => {
     if (customer) {
       setEditName(customer.name || "");
@@ -4033,19 +4061,32 @@ export default function CrmCustomerDetail() {
               Edit Customer
             </Button>
             {currentUser && ["admin", "owner", "sales"].includes(currentUser.role) && (
-              <Button 
-                variant="outline"
-                onClick={() => generatePortalLinkMutation.mutate()}
-                disabled={generatePortalLinkMutation.isPending}
-                data-testid="button-generate-portal-link"
-              >
-                {generatePortalLinkMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Link2 className="h-4 w-4 mr-2" />
+              <div className="flex items-center gap-3 border rounded-lg px-3 py-1.5">
+                <span className="text-sm text-muted-foreground">Customer Portal</span>
+                <Switch
+                  checked={customer.portalEnabled}
+                  onCheckedChange={(checked) => togglePortalMutation.mutate(checked)}
+                  disabled={togglePortalMutation.isPending}
+                  data-testid="switch-portal-access"
+                />
+                {customer.portalEnabled && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => generatePortalLinkMutation.mutate()}
+                    disabled={generatePortalLinkMutation.isPending}
+                    className="h-7 px-2"
+                    data-testid="button-generate-portal-link"
+                  >
+                    {generatePortalLinkMutation.isPending ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Link2 className="h-3 w-3" />
+                    )}
+                    <span className="ml-1 text-xs">Copy Link</span>
+                  </Button>
                 )}
-                Portal Link
-              </Button>
+              </div>
             )}
             {canDeleteCustomer && (
               <Button 
