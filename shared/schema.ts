@@ -1106,6 +1106,7 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   isPending: boolean("is_pending").default(false),
   pendingReason: text("pending_reason").$type<PendingReason>(),
   pendingStartedAt: timestamp("pending_started_at"),
+  totalPendingMinutes: integer("total_pending_minutes").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
