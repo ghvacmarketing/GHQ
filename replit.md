@@ -24,7 +24,7 @@ Preferred communication style: Simple, everyday language.
     -   **Projects**: High-value scope containers ($5k+) with pipeline statuses (Lead → Proposal Sent → Approved → In Progress → Completed → Closed → Archived). Can contain multiple Work Orders.
     -   **Work Orders**: Scheduled visits/appointments with dispatch statuses (Scheduled → Dispatched → En Route → On Site → Completed). Can be independent or linked to Projects.
     -   **Dispatch Board**: Focuses on Work Orders.
--   **Quotes and Invoices System**: Integrated CRM quotes attached to Work Orders or Projects with status workflows (draft → sent → accepted/declined/expired). CRM Invoices tied to Work Orders with status workflows (draft → sent → paid/void).
+-   **Quotes and Invoices System**: Integrated CRM quotes attached to Work Orders or Projects with status workflows (draft → sent → accepted/declined/expired). CRM Invoices tied to Work Orders with status workflows (draft → sent → paid/void). **Install Quote Financing**: Deposit-required quotes (custom_install, proposal, custom_service) display dual payment options: Stripe deposit payment or financing application. Financing link is configurable in CRM Settings > Payment Settings with default GreenSky integration.
 -   **Project Timeline**: Aggregates all project activities (notes, photos, files, status changes, financial updates) chronologically.
 -   **Customer Database**: FieldEdge CSV import, Google Sheets two-way sync, customer lookup integration.
 -   **Processes and Systems Module**: Searchable, voice-guided wiki with Tiptap editor, PDF export, and backward compatibility.
