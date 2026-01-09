@@ -10681,7 +10681,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (customerId !== undefined) updateData.customerId = customerId;
       if (propertyId !== undefined) updateData.propertyId = propertyId;
       if (dispatchNotes !== undefined) updateData.dispatchNotes = dispatchNotes;
-      if (isPending !== undefined) updateData.isPending = isPending;
+      if (isPending !== undefined) {
+        updateData.isPending = isPending;
+        
+        // If turning off pending status, accumulate pending time
+        if (isPending === false && existingWorkOrder.isPending === true && existingWorkOrder.pendingStartedAt) {
+          const pendingDuration = Math.floor((new Date().getTime() - existingWorkOrder.pendingStartedAt.getTime()) / 60000);
+          const currentTotal = existingWorkOrder.totalPendingMinutes || 0;
+          updateData.totalPendingMinutes = currentTotal + Math.max(0, pendingDuration);
+        }
+      }
       if (pendingReason !== undefined) updateData.pendingReason = pendingReason;
       if (pendingStartedAt !== undefined) {
         updateData.pendingStartedAt = pendingStartedAt ? new Date(pendingStartedAt as string) : null;
@@ -21196,12 +21205,25 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
         // Calculate work time (onSiteAt to completedAt) in minutes
         let rawWorkTimeMinutes = 0;
+        let totalPendingMinutes = 0;
         for (const wo of techWorkOrders) {
           if (wo.onSiteAt && wo.completedAt) {
             const duration = Math.floor((wo.completedAt.getTime() - wo.onSiteAt.getTime()) / 60000);
             if (duration > 0) rawWorkTimeMinutes += duration;
           }
+          // Accumulate pending time from completed work orders
+          if (wo.totalPendingMinutes && wo.totalPendingMinutes > 0) {
+            totalPendingMinutes += wo.totalPendingMinutes;
+          }
+          // Also check currently pending work orders
+          if (wo.isPending && wo.pendingStartedAt) {
+            const currentPendingMinutes = Math.floor((new Date().getTime() - wo.pendingStartedAt.getTime()) / 60000);
+            totalPendingMinutes += Math.max(0, currentPendingMinutes);
+          }
         }
+        
+        // Subtract pending time from raw work time (pending time = idle, not work)
+        rawWorkTimeMinutes = Math.max(0, rawWorkTimeMinutes - totalPendingMinutes);
 
         // Clamp drive + work time to not exceed total clocked time
         let driveTimeMinutes = 0;
