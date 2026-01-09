@@ -3325,7 +3325,7 @@ export default function CrmDispatch() {
                     
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-500">Visit Type</span>
-                      <span className="text-sm font-medium text-slate-900" data-testid="text-visit-type">{selectedWorkOrder.jobType}</span>
+                      <span className="text-sm font-medium text-slate-900" data-testid="text-visit-type">{visitTypeLabels[selectedWorkOrder.visitType || "SERVICE"] || selectedWorkOrder.visitType || "Service"}</span>
                     </div>
                     
                     <div className="flex items-center justify-between">
