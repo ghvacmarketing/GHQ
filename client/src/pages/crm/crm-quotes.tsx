@@ -914,15 +914,15 @@ export default function CrmQuotes() {
               <div className="space-y-3">
                 <h4 className="font-semibold text-slate-900">Quote Breakdown</h4>
                 
-                {selectedQuote.lineItems && (selectedQuote.lineItems as CrmQuoteLineItem[]).length > 0 && (
+                {Array.isArray(selectedQuote.lineItems) && selectedQuote.lineItems.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-slate-700">Line Items</p>
-                    {(selectedQuote.lineItems as CrmQuoteLineItem[]).map((item, idx) => (
+                    {(selectedQuote.lineItems as Array<{ description: string; quantity: string; lineTotal: string }>).map((item, idx) => (
                       <div key={idx} className="flex justify-between text-sm">
                         <span className="text-slate-600">
                           {item.description} x{item.quantity}
                         </span>
-                        <span className="text-slate-900">{formatCurrency(item.amount)}</span>
+                        <span className="text-slate-900">{formatCurrency(item.lineTotal)}</span>
                       </div>
                     ))}
                   </div>
