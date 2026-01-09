@@ -19960,6 +19960,40 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // GET /api/quickbooks/invoice/:qbInvoiceId/debug - Debug a QuickBooks invoice
+  app.get("/api/quickbooks/invoice/:qbInvoiceId/debug", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { getQuickBooksInvoiceDetails } = await import("./services/quickbooksService");
+      const result = await getQuickBooksInvoiceDetails(req.params.qbInvoiceId);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Debug invoice error:", error);
+      res.status(500).json({ message: "Failed to get invoice details", error: error.message });
+    }
+  });
+
+  // POST /api/quickbooks/invoice/:crmInvoiceId/resync - Resync a CRM invoice to QuickBooks with correct ItemRefs
+  app.post("/api/quickbooks/invoice/:crmInvoiceId/resync", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { resyncInvoiceToQuickBooks } = await import("./services/quickbooksService");
+      const result = await resyncInvoiceToQuickBooks(req.params.crmInvoiceId);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Resync invoice error:", error);
+      res.status(500).json({ message: "Failed to resync invoice", error: error.message });
+    }
+  });
+
   // POST /api/quickbooks/items - Create an item
   app.post("/api/quickbooks/items", requireCrmAuth, async (req, res) => {
     try {

@@ -3289,3 +3289,265 @@ export async function provisionItemsForSubAccounts(): Promise<{
     return { success: false, provisioned, skipped, errors: [error.message || "Provision failed"] };
   }
 }
+
+/**
+ * Get detailed QuickBooks invoice information for debugging
+ */
+export async function getQuickBooksInvoiceDetails(qbInvoiceId: string): Promise<{
+  success: boolean;
+  invoice?: any;
+  error?: string;
+}> {
+  try {
+    const conn = await getActiveConnection();
+    if (!conn) {
+      return { success: false, error: "No active QuickBooks connection" };
+    }
+    
+    const qbo = getQuickBooksClient(conn);
+    
+    const invoice = await new Promise<any>((resolve, reject) => {
+      // @ts-ignore - getInvoice exists in node-quickbooks
+      qbo.getInvoice(qbInvoiceId, (err: any, inv: any) => {
+        if (err) reject(err);
+        else resolve(inv);
+      });
+    });
+    
+    // Extract relevant info for debugging
+    const lineItems = invoice.Line?.map((line: any) => ({
+      Id: line.Id,
+      Amount: line.Amount,
+      Description: line.Description,
+      DetailType: line.DetailType,
+      ItemRef: line.SalesItemLineDetail?.ItemRef,
+      Qty: line.SalesItemLineDetail?.Qty,
+      UnitPrice: line.SalesItemLineDetail?.UnitPrice
+    })) || [];
+    
+    console.log(`[QuickBooks Debug] Invoice ${qbInvoiceId}:`, JSON.stringify({
+      Id: invoice.Id,
+      DocNumber: invoice.DocNumber,
+      TotalAmt: invoice.TotalAmt,
+      Balance: invoice.Balance,
+      Lines: lineItems
+    }, null, 2));
+    
+    return { 
+      success: true, 
+      invoice: {
+        Id: invoice.Id,
+        DocNumber: invoice.DocNumber,
+        TotalAmt: invoice.TotalAmt,
+        Balance: invoice.Balance,
+        CustomerRef: invoice.CustomerRef,
+        TxnDate: invoice.TxnDate,
+        SyncToken: invoice.SyncToken,
+        Lines: lineItems
+      }
+    };
+    
+  } catch (error: any) {
+    console.error("[QuickBooks Debug] Error:", error);
+    return { success: false, error: error.message || "Failed to get invoice" };
+  }
+}
+
+/**
+ * Resync an existing invoice to QuickBooks with correct ItemRefs
+ * This updates the invoice in QuickBooks to use the correct Items for P&L routing
+ */
+export async function resyncInvoiceToQuickBooks(crmInvoiceId: string): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+}> {
+  try {
+    const conn = await getActiveConnection();
+    if (!conn) {
+      return { success: false, error: "No active QuickBooks connection" };
+    }
+    
+    // Get the sync record
+    const [syncRecord] = await db.select()
+      .from(quickbooksInvoiceSync)
+      .where(eq(quickbooksInvoiceSync.crmInvoiceId, crmInvoiceId))
+      .limit(1);
+    
+    if (!syncRecord?.quickbooksInvoiceId) {
+      return { success: false, error: "Invoice not synced to QuickBooks yet" };
+    }
+    
+    // Get the CRM invoice with line items
+    const [invoice] = await db.select()
+      .from(crmInvoices)
+      .where(eq(crmInvoices.id, crmInvoiceId))
+      .limit(1);
+    
+    if (!invoice) {
+      return { success: false, error: "CRM Invoice not found" };
+    }
+    
+    // Get all items for lookup
+    const allItems = await db.select()
+      .from(quickbooksItems)
+      .where(and(
+        eq(quickbooksItems.realmId, conn.realmId),
+        eq(quickbooksItems.isActive, true)
+      ));
+    
+    // Build item lookup
+    const itemLookup = new Map<string, string>();
+    for (const qbItem of allItems) {
+      if (qbItem.quickbooksItemId && qbItem.categoryType && qbItem.propertyType) {
+        const normalizedProperty = qbItem.propertyType.charAt(0).toUpperCase() + qbItem.propertyType.slice(1).toLowerCase();
+        const key = `${qbItem.categoryType}:${normalizedProperty}`;
+        itemLookup.set(key, qbItem.quickbooksItemId);
+      }
+    }
+    
+    console.log(`[QuickBooks Resync] Item lookup: ${Array.from(itemLookup.entries()).map(([k, v]) => `${k}=${v}`).join(", ")}`);
+    
+    // Get current invoice from QuickBooks
+    const qbo = getQuickBooksClient(conn);
+    
+    const existingInvoice = await new Promise<any>((resolve, reject) => {
+      // @ts-ignore
+      qbo.getInvoice(syncRecord.quickbooksInvoiceId, (err: any, inv: any) => {
+        if (err) reject(err);
+        else resolve(inv);
+      });
+    });
+    
+    console.log(`[QuickBooks Resync] Existing invoice lines:`, JSON.stringify(existingInvoice.Line, null, 2));
+    
+    // Get CRM items for category lookup
+    const allCrmItems = await db.select().from(crmItems);
+    const crmItemsById = new Map<string, typeof allCrmItems[0]>();
+    for (const item of allCrmItems) {
+      crmItemsById.set(item.id, item);
+    }
+    
+    // Get property type from invoice or work order
+    let propertyType: "Residential" | "Commercial" = "Residential";
+    if (invoice.propertyId) {
+      const [property] = await db.select()
+        .from(crmProperties)
+        .where(eq(crmProperties.id, invoice.propertyId))
+        .limit(1);
+      if (property?.propertyType) {
+        propertyType = property.propertyType === "commercial" ? "Commercial" : "Residential";
+      }
+    } else if (invoice.workOrderId) {
+      const [workOrder] = await db.select()
+        .from(crmWorkOrders)
+        .where(eq(crmWorkOrders.id, invoice.workOrderId))
+        .limit(1);
+      if (workOrder?.propertyId) {
+        const [property] = await db.select()
+          .from(crmProperties)
+          .where(eq(crmProperties.id, workOrder.propertyId))
+          .limit(1);
+        if (property?.propertyType) {
+          propertyType = property.propertyType === "commercial" ? "Commercial" : "Residential";
+        }
+      }
+    }
+    
+    // Get line items from CRM invoice
+    const lineItemsData = await db.select()
+      .from(crmInvoiceLineItems)
+      .where(eq(crmInvoiceLineItems.invoiceId, crmInvoiceId));
+    
+    // Build updated line items with correct ItemRef
+    const updatedLines: any[] = [];
+    
+    for (let i = 0; i < existingInvoice.Line.length; i++) {
+      const existingLine = existingInvoice.Line[i];
+      
+      // Skip SubTotalLine
+      if (existingLine.DetailType === "SubTotalLineDetail") {
+        updatedLines.push(existingLine);
+        continue;
+      }
+      
+      // Find corresponding CRM line item
+      const crmLineItem = lineItemsData[i] || lineItemsData[0];
+      
+      if (existingLine.DetailType === "SalesItemLineDetail") {
+        // Determine category type from CRM item
+        let categoryType: string | null = null;
+        if (crmLineItem?.itemId) {
+          const crmItem = crmItemsById.get(crmLineItem.itemId);
+          if (crmItem?.category) {
+            categoryType = crmItem.category.charAt(0).toUpperCase() + crmItem.category.slice(1).toLowerCase();
+            if (categoryType === "Service") categoryType = "Service";
+            else if (categoryType === "Install") categoryType = "Install";
+            else if (categoryType === "Maintenance") categoryType = "Maintenance";
+            else if (categoryType === "Discount") categoryType = "Discount";
+          }
+        }
+        
+        // Default to Service if not determined
+        if (!categoryType) categoryType = "Service";
+        
+        // Look up the correct QuickBooks Item
+        const lookupKey = `${categoryType}:${propertyType}`;
+        const qbItemId = itemLookup.get(lookupKey);
+        
+        console.log(`[QuickBooks Resync] Line ${i}: category=${categoryType}, property=${propertyType}, lookup=${lookupKey}, itemId=${qbItemId}`);
+        
+        const updatedLine = {
+          ...existingLine,
+          SalesItemLineDetail: {
+            ...existingLine.SalesItemLineDetail,
+            ItemRef: qbItemId ? { value: qbItemId } : existingLine.SalesItemLineDetail?.ItemRef
+          }
+        };
+        
+        updatedLines.push(updatedLine);
+      } else {
+        updatedLines.push(existingLine);
+      }
+    }
+    
+    // Update the invoice in QuickBooks
+    const updatedInvoice = {
+      Id: existingInvoice.Id,
+      SyncToken: existingInvoice.SyncToken,
+      sparse: true,
+      Line: updatedLines
+    };
+    
+    console.log(`[QuickBooks Resync] Updating invoice with lines:`, JSON.stringify(updatedLines.map(l => ({
+      Amount: l.Amount,
+      ItemRef: l.SalesItemLineDetail?.ItemRef
+    })), null, 2));
+    
+    const result = await new Promise<any>((resolve, reject) => {
+      // @ts-ignore
+      qbo.updateInvoice(updatedInvoice, (err: any, inv: any) => {
+        if (err) reject(err);
+        else resolve(inv);
+      });
+    });
+    
+    // Update sync record
+    await db.update(quickbooksInvoiceSync)
+      .set({
+        lastSyncedAt: new Date()
+      })
+      .where(eq(quickbooksInvoiceSync.id, syncRecord.id));
+    
+    console.log(`[QuickBooks Resync] Successfully updated invoice ${result.DocNumber} (QB ID: ${result.Id})`);
+    
+    return { 
+      success: true, 
+      message: `Updated invoice ${result.DocNumber} with correct ItemRefs for P&L routing`
+    };
+    
+  } catch (error: any) {
+    console.error("[QuickBooks Resync] Error:", error);
+    return { success: false, error: error.message || "Resync failed" };
+  }
+}
