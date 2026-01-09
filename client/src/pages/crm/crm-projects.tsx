@@ -99,14 +99,14 @@ type CustomersResponse = {
 
 const ITEMS_PER_PAGE = 25;
 
-type FilterTab = "all" | "lead" | "approved" | "equipment_ordered" | "equipment_arrived" | "in_progress" | "completed" | "closed" | "cancelled";
+type FilterTab = "all" | "lead" | "equipment_ordered" | "equipment_arrived" | "approved" | "in_progress" | "completed" | "closed" | "cancelled";
 
 const filterTabConfig: Record<FilterTab, { label: string }> = {
   all: { label: "All Projects" },
   lead: { label: "New / Needs Scheduling" },
-  approved: { label: "Scheduled" },
   equipment_ordered: { label: "Equipment Ordered" },
   equipment_arrived: { label: "Equipment Arrived" },
+  approved: { label: "Scheduled" },
   in_progress: { label: "In Progress" },
   completed: { label: "Completed" },
   closed: { label: "Closed" },
