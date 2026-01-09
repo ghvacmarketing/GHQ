@@ -1975,14 +1975,19 @@ export async function deleteInvoiceFromQuickBooks(invoiceId: string): Promise<{ 
  */
 export async function autoDeleteInvoice(invoiceId: string, qbInvoiceId?: string, realmId?: string): Promise<void> {
   try {
-    const conn = await getActiveConnection();
-    if (!conn) {
-      console.log(`[QuickBooks Auto] No active connection, skipping delete for invoice ${invoiceId}`);
-      return;
-    }
-    
     // If we have pre-captured QB info, use the direct delete function
+    // This path is used when CRM invoice is already deleted (sync record gone via cascade)
     if (qbInvoiceId && realmId) {
+      const conn = await getActiveConnection();
+      if (!conn) {
+        console.warn(`[QuickBooks Auto] WARNING: No active connection - cannot delete invoice ${invoiceId} (QB ID: ${qbInvoiceId}) from QuickBooks. Invoice will remain in QuickBooks!`);
+        return;
+      }
+      if (conn.realmId !== realmId) {
+        console.warn(`[QuickBooks Auto] WARNING: Active realm ${conn.realmId} doesn't match invoice realm ${realmId} - cannot delete invoice ${invoiceId} from QuickBooks!`);
+        return;
+      }
+      
       deleteInvoiceFromQuickBooksDirect(qbInvoiceId, realmId, invoiceId).then(result => {
         if (result.success) {
           console.log(`[QuickBooks Auto] Invoice ${invoiceId} (QB ID: ${qbInvoiceId}) deleted/voided from QuickBooks`);
