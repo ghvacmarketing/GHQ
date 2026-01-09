@@ -142,6 +142,10 @@ const queueStageLabels: Record<DispatchQueueStage, string> = {
   NeedsApproval: "Needs Approval",
   OnHold: "On Hold",
   CallbackPriority: "Callback/Priority",
+  PartsNeeded: "Parts Needed",
+  PartsOrdered: "Parts Ordered",
+  PartsArrived: "Parts Arrived",
+  Scheduled: "Scheduled",
 };
 
 const queueStageColors: Record<DispatchQueueStage, { bg: string; border: string; text: string; badge: string }> = {
@@ -151,6 +155,10 @@ const queueStageColors: Record<DispatchQueueStage, { bg: string; border: string;
   NeedsApproval: { bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-700", badge: "bg-purple-500" },
   OnHold: { bg: "bg-gray-50", border: "border-gray-300", text: "text-gray-700", badge: "bg-gray-500" },
   CallbackPriority: { bg: "bg-red-50", border: "border-red-200", text: "text-red-700", badge: "bg-red-500" },
+  PartsNeeded: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700", badge: "bg-orange-500" },
+  PartsOrdered: { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700", badge: "bg-yellow-500" },
+  PartsArrived: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700", badge: "bg-green-500" },
+  Scheduled: { bg: "bg-cyan-50", border: "border-cyan-200", text: "text-cyan-700", badge: "bg-cyan-500" },
 };
 
 import {
@@ -1246,11 +1254,20 @@ function UnassignedQueueSection({
       NeedsApproval: [],
       OnHold: [],
       CallbackPriority: [],
+      PartsNeeded: [],
+      PartsOrdered: [],
+      PartsArrived: [],
+      Scheduled: [],
     };
     
     filteredWorkOrders.forEach(wo => {
       const stage = getEffectiveQueueStage(wo);
-      groups[stage].push(wo);
+      if (groups[stage]) {
+        groups[stage].push(wo);
+      } else {
+        // Fallback to NeedsScheduling if stage is unknown
+        groups.NeedsScheduling.push(wo);
+      }
     });
     
     return groups;
@@ -1258,9 +1275,13 @@ function UnassignedQueueSection({
 
   const stageOrder: DispatchQueueStage[] = [
     "CallbackPriority",
+    "PartsNeeded",
     "ReadyToDispatch",
     "NeedsScheduling",
     "WaitingOnParts",
+    "PartsOrdered",
+    "PartsArrived",
+    "Scheduled",
     "NeedsApproval",
     "OnHold",
   ];
