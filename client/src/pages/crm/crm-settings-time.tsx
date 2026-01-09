@@ -190,7 +190,7 @@ export default function CrmSettingsTime() {
 
   if (!currentUser) return null;
 
-  const isAdmin = currentUser.role === "owner" || currentUser.role === "admin";
+  const isAdmin = currentUser.role === "owner" || currentUser.role === "admin" || currentUser.role === "supervisor";
   if (!isAdmin) {
     return (
       <CrmLayout currentUser={currentUser}>

@@ -125,7 +125,7 @@ export default function CrmSettings() {
     return null;
   }
 
-  const isAdmin = currentUser.role === "owner" || currentUser.role === "admin";
+  const isAdmin = currentUser.role === "owner" || currentUser.role === "admin" || currentUser.role === "supervisor";
   const canViewSettings = isAdmin || currentUser.role === "sales";
 
   if (!canViewSettings) {

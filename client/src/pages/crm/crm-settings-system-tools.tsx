@@ -113,7 +113,7 @@ export default function CrmSettingsSystemTools() {
         setIsLoadingSmsToggle(false);
       }
     };
-    if (currentUser && (currentUser.role === "owner" || currentUser.role === "admin")) {
+    if (currentUser && (currentUser.role === "owner" || currentUser.role === "admin" || currentUser.role === "supervisor")) {
       fetchSmsToggle();
     }
   }, [currentUser]);
@@ -269,7 +269,7 @@ export default function CrmSettingsSystemTools() {
     return null;
   }
 
-  const isAdmin = currentUser.role === "owner" || currentUser.role === "admin";
+  const isAdmin = currentUser.role === "owner" || currentUser.role === "admin" || currentUser.role === "supervisor";
 
   if (!isAdmin) {
     return (

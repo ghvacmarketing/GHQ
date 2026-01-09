@@ -130,7 +130,7 @@ export default function CrmSettingsPayments() {
     return null;
   }
 
-  const isAdmin = currentUser.role === "owner" || currentUser.role === "admin";
+  const isAdmin = currentUser.role === "owner" || currentUser.role === "admin" || currentUser.role === "supervisor";
   if (!isAdmin) {
     return (
       <CrmLayout currentUser={currentUser}>

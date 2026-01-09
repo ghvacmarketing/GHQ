@@ -463,7 +463,7 @@ export default function CrmSettingsQuickBooks() {
     return null;
   }
 
-  const isAdmin = currentUser.role === "owner" || currentUser.role === "admin";
+  const isAdmin = currentUser.role === "owner" || currentUser.role === "admin" || currentUser.role === "supervisor";
 
   if (!isAdmin) {
     return (
