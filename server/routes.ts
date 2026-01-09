@@ -13048,16 +13048,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DELETE /api/crm/projects/:projectId/activities/:activityId - Delete activity
   app.delete("/api/crm/projects/:projectId/activities/:activityId", requireCrmAuth, async (req, res) => {
     try {
-      const { activityId } = req.params;
+      const { projectId, activityId } = req.params;
 
       const [existing] = await db.select().from(projectActivities).where(eq(projectActivities.id, activityId));
       if (!existing) {
         return res.status(404).json({ message: "Activity not found" });
       }
 
+      // If deleting an equipment_status activity, revert project to "lead" status
+      if (existing.activityType === "equipment_status") {
+        console.log(`[DeleteActivity] Deleting equipment_status activity, reverting project ${projectId} to lead status`);
+        await db.update(crmProjects)
+          .set({ 
+            status: "lead",
+            updatedAt: new Date()
+          })
+          .where(eq(crmProjects.id, projectId));
+      }
+
       await db.delete(projectActivities).where(eq(projectActivities.id, activityId));
 
-      return res.json({ message: "Activity deleted successfully" });
+      return res.json({ 
+        message: "Activity deleted successfully",
+        revertedStatus: existing.activityType === "equipment_status" ? "lead" : null
+      });
     } catch (error) {
       console.error("Error deleting project activity:", error);
       return res.status(500).json({ message: "Failed to delete project activity" });

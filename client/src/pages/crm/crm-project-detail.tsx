@@ -1790,6 +1790,20 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
     },
   });
 
+  const deleteActivityMutation = useMutation({
+    mutationFn: async (activityId: string) => {
+      return apiRequest("DELETE", `/api/crm/projects/${projectId}/activities/${activityId}`);
+    },
+    onSuccess: (_, activityId) => {
+      toast({ title: "Activity deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "activities"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId] });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete activity", variant: "destructive" });
+    },
+  });
+
   const handleSubmitActivity = async () => {
     setIsUploading(true);
     try {
@@ -2481,6 +2495,7 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
                     activity={activity}
                     onTogglePin={(isPinned) => togglePinMutation.mutate({ activityId: activity.id, isPinned })}
                     onNavigateToWorkOrder={(woId) => navigate(`/crm/work-orders/${woId}`)}
+                    onDelete={() => deleteActivityMutation.mutate(activity.id)}
                   />
                 ))}
               </div>
@@ -2514,6 +2529,7 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
                         activity={activity}
                         onTogglePin={(isPinned) => togglePinMutation.mutate({ activityId: activity.id, isPinned })}
                         onNavigateToWorkOrder={(woId) => navigate(`/crm/work-orders/${woId}`)}
+                        onDelete={() => deleteActivityMutation.mutate(activity.id)}
                       />
                     ))}
                   </div>
@@ -2604,10 +2620,12 @@ function ActivityCard({
   activity,
   onTogglePin,
   onNavigateToWorkOrder,
+  onDelete,
 }: {
   activity: ProjectActivityWithMeta;
   onTogglePin: (isPinned: boolean) => void;
   onNavigateToWorkOrder: (woId: string) => void;
+  onDelete: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -2912,15 +2930,26 @@ function ActivityCard({
               )}
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onTogglePin(!activity.isPinned)}
-            className={activity.isPinned ? "text-amber-600" : "text-muted-foreground"}
-            data-testid={`button-toggle-pin-${activity.id}`}
-          >
-            {activity.isPinned ? <Pin className="w-4 h-4" /> : <PinOff className="w-4 h-4" />}
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onTogglePin(!activity.isPinned)}
+              className={activity.isPinned ? "text-amber-600" : "text-muted-foreground"}
+              data-testid={`button-toggle-pin-${activity.id}`}
+            >
+              {activity.isPinned ? <Pin className="w-4 h-4" /> : <PinOff className="w-4 h-4" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDelete}
+              className="text-muted-foreground hover:text-red-600"
+              data-testid={`button-delete-activity-${activity.id}`}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
         {renderTypeSpecificContent()}
       </div>
