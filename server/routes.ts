@@ -10567,11 +10567,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerId: true,
         propertyId: true,
         dispatchNotes: true,
+        isPending: true,
+        pendingReason: true,
       }).extend({
         scheduledStart: z.union([z.string(), z.date(), z.null()]).optional(),
         scheduledEnd: z.union([z.string(), z.date(), z.null()]).optional(),
         startedAt: z.union([z.string(), z.date(), z.null()]).optional(),
         completedAt: z.union([z.string(), z.date(), z.null()]).optional(),
+        pendingStartedAt: z.union([z.string(), z.date(), z.null()]).optional(),
         updateProjectCustomer: z.boolean().optional(),
       });
 
@@ -10584,7 +10587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, completionSummary, checklist, partsUsed, startedAt, completedAt, projectId, agreementId, title, description, priority, visitType, workSubtype, dispatchQueueStage, customerId, propertyId, updateProjectCustomer, dispatchNotes } = result.data;
+      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, completionSummary, checklist, partsUsed, startedAt, completedAt, projectId, agreementId, title, description, priority, visitType, workSubtype, dispatchQueueStage, customerId, propertyId, updateProjectCustomer, dispatchNotes, isPending, pendingReason, pendingStartedAt } = result.data;
 
       // If projectId is provided (not null), verify it exists
       if (projectId !== undefined && projectId !== null) {
@@ -10678,6 +10681,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (customerId !== undefined) updateData.customerId = customerId;
       if (propertyId !== undefined) updateData.propertyId = propertyId;
       if (dispatchNotes !== undefined) updateData.dispatchNotes = dispatchNotes;
+      if (isPending !== undefined) updateData.isPending = isPending;
+      if (pendingReason !== undefined) updateData.pendingReason = pendingReason;
+      if (pendingStartedAt !== undefined) {
+        updateData.pendingStartedAt = pendingStartedAt ? new Date(pendingStartedAt as string) : null;
+      }
 
       // If customer is being changed and there's a linked project, update project too
       if (customerId !== undefined && customerId !== existingWorkOrder.customerId && updateProjectCustomer) {
