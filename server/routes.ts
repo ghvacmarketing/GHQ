@@ -285,6 +285,11 @@ async function createFollowUpWorkOrder(
 
   console.log(`[createFollowUpWorkOrder] Creating follow-up WO #${nextNumber} for quote ${quote.id}, stage: ${options.dispatchQueueStage}`);
 
+  // For PartsNeeded stage, use specific subtype; otherwise inherit from parent or use default
+  const workSubtype = options.dispatchQueueStage === "PartsNeeded" 
+    ? "Service Call: Part Replacement" 
+    : parentWorkOrder.workSubtype || "Other";
+
   const [newWorkOrder] = await db.insert(crmWorkOrders).values({
     customerId: parentWorkOrder.customerId,
     propertyId: parentWorkOrder.propertyId,
@@ -293,7 +298,7 @@ async function createFollowUpWorkOrder(
     workOrderNumber: nextNumber,
     assignedTechId: options.assignedTechId || null,
     visitType: "SERVICE",
-    workSubtype: "Other",
+    workSubtype,
     title: `Follow-up: ${quote.title || quote.quoteNumber}`,
     description: quote.description || `Follow-up work order for accepted quote ${quote.quoteNumber}`,
     status: "scheduled",
