@@ -11231,7 +11231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             tech = t || null;
           }
 
-          return {
+          const enrichedWo = {
             ...wo,
             job,
             customer,
@@ -11239,6 +11239,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             project,
             tech,
           };
+          // Debug: log isPending status for work orders that are pending
+          if (wo.isPending) {
+            console.log(`[Dispatch] Work order ${wo.id} isPending: ${wo.isPending}`);
+          }
+          return enrichedWo;
         })
       );
 
