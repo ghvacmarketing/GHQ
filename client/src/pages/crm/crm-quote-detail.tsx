@@ -215,6 +215,15 @@ export default function CrmQuoteDetail() {
   const [showAddLineItemDialog, setShowAddLineItemDialog] = useState(false);
   const [newLineItemData, setNewLineItemData] = useState<{ description: string; quantity: string; unitPrice: string }>({ description: "", quantity: "1", unitPrice: "" });
 
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+  const [followUpContext, setFollowUpContext] = useState<{
+    customerId: string;
+    propertyId: string | null;
+    projectId: string | null;
+    quoteId: string;
+    quoteTitle: string;
+  } | null>(null);
+
   const [showCreateProjectPrompt, setShowCreateProjectPrompt] = useState(false);
   const [showCreateProjectForm, setShowCreateProjectForm] = useState(false);
   const [projectFormData, setProjectFormData] = useState({
@@ -748,7 +757,7 @@ export default function CrmQuoteDetail() {
       }
       return result;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId, "email-logs"] });
@@ -759,6 +768,11 @@ export default function CrmQuoteDetail() {
       setPresentationAgreed(false);
       setPresentationSelectedOption(null);
       toast({ title: "Quote accepted!", description: "The client has accepted the quote in person." });
+
+      if (data.requiresFollowUpChoice && data.followUpContext) {
+        setFollowUpContext(data.followUpContext);
+        setShowFollowUpModal(true);
+      }
 
       const quoteType = quote?.quoteType?.toLowerCase();
       if (quoteType === "custom_install" || quoteType === "proposal") {
@@ -876,13 +890,18 @@ export default function CrmQuoteDetail() {
       }
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       setShowAcceptOptionSelection(false);
       setSelectedOption("");
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Quote accepted", description: "Quote status updated to accepted." });
+
+      if (data.requiresFollowUpChoice && data.followUpContext) {
+        setFollowUpContext(data.followUpContext);
+        setShowFollowUpModal(true);
+      }
 
       const quoteType = quote?.quoteType?.toLowerCase();
       if (quoteType === "custom_install" || quoteType === "proposal") {
@@ -906,6 +925,46 @@ export default function CrmQuoteDetail() {
         return;
       }
       toast({ title: "Failed to accept quote", description: (error as Error).message || "Unknown error", variant: "destructive" });
+    },
+  });
+
+  const createFollowUpMutation = useMutation({
+    mutationFn: async (mode: "parts_needed" | "schedule_now") => {
+      const res = await fetch(`/api/crm/quotes/${quoteId}/create-follow-up-work-order`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ mode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to create follow-up work order");
+      return data;
+    },
+    onSuccess: (data) => {
+      setShowFollowUpModal(false);
+      setFollowUpContext(null);
+      if (data.mode === "parts_needed" && data.workOrder) {
+        toast({
+          title: "Work Order Created",
+          description: `Follow-up work order #${data.workOrder.workOrderNumber} has been added to the Parts Needed queue.`,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
+      } else if (data.mode === "schedule_now" && data.context) {
+        const params = new URLSearchParams({
+          createWO: "true",
+          customerId: data.context.customerId || "",
+          propertyId: data.context.propertyId || "",
+          projectId: data.context.projectId || "",
+          sourceQuoteId: data.context.sourceQuoteId || "",
+          title: data.context.suggestedTitle || "",
+          description: data.context.suggestedDescription || "",
+        });
+        navigate(`/crm/dispatch?${params.toString()}`);
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -3860,6 +3919,50 @@ export default function CrmQuoteDetail() {
                   Create Project
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showFollowUpModal} onOpenChange={setShowFollowUpModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create Follow-up Work Order?</DialogTitle>
+            <DialogDescription>
+              This quote was accepted while the technician was working. Would you like to create a follow-up work order?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 py-4">
+            <Button
+              onClick={() => createFollowUpMutation.mutate("parts_needed")}
+              disabled={createFollowUpMutation.isPending}
+              className="w-full justify-start gap-2 h-auto py-4 px-4"
+              variant="outline"
+            >
+              <div className="flex flex-col items-start text-left">
+                <span className="font-semibold">Parts Needed</span>
+                <span className="text-sm text-muted-foreground font-normal">
+                  Create urgent work order in the Parts Needed queue
+                </span>
+              </div>
+            </Button>
+            <Button
+              onClick={() => createFollowUpMutation.mutate("schedule_now")}
+              disabled={createFollowUpMutation.isPending}
+              className="w-full justify-start gap-2 h-auto py-4 px-4"
+              variant="outline"
+            >
+              <div className="flex flex-col items-start text-left">
+                <span className="font-semibold">Schedule Now</span>
+                <span className="text-sm text-muted-foreground font-normal">
+                  Open work order form to schedule immediately
+                </span>
+              </div>
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowFollowUpModal(false)}>
+              Skip for now
             </Button>
           </DialogFooter>
         </DialogContent>
