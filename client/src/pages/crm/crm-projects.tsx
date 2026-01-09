@@ -57,7 +57,7 @@ import {
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, isWithinInterval, addDays, isBefore, isAfter, startOfDay } from "date-fns";
 import type { CrmUser, CrmProject, CrmProperty } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
@@ -501,6 +501,104 @@ export default function CrmProjects() {
                   );
                 })}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Upcoming Milestones & Deadlines */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Upcoming Milestones & Deadlines</CardTitle>
+              <CardDescription>Projects with start or end dates in the next 14 days</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {projectsLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : (() => {
+                const today = startOfDay(new Date());
+                const twoWeeksOut = addDays(today, 14);
+                
+                const upcomingMilestones: Array<{
+                  project: ProjectWithDetails;
+                  milestoneType: "start" | "end";
+                  date: Date;
+                }> = [];
+                
+                projects.forEach(project => {
+                  if (project.startDate) {
+                    const startDate = startOfDay(new Date(project.startDate));
+                    if (!isBefore(startDate, today) && !isAfter(startDate, twoWeeksOut)) {
+                      upcomingMilestones.push({ project, milestoneType: "start", date: startDate });
+                    }
+                  }
+                  if (project.endDate) {
+                    const endDate = startOfDay(new Date(project.endDate));
+                    if (!isBefore(endDate, today) && !isAfter(endDate, twoWeeksOut)) {
+                      upcomingMilestones.push({ project, milestoneType: "end", date: endDate });
+                    }
+                  }
+                });
+                
+                upcomingMilestones.sort((a, b) => a.date.getTime() - b.date.getTime());
+                
+                if (upcomingMilestones.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Calendar className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                      <p>No upcoming milestones in the next 14 days</p>
+                      <p className="text-sm mt-1">Set start/end dates on projects to see them here</p>
+                    </div>
+                  );
+                }
+                
+                return (
+                  <div className="space-y-3">
+                    {upcomingMilestones.slice(0, 10).map((milestone, idx) => {
+                      const statusStyle = statusColors[milestone.project.status] || statusColors.lead;
+                      const daysAway = Math.ceil((milestone.date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                      
+                      return (
+                        <button
+                          key={`${milestone.project.id}-${milestone.milestoneType}-${idx}`}
+                          onClick={() => navigate(`/crm/projects/${milestone.project.id}`)}
+                          className="w-full text-left p-4 rounded-lg border hover:bg-muted/50 transition-colors flex items-center justify-between gap-4"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium truncate">{milestone.project.title}</span>
+                              <Badge className={cn("text-xs", statusStyle.bg, statusStyle.text, statusStyle.border)}>
+                                {statusLabels[milestone.project.status] || milestone.project.status}
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {milestone.project.customerName || "No customer"}
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className={cn(
+                              "text-sm font-medium",
+                              milestone.milestoneType === "end" ? "text-orange-600" : "text-blue-600"
+                            )}>
+                              {milestone.milestoneType === "start" ? "Starts" : "Ends"} {format(milestone.date, "MMM d")}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {daysAway === 0 ? "Today" : daysAway === 1 ? "Tomorrow" : `In ${daysAway} days`}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                    {upcomingMilestones.length > 10 && (
+                      <p className="text-sm text-center text-muted-foreground pt-2">
+                        +{upcomingMilestones.length - 10} more milestones
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </TabsContent>
