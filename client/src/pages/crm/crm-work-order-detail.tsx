@@ -331,6 +331,11 @@ export default function CrmWorkOrderDetail() {
   const [quoteTitle, setQuoteTitle] = useState("");
   const [quoteDescription, setQuoteDescription] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  
+  // Timeline editing state
+  const [editingTimestamp, setEditingTimestamp] = useState<"dispatchedAt" | "enRouteAt" | "onSiteAt" | "completedAt" | null>(null);
+  const [editDate, setEditDate] = useState<Date | undefined>(undefined);
+  const [editTime, setEditTime] = useState<string>("");
 
   const [quoteSearch, setQuoteSearch] = useState("");
   const [quoteStatusFilter, setQuoteStatusFilter] = useState("all");
@@ -665,6 +670,33 @@ export default function CrmWorkOrderDetail() {
     if (quoteTitle.trim()) {
       createQuoteMutation.mutate();
     }
+  };
+
+  const openTimestampEdit = (field: "dispatchedAt" | "enRouteAt" | "onSiteAt" | "completedAt", currentValue: string | Date | null) => {
+    if (currentValue) {
+      const date = new Date(currentValue);
+      setEditDate(date);
+      setEditTime(format(date, "HH:mm"));
+    } else {
+      setEditDate(new Date());
+      setEditTime(format(new Date(), "HH:mm"));
+    }
+    setEditingTimestamp(field);
+  };
+
+  const handleSaveTimestamp = () => {
+    if (!editingTimestamp || !editDate || !editTime) return;
+    
+    const [hours, minutes] = editTime.split(":").map(Number);
+    const newDate = new Date(editDate);
+    newDate.setHours(hours, minutes, 0, 0);
+    
+    updateWorkOrderMutation.mutate({
+      updates: { [editingTimestamp]: newDate }
+    });
+    setEditingTimestamp(null);
+    setEditDate(undefined);
+    setEditTime("");
   };
 
   const handleUpdateStatus = () => {
@@ -2096,9 +2128,13 @@ export default function CrmWorkOrderDetail() {
                           <p className="font-medium text-sm text-slate-900">Dispatched</p>
                           {workOrder.dispatchedAt && (
                             <>
-                              <p className="text-xs text-slate-500 mt-1">
+                              <button
+                                onClick={() => openTimestampEdit("dispatchedAt", workOrder.dispatchedAt)}
+                                className="text-xs text-slate-500 mt-1 hover:text-blue-600 hover:underline flex items-center gap-1 mx-auto"
+                              >
                                 {format(new Date(workOrder.dispatchedAt), "MMM d, h:mm a")}
-                              </p>
+                                <Pencil className="h-3 w-3" />
+                              </button>
                               {workOrder.enRouteAt && (
                                 <p className="text-xs text-emerald-600 mt-1">
                                   Duration: {formatDuration(new Date(workOrder.dispatchedAt), new Date(workOrder.enRouteAt))}
@@ -2120,9 +2156,13 @@ export default function CrmWorkOrderDetail() {
                           <p className="font-medium text-sm text-slate-900">Traveling</p>
                           {workOrder.enRouteAt && (
                             <>
-                              <p className="text-xs text-slate-500 mt-1">
+                              <button
+                                onClick={() => openTimestampEdit("enRouteAt", workOrder.enRouteAt)}
+                                className="text-xs text-slate-500 mt-1 hover:text-blue-600 hover:underline flex items-center gap-1 mx-auto"
+                              >
                                 {format(new Date(workOrder.enRouteAt), "MMM d, h:mm a")}
-                              </p>
+                                <Pencil className="h-3 w-3" />
+                              </button>
                               {workOrder.onSiteAt && (
                                 <p className="text-xs text-emerald-600 mt-1">
                                   Duration: {formatDuration(new Date(workOrder.enRouteAt), new Date(workOrder.onSiteAt))}
@@ -2144,9 +2184,13 @@ export default function CrmWorkOrderDetail() {
                           <p className="font-medium text-sm text-slate-900">Working</p>
                           {workOrder.onSiteAt && (
                             <>
-                              <p className="text-xs text-slate-500 mt-1">
+                              <button
+                                onClick={() => openTimestampEdit("onSiteAt", workOrder.onSiteAt)}
+                                className="text-xs text-slate-500 mt-1 hover:text-blue-600 hover:underline flex items-center gap-1 mx-auto"
+                              >
                                 {format(new Date(workOrder.onSiteAt), "MMM d, h:mm a")}
-                              </p>
+                                <Pencil className="h-3 w-3" />
+                              </button>
                               {workOrder.completedAt && (
                                 <p className="text-xs text-emerald-600 mt-1">
                                   Duration: {formatDuration(new Date(workOrder.onSiteAt), new Date(workOrder.completedAt))}
@@ -2167,9 +2211,13 @@ export default function CrmWorkOrderDetail() {
                         <div className="mt-3">
                           <p className="font-medium text-sm text-slate-900">Completed</p>
                           {workOrder.completedAt && (
-                            <p className="text-xs text-slate-500 mt-1">
+                            <button
+                              onClick={() => openTimestampEdit("completedAt", workOrder.completedAt)}
+                              className="text-xs text-slate-500 mt-1 hover:text-blue-600 hover:underline flex items-center gap-1 mx-auto"
+                            >
                               {format(new Date(workOrder.completedAt), "MMM d, h:mm a")}
-                            </p>
+                              <Pencil className="h-3 w-3" />
+                            </button>
                           )}
                         </div>
                       </div>
@@ -2303,6 +2351,59 @@ export default function CrmWorkOrderDetail() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <Dialog open={!!editingTimestamp} onOpenChange={(open) => !open && setEditingTimestamp(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Timestamp</DialogTitle>
+              <DialogDescription>
+                Adjust the {editingTimestamp === "dispatchedAt" ? "dispatched" : 
+                  editingTimestamp === "enRouteAt" ? "traveling" : 
+                  editingTimestamp === "onSiteAt" ? "working" : "completed"} time
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {editDate ? format(editDate, "PPP") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={editDate}
+                      onSelect={setEditDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2">
+                <Label>Time</Label>
+                <Input
+                  type="time"
+                  value={editTime}
+                  onChange={(e) => setEditTime(e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingTimestamp(null)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveTimestamp}
+                disabled={updateWorkOrderMutation.isPending || !editDate || !editTime}
+              >
+                {updateWorkOrderMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </CrmLayout>
   );
