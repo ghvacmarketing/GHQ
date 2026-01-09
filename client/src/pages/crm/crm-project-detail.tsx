@@ -260,6 +260,11 @@ export default function CrmProjectDetail() {
   const [checklistLoading, setChecklistLoading] = useState(false);
   const [maintenanceSubtypes, setMaintenanceSubtypes] = useState<string[]>(["Preventative Maintenance"]);
 
+  const [showEditScheduleDialog, setShowEditScheduleDialog] = useState(false);
+  const [editStartDate, setEditStartDate] = useState<Date | undefined>();
+  const [editEndDate, setEditEndDate] = useState<Date | undefined>();
+  const [editEquipmentInfo, setEditEquipmentInfo] = useState("");
+
   const timeOptions = (() => {
     const options: { value: string; label: string }[] = [];
     for (let hour = 8; hour <= 20; hour++) {
@@ -401,6 +406,14 @@ export default function CrmProjectDetail() {
         setChecklistLoading(false);
       });
   }, [woVisitType, woWorkSubtype, scheduleWODialogOpen]);
+
+  useEffect(() => {
+    if (showEditScheduleDialog && project) {
+      setEditStartDate(project.startDate ? new Date(project.startDate) : undefined);
+      setEditEndDate(project.endDate ? new Date(project.endDate) : undefined);
+      setEditEquipmentInfo(project.equipmentInfo || "");
+    }
+  }, [showEditScheduleDialog, project]);
 
   const generateLocalChecklistSummary = (): string => {
     if (checklistQuestions.length === 0) return "";
@@ -594,6 +607,26 @@ export default function CrmProjectDetail() {
     },
   });
 
+  const updateScheduleMutation = useMutation({
+    mutationFn: async (data: { startDate?: string | null; endDate?: string | null; equipmentInfo?: string | null }) => {
+      const updateData: Record<string, unknown> = { ...data };
+      if (data.equipmentInfo && !project?.equipmentInfo && 
+          (project?.status === "lead" || project?.status === "approved")) {
+        updateData.status = "equipment_ordered";
+      }
+      const res = await apiRequest("PATCH", `/api/crm/projects/${projectId}`, updateData);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Project updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId] });
+      setShowEditScheduleDialog(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to update project", variant: "destructive" });
+    },
+  });
+
   const totalQuoted = (quotes || [])
     .filter((q) => q.status === "accepted")
     .reduce((sum, q) => sum + parseFloat(q.total?.toString() || "0"), 0);
@@ -757,6 +790,68 @@ export default function CrmProjectDetail() {
           </AlertDialog>
         </div>
 
+        <Dialog open={showEditScheduleDialog} onOpenChange={setShowEditScheduleDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Schedule & Equipment</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Start Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {editStartDate ? format(editStartDate, "PPP") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarPicker mode="single" selected={editStartDate} onSelect={setEditStartDate} />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2">
+                <Label>End Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {editEndDate ? format(editEndDate, "PPP") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <CalendarPicker mode="single" selected={editEndDate} onSelect={setEditEndDate} />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2">
+                <Label>Equipment Information</Label>
+                <Textarea
+                  value={editEquipmentInfo}
+                  onChange={(e) => setEditEquipmentInfo(e.target.value)}
+                  placeholder="Enter equipment details, model numbers, specifications..."
+                  rows={4}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowEditScheduleDialog(false)}>Cancel</Button>
+              <Button 
+                onClick={() => {
+                  updateScheduleMutation.mutate({
+                    startDate: editStartDate ? editStartDate.toISOString() : null,
+                    endDate: editEndDate ? editEndDate.toISOString() : null,
+                    equipmentInfo: editEquipmentInfo || null,
+                  });
+                }}
+                disabled={updateScheduleMutation.isPending}
+              >
+                {updateScheduleMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap">
             <TabsTrigger 
@@ -859,6 +954,31 @@ export default function CrmProjectDetail() {
                   <div>
                     <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Closed</p>
                     <p className="text-sm text-slate-700">{formatDate(project.closedAt)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border shadow-sm">
+              <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                <CardTitle className="text-lg font-semibold">Project Schedule & Equipment</CardTitle>
+                <Button variant="outline" size="sm" onClick={() => setShowEditScheduleDialog(true)}>
+                  Edit
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Start Date</p>
+                    <p className="text-sm text-slate-700">{formatDate(project.startDate)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">End Date</p>
+                    <p className="text-sm text-slate-700">{formatDate(project.endDate)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Equipment Status</p>
+                    <p className="text-sm text-slate-700">{project.equipmentInfo || "Not specified"}</p>
                   </div>
                 </div>
               </CardContent>
