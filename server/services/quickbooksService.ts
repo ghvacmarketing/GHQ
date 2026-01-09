@@ -1969,26 +1969,123 @@ export async function deleteInvoiceFromQuickBooks(invoiceId: string): Promise<{ 
 
 /**
  * Auto delete invoice from QuickBooks (fire-and-forget)
+ * @param invoiceId - CRM invoice ID (for logging)
+ * @param qbInvoiceId - Optional: Pre-captured QuickBooks invoice ID (use when sync record already deleted)
+ * @param realmId - Optional: Pre-captured realm ID (use when sync record already deleted)
  */
-export async function autoDeleteInvoice(invoiceId: string): Promise<void> {
+export async function autoDeleteInvoice(invoiceId: string, qbInvoiceId?: string, realmId?: string): Promise<void> {
   try {
     const conn = await getActiveConnection();
     if (!conn) {
+      console.log(`[QuickBooks Auto] No active connection, skipping delete for invoice ${invoiceId}`);
       return;
     }
     
-    // Fire and forget
-    deleteInvoiceFromQuickBooks(invoiceId).then(result => {
-      if (result.success) {
-        console.log(`[QuickBooks Auto] Invoice ${invoiceId} deleted from QuickBooks`);
-      } else {
-        console.log(`[QuickBooks Auto] Invoice ${invoiceId} delete failed: ${result.error}`);
-      }
-    }).catch(err => {
-      console.error(`[QuickBooks Auto] Invoice ${invoiceId} delete error:`, err);
-    });
+    // If we have pre-captured QB info, use the direct delete function
+    if (qbInvoiceId && realmId) {
+      deleteInvoiceFromQuickBooksDirect(qbInvoiceId, realmId, invoiceId).then(result => {
+        if (result.success) {
+          console.log(`[QuickBooks Auto] Invoice ${invoiceId} (QB ID: ${qbInvoiceId}) deleted/voided from QuickBooks`);
+        } else {
+          console.log(`[QuickBooks Auto] Invoice ${invoiceId} delete failed: ${result.error}`);
+        }
+      }).catch(err => {
+        console.error(`[QuickBooks Auto] Invoice ${invoiceId} delete error:`, err);
+      });
+    } else {
+      // Fallback to old method (will likely fail if sync record is gone)
+      console.log(`[QuickBooks Auto] No pre-captured QB info for invoice ${invoiceId}, attempting lookup...`);
+      deleteInvoiceFromQuickBooks(invoiceId).then(result => {
+        if (result.success) {
+          console.log(`[QuickBooks Auto] Invoice ${invoiceId} deleted from QuickBooks`);
+        } else {
+          console.log(`[QuickBooks Auto] Invoice ${invoiceId} delete failed: ${result.error}`);
+        }
+      }).catch(err => {
+        console.error(`[QuickBooks Auto] Invoice ${invoiceId} delete error:`, err);
+      });
+    }
   } catch (error) {
     console.error("[QuickBooks Auto] Invoice delete trigger error:", error);
+  }
+}
+
+/**
+ * Delete invoice from QuickBooks using pre-captured IDs (no sync record lookup needed)
+ */
+async function deleteInvoiceFromQuickBooksDirect(qbInvoiceId: string, realmId: string, crmInvoiceId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const conn = await getActiveConnection();
+    if (!conn || conn.realmId !== realmId) {
+      console.log(`[QuickBooks] Connection realm ${conn?.realmId} doesn't match invoice realm ${realmId}`);
+      return { success: false, error: "Realm mismatch or no connection" };
+    }
+    
+    const qbo = getQuickBooksClient(conn);
+    
+    return new Promise((resolve) => {
+      // First get the invoice to get SyncToken
+      qbo.getInvoice(qbInvoiceId, async (err: any, invoice: any) => {
+        if (err) {
+          // If 404, invoice already deleted in QB
+          if (err.statusCode === 404 || err.message?.includes('not found')) {
+            console.log(`[QuickBooks] Invoice ${qbInvoiceId} already deleted in QuickBooks`);
+            resolve({ success: true });
+            return;
+          }
+          console.error(`[QuickBooks] Error fetching invoice ${qbInvoiceId}:`, err);
+          resolve({ success: false, error: err.message || "Failed to fetch invoice" });
+          return;
+        }
+        
+        // Try to delete the invoice first
+        const deleteInvoiceData = {
+          Id: invoice.Id,
+          SyncToken: invoice.SyncToken
+        };
+        
+        // @ts-ignore
+        qbo.deleteInvoice(deleteInvoiceData, async (deleteErr: any, deleted: any) => {
+          if (deleteErr) {
+            // If delete failed (likely due to linked payments), try to void instead
+            const hasLinkedTxn = invoice.LinkedTxn && invoice.LinkedTxn.length > 0;
+            const errorMessage = deleteErr?.Fault?.Error?.[0]?.Message || deleteErr.message || "";
+            
+            if (hasLinkedTxn || errorMessage.includes('linked') || errorMessage.includes('payment')) {
+              console.log(`[QuickBooks] Cannot delete invoice ${qbInvoiceId} (has linked transactions), voiding instead...`);
+              
+              const voidInvoiceData = {
+                Id: invoice.Id,
+                SyncToken: invoice.SyncToken,
+                sparse: true
+              };
+              
+              // @ts-ignore
+              qbo.voidInvoice(voidInvoiceData, async (voidErr: any, voided: any) => {
+                if (voidErr) {
+                  console.error(`[QuickBooks] Error voiding invoice ${qbInvoiceId}:`, voidErr);
+                  resolve({ success: false, error: voidErr.message || "Failed to void invoice" });
+                  return;
+                }
+                
+                console.log(`[QuickBooks] Voided invoice ${qbInvoiceId} (had linked payments/credits)`);
+                resolve({ success: true });
+              });
+            } else {
+              console.error(`[QuickBooks] Error deleting invoice ${qbInvoiceId}:`, deleteErr);
+              resolve({ success: false, error: errorMessage || "Failed to delete invoice" });
+            }
+            return;
+          }
+          
+          console.log(`[QuickBooks] Deleted invoice ${qbInvoiceId}`);
+          resolve({ success: true });
+        });
+      });
+    });
+  } catch (error: any) {
+    console.error("[QuickBooks] Delete invoice direct error:", error);
+    return { success: false, error: error.message || "Delete failed" };
   }
 }
 

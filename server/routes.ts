@@ -13518,10 +13518,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Delete from QuickBooks if synced (not void - actual delete)
-      autoDeleteInvoice(req.params.id);
+      // IMPORTANT: Capture QuickBooks sync info BEFORE deleting the CRM invoice
+      // The sync record will be CASCADE deleted when the CRM invoice is deleted
+      const [qbSyncRecord] = await db.select()
+        .from(quickbooksInvoiceSync)
+        .where(eq(quickbooksInvoiceSync.crmInvoiceId, req.params.id))
+        .limit(1);
       
+      const capturedQbInvoiceId = qbSyncRecord?.quickbooksInvoiceId;
+      const capturedRealmId = qbSyncRecord?.realmId;
+      
+      // Delete the CRM invoice (this will CASCADE delete the sync record)
       await db.delete(crmInvoices).where(eq(crmInvoices.id, req.params.id));
+      
+      // Now delete from QuickBooks using the captured ID (fire and forget)
+      if (capturedQbInvoiceId && capturedRealmId) {
+        autoDeleteInvoice(req.params.id, capturedQbInvoiceId, capturedRealmId);
+      }
       
       await logCrmAudit(
         user.id,
