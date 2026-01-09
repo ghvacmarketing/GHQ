@@ -951,6 +951,8 @@ export default function CrmQuoteDetail() {
         });
         queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
         queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
+        // Navigate to the unassigned work orders board (Parts Needed section)
+        navigate("/crm/work-orders");
       } else if (data.mode === "schedule_now" && data.context) {
         const params = new URLSearchParams({
           createWO: "true",
