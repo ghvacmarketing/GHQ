@@ -186,7 +186,7 @@ const invoiceStatusColors: Record<string, { bg: string; text: string; border: st
 const statusLabels: Record<string, string> = {
   scheduled: "Scheduled",
   dispatched: "Dispatched",
-  en_route: "En Route",
+  en_route: "Traveling",
   on_site: "On Site",
   completed: "Completed",
   cancelled: "Cancelled",
@@ -1285,7 +1285,14 @@ export default function CrmWorkOrderDetail() {
                               data-testid={`row-quote-${quote.id}`}
                               className="cursor-pointer hover:bg-slate-50"
                             >
-                              <TableCell className="font-medium">{quote.quoteNumber}</TableCell>
+                              <TableCell className="font-medium">
+                                <button
+                                  className="text-[#711419] hover:underline font-medium"
+                                  onClick={() => navigate(`/crm/quotes/${quote.id}`)}
+                                >
+                                  {quote.quoteNumber}
+                                </button>
+                              </TableCell>
                               <TableCell>{quote.title}</TableCell>
                               <TableCell>
                                 <Badge className={cn(
@@ -1430,7 +1437,14 @@ export default function CrmWorkOrderDetail() {
                           data-testid={`row-invoice-${invoice.id}`}
                           className="cursor-pointer hover:bg-slate-50"
                         >
-                          <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                          <TableCell className="font-medium">
+                            <button
+                              className="text-[#711419] hover:underline font-medium"
+                              onClick={() => navigate(`/crm/invoices/${invoice.id}`)}
+                            >
+                              {invoice.invoiceNumber}
+                            </button>
+                          </TableCell>
                           <TableCell>
                             <Badge className={cn(
                               "text-xs",

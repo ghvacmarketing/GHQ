@@ -36,7 +36,7 @@ const statusColors: Record<string, { bg: string; border: string; text: string; s
 const statusLabels: Record<string, string> = {
   scheduled: "Scheduled",
   dispatched: "Dispatched",
-  en_route: "En Route",
+  en_route: "Traveling",
   on_site: "On Site",
   completed: "Completed",
   cancelled: "Cancelled",

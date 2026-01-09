@@ -319,7 +319,7 @@ function getJobTypeColor(jobType: string | null | undefined): { bg: string; bord
 const statusLabels: Record<string, string> = {
   scheduled: "Scheduled",
   dispatched: "Dispatched",
-  en_route: "En Route",
+  en_route: "Traveling",
   on_site: "On Site",
   completed: "Completed",
   cancelled: "Cancelled",
@@ -2853,7 +2853,7 @@ export default function CrmDispatch() {
     all: "All",
     scheduled: "Scheduled",
     dispatched: "Dispatched",
-    en_route: "En Route",
+    en_route: "Traveling",
     on_site: "On Site",
     completed: "Completed"
   };
@@ -3013,7 +3013,7 @@ export default function CrmDispatch() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
-                        <span className="text-sm text-slate-700">En Route</span>
+                        <span className="text-sm text-slate-700">Traveling</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />

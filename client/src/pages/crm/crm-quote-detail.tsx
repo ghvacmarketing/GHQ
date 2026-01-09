@@ -158,6 +158,19 @@ export default function CrmQuoteDetail() {
   const [, params] = useRoute("/crm/quotes/:id");
   const quoteId = params?.id;
   const { toast } = useToast();
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const fromCustomer = searchParams.get("from") === "customer";
+  const customerIdParam = searchParams.get("customerId");
+  const tabParam = searchParams.get("tab");
+
+  const handleBack = () => {
+    if (fromCustomer && customerIdParam) {
+      navigate(`/crm/customers/${customerIdParam}?tab=${tabParam || "quotes"}`);
+    } else {
+      window.history.back();
+    }
+  };
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showOptionSelection, setShowOptionSelection] = useState(false);
   const [showAcceptOptionSelection, setShowAcceptOptionSelection] = useState(false);
@@ -1726,7 +1739,7 @@ export default function CrmQuoteDetail() {
         <div className="flex flex-col items-center justify-center py-16">
           <FileText className="h-16 w-16 text-slate-300 mb-4" />
           <h2 className="text-xl font-semibold text-slate-700">Quote not found</h2>
-          <Button variant="outline" className="mt-4" onClick={() => window.history.back()}>
+          <Button variant="outline" className="mt-4" onClick={handleBack}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
@@ -1745,7 +1758,7 @@ export default function CrmQuoteDetail() {
           {/* First row: Back button, Quote number, Status, Preview icon */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" data-testid="button-back" onClick={() => window.history.back()}>
+              <Button variant="ghost" size="icon" data-testid="button-back" onClick={handleBack}>
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <h1 className="text-2xl font-bold text-slate-900" data-testid="text-quote-number">

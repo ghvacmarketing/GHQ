@@ -131,7 +131,7 @@ const workOrderStatusColors: Record<string, { bg: string; text: string; border: 
 const workOrderStatusLabels: Record<string, string> = {
   scheduled: "Scheduled",
   dispatched: "Dispatched",
-  en_route: "En Route",
+  en_route: "Traveling",
   on_site: "On Site",
   completed: "Completed",
   cancelled: "Cancelled",
@@ -5354,7 +5354,7 @@ export default function CrmCustomerDetail() {
           propertyDialogOpen={propertyDialogOpen}
           setPropertyDialogOpen={setPropertyDialogOpen}
           onOpenAddPropertyDialog={handleOpenAddPropertyDialog}
-          onViewQuote={(quoteId) => setSelectedQuoteId(quoteId)}
+          onViewQuote={(quoteId) => navigate(`/crm/quotes/${quoteId}?from=customer&customerId=${id}&tab=quotes`)}
           onViewWorkOrder={(id) => navigate(`/crm/work-orders/${id}`)}
           onViewProject={(id) => navigate(`/crm/projects/${id}`)}
           onViewInvoice={(id) => navigate(`/crm/invoices/${id}`)}

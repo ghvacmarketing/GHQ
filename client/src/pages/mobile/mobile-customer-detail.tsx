@@ -84,7 +84,7 @@ function WorkOrderItem({ workOrder }: { workOrder: WorkOrderWithDetails }) {
   const statusConfig: Record<string, { label: string; className: string }> = {
     scheduled: { label: "Scheduled", className: "bg-slate-100 text-slate-700" },
     dispatched: { label: "Dispatched", className: "bg-blue-100 text-blue-700" },
-    en_route: { label: "En Route", className: "bg-yellow-100 text-yellow-700" },
+    en_route: { label: "Traveling", className: "bg-yellow-100 text-yellow-700" },
     on_site: { label: "On Site", className: "bg-green-100 text-green-700" },
     completed: { label: "Completed", className: "bg-slate-200 text-slate-600" },
     cancelled: { label: "Cancelled", className: "bg-red-100 text-red-700" },
