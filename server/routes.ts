@@ -12976,6 +12976,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [activity] = await db.insert(projectActivities).values(result.data).returning();
 
+      // When equipment_status activity is created, automatically update project status to equipment_ordered
+      // if current status is lead, proposal_sent, or approved
+      if (activityType === "equipment_status") {
+        const eligibleStatuses = ["lead", "proposal_sent", "approved"];
+        if (eligibleStatuses.includes(project.status)) {
+          await db
+            .update(crmProjects)
+            .set({ status: "equipment_ordered" })
+            .where(eq(crmProjects.id, projectId));
+          console.log(`[EQUIPMENT TRACKING] Updated project ${projectId} status from ${project.status} to equipment_ordered`);
+        }
+      }
+
       // DEBUG: Log created activity
       console.log(`[TIMELINE DEBUG] Activity CREATED:`, {
         id: activity.id,

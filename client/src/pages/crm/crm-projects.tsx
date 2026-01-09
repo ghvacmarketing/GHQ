@@ -99,12 +99,14 @@ type CustomersResponse = {
 
 const ITEMS_PER_PAGE = 25;
 
-type FilterTab = "all" | "lead" | "approved" | "in_progress" | "completed" | "closed" | "cancelled";
+type FilterTab = "all" | "lead" | "approved" | "equipment_ordered" | "equipment_arrived" | "in_progress" | "completed" | "closed" | "cancelled";
 
 const filterTabConfig: Record<FilterTab, { label: string }> = {
   all: { label: "All Projects" },
   lead: { label: "New / Needs Scheduling" },
   approved: { label: "Scheduled" },
+  equipment_ordered: { label: "Equipment Ordered" },
+  equipment_arrived: { label: "Equipment Arrived" },
   in_progress: { label: "In Progress" },
   completed: { label: "Completed" },
   closed: { label: "Closed" },
@@ -115,6 +117,8 @@ const statusColors: Record<string, { bg: string; text: string; border: string }>
   lead: { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-200" },
   proposal_sent: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
   approved: { bg: "bg-green-100", text: "text-green-700", border: "border-green-200" },
+  equipment_ordered: { bg: "bg-yellow-100", text: "text-yellow-700", border: "border-yellow-200" },
+  equipment_arrived: { bg: "bg-lime-100", text: "text-lime-700", border: "border-lime-200" },
   in_progress: { bg: "bg-amber-100", text: "text-amber-700", border: "border-amber-200" },
   completed: { bg: "bg-emerald-100", text: "text-emerald-700", border: "border-emerald-200" },
   closed: { bg: "bg-teal-100", text: "text-teal-700", border: "border-teal-200" },
@@ -126,6 +130,8 @@ const statusLabels: Record<string, string> = {
   lead: "New",
   proposal_sent: "Proposal Sent",
   approved: "Scheduled",
+  equipment_ordered: "Equipment Ordered",
+  equipment_arrived: "Equipment Arrived",
   in_progress: "In Progress",
   completed: "Completed",
   closed: "Closed",

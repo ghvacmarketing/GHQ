@@ -109,7 +109,9 @@ const projectStatusColors: Record<string, { bg: string; text: string; border: st
   lead: { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-200" },
   proposal_sent: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
   approved: { bg: "bg-green-100", text: "text-green-700", border: "border-green-200" },
-  in_progress: { bg: "bg-yellow-100", text: "text-yellow-700", border: "border-yellow-200" },
+  equipment_ordered: { bg: "bg-yellow-100", text: "text-yellow-700", border: "border-yellow-200" },
+  equipment_arrived: { bg: "bg-lime-100", text: "text-lime-700", border: "border-lime-200" },
+  in_progress: { bg: "bg-amber-100", text: "text-amber-700", border: "border-amber-200" },
   completed: { bg: "bg-emerald-100", text: "text-emerald-700", border: "border-emerald-200" },
   closed: { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-200" },
   archived: { bg: "bg-slate-100", text: "text-slate-500", border: "border-slate-200" },
@@ -119,6 +121,8 @@ const projectStatusLabels: Record<string, string> = {
   lead: "Lead",
   proposal_sent: "Proposal Sent",
   approved: "Approved",
+  equipment_ordered: "Equipment Ordered",
+  equipment_arrived: "Equipment Arrived",
   in_progress: "In Progress",
   completed: "Completed",
   closed: "Closed",
@@ -572,6 +576,24 @@ export default function CrmProjectDetail() {
     },
   });
 
+  const updateProjectStatusMutation = useMutation({
+    mutationFn: async (status: string) => {
+      return apiRequest("PATCH", `/api/crm/projects/${projectId}`, { status });
+    },
+    onSuccess: () => {
+      toast({ title: "Project status updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update project status",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const totalQuoted = (quotes || [])
     .filter((q) => q.status === "accepted")
     .reduce((sum, q) => sum + parseFloat(q.total?.toString() || "0"), 0);
@@ -775,6 +797,41 @@ export default function CrmProjectDetail() {
           </TabsList>
 
           <TabsContent value="overview" className="mt-0 space-y-6">
+            {project.status === "equipment_ordered" && (
+              <Card className="border border-yellow-200 bg-yellow-50 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-yellow-100 rounded-lg">
+                        <CheckCircle className="w-5 h-5 text-yellow-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-yellow-900">Equipment Ordered</p>
+                        <p className="text-sm text-yellow-700">Has the equipment arrived?</p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => updateProjectStatusMutation.mutate("equipment_arrived")}
+                      disabled={updateProjectStatusMutation.isPending}
+                      className="bg-lime-600 hover:bg-lime-700 text-white"
+                      data-testid="button-equipment-arrived"
+                    >
+                      {updateProjectStatusMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Updating...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Equipment Arrived
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             <Card className="border shadow-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg font-semibold">Project Details</CardTitle>
@@ -1520,7 +1577,7 @@ type ProjectActivityWithMeta = {
 };
 
 const activityTypeIcons: Record<string, any> = {
-  note: MessageSquare,
+  equipment_status: MessageSquare,
   photo: Image,
   file: File,
   financial: DollarSign,
@@ -1534,7 +1591,7 @@ const activityTypeIcons: Record<string, any> = {
 };
 
 const activityTypeColors: Record<string, { bg: string; text: string; border: string }> = {
-  note: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
+  equipment_status: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
   photo: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200" },
   file: { bg: "bg-slate-50", text: "text-slate-700", border: "border-slate-200" },
   financial: { bg: "bg-green-50", text: "text-green-700", border: "border-green-200" },
@@ -1548,7 +1605,7 @@ const activityTypeColors: Record<string, { bg: string; text: string; border: str
 };
 
 const activityTypeLabels: Record<string, string> = {
-  note: "Note",
+  equipment_status: "Equipment Status",
   photo: "Photo",
   file: "File",
   financial: "Financial",
@@ -1563,7 +1620,7 @@ const activityTypeLabels: Record<string, string> = {
 
 const filterOptions = [
   { value: "all", label: "All Activities" },
-  { value: "note", label: "Notes" },
+  { value: "equipment_status", label: "Equipment Status" },
   { value: "photo", label: "Photos" },
   { value: "file", label: "Files" },
   { value: "financial", label: "Financial" },
@@ -1594,7 +1651,7 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
   const [endDate, setEndDate] = useState("");
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [newActivityType, setNewActivityType] = useState("note");
+  const [newActivityType, setNewActivityType] = useState("equipment_status");
   const [newActivityWorkOrderId, setNewActivityWorkOrderId] = useState("");
 
   const [noteContent, setNoteContent] = useState("");
@@ -1741,9 +1798,9 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
       let metadata: Record<string, any> = {};
 
       switch (newActivityType) {
-        case "note": {
+        case "equipment_status": {
           if (noteContent.length < 10) {
-            toast({ title: "Note must be at least 10 characters", variant: "destructive" });
+            toast({ title: "Equipment status must be at least 10 characters", variant: "destructive" });
             setIsUploading(false);
             return;
           }
@@ -1898,15 +1955,15 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
 
   const renderDynamicForm = () => {
     switch (newActivityType) {
-      case "note":
+      case "equipment_status":
         return (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Note Content <span className="text-red-500">*</span></Label>
+              <Label>Equipment Status <span className="text-red-500">*</span></Label>
               <Textarea
                 value={noteContent}
                 onChange={(e) => setNoteContent(e.target.value)}
-                placeholder="Enter your note (minimum 10 characters)..."
+                placeholder="Enter equipment status (minimum 10 characters)..."
                 rows={4}
                 data-testid="input-note-content"
               />
@@ -2266,7 +2323,7 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
 
   const isFormValid = () => {
     switch (newActivityType) {
-      case "note": return noteContent.length >= 10;
+      case "equipment_status": return noteContent.length >= 10;
       case "photo": return photoFiles.length > 0;
       case "file": return fileUploads.length > 0;
       case "financial": return financialAmount && parseFloat(financialAmount) > 0;
@@ -2486,7 +2543,7 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="note">Note</SelectItem>
+                  <SelectItem value="equipment_status">Equipment Status</SelectItem>
                   <SelectItem value="photo">Photo</SelectItem>
                   <SelectItem value="file">File</SelectItem>
                   <SelectItem value="financial">Financial Update</SelectItem>
@@ -2557,13 +2614,13 @@ function ActivityCard({
   const [lightboxIndex, setLightboxIndex] = useState(0);
   
   const IconComponent = activityTypeIcons[activity.activityType] || Activity;
-  const colors = activityTypeColors[activity.activityType] || activityTypeColors.note;
+  const colors = activityTypeColors[activity.activityType] || activityTypeColors.equipment_status;
   const label = activityTypeLabels[activity.activityType] || activity.activityType;
   const metadata = activity.metadata || {};
 
   const renderTypeSpecificContent = () => {
     switch (activity.activityType) {
-      case "note": {
+      case "equipment_status": {
         const content = metadata.content || activity.description || "";
         const isLong = content.length > 150;
         const displayContent = expanded || !isLong ? content : content.substring(0, 150) + "...";
@@ -2575,7 +2632,7 @@ function ActivityCard({
               <button
                 onClick={() => setExpanded(!expanded)}
                 className="text-xs text-blue-600 hover:underline mt-1 flex items-center gap-1"
-                data-testid={`button-expand-note-${activity.id}`}
+                data-testid={`button-expand-equipment-status-${activity.id}`}
               >
                 {expanded ? (
                   <>

@@ -938,7 +938,7 @@ export const crmJobStatusEnum = ["new", "scheduled", "dispatched", "en_route", "
 export type CrmJobStatus = typeof crmJobStatusEnum[number];
 
 // Project Status Enum (pipeline-style)
-export const projectStatusEnum = ["lead", "proposal_sent", "approved", "in_progress", "completed", "closed", "archived"] as const;
+export const projectStatusEnum = ["lead", "proposal_sent", "approved", "equipment_ordered", "equipment_arrived", "in_progress", "completed", "closed", "archived"] as const;
 export type ProjectStatus = typeof projectStatusEnum[number];
 
 // Project Type Enum
@@ -1407,7 +1407,7 @@ export const crmCustomerNotes = pgTable("crm_customer_notes", {
 });
 
 // Project Activity Types for Timeline
-export const projectActivityTypeEnum = ["note", "photo", "file", "financial_update", "approval", "work_order_created", "work_order_completed", "quote_sent", "quote_accepted", "invoice_sent", "invoice_paid"] as const;
+export const projectActivityTypeEnum = ["equipment_status", "photo", "file", "financial_update", "approval", "work_order_created", "work_order_completed", "quote_sent", "quote_accepted", "invoice_sent", "invoice_paid"] as const;
 export type ProjectActivityType = typeof projectActivityTypeEnum[number];
 
 // Project Activities (Timeline entries aggregating work order activities)
