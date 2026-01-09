@@ -19039,28 +19039,40 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         }),
       });
 
-      console.log(`Quote ${quote.quoteNumber} signed and accepted by ${signerName.trim()} from IP ${signerIp}`);
+      console.log(`[PublicSign] Quote ${quote.quoteNumber} signed and accepted by ${signerName.trim()} from IP ${signerIp}`);
 
       // Auto-create follow-up work order if quote is attached to a working/completed work order (only for custom_service and quick types, AND has service items)
       const followUpQuoteTypes = ["custom_service", "quick"];
+      console.log(`[PublicSign] Quote ${quote.quoteNumber}: workOrderId=${quote.workOrderId}, quoteType=${updated.quoteType}`);
+      
       if (quote.workOrderId && followUpQuoteTypes.includes(updated.quoteType || "")) {
         // Check if quote has service-type items (not just maintenance)
         const hasServiceLineItems = await hasServiceItems(quote.id);
+        console.log(`[PublicSign] Quote ${quote.quoteNumber}: hasServiceLineItems=${hasServiceLineItems}`);
+        
         if (hasServiceLineItems) {
           const [parentWorkOrder] = await db.select().from(crmWorkOrders)
             .where(eq(crmWorkOrders.id, quote.workOrderId)).limit(1);
+          
+          console.log(`[PublicSign] Quote ${quote.quoteNumber}: parentWorkOrder status=${parentWorkOrder?.status}`);
           
           if (parentWorkOrder && (parentWorkOrder.status === "on_site" || parentWorkOrder.status === "completed")) {
             const followUpWO = await createFollowUpWorkOrder(updated, parentWorkOrder, {
               dispatchQueueStage: "PartsNeeded",
             });
             if (followUpWO) {
-              console.log(`Auto-created follow-up work order ${followUpWO.workOrderNumber} for quote ${quote.quoteNumber}`);
+              console.log(`[PublicSign] Auto-created follow-up work order ${followUpWO.workOrderNumber} for quote ${quote.quoteNumber}`);
+            } else {
+              console.log(`[PublicSign] Follow-up work order NOT created (already exists?) for quote ${quote.quoteNumber}`);
             }
+          } else {
+            console.log(`[PublicSign] Quote ${quote.quoteNumber}: parent work order not on_site/completed, status=${parentWorkOrder?.status}`);
           }
         } else {
-          console.log(`Quote ${quote.quoteNumber} has no service items, skipping follow-up work order creation`);
+          console.log(`[PublicSign] Quote ${quote.quoteNumber} has no service items, skipping follow-up work order creation`);
         }
+      } else {
+        console.log(`[PublicSign] Quote ${quote.quoteNumber}: skipping follow-up (no workOrderId or wrong quoteType)`);
       }
 
       return res.json({ 
