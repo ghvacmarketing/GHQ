@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import MobileShell from "./mobile-shell";
 import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
+import { clearCrmToken } from "@/lib/crmAuth";
 import type { CrmUser } from "@shared/schema";
 
 export default function MobileProfile() {
@@ -17,6 +18,7 @@ export default function MobileProfile() {
       await apiRequest("POST", "/api/crm/auth/logout");
     },
     onSuccess: () => {
+      clearCrmToken();
       queryClient.clear();
       window.location.href = "/crm/login";
     },

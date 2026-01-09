@@ -61,6 +61,11 @@ const CrmChecklists = lazy(() => import("@/pages/crm/crm-checklists"));
 const CrmSettings = lazy(() => import("@/pages/crm/crm-settings"));
 const CrmSettingsUsers = lazy(() => import("@/pages/crm/crm-settings-users"));
 const CrmSettingsSubtypes = lazy(() => import("@/pages/crm/crm-settings-subtypes"));
+const CrmSettingsTime = lazy(() => import("@/pages/crm/crm-settings-time"));
+const CrmSettingsPayments = lazy(() => import("@/pages/crm/crm-settings-payments"));
+const CrmSettingsSystemTools = lazy(() => import("@/pages/crm/crm-settings-system-tools"));
+const CrmSettingsQuickBooks = lazy(() => import("@/pages/crm/crm-settings-quickbooks"));
+const CrmSettingsImport = lazy(() => import("@/pages/crm/crm-settings-import"));
 const CrmBusinessDashboard = lazy(() => import("@/pages/crm/crm-business-dashboard"));
 const CrmGoalsTracker = lazy(() => import("@/pages/crm/crm-goals-tracker"));
 const CrmMessaging = lazy(() => import("@/pages/crm/crm-messaging"));
@@ -72,12 +77,18 @@ const MobileTime = lazy(() => import("@/pages/mobile/mobile-time"));
 const MobileJob = lazy(() => import("@/pages/mobile/mobile-job"));
 const MobileProfile = lazy(() => import("@/pages/mobile/mobile-profile"));
 const MobileQuoteDetail = lazy(() => import("@/pages/mobile/mobile-quote-detail"));
+const MobileQuotePresent = lazy(() => import("@/pages/mobile/mobile-quote-present"));
 const MobileInvoiceDetail = lazy(() => import("@/pages/mobile/mobile-invoice-detail"));
+const MobileMessages = lazy(() => import("@/pages/mobile/mobile-messages"));
+const MobileCustomers = lazy(() => import("@/pages/mobile/mobile-customers"));
+const MobileCustomerDetail = lazy(() => import("@/pages/mobile/mobile-customer-detail"));
 
 // Lazy-load Customer Portal pages
 const PortalLogin = lazy(() => import("@/pages/portal/portal-login"));
 const PortalDashboard = lazy(() => import("@/pages/portal/portal-dashboard"));
 const PortalInvoices = lazy(() => import("@/pages/portal/portal-invoices"));
+const PortalInvoiceDetail = lazy(() => import("@/pages/portal/portal-invoice-detail"));
+const PortalQuotes = lazy(() => import("@/pages/portal/portal-quotes"));
 const PortalAgreements = lazy(() => import("@/pages/portal/portal-agreements"));
 const PortalServiceHistory = lazy(() => import("@/pages/portal/portal-service-history"));
 
@@ -260,6 +271,11 @@ function Router() {
       <Route path="/crm/checklists">{() => <ProtectedCrmWrapper><CrmChecklists /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/users">{() => <ProtectedCrmWrapper><CrmSettingsUsers /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/subtypes">{() => <ProtectedCrmWrapper><CrmSettingsSubtypes /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/settings/time-logs">{() => <ProtectedCrmWrapper><CrmSettingsTime /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/settings/payments">{() => <ProtectedCrmWrapper><CrmSettingsPayments /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/settings/system-tools">{() => <ProtectedCrmWrapper><CrmSettingsSystemTools /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/settings/quickbooks">{() => <ProtectedCrmWrapper><CrmSettingsQuickBooks /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/settings/import">{() => <ProtectedCrmWrapper><CrmSettingsImport /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings">{() => <ProtectedCrmWrapper><CrmSettings /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/dashboard">{() => <ProtectedCrmWrapper><CrmBusinessDashboard /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/reports">{() => <ProtectedCrmWrapper><CrmGoalsTracker /></ProtectedCrmWrapper>}</Route>
@@ -267,14 +283,20 @@ function Router() {
       <Route path="/crm">{() => <ProtectedCrmWrapper><CrmBusinessDashboard /></ProtectedCrmWrapper>}</Route>
       <Route path="/mobile/job/:id">{() => <MobileWrapper><MobileJobDetail /></MobileWrapper>}</Route>
       <Route path="/mobile/job">{() => <MobileWrapper><MobileJob /></MobileWrapper>}</Route>
+      <Route path="/mobile/quotes/:id/present">{() => <MobileWrapper><MobileQuotePresent /></MobileWrapper>}</Route>
       <Route path="/mobile/quotes/:id">{() => <MobileWrapper><MobileQuoteDetail /></MobileWrapper>}</Route>
       <Route path="/mobile/invoices/:id">{() => <MobileWrapper><MobileInvoiceDetail /></MobileWrapper>}</Route>
       <Route path="/mobile/time">{() => <MobileWrapper><MobileTime /></MobileWrapper>}</Route>
+      <Route path="/mobile/messages">{() => <MobileWrapper><MobileMessages /></MobileWrapper>}</Route>
+      <Route path="/mobile/customers/:id">{() => <MobileWrapper><MobileCustomerDetail /></MobileWrapper>}</Route>
+      <Route path="/mobile/customers">{() => <MobileWrapper><MobileCustomers /></MobileWrapper>}</Route>
       <Route path="/mobile/profile">{() => <MobileWrapper><MobileProfile /></MobileWrapper>}</Route>
       <Route path="/mobile">{() => <MobileWrapper><MobileAgenda /></MobileWrapper>}</Route>
       <Route path="/portal/login">{() => <PortalWrapper><PortalLogin /></PortalWrapper>}</Route>
       <Route path="/portal/dashboard">{() => <PortalWrapper><PortalDashboard /></PortalWrapper>}</Route>
       <Route path="/portal/invoices">{() => <PortalWrapper><PortalInvoices /></PortalWrapper>}</Route>
+      <Route path="/portal/invoice/:id">{() => <Suspense fallback={<GlobalLoader />}><PortalInvoiceDetail /></Suspense>}</Route>
+      <Route path="/portal/quotes">{() => <PortalWrapper><PortalQuotes /></PortalWrapper>}</Route>
       <Route path="/portal/agreements">{() => <PortalWrapper><PortalAgreements /></PortalWrapper>}</Route>
       <Route path="/portal/service-history">{() => <PortalWrapper><PortalServiceHistory /></PortalWrapper>}</Route>
       <Route path="/quote/:token">{() => <Suspense fallback={<GlobalLoader />}><PublicQuoteView /></Suspense>}</Route>

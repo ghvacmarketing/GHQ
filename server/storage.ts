@@ -1,4 +1,4 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type CallLogTask, type InsertCallLogTask, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, type CrmItem, type InsertCrmItem, type CrmMessagingConversation, type InsertCrmMessagingConversation, type CrmMessagingMessage, type InsertCrmMessagingMessage, type CrmMessagingConversationTag, type InsertCrmMessagingConversationTag, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, callLogTasks, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems, crmItems, crmMessagingConversations, crmMessagingMessages, crmMessagingConversationTags, crmCustomers } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type CallLogTask, type InsertCallLogTask, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, type CrmItem, type InsertCrmItem, type CrmMessagingConversation, type InsertCrmMessagingConversation, type CrmMessagingMessage, type InsertCrmMessagingMessage, type CrmMessagingConversationTag, type InsertCrmMessagingConversationTag, type CrmTimeEntry, type InsertCrmTimeEntry, type SmsNotificationLog, type InsertSmsNotificationLog, type SmsNotificationType, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, callLogTasks, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems, crmItems, crmMessagingConversations, crmMessagingMessages, crmMessagingConversationTags, crmCustomers, crmTimeEntries, smsNotificationLog, crmUsers } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, or, and, ilike, sql, notInArray, desc, gte, lte, asc, isNull } from "drizzle-orm";
@@ -250,12 +250,30 @@ export interface IStorage {
   getMessagingConversationById(id: string): Promise<CrmMessagingConversation | undefined>;
   createMessagingConversation(conversation: InsertCrmMessagingConversation): Promise<CrmMessagingConversation>;
   updateMessagingConversation(id: string, updates: Partial<InsertCrmMessagingConversation>): Promise<CrmMessagingConversation | undefined>;
-  getMessagesForConversation(conversationId: string): Promise<CrmMessagingMessage[]>;
+  getMessagesForConversation(conversationId: string): Promise<(CrmMessagingMessage & { authorName?: string | null })[]>;
   createMessage(message: InsertCrmMessagingMessage): Promise<CrmMessagingMessage>;
   updateMessage(id: string, updates: Partial<InsertCrmMessagingMessage>): Promise<CrmMessagingMessage | undefined>;
   getConversationTags(conversationId: string): Promise<CrmMessagingConversationTag[]>;
   addConversationTag(conversationId: string, tag: string): Promise<CrmMessagingConversationTag>;
   removeConversationTag(conversationId: string, tag: string): Promise<void>;
+  deleteMessagingConversation(id: string): Promise<boolean>;
+  getMobileConversations(userId: string, filters?: { status?: string; search?: string }): Promise<(CrmMessagingConversation & { customer: { id: string; name: string; phone: string | null } | null })[]>;
+  searchCrmCustomers(search: string, limit?: number): Promise<{ id: string; name: string; phone: string | null; email: string | null }[]>;
+  getMessagingConversationByExternalId(externalConversationId: string, externalSource: string): Promise<CrmMessagingConversation | undefined>;
+  getMessagingConversationByPhone(phoneNumber: string): Promise<CrmMessagingConversation | undefined>;
+  getCrmCustomerByPhone(phone: string): Promise<{ id: string; name: string; phone: string | null; email: string | null } | undefined>;
+
+  // Time Entry operations
+  getActiveTimeEntry(technicianId: string): Promise<CrmTimeEntry | null>;
+  clockIn(technicianId: string, workOrderId?: string, source?: string): Promise<CrmTimeEntry>;
+  clockOut(entryId: string): Promise<CrmTimeEntry>;
+  getTimeEntries(filters: { technicianId?: string; startDate?: Date; endDate?: Date }): Promise<CrmTimeEntry[]>;
+  updateTimeEntry(id: string, data: Partial<InsertCrmTimeEntry>): Promise<CrmTimeEntry>;
+
+  // SMS Notification Log operations
+  createSmsNotificationLog(data: InsertSmsNotificationLog): Promise<SmsNotificationLog>;
+  getSmsNotificationByReference(notificationType: SmsNotificationType, referenceId: string, referenceType: 'maintenance_visit' | 'work_order' | 'invoice'): Promise<SmsNotificationLog | undefined>;
+  updateSmsNotificationLog(id: string, data: Partial<InsertSmsNotificationLog>): Promise<SmsNotificationLog | undefined>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -1852,17 +1870,17 @@ export class DatabaseStorage implements IStorage {
             ? and(...conditions, ilike(crmCustomers.name, `%${filters.search}%`))
             : ilike(crmCustomers.name, `%${filters.search}%`)
         )
-        .orderBy(desc(crmMessagingConversations.lastMessageAt));
+        .orderBy(sql`${crmMessagingConversations.lastMessageAt} DESC NULLS LAST`);
       return searchResults.map(r => r.conversation);
     }
 
     if (conditions.length === 0) {
-      return await db.select().from(crmMessagingConversations).orderBy(desc(crmMessagingConversations.lastMessageAt));
+      return await db.select().from(crmMessagingConversations).orderBy(sql`${crmMessagingConversations.lastMessageAt} DESC NULLS LAST`);
     }
 
     return await db.select().from(crmMessagingConversations)
       .where(and(...conditions))
-      .orderBy(desc(crmMessagingConversations.lastMessageAt));
+      .orderBy(sql`${crmMessagingConversations.lastMessageAt} DESC NULLS LAST`);
   }
 
   async getMessagingConversationById(id: string): Promise<CrmMessagingConversation | undefined> {
@@ -1883,10 +1901,20 @@ export class DatabaseStorage implements IStorage {
     return updated || undefined;
   }
 
-  async getMessagesForConversation(conversationId: string): Promise<CrmMessagingMessage[]> {
-    return await db.select().from(crmMessagingMessages)
+  async getMessagesForConversation(conversationId: string): Promise<(CrmMessagingMessage & { authorName?: string | null })[]> {
+    const results = await db.select({
+      message: crmMessagingMessages,
+      authorName: crmUsers.name,
+    })
+      .from(crmMessagingMessages)
+      .leftJoin(crmUsers, eq(crmMessagingMessages.authorUserId, crmUsers.id))
       .where(eq(crmMessagingMessages.conversationId, conversationId))
       .orderBy(asc(crmMessagingMessages.createdAt));
+    
+    return results.map(r => ({
+      ...r.message,
+      authorName: r.authorName,
+    }));
   }
 
   async createMessage(message: InsertCrmMessagingMessage): Promise<CrmMessagingMessage> {
@@ -1949,6 +1977,280 @@ export class DatabaseStorage implements IStorage {
         eq(crmMessagingConversationTags.conversationId, conversationId),
         eq(crmMessagingConversationTags.tag, tag)
       ));
+  }
+
+  async deleteMessagingConversation(id: string): Promise<boolean> {
+    // First delete all messages for this conversation
+    await db.delete(crmMessagingMessages)
+      .where(eq(crmMessagingMessages.conversationId, id));
+    
+    // Delete all tags for this conversation
+    await db.delete(crmMessagingConversationTags)
+      .where(eq(crmMessagingConversationTags.conversationId, id));
+    
+    // Delete the conversation itself
+    const result = await db.delete(crmMessagingConversations)
+      .where(eq(crmMessagingConversations.id, id))
+      .returning();
+    
+    return result.length > 0;
+  }
+
+  async getMobileConversations(userId: string, filters?: { status?: string; search?: string }): Promise<(CrmMessagingConversation & { customer: { id: string; name: string; phone: string | null } | null })[]> {
+    const baseQuery = db.select({
+      conversation: crmMessagingConversations,
+      customer: {
+        id: crmCustomers.id,
+        name: crmCustomers.name,
+        phone: crmCustomers.phone,
+      }
+    })
+    .from(crmMessagingConversations)
+    .leftJoin(crmCustomers, eq(crmMessagingConversations.customerId, crmCustomers.id));
+
+    let results;
+    
+    const statusFilter = filters?.status && filters.status !== "all" 
+      ? eq(crmMessagingConversations.status, filters.status as any)
+      : (!filters?.status ? eq(crmMessagingConversations.status, "open") : null);
+    
+    if (filters?.search) {
+      const searchTerm = `%${filters.search}%`;
+      const searchCondition = or(
+        ilike(crmMessagingConversations.customerName, searchTerm),
+        ilike(crmMessagingConversations.phoneNumber, searchTerm),
+        ilike(crmCustomers.name, searchTerm),
+        ilike(crmCustomers.phone, searchTerm)
+      );
+      
+      if (statusFilter) {
+        results = await baseQuery
+          .where(and(statusFilter, searchCondition))
+          .orderBy(sql`${crmMessagingConversations.lastMessageAt} DESC NULLS LAST`)
+          .limit(50);
+      } else {
+        results = await baseQuery
+          .where(searchCondition)
+          .orderBy(sql`${crmMessagingConversations.lastMessageAt} DESC NULLS LAST`)
+          .limit(50);
+      }
+    } else {
+      if (statusFilter) {
+        results = await baseQuery
+          .where(statusFilter)
+          .orderBy(sql`${crmMessagingConversations.lastMessageAt} DESC NULLS LAST`)
+          .limit(50);
+      } else {
+        results = await baseQuery
+          .orderBy(sql`${crmMessagingConversations.lastMessageAt} DESC NULLS LAST`)
+          .limit(50);
+      }
+    }
+
+    return results.map(r => ({
+      ...r.conversation,
+      customer: r.customer || null
+    }));
+  }
+
+  async searchCrmCustomers(search: string, limit: number = 20): Promise<{ id: string; name: string; phone: string | null; email: string | null }[]> {
+    if (!search || search.trim().length < 2) {
+      return [];
+    }
+    const searchTerm = `%${search.trim()}%`;
+    
+    const results = await db.select({
+      id: crmCustomers.id,
+      name: crmCustomers.name,
+      phone: crmCustomers.phone,
+      email: crmCustomers.email,
+    })
+    .from(crmCustomers)
+    .where(or(
+      ilike(crmCustomers.name, searchTerm),
+      ilike(crmCustomers.phone, searchTerm)
+    ))
+    .limit(limit);
+
+    return results;
+  }
+
+  async getMessagingConversationByExternalId(externalConversationId: string, externalSource: string): Promise<CrmMessagingConversation | undefined> {
+    const [conversation] = await db.select().from(crmMessagingConversations)
+      .where(and(
+        eq(crmMessagingConversations.externalConversationId, externalConversationId),
+        eq(crmMessagingConversations.externalSource, externalSource as any)
+      ));
+    return conversation || undefined;
+  }
+
+  async getMessagingConversationByPhone(phoneNumber: string): Promise<CrmMessagingConversation | undefined> {
+    const normalizedPhone = phoneNumber.replace(/\D/g, '');
+    const phoneVariants = [
+      phoneNumber,
+      normalizedPhone,
+      `+${normalizedPhone}`,
+      `+1${normalizedPhone}`,
+      normalizedPhone.slice(-10),
+    ];
+    
+    const [conversation] = await db.select().from(crmMessagingConversations)
+      .where(or(
+        ...phoneVariants.map(p => ilike(crmMessagingConversations.phoneNumber, `%${p}%`))
+      ))
+      .orderBy(sql`${crmMessagingConversations.lastMessageAt} DESC NULLS LAST`)
+      .limit(1);
+    
+    return conversation || undefined;
+  }
+
+  async getCrmCustomerByPhone(phone: string): Promise<{ id: string; name: string; phone: string | null; email: string | null } | undefined> {
+    const normalizedPhone = phone.replace(/\D/g, '');
+    const phoneVariants = [
+      phone,
+      normalizedPhone,
+      `+${normalizedPhone}`,
+      `+1${normalizedPhone}`,
+      normalizedPhone.slice(-10),
+    ];
+    
+    const [customer] = await db.select({
+      id: crmCustomers.id,
+      name: crmCustomers.name,
+      phone: crmCustomers.phone,
+      email: crmCustomers.email,
+    })
+    .from(crmCustomers)
+    .where(or(
+      ...phoneVariants.map(p => ilike(crmCustomers.phone, `%${p}%`))
+    ))
+    .limit(1);
+    
+    return customer || undefined;
+  }
+
+  // Time Entry operations
+  async getActiveTimeEntry(technicianId: string): Promise<CrmTimeEntry | null> {
+    const [entry] = await db.select().from(crmTimeEntries)
+      .where(and(
+        eq(crmTimeEntries.technicianId, technicianId),
+        isNull(crmTimeEntries.clockOutAt)
+      ))
+      .limit(1);
+    return entry || null;
+  }
+
+  async clockIn(technicianId: string, workOrderId?: string, source?: string): Promise<CrmTimeEntry> {
+    const now = new Date();
+    const [entry] = await db.insert(crmTimeEntries)
+      .values({
+        technicianId,
+        workOrderId: workOrderId || null,
+        clockInAt: now,
+        source: (source as any) || "mobile",
+        createdById: technicianId,
+      })
+      .returning();
+    return entry;
+  }
+
+  async clockOut(entryId: string): Promise<CrmTimeEntry> {
+    const [existing] = await db.select().from(crmTimeEntries)
+      .where(eq(crmTimeEntries.id, entryId))
+      .limit(1);
+    
+    if (!existing) {
+      throw new Error("Time entry not found");
+    }
+
+    const now = new Date();
+    const clockInTime = new Date(existing.clockInAt);
+    const durationMinutes = Math.round((now.getTime() - clockInTime.getTime()) / (1000 * 60));
+
+    const [updated] = await db.update(crmTimeEntries)
+      .set({
+        clockOutAt: now,
+        durationMinutes,
+        updatedAt: now,
+      })
+      .where(eq(crmTimeEntries.id, entryId))
+      .returning();
+    return updated;
+  }
+
+  async getTimeEntries(filters: { technicianId?: string; startDate?: Date; endDate?: Date }): Promise<CrmTimeEntry[]> {
+    const conditions = [];
+    
+    if (filters.technicianId) {
+      conditions.push(eq(crmTimeEntries.technicianId, filters.technicianId));
+    }
+    if (filters.startDate) {
+      conditions.push(gte(crmTimeEntries.clockInAt, filters.startDate));
+    }
+    if (filters.endDate) {
+      conditions.push(lte(crmTimeEntries.clockInAt, filters.endDate));
+    }
+
+    if (conditions.length === 0) {
+      return await db.select().from(crmTimeEntries).orderBy(desc(crmTimeEntries.clockInAt));
+    }
+    
+    return await db.select().from(crmTimeEntries)
+      .where(and(...conditions))
+      .orderBy(desc(crmTimeEntries.clockInAt));
+  }
+
+  async updateTimeEntry(id: string, data: Partial<InsertCrmTimeEntry>): Promise<CrmTimeEntry> {
+    const [updated] = await db.update(crmTimeEntries)
+      .set({ ...data, updatedAt: new Date() } as any)
+      .where(eq(crmTimeEntries.id, id))
+      .returning();
+    
+    if (!updated) {
+      throw new Error("Time entry not found");
+    }
+    return updated;
+  }
+
+  // SMS Notification Log operations
+  async createSmsNotificationLog(data: InsertSmsNotificationLog): Promise<SmsNotificationLog> {
+    const [created] = await db.insert(smsNotificationLog).values(data as any).returning();
+    return created;
+  }
+
+  async getSmsNotificationByReference(
+    notificationType: SmsNotificationType, 
+    referenceId: string, 
+    referenceType: 'maintenance_visit' | 'work_order' | 'invoice'
+  ): Promise<SmsNotificationLog | undefined> {
+    let condition;
+    if (referenceType === 'maintenance_visit') {
+      condition = and(
+        eq(smsNotificationLog.notificationType, notificationType),
+        eq(smsNotificationLog.maintenanceVisitId, referenceId)
+      );
+    } else if (referenceType === 'work_order') {
+      condition = and(
+        eq(smsNotificationLog.notificationType, notificationType),
+        eq(smsNotificationLog.workOrderId, referenceId)
+      );
+    } else {
+      condition = and(
+        eq(smsNotificationLog.notificationType, notificationType),
+        eq(smsNotificationLog.invoiceId, referenceId)
+      );
+    }
+    
+    const [notification] = await db.select().from(smsNotificationLog).where(condition);
+    return notification || undefined;
+  }
+
+  async updateSmsNotificationLog(id: string, data: Partial<InsertSmsNotificationLog>): Promise<SmsNotificationLog | undefined> {
+    const [updated] = await db.update(smsNotificationLog)
+      .set(data as any)
+      .where(eq(smsNotificationLog.id, id))
+      .returning();
+    return updated || undefined;
   }
 
   // Initialize default data if needed

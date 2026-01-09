@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -129,10 +130,26 @@ const statusColors: Record<string, { bg: string; text: string; border: string }>
 const statusLabels: Record<string, string> = {
   scheduled: "Scheduled",
   dispatched: "Dispatched",
-  en_route: "En Route",
-  on_site: "On Site",
+  en_route: "Traveling",
+  on_site: "Working",
   completed: "Completed",
   cancelled: "Cancelled",
+};
+
+const dispatchQueueStageLabels: Record<string, string> = {
+  WaitingOnParts: "Waiting on Parts",
+  NeedsApproval: "Needs Approval",
+  OnHold: "On Hold",
+  CallbackPriority: "Callback/Priority",
+  ReadyToDispatch: "Ready to Dispatch",
+};
+
+const dispatchQueueStageColors: Record<string, { bg: string; text: string; border: string }> = {
+  WaitingOnParts: { bg: "bg-amber-100", text: "text-amber-700", border: "border-amber-200" },
+  NeedsApproval: { bg: "bg-purple-100", text: "text-purple-700", border: "border-purple-200" },
+  OnHold: { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-300" },
+  CallbackPriority: { bg: "bg-red-100", text: "text-red-700", border: "border-red-200" },
+  ReadyToDispatch: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
 };
 
 const visitTypeLabels: Record<string, string> = {
@@ -160,6 +177,7 @@ type FilterTab = "all" | "scheduled" | "in_progress" | "completed" | "ready_to_i
 
 const filterTabConfig: Record<FilterTab, { label: string; shortLabel: string }> = {
   all: { label: "All", shortLabel: "All" },
+  unassigned: { label: "Unassigned", shortLabel: "Unassigned" },
   scheduled: { label: "Scheduled", shortLabel: "Scheduled" },
   in_progress: { label: "In Progress", shortLabel: "Active" },
   completed: { label: "Completed", shortLabel: "Done" },
@@ -167,20 +185,20 @@ const filterTabConfig: Record<FilterTab, { label: string; shortLabel: string }> 
   invoiced: { label: "Invoiced / Awaiting Payment", shortLabel: "Invoiced" },
   closed: { label: "Closed", shortLabel: "Closed" },
   cancelled: { label: "Cancelled", shortLabel: "Cancelled" },
-  unassigned: { label: "Unassigned", shortLabel: "Unassigned" },
 };
 
-type UnassignedCategory = "needs_scheduling" | "ready_to_dispatch" | "waiting_on_parts" | "needs_approval" | "on_hold";
+type UnassignedCategory = "waiting_on_parts" | "needs_approval" | "on_hold" | "callback_priority" | "ready_to_dispatch";
 
 const unassignedCategoryConfig: Record<UnassignedCategory, { label: string; description: string }> = {
-  needs_scheduling: { label: "Needs Scheduling", description: "No time set" },
-  ready_to_dispatch: { label: "Ready to Dispatch", description: "Time set but no tech" },
   waiting_on_parts: { label: "Waiting on Parts", description: "" },
   needs_approval: { label: "Needs Approval", description: "" },
   on_hold: { label: "On Hold", description: "" },
+  callback_priority: { label: "Callback/Priority", description: "" },
+  ready_to_dispatch: { label: "Ready to Dispatch", description: "" },
 };
 
 export default function CrmWorkOrders() {
+  usePageTitle("Work Orders");
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -402,6 +420,30 @@ export default function CrmWorkOrders() {
 
   const projects = projectsResponse?.projects || [];
 
+  // Query for active maintenance agreements when customer is selected
+  interface ActiveAgreement {
+    id: string;
+    agreementType: string | null;
+    status: string;
+    frequency: string | null;
+    visitsPerPeriod: number | null;
+    nextServiceDate: string | null;
+    displayName: string;
+  }
+
+  const { data: activeAgreements = [] } = useQuery<ActiveAgreement[]>({
+    queryKey: ["/api/crm/customers", selectedCustomer?.id, "active-agreements"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${selectedCustomer!.id}/active-agreements`, {
+        credentials: "include",
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : (data.agreements ?? []);
+    },
+    enabled: !!selectedCustomer?.id && createDialogOpen,
+  });
+
   // Query for linking projects in the detail sheet (different from create dialog)
   // Fetch immediately when sheet opens so user can see project options
   const { data: linkableProjectsResponse, isLoading: linkableProjectsLoading } = useQuery<{ projects: CrmProject[]; pagination: any }>({
@@ -497,6 +539,7 @@ export default function CrmWorkOrders() {
       return res.json();
     },
     enabled: !!currentUser,
+    refetchInterval: 15000, // Auto-refresh every 15 seconds to catch new work orders
   });
 
   const filteredWorkOrders = useMemo(() => {
@@ -523,7 +566,7 @@ export default function CrmWorkOrders() {
     // Apply tab-based status filtering (for tabs not handled server-side)
     if (activeTab === "unassigned") {
       // Unassigned work orders - no tech assigned or in queue stages
-      const unassignedStages = ["NeedsScheduling", "ReadyToDispatch", "WaitingOnParts", "NeedsApproval", "OnHold"];
+      const unassignedStages = ["WaitingOnParts", "NeedsApproval", "OnHold", "CallbackPriority", "ReadyToDispatch"];
       orders = orders.filter(wo => 
         !wo.assignedTechId || 
         (wo.dispatchQueueStage && unassignedStages.includes(wo.dispatchQueueStage))
@@ -566,11 +609,11 @@ export default function CrmWorkOrders() {
     if (activeTab !== "unassigned") return null;
     
     const categories: Record<UnassignedCategory, EnrichedWorkOrder[]> = {
-      needs_scheduling: [],
-      ready_to_dispatch: [],
       waiting_on_parts: [],
       needs_approval: [],
       on_hold: [],
+      callback_priority: [],
+      ready_to_dispatch: [],
     };
     
     filteredWorkOrders.forEach(wo => {
@@ -580,10 +623,13 @@ export default function CrmWorkOrders() {
         categories.needs_approval.push(wo);
       } else if (wo.dispatchQueueStage === "OnHold") {
         categories.on_hold.push(wo);
-      } else if (!wo.scheduledStart) {
-        categories.needs_scheduling.push(wo);
-      } else if (!wo.assignedTechId) {
+      } else if (wo.dispatchQueueStage === "CallbackPriority") {
+        categories.callback_priority.push(wo);
+      } else if (wo.dispatchQueueStage === "ReadyToDispatch") {
         categories.ready_to_dispatch.push(wo);
+      } else if (!wo.assignedTechId) {
+        // Default unassigned work orders to "Waiting on Parts" column
+        categories.waiting_on_parts.push(wo);
       }
     });
     
@@ -1068,7 +1114,7 @@ export default function CrmWorkOrders() {
           </Card>
         ) : activeTab === "unassigned" && categorizedUnassigned ? (
           <div className="w-full">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {(Object.keys(unassignedCategoryConfig) as UnassignedCategory[]).map((category) => {
                 const config = unassignedCategoryConfig[category];
                 const categoryOrders = categorizedUnassigned[category];
@@ -1098,7 +1144,6 @@ export default function CrmWorkOrders() {
                         </div>
                       ) : (
                         categoryOrders.map((wo) => {
-                          const statusStyle = statusColors[wo.status] || statusColors.scheduled;
                           const visitStyle = visitTypeColors[wo.visitType || "SERVICE"] || visitTypeColors.SERVICE;
                           
                           return (
@@ -1111,32 +1156,15 @@ export default function CrmWorkOrders() {
                               <CardContent className="p-3">
                                 <div className="flex items-start justify-between gap-2 mb-2">
                                   <p className="font-semibold text-slate-900 text-sm truncate flex-1">
-                                    WO-{wo.workOrderNumber}
+                                    {wo.customer?.name || "—"}
                                   </p>
-                                  <Badge className={`${statusStyle.bg} ${statusStyle.text} border ${statusStyle.border} text-xs shrink-0`}>
-                                    {statusLabels[wo.status]}
-                                  </Badge>
                                 </div>
                                 
-                                {(wo.title || wo.description) && (
+                                {wo.workSubtype && wo.workSubtype !== "Other" && (
                                   <p className="text-xs text-slate-600 truncate mb-2">
-                                    {wo.title || wo.description}
+                                    {wo.workSubtype}
                                   </p>
                                 )}
-
-                                <div className="space-y-1 text-xs">
-                                  <div className="flex items-center gap-1.5 text-slate-600">
-                                    <User className="h-3 w-3 shrink-0" />
-                                    <span className="truncate">{wo.customer?.name || "—"}</span>
-                                  </div>
-
-                                  <div className="flex items-center gap-1.5 text-slate-600">
-                                    <CalendarIcon className="h-3 w-3 shrink-0" />
-                                    <span>
-                                      {wo.scheduledStart ? formatDate(wo.scheduledStart) : "Not scheduled"}
-                                    </span>
-                                  </div>
-                                </div>
 
                                 <div className="flex items-center gap-1.5 mt-2 pt-2 border-t">
                                   <Badge className={`${visitStyle.bg} ${visitStyle.text} text-xs`}>
@@ -1160,11 +1188,17 @@ export default function CrmWorkOrders() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {filteredWorkOrders.map((wo) => {
-              const statusStyle = statusColors[wo.status] || statusColors.scheduled;
+              // For unassigned work orders with dispatchQueueStage, show the queue stage badge instead of status
+              const isUnassignedWithQueueStage = !wo.assignedTechId && wo.dispatchQueueStage && wo.dispatchQueueStage !== "Scheduled";
+              const badgeStyle = isUnassignedWithQueueStage 
+                ? (dispatchQueueStageColors[wo.dispatchQueueStage!] || statusColors.scheduled)
+                : (statusColors[wo.status] || statusColors.scheduled);
+              const badgeLabel = isUnassignedWithQueueStage 
+                ? (dispatchQueueStageLabels[wo.dispatchQueueStage!] || statusLabels[wo.status])
+                : statusLabels[wo.status];
               const visitStyle = visitTypeColors[wo.visitType || "SERVICE"] || visitTypeColors.SERVICE;
-              const prioStyle = priorityColors[wo.priority || "normal"] || priorityColors.normal;
               
               return (
                 <Card
@@ -1173,72 +1207,29 @@ export default function CrmWorkOrders() {
                   onClick={() => handleOpenDetail(wo)}
                   data-testid={`card-work-order-${wo.id}`}
                 >
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-slate-900 truncate" data-testid={`text-wo-number-${wo.id}`}>
-                          WO-{wo.workOrderNumber}
-                        </p>
-                        {(wo.title || wo.description) && (
-                          <p className="text-sm text-slate-600 truncate mt-0.5" data-testid={`text-wo-title-${wo.id}`}>
-                            {wo.title || wo.description}
-                          </p>
-                        )}
-                      </div>
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <p className="font-semibold text-slate-900 text-sm truncate flex-1" data-testid={`text-wo-customer-${wo.id}`}>
+                        {wo.customer?.name || "—"}
+                      </p>
                       <Badge 
-                        className={`${statusStyle.bg} ${statusStyle.text} border ${statusStyle.border} shrink-0`}
+                        className={`${badgeStyle.bg} ${badgeStyle.text} border ${badgeStyle.border} text-xs shrink-0`}
                         data-testid={`badge-status-${wo.id}`}
                       >
-                        {statusLabels[wo.status]}
+                        {badgeLabel}
                       </Badge>
                     </div>
 
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2 text-slate-600" data-testid={`text-customer-${wo.id}`}>
-                        <User className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{wo.customer?.name || "—"}</span>
-                      </div>
+                    {wo.workSubtype && wo.workSubtype !== "Other" && (
+                      <p className="text-xs text-slate-600 truncate mb-2" data-testid={`text-wo-subtype-${wo.id}`}>
+                        {wo.workSubtype}
+                      </p>
+                    )}
 
-                      <div className="flex items-center gap-2 text-slate-600" data-testid={`text-scheduled-${wo.id}`}>
-                        <CalendarIcon className="h-4 w-4 shrink-0" />
-                        <span>
-                          {formatDate(wo.scheduledStart)}
-                          {wo.scheduledStart && (
-                            <span className="text-slate-400 ml-1">
-                              {formatTime(wo.scheduledStart)} - {formatTime(wo.scheduledEnd)}
-                            </span>
-                          )}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2 text-slate-600" data-testid={`text-tech-${wo.id}`}>
-                        <UserCheck className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{wo.tech?.name || "Unassigned"}</span>
-                      </div>
-
-                      {wo.property && (
-                        <div className="flex items-center gap-2 text-slate-500 text-xs" data-testid={`text-address-${wo.id}`}>
-                          <MapPin className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate">{getPropertyAddress(wo.property)}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <Badge className={`${visitStyle.bg} ${visitStyle.text} text-xs`} data-testid={`badge-visit-type-${wo.id}`}>
                         {visitTypeLabels[wo.visitType || "SERVICE"]}
                       </Badge>
-                      {wo.priority && wo.priority !== "normal" && (
-                        <Badge className={`${prioStyle.bg} ${prioStyle.text} text-xs`} data-testid={`badge-priority-${wo.id}`}>
-                          {wo.priority.charAt(0).toUpperCase() + wo.priority.slice(1)}
-                        </Badge>
-                      )}
-                      {wo.project && (
-                        <Badge variant="outline" className="text-xs" data-testid={`badge-project-${wo.id}`}>
-                          <FolderOpen className="h-3 w-3 mr-1" />
-                          {wo.project.title}
-                        </Badge>
-                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -1278,7 +1269,12 @@ export default function CrmWorkOrders() {
                           Change
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[350px] p-0" align="end">
+                      <PopoverContent 
+                        className="w-[350px] p-0 z-[100]" 
+                        align="end"
+                        sideOffset={4}
+                        style={{ maxHeight: "300px", overflowY: "auto" }}
+                      >
                         <Command shouldFilter={false}>
                           <CommandInput
                             placeholder="Search customers..."
@@ -1286,7 +1282,7 @@ export default function CrmWorkOrders() {
                             onValueChange={setReassignCustomerSearch}
                             data-testid="input-reassign-customer-search"
                           />
-                          <CommandList>
+                          <CommandList className="max-h-[250px]">
                             {reassignCustomersLoading ? (
                               <div className="p-4 text-center text-sm text-slate-500">
                                 Loading...
@@ -1485,7 +1481,7 @@ export default function CrmWorkOrders() {
 
                 {selectedWorkOrder.status === "on_site" && (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                    <p className="text-sm text-amber-800 font-medium">Technician is on site</p>
+                    <p className="text-sm text-amber-800 font-medium">Technician is working</p>
                     <p className="text-xs text-amber-600">Assignment and schedule cannot be changed while work is in progress.</p>
                   </div>
                 )}
@@ -1672,7 +1668,12 @@ export default function CrmWorkOrders() {
                       {selectedCustomer ? selectedCustomer.name : "Search for a customer..."}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[350px] p-0" align="start">
+                  <PopoverContent 
+                    className="w-[var(--radix-popover-trigger-width)] min-w-[350px] p-0 z-[100]" 
+                    align="start"
+                    sideOffset={4}
+                    style={{ maxHeight: "300px", overflowY: "auto" }}
+                  >
                     <Command shouldFilter={false}>
                       <CommandInput
                         placeholder="Type to search customers..."
@@ -1680,7 +1681,7 @@ export default function CrmWorkOrders() {
                         onValueChange={setCustomerSearch}
                         data-testid="input-customer-search"
                       />
-                      <CommandList>
+                      <CommandList className="max-h-[250px]">
                         {customersLoading ? (
                           <div className="p-4 text-center text-sm text-slate-500">
                             Loading...
@@ -1717,6 +1718,28 @@ export default function CrmWorkOrders() {
                   </PopoverContent>
                 </Popover>
               </div>
+
+              {/* Maintenance Agreement Info Display */}
+              {selectedCustomer && activeAgreements.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileText className="h-4 w-4 text-amber-600" />
+                    <span className="text-sm font-medium text-amber-800">Active Maintenance Agreement</span>
+                  </div>
+                  {activeAgreements.map((agreement) => (
+                    <div key={agreement.id} className="text-sm text-amber-700">
+                      <p className="font-medium">{agreement.displayName}</p>
+                      <div className="flex flex-wrap gap-3 text-xs mt-1">
+                        {agreement.frequency && <span>Billing: {agreement.frequency}</span>}
+                        {agreement.visitsPerPeriod && <span>Visits: {agreement.visitsPerPeriod}/period</span>}
+                        {agreement.nextServiceDate && (
+                          <span>Next Service: {new Date(agreement.nextServiceDate).toLocaleDateString()}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {selectedCustomer && (
                 <div className="space-y-2">

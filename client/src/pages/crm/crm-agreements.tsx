@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -58,6 +59,7 @@ import {
   Wrench,
   FileText,
   Pencil as Edit,
+  RefreshCw,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format, addDays, subDays, addMonths, addYears, isAfter, isBefore, startOfDay, differenceInCalendarDays, parseISO } from "date-fns";
@@ -76,6 +78,7 @@ type AgreementsResponse = {
     hasPrevPage: boolean;
   };
   statusCounts?: {
+    pending: number;
     active: number;
     grace_period: number;
     expired: number;
@@ -99,6 +102,7 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 const statusLabels: Record<string, string> = {
+  pending: "Pending Payment",
   active: "Active",
   grace_period: "Grace Period",
   expired: "Expired",
@@ -106,6 +110,7 @@ const statusLabels: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
+  pending: "bg-blue-100 text-blue-700 border-blue-200",
   active: "bg-green-100 text-green-700 border-green-200",
   grace_period: "bg-amber-100 text-amber-700 border-amber-200",
   expired: "bg-red-100 text-red-700 border-red-200",
@@ -113,7 +118,8 @@ const statusColors: Record<string, string> = {
 };
 
 const tabFilters = [
-  { key: "all", label: "All Active" },
+  { key: "all", label: "All" },
+  { key: "pending", label: "Pending" },
   { key: "active", label: "Active" },
   { key: "upcoming_service", label: "Upcoming Service" },
   { key: "grace_period", label: "Grace Period" },
@@ -132,6 +138,7 @@ function formatCustomerName(name: string | null | undefined): string {
 }
 
 export default function CrmAgreements() {
+  usePageTitle("Agreements");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [searchInput, setSearchInput] = useState("");
@@ -223,6 +230,8 @@ export default function CrmAgreements() {
   });
 
   const canManageTypes = currentUser?.role === "admin" || currentUser?.role === "owner" || currentUser?.role === "sales";
+  const isAdminOrOwner = currentUser?.role === "admin" || currentUser?.role === "owner";
+  const canSendInvoice = ["owner", "admin", "supervisor", "sales"].includes(currentUser?.role || "");
 
   const { data: customAgreementTypes = [], isLoading: typesLoading } = useQuery<CustomAgreementType[]>({
     queryKey: ["/api/crm/custom-agreement-types"],
@@ -280,6 +289,28 @@ export default function CrmAgreements() {
       toast({ title: "Failed to delete custom agreement type", variant: "destructive" });
     },
   });
+
+  const sendInvoiceMutation = useMutation({
+    mutationFn: async (agreementId: string) => {
+      const res = await apiRequest("POST", `/api/crm/agreements/${agreementId}/send-invoice`);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/agreements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
+      const msg = data.emailSent 
+        ? `Invoice ${data.invoiceNumber} created and emailed to customer`
+        : `Invoice ${data.invoiceNumber} created (no email on file)`;
+      toast({ title: "Invoice Sent", description: msg });
+      setSelectedAgreement(null);
+    },
+    onError: () => {
+      toast({ title: "Failed to send invoice", variant: "destructive" });
+    },
+  });
+
+  // Hide "Send First Invoice" if first invoice has already been sent (using the firstInvoiceSentAt field)
+  const shouldHideFirstInvoiceButton = !!(selectedAgreement?.firstInvoiceSentAt);
 
   const createAgreementMutation = useMutation({
     mutationFn: async (data: typeof createForm) => {
@@ -569,6 +600,16 @@ export default function CrmAgreements() {
                 Reset
               </Button>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSettingsDialog(true)}
+              className="h-8 px-2"
+              data-testid="button-agreement-settings"
+              title="Manage Custom Agreement Types"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -642,6 +683,7 @@ export default function CrmAgreements() {
           <div className="flex overflow-x-auto">
             {tabFilters.map((tab) => {
               const count = tab.key === "all" ? statusCounts.all_active
+                : tab.key === "pending" ? statusCounts.pending
                 : tab.key === "active" ? statusCounts.active
                 : tab.key === "upcoming_service" ? statusCounts.upcoming_service
                 : tab.key === "grace_period" ? statusCounts.grace_period
@@ -795,7 +837,7 @@ export default function CrmAgreements() {
                         <Button
                           variant="outline"
                           className="mt-4"
-                          onClick={() => setShowCreateDialog(true)}
+                          onClick={() => navigate("/crm/agreements/new?type=preventative")}
                           data-testid="button-create-first-agreement"
                         >
                           <Plus className="h-4 w-4 mr-2" />
@@ -1137,6 +1179,12 @@ export default function CrmAgreements() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
+                      <Label className="text-slate-500 text-xs">Billing Type</Label>
+                      <p className="font-medium">
+                        {selectedAgreement.billingPreference === "pay_on_visit" ? "Pay Per Visit" : "Auto Invoice"}
+                      </p>
+                    </div>
+                    <div>
                       <Label className="text-slate-500 text-xs">Region</Label>
                       <p className="font-medium">
                         {selectedAgreement.regionId ? getSelectedRegion(selectedAgreement.regionId)?.name || "—" : "—"}
@@ -1186,6 +1234,28 @@ export default function CrmAgreements() {
                     </div>
                   )}
                   <div className="flex justify-end gap-2 pt-4 border-t">
+                    {canSendInvoice && 
+                      selectedAgreement.billingPreference !== "pay_on_visit" && 
+                      ((selectedAgreement.status === "pending" && !shouldHideFirstInvoiceButton) || selectedAgreement.status === "active") && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const msg = selectedAgreement.status === "pending" 
+                            ? `Create and send first invoice to ${selectedAgreement.customerName} for $${selectedAgreement.price || "0"}?`
+                            : `Send a renewal invoice to ${selectedAgreement.customerName} for $${selectedAgreement.price || "0"}?`;
+                          if (confirm(msg)) {
+                            sendInvoiceMutation.mutate(selectedAgreement.id);
+                          }
+                        }}
+                        disabled={sendInvoiceMutation.isPending}
+                        data-testid="button-send-invoice"
+                        className="text-[#711419] border-[#711419] hover:bg-[#711419]/10"
+                      >
+                        <FileCheck className="h-4 w-4 mr-1" />
+                        {sendInvoiceMutation.isPending ? "Sending..." : selectedAgreement.status === "pending" ? "Send First Invoice" : "Send Invoice"}
+                      </Button>
+                    )}
                     <Button
                       variant="destructive"
                       size="sm"
@@ -1206,16 +1276,16 @@ export default function CrmAgreements() {
         </DialogContent>
       </Dialog>
 
-      {/* Custom Agreement Types Settings Dialog */}
+      {/* Settings Dialog - Agreement Types */}
       <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>Custom Agreement Types</DialogTitle>
+            <DialogTitle>Agreement Types</DialogTitle>
             <DialogDescription>
-              Manage reusable templates for custom service agreements. These types appear as work subtypes under MAINTENANCE visits.
+              Manage custom agreement type templates.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto mt-4">
             <div className="mb-4">
               <Button
                 size="sm"

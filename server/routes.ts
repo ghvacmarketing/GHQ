@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
@@ -22,7 +22,7 @@ import { sendCrmQuoteEmail } from "./services/crmQuoteEmail";
 import { sendCrmInvoiceEmail } from "./services/crmInvoiceEmail";
 import { twilioService } from "./sms";
 import { pool, db } from "./db";
-import { eq, inArray, desc, sql, and, or, ilike, asc, count, isNull, lt, gt, ne, isNotNull } from "drizzle-orm";
+import { eq, inArray, desc, sql, and, or, ilike, asc, count, isNull, lt, gt, gte, lte, ne, isNotNull } from "drizzle-orm";
 import { randomUUID, createHmac } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
@@ -31,10 +31,17 @@ import { generateQuoteWithAI, createQuoteConversation, getConversationHistory, t
 import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorStore, getOrCreateVectorStore, seedVectorStoreWithSalesBook } from "./services/vector-store";
 import { refreshWeather, scheduleWeatherRefresh, getWeatherData } from "./weather-service";
 import { scheduleWeatherImpactJobs } from "./weather-impact-service";
+import { scheduleAgreementRenewals, processAgreementRenewals, processSingleAgreementRenewal } from "./services/agreementRenewalService";
+import { scheduleMaintenanceReminders, processMaintenanceReminders } from "./services/maintenanceReminderService";
+import { sendAutomatedSms, SMS_TEMPLATES, hasNotificationBeenSent } from "./services/smsNotificationService";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
-import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword } from "./crm-auth";
+import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword, isSupervisor } from "./crm-auth";
 import cookieParser from "cookie-parser";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import stripePaymentsRouter from "./stripe-payments";
+import { getMessagingAdapter } from "./services/messaging/adapters";
+import { textlineClient } from "./textlineClient";
+import { autoSyncCustomer, autoSyncInvoice, autoVoidInvoice, autoDeleteInvoice, autoSyncPayment } from "./services/quickbooksService";
 
 // Simple in-memory token store for admin authentication (works in Replit iframe where cookies fail)
 const adminTokens = new Map<string, { createdAt: number }>();
@@ -257,6 +264,94 @@ async function checkSchedulingConflict(
   return { hasConflict: false };
 }
 
+// Helper function to create follow-up work order when quote is accepted
+async function createFollowUpWorkOrder(
+  quote: typeof crmQuotes.$inferSelect,
+  parentWorkOrder: typeof crmWorkOrders.$inferSelect,
+  options: { dispatchQueueStage: "WaitingOnParts" | "ReadyToDispatch", assignedTechId?: string | null }
+): Promise<typeof crmWorkOrders.$inferSelect | null> {
+  // Check if follow-up already exists for this quote
+  const [existing] = await db.select().from(crmWorkOrders)
+    .where(eq(crmWorkOrders.sourceQuoteId, quote.id)).limit(1);
+  if (existing) {
+    console.log(`[createFollowUpWorkOrder] Follow-up WO already exists for quote ${quote.id}`);
+    return null;
+  }
+
+  // Get next work order number
+  const lastWO = await db.select({ workOrderNumber: crmWorkOrders.workOrderNumber })
+    .from(crmWorkOrders).orderBy(desc(crmWorkOrders.workOrderNumber)).limit(1);
+  const nextNumber = (lastWO[0]?.workOrderNumber || 0) + 1;
+
+  console.log(`[createFollowUpWorkOrder] Creating follow-up WO #${nextNumber} for quote ${quote.id}, stage: ${options.dispatchQueueStage}`);
+
+  // For WaitingOnParts stage, use specific subtype; otherwise inherit from parent or use default
+  const workSubtype = options.dispatchQueueStage === "WaitingOnParts" 
+    ? "Service Call: Part Replacement" 
+    : parentWorkOrder.workSubtype || "Other";
+
+  const [newWorkOrder] = await db.insert(crmWorkOrders).values({
+    customerId: parentWorkOrder.customerId,
+    propertyId: parentWorkOrder.propertyId,
+    projectId: parentWorkOrder.projectId,
+    sourceQuoteId: quote.id,
+    workOrderNumber: nextNumber,
+    assignedTechId: options.assignedTechId || null,
+    visitType: "SERVICE",
+    workSubtype,
+    title: `Follow-up: ${quote.title || quote.quoteNumber}`,
+    description: quote.description || `Follow-up work order for accepted quote ${quote.quoteNumber}`,
+    status: "scheduled",
+    priority: "urgent",
+    dispatchQueueStage: options.dispatchQueueStage,
+  }).returning();
+
+  console.log(`[createFollowUpWorkOrder] Created follow-up WO ${newWorkOrder.id} for quote ${quote.id}`);
+
+  return newWorkOrder;
+}
+
+// Helper function to check if a quote contains service-type items (not just maintenance)
+async function hasServiceItems(quoteId: string): Promise<boolean> {
+  // Fetch quote line items with their linked crm_items
+  const lineItems = await db.select({
+    lineId: crmQuoteLineItems.id,
+    itemId: crmQuoteLineItems.itemId,
+    lineType: crmQuoteLineItems.lineType,
+    itemCategory: crmItems.category,
+    itemType: crmItems.itemType,
+  })
+  .from(crmQuoteLineItems)
+  .leftJoin(crmItems, eq(crmQuoteLineItems.itemId, crmItems.id))
+  .where(eq(crmQuoteLineItems.quoteId, quoteId));
+
+  // Check if any line item is a service item
+  // Service items have category = 'service' OR itemType = 'service'
+  // We want to trigger follow-up modal only if there are service items
+  for (const item of lineItems) {
+    // Skip discount lines
+    if (item.lineType === 'discount') continue;
+    
+    // If linked to a crm_item, check its category/itemType
+    if (item.itemId) {
+      if (item.itemCategory === 'service' || item.itemType === 'service') {
+        return true;
+      }
+    } else {
+      // For line items without linked crm_item, check lineType
+      // labor, service, part, and other line types indicate service work
+      // (maintenance-only quotes typically use items from the catalog with category='maintenance')
+      if (item.lineType === 'service' || item.lineType === 'labor' || item.lineType === 'part') {
+        return true;
+      }
+    }
+  }
+
+  // If no service items found, check if ALL items are maintenance (return false)
+  // Otherwise if there are install/parts items but no service, also return false
+  return false;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Trust proxy for Replit's infrastructure
   app.set('trust proxy', 1);
@@ -307,6 +402,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register object storage routes for App Storage file uploads
   registerObjectStorageRoutes(app);
+
+  // Register Stripe payment routes
+  app.use(stripePaymentsRouter);
 
   // Ensure CRM users exist with correct roles
   ensureTechniciansExist().catch(console.error);
@@ -5001,8 +5099,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.cookie(CRM_SESSION_COOKIE, session.sessionToken, {
         httpOnly: true,
-        secure: true,
-        sameSite: "none",
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
         maxAge: 8 * 60 * 60 * 1000, // 8 hours
       });
 
@@ -5010,6 +5108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({
         message: "Login successful",
         user: userWithoutPassword,
+        token: session.sessionToken,
       });
     } catch (error) {
       console.error("CRM login error:", error);
@@ -5146,24 +5245,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 1. Company Overview KPIs
-      const quotesInRange = await db
+      // For multi-option quotes, only count the "Best" option total (highest price option)
+      // Single-mode quotes use their total as-is
+      const allQuotesInRange = await db
         .select({
-          total: sql<string>`COALESCE(SUM(CAST(${crmQuotes.total} AS DECIMAL(10,2))), 0)`,
-          count: sql<number>`COUNT(*)`,
+          id: crmQuotes.id,
+          total: crmQuotes.total,
+          quoteMode: crmQuotes.quoteMode,
+          status: crmQuotes.status,
         })
         .from(crmQuotes)
         .where(sql`${crmQuotes.createdAt} >= ${rangeStart}`);
 
-      const acceptedQuotesInRange = await db
-        .select({
-          total: sql<string>`COALESCE(SUM(CAST(${crmQuotes.total} AS DECIMAL(10,2))), 0)`,
-          count: sql<number>`COUNT(*)`,
-        })
-        .from(crmQuotes)
-        .where(and(
-          sql`${crmQuotes.createdAt} >= ${rangeStart}`,
-          eq(crmQuotes.status, "accepted")
-        ));
+      // Get IDs of multi-option quotes
+      const optionQuoteIds = allQuotesInRange
+        .filter(q => q.quoteMode === "options")
+        .map(q => q.id);
+
+      // Fetch all line items for multi-option quotes in a single query
+      const optionLineItems = optionQuoteIds.length > 0
+        ? await db
+            .select({
+              quoteId: crmQuoteLineItems.quoteId,
+              optionTag: crmQuoteLineItems.optionTag,
+              lineTotal: crmQuoteLineItems.lineTotal,
+            })
+            .from(crmQuoteLineItems)
+            .where(inArray(crmQuoteLineItems.quoteId, optionQuoteIds))
+        : [];
+
+      // Build a nested map: quoteId -> optionTag -> cost (lineTotal stores costs)
+      const optionQuoteCosts = new Map<string, Map<string, number>>();
+      const quoteAllOptionsCost = new Map<string, number>(); // Total cost of all options per quote
+      
+      for (const item of optionLineItems) {
+        const quoteId = item.quoteId;
+        const tag = item.optionTag || "default";
+        const lineTotal = parseFloat(item.lineTotal || "0");
+
+        if (!optionQuoteCosts.has(quoteId)) {
+          optionQuoteCosts.set(quoteId, new Map<string, number>());
+        }
+        const optionMap = optionQuoteCosts.get(quoteId)!;
+        optionMap.set(tag, (optionMap.get(tag) || 0) + lineTotal);
+        quoteAllOptionsCost.set(quoteId, (quoteAllOptionsCost.get(quoteId) || 0) + lineTotal);
+      }
+
+      // For multi-option quotes, calculate the highest option's sell price
+      // Using proportional approach: (highestOptionCost / allOptionsCost) * quote.total
+      // This preserves the markup ratio from the original quote
+      const highestOptionSellPrices = new Map<string, number>();
+      for (const quote of allQuotesInRange.filter(q => q.quoteMode === "options")) {
+        const optionMap = optionQuoteCosts.get(quote.id);
+        const allCost = quoteAllOptionsCost.get(quote.id) || 0;
+        const quoteSellPrice = parseFloat(quote.total || "0");
+        
+        if (optionMap && allCost > 0) {
+          // Find the highest cost option
+          let highestCost = 0;
+          for (const cost of optionMap.values()) {
+            if (cost > highestCost) highestCost = cost;
+          }
+          // Calculate proportional sell price for the highest option
+          const highestOptionSellPrice = (highestCost / allCost) * quoteSellPrice;
+          highestOptionSellPrices.set(quote.id, highestOptionSellPrice);
+        }
+      }
+
+      // Calculate totals using precomputed highest option sell prices
+      let totalQuotedCalc = 0;
+      let totalQuotesCount = 0;
+      let totalSoldCalc = 0;
+      let acceptedQuotesCount = 0;
+
+      for (const quote of allQuotesInRange) {
+        totalQuotesCount++;
+        let effectiveTotal = parseFloat(quote.total || "0");
+
+        // For multi-option quotes, use precomputed highest option sell price
+        if (quote.quoteMode === "options" && highestOptionSellPrices.has(quote.id)) {
+          effectiveTotal = highestOptionSellPrices.get(quote.id) || effectiveTotal;
+        }
+
+        totalQuotedCalc += effectiveTotal;
+
+        if (quote.status === "accepted") {
+          acceptedQuotesCount++;
+          totalSoldCalc += effectiveTotal;
+        }
+      }
+
+      const totalQuoted = totalQuotedCalc;
+      const totalSold = totalSoldCalc;
 
       const rolling12Invoices = await db
         .select({
@@ -5175,10 +5348,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eq(crmInvoices.status, "paid")
         ));
 
-      const totalQuoted = parseFloat(quotesInRange[0]?.total || "0");
-      const totalSold = parseFloat(acceptedQuotesInRange[0]?.total || "0");
-      const totalQuotesCount = quotesInRange[0]?.count || 0;
-      const acceptedQuotesCount = acceptedQuotesInRange[0]?.count || 0;
       const closeRate = totalQuotesCount > 0 ? (acceptedQuotesCount / totalQuotesCount) * 100 : 0;
       
       // Calculate dynamic company goal based on range and budgeted monthly sales from Excel
@@ -5269,10 +5438,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // 3. Technician Performance
+      // Include tech and supervisor roles for dashboard tech performance
       const techs = await db
         .select()
         .from(crmUsers)
-        .where(and(eq(crmUsers.role, "tech"), eq(crmUsers.isActive, true)));
+        .where(and(sql`${crmUsers.role} IN ('tech', 'supervisor')`, eq(crmUsers.isActive, true)));
 
       const techPerformance = await Promise.all(
         techs.map(async (tech) => {
@@ -5424,7 +5594,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(crmWorkOrders)
         .where(and(
           eq(crmWorkOrders.status, "completed"),
-          sql`${crmWorkOrders.completedAt} >= ${thirtyDaysAgo}`
+          sql`COALESCE(${crmWorkOrders.completedAt}, ${crmWorkOrders.updatedAt}) >= ${thirtyDaysAgo}`
         ));
       
       const recentWorkOrders = await db
@@ -5640,10 +5810,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const conditions: any[] = [];
 
       if (searchTerm) {
-        const searchPattern = `%${searchTerm}%`;
-        conditions.push(
-          sql`(LOWER(${crmCustomers.name}) LIKE ${searchPattern} OR LOWER(${crmCustomers.email}) LIKE ${searchPattern} OR ${crmCustomers.phone} LIKE ${searchPattern} OR LOWER(${crmCustomers.fullAddress}) LIKE ${searchPattern})`
-        );
+        // Split search into words and require ALL words to match (for multi-word searches like "catherine davis")
+        const searchWords = searchTerm.split(/\s+/).filter(w => w.length > 0);
+        
+        if (searchWords.length > 1) {
+          // Multi-word search: ALL words must be found in name OR address
+          const wordConditions = searchWords.map(word => {
+            const wordPattern = `%${word}%`;
+            return sql`(LOWER(${crmCustomers.name}) LIKE ${wordPattern} OR LOWER(${crmCustomers.fullAddress}) LIKE ${wordPattern})`;
+          });
+          conditions.push(sql`(${sql.join(wordConditions, sql` AND `)})`);
+        } else {
+          // Single word search: match in any field
+          const searchPattern = `%${searchTerm}%`;
+          conditions.push(
+            sql`(LOWER(${crmCustomers.name}) LIKE ${searchPattern} OR LOWER(${crmCustomers.email}) LIKE ${searchPattern} OR ${crmCustomers.phone} LIKE ${searchPattern} OR LOWER(${crmCustomers.fullAddress}) LIKE ${searchPattern})`
+          );
+        }
       }
 
       if (customerType && customerType !== "all") {
@@ -5754,6 +5937,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const [customer] = await db.insert(crmCustomers).values(parsed.data).returning();
+      autoSyncCustomer(customer.id);
       
       await logCrmAudit(
         user?.id || null,
@@ -5801,10 +5985,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         potentialValue: customerData.potentialValue && !isNaN(Number(customerData.potentialValue)) ? parseInt(String(customerData.potentialValue), 10) : null,
         assignedSalesRepId: customerData.assignedSalesRepId || null,
       }).returning();
+      autoSyncCustomer(newCustomer.id);
 
       // Create property if provided
       let newProperty = null;
       if (propertyData?.address1 && propertyData?.city && propertyData?.state && propertyData?.zip) {
+        // Auto-set property type based on customer type (unless manually specified)
+        // Property managers require manual selection per-property
+        const custType = (customerData.customerType || "").toLowerCase();
+        const autoPropertyType = (custType === "residential" || custType === "commercial")
+          ? custType
+          : null;
+        
         const [property] = await db.insert(crmProperties).values({
           customerId: newCustomer.id,
           address1: propertyData.address1,
@@ -5813,6 +6005,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           state: propertyData.state,
           zip: propertyData.zip,
           notes: propertyData.notes || null,
+          propertyType: propertyData.propertyType || autoPropertyType,
         }).returning();
         newProperty = property;
       }
@@ -5940,6 +6133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await db.update(crmCustomers)
           .set(updateData)
           .where(eq(crmCustomers.id, customerId));
+        autoSyncCustomer(customerId);
 
         const auditDetails = name ? { name: name.trim() } : { customerId };
         await logCrmAudit(user.id, "customer.updated", "customer", customerId, auditDetails, req.ip);
@@ -6597,10 +6791,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/crm/technicians - List field workers for dispatch (techs and sales who do field work)
+  // GET /api/crm/technicians - List field workers for dispatch (techs, sales, and supervisors who do field work)
   app.get("/api/crm/technicians", requireCrmAuth, async (req, res) => {
     try {
-      // Include tech and sales roles only - owner and admin are office roles
+      // Include tech, sales, and supervisor roles - they all do field work
       const technicians = await db.select({
         id: crmUsers.id,
         name: crmUsers.name,
@@ -6608,7 +6802,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: crmUsers.role,
       }).from(crmUsers)
         .where(and(
-          sql`${crmUsers.role} IN ('tech', 'sales')`,
+          sql`${crmUsers.role} IN ('tech', 'sales', 'supervisor')`,
           eq(crmUsers.isActive, true)
         ))
         .orderBy(crmUsers.name);
@@ -6801,9 +6995,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate role if provided
-      const validRoles = ["owner", "admin", "sales", "tech"];
+      const validRoles = ["owner", "admin", "supervisor", "sales", "tech"];
       if (role && !validRoles.includes(role)) {
-        return res.status(400).json({ message: "Invalid role. Must be one of: owner, admin, sales, tech" });
+        return res.status(400).json({ message: "Invalid role. Must be one of: owner, admin, supervisor, sales, tech" });
+      }
+
+      // Only owner can change roles
+      if (role && role !== existingUser.role) {
+        if (currentUser?.role !== "owner") {
+          return res.status(403).json({ message: "Only owners can change user roles" });
+        }
       }
 
       // Prevent demoting the last owner
@@ -6824,11 +7025,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const updateData: { name?: string; email?: string; phone?: string | null; role?: "owner" | "admin" | "sales" | "tech" } = {};
+      const updateData: { name?: string; email?: string; phone?: string | null; role?: "owner" | "admin" | "supervisor" | "sales" | "tech" } = {};
       if (name) updateData.name = name;
       if (email) updateData.email = email.toLowerCase();
       if (phone !== undefined) updateData.phone = phone || null;
-      if (role) updateData.role = role as "owner" | "admin" | "sales" | "tech";
+      if (role) updateData.role = role as "owner" | "admin" | "supervisor" | "sales" | "tech";
 
       const [updatedUser] = await db.update(crmUsers).set(updateData).where(eq(crmUsers.id, userId)).returning();
 
@@ -8224,6 +8425,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sourceSystem: "crm_accounts",
         sourceId: newAccount.id,
       }).returning();
+      autoSyncCustomer(newCustomer.id);
 
       // Create sites if provided
       let createdSites: any[] = [];
@@ -9448,35 +9650,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/crm/customers/:id/active-agreements - Get only active agreements for dropdown selection
+  // GET /api/crm/customers/:id/active-agreements - Get active and pending agreements for dispatch view
   app.get("/api/crm/customers/:id/active-agreements", requireCrmAuth, async (req, res) => {
     try {
       const customerId = req.params.id;
       
-      // Get only active agreements for this customer
+      // Get active and pending agreements for this customer with full details
       const agreements = await db.select({
         id: crmAgreements.id,
+        agreementNumber: crmAgreements.agreementNumber,
+        agreementPlan: crmAgreements.agreementPlan,
         agreementType: crmAgreements.agreementType,
         customAgreementTypeId: crmAgreements.customAgreementTypeId,
         status: crmAgreements.status,
+        numberOfSystems: crmAgreements.numberOfSystems,
+        agreementValue: crmAgreements.agreementValue,
         startDate: crmAgreements.startDate,
         endDate: crmAgreements.endDate,
+        contractDate: crmAgreements.contractDate,
         price: crmAgreements.price,
         frequency: crmAgreements.frequency,
         visitsPerPeriod: crmAgreements.visitsPerPeriod,
         nextServiceDate: crmAgreements.nextServiceDate,
+        nextInvoiceDate: crmAgreements.nextInvoiceDate,
+        billingPreference: crmAgreements.billingPreference,
+        autoRenew: crmAgreements.autoRenew,
+        isInitialCycle: crmAgreements.isInitialCycle,
+        isActive: crmAgreements.isActive,
+        activationDate: crmAgreements.activationDate,
+        notes: crmAgreements.notes,
+        propertyId: crmAgreements.propertyId,
       })
         .from(crmAgreements)
         .where(and(
           eq(crmAgreements.customerId, customerId),
-          eq(crmAgreements.status, "active")
+          or(
+            eq(crmAgreements.status, "active"),
+            eq(crmAgreements.status, "pending"),
+            eq(crmAgreements.status, "grace_period")
+          )
         ))
         .orderBy(desc(crmAgreements.createdAt));
       
-      // For each agreement, get custom agreement type name if applicable
-      const agreementsWithNames = await Promise.all(
+      // For each agreement, get custom agreement type name and visit counts
+      const agreementsWithDetails = await Promise.all(
         agreements.map(async (agreement) => {
-          let displayName = agreement.agreementType || "Agreement";
+          let displayName = agreement.agreementPlan || agreement.agreementType || "Agreement";
           
           if (agreement.customAgreementTypeId) {
             const [customType] = await db.select({ name: customAgreementTypes.name })
@@ -9487,14 +9706,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
           
+          // Get visit counts for this agreement
+          const visits = await db.select({
+            id: maintenanceVisits.id,
+            status: maintenanceVisits.status,
+            visitNumber: maintenanceVisits.visitNumber,
+            scheduledDate: maintenanceVisits.scheduledDate,
+            completedDate: maintenanceVisits.completedDate,
+            cycleYear: maintenanceVisits.cycleYear,
+          })
+            .from(maintenanceVisits)
+            .where(eq(maintenanceVisits.agreementId, agreement.id));
+          
+          const currentYear = new Date().getFullYear();
+          const currentCycleVisits = visits.filter(v => v.cycleYear === currentYear);
+          const completedVisits = currentCycleVisits.filter(v => v.status === "completed").length;
+          const scheduledVisits = currentCycleVisits.filter(v => v.status === "scheduled" || v.status === "pending").length;
+          const totalVisits = agreement.visitsPerPeriod || 2;
+          
+          // Get last completed visit date
+          const completedVisitsSorted = visits
+            .filter(v => v.status === "completed" && v.completedDate)
+            .sort((a, b) => new Date(b.completedDate!).getTime() - new Date(a.completedDate!).getTime());
+          const lastVisitDate = completedVisitsSorted.length > 0 ? completedVisitsSorted[0].completedDate : null;
+          
+          // Calculate price to display (agreementValue or price field)
+          const displayPrice = agreement.agreementValue || agreement.price || "0.00";
+          
           return {
             ...agreement,
             displayName,
+            displayPrice,
+            visitProgress: {
+              completed: completedVisits,
+              scheduled: scheduledVisits,
+              total: totalVisits,
+              remaining: Math.max(0, totalVisits - completedVisits),
+              lastVisitDate,
+            },
           };
         })
       );
       
-      return res.json(agreementsWithNames);
+      return res.json(agreementsWithDetails);
     } catch (error) {
       console.error("Error fetching customer active agreements:", error);
       return res.status(500).json({ message: "Failed to fetch active agreements" });
@@ -9656,6 +9910,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Get customer to determine auto property type
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId)).limit(1);
+      
+      // Auto-set property type based on customer type (unless manually specified)
+      // Property managers require manual selection per-property
+      let autoPropertyType = null;
+      const custType = customer?.customerType?.toLowerCase();
+      if (custType === "residential" || custType === "commercial") {
+        autoPropertyType = custType;
+      }
+      
+      const { propertyType } = req.body;
+      
       const [newProperty] = await db.insert(crmProperties).values({
         customerId,
         address1: address1.trim(),
@@ -9673,6 +9940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentTerms: paymentTerms || null,
         paymentMethod: paymentMethod || null,
         approvalRule: approvalRule || null,
+        propertyType: propertyType || autoPropertyType,
       }).returning();
 
       return res.status(201).json(newProperty);
@@ -9686,7 +9954,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/crm/properties/:id", requireCrmAuth, async (req, res) => {
     try {
       const propertyId = req.params.id;
-      const { address1, address2, city, state, zip, notes, tenantName, tenantPhone, tenantEmail, preferredPaymentMethod, billingOverride, billedTo, paymentTerms, paymentMethod, approvalRule } = req.body;
+      const { address1, address2, city, state, zip, notes, tenantName, tenantPhone, tenantEmail, preferredPaymentMethod, billingOverride, billedTo, paymentTerms, paymentMethod, approvalRule, propertyType } = req.body;
 
       // Fetch existing property to get customer info
       const [existingProperty] = await db.select().from(crmProperties).where(eq(crmProperties.id, propertyId));
@@ -9740,6 +10008,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (paymentTerms !== undefined) updateData.paymentTerms = paymentTerms || null;
       if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod || null;
       if (approvalRule !== undefined) updateData.approvalRule = approvalRule || null;
+      if (propertyType !== undefined) updateData.propertyType = propertyType || null;
 
       if (Object.keys(updateData).length === 0) {
         return res.status(400).json({ message: "No fields to update" });
@@ -10182,10 +10451,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Convert date strings to Date objects before validation
+      // Use fromZonedTime to properly convert local time strings to UTC
+      // (the client sends times in EST without timezone suffix)
       const bodyWithDates = {
         ...req.body,
-        scheduledStart: req.body.scheduledStart ? new Date(req.body.scheduledStart) : undefined,
-        scheduledEnd: req.body.scheduledEnd ? new Date(req.body.scheduledEnd) : undefined,
+        scheduledStart: req.body.scheduledStart 
+          ? fromZonedTime(new Date(req.body.scheduledStart), APP_TIMEZONE)
+          : undefined,
+        scheduledEnd: req.body.scheduledEnd 
+          ? fromZonedTime(new Date(req.body.scheduledEnd), APP_TIMEZONE)
+          : undefined,
         startedAt: req.body.startedAt ? new Date(req.body.startedAt) : undefined,
         completedAt: req.body.completedAt ? new Date(req.body.completedAt) : undefined,
       };
@@ -10193,6 +10468,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = insertCrmWorkOrderSchema.safeParse(bodyWithDates);
       if (!result.success) {
         return res.status(400).json({ message: "Invalid work order data", errors: result.error.flatten() });
+      }
+
+      // For MAINTENANCE visit types, verify property has an active maintenance agreement
+      if (result.data.visitType === "MAINTENANCE") {
+        const activeAgreement = await db.select()
+          .from(crmAgreements)
+          .where(and(
+            eq(crmAgreements.propertyId, propertyId),
+            or(
+              eq(crmAgreements.status, "active"),
+              eq(crmAgreements.status, "pending"),
+              eq(crmAgreements.status, "grace_period")
+            )
+          ))
+          .limit(1);
+        
+        if (activeAgreement.length === 0) {
+          return res.status(400).json({ 
+            message: "Cannot schedule maintenance work order",
+            error: "NO_MAINTENANCE_AGREEMENT",
+            details: "This property does not have an active maintenance agreement. Please create a maintenance agreement first or select a different visit type."
+          });
+        }
       }
 
       // Check for scheduling conflicts
@@ -10304,11 +10602,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dispatchQueueStage: true,
         customerId: true,
         propertyId: true,
+        dispatchNotes: true,
+        isPending: true,
+        pendingReason: true,
       }).extend({
         scheduledStart: z.union([z.string(), z.date(), z.null()]).optional(),
         scheduledEnd: z.union([z.string(), z.date(), z.null()]).optional(),
         startedAt: z.union([z.string(), z.date(), z.null()]).optional(),
         completedAt: z.union([z.string(), z.date(), z.null()]).optional(),
+        pendingStartedAt: z.union([z.string(), z.date(), z.null()]).optional(),
         updateProjectCustomer: z.boolean().optional(),
       });
 
@@ -10321,7 +10623,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, completionSummary, checklist, partsUsed, startedAt, completedAt, projectId, agreementId, title, description, priority, visitType, workSubtype, dispatchQueueStage, customerId, propertyId, updateProjectCustomer } = result.data;
+      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, completionSummary, checklist, partsUsed, startedAt, completedAt, projectId, agreementId, title, description, priority, visitType, workSubtype, dispatchQueueStage, customerId, propertyId, updateProjectCustomer, dispatchNotes, isPending, pendingReason, pendingStartedAt } = result.data;
 
       // If projectId is provided (not null), verify it exists
       if (projectId !== undefined && projectId !== null) {
@@ -10380,6 +10682,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updateData: Partial<InsertCrmWorkOrder> = {};
       if (status !== undefined) updateData.status = status;
+      
+      // Record status change timestamps for time tracking (only if not already set)
+      if (status === "dispatched" && existingWorkOrder.status !== "dispatched" && !existingWorkOrder.dispatchedAt) {
+        updateData.dispatchedAt = new Date();
+      }
+      if (status === "en_route" && existingWorkOrder.status !== "en_route" && !existingWorkOrder.enRouteAt) {
+        updateData.enRouteAt = new Date();
+      }
+      if (status === "on_site" && existingWorkOrder.status !== "on_site" && !existingWorkOrder.onSiteAt) {
+        updateData.onSiteAt = new Date();
+      }
+      if (status === "completed" && existingWorkOrder.status !== "completed" && !existingWorkOrder.completedAt) {
+        updateData.completedAt = new Date();
+      }
+      
       if (assignedTechId !== undefined) updateData.assignedTechId = assignedTechId;
       if (scheduledStart !== undefined) updateData.scheduledStart = scheduledStart ? new Date(scheduledStart) : null;
       if (scheduledEnd !== undefined) updateData.scheduledEnd = scheduledEnd ? new Date(scheduledEnd) : null;
@@ -10399,6 +10716,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (dispatchQueueStage !== undefined) updateData.dispatchQueueStage = dispatchQueueStage;
       if (customerId !== undefined) updateData.customerId = customerId;
       if (propertyId !== undefined) updateData.propertyId = propertyId;
+      if (dispatchNotes !== undefined) updateData.dispatchNotes = dispatchNotes;
+      if (isPending !== undefined) updateData.isPending = isPending;
+      if (pendingReason !== undefined) updateData.pendingReason = pendingReason;
+      if (pendingStartedAt !== undefined) {
+        updateData.pendingStartedAt = pendingStartedAt ? new Date(pendingStartedAt as string) : null;
+      }
 
       // If customer is being changed and there's a linked project, update project too
       if (customerId !== undefined && customerId !== existingWorkOrder.customerId && updateProjectCustomer) {
@@ -10440,6 +10763,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
               })
               .where(eq(maintenanceVisits.id, pendingVisit.id));
             
+            // Check if this is a pay-on-visit agreement that needs activation
+            const [agreement] = await db.select()
+              .from(crmAgreements)
+              .where(eq(crmAgreements.id, effectiveAgreementId))
+              .limit(1);
+            
+            if (agreement && agreement.billingPreference === "pay_on_visit" && 
+                agreement.status === "pending" && agreement.isInitialCycle) {
+              // First visit completed for pay-on-visit = initial payment collected, activate agreement
+              const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
+              await db.update(crmAgreements)
+                .set({
+                  status: "active",
+                  activationDate: todayStr,
+                  isInitialCycle: false,
+                  updatedAt: new Date(),
+                })
+                .where(eq(crmAgreements.id, effectiveAgreementId));
+              console.log(`[WorkOrder] Activated pay-on-visit agreement ${agreement.agreementNumber} after first visit completion`);
+            }
+            
             // Find the next pending visit for this agreement
             const [nextVisit] = await db.select()
               .from(maintenanceVisits)
@@ -10477,6 +10821,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 .where(eq(maintenanceVisits.id, visit.id));
               
               if (visit.agreementId) {
+                // Check if this is a pay-on-visit agreement that needs activation
+                const [linkedAgreement] = await db.select()
+                  .from(crmAgreements)
+                  .where(eq(crmAgreements.id, visit.agreementId))
+                  .limit(1);
+                
+                if (linkedAgreement && linkedAgreement.billingPreference === "pay_on_visit" && 
+                    linkedAgreement.status === "pending" && linkedAgreement.isInitialCycle) {
+                  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
+                  await db.update(crmAgreements)
+                    .set({
+                      status: "active",
+                      activationDate: todayStr,
+                      isInitialCycle: false,
+                      updatedAt: new Date(),
+                    })
+                    .where(eq(crmAgreements.id, visit.agreementId));
+                  console.log(`[WorkOrder] Activated pay-on-visit agreement ${linkedAgreement.agreementNumber} after first visit completion (pre-linked)`);
+                }
+                
                 const [nextVisit] = await db.select()
                   .from(maintenanceVisits)
                   .where(and(
@@ -10495,10 +10859,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
           } else if (workOrder?.customerId) {
-            // No pre-linked visits - try to find an active agreement for this customer/property
+            // No pre-linked visits - try to find an agreement for this customer/property
+            // Check for both active and pending (for pay-on-visit initial activation)
             const agreementConditions = [
               eq(crmAgreements.customerId, workOrder.customerId),
-              eq(crmAgreements.status, "active")
+              or(eq(crmAgreements.status, "active"), eq(crmAgreements.status, "pending"))
             ];
             
             // If property is specified, match by property too for more precision
@@ -10538,6 +10903,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   .set({ agreementId: matchingAgreement.id })
                   .where(eq(crmWorkOrders.id, req.params.id));
                 
+                // Check if this is a pay-on-visit agreement that needs activation
+                if (matchingAgreement.billingPreference === "pay_on_visit" && 
+                    matchingAgreement.status === "pending" && matchingAgreement.isInitialCycle) {
+                  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
+                  await db.update(crmAgreements)
+                    .set({
+                      status: "active",
+                      activationDate: todayStr,
+                      isInitialCycle: false,
+                      updatedAt: new Date(),
+                    })
+                    .where(eq(crmAgreements.id, matchingAgreement.id));
+                  console.log(`[WorkOrder] Activated pay-on-visit agreement ${matchingAgreement.agreementNumber} after first visit completion (customer/property match)`);
+                }
+                
                 // Find the next pending visit for this agreement
                 const [nextVisit] = await db.select()
                   .from(maintenanceVisits)
@@ -10561,16 +10941,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Send SMS notifications for status changes to en_route or on_site
+      let smsNotificationSent = false;
+      if (status && (status === "en_route" || status === "on_site") && existingWorkOrder.status !== status) {
+        try {
+          // Get customer phone
+          const customerId = workOrder?.customerId || existingWorkOrder.customerId;
+          if (customerId) {
+            const [customer] = await db.select().from(crmCustomers)
+              .where(eq(crmCustomers.id, customerId)).limit(1);
+            
+            if (customer?.phone) {
+              const notificationType = status === "en_route" ? "work_order_en_route" : "work_order_on_site";
+              
+              // Check if notification was already sent
+              const alreadySent = await hasNotificationBeenSent(notificationType, req.params.id, "work_order");
+              
+              if (!alreadySent) {
+                const messageBody = status === "en_route" 
+                  ? SMS_TEMPLATES.WORK_ORDER_EN_ROUTE 
+                  : SMS_TEMPLATES.WORK_ORDER_ON_SITE;
+                
+                const smsResult = await sendAutomatedSms({
+                  customerId,
+                  phoneNumber: customer.phone,
+                  messageBody,
+                  notificationType,
+                  workOrderId: req.params.id,
+                });
+                
+                smsNotificationSent = smsResult.success;
+                console.log(`[WorkOrder SMS] ${status} notification ${smsNotificationSent ? 'sent' : 'failed'} for work order ${req.params.id}`);
+              }
+            }
+          }
+        } catch (smsError) {
+          console.error("[WorkOrder SMS] Error sending status notification:", smsError);
+        }
+      }
+
       await logCrmAudit(
         user.id,
         "work_order.updated",
         "work_order",
         req.params.id,
-        { updates: Object.keys(updateData) },
+        { updates: Object.keys(updateData), smsNotificationSent },
         req.ip
       );
 
-      return res.json(workOrder);
+      return res.json({ ...workOrder, smsNotificationSent });
     } catch (error) {
       console.error("Error updating work order:", error);
       return res.status(500).json({ message: "Failed to update work order" });
@@ -10987,50 +11406,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const conditions = [];
 
       // Apply tab-based filtering (server-side filtering before pagination)
+      // Status is stored directly in the status field: pending, active, grace_period, expired, cancelled
       if (tab === "all") {
-        // All Active = active + grace_period (excludes expired and cancelled)
-        conditions.push(
-          and(
-            eq(crmAgreements.status, "active"),
-            or(
-              isNull(crmAgreements.endDate),
-              sql`${crmAgreements.endDate} > ${thirtyDaysAgoStr}`
-            )
-          )
-        );
-      } else if (tab === "active") {
-        // Active only = status='active' AND (endDate is null OR endDate > today)
-        conditions.push(
-          and(
-            eq(crmAgreements.status, "active"),
-            or(
-              isNull(crmAgreements.endDate),
-              sql`${crmAgreements.endDate} > ${todayStr}`
-            )
-          )
-        );
-      } else if (tab === "grace_period") {
-        // Grace Period = status='active' AND endDate between (today-30) and today
-        conditions.push(
-          and(
-            eq(crmAgreements.status, "active"),
-            sql`${crmAgreements.endDate} IS NOT NULL`,
-            sql`${crmAgreements.endDate} <= ${todayStr}`,
-            sql`${crmAgreements.endDate} > ${thirtyDaysAgoStr}`
-          )
-        );
-      } else if (tab === "expired") {
-        // Expired = status='expired' OR (status='active' AND endDate <= today-30)
+        // All = everything except expired and cancelled
         conditions.push(
           or(
-            eq(crmAgreements.status, "expired"),
-            and(
-              eq(crmAgreements.status, "active"),
-              sql`${crmAgreements.endDate} IS NOT NULL`,
-              sql`${crmAgreements.endDate} <= ${thirtyDaysAgoStr}`
-            )
+            eq(crmAgreements.status, "pending"),
+            eq(crmAgreements.status, "active"),
+            eq(crmAgreements.status, "grace_period")
           )
         );
+      } else if (tab === "pending") {
+        // Pending = awaiting first invoice payment
+        conditions.push(eq(crmAgreements.status, "pending"));
+      } else if (tab === "active") {
+        // Active = fully operational agreements
+        conditions.push(eq(crmAgreements.status, "active"));
+      } else if (tab === "grace_period") {
+        // Grace Period = renewal invoice sent, awaiting payment
+        conditions.push(eq(crmAgreements.status, "grace_period"));
+      } else if (tab === "expired") {
+        // Expired = grace period passed without payment
+        conditions.push(eq(crmAgreements.status, "expired"));
       } else if (tab === "upcoming_service") {
         // Upcoming Service = nextServiceDate between today and today+15
         conditions.push(
@@ -11072,47 +11469,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .offset(offset);
 
       // Compute status counts for ALL agreements (ignoring search/pagination)
-      // Status is computed dynamically based on endDate:
-      // - active: endDate is in the future or null
-      // - grace_period: 0-30 days after endDate
-      // - expired: more than 30 days after endDate
-      // (Reusing todayStr, thirtyDaysAgoStr, fifteenDaysFromNowStr from above)
+      // Status is now stored directly as: pending, active, grace_period, expired, cancelled
 
-      // Count active: status='active' AND (end_date IS NULL OR end_date > today)
+      // Count pending: status='pending'
+      const [pendingCount] = await db
+        .select({ count: count() })
+        .from(crmAgreements)
+        .where(eq(crmAgreements.status, "pending"));
+
+      // Count active: status='active'
       const [activeCount] = await db
         .select({ count: count() })
         .from(crmAgreements)
-        .where(and(
-          eq(crmAgreements.status, "active"),
-          or(
-            isNull(crmAgreements.endDate),
-            sql`${crmAgreements.endDate} > ${todayStr}`
-          )
-        ));
+        .where(eq(crmAgreements.status, "active"));
 
-      // Count grace_period: status='active' AND end_date between (today - 30 days) and today
+      // Count grace_period: status='grace_period'
       const [gracePeriodCount] = await db
         .select({ count: count() })
         .from(crmAgreements)
-        .where(and(
-          eq(crmAgreements.status, "active"),
-          sql`${crmAgreements.endDate} IS NOT NULL`,
-          sql`${crmAgreements.endDate} <= ${todayStr}`,
-          sql`${crmAgreements.endDate} > ${thirtyDaysAgoStr}`
-        ));
+        .where(eq(crmAgreements.status, "grace_period"));
 
-      // Count expired: status='active' AND end_date <= (today - 30 days), OR status='expired'
+      // Count expired: status='expired'
       const [expiredCount] = await db
         .select({ count: count() })
         .from(crmAgreements)
-        .where(or(
-          eq(crmAgreements.status, "expired"),
-          and(
-            eq(crmAgreements.status, "active"),
-            sql`${crmAgreements.endDate} IS NOT NULL`,
-            sql`${crmAgreements.endDate} <= ${thirtyDaysAgoStr}`
-          )
-        ));
+        .where(eq(crmAgreements.status, "expired"));
 
       // Count upcoming_service: nextServiceDate is 0-15 days from now
       const [upcomingServiceCount] = await db
@@ -11125,11 +11506,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ));
 
       const statusCounts = {
+        pending: Number(pendingCount?.count || 0),
         active: Number(activeCount?.count || 0),
         grace_period: Number(gracePeriodCount?.count || 0),
         expired: Number(expiredCount?.count || 0),
         upcoming_service: Number(upcomingServiceCount?.count || 0),
-        all_active: Number(activeCount?.count || 0) + Number(gracePeriodCount?.count || 0),
+        all_active: Number(pendingCount?.count || 0) + Number(activeCount?.count || 0) + Number(gracePeriodCount?.count || 0),
       };
 
       return res.json({
@@ -11204,9 +11586,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // For pay-on-visit agreements, start as pending (awaiting first visit payment from tech)
+      // For auto-invoice, start as pending (awaiting first invoice payment)
+      const initialStatus = "pending";
+      const activationDate = undefined;
+      
       const [agreement] = await db
         .insert(crmAgreements)
-        .values(result.data)
+        .values({
+          ...result.data,
+          status: initialStatus,
+          activationDate: activationDate,
+          // Keep isInitialCycle true for first cycle - it flips to false after first renewal
+          isInitialCycle: true,
+        })
         .returning();
 
       // Auto-generate maintenance visits if appointmentDate is provided
@@ -11247,12 +11640,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             visitDate.setMonth(visitDate.getMonth() + (i * monthsApart));
           }
           
+          const isLastVisit = i === visitsPerPeriod - 1;
+          // For pay-on-visit agreements, the last visit is the renewal trigger
+          const isRenewalTrigger = agreement.billingPreference === "pay_on_visit" && isLastVisit;
+          
           visits.push({
             agreementId: agreement.id,
             visitNumber: i + 1,
+            totalVisitsInCycle: visitsPerPeriod,
             cycleYear,
             targetDate: formatDateStr(visitDate),
             status: "pending" as const,
+            isRenewalTrigger,
+            renewalStatus: isRenewalTrigger ? "pending" as const : "none" as const,
           });
         }
         
@@ -11364,6 +11764,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting agreement:", error);
       return res.status(500).json({ message: "Failed to delete agreement" });
+    }
+  });
+
+  // POST /api/crm/agreements/:id/send-invoice - Send renewal invoice for a single agreement
+  app.post("/api/crm/agreements/:id/send-invoice", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const agreementId = req.params.id;
+      
+      const [agreement] = await db
+        .select()
+        .from(crmAgreements)
+        .where(eq(crmAgreements.id, agreementId));
+
+      if (!agreement) {
+        return res.status(404).json({ message: "Agreement not found" });
+      }
+
+      console.log(`[AgreementRenewal] Manual invoice send for agreement ${agreement.agreementNumber} by ${user.email}`);
+      
+      const { processSingleAgreementRenewal } = await import("./services/agreementRenewalService");
+      const result = await processSingleAgreementRenewal(agreement);
+      
+      await logCrmAudit(
+        user.id,
+        "agreement.invoice_sent",
+        "agreement",
+        agreementId,
+        { 
+          agreementNumber: agreement.agreementNumber,
+          invoiceNumber: result.invoiceNumber,
+          emailSent: result.emailSent,
+          error: result.error
+        },
+        req.ip
+      );
+
+      if (result.error) {
+        return res.status(500).json({ message: result.error, result });
+      }
+
+      return res.json(result);
+    } catch (error) {
+      console.error("Error sending agreement invoice:", error);
+      return res.status(500).json({ message: "Failed to send agreement invoice" });
+    }
+  });
+
+  // POST /api/crm/customers/import - Import customers from CSV
+  app.post("/api/crm/customers/import", requireCrmSalesOrAbove, upload.single("file"), async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const csvContent = req.file.buffer.toString("utf-8");
+      const lines = csvContent.split("\n").filter((line) => line.trim());
+
+      if (lines.length < 2) {
+        return res.status(400).json({ message: "CSV file is empty or has no data rows" });
+      }
+
+      const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/['"]/g, ""));
+      const imported: any[] = [];
+      const errors: string[] = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        try {
+          const values = parseCSVLine(lines[i]);
+          const row: Record<string, string> = {};
+          headers.forEach((header, index) => {
+            row[header] = values[index] || "";
+          });
+
+          const customerData = {
+            name: row["name"] || row["customer name"] || row["customername"] || row["customer"] || "",
+            email: row["email"] || row["e-mail"] || null,
+            phone: row["phone"] || row["telephone"] || row["tel"] || null,
+            address1: row["address"] || row["street"] || row["address1"] || null,
+            city: row["city"] || null,
+            state: row["state"] || null,
+            zip: row["zip"] || row["zipcode"] || row["postal code"] || null,
+            notes: row["notes"] || row["note"] || null,
+            fullAddress: null as string | null,
+          };
+
+          if (!customerData.name) {
+            errors.push(`Row ${i + 1}: Missing customer name`);
+            continue;
+          }
+
+          // Build full address if components are present
+          if (customerData.address1 || customerData.city) {
+            const addressParts = [customerData.address1, customerData.city, customerData.state, customerData.zip].filter(Boolean);
+            customerData.fullAddress = addressParts.join(", ");
+          }
+
+          const [newCustomer] = await db.insert(crmCustomers).values({
+            id: nanoid(),
+            name: customerData.name,
+            email: customerData.email,
+            phone: customerData.phone,
+            fullAddress: customerData.fullAddress,
+            notes: customerData.notes,
+          }).returning();
+          autoSyncCustomer(newCustomer.id);
+
+          imported.push(newCustomer);
+        } catch (rowError) {
+          errors.push(`Row ${i + 1}: ${rowError instanceof Error ? rowError.message : "Unknown error"}`);
+        }
+      }
+
+      await logCrmAudit(
+        user.id,
+        "customers.imported",
+        "crm_customers",
+        null,
+        { count: imported.length, errors: errors.length },
+        req.ip
+      );
+
+      return res.json({
+        imported: imported.length,
+        errors: errors.length,
+        errorDetails: errors.slice(0, 10),
+      });
+    } catch (error) {
+      console.error("Error importing customers:", error);
+      return res.status(500).json({ message: "Failed to import customers" });
     }
   });
 
@@ -12489,6 +13028,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [activity] = await db.insert(projectActivities).values(result.data).returning();
 
+      // When equipment_status activity is created, automatically update project status to equipment_ordered
+      // if current status is lead, proposal_sent, or approved
+      if (activityType === "equipment_status") {
+        const eligibleStatuses = ["lead", "proposal_sent", "approved"];
+        if (eligibleStatuses.includes(project.status)) {
+          await db
+            .update(crmProjects)
+            .set({ status: "equipment_ordered" })
+            .where(eq(crmProjects.id, projectId));
+          console.log(`[EQUIPMENT TRACKING] Updated project ${projectId} status from ${project.status} to equipment_ordered`);
+        }
+      }
+
       // DEBUG: Log created activity
       console.log(`[TIMELINE DEBUG] Activity CREATED:`, {
         id: activity.id,
@@ -12548,16 +13100,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DELETE /api/crm/projects/:projectId/activities/:activityId - Delete activity
   app.delete("/api/crm/projects/:projectId/activities/:activityId", requireCrmAuth, async (req, res) => {
     try {
-      const { activityId } = req.params;
+      const { projectId, activityId } = req.params;
 
       const [existing] = await db.select().from(projectActivities).where(eq(projectActivities.id, activityId));
       if (!existing) {
         return res.status(404).json({ message: "Activity not found" });
       }
 
+      // If deleting an equipment_status activity, revert project to "lead" status
+      if (existing.activityType === "equipment_status") {
+        console.log(`[DeleteActivity] Deleting equipment_status activity, reverting project ${projectId} to lead status`);
+        await db.update(crmProjects)
+          .set({ 
+            status: "lead",
+            updatedAt: new Date()
+          })
+          .where(eq(crmProjects.id, projectId));
+      }
+
       await db.delete(projectActivities).where(eq(projectActivities.id, activityId));
 
-      return res.json({ message: "Activity deleted successfully" });
+      return res.json({ 
+        message: "Activity deleted successfully",
+        revertedStatus: existing.activityType === "equipment_status" ? "lead" : null
+      });
     } catch (error) {
       console.error("Error deleting project activity:", error);
       return res.status(500).json({ message: "Failed to delete project activity" });
@@ -12593,7 +13159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/crm/invoices - List invoices with filters and pagination (OPTIMIZED)
   app.get("/api/crm/invoices", requireCrmAuth, async (req, res) => {
     try {
-      const { customerId, status, workOrderId, projectId, page = "1", limit = "25" } = req.query;
+      const { customerId, status, workOrderId, projectId, agreementId, page = "1", limit = "25" } = req.query;
       const pageNum = parseInt(page as string, 10) || 1;
       const limitNum = Math.min(50, parseInt(limit as string, 10) || 25);
       const offset = (pageNum - 1) * limitNum;
@@ -12610,6 +13176,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (projectId) {
         conditions.push(eq(crmInvoices.projectId, projectId as string));
+      }
+      if (agreementId) {
+        conditions.push(eq(crmInvoices.agreementId, agreementId as string));
       }
       
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -12761,6 +13330,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const [invoice] = await db.insert(crmInvoices).values(parseResult.data).returning();
+      autoSyncInvoice(invoice.id);
       
       await db.update(crmWorkOrders)
         .set({ 
@@ -12931,10 +13501,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate invoice number
       const invoiceNumber = await generateInvoiceNumber();
 
-      // Calculate totals from line items
+      // For install/proposal quotes, use the quote's total (sell price) which includes 
+      // overhead, profit margins, etc. Only fall back to summing line items for 
+      // service quotes or if quote total is not set.
       let subtotal = 0;
-      for (const item of quoteLineItems) {
-        subtotal += parseFloat(item.lineTotal || "0");
+      const quoteTotal = parseFloat(quote.total || "0");
+      
+      if (quoteTotal > 0) {
+        // Use the quote's total (sell price) for install quotes
+        subtotal = quoteTotal;
+      } else {
+        // Fall back to summing line items for service quotes
+        for (const item of quoteLineItems) {
+          subtotal += parseFloat(item.lineTotal || "0");
+        }
+      }
+
+      // Calculate balance due (subtract any deposit already paid)
+      const depositPaid = parseFloat(quote.depositAmount || "0");
+      const balanceDue = Math.max(0, subtotal - depositPaid);
+
+      // Build notes to include deposit info if applicable
+      let invoiceNotes = quote.notes || "";
+      if (depositPaid > 0) {
+        const depositNote = `Deposit received: $${depositPaid.toFixed(2)} (paid ${quote.depositPaidAt ? new Date(quote.depositPaidAt).toLocaleDateString() : 'previously'})`;
+        invoiceNotes = invoiceNotes ? `${invoiceNotes}\n\n${depositNote}` : depositNote;
       }
 
       // Create the invoice
@@ -12948,12 +13539,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         subtotal: String(subtotal),
         laborTotal: "0",
         total: String(subtotal),
-        balanceDue: String(subtotal),
-        notes: quote.notes || undefined,
+        amountPaid: depositPaid > 0 ? String(depositPaid) : undefined,
+        balanceDue: String(balanceDue),
+        notes: invoiceNotes || undefined,
         createdBy: user.id,
       };
 
       const [invoice] = await db.insert(crmInvoices).values(invoiceData).returning();
+      autoSyncInvoice(invoice.id);
 
       // Copy line items to invoice - Batch insert for better performance
       const invoiceLineItemsToInsert = quoteLineItems.map(quoteItem => ({
@@ -13041,6 +13634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .set(updates)
         .where(eq(crmInvoices.id, req.params.id))
         .returning();
+      autoSyncInvoice(updatedInvoice.id);
       
       await logCrmAudit(
         user.id,
@@ -13077,6 +13671,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(crmWorkOrders.id, existingInvoice.workOrderId));
       }
       
+      // Deactivate Stripe payment link if it exists
+      if (existingInvoice.stripePaymentLinkId) {
+        try {
+          const { getUncachableStripeClient } = await import("./stripeClient");
+          const stripe = await getUncachableStripeClient();
+          await stripe.paymentLinks.update(existingInvoice.stripePaymentLinkId, {
+            active: false
+          });
+          console.log(`[Invoice] Deactivated Stripe payment link ${existingInvoice.stripePaymentLinkId} for deleted invoice ${existingInvoice.invoiceNumber}`);
+        } catch (stripeErr) {
+          console.error(`[Invoice] Failed to deactivate Stripe payment link:`, stripeErr);
+          // Don't fail the delete - just log the error
+        }
+      }
+      
       // Delete any auto-created maintenance agreements that reference this invoice
       // Agreements are linked by the notes field containing "Auto-created from Invoice {invoiceNumber}"
       if (existingInvoice.invoiceNumber) {
@@ -13093,7 +13702,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // IMPORTANT: Capture QuickBooks sync info BEFORE deleting the CRM invoice
+      // The sync record will be CASCADE deleted when the CRM invoice is deleted
+      const [qbSyncRecord] = await db.select()
+        .from(quickbooksInvoiceSync)
+        .where(eq(quickbooksInvoiceSync.crmInvoiceId, req.params.id))
+        .limit(1);
+      
+      const capturedQbInvoiceId = qbSyncRecord?.quickbooksInvoiceId;
+      const capturedRealmId = qbSyncRecord?.realmId;
+      
+      // Delete the CRM invoice (this will CASCADE delete the sync record)
       await db.delete(crmInvoices).where(eq(crmInvoices.id, req.params.id));
+      
+      // Now delete from QuickBooks using the captured ID (fire and forget)
+      if (capturedQbInvoiceId && capturedRealmId) {
+        autoDeleteInvoice(req.params.id, capturedQbInvoiceId, capturedRealmId);
+      }
       
       await logCrmAudit(
         user.id,
@@ -13185,6 +13810,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .where(eq(crmInvoices.id, req.params.id))
         .returning();
+      autoSyncInvoice(updatedInvoice.id);
       
       await logCrmAudit(
         user.id,
@@ -13252,6 +13878,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(crmInvoices.id, req.params.id))
         .returning();
       
+      // Sync invoice and payment to QuickBooks
+      autoSyncInvoice(updatedInvoice.id);
+      autoSyncPayment(updatedInvoice.id, paidAmount.toFixed(2));
+      
+      // Deactivate Stripe payment link if invoice is fully paid and has one
+      if (newStatus === "paid" && invoice.stripePaymentLinkId) {
+        try {
+          const { getUncachableStripeClient } = await import("./stripeClient");
+          const stripe = await getUncachableStripeClient();
+          await stripe.paymentLinks.update(invoice.stripePaymentLinkId, {
+            active: false
+          });
+          console.log(`[Invoice] Deactivated Stripe payment link ${invoice.stripePaymentLinkId} for invoice ${invoice.invoiceNumber}`);
+        } catch (stripeErr) {
+          console.error(`[Invoice] Failed to deactivate Stripe payment link:`, stripeErr);
+          // Don't fail the payment - just log the error
+        }
+      }
+      
       await logCrmAudit(
         user.id,
         balanceDue <= 0.01 ? "invoice.paid" : "invoice.payment",
@@ -13262,7 +13907,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       // Auto-create maintenance agreement if invoice is fully paid and contains maintenance items
-      if (newStatus === "paid" && invoice.customerId) {
+      // BUT skip if invoice is already linked to an existing agreement (to avoid duplication)
+      if (newStatus === "paid" && invoice.customerId && !invoice.agreementId) {
         try {
           // Find maintenance line items by joining with crmItems catalog or checking description
           const lineItemsWithCatalog = await db.select({
@@ -13293,6 +13939,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           
           if (maintenanceLineItems.length > 0) {
+            // FIRST: Check if there's already an existing agreement for this customer+property
+            // This prevents creating duplicate agreements when invoice is created separately from existing agreement
+            const existingAgreementConditions = [
+              eq(crmAgreements.customerId, invoice.customerId),
+              or(
+                eq(crmAgreements.status, "pending"),
+                eq(crmAgreements.status, "active"),
+                eq(crmAgreements.status, "grace_period")
+              )
+            ];
+            
+            // If invoice has a propertyId, also match on property
+            if (invoice.propertyId) {
+              existingAgreementConditions.push(eq(crmAgreements.propertyId, invoice.propertyId));
+            }
+            
+            const [existingAgreement] = await db.select()
+              .from(crmAgreements)
+              .where(and(...existingAgreementConditions))
+              .limit(1);
+            
+            if (existingAgreement) {
+              // Link this invoice to the existing agreement instead of creating a new one
+              await db.update(crmInvoices)
+                .set({ agreementId: existingAgreement.id, updatedAt: new Date() })
+                .where(eq(crmInvoices.id, req.params.id));
+              
+              console.log(`[Invoice] Linked invoice ${invoice.invoiceNumber} to existing agreement ${existingAgreement.agreementNumber} (skipped duplicate creation)`);
+              
+              // Now trigger agreement activation if needed (same logic as when invoice.agreementId exists)
+              const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
+              
+              if (existingAgreement.status === "pending" && existingAgreement.isInitialCycle) {
+                await db.update(crmAgreements)
+                  .set({
+                    status: "active",
+                    activationDate: todayStr,
+                    isInitialCycle: false,
+                    graceExpiresAt: null,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(crmAgreements.id, existingAgreement.id));
+                
+                console.log(`[Invoice] Activated existing agreement ${existingAgreement.agreementNumber} after linking invoice ${invoice.invoiceNumber}`);
+              }
+            } else {
+              // No existing agreement found - proceed with auto-creation
+            
             // Calculate total maintenance amount from line items (use lineTotal, not total)
             const maintenanceTotal = maintenanceLineItems.reduce((sum, row) => {
               return sum + parseFloat(row.lineItem.lineTotal || "0");
@@ -13468,9 +14162,220 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 console.log(`[Invoice] Auto-created ${agreementFrequency} maintenance agreement ${agreementNumber} for customer ${customer.name} from invoice ${invoice.invoiceNumber} (${totalQuantity} systems, ${agreementVisitsPerPeriod} visits)`);
               }
             }
+            } // Close the else block for "no existing agreement found"
           }
         } catch (agreementError) {
           console.error("Error auto-creating maintenance agreement:", agreementError);
+          // Don't fail the payment - just log the error
+        }
+      }
+      
+      // Handle agreement activation and visit resets when an agreement-linked invoice is paid
+      if (newStatus === "paid" && invoice.agreementId) {
+        try {
+          const [agreement] = await db.select().from(crmAgreements)
+            .where(eq(crmAgreements.id, invoice.agreementId));
+          
+          if (agreement) {
+            const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
+            
+            // If agreement is pending and this is the initial cycle, activate it
+            if (agreement.status === "pending" && agreement.isInitialCycle) {
+              await db.update(crmAgreements)
+                .set({
+                  status: "active",
+                  activationDate: todayStr,
+                  isInitialCycle: false,
+                  graceExpiresAt: null,
+                  updatedAt: new Date(),
+                })
+                .where(eq(crmAgreements.id, agreement.id));
+              
+              console.log(`[Invoice] Activated agreement ${agreement.agreementNumber} after first payment (Invoice ${invoice.invoiceNumber})`);
+            } 
+            // If agreement is active/grace_period and not initial cycle, this is a renewal payment - reset visits
+            else if ((agreement.status === "active" || agreement.status === "grace_period") && !agreement.isInitialCycle) {
+              // Reset all visits for this agreement to pending for the new cycle
+              const currentYear = new Date().getFullYear();
+              
+              // Mark old visits as cancelled and create new pending visits
+              await db.update(maintenanceVisits)
+                .set({ status: "cancelled" as const, updatedAt: new Date() })
+                .where(and(
+                  eq(maintenanceVisits.agreementId, agreement.id),
+                  eq(maintenanceVisits.status, "pending")
+                ));
+              
+              // Create new visits for the new cycle
+              const visitsPerPeriod = agreement.visitsPerPeriod || 2;
+              const frequency = agreement.frequency || "annual";
+              const appointmentDate = new Date(agreement.appointmentDate || todayStr);
+              const isPayOnVisit = agreement.billingPreference === "pay_on_visit";
+              
+              for (let i = 0; i < visitsPerPeriod; i++) {
+                const visitDate = new Date(appointmentDate);
+                if (frequency === "weekly") {
+                  const daysApart = Math.max(1, Math.round(7 / visitsPerPeriod));
+                  visitDate.setDate(visitDate.getDate() + (i * daysApart));
+                } else if (frequency === "monthly") {
+                  const daysApart = Math.max(1, Math.round(30 / visitsPerPeriod));
+                  visitDate.setDate(visitDate.getDate() + (i * daysApart));
+                } else {
+                  const monthsApart = Math.max(1, Math.round(12 / visitsPerPeriod));
+                  visitDate.setMonth(visitDate.getMonth() + (i * monthsApart));
+                }
+                
+                const isLastVisit = i === visitsPerPeriod - 1;
+                const isRenewalTrigger = isPayOnVisit && isLastVisit;
+                
+                await db.insert(maintenanceVisits).values({
+                  agreementId: agreement.id,
+                  cycleYear: currentYear,
+                  visitNumber: i + 1,
+                  totalVisitsInCycle: visitsPerPeriod,
+                  targetDate: visitDate.toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE }),
+                  status: "pending",
+                  isRenewalTrigger,
+                  renewalStatus: isRenewalTrigger ? "pending" as const : "none" as const,
+                });
+              }
+              
+              // Calculate new end date by extending by one term based on frequency
+              const currentEndDate = agreement.endDate ? new Date(agreement.endDate) : new Date(todayStr);
+              const newEndDate = new Date(currentEndDate);
+              if (frequency === "weekly") {
+                newEndDate.setDate(newEndDate.getDate() + 7);
+              } else if (frequency === "monthly") {
+                newEndDate.setDate(newEndDate.getDate() + 30);
+              } else {
+                // Annual - add 1 year
+                newEndDate.setFullYear(newEndDate.getFullYear() + 1);
+              }
+              const newEndDateStr = newEndDate.toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
+              
+              // Calculate next invoice date (same as new end date for next renewal)
+              const newNextInvoiceDate = newEndDateStr;
+              
+              // Update agreement back to active (clearing grace period), extend end date, update next invoice date
+              await db.update(crmAgreements)
+                .set({
+                  status: "active",
+                  graceExpiresAt: null,
+                  endDate: newEndDateStr,
+                  nextInvoiceDate: newNextInvoiceDate,
+                  isInitialCycle: false,
+                  updatedAt: new Date(),
+                })
+                .where(eq(crmAgreements.id, agreement.id));
+              
+              console.log(`[Invoice] Renewed agreement ${agreement.agreementNumber} - visits reset to 0/${visitsPerPeriod}, end date extended to ${newEndDateStr} (Invoice ${invoice.invoiceNumber})`);
+            }
+          }
+        } catch (agreementError) {
+          console.error("Error updating agreement on payment:", agreementError);
+          // Don't fail the payment - just log the error
+        }
+      }
+      
+      // Handle pay-on-visit renewal invoices linked via maintenanceVisits.renewalInvoiceId
+      if (newStatus === "paid") {
+        try {
+          // Check if this invoice is linked as a renewal invoice on any maintenance visit
+          const [renewalVisit] = await db.select()
+            .from(maintenanceVisits)
+            .where(eq(maintenanceVisits.renewalInvoiceId, req.params.id))
+            .limit(1);
+          
+          if (renewalVisit) {
+            // Get the agreement for this visit
+            const [agreement] = await db.select()
+              .from(crmAgreements)
+              .where(eq(crmAgreements.id, renewalVisit.agreementId));
+            
+            if (agreement && agreement.billingPreference === "pay_on_visit") {
+              const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
+              const currentYear = new Date().getFullYear();
+              const visitsPerPeriod = agreement.visitsPerPeriod || 2;
+              const frequency = agreement.frequency || "annual";
+              
+              // Mark the renewal visit as collected
+              await db.update(maintenanceVisits)
+                .set({ 
+                  renewalStatus: "collected" as const, 
+                  updatedAt: new Date() 
+                })
+                .where(eq(maintenanceVisits.id, renewalVisit.id));
+              
+              // Cancel any old pending visits for previous cycle
+              await db.update(maintenanceVisits)
+                .set({ status: "cancelled" as const, updatedAt: new Date() })
+                .where(and(
+                  eq(maintenanceVisits.agreementId, agreement.id),
+                  eq(maintenanceVisits.status, "pending"),
+                  ne(maintenanceVisits.id, renewalVisit.id)
+                ));
+              
+              // Calculate new dates based on frequency
+              const currentEndDate = agreement.endDate ? new Date(agreement.endDate) : new Date(todayStr);
+              const newEndDate = new Date(currentEndDate);
+              const appointmentDate = new Date(agreement.appointmentDate || todayStr);
+              
+              // Extend end date by one term
+              if (frequency === "weekly") {
+                newEndDate.setDate(newEndDate.getDate() + 7);
+              } else if (frequency === "monthly") {
+                newEndDate.setDate(newEndDate.getDate() + 30);
+              } else {
+                // Annual - add 1 year
+                newEndDate.setFullYear(newEndDate.getFullYear() + 1);
+              }
+              const newEndDateStr = newEndDate.toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
+              
+              // Create new visits for the next cycle
+              for (let i = 0; i < visitsPerPeriod; i++) {
+                const visitDate = new Date(appointmentDate);
+                if (frequency === "weekly") {
+                  const daysApart = Math.max(1, Math.round(7 / visitsPerPeriod));
+                  visitDate.setDate(visitDate.getDate() + (i * daysApart));
+                } else if (frequency === "monthly") {
+                  const daysApart = Math.max(1, Math.round(30 / visitsPerPeriod));
+                  visitDate.setDate(visitDate.getDate() + (i * daysApart));
+                } else {
+                  const monthsApart = Math.max(1, Math.round(12 / visitsPerPeriod));
+                  visitDate.setMonth(visitDate.getMonth() + (i * monthsApart));
+                }
+                
+                const isLastVisit = i === visitsPerPeriod - 1;
+                
+                await db.insert(maintenanceVisits).values({
+                  agreementId: agreement.id,
+                  cycleYear: currentYear,
+                  visitNumber: i + 1,
+                  totalVisitsInCycle: visitsPerPeriod,
+                  targetDate: visitDate.toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE }),
+                  status: "pending",
+                  isRenewalTrigger: isLastVisit,
+                  renewalStatus: isLastVisit ? "pending" as const : "none" as const,
+                });
+              }
+              
+              // Update agreement: extend end date, update next invoice date, ensure active status
+              await db.update(crmAgreements)
+                .set({
+                  status: "active",
+                  graceExpiresAt: null,
+                  endDate: newEndDateStr,
+                  nextInvoiceDate: newEndDateStr,
+                  isInitialCycle: false,
+                  updatedAt: new Date(),
+                })
+                .where(eq(crmAgreements.id, agreement.id));
+              
+              console.log(`[Invoice] Pay-on-visit renewal completed for agreement ${agreement.agreementNumber} - end date extended to ${newEndDateStr}, ${visitsPerPeriod} new visits created (Invoice ${invoice.invoiceNumber})`);
+            }
+          }
+        } catch (renewalError) {
+          console.error("Error processing pay-on-visit renewal:", renewalError);
           // Don't fail the payment - just log the error
         }
       }
@@ -13524,6 +14429,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(crmWorkOrders.id, invoice.workOrderId));
       }
       
+      // Deactivate Stripe payment link if it exists
+      if (invoice.stripePaymentLinkId) {
+        try {
+          const { getUncachableStripeClient } = await import("./stripeClient");
+          const stripe = await getUncachableStripeClient();
+          await stripe.paymentLinks.update(invoice.stripePaymentLinkId, {
+            active: false
+          });
+          console.log(`[Invoice] Deactivated Stripe payment link ${invoice.stripePaymentLinkId} for voided invoice ${invoice.invoiceNumber}`);
+        } catch (stripeErr) {
+          console.error(`[Invoice] Failed to deactivate Stripe payment link:`, stripeErr);
+          // Don't fail the void - just log the error
+        }
+      }
+      
+      // Void in QuickBooks if synced
+      autoVoidInvoice(req.params.id);
+      
       await logCrmAudit(
         user.id,
         "invoice.voided",
@@ -13540,7 +14463,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/crm/invoices/:id/send-email - Send invoice via email
+  // POST /api/crm/invoices/:id/send-email - Send invoice via email (supports multiple recipients)
   app.post("/api/crm/invoices/:id/send-email", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -13556,19 +14479,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get customer info
-      let customerEmail = recipientEmail;
       let customerName = "Customer";
+      let defaultEmail = "";
       
       if (invoice.customerId) {
         const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, invoice.customerId)).limit(1);
         if (customer) {
-          customerEmail = recipientEmail || customer.email;
+          defaultEmail = customer.email || "";
           customerName = customer.name || "Customer";
         }
       }
 
-      if (!customerEmail) {
+      // Parse multiple emails (comma, semicolon, or space separated)
+      const emailInput = recipientEmail || defaultEmail;
+      if (!emailInput) {
         return res.status(400).json({ message: "No recipient email provided and customer has no email" });
+      }
+      
+      const emailList = emailInput
+        .split(/[,;\s]+/)
+        .map((e: string) => e.trim().toLowerCase())
+        .filter((e: string) => e && e.includes("@"));
+      
+      if (emailList.length === 0) {
+        return res.status(400).json({ message: "No valid email addresses provided" });
       }
 
       const lineItems = await db.select().from(crmInvoiceLineItems)
@@ -13577,53 +14511,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const sentByName = user.displayName || user.name || user.email;
       const subject = `Your Invoice from Giesbrecht HVAC - ${invoice.invoiceNumber}`;
-
-      // Use the sender's email as Reply-To so customer replies go directly to them
       const replyToEmail = user.email;
       
-      console.log("[Invoice Email] Reply-To:", replyToEmail, "(sender's email)");
+      console.log("[Invoice Email] Sending to multiple recipients:", emailList);
 
-      const result = await sendCrmInvoiceEmail(
-        invoice,
-        lineItems,
-        customerEmail,
-        customerName,
-        personalMessage,
-        sentByName,
-        {
-          senderEmail: user.email,
-          senderName: sentByName,
+      // Send to all recipients
+      const results: { email: string; success: boolean; error?: string; messageId?: string }[] = [];
+      
+      for (const email of emailList) {
+        const result = await sendCrmInvoiceEmail(
+          invoice,
+          lineItems,
+          email,
+          customerName,
+          personalMessage,
+          sentByName,
+          {
+            senderEmail: user.email,
+            senderName: sentByName,
+            replyToEmail,
+          }
+        );
+
+        await db.insert(invoiceEmailLogs).values({
+          invoiceId: invoice.id,
+          direction: "outgoing",
+          fromEmail: result.fromEmail || "invoices@ghvacinc.com",
+          recipientEmail: email,
+          recipientName: customerName,
+          subject,
+          htmlContent: result.htmlContent || null,
+          textContent: result.textContent || null,
+          status: result.success ? "sent" : "failed",
+          errorMessage: result.error || null,
+          sentBy: user.id,
+          personalMessage: personalMessage || null,
+          isManual: false,
+          resendMessageId: result.messageId || null,
           replyToEmail,
-        }
-      );
-
-      const [emailLog] = await db.insert(invoiceEmailLogs).values({
-        invoiceId: invoice.id,
-        direction: "outgoing",
-        fromEmail: result.fromEmail || "invoices@ghvacinc.com",
-        recipientEmail: customerEmail,
-        recipientName: customerName,
-        subject,
-        htmlContent: result.htmlContent || null,
-        textContent: result.textContent || null,
-        status: result.success ? "sent" : "failed",
-        errorMessage: result.error || null,
-        sentBy: user.id,
-        personalMessage: personalMessage || null,
-        isManual: false,
-        resendMessageId: result.messageId || null,
-        replyToEmail,
-      }).returning();
-
-      if (!result.success) {
-        return res.status(500).json({ 
-          message: result.error || "Failed to send invoice email",
-          emailLogId: emailLog.id
         });
+
+        results.push({ email, success: result.success, error: result.error, messageId: result.messageId });
       }
 
-      // Update invoice status to sent if it was draft
-      if (invoice.status === "draft") {
+      const successCount = results.filter(r => r.success).length;
+      const allSucceeded = successCount === emailList.length;
+
+      // Update invoice status to sent if it was draft and at least one email succeeded
+      if (successCount > 0 && invoice.status === "draft") {
         await db.update(crmInvoices)
           .set({ 
             status: "sent" as const,
@@ -13631,6 +14566,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
             updatedAt: new Date()
           })
           .where(eq(crmInvoices.id, invoice.id));
+        
+        // Trigger instant QuickBooks sync when invoice becomes "sent"
+        autoSyncInvoice(invoice.id);
+      }
+
+      // Send SMS for auto-pay maintenance clients
+      let smsSent = false;
+      if (successCount > 0 && invoice.agreementId && invoice.customerId) {
+        try {
+          // Check if this is an auto-pay maintenance agreement
+          const [agreement] = await db.select().from(crmAgreements)
+            .where(eq(crmAgreements.id, invoice.agreementId)).limit(1);
+          
+          if (agreement && agreement.billingPreference === "auto_invoice") {
+            // Get customer phone
+            const [customer] = await db.select().from(crmCustomers)
+              .where(eq(crmCustomers.id, invoice.customerId)).limit(1);
+            
+            if (customer?.phone) {
+              // Check if SMS was already sent for this invoice
+              const alreadySent = await hasNotificationBeenSent("invoice_sms", invoice.id, "invoice");
+              
+              if (!alreadySent) {
+                // Get the first email result's payment link URL (already generated during email send)
+                const emailResult = results.find(r => r.success);
+                // Build payment link from the portal URL
+                const host = req.get('host') || process.env.REPLIT_DOMAINS?.split(',')[0] || 'app.ghvacinc.com';
+                const protocol = req.protocol || 'https';
+                const paymentLink = `${protocol}://${host}/portal/invoice/${invoice.id}`;
+                
+                const smsResult = await sendAutomatedSms({
+                  customerId: invoice.customerId,
+                  phoneNumber: customer.phone,
+                  messageBody: SMS_TEMPLATES.INVOICE_SMS_TEMPLATE(invoice.invoiceNumber, paymentLink),
+                  notificationType: "invoice_sms",
+                  invoiceId: invoice.id,
+                });
+                
+                smsSent = smsResult.success;
+                console.log(`[Invoice SMS] Auto-pay maintenance invoice SMS ${smsSent ? 'sent' : 'failed'} for ${invoice.invoiceNumber}`);
+              }
+            }
+          }
+        } catch (smsError) {
+          console.error("[Invoice SMS] Error sending SMS for invoice:", smsError);
+        }
       }
 
       await logCrmAudit(
@@ -13638,14 +14619,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "invoice.email_sent",
         "invoice",
         invoice.id,
-        { invoiceNumber: invoice.invoiceNumber, recipientEmail: customerEmail },
+        { invoiceNumber: invoice.invoiceNumber, recipients: emailList, successCount, smsSent },
         req.ip
       );
 
       return res.json({ 
-        success: true, 
-        messageId: result.messageId,
-        emailLogId: emailLog.id
+        success: allSucceeded, 
+        successCount,
+        totalCount: emailList.length,
+        results,
+        smsSent,
       });
     } catch (error) {
       console.error("Error sending invoice email:", error);
@@ -14072,6 +15055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         validUntil: crmQuotes.validUntil,
         sentAt: crmQuotes.sentAt,
         viewedAt: crmQuotes.viewedAt,
+        viewCount: crmQuotes.viewCount,
         acceptedAt: crmQuotes.acceptedAt,
         declinedAt: crmQuotes.declinedAt,
         workOrderId: crmQuotes.workOrderId,
@@ -14119,7 +15103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           title, description, line_items as "lineItems", subtotal, 
           labor_total as "laborTotal", total, status,
           valid_until as "validUntil", sent_at as "sentAt", viewed_at as "viewedAt",
-          accepted_at as "acceptedAt", declined_at as "declinedAt",
+          view_count as "viewCount", accepted_at as "acceptedAt", declined_at as "declinedAt",
           work_order_id as "workOrderId", project_id as "projectId", scope, notes,
           created_at as "createdAt", updated_at as "updatedAt",
           job_id as "jobId", account_id as "accountId", site_id as "siteId",
@@ -14128,7 +15112,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customer_notes as "customerNotes", property_id as "propertyId",
           accepted_by as "acceptedBy", decline_reason as "declineReason", created_by as "createdBy",
           ai_generated_quote as "aiGeneratedQuote", quote_mode as "quoteMode",
-          quote_type as "quoteType"
+          quote_type as "quoteType", selected_option as "selectedOption",
+          signed_at as "signedAt", signer_name as "signerName",
+          deposit_paid_at as "depositPaidAt", deposit_amount as "depositAmount",
+          stripe_payment_link_id as "stripePaymentLinkId"
         FROM crm_quotes 
         WHERE id = ${req.params.id}
         LIMIT 1
@@ -14138,6 +15125,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Quote not found" });
       }
       
+      // Fetch deposit percentage from settings
+      let depositPercentage = 50; // default
+      const depositSetting = await storage.getSetting('stripe_deposit_percentage');
+      if (depositSetting) {
+        const parsed = parseInt(depositSetting.value, 10);
+        if (!isNaN(parsed) && parsed >= 1 && parsed <= 100) {
+          depositPercentage = parsed;
+        }
+      }
+      quote.depositPercentage = depositPercentage;
+      
       // Use raw SQL for line items too
       const lineItemsQuery = await db.execute(sql`
         SELECT 
@@ -14145,7 +15143,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           part_number as "partNumber", quantity, unit_price as "unitPrice",
           line_total as "lineTotal", sort_order as "sortOrder",
           item_id as "itemId", is_discount_line as "isDiscountLine",
-          discount_kind as "discountKind", created_at as "createdAt"
+          discount_kind as "discountKind", option_tag as "optionTag",
+          image_url as "imageUrl", created_at as "createdAt"
         FROM crm_quote_line_items
         WHERE quote_id = ${req.params.id}
         ORDER BY sort_order ASC
@@ -14326,6 +15325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerStatus: "prospect",
           customerType: "residential",
         }).returning();
+        autoSyncCustomer(createdCustomer.id);
 
         targetCustomerId = createdCustomer.id;
 
@@ -14382,7 +15382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         scope: "project",
         status: "draft",
         title: `Install - ${installSubtype.charAt(0).toUpperCase() + installSubtype.slice(1)}`,
-        description: `Generated from Install Pricing Worksheet.\nInstall Type: ${installSubtype}\nHours: ${inputs.hoursToInstall}\nCrew Days: ${calcs.crewDays.toFixed(2)}`,
+        description: "",
         subtotal: calcs.linesTotal.toString(),
         total: calcs.discountedSellPrice.toString(),
         createdBy: user.id,
@@ -14390,12 +15390,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedToId: assignedToId || null,
       }).returning();
 
-      // Create line items from worksheet lines (equipment only - labor/warranty used for pricing calculation only)
+      // Create line items from worksheet lines - store actual costs internally
       let sortOrder = 0;
       let equipmentSubtotal = 0;
+      
       for (const line of lines) {
         const cost = line.cost || 0;
+        if (cost === 0) continue; // Skip zero-cost items
+        
         equipmentSubtotal += cost;
+        
         await db.insert(crmQuoteLineItems).values({
           quoteId: newQuote.id,
           lineType: "part",
@@ -14407,13 +15411,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Note: Labor and warranty reserve are factored into the final selling price calculation
-      // but are NOT shown as separate line items on the quote
+      // Add labor line item (visible internally, hidden from client-facing views)
+      // This includes labor payroll + labor benefits
+      const laborTotal = calcs.laborPayroll + calcs.laborBenefits;
+      if (laborTotal > 0) {
+        await db.insert(crmQuoteLineItems).values({
+          quoteId: newQuote.id,
+          lineType: "labor",
+          description: `Installation Labor (${inputs.hoursToInstall} hrs)`,
+          unitPrice: laborTotal.toString(),
+          quantity: "1",
+          lineTotal: laborTotal.toString(),
+          sortOrder: sortOrder++,
+        });
+      }
 
-      // Update the quote with the equipment subtotal and calculated selling price
+      // Add warranty reserve if applicable (use lineType 'other' for internal tracking)
+      if (inputs.warrantyReserveDollar > 0) {
+        await db.insert(crmQuoteLineItems).values({
+          quoteId: newQuote.id,
+          lineType: "other",
+          description: "Warranty Reserve",
+          unitPrice: inputs.warrantyReserveDollar.toString(),
+          quantity: "1",
+          lineTotal: inputs.warrantyReserveDollar.toString(),
+          sortOrder: sortOrder++,
+        });
+      }
+
+      // Calculate the actual subtotal (equipment + labor + warranty for internal tracking)
+      const internalSubtotal = equipmentSubtotal + laborTotal + inputs.warrantyReserveDollar;
+
+      // Update the quote with the calculated selling price as the total
       await db.update(crmQuotes)
         .set({
-          subtotal: equipmentSubtotal.toString(),
+          subtotal: internalSubtotal.toString(),
+          laborTotal: laborTotal.toString(),
           total: calcs.discountedSellPrice.toString(),
           updatedAt: new Date(),
         })
@@ -14857,8 +15890,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Quote not found" });
       }
       
-      if (quote.status !== "draft") {
-        return res.status(400).json({ message: "Can only add line items to draft quotes" });
+      // Allow adding for all statuses except accepted and converted
+      const nonEditableStatuses = ["accepted", "converted"];
+      if (nonEditableStatuses.includes(quote.status)) {
+        return res.status(400).json({ message: "Cannot add line items to accepted or converted quotes" });
       }
       
       // Get existing line items for discount validation
@@ -14911,8 +15946,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Quote not found" });
       }
       
-      if (quote.status !== "draft") {
-        return res.status(400).json({ message: "Can only update line items on draft quotes" });
+      // Allow editing for all statuses except accepted and converted
+      const nonEditableStatuses = ["accepted", "converted"];
+      if (nonEditableStatuses.includes(quote.status)) {
+        return res.status(400).json({ message: "Cannot update line items on accepted or converted quotes" });
       }
       
       const [existingLineItem] = await db.select().from(crmQuoteLineItems)
@@ -14996,8 +16033,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Quote not found" });
       }
       
-      if (quote.status !== "draft") {
-        return res.status(400).json({ message: "Can only delete line items from draft quotes" });
+      // Allow deleting for all statuses except accepted and converted
+      const nonEditableStatuses = ["accepted", "converted"];
+      if (nonEditableStatuses.includes(quote.status)) {
+        return res.status(400).json({ message: "Cannot delete line items from accepted or converted quotes" });
       }
       
       const [existingLineItem] = await db.select().from(crmQuoteLineItems)
@@ -15197,10 +16236,202 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }),
       });
 
-      return res.json(updated);
+      // Check if follow-up work order choice is needed (only for custom_service and quick types, AND has service items)
+      let followUpContext = null;
+      const followUpQuoteTypes = ["custom_service", "quick"];
+      if (existing.workOrderId && followUpQuoteTypes.includes(existing.quoteType || "")) {
+        // Check if quote has service-type items (not just maintenance)
+        const hasServiceLineItems = await hasServiceItems(existing.id);
+        if (hasServiceLineItems) {
+          const [parentWorkOrder] = await db.select().from(crmWorkOrders)
+            .where(eq(crmWorkOrders.id, existing.workOrderId)).limit(1);
+          
+          if (parentWorkOrder && (parentWorkOrder.status === "on_site" || parentWorkOrder.status === "completed")) {
+            followUpContext = {
+              customerId: parentWorkOrder.customerId,
+              propertyId: parentWorkOrder.propertyId,
+              projectId: parentWorkOrder.projectId,
+              quoteId: existing.id,
+              quoteTitle: existing.title || existing.quoteNumber,
+            };
+          }
+        }
+      }
+
+      return res.json({
+        ...updated,
+        requiresFollowUpChoice: !!followUpContext,
+        followUpContext,
+      });
     } catch (error) {
       console.error("Error marking quote as accepted:", error);
       return res.status(500).json({ message: "Failed to mark quote as accepted" });
+    }
+  });
+
+  // POST /api/crm/quotes/:id/accept-in-person - Accept quote with in-person signature
+  app.post("/api/crm/quotes/:id/accept-in-person", requireCrmAuth, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { signatureImage, signerName, selectedOption } = req.body;
+
+      if (!signatureImage || typeof signatureImage !== "string") {
+        return res.status(400).json({ message: "Signature is required" });
+      }
+
+      if (!signerName || typeof signerName !== "string" || signerName.trim().length === 0) {
+        return res.status(400).json({ message: "Signer name is required" });
+      }
+
+      const [existing] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+      if (!existing) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+
+      if (existing.status === "accepted") {
+        return res.status(400).json({ message: "This quote has already been accepted" });
+      }
+
+      if (existing.status === "declined") {
+        return res.status(400).json({ message: "This quote has been declined" });
+      }
+
+      if (existing.status === "expired") {
+        return res.status(400).json({ message: "This quote has expired" });
+      }
+
+      // For multi-option quotes, validate option selection
+      if (existing.quoteMode === 'options') {
+        const lineItems = await db.select().from(crmQuoteLineItems)
+          .where(eq(crmQuoteLineItems.quoteId, req.params.id));
+        
+        const availableOptions = [...new Set(
+          lineItems
+            .map(item => item.optionTag)
+            .filter((tag): tag is string => !!tag)
+        )];
+
+        if (availableOptions.length > 0 && !selectedOption) {
+          return res.status(400).json({
+            message: "Please select which option the customer chose.",
+          });
+        }
+
+        if (selectedOption && availableOptions.length > 0 && !availableOptions.includes(selectedOption)) {
+          return res.status(400).json({
+            message: `Invalid option selected. Available options: ${availableOptions.join(', ')}`,
+          });
+        }
+      }
+
+      const now = new Date();
+
+      const [updated] = await db.update(crmQuotes)
+        .set({
+          status: "accepted",
+          acceptedAt: now,
+          acceptedBy: signerName.trim(),
+          signatureImage,
+          signerName: signerName.trim(),
+          signerIp: "in-person",
+          signedAt: now,
+          updatedAt: now,
+          ...(selectedOption && typeof selectedOption === "string" ? { selectedOption } : {}),
+        })
+        .where(eq(crmQuotes.id, req.params.id))
+        .returning();
+
+      await logCrmAudit(
+        user.id,
+        "quote.accepted_in_person",
+        "crm_quote",
+        req.params.id,
+        { 
+          quoteNumber: existing.quoteNumber, 
+          signerName: signerName.trim(), 
+          selectedOption: selectedOption || null,
+          presentedBy: user.name || user.email,
+        },
+        req.ip
+      );
+
+      // Add system email log entry for in-person acceptance
+      await db.insert(quoteEmailLogs).values({
+        quoteId: existing.id,
+        direction: "system",
+        fromEmail: "system",
+        recipientEmail: existing.customerEmail || "",
+        recipientName: signerName.trim(),
+        subject: `Quote ${existing.quoteNumber} - Accepted In Person`,
+        textContent: `Quote was accepted in person by ${signerName.trim()}, presented by ${user.name || user.email} at ${now.toLocaleString()}`,
+        status: "sent",
+        isManual: false,
+        personalMessage: JSON.stringify({
+          eventType: "quote_accepted_in_person",
+          signerName: signerName.trim(),
+          presentedBy: user.name || user.email,
+          signedAt: now.toISOString(),
+          selectedOption: selectedOption || null,
+        }),
+      });
+
+      // Log activity to projectActivities if quote has a projectId
+      if (existing.projectId) {
+        await db.insert(projectActivities).values({
+          projectId: existing.projectId,
+          type: "approval",
+          title: "Quote Accepted In Person",
+          notes: `Quote ${existing.quoteNumber} was accepted in person by ${signerName.trim()}${selectedOption ? ` (Option: ${selectedOption})` : ''}. Presented by ${user.name || user.email}.`,
+          metadata: JSON.stringify({
+            subType: "quote_accepted_in_person",
+            quoteId: existing.id,
+            quoteNumber: existing.quoteNumber,
+            signerName: signerName.trim(),
+            selectedOption: selectedOption || null,
+            presentedBy: user.name || user.email,
+          }),
+          createdBy: user.id,
+        });
+      }
+
+      console.log(`Quote ${existing.quoteNumber} accepted in person by ${signerName.trim()}, presented by ${user.name || user.email}`);
+
+      // Check if follow-up work order choice is needed (only for custom_service and quick types, AND has service items)
+      let followUpContext = null;
+      const followUpQuoteTypes = ["custom_service", "quick"];
+      if (existing.workOrderId && followUpQuoteTypes.includes(existing.quoteType || "")) {
+        // Check if quote has service-type items (not just maintenance)
+        const hasServiceLineItems = await hasServiceItems(existing.id);
+        if (hasServiceLineItems) {
+          const [parentWorkOrder] = await db.select().from(crmWorkOrders)
+            .where(eq(crmWorkOrders.id, existing.workOrderId)).limit(1);
+          
+          if (parentWorkOrder && (parentWorkOrder.status === "on_site" || parentWorkOrder.status === "completed")) {
+            followUpContext = {
+              customerId: parentWorkOrder.customerId,
+              propertyId: parentWorkOrder.propertyId,
+              projectId: parentWorkOrder.projectId,
+              quoteId: existing.id,
+              quoteTitle: existing.title || existing.quoteNumber,
+            };
+          }
+        }
+      }
+
+      return res.json({ 
+        success: true, 
+        message: "Quote accepted successfully",
+        quote: updated,
+        requiresFollowUpChoice: !!followUpContext,
+        followUpContext,
+      });
+    } catch (error) {
+      console.error("Error accepting quote in person:", error);
+      return res.status(500).json({ message: "Failed to accept quote" });
     }
   });
 
@@ -15249,7 +16480,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/crm/quotes/:id/send-email - Send quote via email
+  // POST /api/crm/quotes/:id/create-follow-up-work-order - Create follow-up work order for accepted quote
+  app.post("/api/crm/quotes/:id/create-follow-up-work-order", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const { mode } = req.body; // "parts_needed" or "schedule_now"
+      console.log(`[create-follow-up-work-order] Request for quote ${req.params.id}, mode: ${mode}`);
+      
+      if (!mode || !["parts_needed", "schedule_now"].includes(mode)) {
+        return res.status(400).json({ message: "Invalid mode. Must be 'parts_needed' or 'schedule_now'" });
+      }
+
+      const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+      if (!quote) {
+        console.log(`[create-follow-up-work-order] Quote ${req.params.id} not found`);
+        return res.status(404).json({ message: "Quote not found" });
+      }
+      console.log(`[create-follow-up-work-order] Found quote ${quote.quoteNumber}, status: ${quote.status}, workOrderId: ${quote.workOrderId}`);
+      
+      if (quote.status !== "accepted") {
+        console.log(`[create-follow-up-work-order] Quote ${quote.quoteNumber} is not accepted (status: ${quote.status})`);
+        return res.status(400).json({ message: "Quote must be accepted first" });
+      }
+      if (!quote.workOrderId) {
+        console.log(`[create-follow-up-work-order] Quote ${quote.quoteNumber} is not attached to a work order`);
+        return res.status(400).json({ message: "Quote is not attached to a work order" });
+      }
+
+      const [parentWorkOrder] = await db.select().from(crmWorkOrders)
+        .where(eq(crmWorkOrders.id, quote.workOrderId)).limit(1);
+      if (!parentWorkOrder) {
+        console.log(`[create-follow-up-work-order] Parent work order ${quote.workOrderId} not found`);
+        return res.status(404).json({ message: "Parent work order not found" });
+      }
+      console.log(`[create-follow-up-work-order] Found parent work order ${parentWorkOrder.id}, status: ${parentWorkOrder.status}`);
+
+      if (mode === "parts_needed") {
+        console.log(`[create-follow-up-work-order] Creating parts_needed follow-up WO for quote ${quote.quoteNumber}`);
+        const followUpWO = await createFollowUpWorkOrder(quote, parentWorkOrder, {
+          dispatchQueueStage: "WaitingOnParts",
+        });
+        if (!followUpWO) {
+          console.log(`[create-follow-up-work-order] Follow-up WO already exists for quote ${quote.id}`);
+          return res.status(400).json({ message: "Follow-up work order already exists for this quote" });
+        }
+        console.log(`[create-follow-up-work-order] Created follow-up WO ${followUpWO.id} with stage WaitingOnParts`);
+        await logCrmAudit(user.id, "workorder.created", "crm_work_order", followUpWO.id, 
+          { source: "quote_follow_up", quoteId: quote.id }, req.ip);
+        return res.json({ workOrder: followUpWO, mode: "parts_needed" });
+      } else {
+        // Return context for manual scheduling
+        console.log(`[create-follow-up-work-order] Returning schedule_now context for quote ${quote.quoteNumber}`);
+        return res.json({
+          mode: "schedule_now",
+          context: {
+            customerId: parentWorkOrder.customerId,
+            propertyId: parentWorkOrder.propertyId,
+            projectId: parentWorkOrder.projectId,
+            sourceQuoteId: quote.id,
+            suggestedTitle: `Follow-up: ${quote.title || quote.quoteNumber}`,
+            suggestedDescription: quote.description || `Follow-up work order for accepted quote ${quote.quoteNumber}`,
+          }
+        });
+      }
+    } catch (error) {
+      console.error("[create-follow-up-work-order] Error:", error);
+      return res.status(500).json({ message: "Failed to create follow-up work order" });
+    }
+  });
+
+  // POST /api/crm/quotes/:id/send-email - Send quote via email (supports multiple recipients)
   app.post("/api/crm/quotes/:id/send-email", requireCrmSalesOrAbove, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
@@ -15264,9 +16566,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Quote not found" });
       }
 
-      const emailTo = recipientEmail || quote.customerEmail;
-      if (!emailTo) {
+      // Parse multiple emails (comma, semicolon, or space separated)
+      const emailInput = recipientEmail || quote.customerEmail || "";
+      if (!emailInput) {
         return res.status(400).json({ message: "No recipient email provided and quote has no customer email" });
+      }
+      
+      const emailList = emailInput
+        .split(/[,;\s]+/)
+        .map((e: string) => e.trim().toLowerCase())
+        .filter((e: string) => e && e.includes("@"));
+      
+      if (emailList.length === 0) {
+        return res.status(400).json({ message: "No valid email addresses provided" });
       }
 
       // Generate viewToken if one doesn't exist
@@ -15302,35 +16614,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      console.log("[Quote Email] Reply-To:", replyToEmail, "(assigned user's email)");
+      console.log("[Quote Email] Sending to multiple recipients:", emailList);
 
-      // Pass sender's email and quote view URL
-      const result = await sendCrmQuoteEmail(quote, lineItems, emailTo, personalMessage, sentByName, {
-        senderEmail: user.email,
-        senderName: sentByName,
-        quoteViewUrl,
-        replyToEmail,
-      });
+      // Send to all recipients
+      const results: { email: string; success: boolean; error?: string; messageId?: string }[] = [];
+      
+      for (const email of emailList) {
+        const result = await sendCrmQuoteEmail(quote, lineItems, email, personalMessage, sentByName, {
+          senderEmail: user.email,
+          senderName: sentByName,
+          quoteViewUrl,
+          replyToEmail,
+        });
 
-      const [emailLog] = await db.insert(quoteEmailLogs).values({
-        quoteId: quote.id,
-        direction: "outgoing",
-        fromEmail: result.fromEmail || "quotes@ghvacinc.com",
-        recipientEmail: emailTo,
-        recipientName: quote.customerName,
-        subject: result.subject || subject,
-        htmlContent: result.htmlContent || null,
-        textContent: result.textContent || null,
-        status: result.success ? "sent" : "failed",
-        errorMessage: result.error || null,
-        sentBy: user.id,
-        personalMessage: personalMessage || null,
-        isManual: false,
-        resendMessageId: result.messageId || null,
-        replyToEmail: result.replyToEmail || null,
-      }).returning();
+        await db.insert(quoteEmailLogs).values({
+          quoteId: quote.id,
+          direction: "outgoing",
+          fromEmail: result.fromEmail || "quotes@ghvacinc.com",
+          recipientEmail: email,
+          recipientName: quote.customerName,
+          subject: result.subject || subject,
+          htmlContent: result.htmlContent || null,
+          textContent: result.textContent || null,
+          status: result.success ? "sent" : "failed",
+          errorMessage: result.error || null,
+          sentBy: user.id,
+          personalMessage: personalMessage || null,
+          isManual: false,
+          resendMessageId: result.messageId || null,
+          replyToEmail: result.replyToEmail || null,
+        });
 
-      if (result.success) {
+        results.push({ email, success: result.success, error: result.error, messageId: result.messageId });
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      const allSucceeded = successCount === emailList.length;
+
+      // Update quote status to sent if at least one email succeeded
+      if (successCount > 0) {
         await db.update(crmQuotes)
           .set({ status: "sent", sentAt: new Date(), updatedAt: new Date() })
           .where(eq(crmQuotes.id, quote.id));
@@ -15340,15 +16662,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "quote.email_sent",
           "crm_quote",
           quote.id,
-          { quoteNumber: quote.quoteNumber, recipientEmail: emailTo, emailLogId: emailLog.id },
+          { quoteNumber: quote.quoteNumber, recipients: emailList, successCount },
           req.ip
         );
       }
 
       return res.json({
-        success: result.success,
-        error: result.error,
-        emailLogId: emailLog.id,
+        success: allSucceeded,
+        successCount,
+        totalCount: emailList.length,
+        results,
       });
     } catch (error) {
       console.error("Error sending quote email:", error);
@@ -15922,6 +17245,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating customer interest level:", error);
       return res.status(500).json({ message: "Failed to update interest level" });
+    }
+  });
+
+  // PATCH /api/crm/customers/:id/portal-access - Toggle customer portal access
+  app.patch("/api/crm/customers/:id/portal-access", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { enabled } = req.body;
+      if (typeof enabled !== "boolean") {
+        return res.status(400).json({ message: "enabled must be a boolean" });
+      }
+
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, req.params.id)).limit(1);
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      const [updatedCustomer] = await db.update(crmCustomers)
+        .set({
+          portalEnabled: enabled,
+          updatedAt: new Date(),
+        })
+        .where(eq(crmCustomers.id, req.params.id))
+        .returning();
+
+      await logCrmAudit(user.id, "portal_access_toggled", "customer", req.params.id, {
+        customerName: customer.name,
+        portalEnabled: enabled,
+        previousValue: customer.portalEnabled,
+      });
+
+      return res.json(updatedCustomer);
+    } catch (error) {
+      console.error("Error updating customer portal access:", error);
+      return res.status(500).json({ message: "Failed to update portal access" });
     }
   });
 
@@ -16572,11 +17934,11 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         percentComplete: mtdGoal > 0 ? Math.round((mtdActual / mtdGoal) * 100) : 0,
       });
       
-      // Get all technicians
+      // Get all technicians (including supervisors who function as techs)
       const techs = await db.select({
         id: crmUsers.id,
         name: crmUsers.name,
-      }).from(crmUsers).where(eq(crmUsers.role, "tech"));
+      }).from(crmUsers).where(sql`${crmUsers.role} IN ('tech', 'supervisor')`);
       
       const techCount = techs.length || 1; // Avoid division by zero
       
@@ -16712,12 +18074,13 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           eq(monthlyGoals.month, month)
         ));
 
-      if (user.role === "tech") {
+      if (user.role === "tech" || user.role === "supervisor") {
         // Tech performance data - invoice-payment-driven attribution
         // Revenue counts as soon as invoice is paid, regardless of work order status
+        // Count both techs and supervisors for goal division
         const techCount = await db.select({ count: count() })
           .from(crmUsers)
-          .where(and(eq(crmUsers.role, "tech"), eq(crmUsers.isActive, true)));
+          .where(and(sql`${crmUsers.role} IN ('tech', 'supervisor')`, eq(crmUsers.isActive, true)));
         const numTechs = Number(techCount[0]?.count) || 1;
 
         // Get all work orders assigned to this tech (any status)
@@ -16804,6 +18167,16 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       } else if (user.role === "sales" || user.role === "owner" || user.role === "admin") {
         // Sales performance data
         const installGoal = parseFloat(goals?.monthlyInstallGoal || "0");
+        
+        // Count only users with 'sales' role to divide goal
+        const salesCount = await db.select({ count: count() })
+          .from(crmUsers)
+          .where(and(
+            eq(crmUsers.role, "sales"),
+            eq(crmUsers.isActive, true)
+          ));
+        const numSalespeople = Number(salesCount[0]?.count) || 1;
+        const individualInstallGoal = numSalespeople > 0 ? installGoal / numSalespeople : installGoal;
 
         // Get quotes created/assigned to this user
         const salesQuotes = await db.select({
@@ -16880,7 +18253,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           lostCount,
           sold: acceptedQuotesTotal,
           quoted: sentQuotesTotal,
-          goal: installGoal,
+          goal: individualInstallGoal, // Divided by number of salespeople like tech goal
         });
       } else {
         res.json({ role: user.role, message: "No performance data for this role" });
@@ -16894,6 +18267,20 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // ============================================
   // CRM MESSAGING ROUTES
   // ============================================
+
+  // GET /api/crm/messaging/unread-count - Get total unread message count
+  app.get("/api/crm/messaging/unread-count", requireCrmAuth, async (req, res) => {
+    try {
+      const result = await db.select({ 
+        totalUnread: sql<number>`COALESCE(SUM(${crmMessagingConversations.unreadInboundCount}), 0)::int`
+      }).from(crmMessagingConversations);
+      
+      return res.json({ unreadCount: result[0]?.totalUnread || 0 });
+    } catch (error) {
+      console.error("Error fetching unread count:", error);
+      return res.status(500).json({ message: "Failed to fetch unread count" });
+    }
+  });
 
   // GET /api/crm/messaging/conversations - List conversations with filters
   app.get("/api/crm/messaging/conversations", requireCrmAuth, async (req, res) => {
@@ -16953,6 +18340,64 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Conversation not found" });
       }
 
+      // If this is a Textline conversation, fetch messages from Textline and cache them
+      // Try phone number first (more reliable), fall back to UUID
+      if (conversation.externalSource === "textline" && textlineClient.isConfigured()) {
+        let textlineMessages: any[] = [];
+        
+        // Try phone number first if available
+        if (conversation.phoneNumber) {
+          try {
+            const phoneResult = await textlineClient.getConversationMessagesByPhone(conversation.phoneNumber);
+            if (!phoneResult.error) {
+              textlineMessages = phoneResult.messages;
+            }
+          } catch (e) {
+            console.error("[Textline] Phone lookup failed, will try UUID:", e);
+          }
+        }
+        
+        // Fall back to UUID if phone failed or wasn't available
+        if (textlineMessages.length === 0 && conversation.externalConversationId) {
+          try {
+            const uuidResult = await textlineClient.getConversationMessages(conversation.externalConversationId);
+            if (!uuidResult.error) {
+              textlineMessages = uuidResult.messages;
+            }
+          } catch (e) {
+            console.error("[Textline] UUID lookup failed:", e);
+          }
+        }
+        
+        if (textlineMessages.length > 0) {
+          // Get existing message external IDs to avoid duplicates
+          const existingMessages = await storage.getMessagesForConversation(id);
+          const existingExternalIds = new Set(existingMessages.map(m => m.externalMessageId).filter(Boolean));
+          
+          // Insert new messages from Textline
+          for (const tm of textlineMessages) {
+            if (!existingExternalIds.has(tm.uuid)) {
+              try {
+                await storage.createMessage({
+                  conversationId: id,
+                  body: tm.body,
+                  direction: tm.direction as any,
+                  channel: "sms" as any,
+                  status: "delivered" as any,
+                  externalMessageId: tm.uuid,
+                  sentAt: tm.created_at ? new Date(tm.created_at) : undefined,
+                  deliveredAt: tm.delivered_at ? new Date(tm.delivered_at) : undefined,
+                  readAt: tm.read_at ? new Date(tm.read_at) : undefined,
+                  attachments: tm.attachments?.map(a => ({ url: a.url, filename: a.filename, contentType: a.content_type })) as any,
+                });
+              } catch (e) {
+                console.error("[Textline] Error caching message:", e);
+              }
+            }
+          }
+        }
+      }
+
       const messages = await storage.getMessagesForConversation(id);
       const tags = await storage.getConversationTags(id);
 
@@ -17010,13 +18455,24 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       const { body, channel, attachments: msgAttachments } = req.body;
 
+      // Get phone number from conversation directly, or from linked customer
+      let recipientPhone: string | null = existing.phoneNumber || null;
+      if (!recipientPhone && existing.customerId) {
+        const [customer] = await db.select({ phone: crmCustomers.phone }).from(crmCustomers).where(eq(crmCustomers.id, existing.customerId));
+        recipientPhone = customer?.phone || null;
+      }
+      
+      if (!recipientPhone) {
+        return res.status(400).json({ message: "No phone number found for this conversation" });
+      }
+
       const messageData = {
         conversationId: id,
         body: body || "",
         channel: channel || "sms",
         attachments: msgAttachments || null,
         direction: "outbound" as const,
-        status: "sent" as const,
+        status: "queued" as const,
         authorUserId: user.id,
         sentAt: new Date(),
       };
@@ -17027,7 +18483,38 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       }
 
       const message = await storage.createMessage(parseResult.data);
-      return res.status(201).json(message);
+
+      const adapter = getMessagingAdapter();
+      const adapterResult = await adapter.sendMessage({
+        conversationId: id,
+        body: body || "",
+        channel: channel || "sms",
+        recipientPhone: recipientPhone,
+        externalConversationId: existing.externalConversationId || undefined,
+      });
+
+      if (adapterResult.success) {
+        const updateData: Record<string, any> = { status: adapterResult.status };
+        if (adapterResult.externalMessageId) {
+          updateData.externalMessageId = adapterResult.externalMessageId;
+        }
+        await storage.updateMessage(message.id, updateData);
+        if (adapterResult.externalConversationId && !existing.externalConversationId) {
+          await storage.updateMessagingConversation(id, { 
+            externalConversationId: adapterResult.externalConversationId,
+            externalSource: "textline" as any
+          });
+        }
+        const updatedMessage = await db.select().from(crmMessagingMessages).where(eq(crmMessagingMessages.id, message.id));
+        return res.status(201).json(updatedMessage[0] || message);
+      } else {
+        await storage.updateMessage(message.id, { 
+          status: "failed" as any, 
+          errorMessage: adapterResult.errorMessage 
+        });
+        const updatedMessage = await db.select().from(crmMessagingMessages).where(eq(crmMessagingMessages.id, message.id));
+        return res.status(201).json(updatedMessage[0] || message);
+      }
     } catch (error) {
       console.error("Error sending message:", error);
       return res.status(500).json({ message: "Failed to send message" });
@@ -17111,6 +18598,363 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // DELETE /api/crm/messaging/conversations/:id - Delete a conversation and all its messages
+  app.delete("/api/crm/messaging/conversations/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const existing = await storage.getMessagingConversationById(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      const deleted = await storage.deleteMessagingConversation(id);
+      if (deleted) {
+        return res.json({ message: "Conversation deleted successfully" });
+      } else {
+        return res.status(500).json({ message: "Failed to delete conversation" });
+      }
+    } catch (error) {
+      console.error("Error deleting conversation:", error);
+      return res.status(500).json({ message: "Failed to delete conversation" });
+    }
+  });
+
+  // POST /api/webhooks/textline - Textline webhook for inbound messages (no auth)
+  app.post("/api/webhooks/textline", async (req, res) => {
+    try {
+      const payload = req.body;
+      const webhookType = payload.webhook;
+      const eventType = payload.event_type;
+      
+      console.log("[Textline Webhook] Received event:", webhookType || eventType, JSON.stringify(payload, null, 2));
+      
+      // Handle inbound messages - check multiple possible payload structures
+      const post = payload.data?.post || payload.post;
+      const conversation = payload.data?.conversation || payload.conversation;
+      
+      // Determine if inbound: check direction field OR creator.type === "customer"
+      const direction = post?.direction;
+      const creatorType = post?.creator?.type;
+      const isInbound = direction === "inbound" || creatorType === "customer";
+      
+      // Check for various webhook event types
+      const isMessageEvent = webhookType === "new_customer_post" || 
+                            eventType === "message.created" || 
+                            eventType === "post.created";
+      
+      if (isMessageEvent && isInbound) {
+        const conversationUuid = conversation?.uuid;
+        const phoneNumber = conversation?.phone_number || conversation?.customer?.phone_number;
+        const contactName = conversation?.contact_name || conversation?.customer?.name;
+        const messageUuid = post?.uuid;
+        const messageBody = post?.body || "";
+        const createdAt = post?.created_at ? new Date(post.created_at * 1000) : new Date();
+        
+        if (!conversationUuid || !phoneNumber) {
+          console.log("[Textline Webhook] Missing conversation UUID or phone number", { conversationUuid, phoneNumber });
+          return res.status(200).json({ message: "OK - missing data" });
+        }
+        
+        console.log("[Textline Webhook] Processing inbound message:", { conversationUuid, phoneNumber, messageBody: messageBody.substring(0, 50) });
+        
+        // First try to find by external ID
+        let localConversation = await storage.getMessagingConversationByExternalId(conversationUuid, "textline");
+        
+        // If not found, try by phone number
+        if (!localConversation) {
+          localConversation = await storage.getMessagingConversationByPhone(phoneNumber);
+          
+          // If found by phone, update to link with Textline
+          if (localConversation && !localConversation.externalConversationId) {
+            await storage.updateMessagingConversation(localConversation.id, {
+              externalSource: "textline" as any,
+              externalConversationId: conversationUuid,
+            });
+          }
+        }
+        
+        let customerId: string | undefined;
+        const customer = await storage.getCrmCustomerByPhone(phoneNumber);
+        if (customer) {
+          customerId = customer.id;
+        }
+        
+        if (!localConversation) {
+          localConversation = await storage.createMessagingConversation({
+            customerId: customerId || null,
+            phoneNumber: phoneNumber,
+            customerName: contactName || null,
+            subject: contactName || phoneNumber,
+            externalSource: "textline" as any,
+            externalConversationId: conversationUuid,
+            status: "open" as any,
+          });
+          console.log("[Textline Webhook] Created new conversation:", localConversation.id);
+        } else if (customerId && !localConversation.customerId) {
+          await storage.updateMessagingConversation(localConversation.id, { customerId });
+        }
+        
+        // Check if message already exists (avoid duplicates)
+        const existingMessages = await storage.getMessagesForConversation(localConversation.id);
+        const isDuplicate = existingMessages.some(m => m.externalMessageId === messageUuid);
+        
+        if (!isDuplicate) {
+          await storage.createMessage({
+            conversationId: localConversation.id,
+            direction: "inbound" as any,
+            channel: "sms" as any,
+            body: messageBody,
+            externalMessageId: messageUuid,
+            status: "delivered" as any,
+            sentAt: createdAt,
+          });
+          
+          console.log("[Textline Webhook] Created inbound message for conversation:", localConversation.id);
+        } else {
+          console.log("[Textline Webhook] Skipped duplicate message:", messageUuid);
+        }
+      }
+      
+      return res.status(200).json({ message: "OK" });
+    } catch (error) {
+      console.error("[Textline Webhook] Error:", error);
+      return res.status(200).json({ message: "OK - error logged" });
+    }
+  });
+
+  // POST /api/crm/messaging/sync-textline - Sync conversations from Textline
+  app.post("/api/crm/messaging/sync-textline", requireCrmAuth, async (req, res) => {
+    try {
+      if (!textlineClient.isConfigured()) {
+        return res.status(400).json({ message: "Textline API is not configured" });
+      }
+      
+      let created = 0;
+      let updated = 0;
+      let linked = 0;
+      let page = 0;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const result = await textlineClient.getConversations(page, 50);
+        
+        if (result.error) {
+          return res.status(500).json({ message: "Error fetching from Textline: " + result.error });
+        }
+        
+        for (const textlineConvo of result.conversations) {
+          // Skip conversations without a phone number
+          if (!textlineConvo.phone_number) {
+            console.log("[Textline Sync] Skipping conversation without phone number:", textlineConvo.uuid);
+            continue;
+          }
+          
+          // First check by external ID, then check by phone number to avoid duplicates
+          let existingConvo = await storage.getMessagingConversationByExternalId(textlineConvo.uuid, "textline");
+          
+          // If not found by external ID, check by phone number to link existing conversations
+          if (!existingConvo) {
+            existingConvo = await storage.getMessagingConversationByPhone(textlineConvo.phone_number);
+          }
+          
+          let customerId: string | undefined;
+          const customer = await storage.getCrmCustomerByPhone(textlineConvo.phone_number);
+          if (customer) {
+            customerId = customer.id;
+          }
+          
+          if (!existingConvo) {
+            await storage.createMessagingConversation({
+              customerId: customerId || null,
+              phoneNumber: textlineConvo.phone_number,
+              customerName: textlineConvo.contact_name || null,
+              subject: textlineConvo.contact_name || textlineConvo.phone_number,
+              externalSource: "textline" as any,
+              externalConversationId: textlineConvo.uuid,
+              status: textlineConvo.status === "resolved" ? "resolved" as any : "open" as any,
+              lastMessageAt: textlineConvo.last_message_at ? new Date(textlineConvo.last_message_at) : undefined,
+            });
+            created++;
+            if (customerId) linked++;
+          } else {
+            const updates: Record<string, any> = {};
+            if (customerId && !existingConvo.customerId) {
+              updates.customerId = customerId;
+              linked++;
+            }
+            if (textlineConvo.last_message_at) {
+              updates.lastMessageAt = new Date(textlineConvo.last_message_at);
+            }
+            // Update external source and ID if missing (link existing local conversation to Textline)
+            if (!existingConvo.externalConversationId || existingConvo.externalSource !== "textline") {
+              updates.externalSource = "textline";
+              updates.externalConversationId = textlineConvo.uuid;
+            }
+            if (Object.keys(updates).length > 0) {
+              await storage.updateMessagingConversation(existingConvo.id, updates);
+              updated++;
+            }
+          }
+        }
+        
+        hasMore = result.hasMore;
+        page++;
+        
+        if (page > 100) {
+          console.log("[Textline Sync] Stopping after 100 pages (5000 conversations)");
+          break;
+        }
+      }
+      
+      return res.json({
+        message: "Sync completed",
+        created,
+        updated,
+        linked,
+      });
+    } catch (error) {
+      console.error("Error syncing Textline conversations:", error);
+      return res.status(500).json({ message: "Failed to sync Textline conversations" });
+    }
+  });
+
+  // POST /api/crm/messaging/start-conversation - Start a new conversation with a phone number
+  app.post("/api/crm/messaging/start-conversation", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { phoneNumber, message, customerId, customerName } = req.body;
+
+      if (!phoneNumber || typeof phoneNumber !== "string") {
+        return res.status(400).json({ message: "Phone number is required" });
+      }
+
+      if (!message || typeof message !== "string") {
+        return res.status(400).json({ message: "Message is required" });
+      }
+
+      // Normalize phone number (basic cleanup)
+      const cleanPhone = phoneNumber.replace(/[^\d+]/g, "");
+      if (cleanPhone.length < 10) {
+        return res.status(400).json({ message: "Invalid phone number" });
+      }
+
+      // Check if a conversation already exists for this phone number
+      let conversation = await storage.getMessagingConversationByPhone(cleanPhone);
+
+      // Look up customer by phone if customerId not provided
+      let resolvedCustomerId = customerId;
+      let resolvedCustomerName = customerName;
+      if (!resolvedCustomerId) {
+        const customer = await storage.getCrmCustomerByPhone(cleanPhone);
+        if (customer) {
+          resolvedCustomerId = customer.id;
+          resolvedCustomerName = customer.name;
+        }
+      }
+
+      // Send message via Textline (this creates a conversation if needed)
+      if (!textlineClient.isConfigured()) {
+        return res.status(400).json({ message: "Textline API is not configured" });
+      }
+
+      const sendResult = await textlineClient.sendMessage({
+        phoneNumber: cleanPhone,
+        body: message,
+      });
+
+      if (!sendResult.success) {
+        return res.status(500).json({ message: sendResult.errorMessage || "Failed to send message via Textline" });
+      }
+
+      // Create or update local conversation record
+      if (!conversation) {
+        conversation = await storage.createMessagingConversation({
+          customerId: resolvedCustomerId || null,
+          phoneNumber: cleanPhone,
+          customerName: resolvedCustomerName || null,
+          subject: resolvedCustomerName || cleanPhone,
+          externalSource: "textline" as any,
+          externalConversationId: sendResult.conversationUuid || null,
+          status: "open" as any,
+          lastMessageAt: new Date(),
+        });
+      } else {
+        // Update existing conversation with external ID if we didn't have it
+        const updates: Record<string, any> = { 
+          status: "open",
+          lastMessageAt: new Date() 
+        };
+        if (sendResult.conversationUuid && !conversation.externalConversationId) {
+          updates.externalConversationId = sendResult.conversationUuid;
+          updates.externalSource = "textline";
+        }
+        if (resolvedCustomerId && !conversation.customerId) {
+          updates.customerId = resolvedCustomerId;
+        }
+        await storage.updateMessagingConversation(conversation.id, updates);
+      }
+
+      // Create the message record locally
+      await storage.createMessage({
+        conversationId: conversation.id,
+        direction: "outbound" as any,
+        channel: "sms" as any,
+        body: message,
+        externalMessageId: sendResult.messageUuid || null,
+        status: "sent" as any,
+        authorUserId: user.id,
+        sentAt: new Date(),
+      });
+
+      return res.status(201).json({
+        conversationId: conversation.id,
+        message: "Message sent successfully",
+      });
+    } catch (error) {
+      console.error("Error starting conversation:", error);
+      return res.status(500).json({ message: "Failed to start conversation" });
+    }
+  });
+
+  // GET /api/crm/messaging/customers/search - Search customers for new message dialog
+  app.get("/api/crm/messaging/customers/search", requireCrmAuth, async (req, res) => {
+    try {
+      const { q } = req.query;
+      if (!q || typeof q !== "string" || q.length < 2) {
+        return res.json([]);
+      }
+
+      // Search for customers with matching name or phone
+      const results = await db.select({
+        id: crmCustomers.id,
+        name: crmCustomers.name,
+        phone: crmCustomers.phone,
+        email: crmCustomers.email,
+      })
+      .from(crmCustomers)
+      .where(
+        or(
+          ilike(crmCustomers.name, `%${q}%`),
+          ilike(crmCustomers.phone, `%${q}%`)
+        )
+      )
+      .limit(10);
+
+      // Filter out customers without phone numbers
+      const customersWithPhones = results.filter(c => c.phone && c.phone.trim() !== "");
+
+      return res.json(customersWithPhones);
+    } catch (error) {
+      console.error("Error searching customers for messaging:", error);
+      return res.status(500).json({ message: "Failed to search customers" });
+    }
+  });
+
   // ============================================
   // PUBLIC QUOTE VIEW & E-SIGNATURE ROUTES
   // ============================================
@@ -17129,16 +18973,55 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Quote not found or link is invalid" });
       }
 
-      // Track that the quote was viewed (first view only)
-      if (!quote.viewedAt) {
-        await db.update(crmQuotes)
-          .set({ viewedAt: new Date(), updatedAt: new Date() })
-          .where(eq(crmQuotes.id, quote.id));
-      }
+      // Track quote views - update viewedAt (first view) and increment viewCount (every view)
+      const now = new Date();
+      const currentViewCount = quote.viewCount || 0;
+      const isFirstView = !quote.viewedAt;
+      
+      await db.update(crmQuotes)
+        .set({ 
+          viewedAt: quote.viewedAt || now, // Only set on first view
+          viewCount: currentViewCount + 1,
+          updatedAt: now 
+        })
+        .where(eq(crmQuotes.id, quote.id));
+      
+      // Log the view event in quote email logs (for activity history)
+      await db.insert(quoteEmailLogs).values({
+        quoteId: quote.id,
+        direction: "system",
+        fromEmail: "system",
+        recipientEmail: quote.customerEmail || "",
+        recipientName: quote.customerName,
+        subject: isFirstView ? `Quote ${quote.quoteNumber} - First Viewed` : `Quote ${quote.quoteNumber} - Viewed Again`,
+        textContent: isFirstView 
+          ? `Quote was viewed for the first time by the customer`
+          : `Quote was viewed again by the customer (view #${currentViewCount + 1})`,
+        status: "sent",
+        isManual: false,
+        personalMessage: JSON.stringify({
+          eventType: "quote_viewed",
+          viewCount: currentViewCount + 1,
+          isFirstView,
+          viewedAt: now.toISOString(),
+        }),
+      });
+      
+      console.log(`[QuoteView] Quote ${quote.quoteNumber} viewed (view #${currentViewCount + 1})`);
 
       const lineItems = await db.select().from(crmQuoteLineItems)
         .where(eq(crmQuoteLineItems.quoteId, quote.id))
         .orderBy(crmQuoteLineItems.sortOrder);
+
+      // Fetch deposit percentage from settings
+      let depositPercentage = 50; // default
+      const depositSetting = await storage.getSetting('stripe_deposit_percentage');
+      if (depositSetting) {
+        const parsed = parseInt(depositSetting.value, 10);
+        if (!isNaN(parsed) && parsed >= 1 && parsed <= 100) {
+          depositPercentage = parsed;
+        }
+      }
 
       // Return only public-safe fields, exclude internal data
       const publicQuote = {
@@ -17157,10 +19040,16 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         acceptedAt: quote.acceptedAt,
         acceptedBy: quote.acceptedBy,
         signedAt: quote.signedAt,
+        signerName: quote.signerName,
         customerNotes: quote.customerNotes,
         aiGeneratedQuote: quote.aiGeneratedQuote,
         quoteMode: quote.quoteMode,
         selectedOption: quote.selectedOption,
+        quoteType: quote.quoteType,
+        depositPaidAt: quote.depositPaidAt,
+        depositAmount: quote.depositAmount,
+        stripePaymentLinkId: quote.stripePaymentLinkId,
+        depositPercentage,
       };
 
       const publicLineItems = lineItems.map((item) => ({
@@ -17276,7 +19165,41 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         }),
       });
 
-      console.log(`Quote ${quote.quoteNumber} signed and accepted by ${signerName.trim()} from IP ${signerIp}`);
+      console.log(`[PublicSign] Quote ${quote.quoteNumber} signed and accepted by ${signerName.trim()} from IP ${signerIp}`);
+
+      // Auto-create follow-up work order if quote is attached to a work order AND has service items
+      // Service quote types (quick, custom_service) always trigger; other types need service items check
+      console.log(`[PublicSign] Quote ${quote.quoteNumber}: workOrderId=${quote.workOrderId}, quoteType=${updated.quoteType}`);
+      
+      if (quote.workOrderId) {
+        // Check if quote has service-type items (service, labor, parts - not just maintenance)
+        const hasServiceLineItems = await hasServiceItems(quote.id);
+        console.log(`[PublicSign] Quote ${quote.quoteNumber}: hasServiceLineItems=${hasServiceLineItems}`);
+        
+        if (hasServiceLineItems) {
+          const [parentWorkOrder] = await db.select().from(crmWorkOrders)
+            .where(eq(crmWorkOrders.id, quote.workOrderId)).limit(1);
+          
+          console.log(`[PublicSign] Quote ${quote.quoteNumber}: parentWorkOrder status=${parentWorkOrder?.status}`);
+          
+          if (parentWorkOrder && (parentWorkOrder.status === "on_site" || parentWorkOrder.status === "completed")) {
+            const followUpWO = await createFollowUpWorkOrder(updated, parentWorkOrder, {
+              dispatchQueueStage: "WaitingOnParts",
+            });
+            if (followUpWO) {
+              console.log(`[PublicSign] Auto-created follow-up work order ${followUpWO.workOrderNumber} for quote ${quote.quoteNumber}`);
+            } else {
+              console.log(`[PublicSign] Follow-up work order NOT created (already exists?) for quote ${quote.quoteNumber}`);
+            }
+          } else {
+            console.log(`[PublicSign] Quote ${quote.quoteNumber}: parent work order not on_site/completed, status=${parentWorkOrder?.status}`);
+          }
+        } else {
+          console.log(`[PublicSign] Quote ${quote.quoteNumber} has no service items, skipping follow-up work order creation`);
+        }
+      } else {
+        console.log(`[PublicSign] Quote ${quote.quoteNumber}: skipping follow-up (no workOrderId)`);
+      }
 
       return res.json({ 
         success: true, 
@@ -17548,6 +19471,1072 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   }
 
+  // GET /api/admin/settings/automated-sms - Get automated SMS enabled status
+  app.get("/api/admin/settings/automated-sms", requireCrmAdmin, async (req, res) => {
+    try {
+      const setting = await storage.getSetting("automated_sms_enabled");
+      const enabled = setting ? setting.value !== "false" : true;
+      return res.json({ enabled });
+    } catch (error) {
+      console.error("Error getting automated SMS setting:", error);
+      return res.status(500).json({ message: "Failed to get setting" });
+    }
+  });
+
+  // PUT /api/admin/settings/automated-sms - Update automated SMS enabled status
+  app.put("/api/admin/settings/automated-sms", requireCrmAdmin, async (req, res) => {
+    try {
+      const { enabled } = req.body;
+      if (typeof enabled !== "boolean") {
+        return res.status(400).json({ message: "enabled must be a boolean" });
+      }
+      await storage.setSetting("automated_sms_enabled", enabled ? "true" : "false");
+      return res.json({ enabled });
+    } catch (error) {
+      console.error("Error updating automated SMS setting:", error);
+      return res.status(500).json({ message: "Failed to update setting" });
+    }
+  });
+
+  // POST /api/admin/trigger-maintenance-reminders - Manually trigger maintenance reminders
+  app.post("/api/admin/trigger-maintenance-reminders", requireCrmAuth, async (req, res) => {
+    const user = await getCurrentCrmUser(req);
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    if (user.role !== "owner" && user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    try {
+      const summary = await processMaintenanceReminders();
+      return res.json({ success: true, summary });
+    } catch (error) {
+      console.error("Error triggering maintenance reminders:", error);
+      return res.status(500).json({ message: "Failed to process reminders" });
+    }
+  });
+
+  // POST /api/admin/trigger-renewal-processing - Manually trigger agreement renewal processing
+  app.post("/api/admin/trigger-renewal-processing", requireCrmAuth, async (req, res) => {
+    const user = await getCurrentCrmUser(req);
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    if (user.role !== "owner" && user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    try {
+      const summary = await processAgreementRenewals();
+      return res.json({ success: true, summary });
+    } catch (error) {
+      console.error("Error triggering renewal processing:", error);
+      return res.status(500).json({ message: "Failed to process renewals" });
+    }
+  });
+
+  // GET /api/admin/agreements-for-invoice - Get agreements available for manual invoice trigger
+  app.get("/api/admin/agreements-for-invoice", requireCrmAuth, async (req, res) => {
+    const user = await getCurrentCrmUser(req);
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    if (user.role !== "owner" && user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    try {
+      const search = (req.query.search as string) || "";
+      let query = db.select({
+        id: crmAgreements.id,
+        agreementNumber: crmAgreements.agreementNumber,
+        customerName: crmAgreements.customerName,
+        agreementPlan: crmAgreements.agreementPlan,
+        status: crmAgreements.status,
+        price: crmAgreements.price,
+      })
+      .from(crmAgreements)
+      .orderBy(desc(crmAgreements.createdAt))
+      .limit(50);
+      
+      if (search) {
+        query = db.select({
+          id: crmAgreements.id,
+          agreementNumber: crmAgreements.agreementNumber,
+          customerName: crmAgreements.customerName,
+          agreementPlan: crmAgreements.agreementPlan,
+          status: crmAgreements.status,
+          price: crmAgreements.price,
+        })
+        .from(crmAgreements)
+        .where(or(
+          ilike(crmAgreements.customerName, `%${search}%`),
+          ilike(crmAgreements.agreementNumber, `%${search}%`)
+        ))
+        .orderBy(desc(crmAgreements.createdAt))
+        .limit(50);
+      }
+      
+      const agreements = await query;
+      return res.json(agreements);
+    } catch (error) {
+      console.error("Error fetching agreements for invoice:", error);
+      return res.status(500).json({ message: "Failed to fetch agreements" });
+    }
+  });
+
+  // POST /api/admin/trigger-agreement-invoice/:agreementId - Manually send invoice for specific agreement
+  app.post("/api/admin/trigger-agreement-invoice/:agreementId", requireCrmAuth, async (req, res) => {
+    const user = await getCurrentCrmUser(req);
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    if (user.role !== "owner" && user.role !== "admin") {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    try {
+      const { agreementId } = req.params;
+      
+      const [agreement] = await db.select()
+        .from(crmAgreements)
+        .where(eq(crmAgreements.id, agreementId))
+        .limit(1);
+      
+      if (!agreement) {
+        return res.status(404).json({ message: "Agreement not found" });
+      }
+      
+      const result = await processSingleAgreementRenewal(agreement);
+      
+      // Build message based on what was sent
+      let message = `Invoice ${result.invoiceNumber} created`;
+      if (result.emailSent && result.smsSent) {
+        message += ` and sent via email and text to ${agreement.customerName}`;
+      } else if (result.emailSent) {
+        message += ` and emailed to ${agreement.customerName}`;
+      } else if (result.smsSent) {
+        message += ` and texted to ${agreement.customerName}`;
+      } else {
+        message += ` (no email or text sent - customer may not have contact info)`;
+      }
+      
+      return res.json({ 
+        success: true, 
+        result,
+        message
+      });
+    } catch (error) {
+      console.error("Error triggering agreement invoice:", error);
+      return res.status(500).json({ message: "Failed to send agreement invoice" });
+    }
+  });
+
+  // =============================================
+  // QUICKBOOKS INTEGRATION ROUTES
+  // =============================================
+  
+  const {
+    getAuthorizationUrl: getQBAuthUrl,
+    exchangeCodeForTokens: exchangeQBTokens,
+    saveConnection: saveQBConnection,
+    getActiveConnection: getActiveQBConnection,
+    disconnectQuickBooks,
+    getConnectionStatus: getQBConnectionStatus,
+    syncCustomerToQuickBooks,
+    syncAllCustomersToQuickBooks,
+    syncInvoiceToQuickBooks,
+    syncAllInvoicesToQuickBooks,
+    syncPaymentToQuickBooks,
+    getSyncLogs: getQBSyncLogs
+  } = await import("./services/quickbooksService");
+  
+  // Import QuickBooks OAuth states table for persistent state storage
+  const { quickbooksOauthStates } = await import("@shared/schema");
+  
+  // GET /api/quickbooks/status - Get QuickBooks connection status
+  app.get("/api/quickbooks/status", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const status = await getQBConnectionStatus();
+      res.json(status);
+    } catch (error: any) {
+      console.error("[QuickBooks] Status error:", error);
+      res.status(500).json({ message: "Failed to get QuickBooks status" });
+    }
+  });
+  
+  // GET /api/quickbooks/connect - Initiate OAuth flow
+  app.get("/api/quickbooks/connect", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const environment = (req.query.environment as "sandbox" | "production") || "sandbox";
+      const state = randomUUID();
+      
+      // Store state in database for persistent CSRF protection (survives server restarts)
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+      await db.insert(quickbooksOauthStates).values({
+        state,
+        environment,
+        expiresAt,
+      });
+      
+      // Clean up expired states
+      await db.delete(quickbooksOauthStates)
+        .where(lt(quickbooksOauthStates.expiresAt, new Date()));
+      
+      console.log(`[QuickBooks] Created OAuth state: ${state.substring(0, 8)}... (expires ${expiresAt.toISOString()})`);
+      
+      const authUrl = getQBAuthUrl(state, environment);
+      res.json({ authUrl });
+    } catch (error: any) {
+      console.error("[QuickBooks] Connect error:", error);
+      res.status(500).json({ message: "Failed to initiate QuickBooks connection" });
+    }
+  });
+  
+  // GET /api/quickbooks/callback - OAuth callback
+  app.get("/api/quickbooks/callback", async (req, res) => {
+    try {
+      const { code, state, realmId, error } = req.query;
+      
+      if (error) {
+        console.error("[QuickBooks] OAuth error:", error);
+        return res.redirect("/crm/settings/quickbooks?error=oauth_denied");
+      }
+      
+      if (!code || !state || !realmId) {
+        return res.redirect("/crm/settings/quickbooks?error=missing_params");
+      }
+      
+      // Verify state from database (persisted across server restarts)
+      const [stateRecord] = await db.select()
+        .from(quickbooksOauthStates)
+        .where(and(
+          eq(quickbooksOauthStates.state, state as string),
+          gt(quickbooksOauthStates.expiresAt, new Date())
+        ))
+        .limit(1);
+      
+      if (!stateRecord) {
+        console.error("[QuickBooks] Invalid or expired state:", (state as string).substring(0, 8));
+        return res.redirect("/crm/settings/quickbooks?error=invalid_state");
+      }
+      
+      // Delete the used state
+      await db.delete(quickbooksOauthStates)
+        .where(eq(quickbooksOauthStates.id, stateRecord.id));
+      
+      console.log(`[QuickBooks] Validated OAuth state: ${(state as string).substring(0, 8)}...`);
+      
+      // Exchange code for tokens
+      const tokens = await exchangeQBTokens(code as string, realmId as string);
+      
+      // Save connection
+      await saveQBConnection(
+        realmId as string,
+        tokens.accessToken,
+        tokens.refreshToken,
+        tokens.accessTokenExpiresIn,
+        tokens.refreshTokenExpiresIn,
+        stateRecord.environment || "sandbox"
+      );
+      
+      console.log(`[QuickBooks] Connected to realm ${realmId} (${stateRecord.environment})`);
+      res.redirect("/crm/settings/quickbooks?success=connected");
+    } catch (error: any) {
+      console.error("[QuickBooks] Callback error:", error);
+      res.redirect("/crm/settings/quickbooks?error=token_exchange_failed");
+    }
+  });
+  
+  // POST /api/quickbooks/disconnect - Disconnect from QuickBooks
+  app.post("/api/quickbooks/disconnect", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      await disconnectQuickBooks();
+      res.json({ success: true, message: "Disconnected from QuickBooks" });
+    } catch (error: any) {
+      console.error("[QuickBooks] Disconnect error:", error);
+      res.status(500).json({ message: "Failed to disconnect from QuickBooks" });
+    }
+  });
+  
+  // POST /api/quickbooks/sync/customers - Sync all customers to QuickBooks
+  // This runs in the background to avoid timeout issues with large datasets
+  app.post("/api/quickbooks/sync/customers", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      // Start sync in background and return immediately
+      const backgroundSync = req.query.background === "true";
+      
+      if (backgroundSync) {
+        // Fire and forget - sync runs in background
+        syncAllCustomersToQuickBooks().then(result => {
+          console.log(`[QuickBooks] Background customer sync finished: ${result.succeeded} succeeded, ${result.failed} failed`);
+        }).catch(err => {
+          console.error("[QuickBooks] Background customer sync error:", err);
+        });
+        
+        return res.json({ 
+          success: true, 
+          message: "Customer sync started in background. Refresh status to see progress.",
+          background: true 
+        });
+      }
+      
+      // Synchronous sync (may timeout for large datasets)
+      const result = await syncAllCustomersToQuickBooks();
+      res.json({ success: result.failed === 0, ...result });
+    } catch (error: any) {
+      console.error("[QuickBooks] Customer sync error:", error);
+      res.status(500).json({ message: "Failed to sync customers" });
+    }
+  });
+  
+  // POST /api/quickbooks/sync/customer/:customerId - Sync single customer
+  app.post("/api/quickbooks/sync/customer/:customerId", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const result = await syncCustomerToQuickBooks(req.params.customerId);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Customer sync error:", error);
+      res.status(500).json({ message: "Failed to sync customer" });
+    }
+  });
+  
+  // POST /api/quickbooks/sync/invoices - Sync all invoices to QuickBooks
+  // This runs in the background to avoid timeout issues
+  app.post("/api/quickbooks/sync/invoices", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      // Start sync in background and return immediately
+      const backgroundSync = req.query.background === "true";
+      
+      if (backgroundSync) {
+        // Fire and forget - sync runs in background
+        syncAllInvoicesToQuickBooks().then(result => {
+          console.log(`[QuickBooks] Background invoice sync finished: ${result.succeeded} succeeded, ${result.failed} failed, ${result.paymentsSynced || 0} payments synced`);
+        }).catch(err => {
+          console.error("[QuickBooks] Background invoice sync error:", err);
+        });
+        
+        return res.json({ 
+          success: true, 
+          message: "Invoice sync started in background. Refresh status to see progress.",
+          background: true 
+        });
+      }
+      
+      // Synchronous sync
+      const result = await syncAllInvoicesToQuickBooks();
+      res.json({ success: result.failed === 0, ...result });
+    } catch (error: any) {
+      console.error("[QuickBooks] Invoice sync error:", error);
+      res.status(500).json({ message: "Failed to sync invoices" });
+    }
+  });
+  
+  // POST /api/quickbooks/sync/invoice/:invoiceId - Sync invoice to QuickBooks
+  app.post("/api/quickbooks/sync/invoice/:invoiceId", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const result = await syncInvoiceToQuickBooks(req.params.invoiceId);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Invoice sync error:", error);
+      res.status(500).json({ message: "Failed to sync invoice" });
+    }
+  });
+  
+  // POST /api/quickbooks/sync/payment/:invoiceId - Record payment in QuickBooks
+  app.post("/api/quickbooks/sync/payment/:invoiceId", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { amount, paymentDate } = req.body;
+      if (!amount) {
+        return res.status(400).json({ message: "Amount is required" });
+      }
+      
+      const result = await syncPaymentToQuickBooks(
+        req.params.invoiceId,
+        amount,
+        paymentDate ? new Date(paymentDate) : undefined
+      );
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Payment sync error:", error);
+      res.status(500).json({ message: "Failed to sync payment" });
+    }
+  });
+  
+  // GET /api/quickbooks/sync-logs - Get sync history
+  app.get("/api/quickbooks/sync-logs", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const limit = parseInt(req.query.limit as string) || 20;
+      const logs = await getQBSyncLogs(limit);
+      res.json(logs);
+    } catch (error: any) {
+      console.error("[QuickBooks] Sync logs error:", error);
+      res.status(500).json({ message: "Failed to get sync logs" });
+    }
+  });
+  
+  // POST /api/quickbooks/sync-all - Manually trigger full background sync
+  app.post("/api/quickbooks/sync-all", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { runBackgroundSync } = await import("./services/quickbooksService");
+      const result = await runBackgroundSync();
+      res.json({
+        success: true,
+        message: "Sync completed",
+        ...result
+      });
+    } catch (error: any) {
+      console.error("[QuickBooks] Sync all error:", error);
+      res.status(500).json({ message: "Failed to run sync" });
+    }
+  });
+
+  // =============================================
+  // QUICKBOOKS CLASS MANAGEMENT
+  // =============================================
+
+  // GET /api/quickbooks/classes - Get all classes
+  app.get("/api/quickbooks/classes", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { getAllLocalClasses } = await import("./services/quickbooksService");
+      const classes = await getAllLocalClasses();
+      res.json(classes);
+    } catch (error: any) {
+      console.error("[QuickBooks] Get classes error:", error);
+      res.status(500).json({ message: "Failed to get classes" });
+    }
+  });
+
+  // POST /api/quickbooks/classes/pull - Pull classes from QuickBooks
+  app.post("/api/quickbooks/classes/pull", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { pullClassesFromQuickBooks } = await import("./services/quickbooksService");
+      const result = await pullClassesFromQuickBooks();
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Pull classes error:", error);
+      res.status(500).json({ message: "Failed to pull classes" });
+    }
+  });
+
+  // POST /api/quickbooks/classes/sync - Sync all classes to QuickBooks
+  app.post("/api/quickbooks/classes/sync", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { syncAllClassesToQuickBooks } = await import("./services/quickbooksService");
+      const result = await syncAllClassesToQuickBooks();
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Sync classes error:", error);
+      res.status(500).json({ message: "Failed to sync classes" });
+    }
+  });
+
+  // POST /api/quickbooks/classes/:classId/sync - Sync single class to QuickBooks
+  app.post("/api/quickbooks/classes/:classId/sync", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { pushClassToQuickBooks } = await import("./services/quickbooksService");
+      const result = await pushClassToQuickBooks(req.params.classId);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Sync class error:", error);
+      res.status(500).json({ message: "Failed to sync class" });
+    }
+  });
+
+  // POST /api/quickbooks/classes - Create a new class
+  app.post("/api/quickbooks/classes", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { name, classType, subType } = req.body;
+      
+      if (!name || !classType || !subType) {
+        return res.status(400).json({ message: "Name, classType, and subType are required" });
+      }
+      
+      const validClassTypes = ["Service", "Install", "Maintenance", "Discount"];
+      const validSubTypes = ["Residential", "Commercial", "Crawlspace", "Promotional", "Maintenance"];
+      
+      if (!validClassTypes.includes(classType)) {
+        return res.status(400).json({ message: `classType must be one of: ${validClassTypes.join(", ")}` });
+      }
+      
+      if (!validSubTypes.includes(subType)) {
+        return res.status(400).json({ message: `subType must be one of: ${validSubTypes.join(", ")}` });
+      }
+      
+      const [created] = await db.insert(quickbooksClasses)
+        .values({
+          name,
+          classType,
+          subType,
+          isActive: true,
+        })
+        .returning();
+      
+      res.status(201).json(created);
+    } catch (error: any) {
+      console.error("[QuickBooks] Create class error:", error);
+      res.status(500).json({ message: "Failed to create class" });
+    }
+  });
+
+  // PATCH /api/quickbooks/classes/:classId - Update class (name, classType, subType, active status)
+  app.patch("/api/quickbooks/classes/:classId", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { name, classType, subType, isActive } = req.body;
+      const updateData: any = { updatedAt: new Date() };
+      
+      if (name !== undefined) updateData.name = name;
+      if (classType !== undefined) {
+        const validClassTypes = ["Service", "Install", "Maintenance", "Discount"];
+        if (!validClassTypes.includes(classType)) {
+          return res.status(400).json({ message: `classType must be one of: ${validClassTypes.join(", ")}` });
+        }
+        updateData.classType = classType;
+      }
+      if (subType !== undefined) {
+        const validSubTypes = ["Residential", "Commercial", "Crawlspace", "Promotional", "Maintenance"];
+        if (!validSubTypes.includes(subType)) {
+          return res.status(400).json({ message: `subType must be one of: ${validSubTypes.join(", ")}` });
+        }
+        updateData.subType = subType;
+      }
+      if (isActive !== undefined) updateData.isActive = isActive;
+      
+      const [updated] = await db.update(quickbooksClasses)
+        .set(updateData)
+        .where(eq(quickbooksClasses.id, req.params.classId))
+        .returning();
+      
+      if (!updated) {
+        return res.status(404).json({ message: "Class not found" });
+      }
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[QuickBooks] Update class error:", error);
+      res.status(500).json({ message: "Failed to update class" });
+    }
+  });
+
+  // =============================================
+  // CATEGORY-CLASS MAPPING
+  // =============================================
+
+  // GET /api/quickbooks/category-mappings - Get category-to-class mappings
+  app.get("/api/quickbooks/category-mappings", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { getCategoryClassMappings } = await import("./services/quickbooksService");
+      const mappings = await getCategoryClassMappings();
+      res.json(mappings);
+    } catch (error: any) {
+      console.error("[QuickBooks] Get category mappings error:", error);
+      res.status(500).json({ message: "Failed to get category mappings" });
+    }
+  });
+
+  // POST /api/quickbooks/category-mappings - Save category-to-class mapping
+  app.post("/api/quickbooks/category-mappings", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { categoryName, classId } = req.body;
+      if (!categoryName) {
+        return res.status(400).json({ message: "Category name is required" });
+      }
+      
+      const { saveCategoryClassMapping } = await import("./services/quickbooksService");
+      const result = await saveCategoryClassMapping(categoryName, classId || null);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Save category mapping error:", error);
+      res.status(500).json({ message: "Failed to save category mapping" });
+    }
+  });
+
+  // POST /api/quickbooks/category-mappings/bulk - Bulk save category-to-class mappings
+  app.post("/api/quickbooks/category-mappings/bulk", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { mappings } = req.body;
+      if (!Array.isArray(mappings)) {
+        return res.status(400).json({ message: "Mappings array is required" });
+      }
+      
+      // Validate that all mappings have valid class IDs
+      const invalidMappings = mappings.filter(m => m.categoryName && !m.classId);
+      if (invalidMappings.length > 0) {
+        const missingCategories = invalidMappings.map(m => m.categoryName).join(", ");
+        return res.status(400).json({ 
+          message: `All categories must be mapped to a class. Missing mappings for: ${missingCategories}` 
+        });
+      }
+      
+      // Validate that class IDs are valid
+      const classIds = mappings.filter(m => m.classId).map(m => m.classId);
+      if (classIds.length > 0) {
+        const { inArray } = await import("drizzle-orm");
+        const validClasses = await db.select({ id: quickbooksClasses.id })
+          .from(quickbooksClasses)
+          .where(inArray(quickbooksClasses.id, classIds));
+        const validClassIds = new Set(validClasses.map(c => c.id));
+        const invalidClassIds = classIds.filter(id => !validClassIds.has(id));
+        if (invalidClassIds.length > 0) {
+          return res.status(400).json({ 
+            message: "One or more selected classes do not exist" 
+          });
+        }
+      }
+      
+      const { saveCategoryClassMapping } = await import("./services/quickbooksService");
+      let saved = 0;
+      let errors = 0;
+      
+      for (const mapping of mappings) {
+        const result = await saveCategoryClassMapping(mapping.categoryName, mapping.classId || null);
+        if (result.success) {
+          saved++;
+        } else {
+          errors++;
+        }
+      }
+      
+      res.json({ success: errors === 0, saved, errors });
+    } catch (error: any) {
+      console.error("[QuickBooks] Bulk save category mappings error:", error);
+      res.status(500).json({ message: "Failed to save category mappings" });
+    }
+  });
+
+  // =============================================
+  // QUICKBOOKS ACCOUNTS (CHART OF ACCOUNTS)
+  // =============================================
+
+  // GET /api/quickbooks/accounts - Get all accounts
+  app.get("/api/quickbooks/accounts", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { getActiveConnection } = await import("./services/quickbooksService");
+      const conn = await getActiveConnection();
+      if (!conn) {
+        return res.json([]);
+      }
+      
+      const accounts = await db.select()
+        .from(quickbooksAccounts)
+        .where(eq(quickbooksAccounts.realmId, conn.realmId));
+      
+      res.json(accounts);
+    } catch (error: any) {
+      console.error("[QuickBooks] Get accounts error:", error);
+      res.status(500).json({ message: "Failed to get accounts" });
+    }
+  });
+
+  // GET /api/quickbooks/accounts/parents - Get parent accounts only
+  app.get("/api/quickbooks/accounts/parents", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { getActiveConnection, getParentAccounts } = await import("./services/quickbooksService");
+      const conn = await getActiveConnection();
+      if (!conn) {
+        return res.json([]);
+      }
+      
+      const parents = await getParentAccounts(conn.realmId);
+      res.json(parents);
+    } catch (error: any) {
+      console.error("[QuickBooks] Get parent accounts error:", error);
+      res.status(500).json({ message: "Failed to get parent accounts" });
+    }
+  });
+
+  // POST /api/quickbooks/accounts/pull - Pull accounts from QuickBooks
+  app.post("/api/quickbooks/accounts/pull", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { pullAccountsFromQuickBooks } = await import("./services/quickbooksService");
+      const result = await pullAccountsFromQuickBooks();
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Pull accounts error:", error);
+      res.status(500).json({ message: "Failed to pull accounts" });
+    }
+  });
+
+  // POST /api/quickbooks/accounts/sub-account - Create a sub-account
+  app.post("/api/quickbooks/accounts/sub-account", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { name, parentAccountId, categoryType, propertyType } = req.body;
+      
+      if (!name || !parentAccountId || !categoryType || !propertyType) {
+        return res.status(400).json({ 
+          message: "name, parentAccountId, categoryType, and propertyType are required" 
+        });
+      }
+      
+      const validCategoryTypes = ["Service", "Install", "Maintenance", "Discount"];
+      if (!validCategoryTypes.includes(categoryType)) {
+        return res.status(400).json({ 
+          message: `categoryType must be one of: ${validCategoryTypes.join(", ")}` 
+        });
+      }
+      
+      const validPropertyTypes = ["Residential", "Commercial", "None"];
+      if (!validPropertyTypes.includes(propertyType)) {
+        return res.status(400).json({ 
+          message: `propertyType must be one of: ${validPropertyTypes.join(", ")}` 
+        });
+      }
+      
+      const { createSubAccountInQuickBooks } = await import("./services/quickbooksService");
+      const result = await createSubAccountInQuickBooks(name, parentAccountId, categoryType, propertyType);
+      
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error: any) {
+      console.error("[QuickBooks] Create sub-account error:", error);
+      res.status(500).json({ message: "Failed to create sub-account" });
+    }
+  });
+
+  // PATCH /api/quickbooks/accounts/:accountId - Update account mapping
+  app.patch("/api/quickbooks/accounts/:accountId", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { categoryType, propertyType, isActive } = req.body;
+      const updateData: any = { updatedAt: new Date() };
+      
+      if (categoryType !== undefined) {
+        const validCategoryTypes = ["Service", "Install", "Maintenance", "Discount", null];
+        if (!validCategoryTypes.includes(categoryType)) {
+          return res.status(400).json({ 
+            message: "categoryType must be one of: Service, Install, Maintenance, Discount, or null" 
+          });
+        }
+        updateData.categoryType = categoryType;
+      }
+      
+      if (propertyType !== undefined) {
+        const validPropertyTypes = ["Residential", "Commercial", null];
+        if (!validPropertyTypes.includes(propertyType)) {
+          return res.status(400).json({ 
+            message: "propertyType must be one of: Residential, Commercial, or null" 
+          });
+        }
+        updateData.propertyType = propertyType;
+      }
+      
+      if (isActive !== undefined) updateData.isActive = isActive;
+      
+      const [updated] = await db.update(quickbooksAccounts)
+        .set(updateData)
+        .where(eq(quickbooksAccounts.id, req.params.accountId))
+        .returning();
+      
+      if (!updated) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[QuickBooks] Update account error:", error);
+      res.status(500).json({ message: "Failed to update account" });
+    }
+  });
+
+  // =============================================
+  // QUICKBOOKS ITEMS (Products & Services)
+  // =============================================
+
+  // GET /api/quickbooks/items - Get all items
+  app.get("/api/quickbooks/items", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { getQuickbooksItems } = await import("./services/quickbooksService");
+      const items = await getQuickbooksItems();
+      res.json(items);
+    } catch (error: any) {
+      console.error("[QuickBooks] Get items error:", error);
+      res.status(500).json({ message: "Failed to get items" });
+    }
+  });
+
+  // POST /api/quickbooks/items/pull - Pull items from QuickBooks
+  app.post("/api/quickbooks/items/pull", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { pullItemsFromQuickBooks } = await import("./services/quickbooksService");
+      const result = await pullItemsFromQuickBooks();
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error: any) {
+      console.error("[QuickBooks] Pull items error:", error);
+      res.status(500).json({ message: "Failed to pull items" });
+    }
+  });
+
+  // POST /api/quickbooks/items/provision - Auto-provision items for mapped sub-accounts
+  app.post("/api/quickbooks/items/provision", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { provisionItemsForSubAccounts } = await import("./services/quickbooksService");
+      const result = await provisionItemsForSubAccounts();
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Provision items error:", error);
+      res.status(500).json({ message: "Failed to provision items", error: error.message });
+    }
+  });
+
+  // POST /api/quickbooks/items/push - Push all items to QuickBooks with correct IncomeAccountRef
+  app.post("/api/quickbooks/items/push", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { pushAllItemsToQuickBooks } = await import("./services/quickbooksService");
+      const result = await pushAllItemsToQuickBooks();
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Push items error:", error);
+      res.status(500).json({ message: "Failed to push items", error: error.message });
+    }
+  });
+
+  // GET /api/quickbooks/invoice/:qbInvoiceId/debug - Debug a QuickBooks invoice
+  app.get("/api/quickbooks/invoice/:qbInvoiceId/debug", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { getQuickBooksInvoiceDetails } = await import("./services/quickbooksService");
+      const result = await getQuickBooksInvoiceDetails(req.params.qbInvoiceId);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Debug invoice error:", error);
+      res.status(500).json({ message: "Failed to get invoice details", error: error.message });
+    }
+  });
+
+  // POST /api/quickbooks/invoice/:crmInvoiceId/resync - Resync a CRM invoice to QuickBooks with correct ItemRefs
+  app.post("/api/quickbooks/invoice/:crmInvoiceId/resync", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { resyncInvoiceToQuickBooks } = await import("./services/quickbooksService");
+      const result = await resyncInvoiceToQuickBooks(req.params.crmInvoiceId);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Resync invoice error:", error);
+      res.status(500).json({ message: "Failed to resync invoice", error: error.message });
+    }
+  });
+
+  // POST /api/quickbooks/items - Create an item
+  app.post("/api/quickbooks/items", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { name, description, categoryType, propertyType, incomeAccountId, itemType } = req.body;
+      
+      if (!name || !categoryType || !propertyType) {
+        return res.status(400).json({ 
+          message: "name, categoryType, and propertyType are required" 
+        });
+      }
+      
+      const { createQuickbooksItem } = await import("./services/quickbooksService");
+      const result = await createQuickbooksItem({
+        name,
+        description,
+        categoryType,
+        propertyType,
+        incomeAccountId,
+        itemType: itemType || "Service"
+      });
+      
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error: any) {
+      console.error("[QuickBooks] Create item error:", error);
+      res.status(500).json({ message: "Failed to create item" });
+    }
+  });
+
+  // PATCH /api/quickbooks/items/:itemId - Update item mapping
+  app.patch("/api/quickbooks/items/:itemId", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { categoryType, propertyType, incomeAccountId, isActive } = req.body;
+      const updates: any = {};
+      
+      if (categoryType !== undefined) updates.categoryType = categoryType;
+      if (propertyType !== undefined) updates.propertyType = propertyType;
+      if (incomeAccountId !== undefined) updates.incomeAccountId = incomeAccountId;
+      if (isActive !== undefined) updates.isActive = isActive;
+      
+      const { updateQuickbooksItemMapping } = await import("./services/quickbooksService");
+      const result = await updateQuickbooksItemMapping(
+        req.params.itemId,
+        updates
+      );
+      
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error: any) {
+      console.error("[QuickBooks] Update item error:", error);
+      res.status(500).json({ message: "Failed to update item" });
+    }
+  });
+
   // POST /api/admin/portal/generate-link/:customerId - Generate portal login link for a customer
   app.post("/api/admin/portal/generate-link/:customerId", requireCrmAuth, async (req, res) => {
     try {
@@ -17655,6 +20644,10 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       if (!customer) {
         return res.status(401).json({ message: "Customer not found" });
+      }
+
+      if (!customer.portalEnabled) {
+        return res.status(403).json({ message: "Portal access is not enabled for this account" });
       }
 
       const sessionToken = randomUUID();
@@ -17773,6 +20766,18 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         .orderBy(desc(crmWorkOrders.completedAt))
         .limit(1);
 
+      // Get quotes summary for the customer
+      const allQuotes = await db.select({
+        id: crmQuotes.id,
+        status: crmQuotes.status,
+        total: crmQuotes.total,
+      })
+        .from(crmQuotes)
+        .where(eq(crmQuotes.customerId, customerId));
+
+      const pendingQuotes = allQuotes.filter(q => q.status === "sent" || q.status === "draft");
+      const pendingQuotesTotal = pendingQuotes.reduce((sum, q) => sum + parseFloat(q.total || "0"), 0);
+
       res.json({
         customer: {
           id: customer.id,
@@ -17786,6 +20791,11 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         agreementsSummary: {
           active: activeAgreements,
           total: totalAgreements,
+        },
+        quotesSummary: {
+          pendingCount: pendingQuotes.length,
+          pendingTotal: pendingQuotesTotal.toFixed(2),
+          totalCount: allQuotes.length,
         },
         recentService: recentService.length > 0 ? {
           title: recentService[0].title,
@@ -17826,6 +20836,67 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // GET /api/portal/invoice/:id - Returns single invoice details (public for payment redirects)
+  app.get("/api/portal/invoice/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const [invoice] = await db.select()
+        .from(crmInvoices)
+        .where(eq(crmInvoices.id, id));
+
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      // Get line items
+      const lineItems = await db.select()
+        .from(crmInvoiceLineItems)
+        .where(eq(crmInvoiceLineItems.invoiceId, id))
+        .orderBy(crmInvoiceLineItems.sortOrder);
+
+      // Get customer info if available
+      let customerName = "Customer";
+      let customerEmail = null;
+      let customerPhone = null;
+      if (invoice.customerId) {
+        const [customer] = await db.select()
+          .from(crmCustomers)
+          .where(eq(crmCustomers.id, invoice.customerId));
+        if (customer) {
+          customerName = customer.name;
+          customerEmail = customer.email;
+          customerPhone = customer.phone;
+        }
+      }
+
+      // Get property info if available  
+      let serviceAddress = null;
+      if (invoice.propertyId) {
+        const [property] = await db.select()
+          .from(crmProperties)
+          .where(eq(crmProperties.id, invoice.propertyId));
+        if (property) {
+          serviceAddress = [property.address1, property.city, property.state, property.zip].filter(Boolean).join(", ");
+        }
+      }
+
+      res.json({ 
+        invoice: {
+          ...invoice,
+          customerName,
+          customerEmail,
+          customerPhone,
+          serviceAddress,
+        },
+        lineItems,
+      });
+    } catch (error) {
+      console.error("Error fetching portal invoice:", error);
+      res.status(500).json({ message: "Failed to fetch invoice" });
+    }
+  });
+
   // GET /api/portal/quotes - Returns customer's quotes
   app.get("/api/portal/quotes", requireCustomerPortalAuth, async (req: any, res) => {
     try {
@@ -17840,6 +20911,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         quoteDate: crmQuotes.quoteDate,
         validUntil: crmQuotes.validUntil,
         title: crmQuotes.title,
+        publicToken: crmQuotes.publicToken,
       })
         .from(crmQuotes)
         .where(eq(crmQuotes.customerId, customerId))
@@ -17852,7 +20924,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
-  // GET /api/portal/agreements - Returns customer's maintenance agreements
+  // GET /api/portal/agreements - Returns customer's maintenance agreements with visit tracking
   app.get("/api/portal/agreements", requireCustomerPortalAuth, async (req: any, res) => {
     try {
       const customerId = req.portalCustomer.id;
@@ -17873,7 +20945,36 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         .where(eq(crmAgreements.customerId, customerId))
         .orderBy(desc(crmAgreements.startDate));
 
-      res.json({ agreements: agreementsResult });
+      // For each agreement, get the maintenance visits
+      const agreementsWithVisits = await Promise.all(
+        agreementsResult.map(async (agreement) => {
+          const visits = await db.select({
+            id: maintenanceVisits.id,
+            visitNumber: maintenanceVisits.visitNumber,
+            cycleYear: maintenanceVisits.cycleYear,
+            targetDate: maintenanceVisits.targetDate,
+            completedAt: maintenanceVisits.completedAt,
+            status: maintenanceVisits.status,
+          })
+            .from(maintenanceVisits)
+            .where(eq(maintenanceVisits.agreementId, agreement.id))
+            .orderBy(maintenanceVisits.targetDate);
+          
+          const completedVisits = visits.filter(v => v.status === "completed").length;
+          const totalVisits = visits.length;
+          const remainingVisits = totalVisits - completedVisits;
+          
+          return {
+            ...agreement,
+            visits,
+            completedVisits,
+            totalVisits,
+            remainingVisits,
+          };
+        })
+      );
+
+      res.json({ agreements: agreementsWithVisits });
     } catch (error) {
       console.error("Error fetching portal agreements:", error);
       res.status(500).json({ message: "Failed to fetch agreements" });
@@ -17903,10 +21004,1637 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         ))
         .orderBy(desc(crmWorkOrders.completedAt));
 
-      res.json({ serviceHistory: workOrders });
+      res.json({ workOrders });
     } catch (error) {
       console.error("Error fetching portal service history:", error);
       res.status(500).json({ message: "Failed to fetch service history" });
+    }
+  });
+
+  // ============================================
+  // MOBILE TIME TRACKING ENDPOINTS
+  // ============================================
+
+  // GET /api/mobile/time/current - Get active time entry for logged-in tech
+  app.get("/api/mobile/time/current", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const activeEntry = await storage.getActiveTimeEntry(user.id);
+      return res.json({ entry: activeEntry });
+    } catch (error) {
+      console.error("Error fetching active time entry:", error);
+      return res.status(500).json({ message: "Failed to fetch active time entry" });
+    }
+  });
+
+  // POST /api/mobile/time/clock-in - Clock in (optional body: { workOrderId })
+  app.post("/api/mobile/time/clock-in", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const existingEntry = await storage.getActiveTimeEntry(user.id);
+      if (existingEntry) {
+        return res.status(400).json({ message: "Already clocked in" });
+      }
+
+      const { workOrderId } = req.body || {};
+      const entry = await storage.clockIn(user.id, workOrderId, "mobile");
+      return res.status(201).json(entry);
+    } catch (error) {
+      console.error("Error clocking in:", error);
+      return res.status(500).json({ message: "Failed to clock in" });
+    }
+  });
+
+  // POST /api/mobile/time/clock-out - Clock out current entry
+  app.post("/api/mobile/time/clock-out", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const activeEntry = await storage.getActiveTimeEntry(user.id);
+      if (!activeEntry) {
+        return res.status(400).json({ message: "Not currently clocked in" });
+      }
+
+      const entry = await storage.clockOut(activeEntry.id);
+      return res.json(entry);
+    } catch (error) {
+      console.error("Error clocking out:", error);
+      return res.status(500).json({ message: "Failed to clock out" });
+    }
+  });
+
+  // GET /api/mobile/time/history - Get recent time entries for logged-in tech (last 30 days)
+  app.get("/api/mobile/time/history", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const entries = await storage.getTimeEntries({
+        technicianId: user.id,
+        startDate: thirtyDaysAgo,
+      });
+      return res.json(entries);
+    } catch (error) {
+      console.error("Error fetching time history:", error);
+      return res.status(500).json({ message: "Failed to fetch time history" });
+    }
+  });
+
+  // ============================================
+  // CRM ADMIN TIME TRACKING ENDPOINTS
+  // ============================================
+
+  // GET /api/crm/time-entries - Get all time entries with filters
+  app.get("/api/crm/time-entries", requireCrmAdmin, async (req, res) => {
+    try {
+      const { technicianId, startDate, endDate } = req.query;
+
+      const filters: { technicianId?: string; startDate?: Date; endDate?: Date } = {};
+      if (technicianId && typeof technicianId === "string") {
+        filters.technicianId = technicianId;
+      }
+      if (startDate && typeof startDate === "string") {
+        filters.startDate = new Date(startDate);
+      }
+      if (endDate && typeof endDate === "string") {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999); // Include the full end date
+        filters.endDate = end;
+      }
+
+      const entries = await storage.getTimeEntries(filters);
+      
+      // Enrich with technician names
+      const users = await db.select().from(crmUsers);
+      const userMap = new Map(users.map((u) => [u.id, u.name]));
+      const enrichedEntries = entries.map((entry) => ({
+        ...entry,
+        technicianName: userMap.get(entry.technicianId) || "Unknown",
+      }));
+      
+      return res.json(enrichedEntries);
+    } catch (error) {
+      console.error("Error fetching time entries:", error);
+      return res.status(500).json({ message: "Failed to fetch time entries" });
+    }
+  });
+
+  // PATCH /api/crm/time-entries/:id - Update a time entry (for admin adjustments)
+  app.patch("/api/crm/time-entries/:id", requireCrmAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { clockInAt, clockOutAt, durationMinutes, notes, workOrderId } = req.body;
+
+      const updates: Record<string, any> = {};
+      if (clockInAt !== undefined) updates.clockInAt = new Date(clockInAt);
+      if (clockOutAt !== undefined) updates.clockOutAt = clockOutAt ? new Date(clockOutAt) : null;
+      if (durationMinutes !== undefined) updates.durationMinutes = durationMinutes;
+      if (notes !== undefined) updates.notes = notes;
+      if (workOrderId !== undefined) updates.workOrderId = workOrderId || null;
+
+      const entry = await storage.updateTimeEntry(id, updates);
+      return res.json(entry);
+    } catch (error: any) {
+      console.error("Error updating time entry:", error);
+      if (error.message === "Time entry not found") {
+        return res.status(404).json({ message: "Time entry not found" });
+      }
+      return res.status(500).json({ message: "Failed to update time entry" });
+    }
+  });
+
+  // GET /api/crm/time-breakdown - Get time breakdown (idle/drive/work) per employee
+  // Available to all CRM users (tech and above) who can view dispatch board
+  app.get("/api/crm/time-breakdown", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+
+      if (!startDate || !endDate || typeof startDate !== "string" || typeof endDate !== "string") {
+        return res.status(400).json({ message: "startDate and endDate are required" });
+      }
+
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999); // Include the full end date
+
+      // Get all time entries in the date range
+      const timeEntries = await storage.getTimeEntries({ startDate: start, endDate: end });
+
+      // Get work orders with timing data that overlap the date range
+      // Include work orders where any timing window (dispatch/onsite/complete) intersects range
+      const workOrders = await db.select()
+        .from(crmWorkOrders)
+        .where(
+          or(
+            // Dispatched within range
+            and(
+              isNotNull(crmWorkOrders.dispatchedAt),
+              gte(crmWorkOrders.dispatchedAt, start),
+              lte(crmWorkOrders.dispatchedAt, end)
+            ),
+            // On-site within range
+            and(
+              isNotNull(crmWorkOrders.onSiteAt),
+              gte(crmWorkOrders.onSiteAt, start),
+              lte(crmWorkOrders.onSiteAt, end)
+            ),
+            // Completed within range
+            and(
+              isNotNull(crmWorkOrders.completedAt),
+              gte(crmWorkOrders.completedAt, start),
+              lte(crmWorkOrders.completedAt, end)
+            )
+          )
+        );
+
+      // Get all users (technicians)
+      const users = await db.select().from(crmUsers);
+      const techUsers = users.filter(u => ["tech", "supervisor", "sales"].includes(u.role || ""));
+
+      // Calculate breakdown for each technician
+      const breakdowns = techUsers.map(tech => {
+        // Get time entries for this tech
+        const techTimeEntries = timeEntries.filter(e => e.technicianId === tech.id);
+        
+        // Calculate total clocked time in minutes (skip entries without clock-out)
+        let totalClockedMinutes = 0;
+        for (const entry of techTimeEntries) {
+          if (entry.durationMinutes) {
+            totalClockedMinutes += entry.durationMinutes;
+          } else if (entry.clockOutAt) {
+            const duration = Math.floor((entry.clockOutAt.getTime() - entry.clockInAt.getTime()) / 60000);
+            if (duration > 0) totalClockedMinutes += duration;
+          }
+          // Skip entries without clock-out (still in progress)
+        }
+
+        // Get work orders for this tech
+        const techWorkOrders = workOrders.filter(wo => wo.assignedTechId === tech.id);
+
+        // Calculate drive time (dispatchedAt to onSiteAt) in minutes
+        let rawDriveTimeMinutes = 0;
+        for (const wo of techWorkOrders) {
+          if (wo.dispatchedAt && wo.onSiteAt) {
+            const duration = Math.floor((wo.onSiteAt.getTime() - wo.dispatchedAt.getTime()) / 60000);
+            if (duration > 0) rawDriveTimeMinutes += duration;
+          }
+        }
+
+        // Calculate work time (onSiteAt to completedAt) in minutes
+        let rawWorkTimeMinutes = 0;
+        for (const wo of techWorkOrders) {
+          if (wo.onSiteAt && wo.completedAt) {
+            const duration = Math.floor((wo.completedAt.getTime() - wo.onSiteAt.getTime()) / 60000);
+            if (duration > 0) rawWorkTimeMinutes += duration;
+          }
+        }
+
+        // Clamp drive + work time to not exceed total clocked time
+        let driveTimeMinutes = 0;
+        let workTimeMinutes = 0;
+        
+        if (totalClockedMinutes > 0) {
+          const totalActiveMinutes = rawDriveTimeMinutes + rawWorkTimeMinutes;
+          if (totalActiveMinutes > totalClockedMinutes) {
+            // Scale down proportionally if active time exceeds clocked time
+            const ratio = totalClockedMinutes / totalActiveMinutes;
+            driveTimeMinutes = Math.floor(rawDriveTimeMinutes * ratio);
+            workTimeMinutes = Math.floor(rawWorkTimeMinutes * ratio);
+          } else {
+            driveTimeMinutes = rawDriveTimeMinutes;
+            workTimeMinutes = rawWorkTimeMinutes;
+          }
+        }
+        // If no clock data, drive/work stay at 0
+
+        // Idle time = total clocked time - drive time - work time
+        const idleTimeMinutes = Math.max(0, totalClockedMinutes - driveTimeMinutes - workTimeMinutes);
+
+        return {
+          technicianId: tech.id,
+          technicianName: tech.name,
+          role: tech.role,
+          totalClockedMinutes,
+          driveTimeMinutes,
+          workTimeMinutes,
+          idleTimeMinutes,
+          workOrdersCompleted: techWorkOrders.filter(wo => wo.status === "completed").length,
+          // Also include daily breakdown
+          entries: techTimeEntries.map(e => ({
+            id: e.id,
+            date: e.clockInAt.toISOString().split('T')[0],
+            clockInAt: e.clockInAt,
+            clockOutAt: e.clockOutAt,
+            durationMinutes: e.durationMinutes || (e.clockOutAt ? Math.max(0, Math.floor((e.clockOutAt.getTime() - e.clockInAt.getTime()) / 60000)) : 0),
+          })),
+        };
+      });
+
+      return res.json({
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+        breakdowns: breakdowns.filter(b => b.totalClockedMinutes > 0 || b.workOrdersCompleted > 0 || b.entries.length > 0),
+      });
+    } catch (error) {
+      console.error("Error calculating time breakdown:", error);
+      return res.status(500).json({ message: "Failed to calculate time breakdown" });
+    }
+  });
+
+  // ============================================
+  // MOBILE MESSAGING ENDPOINTS
+  // ============================================
+
+  // GET /api/mobile/messaging/conversations - List conversations for logged-in tech
+  app.get("/api/mobile/messaging/conversations", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { status, search } = req.query;
+      const filters: { status?: string; search?: string } = {};
+      if (status && typeof status === "string") filters.status = status;
+      if (search && typeof search === "string") filters.search = search;
+
+      const conversations = await storage.getMobileConversations(user.id, filters);
+      return res.json(conversations);
+    } catch (error) {
+      console.error("Error fetching mobile conversations:", error);
+      return res.status(500).json({ message: "Failed to fetch conversations" });
+    }
+  });
+
+  // GET /api/mobile/messaging/conversations/:id - Get single conversation with messages
+  app.get("/api/mobile/messaging/conversations/:id", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+      const conversation = await storage.getMessagingConversationById(id);
+      
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      // If this is a Textline conversation, fetch messages from Textline and cache them
+      // Try phone number first (more reliable), fall back to UUID
+      if (conversation.externalSource === "textline" && textlineClient.isConfigured()) {
+        let textlineMessages: any[] = [];
+        
+        // Try phone number first if available
+        if (conversation.phoneNumber) {
+          try {
+            const phoneResult = await textlineClient.getConversationMessagesByPhone(conversation.phoneNumber);
+            if (!phoneResult.error) {
+              textlineMessages = phoneResult.messages;
+            }
+          } catch (e) {
+            console.error("[Textline] Phone lookup failed, will try UUID:", e);
+          }
+        }
+        
+        // Fall back to UUID if phone failed or wasn't available
+        if (textlineMessages.length === 0 && conversation.externalConversationId) {
+          try {
+            const uuidResult = await textlineClient.getConversationMessages(conversation.externalConversationId);
+            if (!uuidResult.error) {
+              textlineMessages = uuidResult.messages;
+            }
+          } catch (e) {
+            console.error("[Textline] UUID lookup failed:", e);
+          }
+        }
+        
+        if (textlineMessages.length > 0) {
+          // Get existing message external IDs to avoid duplicates
+          const existingMessages = await storage.getMessagesForConversation(id);
+          const existingExternalIds = new Set(existingMessages.map(m => m.externalMessageId).filter(Boolean));
+          
+          // Insert new messages from Textline
+          for (const tm of textlineMessages) {
+            if (!existingExternalIds.has(tm.uuid)) {
+              try {
+                await storage.createMessage({
+                  conversationId: id,
+                  body: tm.body,
+                  direction: tm.direction as any,
+                  channel: "sms" as any,
+                  status: "delivered" as any,
+                  externalMessageId: tm.uuid,
+                  sentAt: tm.created_at ? new Date(tm.created_at) : undefined,
+                  deliveredAt: tm.delivered_at ? new Date(tm.delivered_at) : undefined,
+                  readAt: tm.read_at ? new Date(tm.read_at) : undefined,
+                  attachments: tm.attachments?.map(a => ({ url: a.url, filename: a.filename, contentType: a.content_type })) as any,
+                });
+              } catch (e) {
+                console.error("[Textline] Error caching message:", e);
+              }
+            }
+          }
+        }
+      }
+
+      // Now fetch all messages (including newly cached ones)
+      const messages = await storage.getMessagesForConversation(id);
+      
+      let customer = null;
+      if (conversation.customerId) {
+        const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, conversation.customerId));
+        customer = cust || null;
+      }
+
+      return res.json({ conversation, messages, customer });
+    } catch (error) {
+      console.error("Error fetching mobile conversation details:", error);
+      return res.status(500).json({ message: "Failed to fetch conversation" });
+    }
+  });
+
+  // POST /api/mobile/messaging/conversations - Create new conversation for a customer
+  app.post("/api/mobile/messaging/conversations", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { customerId, initialMessage } = req.body;
+      
+      if (!customerId) {
+        return res.status(400).json({ message: "customerId is required" });
+      }
+
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      if (!customer.phone) {
+        return res.status(400).json({ message: "Customer has no phone number" });
+      }
+
+      const conversationData = {
+        customerId,
+        phoneNumber: customer.phone,
+        customerName: customer.name,
+        assignedToId: user.id,
+        status: "open" as const,
+        lastMessageAt: new Date(),
+      };
+
+      const conversation = await storage.createMessagingConversation(conversationData);
+
+      if (initialMessage && typeof initialMessage === "string" && initialMessage.trim()) {
+        const messageData = {
+          conversationId: conversation.id,
+          body: initialMessage.trim(),
+          channel: "sms" as const,
+          direction: "outbound" as const,
+          status: "sent" as const,
+          authorUserId: user.id,
+          sentAt: new Date(),
+        };
+        await storage.createMessage(messageData);
+      }
+
+      return res.status(201).json(conversation);
+    } catch (error) {
+      console.error("Error creating mobile conversation:", error);
+      return res.status(500).json({ message: "Failed to create conversation" });
+    }
+  });
+
+  // POST /api/mobile/messaging/conversations/:id/messages - Send a new message
+  app.post("/api/mobile/messaging/conversations/:id/messages", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+      const conversation = await storage.getMessagingConversationById(id);
+      
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      const { body } = req.body;
+      
+      if (!body || typeof body !== "string" || !body.trim()) {
+        return res.status(400).json({ message: "Message body is required" });
+      }
+
+      const messageBody = body.trim();
+
+      // Store message locally first
+      const messageData = {
+        conversationId: id,
+        body: messageBody,
+        channel: "sms" as const,
+        direction: "outbound" as const,
+        status: "queued" as const,
+        authorUserId: user.id,
+        sentAt: new Date(),
+      };
+
+      const message = await storage.createMessage(messageData);
+
+      // Send via messaging adapter (Textline if configured, local otherwise)
+      const adapter = getMessagingAdapter();
+      const adapterResult = await adapter.sendMessage({
+        conversationId: id,
+        body: messageBody,
+        channel: "sms",
+        recipientPhone: conversation.phoneNumber || undefined,
+        externalConversationId: conversation.externalConversationId || undefined,
+      });
+
+      if (!adapterResult.success) {
+        console.error("[Mobile] Message send failed:", adapterResult.errorMessage);
+        // Update message status to failed
+        await storage.updateMessage(message.id, { status: "failed" });
+        return res.status(500).json({ message: adapterResult.errorMessage || "Failed to send SMS" });
+      }
+
+      // Update message status and external ID
+      await storage.updateMessage(message.id, { 
+        status: adapterResult.status,
+        externalMessageId: adapterResult.externalMessageId,
+      });
+      
+      // Update conversation lastMessageAt
+      await storage.updateMessagingConversation(id, {
+        lastMessageAt: new Date(),
+        lastOutboundAt: new Date(),
+      });
+
+      return res.status(201).json(message);
+    } catch (error) {
+      console.error("Error sending mobile message:", error);
+      return res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  // GET /api/mobile/messaging/contacts - Search customers for new conversations
+  app.get("/api/mobile/messaging/contacts", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const { search } = req.query;
+      
+      if (!search || typeof search !== "string") {
+        return res.json([]);
+      }
+
+      const customers = await storage.searchCrmCustomers(search, 20);
+      return res.json(customers);
+    } catch (error) {
+      console.error("Error searching mobile contacts:", error);
+      return res.status(500).json({ message: "Failed to search contacts" });
+    }
+  });
+
+  // GET /api/mobile/customers - Mobile customer lookup (for field technicians)
+  app.get("/api/mobile/customers", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const { search, limit = "20" } = req.query as Record<string, string | undefined>;
+      const limitNum = Math.min(50, Math.max(1, parseInt(limit || "20") || 20));
+      const searchTerm = search?.trim() || "";
+      
+      // If no search term, return empty (don't load all customers)
+      if (!searchTerm) {
+        return res.json([]);
+      }
+
+      const customers = await storage.searchCrmCustomers(searchTerm, limitNum);
+      return res.json(customers);
+    } catch (error) {
+      console.error("Error fetching mobile customers:", error);
+      return res.status(500).json({ message: "Failed to fetch customers" });
+    }
+  });
+
+  // GET /api/mobile/work-orders/available-slots - Get available time slots for a given date
+  app.get("/api/mobile/work-orders/available-slots", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { date, techId, durationMinutes = "60" } = req.query as Record<string, string | undefined>;
+      
+      if (!date) {
+        return res.status(400).json({ message: "Date is required" });
+      }
+
+      // Use provided techId or default to current user
+      const targetTechId = techId || user.id;
+      const duration = parseInt(durationMinutes) || 60;
+      const slotsNeeded = Math.ceil(duration / 30); // How many 30-min slots needed
+
+      // Constants matching dispatch board (8am to 8pm)
+      const START_HOUR = 8;
+      const END_HOUR = 20;
+      const STEP_MINUTES = 30;
+
+      // Parse the date properly - add T00:00:00 to avoid UTC interpretation
+      // date comes in as "2026-01-09", we need to treat it as local time
+      const [year, month, day] = date.split('-').map(Number);
+      const targetDate = new Date(year, month - 1, day); // month is 0-indexed
+      
+      const dayStart = new Date(year, month - 1, day, 0, 0, 0, 0);
+      const dayEnd = new Date(year, month - 1, day, 23, 59, 59, 999);
+
+      // Get existing work orders for this tech on this date
+      const existingOrders = await db.select({
+        scheduledStart: crmWorkOrders.scheduledStart,
+        scheduledEnd: crmWorkOrders.scheduledEnd,
+      })
+      .from(crmWorkOrders)
+      .where(and(
+        eq(crmWorkOrders.assignedTechId, targetTechId),
+        isNotNull(crmWorkOrders.scheduledStart),
+        isNotNull(crmWorkOrders.scheduledEnd),
+        gte(crmWorkOrders.scheduledStart, dayStart),
+        lte(crmWorkOrders.scheduledStart, dayEnd),
+        sql`${crmWorkOrders.status} NOT IN ('cancelled', 'completed')`
+      ));
+
+      // Build time slots
+      const slots: Array<{ 
+        start: string; 
+        end: string; 
+        label: string;
+        available: boolean;
+      }> = [];
+
+      for (let hour = START_HOUR; hour < END_HOUR; hour++) {
+        for (let minute = 0; minute < 60; minute += STEP_MINUTES) {
+          const slotStart = new Date(targetDate);
+          slotStart.setHours(hour, minute, 0, 0);
+          
+          const slotEnd = new Date(slotStart);
+          slotEnd.setMinutes(slotEnd.getMinutes() + duration);
+
+          // Don't show slots that would extend past business hours
+          if (slotEnd.getHours() > END_HOUR || (slotEnd.getHours() === END_HOUR && slotEnd.getMinutes() > 0)) {
+            continue;
+          }
+
+          // Check if this slot conflicts with any existing orders
+          const hasConflict = existingOrders.some(order => {
+            if (!order.scheduledStart || !order.scheduledEnd) return false;
+            const orderStart = new Date(order.scheduledStart);
+            const orderEnd = new Date(order.scheduledEnd);
+            // Overlap: slotStart < orderEnd AND slotEnd > orderStart
+            return slotStart < orderEnd && slotEnd > orderStart;
+          });
+
+          // Format time for display
+          const formatTime = (d: Date) => {
+            const h = d.getHours();
+            const m = d.getMinutes();
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+            return m === 0 ? `${displayHour} ${ampm}` : `${displayHour}:${m.toString().padStart(2, '0')} ${ampm}`;
+          };
+
+          // Format as local time string (without Z suffix) so frontend interprets correctly
+          const formatLocalISO = (d: Date) => {
+            const yr = d.getFullYear();
+            const mo = String(d.getMonth() + 1).padStart(2, '0');
+            const dy = String(d.getDate()).padStart(2, '0');
+            const hr = String(d.getHours()).padStart(2, '0');
+            const mi = String(d.getMinutes()).padStart(2, '0');
+            return `${yr}-${mo}-${dy}T${hr}:${mi}:00`;
+          };
+
+          slots.push({
+            start: formatLocalISO(slotStart),
+            end: formatLocalISO(slotEnd),
+            label: `${formatTime(slotStart)} - ${formatTime(slotEnd)}`,
+            available: !hasConflict,
+          });
+        }
+      }
+
+      return res.json({ slots, date: targetDate.toISOString().split('T')[0] });
+    } catch (error) {
+      console.error("Error fetching available slots:", error);
+      return res.status(500).json({ message: "Failed to fetch available slots" });
+    }
+  });
+
+  // POST /api/mobile/work-orders/:id/assign-to-me - Supervisor self-assign work order
+  app.post("/api/mobile/work-orders/:id/assign-to-me", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Only supervisors can self-assign from mobile
+      if (!isSupervisor(user.role)) {
+        return res.status(403).json({ message: "Only supervisors can assign work orders to themselves" });
+      }
+
+      const workOrder = await storage.getWorkOrder(req.params.id);
+      if (!workOrder) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+
+      // Update the work order to assign to the supervisor
+      const updatedWorkOrder = await storage.updateWorkOrder(workOrder.id, {
+        assignedTechId: user.id,
+      });
+
+      await logCrmAudit(
+        user.id,
+        "work_order.self_assigned",
+        "work_order",
+        workOrder.id,
+        { previousTechId: workOrder.assignedTechId, newTechId: user.id },
+        req.ip
+      );
+
+      return res.json(updatedWorkOrder);
+    } catch (error) {
+      console.error("Error self-assigning work order:", error);
+      return res.status(500).json({ message: "Failed to assign work order" });
+    }
+  });
+
+  // PATCH /api/mobile/work-orders/:id - Supervisor edit their assigned work order
+  app.patch("/api/mobile/work-orders/:id", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const workOrder = await storage.getWorkOrder(req.params.id);
+      if (!workOrder) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+
+      // Only supervisors can edit work orders from mobile, and only their assigned ones
+      if (!isSupervisor(user.role)) {
+        return res.status(403).json({ message: "Only supervisors can edit work orders from mobile" });
+      }
+
+      if (workOrder.assignedTechId !== user.id) {
+        return res.status(403).json({ message: "You can only edit work orders assigned to you" });
+      }
+
+      // Define allowed fields for supervisor mobile editing
+      const allowedFieldsSchema = z.object({
+        scheduledStart: z.union([z.string(), z.date(), z.null()]).optional(),
+        scheduledEnd: z.union([z.string(), z.date(), z.null()]).optional(),
+        priority: z.enum(["low", "normal", "high", "emergency"]).optional(),
+        dispatchNotes: z.string().optional(),
+        techNotes: z.string().optional(),
+        visitType: z.string().optional(),
+        workSubtype: z.string().optional(),
+        title: z.string().optional(),
+        description: z.string().optional(),
+      });
+
+      const result = allowedFieldsSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: "Invalid request body", 
+          errors: result.error.flatten().fieldErrors 
+        });
+      }
+
+      const updateData: Partial<InsertCrmWorkOrder> = {};
+      
+      // Handle datetime fields - convert local timezone strings to proper UTC dates
+      if (result.data.scheduledStart !== undefined) {
+        if (result.data.scheduledStart) {
+          // Input is in local time format (e.g., "2026-01-06T10:00"), convert to UTC
+          updateData.scheduledStart = fromZonedTime(result.data.scheduledStart, APP_TIMEZONE);
+        } else {
+          updateData.scheduledStart = null;
+        }
+      }
+      if (result.data.scheduledEnd !== undefined) {
+        if (result.data.scheduledEnd) {
+          updateData.scheduledEnd = fromZonedTime(result.data.scheduledEnd, APP_TIMEZONE);
+        } else {
+          updateData.scheduledEnd = null;
+        }
+      }
+      if (result.data.priority !== undefined) {
+        updateData.priority = result.data.priority;
+      }
+      if (result.data.dispatchNotes !== undefined) {
+        updateData.dispatchNotes = result.data.dispatchNotes;
+      }
+      if (result.data.techNotes !== undefined) {
+        updateData.techNotes = result.data.techNotes;
+      }
+      if (result.data.visitType !== undefined) {
+        updateData.visitType = result.data.visitType;
+      }
+      if (result.data.workSubtype !== undefined) {
+        updateData.workSubtype = result.data.workSubtype;
+      }
+      if (result.data.title !== undefined) {
+        updateData.title = result.data.title;
+      }
+      if (result.data.description !== undefined) {
+        updateData.description = result.data.description;
+      }
+
+      const updatedWorkOrder = await storage.updateWorkOrder(workOrder.id, updateData);
+
+      await logCrmAudit(
+        user.id,
+        "work_order.mobile_edited",
+        "work_order",
+        workOrder.id,
+        { fields: Object.keys(updateData) },
+        req.ip
+      );
+
+      return res.json(updatedWorkOrder);
+    } catch (error) {
+      console.error("Error editing work order from mobile:", error);
+      return res.status(500).json({ message: "Failed to update work order" });
+    }
+  });
+
+  // ============================================
+  // MOBILE MAINTENANCE RENEWAL ENDPOINTS
+  // ============================================
+
+  // GET /api/mobile/work-orders/:id/renewal-info - Get renewal info for a work order
+  // Also detects pay-on-visit agreements needing initial payment
+  app.get("/api/mobile/work-orders/:id/renewal-info", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const workOrderId = req.params.id;
+      
+      // Get work order details first
+      const [workOrder] = await db.select()
+        .from(crmWorkOrders)
+        .where(eq(crmWorkOrders.id, workOrderId))
+        .limit(1);
+      
+      if (!workOrder) {
+        return res.json({
+          isRenewalVisit: false,
+          paymentType: null,
+          renewalStatus: "none",
+          agreementInfo: null,
+          visitInfo: null
+        });
+      }
+      
+      // Check if this work order is linked to a maintenance visit
+      const [visit] = await db.select()
+        .from(maintenanceVisits)
+        .where(eq(maintenanceVisits.workOrderId, workOrderId))
+        .limit(1);
+      
+      // If no direct visit link, check if this is a MAINTENANCE type work order
+      // and find an agreement by matching propertyId
+      if (!visit) {
+        // Only check for agreements if work order is maintenance type
+        if (workOrder.visitType !== "MAINTENANCE") {
+          return res.json({
+            isRenewalVisit: false,
+            paymentType: null,
+            renewalStatus: "none",
+            agreementInfo: null,
+            visitInfo: null
+          });
+        }
+        
+        // Find pay-on-visit agreements for this property
+        const [agreementByProperty] = await db.select()
+          .from(crmAgreements)
+          .where(
+            and(
+              eq(crmAgreements.propertyId, workOrder.propertyId!),
+              eq(crmAgreements.billingPreference, "pay_on_visit"),
+              or(
+                eq(crmAgreements.status, "pending"),
+                eq(crmAgreements.status, "active")
+              )
+            )
+          )
+          .orderBy(desc(crmAgreements.createdAt))
+          .limit(1);
+        
+        if (!agreementByProperty) {
+          return res.json({
+            isRenewalVisit: false,
+            paymentType: null,
+            renewalStatus: "none",
+            agreementInfo: null,
+            visitInfo: null
+          });
+        }
+        
+        // Calculate visit info based on agreement settings
+        const totalVisits = agreementByProperty.visitsPerPeriod || 2;
+        
+        // For pending agreements, it's always the first visit (activation)
+        // For active agreements, count completed MAINTENANCE work orders for this property
+        // since the agreement was activated to determine current visit number
+        let currentVisitNumber = 1;
+        let isLastVisit = false;
+        
+        if (agreementByProperty.status === "active") {
+          // Count ALL maintenance work orders for this property (including in-progress)
+          // This represents how many visits have been done/are being done
+          const startDate = agreementByProperty.activationDate 
+            ? new Date(agreementByProperty.activationDate) 
+            : new Date(agreementByProperty.startDate || agreementByProperty.createdAt || '2020-01-01');
+          
+          // Count maintenance work orders that are completed OR in progress (not just completed)
+          const maintenanceOrders = await db.select({ count: count() })
+            .from(crmWorkOrders)
+            .where(
+              and(
+                eq(crmWorkOrders.propertyId, workOrder.propertyId!),
+                eq(crmWorkOrders.visitType, "MAINTENANCE"),
+                or(
+                  eq(crmWorkOrders.status, "completed"),
+                  eq(crmWorkOrders.status, "on_site"),
+                  eq(crmWorkOrders.status, "en_route"),
+                  eq(crmWorkOrders.status, "dispatched"),
+                  eq(crmWorkOrders.status, "scheduled")
+                ),
+                gte(crmWorkOrders.createdAt, startDate)
+              )
+            );
+          
+          const orderCount = Number(maintenanceOrders[0]?.count || 0);
+          // Current visit number: cycle through 1, 2, 1, 2, etc.
+          // Use modulo and OR to handle the wrap-around: (2 % 2) = 0, but we want 2
+          currentVisitNumber = (orderCount % totalVisits) || totalVisits;
+          isLastVisit = currentVisitNumber === totalVisits;
+          console.log(`[RenewalInfo] Property ${workOrder.propertyId}: orderCount=${orderCount}, currentVisitNumber=${currentVisitNumber}, totalVisits=${totalVisits}, isLastVisit=${isLastVisit}, agreementStatus=${agreementByProperty.status}`);
+        }
+        
+        // Determine payment type
+        let paymentType: "initial" | "renewal" | null = null;
+        let renewalStatus = "none";
+        
+        if (agreementByProperty.status === "pending" && agreementByProperty.isInitialCycle) {
+          paymentType = "initial";
+          renewalStatus = "pending";
+        } else if (agreementByProperty.status === "active" && isLastVisit) {
+          paymentType = "renewal";
+          renewalStatus = "pending";
+        }
+        
+        return res.json({
+          isRenewalVisit: paymentType !== null,
+          paymentType,
+          renewalStatus,
+          agreementInfo: {
+            id: agreementByProperty.id,
+            agreementNumber: agreementByProperty.agreementNumber,
+            price: agreementByProperty.price,
+            customerName: agreementByProperty.customerName,
+            billingPreference: agreementByProperty.billingPreference,
+            status: agreementByProperty.status,
+            agreementPlan: agreementByProperty.agreementPlan
+          },
+          visitInfo: {
+            visitNumber: currentVisitNumber,
+            totalVisitsInCycle: totalVisits,
+            targetDate: null,
+            isRenewalTrigger: isLastVisit
+          }
+        });
+      }
+      
+      // Get agreement info
+      const [agreement] = await db.select()
+        .from(crmAgreements)
+        .where(eq(crmAgreements.id, visit.agreementId))
+        .limit(1);
+      
+      if (!agreement) {
+        return res.json({
+          isRenewalVisit: false,
+          paymentType: null,
+          renewalStatus: "none",
+          agreementInfo: null,
+          visitInfo: {
+            visitNumber: visit.visitNumber,
+            totalVisitsInCycle: visit.totalVisitsInCycle,
+            targetDate: visit.targetDate
+          }
+        });
+      }
+      
+      // Determine if payment is needed
+      let isRenewalVisit = false;
+      let paymentType: "initial" | "renewal" | null = null;
+      let renewalStatus = visit.renewalStatus || "none";
+      
+      // Check if this is a pay-on-visit agreement in pending status (needs initial payment)
+      if (agreement.billingPreference === "pay_on_visit" && 
+          agreement.status === "pending" && 
+          agreement.isInitialCycle) {
+        isRenewalVisit = true;
+        paymentType = "initial";
+        // If renewalStatus is "none" (default), treat as "pending" so the UI shows the payment prompt
+        renewalStatus = visit.renewalStatus === "none" ? "pending" : visit.renewalStatus;
+      }
+      // Check if this is a renewal trigger visit for pay-on-visit
+      else if (visit.isRenewalTrigger && agreement.billingPreference === "pay_on_visit") {
+        isRenewalVisit = true;
+        paymentType = "renewal";
+      }
+      
+      return res.json({
+        isRenewalVisit,
+        paymentType,
+        renewalStatus,
+        agreementInfo: {
+          id: agreement.id,
+          agreementNumber: agreement.agreementNumber,
+          price: agreement.price,
+          customerName: agreement.customerName,
+          billingPreference: agreement.billingPreference,
+          status: agreement.status,
+          agreementPlan: agreement.agreementPlan
+        },
+        visitInfo: {
+          visitNumber: visit.visitNumber,
+          totalVisitsInCycle: visit.totalVisitsInCycle,
+          targetDate: visit.targetDate,
+          isRenewalTrigger: visit.isRenewalTrigger
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching renewal info:", error);
+      return res.status(500).json({ message: "Failed to fetch renewal info" });
+    }
+  });
+
+  // POST /api/mobile/work-orders/:id/collect-renewal - Collect renewal or initial payment
+  // Handles both renewal payments (isRenewalTrigger visits) and initial payments (pay-on-visit pending agreements)
+  app.post("/api/mobile/work-orders/:id/collect-renewal", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const workOrderId = req.params.id;
+      const { paymentType } = req.body; // "initial" or "renewal"
+      
+      // Get the work order
+      const [workOrder] = await db.select().from(crmWorkOrders).where(eq(crmWorkOrders.id, workOrderId));
+      if (!workOrder) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+      
+      // First check if this is an initial payment for a pay-on-visit agreement
+      const [anyVisit] = await db.select()
+        .from(maintenanceVisits)
+        .where(eq(maintenanceVisits.workOrderId, workOrderId))
+        .limit(1);
+      
+      if (anyVisit && paymentType === "initial") {
+        const [agreement] = await db.select()
+          .from(crmAgreements)
+          .where(eq(crmAgreements.id, anyVisit.agreementId))
+          .limit(1);
+        
+        if (agreement && 
+            agreement.billingPreference === "pay_on_visit" && 
+            agreement.status === "pending" && 
+            agreement.isInitialCycle) {
+          
+          // Check if invoice already created for this visit
+          if (anyVisit.renewalInvoiceId) {
+            return res.status(400).json({ message: "Invoice already created for this visit. Please complete or void the existing invoice." });
+          }
+          
+          // Create invoice for initial payment
+          const invoiceNumber = await generateInvoiceNumber();
+          const paymentAmount = String(agreement.price || "0");
+          
+          const invoiceToCreate = {
+            invoiceNumber,
+            workOrderId: workOrderId,
+            customerId: workOrder.customerId,
+            propertyId: workOrder.propertyId,
+            agreementId: agreement.id,
+            status: "draft" as const,
+            subtotal: paymentAmount,
+            total: paymentAmount,
+            amountPaid: "0",
+            balanceDue: paymentAmount,
+            createdBy: user.id,
+            notes: `Maintenance Agreement Initial Payment - ${agreement.agreementNumber}`,
+          };
+          
+          const parseResult = insertCrmInvoiceSchema.safeParse(invoiceToCreate);
+          if (!parseResult.success) {
+            return res.status(400).json({ 
+              message: "Failed to create invoice", 
+              errors: parseResult.error.errors 
+            });
+          }
+          
+          const [invoice] = await db.insert(crmInvoices).values(parseResult.data).returning();
+          
+          // Add line item
+          const lineItem = {
+            invoiceId: invoice.id,
+            description: `Maintenance Agreement - ${agreement.agreementPlan || "Service Plan"} (Year 1)`,
+            quantity: "1",
+            unitPrice: paymentAmount,
+            lineTotal: paymentAmount,
+          };
+          await db.insert(crmInvoiceLineItems).values(lineItem);
+          
+          // Update the visit with the invoice ID and pending_payment status
+          await db.update(maintenanceVisits)
+            .set({ 
+              renewalInvoiceId: invoice.id, 
+              renewalStatus: "pending_payment" as const, 
+              updatedAt: new Date() 
+            })
+            .where(eq(maintenanceVisits.id, anyVisit.id));
+          
+          await logCrmAudit(
+            user.id,
+            "agreement.initial_payment_invoice_created",
+            "maintenance_visit",
+            anyVisit.id,
+            { invoiceId: invoice.id, agreementId: agreement.id, amount: paymentAmount },
+            req.ip
+          );
+          
+          return res.status(201).json({ ...invoice, paymentType: "initial" });
+        }
+      }
+      
+      // Fall back to renewal trigger visit logic
+      const [visit] = await db.select()
+        .from(maintenanceVisits)
+        .where(and(
+          eq(maintenanceVisits.workOrderId, workOrderId),
+          eq(maintenanceVisits.isRenewalTrigger, true)
+        ))
+        .limit(1);
+      
+      if (!visit) {
+        // FALLBACK: For manual MAINTENANCE work orders without a maintenanceVisits link,
+        // try to find a pay-on-visit agreement by property match
+        if (workOrder.propertyId && workOrder.visitType === "MAINTENANCE") {
+          const [agreementByProperty] = await db.select()
+            .from(crmAgreements)
+            .where(and(
+              eq(crmAgreements.propertyId, workOrder.propertyId),
+              eq(crmAgreements.billingPreference, "pay_on_visit"),
+              or(
+                eq(crmAgreements.status, "pending"),
+                eq(crmAgreements.status, "active")
+              )
+            ))
+            .limit(1);
+          
+          if (agreementByProperty) {
+            // Handle initial payment for pending agreements
+            if (agreementByProperty.status === "pending" && paymentType === "initial") {
+              // Create invoice for initial payment
+              const invoiceNumber = await generateInvoiceNumber();
+              const paymentAmount = String(agreementByProperty.price || "0");
+              
+              const invoiceToCreate = {
+                invoiceNumber,
+                workOrderId: workOrderId,
+                customerId: workOrder.customerId,
+                propertyId: workOrder.propertyId,
+                agreementId: agreementByProperty.id,
+                status: "draft" as const,
+                subtotal: paymentAmount,
+                total: paymentAmount,
+                amountPaid: "0",
+                balanceDue: paymentAmount,
+                createdBy: user.id,
+                notes: `Maintenance Agreement Initial Payment - ${agreementByProperty.agreementNumber}`,
+              };
+              
+              const parseResult = insertCrmInvoiceSchema.safeParse(invoiceToCreate);
+              if (!parseResult.success) {
+                return res.status(400).json({ 
+                  message: "Failed to create invoice", 
+                  errors: parseResult.error.errors 
+                });
+              }
+              
+              const [invoice] = await db.insert(crmInvoices).values(parseResult.data).returning();
+              
+              // Add line item
+              const lineItem = {
+                invoiceId: invoice.id,
+                description: `Maintenance Agreement - ${agreementByProperty.agreementPlan || "Service Plan"} (Year 1)`,
+                quantity: "1",
+                unitPrice: paymentAmount,
+                lineTotal: paymentAmount,
+              };
+              await db.insert(crmInvoiceLineItems).values(lineItem);
+              
+              await logCrmAudit(
+                user.id,
+                "agreement.initial_payment_invoice_created_via_property",
+                "agreement",
+                agreementByProperty.id,
+                { invoiceId: invoice.id, workOrderId, amount: paymentAmount },
+                req.ip
+              );
+              
+              return res.status(201).json({ ...invoice, paymentType: "initial" });
+            }
+            
+            // Handle renewal payment for active agreements
+            if (agreementByProperty.status === "active" && paymentType === "renewal") {
+              // Create invoice for renewal amount
+              const invoiceNumber = await generateInvoiceNumber();
+              const renewalAmount = String(agreementByProperty.price || "0");
+              
+              const invoiceToCreate = {
+                invoiceNumber,
+                workOrderId: workOrderId,
+                customerId: workOrder.customerId,
+                propertyId: workOrder.propertyId,
+                agreementId: agreementByProperty.id,
+                status: "draft" as const,
+                subtotal: renewalAmount,
+                total: renewalAmount,
+                amountPaid: "0",
+                balanceDue: renewalAmount,
+                createdBy: user.id,
+                notes: `Maintenance Agreement Renewal - ${agreementByProperty.agreementNumber}`,
+              };
+              
+              const parseResult = insertCrmInvoiceSchema.safeParse(invoiceToCreate);
+              if (!parseResult.success) {
+                return res.status(400).json({ 
+                  message: "Failed to create invoice", 
+                  errors: parseResult.error.errors 
+                });
+              }
+              
+              const [invoice] = await db.insert(crmInvoices).values(parseResult.data).returning();
+              
+              // Add line item for the renewal
+              const lineItem = {
+                invoiceId: invoice.id,
+                description: `Maintenance Agreement Renewal - ${agreementByProperty.agreementPlan || "Service Plan"}`,
+                quantity: "1",
+                unitPrice: renewalAmount,
+                lineTotal: renewalAmount,
+              };
+              await db.insert(crmInvoiceLineItems).values(lineItem);
+              
+              await logCrmAudit(
+                user.id,
+                "agreement.renewal_invoice_created_via_property",
+                "agreement",
+                agreementByProperty.id,
+                { invoiceId: invoice.id, workOrderId, amount: renewalAmount },
+                req.ip
+              );
+              
+              return res.status(201).json({ ...invoice, paymentType: "renewal" });
+            }
+          }
+        }
+        
+        return res.status(400).json({ message: "This work order is not a renewal visit" });
+      }
+      
+      if (visit.renewalStatus === "collected") {
+        return res.status(400).json({ message: "Renewal payment already collected" });
+      }
+      if (visit.renewalStatus === "declined") {
+        return res.status(400).json({ message: "Renewal was already declined" });
+      }
+      // Prevent duplicate invoice creation - if renewalInvoiceId is set, invoice already created
+      if (visit.renewalInvoiceId) {
+        return res.status(400).json({ message: "Renewal invoice already created. Please complete or void the existing invoice before creating another." });
+      }
+      
+      // Get the agreement
+      const [agreement] = await db.select()
+        .from(crmAgreements)
+        .where(eq(crmAgreements.id, visit.agreementId))
+        .limit(1);
+      
+      if (!agreement) {
+        return res.status(404).json({ message: "Agreement not found" });
+      }
+      
+      // Check if agreement allows renewal
+      if (agreement.autoRenew === false) {
+        return res.status(400).json({ message: "This agreement is not set to auto-renew. Cannot collect renewal payment." });
+      }
+      
+      // Create invoice for renewal amount
+      const invoiceNumber = await generateInvoiceNumber();
+      const renewalAmount = String(agreement.price || "0");
+      
+      const invoiceToCreate = {
+        invoiceNumber,
+        workOrderId: workOrderId,
+        customerId: workOrder.customerId,
+        propertyId: workOrder.propertyId,
+        agreementId: agreement.id,
+        status: "draft" as const,
+        subtotal: renewalAmount,
+        total: renewalAmount,
+        amountPaid: "0",
+        balanceDue: renewalAmount,
+        createdBy: user.id,
+        notes: `Maintenance Agreement Renewal - ${agreement.agreementNumber}`,
+      };
+      
+      const parseResult = insertCrmInvoiceSchema.safeParse(invoiceToCreate);
+      if (!parseResult.success) {
+        return res.status(400).json({ 
+          message: "Failed to create invoice", 
+          errors: parseResult.error.errors 
+        });
+      }
+      
+      const [invoice] = await db.insert(crmInvoices).values(parseResult.data).returning();
+      
+      // Add line item for the renewal
+      const lineItem = {
+        invoiceId: invoice.id,
+        description: `Maintenance Agreement Renewal - ${agreement.agreementPlan}`,
+        quantity: "1",
+        unitPrice: renewalAmount,
+        lineTotal: renewalAmount,
+      };
+      await db.insert(crmInvoiceLineItems).values(lineItem);
+      
+      // Update the visit with the renewal invoice ID and set status to pending_payment
+      // The invoice-paid handler will flip renewalStatus to "collected" when payment settles
+      await db.update(maintenanceVisits)
+        .set({ renewalInvoiceId: invoice.id, renewalStatus: "pending_payment" as const, updatedAt: new Date() })
+        .where(eq(maintenanceVisits.id, visit.id));
+      
+      await logCrmAudit(
+        user.id,
+        "renewal.invoice_created",
+        "maintenance_visit",
+        visit.id,
+        { invoiceId: invoice.id, agreementId: agreement.id, amount: renewalAmount, status: "pending_payment" },
+        req.ip
+      );
+      
+      return res.status(201).json({ ...invoice, paymentType: "renewal" });
+    } catch (error) {
+      console.error("Error collecting renewal:", error);
+      return res.status(500).json({ message: "Failed to collect renewal" });
+    }
+  });
+
+  // POST /api/mobile/work-orders/:id/decline-renewal - Decline renewal
+  app.post("/api/mobile/work-orders/:id/decline-renewal", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const workOrderId = req.params.id;
+      
+      // Find the renewal trigger visit for this work order
+      const [visit] = await db.select()
+        .from(maintenanceVisits)
+        .where(and(
+          eq(maintenanceVisits.workOrderId, workOrderId),
+          eq(maintenanceVisits.isRenewalTrigger, true)
+        ))
+        .limit(1);
+      
+      if (!visit) {
+        return res.status(400).json({ message: "This work order is not a renewal visit" });
+      }
+      
+      if (visit.renewalStatus === "collected") {
+        return res.status(400).json({ message: "Renewal has already been collected" });
+      }
+      
+      if (visit.renewalStatus === "declined") {
+        return res.status(400).json({ message: "Renewal has already been declined" });
+      }
+      
+      // Update maintenance visit renewal status to declined
+      await db.update(maintenanceVisits)
+        .set({
+          renewalStatus: "declined",
+          updatedAt: new Date()
+        })
+        .where(eq(maintenanceVisits.id, visit.id));
+      
+      // Update agreement status to expired
+      await db.update(crmAgreements)
+        .set({
+          status: "expired",
+          isActive: false,
+          updatedAt: new Date()
+        })
+        .where(eq(crmAgreements.id, visit.agreementId));
+      
+      await logCrmAudit(
+        user.id,
+        "renewal.declined",
+        "maintenance_visit",
+        visit.id,
+        { agreementId: visit.agreementId },
+        req.ip
+      );
+      
+      return res.json({ success: true, message: "Renewal declined, agreement expired" });
+    } catch (error) {
+      console.error("Error declining renewal:", error);
+      return res.status(500).json({ message: "Failed to decline renewal" });
+    }
+  });
+
+  // POST /api/mobile/work-orders/:workOrderId/create-agreement - Create maintenance agreement from mobile invoice tab
+  app.post("/api/mobile/work-orders/:workOrderId/create-agreement", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const workOrderId = req.params.workOrderId;
+      const { numberOfSystems, contractDate, startDate, billingPreference, autoRenew, notes, payingNow } = req.body;
+
+      // Validate required fields (startDate is now optional - defaults to contractDate + 1 month)
+      if (!numberOfSystems || !contractDate || !billingPreference) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Get the work order with customer and property info
+      const [workOrder] = await db.select()
+        .from(crmWorkOrders)
+        .where(eq(crmWorkOrders.id, workOrderId))
+        .limit(1);
+
+      if (!workOrder) {
+        return res.status(404).json({ message: "Work order not found" });
+      }
+
+      // Fetch customer info for required fields
+      const [customer] = await db.select()
+        .from(crmCustomers)
+        .where(eq(crmCustomers.id, workOrder.customerId))
+        .limit(1);
+
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      // Fetch property info if available
+      const [property] = workOrder.propertyId ? await db.select()
+        .from(crmProperties)
+        .where(eq(crmProperties.id, workOrder.propertyId))
+        .limit(1) : [null];
+
+      // Calculate price: $229 for first system, -$10 for each additional
+      let totalPrice = 0;
+      for (let i = 0; i < numberOfSystems; i++) {
+        totalPrice += 229 - (10 * i);
+      }
+
+      // Parse dates - startDate defaults to contractDate + 1 month if not provided
+      const parsedContractDate = new Date(contractDate);
+      const parsedStartDate = startDate 
+        ? new Date(startDate) 
+        : new Date(parsedContractDate.getFullYear(), parsedContractDate.getMonth() + 1, parsedContractDate.getDate());
+      const endDate = new Date(parsedStartDate);
+      endDate.setFullYear(endDate.getFullYear() + 1);
+      const nextServiceDate = new Date(parsedStartDate);
+      nextServiceDate.setMonth(nextServiceDate.getMonth() + 1);
+
+      // Generate agreement number
+      const agreementNumber = `AGR-${Date.now()}`;
+
+      // Build service address from property
+      const serviceAddress = property 
+        ? [property.address1, property.city, property.state, property.zip].filter(Boolean).join(", ") 
+        : null;
+
+      // Create the agreement
+      const agreementId = nanoid();
+      const agreementData = {
+        id: agreementId,
+        agreementNumber,
+        customerId: workOrder.customerId,
+        customerName: customer.name,
+        serviceAddress,
+        propertyId: workOrder.propertyId,
+        agreementPlan: "Preventative Maintenance",
+        numberOfSystems,
+        agreementValue: totalPrice.toFixed(2),
+        frequency: "annual",
+        visitsPerPeriod: 2,
+        billingPreference,
+        contractDate: parsedContractDate,
+        startDate: parsedStartDate,
+        endDate,
+        nextServiceDate,
+        nextInvoiceDate: parsedStartDate,
+        autoRenew: autoRenew ?? true,
+        status: payingNow ? "active" : "pending",
+        isActive: payingNow ?? false,
+        activationDate: payingNow ? new Date() : null,
+        isInitialCycle: !payingNow,
+        notes: notes || null,
+        sourceWorkOrderId: workOrderId,
+        createdBy: user.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      await db.insert(crmAgreements).values(agreementData);
+
+      // Log agreement creation
+      await logCrmAudit(
+        user.id,
+        "agreement.created",
+        "crm_agreement",
+        agreementId,
+        { workOrderId, numberOfSystems, price: totalPrice, payingNow, billingPreference },
+        req.ip
+      );
+
+      // If paying now, create invoice and mark as paid
+      if (payingNow) {
+        const invoiceNumber = `INV-${Date.now()}`;
+        const invoiceId = nanoid();
+        
+        // Create invoice
+        const invoice = {
+          id: invoiceId,
+          invoiceNumber,
+          workOrderId,
+          customerId: workOrder.customerId,
+          propertyId: workOrder.propertyId,
+          customerName: customer?.name || "Unknown Customer",
+          customerEmail: customer?.email || null,
+          customerPhone: customer?.phone || null,
+          serviceAddress: property ? [property.address1, property.city, property.state, property.zip].filter(Boolean).join(", ") : null,
+          subtotal: totalPrice.toFixed(2),
+          laborTotal: "0.00",
+          taxTotal: "0.00",
+          total: totalPrice.toFixed(2),
+          amountPaid: totalPrice.toFixed(2),
+          balanceDue: "0.00",
+          status: "paid",
+          paidDate: new Date(),
+          createdBy: user.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        await db.insert(crmInvoices).values(invoice);
+
+        // Create line item for the invoice
+        const lineItemId = nanoid();
+        const lineItem = {
+          id: lineItemId,
+          invoiceId,
+          description: `Preventative Maintenance Agreement (${numberOfSystems} system${numberOfSystems > 1 ? 's' : ''})`,
+          quantity: 1,
+          unitPrice: totalPrice.toFixed(2),
+          total: totalPrice.toFixed(2),
+          lineType: "maintenance" as const,
+          sortOrder: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        await db.insert(crmInvoiceLineItems).values(lineItem);
+
+        // Update agreement to mark as activated
+        await db.update(crmAgreements)
+          .set({
+            isInitialCycle: false,
+            activationDate: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(crmAgreements.id, agreementId));
+
+        await logCrmAudit(
+          user.id,
+          "agreement.activated",
+          "crm_agreement",
+          agreementId,
+          { invoiceId, amount: totalPrice },
+          req.ip
+        );
+
+        return res.status(201).json({
+          success: true,
+          payingNow: true,
+          agreement: agreementData,
+          invoice,
+        });
+      } else {
+        // Not paying now - return line item data for frontend to add to invoice
+        const lineItemData = {
+          description: `Preventative Maintenance Agreement (${numberOfSystems} system${numberOfSystems > 1 ? 's' : ''})`,
+          unitPrice: totalPrice.toFixed(2),
+          quantity: 1,
+          lineType: "maintenance",
+        };
+
+        return res.status(201).json({
+          success: true,
+          payingNow: false,
+          agreement: agreementData,
+          lineItemData,
+        });
+      }
+    } catch (error) {
+      console.error("Error creating agreement:", error);
+      return res.status(500).json({ message: "Failed to create agreement" });
     }
   });
 
@@ -17923,6 +22651,12 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
     // Start weather impact jobs (refreshes call_daily and weather_daily every 6 hours)
     scheduleWeatherImpactJobs();
+
+    // Start agreement renewal job (runs daily, creates invoices for due agreements)
+    scheduleAgreementRenewals();
+
+    // Start maintenance reminder job (sends 10-day and 5-day SMS reminders for upcoming visits)
+    scheduleMaintenanceReminders();
 
     // Seed vector store with sales book if empty (async, don't block startup)
     seedVectorStoreWithSalesBook().then(success => {

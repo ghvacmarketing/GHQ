@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { clearCrmToken } from "@/lib/crmAuth";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -36,12 +36,14 @@ interface CrmLayoutProps {
   children: React.ReactNode;
   currentUser: CrmUser;
   disableScroll?: boolean;
+  hideGlobalSearch?: boolean;
 }
 
 type NavItem = {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
+  badgeCount?: number;
 };
 
 type NavSection = {
@@ -115,9 +117,16 @@ function NavItemComponent({
       >
         <Icon className="h-5 w-5 flex-shrink-0" />
         <span className="text-sm font-medium">{item.label}</span>
-        {isActive && (
+        {item.badgeCount && item.badgeCount > 0 ? (
+          <Badge 
+            className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 min-w-[20px] text-center"
+            data-testid={`badge-unread-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
+          >
+            {item.badgeCount > 99 ? "99+" : item.badgeCount}
+          </Badge>
+        ) : isActive ? (
           <ChevronRight className="h-4 w-4 ml-auto opacity-70" />
-        )}
+        ) : null}
       </div>
     </Link>
   );
@@ -132,11 +141,18 @@ function SidebarContent({
 }) {
   const [location] = useLocation();
 
+  // Fetch unread message count with polling
+  const { data: unreadData } = useQuery<{ unreadCount: number }>({
+    queryKey: ["/api/crm/messaging/unread-count"],
+    refetchInterval: 10000, // Poll every 10 seconds
+  });
+
   const logoutMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", "/api/crm/auth/logout");
     },
     onSuccess: () => {
+      clearCrmToken();
       queryClient.clear();
       sessionStorage.removeItem("crm_gate_passed");
       window.location.href = "/crm/login";
@@ -179,7 +195,7 @@ function SidebarContent({
         </div>
       </div>
 
-      <ScrollArea className="flex-1 px-3 py-4">
+      <div className="flex-1 px-3 py-4 overflow-y-auto">
         <div className="space-y-6">
           {navSections.map((section) => (
             <div key={section.title}>
@@ -187,19 +203,25 @@ function SidebarContent({
                 {section.title}
               </p>
               <div className="space-y-1">
-                {section.items.map((item) => (
-                  <NavItemComponent
-                    key={item.href}
-                    item={item}
-                    isActive={isActive(item.href)}
-                    onClick={onItemClick}
-                  />
-                ))}
+                {section.items.map((item) => {
+                  // Add unread count badge to Messaging nav item
+                  const itemWithBadge = item.label === "Messaging" && unreadData?.unreadCount
+                    ? { ...item, badgeCount: unreadData.unreadCount }
+                    : item;
+                  return (
+                    <NavItemComponent
+                      key={item.href}
+                      item={itemWithBadge}
+                      isActive={isActive(item.href)}
+                      onClick={onItemClick}
+                    />
+                  );
+                })}
               </div>
             </div>
           ))}
         </div>
-      </ScrollArea>
+      </div>
 
       <div className="p-3 border-t border-slate-700">
         {currentUser?.role !== "tech" && (
@@ -264,7 +286,7 @@ function SidebarContent({
   );
 }
 
-export function CrmLayout({ children, currentUser, disableScroll = false }: CrmLayoutProps) {
+export function CrmLayout({ children, currentUser, disableScroll = false, hideGlobalSearch = false }: CrmLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -319,14 +341,12 @@ export function CrmLayout({ children, currentUser, disableScroll = false }: CrmL
             <div className="h-full p-4 lg:p-6 overflow-hidden">{children}</div>
           </div>
         ) : (
-          <div className="min-h-screen pt-16 lg:pt-0">
-            <ScrollArea className="h-[calc(100vh-4rem)] lg:h-screen">
-              <div className="p-4 lg:p-6">{children}</div>
-            </ScrollArea>
+          <div className="h-screen pt-16 lg:pt-0 overflow-y-auto">
+            <div className="p-4 lg:p-6">{children}</div>
           </div>
         )}
       </main>
-      <GhqSearch />
+      {!hideGlobalSearch && <GhqSearch />}
     </div>
   );
 }

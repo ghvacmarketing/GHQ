@@ -4,7 +4,6 @@ import type { CrmQuote, CrmQuoteLineItem } from "@shared/schema";
 const brandDefaults = {
   name: "Giesbrecht HVAC",
   color: "#711419",
-  logoUrl: "https://images.squarespace-cdn.com/content/v1/65b2790c0b83175df7337294/93a31506-d2ae-4e07-958b-c86d0c49f7cd/GHVAC-icons.png?format=200w",
 };
 
 function asCurrency(v: string | number, locale = "en-US", currency = "USD") {
@@ -66,7 +65,6 @@ export async function sendCrmQuoteEmail(
   const fallbackEmail = process.env.FROM_EMAIL || "quotes@ghvac.work";
   const brandName = brandDefaults.name;
   const brandColor = brandDefaults.color;
-  const logoUrl = brandDefaults.logoUrl;
 
   // Debug: log first 15 chars of API key to verify correct key is loaded
   console.log("[CRM Email] API Key prefix:", apiKey ? apiKey.substring(0, 15) + "..." : "NOT SET");
@@ -101,9 +99,14 @@ export async function sendCrmQuoteEmail(
   
   console.log("[CRM Email] Sending quote email FROM:", standardFromEmail, "REPLY-TO:", replyToEmail, "TO:", recipientEmail);
 
+  // Filter out labor/internal line items from client-facing email
+  const clientVisibleItems = lineItems.filter(item => 
+    item.lineType !== "labor" && item.lineType !== "other"
+  );
+
   const subject = `Your Quote from ${brandName} - ${quote.quoteNumber}`;
-  const html = buildHtmlBody(quote, lineItems, personalMessage, sentBy, options?.quoteViewUrl);
-  const text = buildTextBody(quote, lineItems, personalMessage, sentBy, options?.quoteViewUrl);
+  const html = buildHtmlBody(quote, clientVisibleItems, personalMessage, sentBy, options?.quoteViewUrl);
+  const text = buildTextBody(quote, clientVisibleItems, personalMessage, sentBy, options?.quoteViewUrl);
 
   try {
     const { data, error } = await resend.emails.send({
@@ -185,86 +188,64 @@ function buildTextBody(
   quoteViewUrl?: string
 ): string {
   const lines: string[] = [];
-  lines.push(`${brandDefaults.name} - Quote ${quote.quoteNumber}`);
+  lines.push(`${brandDefaults.name}`);
+  lines.push("Professional Heating & Cooling Solutions");
   lines.push("");
-
-  if (personalMessage) {
-    lines.push("Message from our team:");
-    lines.push(personalMessage);
-    lines.push("");
-  }
-
-  lines.push(`Customer: ${quote.customerName}`);
-  if (quote.serviceAddress) {
-    lines.push(`Service Address: ${quote.serviceAddress}`);
-  }
-  lines.push(`Quote Date: ${formatDate(quote.createdAt)}`);
+  lines.push("----------------------------------------");
+  lines.push("");
+  lines.push(`Quote Number: ${quote.quoteNumber || ""}`);
+  lines.push(`Date Prepared: ${formatDate(quote.createdAt)}`);
+  lines.push(`Service Type: ${formatQuoteType(quote.quoteType)}`);
   if (quote.validUntil) {
     lines.push(`Valid Until: ${formatDate(quote.validUntil)}`);
   }
   lines.push("");
+  lines.push("----------------------------------------");
+  lines.push("");
+  lines.push("YOUR QUOTE IS READY!");
+  lines.push("");
+  lines.push(`Prepared For: ${quote.customerName || "Valued Customer"}`);
+  if (quote.serviceAddress) {
+    lines.push(`Service Location: ${quote.serviceAddress}`);
+  }
+  lines.push("");
+  lines.push("Thank you for considering Giesbrecht HVAC for your HVAC needs.");
+  lines.push("We've prepared a detailed quote for you to review.");
+  lines.push("");
 
-  // Handle option-based quotes differently
-  if (quote.quoteMode === "options") {
-    lines.push("YOUR HOME COMFORT OPTIONS");
-    lines.push("This proposal includes multiple HVAC replacement options for you to choose from.");
-    lines.push("Each option is a complete, standalone package - please select ONE option.");
-    lines.push("");
-    
-    const optionGroups = groupLineItemsByOption(lineItems);
-    optionGroups.forEach((option) => {
-      lines.push(`=== ${option.tag} - ${asCurrency(option.total)} ===`);
-      option.items.forEach((item) => {
-        const qty = parseFloat(item.quantity || "1");
-        lines.push(`  - ${item.description} (Qty: ${qty}) - ${asCurrency(item.lineTotal)}`);
-      });
-      lines.push("");
-    });
-  } else {
-    if (quote.title) {
-      lines.push(`Quote Title: ${quote.title}`);
-    }
-    if (quote.description) {
-      lines.push(`Description: ${quote.description}`);
-      lines.push("");
-    }
-
-    lines.push("Line Items:");
-    if (lineItems.length > 0) {
-      lineItems.forEach((item) => {
-        const qty = parseFloat(item.quantity || "1");
-        const price = asCurrency(item.lineTotal);
-        lines.push(`- ${item.description} (Qty: ${qty}) - ${price}`);
-      });
-    } else {
-      lines.push("- No items listed");
-    }
-    lines.push("");
-
-    lines.push(`Subtotal: ${asCurrency(quote.subtotal)}`);
-    if (quote.laborTotal && parseFloat(quote.laborTotal) > 0) {
-      lines.push(`Labor: ${asCurrency(quote.laborTotal)}`);
-    }
-    lines.push(`TOTAL: ${asCurrency(quote.total)}`);
+  if (personalMessage) {
+    lines.push(personalMessage);
     lines.push("");
   }
 
   if (quoteViewUrl) {
-    lines.push("VIEW & SIGN YOUR QUOTE ONLINE:");
+    lines.push("VIEW YOUR QUOTE:");
     lines.push(quoteViewUrl);
     lines.push("");
-    lines.push("Click the link above to view the full quote details and electronically sign to accept.");
-    lines.push("");
   }
 
-  lines.push("To accept this quote or ask questions, please contact us at (830) 626-0408.");
+  lines.push("----------------------------------------");
   lines.push("");
-  lines.push("Thank you for choosing Giesbrecht HVAC!");
-  if (sentBy) {
-    lines.push(`Sent by: ${sentBy}`);
-  }
+  lines.push("Questions? Contact us at (706) 826-0644 or reply to this email.");
+  lines.push("");
+  lines.push("Giesbrecht HVAC");
+  lines.push("(706) 826-0644");
+  lines.push("1530 Crescent Ct, Augusta, GA");
+  lines.push("");
+  lines.push("Licensed & Insured | Serving Augusta, GA and surrounding areas");
 
   return lines.join("\n");
+}
+
+function formatQuoteType(quoteType?: string | null): string {
+  if (!quoteType) return "HVAC Service";
+  switch (quoteType.toLowerCase()) {
+    case "quick": return "Service Quote";
+    case "proposal": return "Installation Proposal";
+    case "custom_install": return "Custom Installation";
+    case "custom_service": return "Custom Service";
+    default: return "HVAC Service";
+  }
 }
 
 function buildHtmlBody(
@@ -276,38 +257,20 @@ function buildHtmlBody(
 ): string {
   const brandName = brandDefaults.name;
   const brandColor = brandDefaults.color;
-  const logoUrl = brandDefaults.logoUrl;
-
-  const lineItemsHtml = lineItems.length > 0
-    ? lineItems.map((item) => {
-        const qty = parseFloat(item.quantity || "1");
-        return `
-          <tr>
-            <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb;font-family:Arial,sans-serif;">
-              <div style="font-weight:600;color:#111827;">${esc(item.description)}</div>
-              ${item.partNumber ? `<div style="font-size:12px;color:#6b7280;">Part #: ${esc(item.partNumber)}</div>` : ""}
-            </td>
-            <td style="padding:12px 10px;text-align:center;border-bottom:1px solid #e5e7eb;color:#6b7280;font-family:Arial,sans-serif;">${qty}</td>
-            <td style="padding:12px 14px;text-align:right;border-bottom:1px solid #e5e7eb;color:#111827;font-weight:600;font-family:Arial,sans-serif;">${esc(asCurrency(item.lineTotal))}</td>
-          </tr>`;
-      }).join("")
-    : `<tr><td colspan="3" style="padding:18px;text-align:center;color:#6b7280;font-style:italic;font-family:Arial,sans-serif;">No items listed</td></tr>`;
 
   const personalMessageHtml = personalMessage
     ? `
       <tr>
-        <td style="padding:0 20px 20px 20px;">
-          <div style="background:#f0f9ff;border:1px solid #bae6fd;padding:16px;border-radius:10px;">
-            <div style="font-weight:700;color:#0369a1;font-family:Arial,sans-serif;margin-bottom:8px;">A message from our team:</div>
-            <div style="color:#0c4a6e;font-family:Arial,sans-serif;line-height:1.6;">${esc(personalMessage)}</div>
-          </div>
+        <td class="px-24" style="padding:0 20px 16px 20px;">
+          <div style="font-size:15px;color:#374151;font-family:Arial,sans-serif;line-height:1.6;">${esc(personalMessage)}</div>
         </td>
       </tr>`
     : "";
 
-  const validUntilHtml = quote.validUntil
-    ? `<div style="font-size:13px;color:#6b7280;margin-top:4px;">Valid until: ${formatDate(quote.validUntil)}</div>`
-    : "";
+  const serviceType = formatQuoteType(quote.quoteType);
+  const quoteDate = formatDate(quote.createdAt);
+  const validUntilDate = quote.validUntil ? formatDate(quote.validUntil) : null;
+  const serviceAddress = quote.serviceAddress;
 
   const headCss = `
     :root { color-scheme: light only; }
@@ -324,7 +287,7 @@ function buildHtmlBody(
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Quote ${esc(quote.quoteNumber)} from ${esc(brandName)}</title>
+  <title>Quote from ${esc(brandName)}</title>
   <style type="text/css">${headCss}</style>
 </head>
 <body style="margin:0;padding:0;font-family:Arial,Segoe UI,Roboto,Helvetica,sans-serif;background-color:#f3f4f6;">
@@ -333,175 +296,117 @@ function buildHtmlBody(
       <td align="center" style="padding:20px 0;">
         <table role="presentation" cellpadding="0" cellspacing="0" class="container" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(16,24,40,0.08);">
 
-          <!-- Header -->
+          <!-- Header with text branding -->
           <tr>
-            <td style="background:${brandColor};padding:24px 20px;text-align:center;">
-              <img src="${esc(logoUrl)}" alt="${esc(brandName)}" width="120" style="height:auto;border:0;display:inline-block;"/>
-              <h1 style="margin:16px 0 0 0;font-size:22px;font-weight:900;color:#ffffff;letter-spacing:0.3px;">Your HVAC Quote</h1>
+            <td style="background:${brandColor};padding:28px 20px;text-align:center;">
+              <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:0.5px;">${esc(brandName)}</h1>
+              <p style="margin:6px 0 0 0;color:rgba(255,255,255,0.85);font-size:13px;">Professional Heating & Cooling Solutions</p>
             </td>
           </tr>
 
-          <!-- Quote Info -->
+          <!-- Quote Reference Header -->
           <tr>
-            <td class="px-24" style="padding:24px 20px 16px 20px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <td class="px-24" style="padding:20px 20px 0 20px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;border-radius:8px;padding:16px;">
                 <tr>
-                  <td style="vertical-align:top;">
-                    <div style="font-size:13px;color:#6b7280;">Quote Number</div>
-                    <div style="font-size:18px;font-weight:800;color:#111827;margin-top:2px;">${esc(quote.quoteNumber)}</div>
-                  </td>
-                  <td style="text-align:right;vertical-align:top;">
-                    <div style="font-size:13px;color:#6b7280;">Date</div>
-                    <div style="font-size:15px;color:#111827;margin-top:2px;">${formatDate(quote.createdAt)}</div>
-                    ${validUntilHtml}
+                  <td style="padding:16px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="width:50%;vertical-align:top;">
+                          <p style="margin:0 0 4px 0;color:#64748b;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Quote Number</p>
+                          <p style="margin:0;color:#1e293b;font-size:15px;font-weight:700;">${esc(quote.quoteNumber || "")}</p>
+                        </td>
+                        <td style="width:50%;vertical-align:top;text-align:right;">
+                          <p style="margin:0 0 4px 0;color:#64748b;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Date Prepared</p>
+                          <p style="margin:0;color:#1e293b;font-size:14px;font-weight:600;">${esc(quoteDate)}</p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colspan="2" style="padding-top:12px;">
+                          <p style="margin:0 0 4px 0;color:#64748b;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Service Type</p>
+                          <p style="margin:0;color:#1e293b;font-size:14px;font-weight:600;">${esc(serviceType)}</p>
+                        </td>
+                      </tr>
+                      ${validUntilDate ? `
+                      <tr>
+                        <td colspan="2" style="padding-top:12px;">
+                          <p style="margin:0 0 4px 0;color:#64748b;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Valid Until</p>
+                          <p style="margin:0;color:#1e293b;font-size:14px;font-weight:600;">${esc(validUntilDate)}</p>
+                        </td>
+                      </tr>
+                      ` : ""}
+                    </table>
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
 
-          <!-- Customer Info -->
+          <!-- Greeting -->
           <tr>
-            <td class="px-24" style="padding:0 20px 20px 20px;">
-              <div style="background:#f9fafb;padding:16px;border-radius:10px;">
-                <div style="font-weight:700;color:#374151;font-family:Arial,sans-serif;margin-bottom:8px;">Prepared For</div>
-                <div style="font-size:16px;font-weight:600;color:#111827;">${esc(quote.customerName)}</div>
-                ${quote.serviceAddress ? `<div style="font-size:14px;color:#6b7280;margin-top:4px;">${esc(quote.serviceAddress)}</div>` : ""}
-              </div>
+            <td class="px-24" style="padding:20px 20px 16px 20px;">
+              <h2 style="margin:0;color:#111827;font-size:20px;font-weight:600;">Your Quote is Ready!</h2>
+              <p style="margin:10px 0 0 0;color:#6b7280;font-size:14px;line-height:1.5;">
+                Thank you for considering ${esc(brandName)} for your HVAC needs. We've prepared a detailed quote for you to review.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Customer and Service Location -->
+          <tr>
+            <td class="px-24" style="padding:0 20px 16px 20px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="width:${serviceAddress ? '50%' : '100%'};vertical-align:top;padding-right:${serviceAddress ? '8px' : '0'};">
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;height:100%;">
+                      <p style="margin:0 0 4px 0;color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Prepared For</p>
+                      <p style="margin:0;color:#1e293b;font-size:16px;font-weight:600;">${esc(quote.customerName || "Valued Customer")}</p>
+                    </div>
+                  </td>
+                  ${serviceAddress ? `
+                  <td style="width:50%;vertical-align:top;padding-left:8px;">
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;height:100%;">
+                      <p style="margin:0 0 4px 0;color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">Service Location</p>
+                      <p style="margin:0;color:#1e293b;font-size:14px;font-weight:500;line-height:1.4;">${esc(serviceAddress)}</p>
+                    </div>
+                  </td>
+                  ` : ""}
+                </tr>
+              </table>
             </td>
           </tr>
 
           ${personalMessageHtml}
 
-          ${quote.quoteMode === "options" ? `
-          <!-- Option-based Quote: Multiple packages to choose from -->
+          <!-- View Quote Button -->
           <tr>
-            <td class="px-24" style="padding:0 20px 20px 20px;">
-              <h2 style="margin:0 0 8px 0;font-size:18px;font-weight:800;color:#111827;">Your Home Comfort Options</h2>
-              <p style="margin:0;font-size:14px;color:#4b5563;line-height:1.6;">
-                Prepared for ${esc(quote.customerName)}${quote.serviceAddress ? ` at ${esc(quote.serviceAddress)}` : ""}. 
-                This proposal includes multiple HVAC replacement options for you to choose from. 
-                Each option is a complete, standalone package—please select ONE option (prices are not combined).
-              </p>
-            </td>
-          </tr>
-          
-          <!-- Option Cards -->
-          ${groupLineItemsByOption(lineItems).map((option) => `
-          <tr>
-            <td class="px-24" style="padding:0 20px 16px 20px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px solid #e5e7eb;border-radius:10px;overflow:hidden;">
-                <tr>
-                  <td style="background:#f1f5f9;padding:12px 16px;">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                      <tr>
-                        <td style="font-weight:700;font-size:16px;color:#111827;">${esc(option.tag)}</td>
-                        <td style="text-align:right;font-weight:800;font-size:18px;color:${brandColor};">${esc(asCurrency(option.total))}</td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding:12px 16px;">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                    ${option.items.map((item) => `
-                      <tr style="border-bottom:1px solid #f1f5f9;">
-                        <td style="padding:8px 0;vertical-align:top;">
-                          <div style="font-weight:600;color:#111827;font-size:14px;">${esc(item.description)}</div>
-                          ${item.partNumber ? `<div style="font-size:12px;color:#6b7280;">Part #: ${esc(item.partNumber)}</div>` : ""}
-                        </td>
-                        <td style="padding:8px 8px;text-align:center;color:#6b7280;font-size:13px;width:40px;vertical-align:top;">${parseFloat(item.quantity || "1")}</td>
-                        <td style="padding:8px 0;text-align:right;font-weight:600;color:#111827;font-size:14px;width:80px;vertical-align:top;">${esc(asCurrency(item.lineTotal))}</td>
-                      </tr>
-                    `).join("")}
-                    </table>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          `).join("")}
-          
-          <!-- Option Selection Notice -->
-          <tr>
-            <td class="px-24" style="padding:0 20px 20px 20px;">
-              <div style="background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;text-align:center;">
-                <p style="margin:0;color:#92400e;font-weight:600;">Please select one option. Contact us at (830) 626-0408 to discuss which option is right for you.</p>
-              </div>
-            </td>
-          </tr>
-          ` : `
-          <!-- Standard Quote: Title/Description -->
-          ${quote.title || quote.description ? `
-          <tr>
-            <td class="px-24" style="padding:0 20px 20px 20px;">
-              ${quote.title ? `<h2 style="margin:0 0 8px 0;font-size:18px;font-weight:800;color:#111827;">${esc(quote.title)}</h2>` : ""}
-              ${quote.description ? `<p style="margin:0;font-size:14px;color:#4b5563;line-height:1.6;">${esc(quote.description)}</p>` : ""}
-            </td>
-          </tr>` : ""}
-
-          <!-- Line Items -->
-          <tr>
-            <td class="px-24" style="padding:0 20px 20px 20px;">
-              <h3 style="margin:0 0 12px 0;font-size:16px;font-weight:800;color:#111827;">Quote Details</h3>
-              <table role="table" width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:10px;overflow:hidden;">
-                <thead>
-                  <tr style="background:#e5e7eb;">
-                    <th style="padding:12px 14px;text-align:left;font-weight:700;color:#374151;font-size:13px;">Description</th>
-                    <th style="padding:12px 10px;text-align:center;font-weight:700;color:#374151;font-size:13px;">Qty</th>
-                    <th style="padding:12px 14px;text-align:right;font-weight:700;color:#374151;font-size:13px;">Price</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${lineItemsHtml}
-                </tbody>
-              </table>
+            <td class="px-24" style="padding:8px 20px 24px 20px;text-align:center;">
+              ${quoteViewUrl ? `
+              <a href="${esc(quoteViewUrl)}" style="display:inline-block;background:${brandColor};color:#ffffff;padding:16px 48px;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px;box-shadow:0 2px 4px rgba(113,20,25,0.3);">View Your Quote</a>
+              ` : `
+              <a href="tel:+17068260644" style="display:inline-block;background:${brandColor};color:#ffffff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;">Call Us: (706) 826-0644</a>
+              `}
             </td>
           </tr>
 
-          <!-- Summary -->
+          <!-- Info section -->
           <tr>
             <td class="px-24" style="padding:0 20px 24px 20px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border-radius:10px;padding:16px;">
-                <tr>
-                  <td style="padding:8px 14px;color:#374151;font-family:Arial,sans-serif;">Subtotal</td>
-                  <td style="padding:8px 14px;text-align:right;color:#374151;font-family:Arial,sans-serif;">${esc(asCurrency(quote.subtotal))}</td>
-                </tr>
-                ${quote.laborTotal && parseFloat(quote.laborTotal) > 0 ? `
-                <tr>
-                  <td style="padding:8px 14px;color:#374151;font-family:Arial,sans-serif;">Labor</td>
-                  <td style="padding:8px 14px;text-align:right;color:#374151;font-family:Arial,sans-serif;">${esc(asCurrency(quote.laborTotal))}</td>
-                </tr>` : ""}
-                <tr style="border-top:2px solid #e5e7eb;">
-                  <td style="padding:14px;font-weight:900;font-size:16px;color:${brandColor};font-family:Arial,sans-serif;">Total</td>
-                  <td style="padding:14px;text-align:right;font-weight:900;font-size:20px;color:${brandColor};font-family:Arial,sans-serif;">${esc(asCurrency(quote.total))}</td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          `}
-
-          <!-- CTA -->
-          <tr>
-            <td class="px-24" style="padding:0 20px 24px 20px;text-align:center;">
-              ${quoteViewUrl ? `
-              <p style="margin:0 0 16px 0;font-size:14px;color:#4b5563;">Ready to move forward? Click below to view the full quote and sign electronically to accept.</p>
-              <a href="${esc(quoteViewUrl)}" style="display:inline-block;background:${brandColor};color:#ffffff;padding:16px 40px;border-radius:8px;text-decoration:none;font-weight:700;font-size:16px;margin-bottom:12px;">View & Sign Quote</a>
-              <p style="margin:16px 0 0 0;font-size:13px;color:#6b7280;">Or call us: <a href="tel:+18306260408" style="color:${brandColor};font-weight:600;text-decoration:none;">(830) 626-0408</a></p>
-              ` : `
-              <p style="margin:0 0 16px 0;font-size:14px;color:#4b5563;">Ready to move forward? Contact us to accept this quote or if you have any questions.</p>
-              <a href="tel:+18306260408" style="display:inline-block;background:${brandColor};color:#ffffff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;">Call Us: (830) 626-0408</a>
-              `}
+              <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:16px;">
+                <p style="margin:0;color:#92400e;font-size:13px;line-height:1.5;">
+                  <strong>Questions?</strong> We're here to help! Call us at <a href="tel:+17068260644" style="color:#92400e;font-weight:600;">(706) 826-0644</a> or reply to this email.
+                </p>
+              </div>
             </td>
           </tr>
 
           <!-- Footer -->
           <tr>
-            <td style="background:#f3f4f6;padding:20px;text-align:center;">
-              <p style="margin:0;font-weight:700;color:#111827;font-size:14px;">${esc(brandName)}</p>
-              <p style="margin:6px 0 0 0;font-size:12px;color:#6b7280;">Professional HVAC Service Solutions</p>
-              ${sentBy ? `<p style="margin:8px 0 0 0;font-size:11px;color:#9ca3af;">Sent by: ${esc(sentBy)}</p>` : ""}
-              <p style="margin:8px 0 0 0;font-size:11px;color:#9ca3af;">This is a transactional message regarding your requested quote.</p>
+            <td style="background:#f3f4f6;padding:24px 20px;text-align:center;border-top:1px solid #e5e7eb;">
+              <p style="margin:0;font-weight:700;color:#111827;font-size:15px;">${esc(brandName)}</p>
+              <p style="margin:8px 0 0 0;font-size:13px;color:#6b7280;">(706) 826-0644</p>
+              <p style="margin:8px 0 0 0;font-size:12px;color:#6b7280;">1530 Crescent Ct, Augusta, GA</p>
+              <p style="margin:12px 0 0 0;font-size:11px;color:#9ca3af;">Licensed &amp; Insured | Serving Augusta, GA and surrounding areas</p>
             </td>
           </tr>
 

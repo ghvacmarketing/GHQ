@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect, type ReactNode } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -37,8 +38,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { GripVertical, Phone, Calendar, Play, Pause, RefreshCw, ChevronDown, ChevronRight, Plus, Search, Edit2, Trash2, X, Check, Cloud, Sun, CloudRain, CloudSnow, Wind, AlertTriangle, BarChart3, ClipboardList, Send } from "lucide-react";
-import { ScatterChart, Scatter, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { GripVertical, Phone, Calendar, CalendarDays, Play, Pause, RefreshCw, ChevronDown, ChevronRight, Plus, Search, Edit2, Trash2, X, Check, Cloud, Sun, CloudRain, CloudSnow, Wind, AlertTriangle, BarChart3, ClipboardList, Send } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -932,6 +933,149 @@ interface SearchResult extends CallLog {
   date: string;
 }
 
+interface YearlyCallCalendarProps {
+  days: { id: string; date: string; count: number }[];
+}
+
+function YearlyCallCalendar({ days }: YearlyCallCalendarProps) {
+  const currentYear = new Date().getFullYear();
+  const todayStr = formatLocal(new Date(), "yyyy-MM-dd");
+  
+  const dayCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    days.forEach((d) => {
+      if (d.date.startsWith(String(currentYear))) {
+        map.set(d.date, d.count);
+      }
+    });
+    return map;
+  }, [days, currentYear]);
+
+  const months = useMemo(() => {
+    const result: { name: string; days: { date: string; day: number; count: number; isToday: boolean }[] }[] = [];
+    
+    for (let month = 0; month < 12; month++) {
+      const monthDate = new Date(currentYear, month, 1);
+      const monthName = format(monthDate, "MMMM");
+      const daysInMonth = new Date(currentYear, month + 1, 0).getDate();
+      const firstDayOfWeek = monthDate.getDay();
+      
+      const monthDays: { date: string; day: number; count: number; isToday: boolean }[] = [];
+      
+      for (let i = 0; i < firstDayOfWeek; i++) {
+        monthDays.push({ date: "", day: 0, count: 0, isToday: false });
+      }
+      
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${currentYear}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        const count = dayCountMap.get(dateStr) || 0;
+        monthDays.push({
+          date: dateStr,
+          day,
+          count,
+          isToday: dateStr === todayStr,
+        });
+      }
+      
+      result.push({ name: monthName, days: monthDays });
+    }
+    
+    return result;
+  }, [currentYear, dayCountMap, todayStr]);
+
+  const totalYearCalls = useMemo(() => {
+    return Array.from(dayCountMap.values()).reduce((sum, count) => sum + count, 0);
+  }, [dayCountMap]);
+
+  const getCountColor = (count: number, isToday: boolean) => {
+    if (isToday) return "bg-primary text-primary-foreground";
+    if (count === 0) return "bg-muted/30 text-muted-foreground/50";
+    if (count <= 2) return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+    if (count <= 5) return "bg-green-200 text-green-900 dark:bg-green-800/40 dark:text-green-200";
+    if (count <= 10) return "bg-green-300 text-green-900 dark:bg-green-700/50 dark:text-green-100";
+    return "bg-green-500 text-white dark:bg-green-600";
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">{currentYear} Call Calendar</h2>
+        <Badge variant="secondary" className="text-sm font-semibold">
+          {totalYearCalls} calls this year
+        </Badge>
+      </div>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {months.map((month) => (
+          <Card key={month.name} className="p-3">
+            <h3 className="text-sm font-semibold mb-2 text-center">{month.name}</h3>
+            <div className="grid grid-cols-7 gap-0.5 text-center">
+              {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+                <div key={i} className="text-[10px] font-medium text-muted-foreground py-0.5">
+                  {d}
+                </div>
+              ))}
+              {month.days.map((day, i) => (
+                <div key={i} className="aspect-square flex items-center justify-center">
+                  {day.day > 0 ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div
+                          className={cn(
+                            "w-full h-full flex items-center justify-center rounded text-[10px] font-medium cursor-default transition-colors",
+                            getCountColor(day.count, day.isToday)
+                          )}
+                          data-testid={`calendar-day-${day.date}`}
+                        >
+                          {day.day}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        <p className="font-medium">{format(parseISO(day.date), "MMM d, yyyy")}</p>
+                        <p>{day.count} {day.count === 1 ? "call" : "calls"}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <div className="w-full h-full" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+        ))}
+      </div>
+      
+      <div className="flex items-center gap-2 justify-center text-xs text-muted-foreground">
+        <span>Less</span>
+        <div className="flex gap-1">
+          <div className="w-4 h-4 rounded bg-muted/30" />
+          <div className="w-4 h-4 rounded bg-green-100 dark:bg-green-900/30" />
+          <div className="w-4 h-4 rounded bg-green-200 dark:bg-green-800/40" />
+          <div className="w-4 h-4 rounded bg-green-300 dark:bg-green-700/50" />
+          <div className="w-4 h-4 rounded bg-green-500 dark:bg-green-600" />
+        </div>
+        <span>More</span>
+      </div>
+    </div>
+  );
+}
+
+function YearlyCalendarTab() {
+  const { data: days = [], isLoading } = useQuery<{ id: string; date: string; count: number }[]>({
+    queryKey: ["/api/call-logs/days"],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-muted-foreground">Loading calendar...</div>
+      </div>
+    );
+  }
+
+  return <YearlyCallCalendar days={days} />;
+}
+
 interface WeeklyStatsProps {
   days: { id: string; date: string; count: number }[];
 }
@@ -1086,8 +1230,6 @@ function DailyCallLog() {
 
   return (
     <div className="space-y-2">
-      <WeeklyStats days={days} />
-
       <div className="relative">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -2366,7 +2508,7 @@ function WeatherImpactTab() {
       
       <div className="flex items-center justify-between flex-wrap gap-2">
         <Select value={range} onValueChange={setRange}>
-          <SelectTrigger className="w-[140px]" data-testid="crm-phone-select-weather-range">
+          <SelectTrigger className="w-auto h-8 px-3 text-xs border-0 bg-transparent hover:bg-muted/50 focus:ring-0 gap-1" data-testid="crm-phone-select-weather-range">
             <SelectValue placeholder="Select range" />
           </SelectTrigger>
           <SelectContent>
@@ -2398,104 +2540,158 @@ function WeatherImpactTab() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card data-testid="crm-phone-chart-hot-index">
+          <div className="grid grid-cols-1 gap-4">
+            <Card data-testid="crm-phone-chart-calls-temp">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Hot Index vs Calls</CardTitle>
+                <CardTitle className="text-sm font-medium">Calls & Temperature Trend</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
+                    <LineChart 
+                      data={data.data.sort((a, b) => a.date.localeCompare(b.date))} 
+                      margin={{ top: 10, right: 30, bottom: 20, left: 10 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                       <XAxis 
-                        type="number" 
-                        dataKey="hotIndex" 
-                        name="Hot Index (CDD)" 
-                        tick={{ fontSize: 12 }}
-                        label={{ value: "CDD", position: "bottom", fontSize: 12 }}
+                        dataKey="date" 
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(value) => format(parseISO(value), "M/d")}
+                        interval="preserveStartEnd"
                       />
                       <YAxis 
-                        type="number" 
-                        dataKey="calls" 
-                        name="Calls" 
-                        tick={{ fontSize: 12 }}
-                        label={{ value: "Calls", angle: -90, position: "left", fontSize: 12 }}
+                        yAxisId="left"
+                        tick={{ fontSize: 11 }}
+                        label={{ value: "Calls", angle: -90, position: "insideLeft", fontSize: 11, fill: "#711419" }}
+                      />
+                      <YAxis 
+                        yAxisId="right"
+                        orientation="right"
+                        tick={{ fontSize: 11 }}
+                        label={{ value: "Temp (°F)", angle: 90, position: "insideRight", fontSize: 11, fill: "#3b82f6" }}
                       />
                       <RechartsTooltip 
-                        cursor={{ strokeDasharray: "3 3" }}
-                        content={({ active, payload }) => {
+                        content={({ active, payload, label }) => {
                           if (active && payload?.length) {
-                            const point = payload[0].payload as WeatherImpactDataPoint;
                             return (
                               <div className="bg-popover border rounded-md p-2 text-xs shadow-md">
-                                <p className="font-medium">{point.date}</p>
-                                <p>Calls: {point.calls}</p>
-                                <p>Hot Index: {point.hotIndex.toFixed(1)}</p>
-                                <p>Avg Temp: {point.avgTempF.toFixed(1)}°F</p>
+                                <p className="font-medium">{format(parseISO(label), "MMM d, yyyy")}</p>
+                                {payload.map((p, i) => (
+                                  <p key={i} style={{ color: p.color }}>
+                                    {p.name}: {typeof p.value === 'number' ? p.value.toFixed(1) : p.value}
+                                  </p>
+                                ))}
                               </div>
                             );
                           }
                           return null;
                         }}
                       />
-                      <Scatter 
-                        data={data.data.filter(d => d.hotIndex > 0)} 
-                        fill="#ef4444" 
-                        fillOpacity={0.6}
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <Line 
+                        yAxisId="left"
+                        type="monotone" 
+                        dataKey="calls" 
+                        name="Calls"
+                        stroke="#711419" 
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
                       />
-                    </ScatterChart>
+                      <Line 
+                        yAxisId="right"
+                        type="monotone" 
+                        dataKey="avgTempF" 
+                        name="Avg Temp"
+                        stroke="#3b82f6" 
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>
 
-            <Card data-testid="crm-phone-chart-cold-index">
+            <Card data-testid="crm-phone-chart-weather-index">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Cold Index vs Calls</CardTitle>
+                <CardTitle className="text-sm font-medium">Weather Index Trend</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
+                    <LineChart 
+                      data={data.data.sort((a, b) => a.date.localeCompare(b.date))} 
+                      margin={{ top: 10, right: 30, bottom: 20, left: 10 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                       <XAxis 
-                        type="number" 
-                        dataKey="coldIndex" 
-                        name="Cold Index (HDD)" 
-                        tick={{ fontSize: 12 }}
-                        label={{ value: "HDD", position: "bottom", fontSize: 12 }}
+                        dataKey="date" 
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(value) => format(parseISO(value), "M/d")}
+                        interval="preserveStartEnd"
                       />
                       <YAxis 
-                        type="number" 
-                        dataKey="calls" 
-                        name="Calls" 
-                        tick={{ fontSize: 12 }}
-                        label={{ value: "Calls", angle: -90, position: "left", fontSize: 12 }}
+                        yAxisId="left"
+                        tick={{ fontSize: 11 }}
+                        label={{ value: "Calls", angle: -90, position: "insideLeft", fontSize: 11, fill: "#711419" }}
+                      />
+                      <YAxis 
+                        yAxisId="right"
+                        orientation="right"
+                        tick={{ fontSize: 11 }}
+                        label={{ value: "Index", angle: 90, position: "insideRight", fontSize: 11, fill: "#64748b" }}
                       />
                       <RechartsTooltip 
-                        cursor={{ strokeDasharray: "3 3" }}
-                        content={({ active, payload }) => {
+                        content={({ active, payload, label }) => {
                           if (active && payload?.length) {
-                            const point = payload[0].payload as WeatherImpactDataPoint;
                             return (
                               <div className="bg-popover border rounded-md p-2 text-xs shadow-md">
-                                <p className="font-medium">{point.date}</p>
-                                <p>Calls: {point.calls}</p>
-                                <p>Cold Index: {point.coldIndex.toFixed(1)}</p>
-                                <p>Avg Temp: {point.avgTempF.toFixed(1)}°F</p>
+                                <p className="font-medium">{format(parseISO(label), "MMM d, yyyy")}</p>
+                                {payload.map((p, i) => (
+                                  <p key={i} style={{ color: p.color }}>
+                                    {p.name}: {typeof p.value === 'number' ? p.value.toFixed(1) : p.value}
+                                  </p>
+                                ))}
                               </div>
                             );
                           }
                           return null;
                         }}
                       />
-                      <Scatter 
-                        data={data.data.filter(d => d.coldIndex > 0)} 
-                        fill="#3b82f6" 
-                        fillOpacity={0.6}
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <Line 
+                        yAxisId="left"
+                        type="monotone" 
+                        dataKey="calls" 
+                        name="Calls"
+                        stroke="#711419" 
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
                       />
-                    </ScatterChart>
+                      <Line 
+                        yAxisId="right"
+                        type="monotone" 
+                        dataKey="hotIndex" 
+                        name="Hot Index (CDD)"
+                        stroke="#ef4444" 
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                      <Line 
+                        yAxisId="right"
+                        type="monotone" 
+                        dataKey="coldIndex" 
+                        name="Cold Index (HDD)"
+                        stroke="#3b82f6" 
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
@@ -2503,7 +2699,7 @@ function WeatherImpactTab() {
           </div>
 
           <p className="text-xs text-muted-foreground text-center" data-testid="crm-phone-weather-impact-note">
-            Hot Index = CDD base 65°F, Cold Index = HDD base 65°F
+            Hot Index (CDD) = Cooling Degree Days above 65°F, Cold Index (HDD) = Heating Degree Days below 65°F
           </p>
         </>
       )}
@@ -2641,6 +2837,10 @@ function CrmPhoneContent() {
             <ClipboardList className="h-3.5 w-3.5 mr-1.5" />
             Screening
           </TabsTrigger>
+          <TabsTrigger value="calendar" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" data-testid="crm-phone-tab-calendar">
+            <CalendarDays className="h-3.5 w-3.5 mr-1.5" />
+            Calendar
+          </TabsTrigger>
           <TabsTrigger value="weather" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" data-testid="crm-phone-tab-weather">
             <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
             Weather
@@ -2653,6 +2853,10 @@ function CrmPhoneContent() {
 
         <TabsContent value="call-logs" className="mt-0">
           <DailyCallLog />
+        </TabsContent>
+
+        <TabsContent value="calendar" className="mt-0">
+          <YearlyCalendarTab />
         </TabsContent>
 
         <TabsContent value="screening" className="mt-0">
@@ -2668,6 +2872,7 @@ function CrmPhoneContent() {
 }
 
 export default function CrmPhonePage() {
+  usePageTitle("Phone");
   const { data: currentUser, isLoading: userLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),

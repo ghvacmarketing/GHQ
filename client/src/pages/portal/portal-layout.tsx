@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import ghvacLogo from "@assets/ghvac-logo.png";
 
 interface PortalLayoutProps {
   children: ReactNode;
@@ -23,11 +24,14 @@ export function PortalLayout({ children, showLogout = true }: PortalLayoutProps)
   return (
     <div className="min-h-screen flex flex-col bg-[#faf9f7]" data-testid="portal-layout">
       <header className="bg-[#711419] text-white shadow-md">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/portal/dashboard">
-            <span className="text-xl font-bold tracking-tight cursor-pointer" data-testid="link-portal-home">
-              GHVAC Customer Portal
-            </span>
+            <img 
+              src={ghvacLogo} 
+              alt="Giesbrecht HVAC" 
+              className="h-12 w-auto object-contain cursor-pointer brightness-0 invert"
+              data-testid="link-portal-home"
+            />
           </Link>
           {showLogout && (
             <Button
@@ -55,8 +59,8 @@ export function PortalLayout({ children, showLogout = true }: PortalLayoutProps)
           <p>&copy; {new Date().getFullYear()} Giesbrecht HVAC. All rights reserved.</p>
           <p className="mt-1">
             Questions? Contact us at{" "}
-            <a href="tel:+15555551234" className="text-[#711419] hover:underline" data-testid="link-phone">
-              (555) 555-1234
+            <a href="tel:+17068260644" className="text-[#711419] hover:underline" data-testid="link-phone">
+              (706) 826-0644
             </a>
           </p>
         </div>

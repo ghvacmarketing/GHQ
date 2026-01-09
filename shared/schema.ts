@@ -1,5 +1,20 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, timestamp, boolean, json, integer, date, index } from "drizzle-orm/pg-core";
+
+import {
+  pgTable,
+  text,
+  varchar,
+  decimal,
+  timestamp,
+  boolean,
+  json,
+  integer,
+  date,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
+
+
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -780,8 +795,9 @@ export type EmployeeDocument = typeof employeeDocuments.$inferSelect;
 // owner: Full access to everything (desktop CRM + mobile)
 // admin: Desktop CRM access only
 // sales: Desktop CRM + mobile access (manager-level features)
+// supervisor: Desktop CRM (admin-level) + enhanced mobile (view all techs, self-assign, edit own)
 // tech: Mobile access only
-export const crmUserRoleEnum = ["owner", "admin", "sales", "tech"] as const;
+export const crmUserRoleEnum = ["owner", "admin", "supervisor", "sales", "tech"] as const;
 export type CrmUserRole = typeof crmUserRoleEnum[number];
 
 // CRM Users
@@ -857,6 +873,7 @@ export const crmCustomers = pgTable("crm_customers", {
   leadSource: text("lead_source"),
   tags: json("tags").$type<string[]>().default([]),
   notes: text("notes"),
+  portalEnabled: boolean("portal_enabled").default(false).notNull(),
   sourceSystem: text("source_system"),
   sourceId: text("source_id"),
   // Prospect funnel fields
@@ -872,6 +889,10 @@ export const crmCustomers = pgTable("crm_customers", {
   customerTypeIdx: index("crm_customers_customer_type_idx").on(table.customerType),
   customerStatusIdx: index("crm_customers_customer_status_idx").on(table.customerStatus),
 }));
+
+// Property Type Enum - for QuickBooks class determination
+export const propertyTypeEnum = ["residential", "commercial"] as const;
+export type PropertyType = typeof propertyTypeEnum[number];
 
 // CRM Properties (addresses linked to customers)
 export const crmProperties = pgTable("crm_properties", {
@@ -898,6 +919,8 @@ export const crmProperties = pgTable("crm_properties", {
   paymentTerms: text("payment_terms"), // e.g., "net_30", "due_on_receipt", "net_15"
   paymentMethod: text("payment_method"), // e.g., "invoice", "credit_card", "check"
   approvalRule: text("approval_rule"), // e.g., "pm_approval_required", "tenant_direct", "auto_approve"
+  // Property type for QuickBooks class determination (defaults from customer type)
+  propertyType: text("property_type").$type<PropertyType>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -933,7 +956,7 @@ export const crmJobStatusEnum = ["new", "scheduled", "dispatched", "en_route", "
 export type CrmJobStatus = typeof crmJobStatusEnum[number];
 
 // Project Status Enum (pipeline-style)
-export const projectStatusEnum = ["lead", "proposal_sent", "approved", "in_progress", "completed", "closed", "archived"] as const;
+export const projectStatusEnum = ["lead", "proposal_sent", "approved", "equipment_ordered", "equipment_arrived", "in_progress", "completed", "closed", "archived"] as const;
 export type ProjectStatus = typeof projectStatusEnum[number];
 
 // Project Type Enum
@@ -1048,9 +1071,23 @@ export const dispatchQueueStageEnum = [
   "WaitingOnParts",
   "NeedsApproval",
   "OnHold",
-  "CallbackPriority"
+  "CallbackPriority",
+  "PartsNeeded",
+  "PartsOrdered",
+  "PartsArrived",
+  "Scheduled"
 ] as const;
 export type DispatchQueueStage = typeof dispatchQueueStageEnum[number];
+
+// Pending Reason - why a tech is waiting during a job
+export const pendingReasonEnum = [
+  "waiting_on_parts",
+  "waiting_on_customer", 
+  "waiting_for_next_job",
+  "lunch_break",
+  "other"
+] as const;
+export type PendingReason = typeof pendingReasonEnum[number];
 
 export const crmWorkOrders = pgTable("crm_work_orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1078,10 +1115,19 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   photos: json("photos").$type<{ id: string; url: string; objectPath: string; filename: string; uploadedAt: string }[]>(),
   billingDisposition: text("billing_disposition").$type<BillingDisposition>(),
   billingNotes: text("billing_notes"),
+  dispatchNotes: text("dispatch_notes"),
   invoiceId: varchar("invoice_id"),
+  sourceQuoteId: varchar("source_quote_id").references(() => crmQuotes.id, { onDelete: "set null" }),
+  dispatchedAt: timestamp("dispatched_at"),
+  enRouteAt: timestamp("en_route_at"),
+  onSiteAt: timestamp("on_site_at"),
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
   finalizedAt: timestamp("finalized_at"),
+  isPending: boolean("is_pending").default(false),
+  pendingReason: text("pending_reason").$type<PendingReason>(),
+  pendingStartedAt: timestamp("pending_started_at"),
+  totalPendingMinutes: integer("total_pending_minutes").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -1126,6 +1172,7 @@ export const crmQuotes = pgTable("crm_quotes", {
   validUntil: timestamp("valid_until"),
   sentAt: timestamp("sent_at"),
   viewedAt: timestamp("viewed_at"),
+  viewCount: integer("view_count").default(0),
   acceptedAt: timestamp("accepted_at"),
   declinedAt: timestamp("declined_at"),
   createdById: varchar("created_by_id"),
@@ -1165,9 +1212,15 @@ export const crmQuotes = pgTable("crm_quotes", {
   signedAt: timestamp("signed_at"),
   // Email routing fields
   quoteCategory: text("quote_category").$type<QuoteCategory>(),
+  // Deposit payment tracking
+  depositPaidAt: timestamp("deposit_paid_at"),
+  depositAmount: decimal("deposit_amount", { precision: 10, scale: 2 }),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  stripePaymentLinkId: text("stripe_payment_link_id"),
 }, (table) => ({
   statusIdx: index("crm_quotes_status_idx").on(table.status),
 }));
+
 
 // CRM Quote Line Items
 export const crmQuoteLineItems = pgTable("crm_quote_line_items", {
@@ -1185,6 +1238,8 @@ export const crmQuoteLineItems = pgTable("crm_quote_line_items", {
   discountKind: text("discount_kind").$type<DiscountKind>(),
   optionTag: text("option_tag"),
   imageUrl: text("image_url"),
+  // QuickBooks sub-account override - if null, calculated from item category + property type
+  quickbooksSubAccountId: varchar("quickbooks_sub_account_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1250,6 +1305,7 @@ export const crmInvoices = pgTable("crm_invoices", {
   voidReason: text("void_reason"),
   paymentMethod: text("payment_method"),
   paymentReference: text("payment_reference"),
+  stripePaymentLinkId: text("stripe_payment_link_id"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => crmUsers.id),
   createdAt: timestamp("created_at").defaultNow(),
@@ -1272,6 +1328,8 @@ export const crmInvoiceLineItems = pgTable("crm_invoice_line_items", {
   itemId: varchar("item_id").references(() => crmItems.id, { onDelete: "set null" }),
   isDiscountLine: boolean("is_discount_line").default(false),
   discountKind: text("discount_kind").$type<DiscountKind>(),
+  // QuickBooks sub-account override - if null, calculated from item category + property type
+  quickbooksSubAccountId: varchar("quickbooks_sub_account_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1396,7 +1454,7 @@ export const crmCustomerNotes = pgTable("crm_customer_notes", {
 });
 
 // Project Activity Types for Timeline
-export const projectActivityTypeEnum = ["note", "photo", "file", "financial_update", "approval", "work_order_created", "work_order_completed", "quote_sent", "quote_accepted", "invoice_sent", "invoice_paid"] as const;
+export const projectActivityTypeEnum = ["equipment_status", "photo", "file", "financial_update", "approval", "work_order_created", "work_order_completed", "quote_sent", "quote_accepted", "invoice_sent", "invoice_paid"] as const;
 export type ProjectActivityType = typeof projectActivityTypeEnum[number];
 
 // Project Activities (Timeline entries aggregating work order activities)
@@ -1481,8 +1539,12 @@ export type ApprovalMetadata = z.infer<typeof approvalMetadataSchema>;
 
 
 // CRM Agreements Status Enum
-export const crmAgreementStatusEnum = ["active", "expiring", "expired", "cancelled"] as const;
+export const crmAgreementStatusEnum = ["pending", "active", "grace_period", "expired", "cancelled"] as const;
 export type CrmAgreementStatus = typeof crmAgreementStatusEnum[number];
+
+// Billing Preference Enum (how customer wants to be billed)
+export const billingPreferenceEnum = ["auto_invoice", "pay_on_visit"] as const;
+export type BillingPreference = typeof billingPreferenceEnum[number];
 
 // Agreement Type Enum (standard HVAC maintenance vs custom agreement types)
 export const agreementTypeEnum = ["standard", "custom"] as const;
@@ -1559,6 +1621,12 @@ export const crmAgreements = pgTable("crm_agreements", {
   regionId: varchar("region_id").references(() => maintenanceRegions.id),
   agreementType: text("agreement_type").$type<AgreementType>().notNull().default("standard"),
   customAgreementTypeId: varchar("custom_agreement_type_id").references(() => customAgreementTypes.id),
+  billingPreference: text("billing_preference").$type<BillingPreference>().notNull().default("auto_invoice"),
+  activationDate: date("activation_date"),
+  graceExpiresAt: date("grace_expires_at"),
+  isInitialCycle: boolean("is_initial_cycle").notNull().default(true),
+  firstInvoiceSentAt: timestamp("first_invoice_sent_at"),
+  initialInvoiceId: varchar("initial_invoice_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1569,17 +1637,30 @@ export const insertCrmAgreementSchema = createInsertSchema(crmAgreements).omit({
   updatedAt: true,
 });
 
+// Renewal status for pay-on-visit agreement visits
+// none = not a renewal visit or renewal not applicable
+// pending = renewal due, technician needs to collect payment
+// pending_payment = invoice created, awaiting payment
+// collected = payment received, agreement renewed
+// declined = customer declined renewal, agreement will expire
+export const visitRenewalStatusEnum = ["none", "pending", "pending_payment", "collected", "declined"] as const;
+export type VisitRenewalStatus = typeof visitRenewalStatusEnum[number];
+
 // Maintenance Visits (track the 2 visits per year for each agreement)
 export const maintenanceVisits = pgTable("maintenance_visits", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   agreementId: varchar("agreement_id").notNull().references(() => crmAgreements.id, { onDelete: "cascade" }),
   visitNumber: integer("visit_number").notNull(),
+  totalVisitsInCycle: integer("total_visits_in_cycle").notNull().default(2),
   cycleYear: integer("cycle_year").notNull(),
   targetDate: date("target_date").notNull(),
   reminderSentAt: timestamp("reminder_sent_at"),
   workOrderId: varchar("work_order_id").references(() => crmWorkOrders.id),
   completedAt: timestamp("completed_at"),
   status: text("status").$type<"pending" | "scheduled" | "completed" | "cancelled">().notNull().default("pending"),
+  isRenewalTrigger: boolean("is_renewal_trigger").notNull().default(false),
+  renewalStatus: text("renewal_status").$type<VisitRenewalStatus>().notNull().default("none"),
+  renewalInvoiceId: varchar("renewal_invoice_id").references(() => crmInvoices.id),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -2359,6 +2440,9 @@ export type MessageAttachment = {
 export const crmMessagingConversations = pgTable("crm_messaging_conversations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   customerId: varchar("customer_id").references(() => crmCustomers.id, { onDelete: "cascade" }),
+  phoneNumber: text("phone_number").notNull(),
+  customerName: text("customer_name"),
+  source: text("source"),
   subject: text("subject"),
   externalSource: text("external_source").$type<MessagingSource>().default("internal"),
   externalConversationId: text("external_conversation_id"),
@@ -2366,6 +2450,7 @@ export const crmMessagingConversations = pgTable("crm_messaging_conversations", 
   lastMessageAt: timestamp("last_message_at"),
   lastOutboundAt: timestamp("last_outbound_at"),
   unreadInboundCount: integer("unread_inbound_count").default(0),
+  unreadCount: integer("unread_count").default(0),
   assignedToId: varchar("assigned_to_id").references(() => crmUsers.id),
   snoozeUntil: timestamp("snooze_until"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -2420,3 +2505,313 @@ export type InsertCrmMessagingMessage = z.infer<typeof insertCrmMessagingMessage
 export type CrmMessagingMessage = typeof crmMessagingMessages.$inferSelect;
 export type InsertCrmMessagingConversationTag = z.infer<typeof insertCrmMessagingConversationTagSchema>;
 export type CrmMessagingConversationTag = typeof crmMessagingConversationTags.$inferSelect;
+
+// Time Entry Source Types
+export type TimeEntrySource = "mobile" | "manual" | "system";
+
+// CRM Time Entries (tech clock in/out)
+export const crmTimeEntries = pgTable("crm_time_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  technicianId: varchar("technician_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  workOrderId: varchar("work_order_id").references(() => crmWorkOrders.id, { onDelete: "set null" }),
+  clockInAt: timestamp("clock_in_at").notNull(),
+  clockOutAt: timestamp("clock_out_at"),
+  durationMinutes: integer("duration_minutes"),
+  notes: text("notes"),
+  source: text("source").$type<TimeEntrySource>().default("mobile"),
+  createdById: varchar("created_by_id").references(() => crmUsers.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCrmTimeEntrySchema = createInsertSchema(crmTimeEntries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCrmTimeEntry = z.infer<typeof insertCrmTimeEntrySchema>;
+export type CrmTimeEntry = typeof crmTimeEntries.$inferSelect;
+
+// =============================================
+// SMS NOTIFICATION LOG
+// =============================================
+
+// Notification types for tracking sent SMS
+export const smsNotificationTypeEnum = [
+  "maintenance_reminder_10_day",
+  "maintenance_reminder_5_day", 
+  "work_order_en_route",
+  "work_order_on_site",
+  "invoice_sms",
+] as const;
+export type SmsNotificationType = typeof smsNotificationTypeEnum[number];
+
+// SMS Notification Log - tracks all automated SMS notifications to prevent duplicates
+export const smsNotificationLog = pgTable("sms_notification_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => crmCustomers.id, { onDelete: "cascade" }),
+  notificationType: text("notification_type").$type<SmsNotificationType>().notNull(),
+  // Reference IDs based on notification type
+  maintenanceVisitId: varchar("maintenance_visit_id").references(() => maintenanceVisits.id, { onDelete: "cascade" }),
+  workOrderId: varchar("work_order_id").references(() => crmWorkOrders.id, { onDelete: "cascade" }),
+  invoiceId: varchar("invoice_id").references(() => crmInvoices.id, { onDelete: "cascade" }),
+  // Message tracking
+  messageId: varchar("message_id"), // External message ID from Textline
+  conversationId: varchar("conversation_id").references(() => crmMessagingConversations.id),
+  phoneNumber: text("phone_number"),
+  messageBody: text("message_body"),
+  status: text("status").$type<"sent" | "failed" | "pending">().default("pending"),
+  errorMessage: text("error_message"),
+  sentAt: timestamp("sent_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSmsNotificationLogSchema = createInsertSchema(smsNotificationLog).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSmsNotificationLog = z.infer<typeof insertSmsNotificationLogSchema>;
+export type SmsNotificationLog = typeof smsNotificationLog.$inferSelect;
+
+// =============================================
+// QUICKBOOKS INTEGRATION
+// =============================================
+
+// QuickBooks OAuth state (for CSRF protection during OAuth flow)
+export const quickbooksOauthStates = pgTable("quickbooks_oauth_states", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  state: varchar("state").notNull().unique(),
+  environment: text("environment").$type<"sandbox" | "production">().default("sandbox"),
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+});
+
+// QuickBooks OAuth connection tokens
+export const quickbooksConnection = pgTable("quickbooks_connection", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  realmId: varchar("realm_id").notNull().unique(), // QuickBooks company ID
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  accessTokenExpiresAt: timestamp("access_token_expires_at").notNull(),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at").notNull(),
+  environment: text("environment").$type<"sandbox" | "production">().default("sandbox"),
+  companyName: text("company_name"),
+  isActive: boolean("is_active").default(true),
+  lastSyncAt: timestamp("last_sync_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuickbooksConnectionSchema = createInsertSchema(quickbooksConnection).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertQuickbooksConnection = z.infer<typeof insertQuickbooksConnectionSchema>;
+export type QuickbooksConnection = typeof quickbooksConnection.$inferSelect;
+
+// Customer sync mapping - links CRM customers to QuickBooks customers
+export const quickbooksCustomerSync = pgTable("quickbooks_customer_sync", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  crmCustomerId: varchar("crm_customer_id").notNull().references(() => crmCustomers.id, { onDelete: "cascade" }),
+  quickbooksCustomerId: varchar("quickbooks_customer_id").notNull(),
+  realmId: varchar("realm_id").notNull(),
+  syncStatus: text("sync_status").$type<"synced" | "pending" | "error">().default("synced"),
+  lastSyncAt: timestamp("last_sync_at").defaultNow(),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuickbooksCustomerSyncSchema = createInsertSchema(quickbooksCustomerSync).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertQuickbooksCustomerSync = z.infer<typeof insertQuickbooksCustomerSyncSchema>;
+export type QuickbooksCustomerSync = typeof quickbooksCustomerSync.$inferSelect;
+
+// Invoice sync mapping - links CRM invoices to QuickBooks invoices
+// Unique constraint on (crmInvoiceId, realmId) prevents race condition duplicates
+export const quickbooksInvoiceSync = pgTable("quickbooks_invoice_sync", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  crmInvoiceId: varchar("crm_invoice_id").notNull().references(() => crmInvoices.id, { onDelete: "cascade" }),
+  quickbooksInvoiceId: varchar("quickbooks_invoice_id").notNull(),
+  realmId: varchar("realm_id").notNull(),
+  syncStatus: text("sync_status").$type<"synced" | "pending" | "error">().default("synced"),
+  lastSyncAt: timestamp("last_sync_at").defaultNow(),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("idx_quickbooks_invoice_sync_unique").on(table.crmInvoiceId, table.realmId),
+]);
+
+export const insertQuickbooksInvoiceSyncSchema = createInsertSchema(quickbooksInvoiceSync).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertQuickbooksInvoiceSync = z.infer<typeof insertQuickbooksInvoiceSyncSchema>;
+export type QuickbooksInvoiceSync = typeof quickbooksInvoiceSync.$inferSelect;
+
+// Payment sync mapping - links CRM payments to QuickBooks payments
+export const quickbooksPaymentSync = pgTable("quickbooks_payment_sync", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  crmInvoiceId: varchar("crm_invoice_id").notNull().references(() => crmInvoices.id, { onDelete: "cascade" }),
+  quickbooksPaymentId: varchar("quickbooks_payment_id").notNull(),
+  realmId: varchar("realm_id").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  syncStatus: text("sync_status").$type<"synced" | "pending" | "error">().default("synced"),
+  lastSyncAt: timestamp("last_sync_at").defaultNow(),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuickbooksPaymentSyncSchema = createInsertSchema(quickbooksPaymentSync).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertQuickbooksPaymentSync = z.infer<typeof insertQuickbooksPaymentSyncSchema>;
+export type QuickbooksPaymentSync = typeof quickbooksPaymentSync.$inferSelect;
+
+// Sync log for tracking all sync operations
+export const quickbooksSyncLog = pgTable("quickbooks_sync_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  realmId: varchar("realm_id").notNull(),
+  syncType: text("sync_type").$type<"customer" | "invoice" | "payment" | "full">().notNull(),
+  direction: text("direction").$type<"push" | "pull">().notNull(),
+  status: text("status").$type<"started" | "completed" | "failed">().notNull(),
+  recordsProcessed: integer("records_processed").default(0),
+  recordsFailed: integer("records_failed").default(0),
+  errorMessage: text("error_message"),
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertQuickbooksSyncLogSchema = createInsertSchema(quickbooksSyncLog).omit({
+  id: true,
+});
+
+export type InsertQuickbooksSyncLog = z.infer<typeof insertQuickbooksSyncLogSchema>;
+export type QuickbooksSyncLog = typeof quickbooksSyncLog.$inferSelect;
+
+// QuickBooks Classes - maps to QuickBooks Class entity for item classification
+export const quickbooksClasses = pgTable("quickbooks_classes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 255 }).notNull(), // e.g., "Service - Residential"
+  classType: text("class_type").$type<"Service" | "Install" | "Maintenance" | "Discount">().notNull(),
+  subType: text("sub_type").$type<"Residential" | "Commercial" | "Crawlspace" | "Promotional" | "Maintenance">().notNull(),
+  quickbooksClassId: varchar("quickbooks_class_id"), // QuickBooks Class.Id
+  realmId: varchar("realm_id"), // QuickBooks company ID
+  syncToken: varchar("sync_token"), // Required for QuickBooks updates
+  isActive: boolean("is_active").default(true),
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuickbooksClassSchema = createInsertSchema(quickbooksClasses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertQuickbooksClass = z.infer<typeof insertQuickbooksClassSchema>;
+export type QuickbooksClass = typeof quickbooksClasses.$inferSelect;
+
+// Category to Class mapping - links categories to QuickBooks classes
+export const quickbooksCategoryClassMap = pgTable("quickbooks_category_class_map", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  categoryName: varchar("category_name", { length: 255 }).notNull(), // The category name (e.g., "HVAC Parts")
+  quickbooksClassId: varchar("quickbooks_class_id").references(() => quickbooksClasses.id),
+  realmId: varchar("realm_id").notNull(), // QuickBooks company ID
+  isDefault: boolean("is_default").default(false), // If true, this class applies to all unmapped categories
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuickbooksCategoryClassMapSchema = createInsertSchema(quickbooksCategoryClassMap).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertQuickbooksCategoryClassMap = z.infer<typeof insertQuickbooksCategoryClassMapSchema>;
+export type QuickbooksCategoryClassMap = typeof quickbooksCategoryClassMap.$inferSelect;
+
+// QuickBooks Accounts - maps to QuickBooks Chart of Accounts for income tracking
+// Supports hierarchical parent/child structure (e.g., Service > Residential, Install > Commercial)
+export const quickbooksAccounts = pgTable("quickbooks_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 255 }).notNull(), // e.g., "Service" or "Residential"
+  fullyQualifiedName: varchar("fully_qualified_name", { length: 500 }), // e.g., "Service:Residential"
+  accountType: text("account_type").$type<"Income" | "Expense" | "Other Income" | "Other Expense">().default("Income"), // QuickBooks account type
+  accountSubType: varchar("account_sub_type", { length: 100 }), // QuickBooks detail type (e.g., "ServiceFeeIncome")
+  // Category mapping - which CRM item category this account handles
+  categoryType: text("category_type").$type<"Service" | "Install" | "Maintenance" | "Discount">(), // null for parent accounts
+  // Property type mapping - which property type this sub-account handles  
+  propertyType: text("property_type").$type<"Residential" | "Commercial">(), // null for parent accounts
+  isParent: boolean("is_parent").default(false), // true for parent accounts (Service, Install, etc.)
+  parentAccountId: varchar("parent_account_id"), // references id of parent account in this table
+  quickbooksAccountId: varchar("quickbooks_account_id"), // QuickBooks Account.Id
+  quickbooksParentAccountId: varchar("quickbooks_parent_account_id"), // QuickBooks parent Account.Id
+  realmId: varchar("realm_id"), // QuickBooks company ID
+  syncToken: varchar("sync_token"), // Required for QuickBooks updates
+  isActive: boolean("is_active").default(true),
+  currentBalance: varchar("current_balance"), // Current balance from QuickBooks
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuickbooksAccountSchema = createInsertSchema(quickbooksAccounts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertQuickbooksAccount = z.infer<typeof insertQuickbooksAccountSchema>;
+export type QuickbooksAccount = typeof quickbooksAccounts.$inferSelect;
+
+// QuickBooks Items (Products & Services) - maps to QuickBooks Items for invoice line items
+// Each item is linked to an income account for proper P&L routing
+export const quickbooksItems = pgTable("quickbooks_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 255 }).notNull(), // e.g., "HVAC Service - Residential"
+  description: text("description"), // Item description for invoice lines
+  // Category mapping - which CRM item category this item handles
+  categoryType: text("category_type").$type<"Service" | "Install" | "Maintenance" | "Discount">().notNull(),
+  // Property type mapping - which property type this item handles  
+  propertyType: text("property_type").$type<"Residential" | "Commercial">().notNull(),
+  // Linked income account in CRM (references quickbooksAccounts)
+  incomeAccountId: varchar("income_account_id").references(() => quickbooksAccounts.id),
+  // QuickBooks Item data
+  quickbooksItemId: varchar("quickbooks_item_id"), // QuickBooks Item.Id
+  quickbooksIncomeAccountId: varchar("quickbooks_income_account_id"), // QuickBooks Account.Id for IncomeAccountRef
+  realmId: varchar("realm_id"), // QuickBooks company ID
+  syncToken: varchar("sync_token"), // Required for QuickBooks updates
+  itemType: text("item_type").$type<"Service" | "NonInventory" | "Inventory">().default("Service"),
+  isActive: boolean("is_active").default(true),
+  unitPrice: varchar("unit_price"), // Default unit price
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuickbooksItemSchema = createInsertSchema(quickbooksItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertQuickbooksItem = z.infer<typeof insertQuickbooksItemSchema>;
+export type QuickbooksItem = typeof quickbooksItems.$inferSelect;

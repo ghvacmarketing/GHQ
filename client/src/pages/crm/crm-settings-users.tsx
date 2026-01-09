@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -60,7 +61,7 @@ import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmUser } from "@shared/schema";
 
-type CrmUserRole = "owner" | "admin" | "sales" | "tech";
+type CrmUserRole = "owner" | "admin" | "supervisor" | "sales" | "tech";
 
 interface CrmUserListItem {
   id: string;
@@ -85,6 +86,12 @@ const roleConfig: Record<CrmUserRole, { label: string; icon: typeof Shield; colo
     color: "bg-blue-100 text-blue-700",
     description: "Desktop CRM access only"
   },
+  supervisor: { 
+    label: "Supervisor", 
+    icon: Users, 
+    color: "bg-indigo-100 text-indigo-700",
+    description: "Desktop CRM (admin) + mobile with all techs view"
+  },
   sales: { 
     label: "Sales", 
     icon: BadgeDollarSign, 
@@ -100,6 +107,7 @@ const roleConfig: Record<CrmUserRole, { label: string; icon: typeof Shield; colo
 };
 
 export default function CrmSettingsUsers() {
+  usePageTitle("User Settings");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   
@@ -124,7 +132,7 @@ export default function CrmSettingsUsers() {
 
   const { data: users, isLoading: usersLoading } = useQuery<CrmUserListItem[]>({
     queryKey: ["/api/crm/users"],
-    enabled: !!currentUser && (currentUser.role === "owner" || currentUser.role === "admin" || currentUser.role === "sales"),
+    enabled: !!currentUser && (currentUser.role === "owner" || currentUser.role === "admin" || currentUser.role === "supervisor" || currentUser.role === "sales"),
     staleTime: 0, // Always refetch to show latest user list
     refetchOnMount: "always",
   });
@@ -261,7 +269,7 @@ export default function CrmSettingsUsers() {
     return null;
   }
 
-  const isAdmin = currentUser.role === "owner" || currentUser.role === "admin";
+  const isAdmin = currentUser.role === "owner" || currentUser.role === "admin" || currentUser.role === "supervisor";
   const isOwner = currentUser.role === "owner";
   const canViewSettings = isAdmin || currentUser.role === "sales";
 

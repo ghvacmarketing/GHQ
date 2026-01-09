@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -156,6 +157,20 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
+function formatDuration(start: Date, end: Date): string {
+  const diffMs = end.getTime() - start.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const hours = Math.floor(diffMins / 60);
+  const mins = diffMins % 60;
+  
+  if (hours === 0) {
+    return `${mins}m`;
+  } else if (mins === 0) {
+    return `${hours}h`;
+  }
+  return `${hours}h ${mins}m`;
+}
+
 const workOrderStatusColors: Record<string, { bg: string; text: string; border: string }> = {
   scheduled: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
   dispatched: { bg: "bg-yellow-100", text: "text-yellow-700", border: "border-yellow-200" },
@@ -185,8 +200,8 @@ const invoiceStatusColors: Record<string, { bg: string; text: string; border: st
 const statusLabels: Record<string, string> = {
   scheduled: "Scheduled",
   dispatched: "Dispatched",
-  en_route: "En Route",
-  on_site: "On Site",
+  en_route: "Traveling",
+  on_site: "Working",
   completed: "Completed",
   cancelled: "Cancelled",
 };
@@ -305,6 +320,7 @@ function getPropertyAddress(property: CrmProperty | null): string {
 }
 
 export default function CrmWorkOrderDetail() {
+  usePageTitle("Work Order Detail");
   const [, navigate] = useLocation();
   const params = useParams<{ id: string }>();
   const workOrderId = params.id;
@@ -315,6 +331,16 @@ export default function CrmWorkOrderDetail() {
   const [quoteTitle, setQuoteTitle] = useState("");
   const [quoteDescription, setQuoteDescription] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  
+  // Timeline editing state
+  const [editingTimestamp, setEditingTimestamp] = useState<"dispatchedAt" | null>(null);
+  const [editDate, setEditDate] = useState<Date | undefined>(undefined);
+  const [editTime, setEditTime] = useState<string>("");
+  
+  // Duration editing state (hours and minutes)
+  const [editingDuration, setEditingDuration] = useState<"dispatched_to_enroute" | "enroute_to_onsite" | "onsite_to_completed" | null>(null);
+  const [editHours, setEditHours] = useState<number>(0);
+  const [editMinutes, setEditMinutes] = useState<number>(0);
 
   const [quoteSearch, setQuoteSearch] = useState("");
   const [quoteStatusFilter, setQuoteStatusFilter] = useState("all");
@@ -651,6 +677,126 @@ export default function CrmWorkOrderDetail() {
     }
   };
 
+  const openTimestampEdit = (field: "dispatchedAt", currentValue: string | Date | null) => {
+    if (currentValue) {
+      const date = new Date(currentValue);
+      setEditDate(date);
+      setEditTime(format(date, "HH:mm"));
+    } else {
+      setEditDate(new Date());
+      setEditTime(format(new Date(), "HH:mm"));
+    }
+    setEditingTimestamp(field);
+  };
+
+  const handleSaveTimestamp = () => {
+    if (!editingTimestamp || !editDate || !editTime) return;
+    
+    const [hours, minutes] = editTime.split(":").map(Number);
+    const newDate = new Date(editDate);
+    newDate.setHours(hours, minutes, 0, 0);
+    
+    updateWorkOrderMutation.mutate({
+      updates: { [editingTimestamp]: newDate }
+    });
+    setEditingTimestamp(null);
+    setEditDate(undefined);
+    setEditTime("");
+  };
+
+  const openDurationEdit = (phase: "dispatched_to_enroute" | "enroute_to_onsite" | "onsite_to_completed") => {
+    if (!workOrder) return;
+    
+    let startTime: Date | null = null;
+    let endTime: Date | null = null;
+    
+    if (phase === "dispatched_to_enroute" && workOrder.dispatchedAt && workOrder.enRouteAt) {
+      startTime = new Date(workOrder.dispatchedAt);
+      endTime = new Date(workOrder.enRouteAt);
+    } else if (phase === "enroute_to_onsite" && workOrder.enRouteAt && workOrder.onSiteAt) {
+      startTime = new Date(workOrder.enRouteAt);
+      endTime = new Date(workOrder.onSiteAt);
+    } else if (phase === "onsite_to_completed" && workOrder.onSiteAt && workOrder.completedAt) {
+      startTime = new Date(workOrder.onSiteAt);
+      endTime = new Date(workOrder.completedAt);
+    }
+    
+    if (startTime && endTime) {
+      const diffMs = endTime.getTime() - startTime.getTime();
+      const totalMinutes = Math.floor(diffMs / (1000 * 60));
+      setEditHours(Math.floor(totalMinutes / 60));
+      setEditMinutes(totalMinutes % 60);
+    } else {
+      setEditHours(0);
+      setEditMinutes(0);
+    }
+    
+    setEditingDuration(phase);
+  };
+
+  const getPreviewTimestamp = (): Date | null => {
+    if (!workOrder || !editingDuration) return null;
+    
+    const totalMinutes = editHours * 60 + editMinutes;
+    let baseTime: Date | null = null;
+    
+    if (editingDuration === "dispatched_to_enroute" && workOrder.dispatchedAt) {
+      baseTime = new Date(workOrder.dispatchedAt);
+    } else if (editingDuration === "enroute_to_onsite" && workOrder.enRouteAt) {
+      baseTime = new Date(workOrder.enRouteAt);
+    } else if (editingDuration === "onsite_to_completed" && workOrder.onSiteAt) {
+      baseTime = new Date(workOrder.onSiteAt);
+    }
+    
+    if (baseTime) {
+      return new Date(baseTime.getTime() + totalMinutes * 60 * 1000);
+    }
+    return null;
+  };
+
+  const handleSaveDuration = () => {
+    if (!workOrder || !editingDuration) return;
+    
+    const totalMinutes = editHours * 60 + editMinutes;
+    const updates: Partial<CrmWorkOrder> = {};
+    
+    if (editingDuration === "dispatched_to_enroute" && workOrder.dispatchedAt) {
+      const newEnRouteAt = new Date(new Date(workOrder.dispatchedAt).getTime() + totalMinutes * 60 * 1000);
+      updates.enRouteAt = newEnRouteAt;
+      
+      // Cascade: if onSiteAt exists, maintain its duration from enRouteAt
+      if (workOrder.enRouteAt && workOrder.onSiteAt) {
+        const oldDuration = new Date(workOrder.onSiteAt).getTime() - new Date(workOrder.enRouteAt).getTime();
+        updates.onSiteAt = new Date(newEnRouteAt.getTime() + oldDuration);
+        
+        // Cascade: if completedAt exists, maintain its duration from onSiteAt
+        if (workOrder.completedAt) {
+          const workDuration = new Date(workOrder.completedAt).getTime() - new Date(workOrder.onSiteAt).getTime();
+          updates.completedAt = new Date((updates.onSiteAt as Date).getTime() + workDuration);
+        }
+      }
+    } else if (editingDuration === "enroute_to_onsite" && workOrder.enRouteAt) {
+      const newOnSiteAt = new Date(new Date(workOrder.enRouteAt).getTime() + totalMinutes * 60 * 1000);
+      updates.onSiteAt = newOnSiteAt;
+      
+      // Cascade: if completedAt exists, maintain its duration from onSiteAt
+      if (workOrder.onSiteAt && workOrder.completedAt) {
+        const workDuration = new Date(workOrder.completedAt).getTime() - new Date(workOrder.onSiteAt).getTime();
+        updates.completedAt = new Date(newOnSiteAt.getTime() + workDuration);
+      }
+    } else if (editingDuration === "onsite_to_completed" && workOrder.onSiteAt) {
+      updates.completedAt = new Date(new Date(workOrder.onSiteAt).getTime() + totalMinutes * 60 * 1000);
+    }
+    
+    if (Object.keys(updates).length > 0) {
+      updateWorkOrderMutation.mutate({ updates });
+    }
+    
+    setEditingDuration(null);
+    setEditHours(0);
+    setEditMinutes(0);
+  };
+
   const handleUpdateStatus = () => {
     if (newStatus) {
       updateWorkOrderMutation.mutate({
@@ -828,6 +974,11 @@ export default function CrmWorkOrderDetail() {
                   >
                     {statusLabels[workOrder.status] || workOrder.status}
                   </Badge>
+                  {workOrder.isPending && (
+                    <Badge className="bg-amber-100 text-amber-800 border border-amber-200">
+                      Waiting
+                    </Badge>
+                  )}
                   <Badge
                     variant="outline"
                     data-testid="badge-visit-type"
@@ -908,6 +1059,14 @@ export default function CrmWorkOrderDetail() {
             >
               <Pencil className="h-4 w-4 md:mr-2" />
               <span className="hidden md:inline">Edit</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="timeline"
+              data-testid="tab-timeline"
+              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
+            >
+              <Clock className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Timeline</span>
             </TabsTrigger>
           </TabsList>
 
@@ -1043,6 +1202,78 @@ export default function CrmWorkOrderDetail() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Pending Status Toggle */}
+            <Card className={`shadow-sm mb-6 ${workOrder.isPending ? 'border-amber-300 bg-amber-50/30' : ''}`}>
+              <CardHeader className="pb-3 border-b bg-slate-50/50">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <Clock className="h-4 w-4 text-[#711419]" />
+                  Technician Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      id="isPending"
+                      checked={workOrder.isPending || false}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          updateWorkOrderMutation.mutate({
+                            updates: { 
+                              isPending: true, 
+                              pendingReason: "waiting_for_next_job",
+                              pendingStartedAt: new Date()
+                            }
+                          });
+                        } else {
+                          updateWorkOrderMutation.mutate({
+                            updates: { 
+                              isPending: false, 
+                              pendingReason: null,
+                              pendingStartedAt: null
+                            }
+                          });
+                        }
+                      }}
+                      disabled={updateWorkOrderMutation.isPending}
+                    />
+                    <Label htmlFor="isPending" className="text-sm font-medium">
+                      Technician is currently waiting
+                    </Label>
+                  </div>
+                  {workOrder.isPending && (
+                    <div className="flex-1">
+                      <Select
+                        value={workOrder.pendingReason || "waiting_for_next_job"}
+                        onValueChange={(value) => {
+                          updateWorkOrderMutation.mutate({
+                            updates: { pendingReason: value as any }
+                          });
+                        }}
+                        disabled={updateWorkOrderMutation.isPending}
+                      >
+                        <SelectTrigger className="w-full sm:w-[250px]">
+                          <SelectValue placeholder="Select reason" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="waiting_on_parts">Waiting on Parts</SelectItem>
+                          <SelectItem value="waiting_on_customer">Waiting on Customer</SelectItem>
+                          <SelectItem value="waiting_for_next_job">Waiting for Next Job</SelectItem>
+                          <SelectItem value="lunch_break">Lunch Break</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+                {workOrder.isPending && workOrder.pendingStartedAt && (
+                  <p className="text-xs text-amber-600 mt-3">
+                    Waiting since {format(new Date(workOrder.pendingStartedAt), "h:mm a")}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
 
             {checklistResponse && checklistResponse.checklist && (
               <Card className="shadow-sm mb-6 border-amber-200 bg-amber-50/30" data-testid="card-service-checklist">
@@ -1283,7 +1514,14 @@ export default function CrmWorkOrderDetail() {
                               data-testid={`row-quote-${quote.id}`}
                               className="cursor-pointer hover:bg-slate-50"
                             >
-                              <TableCell className="font-medium">{quote.quoteNumber}</TableCell>
+                              <TableCell className="font-medium">
+                                <button
+                                  className="text-[#711419] hover:underline font-medium"
+                                  onClick={() => navigate(`/crm/quotes/${quote.id}`)}
+                                >
+                                  {quote.quoteNumber}
+                                </button>
+                              </TableCell>
                               <TableCell>{quote.title}</TableCell>
                               <TableCell>
                                 <Badge className={cn(
@@ -1428,7 +1666,14 @@ export default function CrmWorkOrderDetail() {
                           data-testid={`row-invoice-${invoice.id}`}
                           className="cursor-pointer hover:bg-slate-50"
                         >
-                          <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                          <TableCell className="font-medium">
+                            <button
+                              className="text-[#711419] hover:underline font-medium"
+                              onClick={() => navigate(`/crm/invoices/${invoice.id}`)}
+                            >
+                              {invoice.invoiceNumber}
+                            </button>
+                          </TableCell>
                           <TableCell>
                             <Badge className={cn(
                               "text-xs",
@@ -2012,6 +2257,163 @@ export default function CrmWorkOrderDetail() {
               </Card>
             </div>
           </TabsContent>
+
+          <TabsContent value="timeline" className="mt-6">
+            {!workOrder.dispatchedAt ? (
+              <Card className="shadow-sm">
+                <CardContent className="py-16 text-center">
+                  <Clock className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-slate-700 mb-2">No Dispatch Timeline Available</h3>
+                  <p className="text-slate-500">Dispatch this work order to see the timeline of status changes.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="shadow-sm">
+                <CardHeader className="pb-4 border-b bg-slate-50/50">
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                    <Clock className="h-4 w-4 text-[#711419]" />
+                    Dispatch Timeline
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <div className="relative">
+                    {/* Horizontal Timeline */}
+                    <div className="flex items-start justify-between relative">
+                      {/* Timeline connector line */}
+                      <div className="absolute top-5 left-0 right-0 h-1 bg-slate-200" />
+                      <div 
+                        className="absolute top-5 left-0 h-1 bg-[#711419] transition-all duration-300"
+                        style={{
+                          width: workOrder.completedAt ? '100%' 
+                            : workOrder.onSiteAt ? '75%' 
+                            : workOrder.enRouteAt ? '50%' 
+                            : workOrder.dispatchedAt ? '25%' 
+                            : '0%'
+                        }}
+                      />
+                      
+                      {/* Dispatched */}
+                      <div className="relative z-10 flex flex-col items-center text-center w-1/4">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          workOrder.dispatchedAt ? 'bg-[#711419] text-white' : 'bg-slate-200 text-slate-400'
+                        }`}>
+                          <CheckCircle className="h-5 w-5" />
+                        </div>
+                        <div className="mt-3">
+                          <p className="font-medium text-sm text-slate-900">Dispatched</p>
+                          {workOrder.dispatchedAt && (
+                            <>
+                              <button
+                                onClick={() => openTimestampEdit("dispatchedAt", workOrder.dispatchedAt)}
+                                className="text-xs text-slate-500 mt-1 hover:text-blue-600 hover:underline flex items-center gap-1 mx-auto"
+                              >
+                                {format(new Date(workOrder.dispatchedAt), "MMM d, h:mm a")}
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                              {workOrder.enRouteAt && (
+                                <button
+                                  onClick={() => openDurationEdit("dispatched_to_enroute")}
+                                  className="text-xs text-emerald-600 mt-1 hover:text-emerald-800 hover:underline flex items-center gap-1 mx-auto"
+                                >
+                                  Duration: {formatDuration(new Date(workOrder.dispatchedAt), new Date(workOrder.enRouteAt))}
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Traveling */}
+                      <div className="relative z-10 flex flex-col items-center text-center w-1/4">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          workOrder.enRouteAt ? 'bg-[#711419] text-white' : 'bg-slate-200 text-slate-400'
+                        }`}>
+                          {workOrder.enRouteAt ? <CheckCircle className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+                        </div>
+                        <div className="mt-3">
+                          <p className="font-medium text-sm text-slate-900">Traveling</p>
+                          {workOrder.enRouteAt && (
+                            <>
+                              <p className="text-xs text-slate-500 mt-1">
+                                {format(new Date(workOrder.enRouteAt), "MMM d, h:mm a")}
+                              </p>
+                              {workOrder.onSiteAt && (
+                                <button
+                                  onClick={() => openDurationEdit("enroute_to_onsite")}
+                                  className="text-xs text-emerald-600 mt-1 hover:text-emerald-800 hover:underline flex items-center gap-1 mx-auto"
+                                >
+                                  Duration: {formatDuration(new Date(workOrder.enRouteAt), new Date(workOrder.onSiteAt))}
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Working */}
+                      <div className="relative z-10 flex flex-col items-center text-center w-1/4">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          workOrder.onSiteAt ? 'bg-[#711419] text-white' : 'bg-slate-200 text-slate-400'
+                        }`}>
+                          {workOrder.onSiteAt ? <CheckCircle className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+                        </div>
+                        <div className="mt-3">
+                          <p className="font-medium text-sm text-slate-900">Working</p>
+                          {workOrder.onSiteAt && (
+                            <>
+                              <p className="text-xs text-slate-500 mt-1">
+                                {format(new Date(workOrder.onSiteAt), "MMM d, h:mm a")}
+                              </p>
+                              {workOrder.completedAt && (
+                                <button
+                                  onClick={() => openDurationEdit("onsite_to_completed")}
+                                  className="text-xs text-emerald-600 mt-1 hover:text-emerald-800 hover:underline flex items-center gap-1 mx-auto"
+                                >
+                                  Duration: {formatDuration(new Date(workOrder.onSiteAt), new Date(workOrder.completedAt))}
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Completed */}
+                      <div className="relative z-10 flex flex-col items-center text-center w-1/4">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          workOrder.completedAt ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-400'
+                        }`}>
+                          {workOrder.completedAt ? <CheckCircle className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+                        </div>
+                        <div className="mt-3">
+                          <p className="font-medium text-sm text-slate-900">Completed</p>
+                          {workOrder.completedAt && (
+                            <p className="text-xs text-slate-500 mt-1">
+                              {format(new Date(workOrder.completedAt), "MMM d, h:mm a")}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Total Duration Summary */}
+                    {workOrder.dispatchedAt && workOrder.completedAt && (
+                      <div className="mt-8 pt-6 border-t">
+                        <div className="flex items-center justify-center gap-2 text-center">
+                          <Clock className="h-5 w-5 text-[#711419]" />
+                          <span className="text-lg font-semibold text-slate-900">
+                            Total Time: {formatDuration(new Date(workOrder.dispatchedAt), new Date(workOrder.completedAt))}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
         </Tabs>
 
         <Dialog open={createQuoteDialogOpen} onOpenChange={setCreateQuoteDialogOpen}>
@@ -2124,6 +2526,113 @@ export default function CrmWorkOrderDetail() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <Dialog open={!!editingTimestamp} onOpenChange={(open) => !open && setEditingTimestamp(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Dispatched Time</DialogTitle>
+              <DialogDescription>
+                Adjust when this work order was dispatched
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {editDate ? format(editDate, "PPP") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={editDate}
+                      onSelect={setEditDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2">
+                <Label>Time</Label>
+                <Input
+                  type="time"
+                  value={editTime}
+                  onChange={(e) => setEditTime(e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingTimestamp(null)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveTimestamp}
+                disabled={updateWorkOrderMutation.isPending || !editDate || !editTime}
+              >
+                {updateWorkOrderMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!editingDuration} onOpenChange={(open) => !open && setEditingDuration(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Duration</DialogTitle>
+              <DialogDescription>
+                {editingDuration === "dispatched_to_enroute" ? "Time from dispatched to traveling" :
+                  editingDuration === "enroute_to_onsite" ? "Travel time to job site" :
+                  "Time spent working on site"}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="flex gap-4">
+                <div className="flex-1 space-y-2">
+                  <Label>Hours</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="23"
+                    value={editHours}
+                    onChange={(e) => setEditHours(Math.max(0, parseInt(e.target.value) || 0))}
+                  />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <Label>Minutes</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={editMinutes}
+                    onChange={(e) => setEditMinutes(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                  />
+                </div>
+              </div>
+              {getPreviewTimestamp() && (
+                <div className="p-3 bg-slate-100 rounded-md">
+                  <p className="text-sm text-slate-600">
+                    <span className="font-medium">New end time: </span>
+                    {format(getPreviewTimestamp()!, "MMM d, h:mm a")}
+                  </p>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingDuration(null)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveDuration}
+                disabled={updateWorkOrderMutation.isPending}
+              >
+                {updateWorkOrderMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </CrmLayout>
   );

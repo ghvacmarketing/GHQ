@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
@@ -132,6 +133,7 @@ function formatCurrencyFull(value: number): string {
 }
 
 export default function CrmBusinessDashboard() {
+  usePageTitle("Business Dashboard");
   const [, navigate] = useLocation();
   const [timeRange, setTimeRange] = useState<TimeRange>("month");
 

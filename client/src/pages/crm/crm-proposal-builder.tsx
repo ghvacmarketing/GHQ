@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Sparkles, Download, Save, X, MapPin, Cog, Shield, Plus, FileEdit } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Sparkles, Download, Save, X, MapPin, Cog, Shield, Plus, FileEdit, Pencil } from "lucide-react";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, Table, TableRow, TableCell, WidthType } from "docx";
 import { saveAs } from "file-saver";
 import { jsPDF } from "jspdf";
@@ -725,6 +726,7 @@ function loadCustomerFromStorage(): { name: string; address: string; notes: stri
 }
 
 export default function CrmProposalBuilder() {
+  usePageTitle("Proposal Builder");
   const { toast } = useToast();
   
   const { data: currentUser, isLoading: isLoadingUser } = useQuery<CrmUser>({
@@ -790,10 +792,16 @@ export default function CrmProposalBuilder() {
   // Pre-loaded entity IDs from URL parameters
   const [preloadedProjectId, setPreloadedProjectId] = useState<string | null>(null);
   const [preloadedWorkOrderId, setPreloadedWorkOrderId] = useState<string | null>(null);
+  
+  // Edit dialogs for financing and warranties
+  const [editFinancingOpen, setEditFinancingOpen] = useState(false);
+  const [editFinancingText, setEditFinancingText] = useState("");
+  const [editWarrantiesOpen, setEditWarrantiesOpen] = useState(false);
+  const [editWarrantiesText, setEditWarrantiesText] = useState("");
   const [preloadedPropertyId, setPreloadedPropertyId] = useState<string | null>(null);
   
   // Customer properties for site selection
-  const [customerProperties, setCustomerProperties] = useState<Array<{ id: string; address: string; city?: string; state?: string }>>([]);
+  const [customerProperties, setCustomerProperties] = useState<Array<{ id: string; address1: string; address2?: string; city: string; state: string; zip: string }>>([]);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [isLoadingProperties, setIsLoadingProperties] = useState(false);
   
@@ -1200,12 +1208,18 @@ export default function CrmProposalBuilder() {
         if (item.coilImageUrl) equipmentImages.coil = `/assets/${item.coilImageUrl}`;
         if (item.furnaceImageUrl) equipmentImages.furnace = `/assets/${item.furnaceImageUrl}`;
         
+        // For options mode, create unique option tags that include tonnage to distinguish multiple systems
+        // e.g., "Best - 2.5 Ton" instead of just "Best" when there are multiple systems
+        const uniqueOptionTag = quoteMode === "options" 
+          ? `${item.packageLevel} - ${item.extractedTonnage}` 
+          : undefined;
+        
         lineItems.push({
           description: `${item.packageLevel} Package - ${item.extractedTonnage} - ${item.outdoorBrand} ${item.outdoorName}`,
           quantity: item.quantity,
           unitPrice: price,
           taxable: true,
-          optionTag: quoteMode === "options" ? item.packageLevel : undefined,
+          optionTag: uniqueOptionTag,
           imageUrl: Object.keys(equipmentImages).length > 0 ? JSON.stringify(equipmentImages) : undefined,
         });
       } else if (isCrawlspaceItem(item)) {
@@ -5090,7 +5104,7 @@ export default function CrmProposalBuilder() {
                     <option value="">-- Select a property --</option>
                     {customerProperties.map((prop) => (
                       <option key={prop.id} value={prop.id}>
-                        {prop.address}{prop.city ? `, ${prop.city}` : ''}{prop.state ? `, ${prop.state}` : ''}
+                        {prop.address1}{prop.address2 ? ` ${prop.address2}` : ''}, {prop.city}, {prop.state} {prop.zip}
                       </option>
                     ))}
                   </select>
@@ -5105,7 +5119,7 @@ export default function CrmProposalBuilder() {
               {selectedCustomer && customerProperties.length === 1 && (
                 <div className="mt-2 text-sm text-muted-foreground flex items-center gap-2">
                   <MapPin className="h-3 w-3" />
-                  {customerProperties[0].address}
+                  {customerProperties[0].address1}, {customerProperties[0].city}, {customerProperties[0].state} {customerProperties[0].zip}
                 </div>
               )}
               
@@ -5587,22 +5601,59 @@ export default function CrmProposalBuilder() {
                     </p>
                   )}
                   
-                  {/* Financing text */}
-                  {aiGeneratedQuote.financing_text && (
-                    <p className="text-sm text-muted-foreground mb-4">
-                      {aiGeneratedQuote.financing_text}
-                    </p>
+                  {/* Financing text - Editable */}
+                  {aiGeneratedQuote.financing_text !== undefined && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs font-semibold text-muted-foreground">ESTIMATED PAYMENT</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs"
+                          data-testid="button-edit-financing"
+                          onClick={() => {
+                            setEditFinancingText(aiGeneratedQuote.financing_text || "");
+                            setEditFinancingOpen(true);
+                          }}
+                        >
+                          <Pencil className="h-3 w-3 mr-1" />
+                          Edit
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {aiGeneratedQuote.financing_text || "(No financing text)"}
+                      </p>
+                    </div>
                   )}
                   
-                  {/* Warranties & Terms */}
-                  {aiGeneratedQuote.warranties_and_terms && aiGeneratedQuote.warranties_and_terms.length > 0 && (
+                  {/* Warranties & Terms - Editable */}
+                  {aiGeneratedQuote.warranties_and_terms && (
                     <div className="pt-3 border-t">
-                      <p className="text-xs font-semibold text-muted-foreground mb-2">WARRANTIES & TERMS</p>
-                      <ul className="text-xs text-muted-foreground space-y-1">
-                        {aiGeneratedQuote.warranties_and_terms.map((term, idx) => (
-                          <li key={idx}>• {term}</li>
-                        ))}
-                      </ul>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-muted-foreground">WARRANTIES & TERMS</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs"
+                          data-testid="button-edit-warranties"
+                          onClick={() => {
+                            setEditWarrantiesText(aiGeneratedQuote.warranties_and_terms?.join("\n") || "");
+                            setEditWarrantiesOpen(true);
+                          }}
+                        >
+                          <Pencil className="h-3 w-3 mr-1" />
+                          Edit
+                        </Button>
+                      </div>
+                      {aiGeneratedQuote.warranties_and_terms.length > 0 ? (
+                        <ul className="text-xs text-muted-foreground space-y-1">
+                          {aiGeneratedQuote.warranties_and_terms.map((term, idx) => (
+                            <li key={idx}>• {term}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">(No terms added)</p>
+                      )}
                     </div>
                   )}
                   
@@ -5787,6 +5838,76 @@ export default function CrmProposalBuilder() {
               >
                 <Download className="h-4 w-4 mr-2" />
                 Download PDF
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Edit Financing Text Dialog */}
+      <Dialog open={editFinancingOpen} onOpenChange={setEditFinancingOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Financing Text</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Textarea
+              value={editFinancingText}
+              onChange={(e) => setEditFinancingText(e.target.value)}
+              placeholder="Enter financing payment information..."
+              className="min-h-[100px]"
+              data-testid="input-financing-text"
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditFinancingOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (aiGeneratedQuote) {
+                    setAiGeneratedQuote({ ...aiGeneratedQuote, financing_text: editFinancingText });
+                  }
+                  setEditFinancingOpen(false);
+                }}
+                data-testid="button-save-financing"
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Edit Warranties & Terms Dialog */}
+      <Dialog open={editWarrantiesOpen} onOpenChange={setEditWarrantiesOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Warranties & Terms</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">Enter each warranty or term on a separate line:</p>
+            <Textarea
+              value={editWarrantiesText}
+              onChange={(e) => setEditWarrantiesText(e.target.value)}
+              placeholder="Equipment warranties are per manufacturer terms...&#10;Standard installation includes start-up...&#10;Any required permits may affect scope..."
+              className="min-h-[200px]"
+              data-testid="input-warranties-text"
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditWarrantiesOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (aiGeneratedQuote) {
+                    const termsArray = editWarrantiesText.split("\n").filter(t => t.trim());
+                    setAiGeneratedQuote({ ...aiGeneratedQuote, warranties_and_terms: termsArray });
+                  }
+                  setEditWarrantiesOpen(false);
+                }}
+                data-testid="button-save-warranties"
+              >
+                Save
               </Button>
             </div>
           </div>

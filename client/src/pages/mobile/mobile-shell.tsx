@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ClipboardList, Wrench, Clock, User, Monitor, ShieldX } from "lucide-react";
+import { ClipboardList, Wrench, Clock, User, Monitor, ShieldX, MessageSquare, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import type { CrmUser } from "@shared/schema";
 import { Button } from "@/components/ui/button";
@@ -12,13 +12,15 @@ interface MobileShellProps {
 const navTabs = [
   { path: "/mobile", label: "Agenda", icon: ClipboardList },
   { path: "/mobile/job", label: "Job", icon: Wrench },
+  { path: "/mobile/customers", label: "Customers", icon: Users },
+  { path: "/mobile/messages", label: "Messages", icon: MessageSquare },
   { path: "/mobile/time", label: "Time", icon: Clock },
   { path: "/mobile/profile", label: "Profile", icon: User },
 ];
 
-// Roles that can access mobile app: owner, sales, tech
+// Roles that can access mobile app: owner, supervisor, sales, tech
 // Admin role is desktop-only
-const MOBILE_ALLOWED_ROLES = ["owner", "sales", "tech"];
+const MOBILE_ALLOWED_ROLES = ["owner", "supervisor", "sales", "tech"];
 
 export default function MobileShell({ children }: MobileShellProps) {
   const [location] = useLocation();

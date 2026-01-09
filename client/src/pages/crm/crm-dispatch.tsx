@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { cn } from "@/lib/utils";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -141,6 +142,10 @@ const queueStageLabels: Record<DispatchQueueStage, string> = {
   NeedsApproval: "Needs Approval",
   OnHold: "On Hold",
   CallbackPriority: "Callback/Priority",
+  PartsNeeded: "Parts Needed",
+  PartsOrdered: "Parts Ordered",
+  PartsArrived: "Parts Arrived",
+  Scheduled: "Scheduled",
 };
 
 const queueStageColors: Record<DispatchQueueStage, { bg: string; border: string; text: string; badge: string }> = {
@@ -150,6 +155,10 @@ const queueStageColors: Record<DispatchQueueStage, { bg: string; border: string;
   NeedsApproval: { bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-700", badge: "bg-purple-500" },
   OnHold: { bg: "bg-gray-50", border: "border-gray-300", text: "text-gray-700", badge: "bg-gray-500" },
   CallbackPriority: { bg: "bg-red-50", border: "border-red-200", text: "text-red-700", badge: "bg-red-500" },
+  PartsNeeded: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700", badge: "bg-orange-500" },
+  PartsOrdered: { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700", badge: "bg-yellow-500" },
+  PartsArrived: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700", badge: "bg-green-500" },
+  Scheduled: { bg: "bg-cyan-50", border: "border-cyan-200", text: "text-cyan-700", badge: "bg-cyan-500" },
 };
 
 import {
@@ -318,8 +327,8 @@ function getJobTypeColor(jobType: string | null | undefined): { bg: string; bord
 const statusLabels: Record<string, string> = {
   scheduled: "Scheduled",
   dispatched: "Dispatched",
-  en_route: "En Route",
-  on_site: "On Site",
+  en_route: "Traveling",
+  on_site: "Working",
   completed: "Completed",
   cancelled: "Cancelled",
 };
@@ -638,6 +647,9 @@ function QueueCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm text-slate-900 truncate">{workOrder.customerName}</p>
+          {workOrder.propertyAddress && (
+            <p className="text-xs text-slate-500 truncate">{workOrder.propertyAddress}</p>
+          )}
         </div>
         {workOrder.priority && workOrder.priority !== "normal" && (
           <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${priorityStyle.bg} ${priorityStyle.text}`}>
@@ -1097,9 +1109,9 @@ function DraggableScheduleCard({
       
       <div className="flex items-center gap-1.5">
         {workOrder.status === "completed" && <CheckSquare className="h-3 w-3 flex-shrink-0 text-green-600" />}
-        <p className="text-xs font-medium truncate">{workOrder.title || workOrder.description || workOrder.customerName}</p>
+        <p className="text-xs font-medium truncate">{workOrder.customerName}</p>
       </div>
-      <p className="text-[10px] text-slate-600 truncate">{workOrder.customerName}</p>
+      <p className="text-[10px] text-slate-600 truncate">{workOrder.propertyAddress || "No address"}</p>
     </div>
   );
 }
@@ -1242,23 +1254,31 @@ function UnassignedQueueSection({
       NeedsApproval: [],
       OnHold: [],
       CallbackPriority: [],
+      PartsNeeded: [],
+      PartsOrdered: [],
+      PartsArrived: [],
+      Scheduled: [],
     };
     
     filteredWorkOrders.forEach(wo => {
       const stage = getEffectiveQueueStage(wo);
-      groups[stage].push(wo);
+      if (groups[stage]) {
+        groups[stage].push(wo);
+      } else {
+        // Fallback to NeedsScheduling if stage is unknown
+        groups.NeedsScheduling.push(wo);
+      }
     });
     
     return groups;
   }, [filteredWorkOrders]);
 
   const stageOrder: DispatchQueueStage[] = [
-    "CallbackPriority",
-    "ReadyToDispatch",
-    "NeedsScheduling",
     "WaitingOnParts",
     "NeedsApproval",
     "OnHold",
+    "CallbackPriority",
+    "ReadyToDispatch",
   ];
 
   return (
@@ -1417,6 +1437,15 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
       style={style}
       data-testid={`workorder-card-${workOrder.id}`}
     >
+      {workOrder.isPending && (
+        <div 
+          className="absolute top-0.5 left-3 w-5 h-5 rounded-full bg-red-600 flex items-center justify-center z-10"
+          data-testid={`pending-icon-${workOrder.id}`}
+          title="Waiting"
+        >
+          <Clock className="h-3 w-3 text-white" />
+        </div>
+      )}
       {workOrder.priority && workOrder.priority !== "normal" && (
         <div 
           className={`absolute top-0.5 right-1 px-1 py-0 text-[9px] font-bold rounded ${priorityStyle.bg} ${priorityStyle.text}`}
@@ -1454,7 +1483,7 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
         }}
       >
         <div className="flex items-center gap-1">
-          <p className="text-xs font-medium truncate flex-1">{workOrder.title || workOrder.description || workOrder.customerName}</p>
+          <p className={`text-xs font-medium truncate flex-1 ${workOrder.isPending ? 'ml-5' : ''}`}>{workOrder.customerName}</p>
           {workOrder.status !== "scheduled" && (
             <span 
               className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm ${
@@ -1470,7 +1499,7 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
             </span>
           )}
         </div>
-        <p className="text-xs truncate opacity-70">{workOrder.customerName}</p>
+        <p className={`text-xs truncate opacity-70 ${workOrder.isPending ? 'ml-5' : ''}`}>{workOrder.propertyAddress || "No address"}</p>
       </div>
     </div>
   );
@@ -1490,6 +1519,14 @@ function WorkOrderCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
       className={`rounded border-l-4 ${jobColors.bg} ${jobColors.border} ${jobColors.text} ${statusStripe} px-3 py-1 shadow-md cursor-grabbing flex flex-col justify-center relative ${isCompletedStatus ? 'opacity-60' : ''}`}
       style={{ width: `${widthPx}px`, height: '48px' }}
     >
+      {workOrder.isPending && (
+        <div 
+          className="absolute top-0.5 left-3 w-5 h-5 rounded-full bg-red-600 flex items-center justify-center z-10"
+          title="Waiting"
+        >
+          <Clock className="h-3 w-3 text-white" />
+        </div>
+      )}
       {workOrder.priority && workOrder.priority !== "normal" && (
         <div 
           className={`absolute top-0.5 right-1 px-1 py-0 text-[9px] font-bold rounded ${priorityStyle.bg} ${priorityStyle.text}`}
@@ -1498,7 +1535,7 @@ function WorkOrderCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
         </div>
       )}
       <div className="flex items-center gap-1">
-        <p className="text-xs font-medium truncate flex-1">{workOrder.title || workOrder.description || workOrder.customerName}</p>
+        <p className={`text-xs font-medium truncate flex-1 ${workOrder.isPending ? 'ml-5' : ''}`}>{workOrder.customerName}</p>
         {workOrder.status !== "scheduled" && (
           <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm ${
             workOrder.status === 'dispatched' ? 'bg-purple-600 text-white' :
@@ -1511,7 +1548,7 @@ function WorkOrderCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
           </span>
         )}
       </div>
-      <p className="text-xs truncate opacity-70">{workOrder.customerName}</p>
+      <p className={`text-xs truncate opacity-70 ${workOrder.isPending ? 'ml-5' : ''}`}>{workOrder.propertyAddress || "No address"}</p>
     </div>
   );
 }
@@ -1597,7 +1634,7 @@ function MobileWorkOrderCard({ workOrder, technician, onClick }: { workOrder: Di
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <p className={`font-semibold text-sm ${jobColors.text}`}>{workOrder.customerName}</p>
-            <p className={`text-xs ${jobColors.text} opacity-80`}>{workOrder.jobType} #{workOrder.workOrderNumber}</p>
+            <p className={`text-xs ${jobColors.text} opacity-80`}>{workOrder.propertyAddress || "No address"}</p>
           </div>
           <Badge 
             className={`text-xs font-bold ${workOrder.priority && workOrder.priority !== "normal" ? 'mr-12' : ''} ${
@@ -1635,11 +1672,16 @@ interface DispatchData {
 }
 
 function enrichWorkOrder(wo: any): DispatchWorkOrder {
+  const property = wo.property;
+  const propertyAddress = property
+    ? [property.address1, property.city, property.state].filter(Boolean).join(", ")
+    : wo.customer?.address1 || null;
+  
   return {
     ...wo,
     customerName: wo.customer?.name || "Unknown Customer",
     customerPhone: wo.customer?.phone || null,
-    propertyAddress: wo.customer?.address1 || null,
+    propertyAddress,
     jobType: wo.job?.jobType || "Service",
     priority: wo.job?.priority || "normal",
     description: wo.job?.description || null,
@@ -1680,6 +1722,7 @@ function formatWeekRange(dates: Date[]): string {
 }
 
 export default function CrmDispatch() {
+  usePageTitle("Dispatch Board");
   const [, navigate] = useLocation();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("day");
@@ -1693,6 +1736,8 @@ export default function CrmDispatch() {
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [newNote, setNewNote] = useState("");
+  const [dispatchNote, setDispatchNote] = useState("");
+  const [workOrderDescription, setWorkOrderDescription] = useState("");
   const { toast } = useToast();
   
   const weekDates = useMemo(() => getWeekDates(selectedDate), [selectedDate]);
@@ -1736,16 +1781,21 @@ export default function CrmDispatch() {
   const [showChecklist, setShowChecklist] = useState(true);
   const [checklistLoading, setChecklistLoading] = useState(false);
   const [checklistId, setChecklistId] = useState<string | null>(null);
+  
+  // Track source quote ID when creating follow-up work order from quote acceptance
+  const [sourceQuoteId, setSourceQuoteId] = useState<string | null>(null);
 
   const debouncedCustomerSearch = useDebounce(customerSearch, 300);
   
   const selectedWorkOrder = selectedWorkOrderId ? localWorkOrders.find(wo => wo.id === selectedWorkOrderId) : null;
 
   const handleWorkOrderClick = useCallback((workOrderId: string) => {
+    const wo = localWorkOrders.find(w => w.id === workOrderId);
     setSelectedWorkOrderId(workOrderId);
     setIsSheetOpen(true);
     setNewNote("");
-  }, []);
+    setWorkOrderDescription(wo?.description || "");
+  }, [localWorkOrders]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -1813,6 +1863,49 @@ export default function CrmDispatch() {
 
   const projects = projectsResponse?.projects || [];
 
+  // Query for active maintenance agreements when customer is selected
+  interface ActiveAgreement {
+    id: string;
+    agreementNumber: string | null;
+    agreementPlan: string | null;
+    agreementType: string | null;
+    status: string;
+    numberOfSystems: number | null;
+    agreementValue: string | null;
+    displayPrice: string;
+    frequency: string | null;
+    visitsPerPeriod: number | null;
+    nextServiceDate: string | null;
+    nextInvoiceDate: string | null;
+    billingPreference: "auto_invoice" | "pay_on_visit" | null;
+    autoRenew: boolean | null;
+    contractDate: string | null;
+    endDate: string | null;
+    isInitialCycle: boolean | null;
+    notes: string | null;
+    displayName: string;
+    visitProgress: {
+      completed: number;
+      scheduled: number;
+      total: number;
+      remaining: number;
+      lastVisitDate: string | null;
+    };
+  }
+
+  const { data: activeAgreements = [], isLoading: agreementsLoading } = useQuery<ActiveAgreement[]>({
+    queryKey: ["/api/crm/customers", selectedCustomer?.id, "active-agreements"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${selectedCustomer!.id}/active-agreements`, {
+        credentials: "include",
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : (data.agreements ?? []);
+    },
+    enabled: !!selectedCustomer?.id && createDialogOpen,
+  });
+
   // Query to fetch work order subtypes dynamically
   const { data: workOrderSubtypes = [] } = useQuery<WorkOrderSubtype[]>({
     queryKey: ["/api/crm/work-order-subtypes", { activeOnly: "true" }],
@@ -1820,7 +1913,9 @@ export default function CrmDispatch() {
       const res = await fetch("/api/crm/work-order-subtypes?activeOnly=true", {
         credentials: "include",
       });
-      return res.json();
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
     },
     enabled: !!currentUser,
   });
@@ -1842,6 +1937,32 @@ export default function CrmDispatch() {
     enabled: !!currentUser,
     refetchInterval: 10000,
   });
+
+  // Time breakdown data for the selected date
+  interface TimeBreakdown {
+    technicianId: string;
+    technicianName: string;
+    role: string;
+    totalClockedMinutes: number;
+    driveTimeMinutes: number;
+    workTimeMinutes: number;
+    idleTimeMinutes: number;
+    workOrdersCompleted: number;
+  }
+  interface TimeBreakdownResponse {
+    breakdowns: TimeBreakdown[];
+  }
+  const { data: timeBreakdownData } = useQuery<TimeBreakdownResponse>({
+    queryKey: ["/api/crm/time-breakdown", dateString],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/time-breakdown?startDate=${dateString}&endDate=${dateString}`, { credentials: "include" });
+      if (!res.ok) return { breakdowns: [] };
+      return res.json();
+    },
+    enabled: !!currentUser,
+    staleTime: 60000,
+  });
+  const [showTimeBreakdown, setShowTimeBreakdown] = useState(false);
 
   useEffect(() => {
     if (workOrdersData) {
@@ -1907,7 +2028,6 @@ export default function CrmDispatch() {
     setWoTitle("");
     setWoDescription("");
     setVisitType("SERVICE");
-    setWorkCategory("Service");
     setWorkSubtype("Other");
     setScheduledDate(selectedDate);
     setStartTime("08:00");
@@ -1921,7 +2041,55 @@ export default function CrmDispatch() {
     setChecklistAnswers({});
     setShowChecklist(true);
     setChecklistId(null);
+    // Reset source quote ID
+    setSourceQuoteId(null);
   };
+
+  // Auto-open work order creation dialog when URL params are present (from quote acceptance flow)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const createWO = params.get("createWO");
+    const customerId = params.get("customerId");
+    const propertyId = params.get("propertyId");
+    const projectId = params.get("projectId");
+    const quoteId = params.get("sourceQuoteId");
+    const title = params.get("title");
+    const description = params.get("description");
+
+    if (createWO === "true" && customerId) {
+      // Fetch the customer by ID and set up the form
+      const fetchCustomerAndOpenDialog = async () => {
+        try {
+          const res = await fetch(`/api/crm/customers/${customerId}`, {
+            credentials: "include",
+          });
+          if (res.ok) {
+            const customer = await res.json();
+            const customerWithInfo: CustomerWithInfo = {
+              id: customer.id,
+              name: customer.name,
+              customerType: customer.customerType || "residential",
+              fullAddress: customer.fullAddress || null,
+            };
+            setSelectedCustomer(customerWithInfo);
+            setSelectedPropertyId(propertyId || "");
+            setSelectedProjectId(projectId || "");
+            setWoTitle(title ? decodeURIComponent(title) : "");
+            setWoDescription(description ? decodeURIComponent(description) : "");
+            setSourceQuoteId(quoteId || null);
+            setCreateDialogOpen(true);
+
+            // Clear URL params after reading
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState({}, "", cleanUrl);
+          }
+        } catch (error) {
+          console.error("Failed to fetch customer for work order creation:", error);
+        }
+      };
+      fetchCustomerAndOpenDialog();
+    }
+  }, []);
 
   // Fetch checklist questions when SERVICE is selected and workSubtype changes
   useEffect(() => {
@@ -2071,6 +2239,7 @@ export default function CrmDispatch() {
         customerId: selectedCustomer.id,
         propertyId: selectedPropertyId || null,
         projectId: selectedProjectId || null,
+        sourceQuoteId: sourceQuoteId || null,
         title: woTitle.trim(),
         description: finalDescription,
         visitType,
@@ -2115,7 +2284,7 @@ export default function CrmDispatch() {
       setCreateDialogOpen(false);
       resetCreateForm();
     },
-    onError: (error: Error & { error?: string; conflictingOrder?: { title?: string; scheduledStart?: string } }) => {
+    onError: (error: Error & { error?: string; details?: string; conflictingOrder?: { title?: string; scheduledStart?: string } }) => {
       // Handle scheduling conflict errors specifically
       if (error?.error === 'SCHEDULING_CONFLICT' || error?.message === 'Scheduling conflict') {
         const conflictInfo = error?.conflictingOrder;
@@ -2125,6 +2294,12 @@ export default function CrmDispatch() {
         toast({ 
           title: "Scheduling Conflict",
           description: `This technician already has "${conflictInfo?.title || 'a work order'}" scheduled at ${startTime}. You cannot schedule overlapping appointments.`,
+          variant: "destructive" 
+        });
+      } else if (error?.error === 'NO_MAINTENANCE_AGREEMENT') {
+        toast({ 
+          title: "No Maintenance Agreement",
+          description: error?.details || "This property does not have an active maintenance agreement. Please create one first or select a different visit type.",
           variant: "destructive" 
         });
       } else {
@@ -2199,6 +2374,43 @@ export default function CrmDispatch() {
       }
     });
   }, [selectedWorkOrderId, newNote, localWorkOrders, updateWorkOrderMutation, toast]);
+
+  const handleSaveDispatchNotes = useCallback(() => {
+    if (!selectedWorkOrderId || !dispatchNote.trim()) return;
+    const currentWO = localWorkOrders.find(wo => wo.id === selectedWorkOrderId);
+    const updatedNotes = currentWO?.dispatchNotes 
+      ? `${currentWO.dispatchNotes}\n\n---\n${new Date().toLocaleDateString()}: ${dispatchNote.trim()}`
+      : dispatchNote.trim();
+    
+    updateWorkOrderMutation.mutate({
+      workOrderId: selectedWorkOrderId,
+      updates: { dispatchNotes: updatedNotes },
+    }, {
+      onSuccess: () => {
+        toast({ title: "Dispatch notes saved", description: "Notes for callback/reference have been updated" });
+        setLocalWorkOrders(prev => prev.map(wo => 
+          wo.id === selectedWorkOrderId ? { ...wo, dispatchNotes: updatedNotes } : wo
+        ));
+        setDispatchNote("");
+      }
+    });
+  }, [selectedWorkOrderId, dispatchNote, localWorkOrders, updateWorkOrderMutation, toast]);
+
+  const handleSaveWorkOrderDetails = useCallback(() => {
+    if (!selectedWorkOrderId) return;
+    
+    updateWorkOrderMutation.mutate({
+      workOrderId: selectedWorkOrderId,
+      updates: { description: workOrderDescription },
+    }, {
+      onSuccess: () => {
+        toast({ title: "Details saved", description: "Work order details have been updated" });
+        setLocalWorkOrders(prev => prev.map(wo => 
+          wo.id === selectedWorkOrderId ? { ...wo, description: workOrderDescription } : wo
+        ));
+      }
+    });
+  }, [selectedWorkOrderId, workOrderDescription, updateWorkOrderMutation, toast]);
 
   const handleQuickAssign = useCallback((workOrderId: string, techId: string) => {
     const newTech = technicians.find(t => t.id === techId);
@@ -2725,8 +2937,8 @@ export default function CrmDispatch() {
     all: "All",
     scheduled: "Scheduled",
     dispatched: "Dispatched",
-    en_route: "En Route",
-    on_site: "On Site",
+    en_route: "Traveling",
+    on_site: "Working",
     completed: "Completed"
   };
 
@@ -2885,11 +3097,11 @@ export default function CrmDispatch() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
-                        <span className="text-sm text-slate-700">En Route</span>
+                        <span className="text-sm text-slate-700">Traveling</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
-                        <span className="text-sm text-slate-700">On Site</span>
+                        <span className="text-sm text-slate-700">Working</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
@@ -2919,6 +3131,68 @@ export default function CrmDispatch() {
             </Button>
           </div>
           </div>
+
+          {/* Time Breakdown Summary Panel */}
+          <Collapsible open={showTimeBreakdown} onOpenChange={setShowTimeBreakdown}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full flex justify-between items-center py-2 px-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg" data-testid="toggle-time-breakdown">
+                <div className="flex items-center gap-2">
+                  <Timer className="h-4 w-4 text-slate-600" />
+                  <span className="font-medium text-slate-700">Time Breakdown</span>
+                  {timeBreakdownData?.breakdowns && timeBreakdownData.breakdowns.length > 0 && (
+                    <span className="text-xs text-slate-500">
+                      ({timeBreakdownData.breakdowns.length} techs clocked in)
+                    </span>
+                  )}
+                </div>
+                <ChevronDown className={cn("h-4 w-4 text-slate-500 transition-transform", showTimeBreakdown && "rotate-180")} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {timeBreakdownData?.breakdowns && timeBreakdownData.breakdowns.length > 0 ? (
+                  timeBreakdownData.breakdowns.map(tech => {
+                    const total = tech.totalClockedMinutes || 0;
+                    const idle = tech.idleTimeMinutes || 0;
+                    const drive = tech.driveTimeMinutes || 0;
+                    const work = tech.workTimeMinutes || 0;
+                    const idlePct = total > 0 ? Math.round((idle / total) * 100) : 0;
+                    const drivePct = total > 0 ? Math.round((drive / total) * 100) : 0;
+                    const workPct = total > 0 ? Math.round((work / total) * 100) : 0;
+                    const formatMins = (mins: number) => {
+                      const m = mins || 0;
+                      const h = Math.floor(m / 60);
+                      const remainder = m % 60;
+                      return h > 0 ? `${h}h ${remainder}m` : `${remainder}m`;
+                    };
+                    return (
+                      <Card key={tech.technicianId} className="p-3 bg-white" data-testid={`time-card-${tech.technicianId}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium text-sm text-slate-800 truncate">{tech.technicianName}</span>
+                          <span className="text-xs text-slate-500">{formatMins(total)}</span>
+                        </div>
+                        {/* Stacked Progress Bar */}
+                        <div className="w-full h-3 rounded-full overflow-hidden flex bg-slate-100">
+                          {idlePct > 0 && <div className="bg-gray-400" style={{ width: `${idlePct}%` }} title={`Idle: ${formatMins(idle)}`} />}
+                          {drivePct > 0 && <div className="bg-blue-500" style={{ width: `${drivePct}%` }} title={`Drive: ${formatMins(drive)}`} />}
+                          {workPct > 0 && <div className="bg-green-500" style={{ width: `${workPct}%` }} title={`Work: ${formatMins(work)}`} />}
+                        </div>
+                        <div className="flex justify-between mt-2 text-xs text-slate-500">
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-400" />Idle {idlePct}%</span>
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" />Drive {drivePct}%</span>
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" />Work {workPct}%</span>
+                        </div>
+                      </Card>
+                    );
+                  })
+                ) : (
+                  <div className="col-span-full text-center py-4 text-sm text-slate-500">
+                    No technicians clocked in for this date
+                  </div>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
 
         {/* Main Content Area - Scrollable Schedule + Fixed Queue */}
@@ -3062,12 +3336,19 @@ export default function CrmDispatch() {
                     
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-500">Status</span>
-                      <Badge 
-                        className={`${statusColors[selectedWorkOrder.status]?.bg} ${statusColors[selectedWorkOrder.status]?.text} ${statusColors[selectedWorkOrder.status]?.border} border`}
-                        data-testid="badge-status"
-                      >
-                        {statusLabels[selectedWorkOrder.status] || selectedWorkOrder.status}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        {selectedWorkOrder.isPending && (
+                          <Badge className="bg-amber-100 text-amber-800 border border-amber-200">
+                            Waiting
+                          </Badge>
+                        )}
+                        <Badge 
+                          className={`${statusColors[selectedWorkOrder.status]?.bg} ${statusColors[selectedWorkOrder.status]?.text} ${statusColors[selectedWorkOrder.status]?.border} border`}
+                          data-testid="badge-status"
+                        >
+                          {statusLabels[selectedWorkOrder.status] || selectedWorkOrder.status}
+                        </Badge>
+                      </div>
                     </div>
                     
                     <div className="flex items-center justify-between">
@@ -3112,7 +3393,60 @@ export default function CrmDispatch() {
                 <Separator />
 
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-900">Work Order Summary</h3>
+                  <h3 className="text-sm font-semibold text-slate-900">Work Order Details</h3>
+                  <p className="text-xs text-slate-500">Description of the work to be performed.</p>
+                  <Textarea
+                    placeholder="Enter work order details..."
+                    value={workOrderDescription}
+                    onChange={(e) => setWorkOrderDescription(e.target.value)}
+                    className="min-h-[80px]"
+                    data-testid="textarea-work-order-details"
+                  />
+                  <Button 
+                    size="sm" 
+                    onClick={handleSaveWorkOrderDetails}
+                    disabled={updateWorkOrderMutation.isPending}
+                    data-testid="button-save-work-order-details"
+                  >
+                    Save Details
+                  </Button>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                    <Phone className="h-4 w-4" />
+                    Dispatch Notes
+                  </h3>
+                  <p className="text-xs text-slate-500">For client callbacks or technician reference. These notes will be visible to technicians in the mobile app.</p>
+                  {selectedWorkOrder.dispatchNotes && (
+                    <div className="bg-amber-50 border border-amber-200 rounded p-3 text-sm whitespace-pre-wrap" data-testid="dispatch-notes-display">
+                      {selectedWorkOrder.dispatchNotes}
+                    </div>
+                  )}
+                  <Textarea
+                    placeholder="Add dispatch notes (e.g., client called back, special instructions)..."
+                    value={dispatchNote}
+                    onChange={(e) => setDispatchNote(e.target.value)}
+                    className="min-h-[80px]"
+                    data-testid="textarea-dispatch-notes"
+                  />
+                  <Button 
+                    size="sm" 
+                    onClick={handleSaveDispatchNotes}
+                    disabled={!dispatchNote.trim() || updateWorkOrderMutation.isPending}
+                    data-testid="button-save-dispatch-notes"
+                  >
+                    Save Dispatch Notes
+                  </Button>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-slate-900">Technician Notes</h3>
+                  <p className="text-xs text-slate-500">Notes added by the technician during or after completion.</p>
                   {selectedWorkOrder.completionSummary && (
                     <div className="bg-green-50 border border-green-200 rounded p-3 text-sm" data-testid="completion-summary">
                       <div className="flex items-center gap-2 text-green-700 font-medium mb-1">
@@ -3149,6 +3483,16 @@ export default function CrmDispatch() {
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-slate-900">Actions</h3>
                   <div className="flex flex-wrap gap-2">
+                    <Link href={`/crm/work-orders/${selectedWorkOrder.id}`}>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        data-testid="button-view-full-details"
+                      >
+                        <FileText className="h-4 w-4 mr-1" />
+                        View Full Details
+                      </Button>
+                    </Link>
                     {selectedWorkOrder.assignedTechId && (
                       <Button
                         size="sm"
@@ -3217,14 +3561,14 @@ export default function CrmDispatch() {
                     <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0">
-                  <Command>
+                <PopoverContent className="w-[400px] p-0 z-[100]" sideOffset={4}>
+                  <Command shouldFilter={false}>
                     <CommandInput 
                       placeholder="Search customers..." 
                       value={customerSearch}
                       onValueChange={setCustomerSearch}
                     />
-                    <CommandList>
+                    <CommandList className="max-h-[300px]">
                       <CommandEmpty>
                         {customersLoading ? "Searching..." : "No customers found."}
                       </CommandEmpty>
@@ -3253,9 +3597,169 @@ export default function CrmDispatch() {
               </Popover>
             </div>
 
+            {/* Maintenance Agreement Info Display - Enhanced */}
+            {selectedCustomer && agreementsLoading && (
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
+                <span className="text-sm text-slate-600">Checking for maintenance agreements...</span>
+              </div>
+            )}
+            {selectedCustomer && !agreementsLoading && activeAgreements.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg overflow-hidden">
+                {activeAgreements.map((agreement) => (
+                  <div key={agreement.id} className="p-3">
+                    {/* Header with status badges */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-amber-600" />
+                        <span className="text-sm font-semibold text-amber-800">
+                          {agreement.status === "active" ? "Active" : 
+                           agreement.status === "pending" ? "Pending" : 
+                           agreement.status === "grace_period" ? "Grace Period" : ""} Maintenance Agreement
+                        </span>
+                        {agreement.status === "pending" && (
+                          <span className="text-[10px] bg-yellow-500 text-white px-2 py-0.5 rounded-full font-medium">
+                            Awaiting Payment
+                          </span>
+                        )}
+                        {agreement.status === "grace_period" && (
+                          <span className="text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full font-medium">
+                            Renewal Due
+                          </span>
+                        )}
+                      </div>
+                      {agreement.billingPreference === "pay_on_visit" && (
+                        <span className="text-[10px] bg-orange-500 text-white px-2 py-0.5 rounded-full font-medium">
+                          Pay on Visit
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Plan name and agreement number */}
+                    <div className="mb-3">
+                      <p className="font-semibold text-amber-900">{agreement.displayName}</p>
+                      {agreement.agreementNumber && (
+                        <p className="text-xs text-amber-600">{agreement.agreementNumber}</p>
+                      )}
+                    </div>
+
+                    {/* Two column layout */}
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      {/* Left column - Service Schedule */}
+                      <div className="space-y-1.5">
+                        <p className="font-semibold text-amber-800 text-[11px] uppercase tracking-wide">Service</p>
+                        
+                        {agreement.numberOfSystems && (
+                          <div className="flex justify-between">
+                            <span className="text-amber-600">Systems:</span>
+                            <span className="font-medium text-amber-800">{agreement.numberOfSystems}</span>
+                          </div>
+                        )}
+                        
+                        <div className="flex justify-between">
+                          <span className="text-amber-600">Visit Progress:</span>
+                          <span className="font-medium text-amber-800">
+                            {agreement.visitProgress.completed}/{agreement.visitProgress.total}
+                          </span>
+                        </div>
+                        
+                        {agreement.visitProgress.remaining > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-amber-600">Remaining:</span>
+                            <span className="font-medium text-amber-800">{agreement.visitProgress.remaining} visits</span>
+                          </div>
+                        )}
+                        
+                        {agreement.nextServiceDate && (
+                          <div className="flex justify-between">
+                            <span className="text-amber-600">Next Service:</span>
+                            <span className="font-medium text-amber-800">
+                              {new Date(agreement.nextServiceDate).toLocaleDateString()}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {agreement.visitProgress.lastVisitDate && (
+                          <div className="flex justify-between">
+                            <span className="text-amber-600">Last Visit:</span>
+                            <span className="font-medium text-amber-800">
+                              {new Date(agreement.visitProgress.lastVisitDate).toLocaleDateString()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right column - Billing & Terms */}
+                      <div className="space-y-1.5">
+                        <p className="font-semibold text-amber-800 text-[11px] uppercase tracking-wide">Billing</p>
+                        
+                        <div className="flex justify-between">
+                          <span className="text-amber-600">Value:</span>
+                          <span className="font-medium text-amber-800">${parseFloat(agreement.displayPrice).toFixed(2)}</span>
+                        </div>
+                        
+                        {agreement.frequency && (
+                          <div className="flex justify-between">
+                            <span className="text-amber-600">Frequency:</span>
+                            <span className="font-medium text-amber-800 capitalize">{agreement.frequency}</span>
+                          </div>
+                        )}
+                        
+                        <div className="flex justify-between">
+                          <span className="text-amber-600">Billing:</span>
+                          <span className="font-medium text-amber-800">
+                            {agreement.billingPreference === "pay_on_visit" ? "On Visit" : "Auto Invoice"}
+                          </span>
+                        </div>
+                        
+                        {agreement.autoRenew !== null && (
+                          <div className="flex justify-between">
+                            <span className="text-amber-600">Auto Renew:</span>
+                            <span className="font-medium text-amber-800">{agreement.autoRenew ? "Yes" : "No"}</span>
+                          </div>
+                        )}
+                        
+                        {agreement.endDate && (
+                          <div className="flex justify-between">
+                            <span className="text-amber-600">Expires:</span>
+                            <span className="font-medium text-amber-800">
+                              {new Date(agreement.endDate).toLocaleDateString()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Alerts section */}
+                    {agreement.billingPreference === "pay_on_visit" && agreement.visitProgress.completed === 0 && (
+                      <div className="mt-3 bg-orange-100 border border-orange-300 rounded p-2 text-xs text-orange-800">
+                        <span className="font-semibold">First Visit:</span> Collect ${parseFloat(agreement.displayPrice).toFixed(2)} payment on-site to activate agreement
+                      </div>
+                    )}
+                    
+                    {agreement.billingPreference === "pay_on_visit" && 
+                     agreement.visitProgress.remaining === 1 && 
+                     agreement.visitProgress.completed > 0 && (
+                      <div className="mt-3 bg-blue-100 border border-blue-300 rounded p-2 text-xs text-blue-800">
+                        <span className="font-semibold">Renewal Visit:</span> Last visit of cycle - collect renewal payment
+                      </div>
+                    )}
+                    
+                    {/* Notes (collapsible) */}
+                    {agreement.notes && (
+                      <div className="mt-3 pt-2 border-t border-amber-200">
+                        <p className="text-[10px] text-amber-600 uppercase font-medium mb-1">Notes</p>
+                        <p className="text-xs text-amber-700">{agreement.notes}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
             {selectedCustomer && (
               <div className="space-y-2">
-                <Label>Property *</Label>
+                <Label>Location *</Label>
                 <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select property..." />

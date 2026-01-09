@@ -49,14 +49,15 @@ type PerformanceData = TechPerformance | SalesPerformance | { role: string; mess
 const statusConfig: Record<string, { label: string; className: string }> = {
   scheduled: { label: "Scheduled", className: "bg-slate-100 text-slate-700 border-slate-300" },
   dispatched: { label: "Dispatched", className: "bg-blue-100 text-blue-700 border-blue-300" },
-  en_route: { label: "En Route", className: "bg-yellow-100 text-yellow-700 border-yellow-300" },
-  on_site: { label: "On Site", className: "bg-green-100 text-green-700 border-green-300" },
+  en_route: { label: "Traveling", className: "bg-yellow-100 text-yellow-700 border-yellow-300" },
+  on_site: { label: "Working", className: "bg-green-100 text-green-700 border-green-300" },
   completed: { label: "Completed", className: "bg-slate-200 text-slate-600 border-slate-400" },
 };
 
 const roleLabels: Record<string, { label: string; className: string }> = {
   owner: { label: "Owner", className: "bg-purple-100 text-purple-700" },
   admin: { label: "Admin", className: "bg-blue-100 text-blue-700" },
+  supervisor: { label: "Supervisor", className: "bg-indigo-100 text-indigo-700" },
   sales: { label: "Sales", className: "bg-green-100 text-green-700" },
   tech: { label: "Technician", className: "bg-orange-100 text-orange-700" },
 };
@@ -450,6 +451,8 @@ export default function MobileAgenda() {
   const todayEnd = getLocalEndOfDay(today).toISOString();
   const { isOnline } = useOnlineStatus();
   const [isFromCache, setIsFromCache] = useState(false);
+  // Supervisors can toggle between viewing all techs or just their own work orders
+  const [supervisorViewAll, setSupervisorViewAll] = useState(true);
 
   const { data: currentUser, isLoading: isLoadingUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -462,15 +465,21 @@ export default function MobileAgenda() {
     gcTime: 24 * 60 * 60 * 1000,
   });
 
+  const isSupervisor = currentUser?.role === 'supervisor';
+  // Determine if we should filter by tech ID
+  const shouldFilterByTech = (currentUser?.role === 'tech' || currentUser?.role === 'sales') || 
+                              (isSupervisor && !supervisorViewAll);
+
   const { data: workOrders, isLoading: isLoadingOrders, error, isError } = useQuery<WorkOrderWithDetails[]>({
-    queryKey: ["/api/crm/work-orders", { dateFrom: todayStart, dateTo: todayEnd, techId: (currentUser?.role === 'tech' || currentUser?.role === 'sales') ? currentUser?.id : undefined }],
+    queryKey: ["/api/crm/work-orders", { dateFrom: todayStart, dateTo: todayEnd, techId: shouldFilterByTech ? currentUser?.id : undefined }],
     queryFn: async () => {
       const params = new URLSearchParams({
         dateFrom: todayStart,
         dateTo: todayEnd,
       });
-      // Both tech and sales users see only their assigned work orders on mobile
-      if ((currentUser?.role === 'tech' || currentUser?.role === 'sales') && currentUser?.id) {
+      // Tech and sales users see only their assigned work orders on mobile
+      // Supervisors can toggle between all or their own
+      if (shouldFilterByTech && currentUser?.id) {
         params.set('techId', currentUser.id);
       }
       const res = await fetch(`/api/crm/work-orders?${params}`);
@@ -511,6 +520,22 @@ export default function MobileAgenda() {
     refetchOnWindowFocus: true,
   });
 
+  // Fetch all technicians when supervisor is viewing all techs
+  const { data: technicians = [] } = useQuery<{ id: string; name: string; role: string }[]>({
+    queryKey: ["/api/crm/users", "technicians-for-agenda"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/users", { credentials: "include" });
+      if (!res.ok) return [];
+      const users = await res.json();
+      // Filter to tech, sales, supervisor roles that can have work orders assigned
+      return users.filter((u: CrmUser) => 
+        ['tech', 'sales', 'supervisor', 'owner', 'admin'].includes(u.role) && u.isActive
+      );
+    },
+    enabled: isSupervisor && supervisorViewAll,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const isLoading = isLoadingUser || isLoadingOrders;
 
   const isAuthError = isError && error instanceof Error && error.message === "AUTH_REQUIRED";
@@ -525,6 +550,45 @@ export default function MobileAgenda() {
     const bTime = b.scheduledStart ? new Date(b.scheduledStart).getTime() : Infinity;
     return aTime - bTime;
   });
+
+  // Group work orders by technician when supervisor views all techs
+  const groupedByTech = isSupervisor && supervisorViewAll 
+    ? todaysOrders.reduce((acc, wo) => {
+        const techId = wo.assignedTechId || 'unassigned';
+        if (!acc[techId]) {
+          acc[techId] = [];
+        }
+        acc[techId].push(wo);
+        return acc;
+      }, {} as Record<string, WorkOrderWithDetails[]>)
+    : null;
+
+  // Sort work orders within each tech group by scheduled start time
+  if (groupedByTech) {
+    Object.keys(groupedByTech).forEach((techId) => {
+      groupedByTech[techId].sort((a, b) => {
+        const aTime = a.scheduledStart ? new Date(a.scheduledStart).getTime() : Infinity;
+        const bTime = b.scheduledStart ? new Date(b.scheduledStart).getTime() : Infinity;
+        return aTime - bTime;
+      });
+    });
+  }
+
+  // Get tech name by ID
+  const getTechName = (techId: string): string => {
+    if (techId === 'unassigned') return 'Unassigned';
+    const tech = technicians.find(t => t.id === techId);
+    return tech?.name || 'Unknown';
+  };
+
+  // Sort technicians: those with work orders first, alphabetically within each group
+  const sortedTechIds = groupedByTech 
+    ? Object.keys(groupedByTech).sort((a, b) => {
+        if (a === 'unassigned') return 1;
+        if (b === 'unassigned') return -1;
+        return getTechName(a).localeCompare(getTechName(b));
+      })
+    : [];
 
   const showCacheWarning = !isOnline || isFromCache;
 
@@ -545,6 +609,35 @@ export default function MobileAgenda() {
           <p className="text-slate-500 dark:text-slate-400">
             {formatLocal(today, "MMMM d, yyyy")}
           </p>
+          
+          {isSupervisor && (
+            <div className="mt-3 flex items-center justify-center gap-2" data-testid="supervisor-view-toggle">
+              <button
+                onClick={() => setSupervisorViewAll(true)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-l-full transition-colors ${
+                  supervisorViewAll 
+                    ? "bg-[#711419] text-white" 
+                    : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-300"
+                }`}
+                data-testid="btn-view-all-techs"
+              >
+                <Users className="h-3 w-3 inline mr-1" />
+                All Techs
+              </button>
+              <button
+                onClick={() => setSupervisorViewAll(false)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-r-full transition-colors ${
+                  !supervisorViewAll 
+                    ? "bg-[#711419] text-white" 
+                    : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-300"
+                }`}
+                data-testid="btn-view-my-orders"
+              >
+                <User className="h-3 w-3 inline mr-1" />
+                My Jobs
+              </button>
+            </div>
+          )}
           
           {showCacheWarning && workOrders && workOrders.length > 0 && (
             <div 
@@ -587,7 +680,7 @@ export default function MobileAgenda() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
-                  Today's Jobs
+                  {isSupervisor && supervisorViewAll ? "All Technicians" : "Today's Jobs"}
                 </h3>
                 <Badge variant="secondary" className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold">
                   {todaysOrders.length}
@@ -600,7 +693,50 @@ export default function MobileAgenda() {
                 >
                   <ClipboardList className="h-10 w-10 text-slate-300 mb-2" />
                   <h3 className="text-sm font-medium text-slate-600 mb-1">No Jobs Today</h3>
-                  <p className="text-slate-400 text-xs">You have no work orders scheduled for today.</p>
+                  <p className="text-slate-400 text-xs">
+                    {isSupervisor && supervisorViewAll 
+                      ? "No work orders scheduled for any technician today." 
+                      : "You have no work orders scheduled for today."}
+                  </p>
+                </div>
+              ) : isSupervisor && supervisorViewAll && groupedByTech ? (
+                <div className="space-y-4" data-testid="agenda-grouped-list">
+                  {sortedTechIds.map((techId) => {
+                    const techOrders = groupedByTech[techId];
+                    const techName = getTechName(techId);
+                    const tech = technicians.find(t => t.id === techId);
+                    const roleConfig = tech ? roleLabels[tech.role] : null;
+                    
+                    return (
+                      <div key={techId} data-testid={`tech-section-${techId}`}>
+                        <div className="flex items-center gap-2 mb-2 px-1">
+                          <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+                            <User className="w-4 h-4 text-slate-500" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">{techName}</p>
+                            {roleConfig && (
+                              <Badge className={`text-xs ${roleConfig.className}`}>
+                                {roleConfig.label}
+                              </Badge>
+                            )}
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            {techOrders.length} job{techOrders.length !== 1 ? 's' : ''}
+                          </Badge>
+                        </div>
+                        <div className="space-y-2 ml-2 pl-4 border-l-2 border-slate-200 dark:border-slate-700">
+                          {techOrders.map((workOrder) => (
+                            <WorkOrderCard 
+                              key={workOrder.id} 
+                              workOrder={workOrder} 
+                              showCacheWarning={showCacheWarning} 
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="space-y-3" data-testid="agenda-list">

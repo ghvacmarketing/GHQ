@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -130,8 +131,8 @@ const workOrderStatusColors: Record<string, { bg: string; text: string; border: 
 const workOrderStatusLabels: Record<string, string> = {
   scheduled: "Scheduled",
   dispatched: "Dispatched",
-  en_route: "En Route",
-  on_site: "On Site",
+  en_route: "Traveling",
+  on_site: "Working",
   completed: "Completed",
   cancelled: "Cancelled",
 };
@@ -1328,6 +1329,7 @@ interface CustomerTabbedViewProps {
   toast: ReturnType<typeof useToast>['toast'];
   propertyDialogOpen: boolean;
   setPropertyDialogOpen: (open: boolean) => void;
+  onOpenAddPropertyDialog: () => void;
   onViewQuote: (quoteId: string) => void;
   onViewWorkOrder: (id: string) => void;
   onViewProject: (id: string) => void;
@@ -1360,6 +1362,7 @@ function CustomerTabbedView({
   toast,
   propertyDialogOpen,
   setPropertyDialogOpen,
+  onOpenAddPropertyDialog,
   onViewQuote,
   onViewWorkOrder,
   onViewProject,
@@ -1652,7 +1655,7 @@ function CustomerTabbedView({
                   variant="outline" 
                   size="sm"
                   className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
-                  onClick={() => setPropertyDialogOpen(true)}
+                  onClick={onOpenAddPropertyDialog}
                   data-testid="button-add-location-checklist"
                 >
                   <Plus className="h-4 w-4 mr-1" />
@@ -1719,7 +1722,7 @@ function CustomerTabbedView({
             <Button 
               size="sm"
               className="bg-[#711419] hover:bg-[#5a1014] text-white"
-              onClick={() => setPropertyDialogOpen(true)}
+              onClick={onOpenAddPropertyDialog}
               data-testid="button-add-location"
             >
               <Plus className="h-4 w-4 mr-1" />
@@ -1738,7 +1741,7 @@ function CustomerTabbedView({
                 <p className="text-slate-500 mb-4">No locations/properties added yet</p>
                 <Button 
                   className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                  onClick={() => setPropertyDialogOpen(true)}
+                  onClick={onOpenAddPropertyDialog}
                   data-testid="button-add-first-location"
                 >
                   <Plus className="h-4 w-4 mr-1" />
@@ -2239,6 +2242,7 @@ function CustomerTabbedView({
 }
 
 export default function CrmCustomerDetail() {
+  usePageTitle("Customer Detail");
   const [, navigate] = useLocation();
   const params = useParams<{ id: string }>();
   const customerId = params.id;
@@ -2441,6 +2445,7 @@ export default function CrmCustomerDetail() {
   const [propPaymentTerms, setPropPaymentTerms] = useState("");
   const [propPaymentMethod, setPropPaymentMethod] = useState("");
   const [propApprovalRule, setPropApprovalRule] = useState("");
+  const [propPropertyType, setPropPropertyType] = useState<"residential" | "commercial" | "">("");
 
   const resetPropertyForm = () => {
     setPropAddress1("");
@@ -2460,6 +2465,7 @@ export default function CrmCustomerDetail() {
     setPropPaymentTerms("");
     setPropPaymentMethod("");
     setPropApprovalRule("");
+    setPropPropertyType("");
     setEditingProperty(null);
   };
 
@@ -2468,12 +2474,22 @@ export default function CrmCustomerDetail() {
     resetPropertyForm();
   };
 
+  const handleOpenAddPropertyDialog = () => {
+    resetPropertyForm();
+    const customerType = customer?.customerType?.toLowerCase() || "";
+    if (customerType === "residential") {
+      setPropPropertyType("residential");
+    } else if (customerType === "commercial") {
+      setPropPropertyType("commercial");
+    }
+    setPropertyDialogOpen(true);
+  };
+
   const resetVisitForm = () => {
     setVisitJobId("");
     setVisitType("SERVICE");
     setVisitDate(new Date());
-    setVisitStartTime("08:00");
-    setVisitEndTime("10:00");
+    setStartTime("08:00");
     setVisitTechId("unassigned");
     setCreateNewJobForVisit(false);
     setNewJobTypeForVisit("SERVICE");
@@ -3696,6 +3712,34 @@ export default function CrmCustomerDetail() {
     },
   });
 
+  const togglePortalMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await fetch(`/api/crm/customers/${customerId}/portal-access`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ enabled }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to update portal access");
+      }
+      return res.json();
+    },
+    onSuccess: (_, enabled) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId] });
+      toast({
+        title: enabled ? "Portal Enabled" : "Portal Disabled",
+        description: enabled 
+          ? "Customer can now access the customer portal." 
+          : "Customer portal access has been disabled.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const openEditDialog = () => {
     if (customer) {
       setEditName(customer.name || "");
@@ -3786,6 +3830,7 @@ export default function CrmCustomerDetail() {
         paymentTerms: propBillingOverride ? (propPaymentTerms || null) : null,
         paymentMethod: propBillingOverride ? (propPaymentMethod || null) : null,
         approvalRule: propBillingOverride ? (propApprovalRule || null) : null,
+        propertyType: propPropertyType || null,
       });
       if (!res.ok) {
         const error = await res.json();
@@ -3830,6 +3875,7 @@ export default function CrmCustomerDetail() {
         paymentTerms: propBillingOverride ? (propPaymentTerms || null) : null,
         paymentMethod: propBillingOverride ? (propPaymentMethod || null) : null,
         approvalRule: propBillingOverride ? (propApprovalRule || null) : null,
+        propertyType: propPropertyType || null,
       });
       if (!res.ok) {
         const error = await res.json();
@@ -3872,6 +3918,7 @@ export default function CrmCustomerDetail() {
     setPropPaymentTerms((property as any).paymentTerms || "");
     setPropPaymentMethod((property as any).paymentMethod || "");
     setPropApprovalRule((property as any).approvalRule || "");
+    setPropPropertyType((property as any).propertyType || "");
     setPropertyDialogOpen(true);
   };
 
@@ -3880,6 +3927,16 @@ export default function CrmCustomerDetail() {
       toast({
         title: "Validation Error",
         description: "Street address, city, state, and ZIP are required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // For Property Managers, require property type selection
+    if (isPropertyManager && !propPropertyType) {
+      toast({
+        title: "Validation Error",
+        description: "Property type is required for property manager customers",
         variant: "destructive",
       });
       return;
@@ -4004,19 +4061,32 @@ export default function CrmCustomerDetail() {
               Edit Customer
             </Button>
             {currentUser && ["admin", "owner", "sales"].includes(currentUser.role) && (
-              <Button 
-                variant="outline"
-                onClick={() => generatePortalLinkMutation.mutate()}
-                disabled={generatePortalLinkMutation.isPending}
-                data-testid="button-generate-portal-link"
-              >
-                {generatePortalLinkMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Link2 className="h-4 w-4 mr-2" />
+              <div className="flex items-center gap-3 border rounded-lg px-3 py-1.5">
+                <span className="text-sm text-muted-foreground">Customer Portal</span>
+                <Switch
+                  checked={customer.portalEnabled}
+                  onCheckedChange={(checked) => togglePortalMutation.mutate(checked)}
+                  disabled={togglePortalMutation.isPending}
+                  data-testid="switch-portal-access"
+                />
+                {customer.portalEnabled && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => generatePortalLinkMutation.mutate()}
+                    disabled={generatePortalLinkMutation.isPending}
+                    className="h-7 px-2"
+                    data-testid="button-generate-portal-link"
+                  >
+                    {generatePortalLinkMutation.isPending ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Link2 className="h-3 w-3" />
+                    )}
+                    <span className="ml-1 text-xs">Copy Link</span>
+                  </Button>
                 )}
-                Portal Link
-              </Button>
+              </div>
             )}
             {canDeleteCustomer && (
               <Button 
@@ -4669,7 +4739,7 @@ export default function CrmCustomerDetail() {
                     </SelectItem>
                     {customerProperties?.map((prop) => (
                       <SelectItem key={prop.id} value={prop.id} data-testid={`proj-property-${prop.id}`}>
-                        {prop.name || prop.address || `Property ${prop.id.slice(-4)}`}
+                        {prop.address1 || `Property ${prop.id.slice(-4)}`}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -5038,6 +5108,25 @@ export default function CrmCustomerDetail() {
                 </div>
               </div>
 
+              {/* Property Type */}
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">
+                  Property Type {isPropertyManager ? <span className="text-red-500">*</span> : ""}
+                </Label>
+                <Select value={propPropertyType} onValueChange={(v) => setPropPropertyType(v as "residential" | "commercial")}>
+                  <SelectTrigger className="h-11" data-testid="select-prop-property-type">
+                    <SelectValue placeholder="Select property type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="residential">Residential</SelectItem>
+                    <SelectItem value="commercial">Commercial</SelectItem>
+                  </SelectContent>
+                </Select>
+                {isPropertyManager && (
+                  <p className="text-xs text-slate-500">Required for property manager customers</p>
+                )}
+              </div>
+
               {/* Notes - Only for non-PM customers */}
               {!isPropertyManager && (
                 <div className="space-y-1.5">
@@ -5262,6 +5351,7 @@ export default function CrmCustomerDetail() {
                   !propCity.trim() || 
                   !propState.trim() || 
                   !propZip.trim() || 
+                  (isPropertyManager && !propPropertyType) ||
                   (isPropertyManager && propBillingOverride && (!propPaymentTerms || !propPaymentMethod || !propApprovalRule)) ||
                   (isPropertyManager && propBillingOverride && propBilledTo === "tenant" && (!propTenantName.trim() || !propTenantEmail.trim())) || 
                   (isPropertyManager && propBillingOverride && propBilledTo === "owner" && (!propOwnerName.trim() || !propOwnerEmail.trim())) || 
@@ -5304,7 +5394,8 @@ export default function CrmCustomerDetail() {
           toast={toast}
           propertyDialogOpen={propertyDialogOpen}
           setPropertyDialogOpen={setPropertyDialogOpen}
-          onViewQuote={(quoteId) => setSelectedQuoteId(quoteId)}
+          onOpenAddPropertyDialog={handleOpenAddPropertyDialog}
+          onViewQuote={(quoteId) => navigate(`/crm/quotes/${quoteId}?from=customer&customerId=${customerId}&tab=quotes`)}
           onViewWorkOrder={(id) => navigate(`/crm/work-orders/${id}`)}
           onViewProject={(id) => navigate(`/crm/projects/${id}`)}
           onViewInvoice={(id) => navigate(`/crm/invoices/${id}`)}

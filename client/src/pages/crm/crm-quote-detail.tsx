@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, useRoute } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -45,7 +46,6 @@ import {
   Calendar,
   DollarSign,
   Printer,
-  Eye,
   X,
   Trash2,
   Receipt,
@@ -61,6 +61,11 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   Inbox,
+  Edit,
+  Monitor,
+  Pencil,
+  FolderKanban,
+  Eye,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -83,14 +88,26 @@ import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { CrmUser, CrmQuote, CrmQuoteLineItem, QuoteEmailLog } from "@shared/schema";
-
-const COMPANY_INFO = {
-  name: "Giesbrecht HVAC",
-  address: "PO Box 917, Wrens, GA 30833",
-  phone: "(706) 826-0644",
-  email: "chandler@ghvacinc.com",
-  website: "www.ghvacinc.com",
-};
+import { PaymentLinkButton } from "@/components/stripe-payment-link-button";
+import { Checkbox } from "@/components/ui/checkbox";
+import ghvacLogo from "@assets/ghvac-logo.png";
+import {
+  BRAND_COLOR,
+  COMPANY_INFO,
+  PACKAGE_LEVEL_ORDER,
+  getOptionSortOrder,
+  groupLineItemsByOption,
+  formatPresentationCurrency,
+  formatPresentationDate,
+  parseEquipmentImages,
+  PresentationEquipmentImageGrid,
+  getWhatsIncludedForOption,
+  PresentationSignaturePad,
+  type OptionGroup,
+  type EquipmentImages,
+  type WhatsIncludedItem,
+  type WhatsIncludedResult,
+} from "@/components/quote-presentation";
 
 type QuoteWithLines = CrmQuote & {
   lineItems?: CrmQuoteLineItem[];
@@ -138,11 +155,24 @@ const statusColors: Record<string, string> = {
 };
 
 export default function CrmQuoteDetail() {
+  usePageTitle("Quote Detail");
   const [, navigate] = useLocation();
   const [, params] = useRoute("/crm/quotes/:id");
   const quoteId = params?.id;
   const { toast } = useToast();
-  const [showPreview, setShowPreview] = useState(false);
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const fromCustomer = searchParams.get("from") === "customer";
+  const customerIdParam = searchParams.get("customerId");
+  const tabParam = searchParams.get("tab");
+
+  const handleBack = () => {
+    if (fromCustomer && customerIdParam) {
+      navigate(`/crm/customers/${customerIdParam}?tab=${tabParam || "quotes"}`);
+    } else {
+      window.history.back();
+    }
+  };
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showOptionSelection, setShowOptionSelection] = useState(false);
   const [showAcceptOptionSelection, setShowAcceptOptionSelection] = useState(false);
@@ -166,6 +196,47 @@ export default function CrmQuoteDetail() {
   const [markSentNote, setMarkSentNote] = useState("");
   const [isEditingAssignment, setIsEditingAssignment] = useState(false);
   const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | null>(null);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editedDescription, setEditedDescription] = useState("");
+  const [showPresentation, setShowPresentation] = useState(false);
+  const [presentationSignature, setPresentationSignature] = useState("");
+  const [presentationName, setPresentationName] = useState("");
+  const [presentationAgreed, setPresentationAgreed] = useState(false);
+  const [presentationSelectedOption, setPresentationSelectedOption] = useState<string | null>(null);
+  const [showWhatsIncludedDialog, setShowWhatsIncludedDialog] = useState(false);
+  const [editingWhatsIncluded, setEditingWhatsIncluded] = useState<Array<{ category: string; items: string[] }>>([]);
+  const [showWarrantiesDialog, setShowWarrantiesDialog] = useState(false);
+  const [editingWarranties, setEditingWarranties] = useState("");
+  const [showFinancingDialog, setShowFinancingDialog] = useState(false);
+  const [editingFinancingText, setEditingFinancingText] = useState("");
+  const [isVerifyingDeposit, setIsVerifyingDeposit] = useState(false);
+  const [isGeneratingPaymentLink, setIsGeneratingPaymentLink] = useState(false);
+  const [editingLineItemId, setEditingLineItemId] = useState<string | null>(null);
+  const [editingLineItemData, setEditingLineItemData] = useState<{ description: string; quantity: string; unitPrice: string }>({ description: "", quantity: "", unitPrice: "" });
+  const [showAddLineItemDialog, setShowAddLineItemDialog] = useState(false);
+  const [newLineItemData, setNewLineItemData] = useState<{ description: string; quantity: string; unitPrice: string }>({ description: "", quantity: "1", unitPrice: "" });
+
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+  const [followUpContext, setFollowUpContext] = useState<{
+    customerId: string;
+    propertyId: string | null;
+    projectId: string | null;
+    quoteId: string;
+    quoteTitle: string;
+  } | null>(null);
+
+  const [showCreateProjectPrompt, setShowCreateProjectPrompt] = useState(false);
+  const [showCreateProjectForm, setShowCreateProjectForm] = useState(false);
+  const [projectFormData, setProjectFormData] = useState({
+    title: "",
+    projectType: "INSTALL",
+    expectedValue: "",
+    description: "",
+    priority: "normal",
+    customerId: "",
+    propertyId: "",
+    customerName: "",
+  });
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -249,9 +320,9 @@ export default function CrmQuoteDetail() {
       if (!res.ok || !result.success) {
         throw new Error(result.error || result.message || "Failed to send email");
       }
-      return result;
+      return result as { success: boolean; successCount: number; totalCount: number };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId, "email-logs"] });
@@ -259,7 +330,10 @@ export default function CrmQuoteDetail() {
       setShowSendQuoteDialog(false);
       setSendEmailRecipient("");
       setSendEmailMessage("");
-      toast({ title: "Quote sent!", description: "The quote has been emailed to the customer." });
+      const description = data.totalCount > 1 
+        ? `Quote sent to ${data.successCount} of ${data.totalCount} recipients.`
+        : "The quote has been emailed to the customer.";
+      toast({ title: "Quote sent!", description });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to send email", description: error.message, variant: "destructive" });
@@ -320,6 +394,482 @@ export default function CrmQuoteDetail() {
     },
   });
 
+  const updateDescriptionMutation = useMutation({
+    mutationFn: async (description: string) => {
+      const res = await fetch(`/api/crm/quotes/${quoteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ description }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || result.message || "Failed to update description");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      setIsEditingDescription(false);
+      toast({ title: "Description updated", description: "The quote description has been saved." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update description", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateWhatsIncludedMutation = useMutation({
+    mutationFn: async (whatsIncluded: Array<{ category: string; items: string[] }>) => {
+      const updatedAiGeneratedQuote = {
+        ...(quote?.aiGeneratedQuote ?? {}),
+        whats_included: whatsIncluded,
+      };
+      const res = await fetch(`/api/crm/quotes/${quoteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ aiGeneratedQuote: updatedAiGeneratedQuote }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || result.message || "Failed to update What's Included");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      setShowWhatsIncludedDialog(false);
+      toast({ title: "What's Included updated", description: "The What's Included section has been saved." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update What's Included", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleOpenWhatsIncludedDialog = () => {
+    if (quote?.aiGeneratedQuote?.whats_included) {
+      setEditingWhatsIncluded(JSON.parse(JSON.stringify(quote.aiGeneratedQuote.whats_included)));
+    } else {
+      setEditingWhatsIncluded([]);
+    }
+    setShowWhatsIncludedDialog(true);
+  };
+
+  const handleWhatsIncludedItemChange = (categoryIndex: number, itemIndex: number, value: string) => {
+    setEditingWhatsIncluded(prev => {
+      const updated = [...prev];
+      updated[categoryIndex] = {
+        ...updated[categoryIndex],
+        items: [...updated[categoryIndex].items],
+      };
+      updated[categoryIndex].items[itemIndex] = value;
+      return updated;
+    });
+  };
+
+  const handleAddWhatsIncludedItem = (categoryIndex: number) => {
+    setEditingWhatsIncluded(prev => {
+      const updated = [...prev];
+      updated[categoryIndex] = {
+        ...updated[categoryIndex],
+        items: [...updated[categoryIndex].items, ""],
+      };
+      return updated;
+    });
+  };
+
+  const handleRemoveWhatsIncludedItem = (categoryIndex: number, itemIndex: number) => {
+    setEditingWhatsIncluded(prev => {
+      const updated = [...prev];
+      updated[categoryIndex] = {
+        ...updated[categoryIndex],
+        items: updated[categoryIndex].items.filter((_, i) => i !== itemIndex),
+      };
+      return updated;
+    });
+  };
+
+  const handleSaveWhatsIncluded = () => {
+    // Guard against saving if quote status has changed from draft
+    if (quote?.status !== "draft") {
+      toast({
+        title: "Cannot Save Changes",
+        description: "This quote is no longer a draft. Changes cannot be saved.",
+        variant: "destructive",
+      });
+      setShowWhatsIncludedDialog(false);
+      return;
+    }
+    
+    const cleanedData = editingWhatsIncluded.map(cat => ({
+      category: cat.category,
+      items: cat.items.filter(item => item.trim() !== ""),
+    }));
+    updateWhatsIncludedMutation.mutate(cleanedData);
+  };
+
+  const updateWarrantiesMutation = useMutation({
+    mutationFn: async (warranties: string[]) => {
+      const updatedAiGeneratedQuote = {
+        ...(quote?.aiGeneratedQuote ?? {}),
+        warranties_and_terms: warranties,
+      };
+      const res = await fetch(`/api/crm/quotes/${quoteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ aiGeneratedQuote: updatedAiGeneratedQuote }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || result.message || "Failed to update Warranties & Terms");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      setShowWarrantiesDialog(false);
+      toast({ title: "Warranties & Terms updated", description: "The Warranties & Terms section has been saved." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update Warranties & Terms", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleOpenWarrantiesDialog = () => {
+    if (quote?.aiGeneratedQuote?.warranties_and_terms) {
+      setEditingWarranties(quote.aiGeneratedQuote.warranties_and_terms.join("\n"));
+    } else {
+      setEditingWarranties("");
+    }
+    setShowWarrantiesDialog(true);
+  };
+
+  const handleSaveWarranties = () => {
+    if (quote?.status !== "draft") {
+      toast({
+        title: "Cannot Save Changes",
+        description: "This quote is no longer a draft. Changes cannot be saved.",
+        variant: "destructive",
+      });
+      setShowWarrantiesDialog(false);
+      return;
+    }
+    
+    const warrantiesArray = editingWarranties
+      .split("\n")
+      .map(line => line.trim())
+      .filter(line => line !== "");
+    updateWarrantiesMutation.mutate(warrantiesArray);
+  };
+
+  const updateFinancingMutation = useMutation({
+    mutationFn: async (financingText: string) => {
+      const updatedAiGeneratedQuote = {
+        ...(quote?.aiGeneratedQuote ?? {}),
+        financing_text: financingText,
+      };
+      const res = await fetch(`/api/crm/quotes/${quoteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ aiGeneratedQuote: updatedAiGeneratedQuote }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || result.message || "Failed to update Financing Text");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      setShowFinancingDialog(false);
+      toast({ title: "Financing text updated", description: "The financing text has been saved." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update financing text", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleOpenFinancingDialog = () => {
+    setEditingFinancingText(quote?.aiGeneratedQuote?.financing_text || "");
+    setShowFinancingDialog(true);
+  };
+
+  const handleSaveFinancing = () => {
+    if (quote?.status !== "draft") {
+      toast({
+        title: "Cannot Save Changes",
+        description: "This quote is no longer a draft. Changes cannot be saved.",
+        variant: "destructive",
+      });
+      setShowFinancingDialog(false);
+      return;
+    }
+    
+    updateFinancingMutation.mutate(editingFinancingText.trim());
+  };
+
+  const updateLineItemMutation = useMutation({
+    mutationFn: async (data: { lineItemId: string; description: string; quantity: number; unitPrice: number; lineTotal: number }) => {
+      const res = await fetch(`/api/crm/quotes/${quoteId}/line-items/${data.lineItemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          description: data.description,
+          quantity: data.quantity,
+          unitPrice: data.unitPrice.toString(),
+          lineTotal: data.lineTotal.toString(),
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || result.message || "Failed to update line item");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      setEditingLineItemId(null);
+      setEditingLineItemData({ description: "", quantity: "", unitPrice: "" });
+      toast({ title: "Line item updated", description: "The line item has been saved." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update line item", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const addLineItemMutation = useMutation({
+    mutationFn: async (data: { description: string; quantity: number; unitPrice: number; lineTotal: number }) => {
+      const res = await fetch(`/api/crm/quotes/${quoteId}/line-items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          description: data.description,
+          quantity: data.quantity,
+          unitPrice: data.unitPrice.toString(),
+          lineTotal: data.lineTotal.toString(),
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || result.message || "Failed to add line item");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      setShowAddLineItemDialog(false);
+      setNewLineItemData({ description: "", quantity: "1", unitPrice: "" });
+      toast({ title: "Line item added", description: "The new line item has been added to the quote." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to add line item", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleStartEditLineItem = (item: CrmQuoteLineItem) => {
+    setEditingLineItemId(item.id);
+    setEditingLineItemData({
+      description: item.description || "",
+      quantity: String(item.quantity || 1),
+      unitPrice: String(parseFloat(item.unitPrice || "0")),
+    });
+  };
+
+  const handleCancelEditLineItem = () => {
+    setEditingLineItemId(null);
+    setEditingLineItemData({ description: "", quantity: "", unitPrice: "" });
+  };
+
+  const handleSaveLineItem = () => {
+    if (!editingLineItemId) return;
+    const quantity = parseFloat(editingLineItemData.quantity) || 0;
+    const unitPrice = parseFloat(editingLineItemData.unitPrice) || 0;
+    const lineTotal = quantity * unitPrice;
+    if (!editingLineItemData.description.trim()) {
+      toast({ title: "Description required", variant: "destructive" });
+      return;
+    }
+    if (quantity <= 0) {
+      toast({ title: "Quantity must be greater than 0", variant: "destructive" });
+      return;
+    }
+    updateLineItemMutation.mutate({
+      lineItemId: editingLineItemId,
+      description: editingLineItemData.description.trim(),
+      quantity,
+      unitPrice,
+      lineTotal,
+    });
+  };
+
+  const handleAddLineItem = () => {
+    const quantity = parseFloat(newLineItemData.quantity) || 0;
+    const unitPrice = parseFloat(newLineItemData.unitPrice) || 0;
+    const lineTotal = quantity * unitPrice;
+    if (!newLineItemData.description.trim()) {
+      toast({ title: "Description required", variant: "destructive" });
+      return;
+    }
+    if (quantity <= 0) {
+      toast({ title: "Quantity must be greater than 0", variant: "destructive" });
+      return;
+    }
+    addLineItemMutation.mutate({
+      description: newLineItemData.description.trim(),
+      quantity,
+      unitPrice,
+      lineTotal,
+    });
+  };
+
+  const getEditingLineTotal = () => {
+    const quantity = parseFloat(editingLineItemData.quantity) || 0;
+    const unitPrice = parseFloat(editingLineItemData.unitPrice) || 0;
+    return quantity * unitPrice;
+  };
+
+  const getNewLineTotal = () => {
+    const quantity = parseFloat(newLineItemData.quantity) || 0;
+    const unitPrice = parseFloat(newLineItemData.unitPrice) || 0;
+    return quantity * unitPrice;
+  };
+
+  const canEditLineItems = quote && !["accepted", "converted"].includes(quote.status);
+
+  const acceptInPersonMutation = useMutation({
+    mutationFn: async (data: { signatureImage: string; signerName: string; selectedOption?: string | null }) => {
+      const res = await fetch(`/api/crm/quotes/${quoteId}/accept-in-person`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || result.message || "Failed to accept quote");
+      }
+      return result;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId, "email-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
+      setShowPresentation(false);
+      setPresentationSignature("");
+      setPresentationName("");
+      setPresentationAgreed(false);
+      setPresentationSelectedOption(null);
+      toast({ title: "Quote accepted!", description: "The client has accepted the quote in person." });
+
+      if (data.requiresFollowUpChoice && data.followUpContext) {
+        setFollowUpContext(data.followUpContext);
+        setShowFollowUpModal(true);
+      }
+
+      const quoteType = quote?.quoteType?.toLowerCase();
+      if (quoteType === "custom_install" || quoteType === "proposal") {
+        setProjectFormData({
+          title: quote?.title || `Project for ${quote?.quoteNumber || "Quote"}`,
+          projectType: "INSTALL",
+          expectedValue: quote?.total || "",
+          description: quote?.description || "",
+          priority: "normal",
+          customerId: quote?.customerId || quote?.accountId || "",
+          propertyId: quote?.propertyId || quote?.siteId || "",
+          customerName: quote?.customer?.name || quote?.customerName || "",
+        });
+        setShowCreateProjectPrompt(true);
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to accept quote", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handlePresentationAccept = async () => {
+    if (!presentationSignature) {
+      toast({ title: "Signature required", description: "Please have the client sign above.", variant: "destructive" });
+      return;
+    }
+    if (!presentationName.trim()) {
+      toast({ title: "Name required", description: "Please enter the client's printed name.", variant: "destructive" });
+      return;
+    }
+    if (!presentationAgreed) {
+      toast({ title: "Terms required", description: "Please agree to the terms and conditions.", variant: "destructive" });
+      return;
+    }
+    if (quote?.quoteMode === "options" && !presentationSelectedOption) {
+      toast({ title: "Selection required", description: "Please select one of the available options.", variant: "destructive" });
+      return;
+    }
+
+    // Check if this quote requires a deposit payment (install/proposal quotes)
+    const DEPOSIT_QUOTE_TYPES = ["custom_install", "proposal", "custom_service"];
+    const requiresDeposit = DEPOSIT_QUOTE_TYPES.includes(quote?.quoteType?.toLowerCase() || "");
+
+    if (requiresDeposit) {
+      // Generate payment link and redirect to Stripe
+      setIsGeneratingPaymentLink(true);
+      try {
+        const response = await fetch(`/api/stripe/quote/${quoteId}/payment-link`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            selectedOption: presentationSelectedOption,
+            signatureImage: presentationSignature,
+            signerName: presentationName.trim(),
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to create payment link");
+        }
+
+        if (data.paymentLinkUrl) {
+          // Open Stripe payment page in new tab
+          window.open(data.paymentLinkUrl, '_blank');
+          toast({ 
+            title: "Payment link opened", 
+            description: "A new tab has been opened for the customer to complete the deposit payment." 
+          });
+        }
+      } catch (error: any) {
+        toast({ 
+          title: "Payment Error", 
+          description: error.message || "Failed to generate payment link", 
+          variant: "destructive" 
+        });
+      } finally {
+        setIsGeneratingPaymentLink(false);
+      }
+    } else {
+      // For non-deposit quotes, accept directly
+      acceptInPersonMutation.mutate({
+        signatureImage: presentationSignature,
+        signerName: presentationName.trim(),
+        selectedOption: presentationSelectedOption,
+      });
+    }
+  };
+
+  const resetPresentationState = () => {
+    setPresentationSignature("");
+    setPresentationName("");
+    setPresentationAgreed(false);
+    setPresentationSelectedOption(null);
+  };
+
   const acceptMutation = useMutation({
     mutationFn: async (params: { selectedOption?: string } = {}) => {
       const res = await fetch(`/api/crm/quotes/${quoteId}/accept`, {
@@ -341,13 +891,33 @@ export default function CrmQuoteDetail() {
       }
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       setShowAcceptOptionSelection(false);
       setSelectedOption("");
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Quote accepted", description: "Quote status updated to accepted." });
+
+      if (data.requiresFollowUpChoice && data.followUpContext) {
+        setFollowUpContext(data.followUpContext);
+        setShowFollowUpModal(true);
+      }
+
+      const quoteType = quote?.quoteType?.toLowerCase();
+      if (quoteType === "custom_install" || quoteType === "proposal") {
+        setProjectFormData({
+          title: quote?.title || `Project for ${quote?.quoteNumber || "Quote"}`,
+          projectType: "INSTALL",
+          expectedValue: quote?.total || "",
+          description: quote?.description || "",
+          priority: "normal",
+          customerId: quote?.customerId || quote?.accountId || "",
+          propertyId: quote?.propertyId || quote?.siteId || "",
+          customerName: quote?.customer?.name || quote?.customerName || "",
+        });
+        setShowCreateProjectPrompt(true);
+      }
     },
     onError: (error: { message?: string; requiresOptionSelection?: boolean; availableOptions?: string[] } | Error) => {
       if ('requiresOptionSelection' in error && error.requiresOptionSelection && error.availableOptions) {
@@ -358,6 +928,118 @@ export default function CrmQuoteDetail() {
       toast({ title: "Failed to accept quote", description: (error as Error).message || "Unknown error", variant: "destructive" });
     },
   });
+
+  const createFollowUpMutation = useMutation({
+    mutationFn: async (mode: "parts_needed" | "schedule_now") => {
+      const res = await fetch(`/api/crm/quotes/${quoteId}/create-follow-up-work-order`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ mode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to create follow-up work order");
+      return data;
+    },
+    onSuccess: (data) => {
+      setShowFollowUpModal(false);
+      setFollowUpContext(null);
+      if (data.mode === "parts_needed" && data.workOrder) {
+        toast({
+          title: "Work Order Created",
+          description: `Follow-up work order #${data.workOrder.workOrderNumber} has been added to the Parts Needed queue.`,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch"] });
+        // Navigate to the unassigned work orders board (Parts Needed section)
+        navigate("/crm/work-orders");
+      } else if (data.mode === "schedule_now" && data.context) {
+        const params = new URLSearchParams({
+          createWO: "true",
+          customerId: data.context.customerId || "",
+          propertyId: data.context.propertyId || "",
+          projectId: data.context.projectId || "",
+          sourceQuoteId: data.context.sourceQuoteId || "",
+          title: data.context.suggestedTitle || "",
+          description: data.context.suggestedDescription || "",
+        });
+        navigate(`/crm/dispatch?${params.toString()}`);
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const createProjectMutation = useMutation({
+    mutationFn: async (data: {
+      customerId: string;
+      propertyId?: string;
+      title: string;
+      projectType: string;
+      expectedValue?: string;
+      description?: string;
+      priority?: string;
+      quoteId?: string;
+    }) => {
+      const res = await apiRequest("POST", "/api/crm/projects", data);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to create project");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Project created",
+        description: "The project has been created successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects"] });
+      setShowCreateProjectForm(false);
+      setShowCreateProjectPrompt(false);
+      if (data?.id) {
+        navigate(`/crm/projects/${data.id}`);
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create project",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateProject = () => {
+    if (!projectFormData.customerId) {
+      toast({
+        title: "Missing customer",
+        description: "Cannot create project - no customer associated with this quote.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!projectFormData.title.trim()) {
+      toast({
+        title: "Title required",
+        description: "Please enter a project title.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createProjectMutation.mutate({
+      customerId: projectFormData.customerId,
+      propertyId: projectFormData.propertyId || undefined,
+      title: projectFormData.title.trim(),
+      projectType: projectFormData.projectType,
+      expectedValue: projectFormData.expectedValue || undefined,
+      description: projectFormData.description || undefined,
+      priority: projectFormData.priority || undefined,
+      quoteId: quoteId,
+    });
+  };
 
   const declineMutation = useMutation({
     mutationFn: async () => {
@@ -612,6 +1294,43 @@ export default function CrmQuoteDetail() {
   const confirmDelete = () => {
     deleteMutation.mutate();
     setShowDeleteConfirm(false);
+  };
+
+  const handleVerifyDeposit = async () => {
+    if (!quote) return;
+    setIsVerifyingDeposit(true);
+    try {
+      const res = await fetch(`/api/stripe/quote/${quote.id}/verify-deposit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      const result = await res.json();
+      if (result.success) {
+        toast({
+          title: "Deposit Verified",
+          description: result.alreadyPaid 
+            ? "Deposit was already recorded."
+            : `Deposit of $${result.depositAmount?.toFixed(2)} has been verified and recorded.`,
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "No Deposit Found",
+          description: result.message || "No successful payment found for this quote.",
+        });
+      }
+    } catch (err) {
+      console.error("Error verifying deposit:", err);
+      toast({
+        variant: "destructive",
+        title: "Verification Error",
+        description: "Failed to verify deposit. Please try again.",
+      });
+    } finally {
+      setIsVerifyingDeposit(false);
+    }
   };
 
   const handleDownloadPDF = () => {
@@ -1042,7 +1761,13 @@ export default function CrmQuoteDetail() {
 
         addTableHeader();
 
-        const lineItems = quote.lineItems || [];
+        // Filter out labor/internal line items from PDF export (client-facing)
+        const lineItems = (quote.lineItems || []).filter(item => 
+          item.lineType !== "labor" && item.lineType !== "other"
+        );
+        // For single line item quotes, show sell price instead of actual cost
+        const isSingleItem = lineItems.length === 1;
+        
         let rowIndex = 0;
         lineItems.forEach((item) => {
           doc.setFontSize(9);
@@ -1064,10 +1789,14 @@ export default function CrmQuoteDetail() {
             doc.text(line, margin + 5, textY + (idx * 4));
           });
           
+          // Use sell price for single item quotes in client-facing PDF
+          const displayPrice = isSingleItem ? quote.total : item.unitPrice;
+          const displayTotal = isSingleItem ? quote.total : item.lineTotal;
+          
           doc.text(String(item.quantity || 1), margin + contentWidth * 0.52, y + 5.5, { align: 'center' });
-          doc.text(formatCurrency(item.unitPrice), margin + contentWidth * 0.70, y + 5.5, { align: 'center' });
+          doc.text(formatCurrency(displayPrice), margin + contentWidth * 0.70, y + 5.5, { align: 'center' });
           doc.setFont("helvetica", "bold");
-          doc.text(formatCurrency(item.lineTotal), pageWidth - margin - 5, y + 5.5, { align: 'right' });
+          doc.text(formatCurrency(displayTotal), pageWidth - margin - 5, y + 5.5, { align: 'right' });
           doc.setFont("helvetica", "normal");
           y += rowHeight;
           rowIndex++;
@@ -1097,41 +1826,16 @@ export default function CrmQuoteDetail() {
           doc.setFontSize(9);
           doc.setFont("helvetica", "normal");
           doc.setTextColor(...mutedColor);
-          doc.text("Subtotal", totalsX + 5, y + 7);
-          doc.setTextColor(...textColor);
-          doc.text(formatCurrency(quote.subtotal), pageWidth - margin - 5, y + 7, { align: 'right' });
-          
-          doc.setDrawColor(...goldColor);
-          doc.setLineWidth(0.5);
-          doc.line(totalsX + 5, y + 11, pageWidth - margin - 5, y + 11);
-          
           doc.setFontSize(11);
           doc.setFont("helvetica", "bold");
           doc.setTextColor(...textColor);
-          doc.text("Total", totalsX + 5, y + 17);
+          doc.text("Total", totalsX + 5, y + 10);
           doc.setTextColor(...brandColor);
-          doc.text(formatCurrency(quote.subtotal), pageWidth - margin - 5, y + 17, { align: 'right' });
+          doc.text(formatCurrency(quote.total), pageWidth - margin - 5, y + 10, { align: 'right' });
 
           y += 28;
         }
 
-        if (quote.description) {
-          checkPageBreak(25);
-          doc.setFillColor(254, 252, 232);
-          doc.setDrawColor(253, 230, 138);
-          doc.roundedRect(margin, y, contentWidth, 20, 2, 2, 'FD');
-          doc.setFontSize(9);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(120, 53, 15);
-          doc.text("Notes", margin + 5, y + 7);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(146, 64, 14);
-          const noteLines = doc.splitTextToSize(quote.description, contentWidth - 10);
-          noteLines.slice(0, 2).forEach((line: string, idx: number) => {
-            doc.text(line, margin + 5, y + 13 + (idx * 4));
-          });
-          y += 25;
-        }
       }
 
       const footerY = pageHeight - 18;
@@ -1211,7 +1915,7 @@ export default function CrmQuoteDetail() {
         <div className="flex flex-col items-center justify-center py-16">
           <FileText className="h-16 w-16 text-slate-300 mb-4" />
           <h2 className="text-xl font-semibold text-slate-700">Quote not found</h2>
-          <Button variant="outline" className="mt-4" onClick={() => window.history.back()}>
+          <Button variant="outline" className="mt-4" onClick={handleBack}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
@@ -1230,7 +1934,7 @@ export default function CrmQuoteDetail() {
           {/* First row: Back button, Quote number, Status, Preview icon */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" data-testid="button-back" onClick={() => window.history.back()}>
+              <Button variant="ghost" size="icon" data-testid="button-back" onClick={handleBack}>
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <h1 className="text-2xl font-bold text-slate-900" data-testid="text-quote-number">
@@ -1241,13 +1945,14 @@ export default function CrmQuoteDetail() {
               </Badge>
             </div>
             <Button
-              onClick={() => setShowPreview(true)}
+              onClick={() => setShowPresentation(true)}
               variant="ghost"
               size="icon"
               className="text-slate-500 hover:text-[#711419]"
-              data-testid="button-preview"
+              title="Present to Client"
+              data-testid="button-present"
             >
-              <Eye className="h-5 w-5" />
+              <Monitor className="h-5 w-5" />
             </Button>
           </div>
           
@@ -1309,6 +2014,42 @@ export default function CrmQuoteDetail() {
                   )}
                   Create Invoice
                 </Button>
+              )}
+              
+              {/* Payment Link button - only for install quotes */}
+              <PaymentLinkButton
+                type="quote"
+                id={quote.id}
+                quoteCategory={quote.quoteCategory}
+                total={parseFloat(quote.total?.toString() || "0")}
+                customerPhone={quote.customer?.phone || quote.customerPhone}
+              />
+              
+              {/* Verify Deposit button - for install quotes with payment link */}
+              {quote.stripePaymentLinkId && !quote.depositPaidAt && (
+                <Button
+                  onClick={handleVerifyDeposit}
+                  size="sm"
+                  variant="outline"
+                  className="border-green-600 text-green-600 hover:bg-green-50"
+                  disabled={isVerifyingDeposit}
+                  data-testid="button-verify-deposit"
+                >
+                  {isVerifyingDeposit ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                  )}
+                  Verify Deposit
+                </Button>
+              )}
+              
+              {/* Show deposit status if paid */}
+              {quote.depositPaidAt && (
+                <Badge className="bg-green-100 text-green-800 border-green-200">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Deposit Paid: ${parseFloat(quote.depositAmount || "0").toFixed(2)}
+                </Badge>
               )}
               
               <DropdownMenu>
@@ -1390,6 +2131,18 @@ export default function CrmQuoteDetail() {
                   <span className="text-sm">{formatDate(quote.sentAt)}</span>
                 </div>
               )}
+              {quote.viewedAt && (
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">First Viewed</span>
+                  <span className="text-sm">{formatDate(quote.viewedAt)}</span>
+                </div>
+              )}
+              {(quote.viewCount || 0) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">View Count</span>
+                  <span className="text-sm font-medium text-purple-600">{quote.viewCount} {quote.viewCount === 1 ? "view" : "views"}</span>
+                </div>
+              )}
               <div className="flex justify-between items-center">
                 <span className="text-sm text-slate-500">Assigned To</span>
                 {isEditingAssignment ? (
@@ -1461,35 +2214,132 @@ export default function CrmQuoteDetail() {
         </div>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
               Line Items
             </CardTitle>
+            {canEditLineItems && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowAddLineItemDialog(true)}
+                data-testid="button-add-line-item"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Line Item
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Qty</TableHead>
-                  <TableHead className="text-right">Unit Price</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right w-24">Qty</TableHead>
+                  <TableHead className="text-right w-32">Unit Price</TableHead>
+                  <TableHead className="text-right w-32">Total</TableHead>
+                  {canEditLineItems && <TableHead className="w-24">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {quote.lineItems && quote.lineItems.length > 0 ? (
                   quote.lineItems.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell>{item.description}</TableCell>
-                      <TableCell className="text-right">{item.quantity}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(item.lineTotal)}</TableCell>
+                      {editingLineItemId === item.id ? (
+                        <>
+                          <TableCell>
+                            <Input
+                              value={editingLineItemData.description}
+                              onChange={(e) => setEditingLineItemData(prev => ({ ...prev, description: e.target.value }))}
+                              placeholder="Description"
+                              className="w-full"
+                              data-testid={`input-line-item-description-${item.id}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              value={editingLineItemData.quantity}
+                              onChange={(e) => setEditingLineItemData(prev => ({ ...prev, quantity: e.target.value }))}
+                              placeholder="Qty"
+                              className="w-20 text-right"
+                              min="0"
+                              step="1"
+                              data-testid={`input-line-item-quantity-${item.id}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              value={editingLineItemData.unitPrice}
+                              onChange={(e) => setEditingLineItemData(prev => ({ ...prev, unitPrice: e.target.value }))}
+                              placeholder="Unit Price"
+                              className="w-28 text-right"
+                              min="0"
+                              step="0.01"
+                              data-testid={`input-line-item-unitPrice-${item.id}`}
+                            />
+                          </TableCell>
+                          <TableCell className="text-right font-medium text-slate-600">
+                            {formatCurrency(getEditingLineTotal())}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={handleSaveLineItem}
+                                disabled={updateLineItemMutation.isPending}
+                                data-testid={`button-save-line-item-${item.id}`}
+                              >
+                                {updateLineItemMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Check className="h-4 w-4 text-green-600" />
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={handleCancelEditLineItem}
+                                disabled={updateLineItemMutation.isPending}
+                                data-testid={`button-cancel-line-item-${item.id}`}
+                              >
+                                <X className="h-4 w-4 text-slate-500" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </>
+                      ) : (
+                        <>
+                          <TableCell>{item.description}</TableCell>
+                          <TableCell className="text-right">{item.quantity}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(item.lineTotal)}</TableCell>
+                          {canEditLineItems && (
+                            <TableCell>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0"
+                                onClick={() => handleStartEditLineItem(item)}
+                                disabled={editingLineItemId !== null}
+                                data-testid={`button-edit-line-item-${item.id}`}
+                              >
+                                <Pencil className="h-4 w-4 text-slate-500 hover:text-[#711419]" />
+                              </Button>
+                            </TableCell>
+                          )}
+                        </>
+                      )}
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-slate-500 py-8">
+                    <TableCell colSpan={canEditLineItems ? 5 : 4} className="text-center text-slate-500 py-8">
                       No line items
                     </TableCell>
                   </TableRow>
@@ -1501,26 +2351,155 @@ export default function CrmQuoteDetail() {
             {quote.quoteMode !== "options" && (
               <div className="mt-6 border-t pt-4 space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Subtotal</span>
+                  <span className="text-slate-600">Equipment & Labor</span>
                   <span>{formatCurrency(quote.subtotal)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-lg font-semibold">
-                  <span>Total</span>
-                  <span className="text-[#d3b07d]">{formatCurrency(quote.subtotal)}</span>
+                  <span>Sell Price</span>
+                  <span className="text-[#d3b07d]">{formatCurrency(quote.total)}</span>
                 </div>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {quote.description && (
+        {/* Add Line Item Dialog */}
+        <Dialog open={showAddLineItemDialog} onOpenChange={setShowAddLineItemDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add Line Item</DialogTitle>
+              <DialogDescription>
+                Add a new line item to this quote.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-line-description">Description</Label>
+                <Input
+                  id="new-line-description"
+                  value={newLineItemData.description}
+                  onChange={(e) => setNewLineItemData(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Enter description"
+                  data-testid="input-new-line-item-description"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-line-quantity">Quantity</Label>
+                  <Input
+                    id="new-line-quantity"
+                    type="number"
+                    value={newLineItemData.quantity}
+                    onChange={(e) => setNewLineItemData(prev => ({ ...prev, quantity: e.target.value }))}
+                    placeholder="1"
+                    min="0"
+                    step="1"
+                    data-testid="input-new-line-item-quantity"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-line-unitPrice">Unit Price</Label>
+                  <Input
+                    id="new-line-unitPrice"
+                    type="number"
+                    value={newLineItemData.unitPrice}
+                    onChange={(e) => setNewLineItemData(prev => ({ ...prev, unitPrice: e.target.value }))}
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                    data-testid="input-new-line-item-unitPrice"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-between items-center pt-2 border-t">
+                <span className="text-sm text-slate-600">Total:</span>
+                <span className="text-lg font-semibold text-[#d3b07d]">{formatCurrency(getNewLineTotal())}</span>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowAddLineItemDialog(false);
+                  setNewLineItemData({ description: "", quantity: "1", unitPrice: "" });
+                }}
+                data-testid="button-cancel-add-line-item"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddLineItem}
+                disabled={addLineItemMutation.isPending}
+                data-testid="button-confirm-add-line-item"
+              >
+                {addLineItemMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  "Add Line Item"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Editable Description for custom install quotes */}
+        {quote.quoteType === "custom_install" && (
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Notes</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-base">Description</CardTitle>
+              {!isEditingDescription && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditedDescription(quote.description || "");
+                    setIsEditingDescription(true);
+                  }}
+                  data-testid="button-edit-description"
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  Edit
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-slate-600 whitespace-pre-wrap">{quote.description}</p>
+              {isEditingDescription ? (
+                <div className="space-y-3">
+                  <Textarea
+                    value={editedDescription}
+                    onChange={(e) => setEditedDescription(e.target.value)}
+                    placeholder="Add a description for this custom install quote..."
+                    className="min-h-[100px]"
+                    data-testid="textarea-quote-description"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => updateDescriptionMutation.mutate(editedDescription)}
+                      disabled={updateDescriptionMutation.isPending}
+                      data-testid="button-save-description"
+                    >
+                      {updateDescriptionMutation.isPending ? "Saving..." : "Save"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsEditingDescription(false)}
+                      data-testid="button-cancel-description"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : quote.description ? (
+                <p className="text-sm text-slate-600 whitespace-pre-wrap">{quote.description}</p>
+              ) : (
+                <p className="text-sm text-slate-400 italic">No description added. Click Edit to add one.</p>
+              )}
             </CardContent>
           </Card>
         )}
@@ -1557,7 +2536,21 @@ export default function CrmQuoteDetail() {
               
               {quote.aiGeneratedQuote.whats_included && quote.aiGeneratedQuote.whats_included.length > 0 && (
                 <div className="space-y-3">
-                  <h4 className="text-xs font-semibold text-slate-500 uppercase">What's Included</h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-semibold text-slate-500 uppercase">What's Included</h4>
+                    {quote.status === "draft" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        onClick={handleOpenWhatsIncludedDialog}
+                        data-testid="btn-edit-whats-included"
+                      >
+                        <Pencil className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
+                    )}
+                  </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {quote.aiGeneratedQuote.whats_included.map((category: { category: string; items: string[] }, idx: number) => (
                       <div key={idx} className="bg-white p-3 rounded-lg border">
@@ -1578,7 +2571,21 @@ export default function CrmQuoteDetail() {
               
               {quote.aiGeneratedQuote.warranties_and_terms && quote.aiGeneratedQuote.warranties_and_terms.length > 0 && (
                 <div className="pt-3 border-t">
-                  <h4 className="text-xs font-semibold text-slate-500 uppercase mb-2">Warranties & Terms</h4>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-semibold text-slate-500 uppercase">Warranties & Terms</h4>
+                    {quote.status === "draft" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        onClick={handleOpenWarrantiesDialog}
+                        data-testid="btn-edit-warranties"
+                      >
+                        <Pencil className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
+                    )}
+                  </div>
                   <ul className="text-xs text-slate-600 space-y-1">
                     {quote.aiGeneratedQuote.warranties_and_terms.map((term: string, idx: number) => (
                       <li key={idx}>• {term}</li>
@@ -1588,9 +2595,26 @@ export default function CrmQuoteDetail() {
               )}
               
               {quote.aiGeneratedQuote.financing_text && (
-                <p className="text-sm text-slate-600 pt-2 border-t">
-                  {quote.aiGeneratedQuote.financing_text}
-                </p>
+                <div className="pt-2 border-t">
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="text-xs font-semibold text-slate-500 uppercase">Financing</h4>
+                    {quote.status === "draft" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        onClick={handleOpenFinancingDialog}
+                        data-testid="btn-edit-financing"
+                      >
+                        <Pencil className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-600">
+                    {quote.aiGeneratedQuote.financing_text}
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -1624,7 +2648,7 @@ export default function CrmQuoteDetail() {
                   const hasContent = log.htmlContent || log.textContent;
                   
                   // Parse system event metadata
-                  let systemEventData: { eventType?: string; signerName?: string; signedAt?: string; acceptedAt?: string; markedByUser?: string } | null = null;
+                  let systemEventData: { eventType?: string; signerName?: string; signedAt?: string; acceptedAt?: string; markedByUser?: string; viewCount?: number; isFirstView?: boolean; viewedAt?: string } | null = null;
                   if (isSystemEvent && log.personalMessage) {
                     try {
                       systemEventData = JSON.parse(log.personalMessage);
@@ -1647,6 +2671,53 @@ export default function CrmQuoteDetail() {
                   
                   // Render system events differently
                   if (isSystemEvent) {
+                    const eventType = systemEventData?.eventType;
+                    
+                    // Handle quote view events
+                    if (eventType === "quote_viewed") {
+                      const viewCount = systemEventData?.viewCount || 1;
+                      const isFirstView = systemEventData?.isFirstView;
+                      const eventTime = systemEventData?.viewedAt || log.sentAt;
+                      
+                      return (
+                        <div
+                          key={log.id}
+                          className="rounded-lg border overflow-hidden bg-purple-50 border-purple-200"
+                          data-testid={`email-log-${log.id}`}
+                        >
+                          <div className="p-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Eye className="h-4 w-4 text-purple-600 flex-shrink-0" />
+                                  <span className="font-medium text-sm text-purple-800">
+                                    {isFirstView ? "Quote First Viewed by Customer" : "Quote Viewed Again"}
+                                  </span>
+                                </div>
+                                
+                                <div className="flex items-center gap-2 text-xs text-purple-600">
+                                  <Clock className="h-3 w-3" />
+                                  <span>
+                                    {eventTime
+                                      ? format(new Date(eventTime), "MMM d, yyyy 'at' h:mm a")
+                                      : "—"}
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              <Badge
+                                variant="outline"
+                                className="bg-purple-100 text-purple-700 border-purple-300"
+                              >
+                                View #{viewCount}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    // Handle signature/acceptance events (default system event type)
                     const eventTime = systemEventData?.signedAt || systemEventData?.acceptedAt || log.sentAt;
                     const signerName = systemEventData?.signerName || log.recipientName;
                     
@@ -1828,20 +2899,21 @@ export default function CrmQuoteDetail() {
               Send Quote via Email
             </DialogTitle>
             <DialogDescription>
-              Send this quote to the customer via email. They will receive a PDF attachment.
+              Send this quote to the customer via email. They will receive a link to view it.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="recipient-email">Recipient Email</Label>
+              <Label htmlFor="recipient-email">Recipient Email(s)</Label>
               <Input
                 id="recipient-email"
-                type="email"
-                placeholder="customer@example.com"
+                type="text"
+                placeholder="email1@example.com, email2@example.com"
                 value={sendEmailRecipient}
                 onChange={(e) => setSendEmailRecipient(e.target.value)}
                 data-testid="input-recipient-email"
               />
+              <p className="text-xs text-slate-500">Separate multiple emails with commas</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="personal-message">Personal Message (optional)</Label>
@@ -1924,228 +2996,6 @@ export default function CrmQuoteDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-4xl w-[95vw] h-[90vh] p-0 overflow-hidden">
-          <div className="h-full overflow-y-auto bg-white">
-            <div className="sticky top-0 z-10 bg-white border-b px-6 py-3 flex items-center justify-between">
-              <h2 className="font-semibold text-slate-900">Quote Preview</h2>
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={handleDownloadPDF}
-                  variant="outline"
-                  size="sm"
-                  className="border-blue-500 text-blue-600"
-                >
-                  <Printer className="h-4 w-4 mr-1" />
-                  PDF
-                </Button>
-                <Button
-                  onClick={() => setShowPreview(false)}
-                  variant="ghost"
-                  size="sm"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            
-            <div className="p-8 print:p-0" id="quote-preview-content">
-              <div className="bg-[#711419] text-white p-6 rounded-lg mb-6 print:rounded-none">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h1 className="text-3xl font-bold">{COMPANY_INFO.name}</h1>
-                    <p className="text-white/80 mt-1">{COMPANY_INFO.address}</p>
-                  </div>
-                  <div className="text-right text-sm text-white/90">
-                    <p>{COMPANY_INFO.phone}</p>
-                    <p>{COMPANY_INFO.email}</p>
-                    <p>{COMPANY_INFO.website}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-slate-900">QUOTE</h2>
-                  <p className="text-slate-500">{quote.quoteNumber}</p>
-                </div>
-                <Badge variant="outline" className={`${statusColors[status]} text-sm`}>
-                  {statusLabels[status] || status}
-                </Badge>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-6 mb-8">
-                <div className="bg-slate-50 p-4 rounded-lg">
-                  <h3 className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    Bill To
-                  </h3>
-                  <p className="font-medium">{quote.customer?.name || quote.customerName || "—"}</p>
-                  {(quote.customer?.email || quote.customerEmail) && (
-                    <p className="text-sm text-slate-600">{quote.customer?.email || quote.customerEmail}</p>
-                  )}
-                  {(quote.customer?.phone || quote.customerPhone) && (
-                    <p className="text-sm text-slate-600">{quote.customer?.phone || quote.customerPhone}</p>
-                  )}
-                  {quote.serviceAddress && (
-                    <p className="text-sm text-slate-600 mt-1">{quote.serviceAddress}</p>
-                  )}
-                </div>
-                <div className="bg-slate-50 p-4 rounded-lg">
-                  <h3 className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Quote Details
-                  </h3>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Date:</span>
-                      <span>{formatDate(quote.createdAt)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Valid Until:</span>
-                      <span>{quote.validUntil ? formatDate(quote.validUntil) : "30 days"}</span>
-                    </div>
-                    {quote.title && (
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Title:</span>
-                        <span>{quote.title}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Show AI-generated proposal if available, otherwise show line items */}
-              {quote.aiGeneratedQuote ? (
-                <div className="space-y-6 mb-8">
-                  {/* AI Quote Title & Description */}
-                  <div className="border-l-4 border-[#711419] pl-4">
-                    <h3 className="text-xl font-bold text-slate-900">
-                      {quote.aiGeneratedQuote.quote_title || quote.title}
-                    </h3>
-                    {quote.aiGeneratedQuote.package_description && (
-                      <p className="text-slate-600 mt-2">{quote.aiGeneratedQuote.package_description}</p>
-                    )}
-                  </div>
-
-                  {/* Best For */}
-                  {quote.aiGeneratedQuote.best_for && (
-                    <p className="text-sm italic text-slate-500 bg-slate-50 p-3 rounded-lg">
-                      <span className="font-medium not-italic">Best For:</span> {quote.aiGeneratedQuote.best_for}
-                    </p>
-                  )}
-
-                  {/* What's Included */}
-                  {quote.aiGeneratedQuote.whats_included && quote.aiGeneratedQuote.whats_included.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">What's Included</h4>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {quote.aiGeneratedQuote.whats_included.map((category: { category: string; items: string[] }, idx: number) => (
-                          <div key={idx} className="bg-slate-50 p-4 rounded-lg border">
-                            <p className="font-semibold text-slate-800 mb-2">{category.category}</p>
-                            <ul className="text-sm text-slate-600 space-y-1">
-                              {category.items.map((item: string, i: number) => (
-                                <li key={i} className="flex items-start gap-2">
-                                  <span className="text-[#711419] mt-0.5">•</span>
-                                  <span>{item}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Warranties & Terms */}
-                  {quote.aiGeneratedQuote.warranties_and_terms && quote.aiGeneratedQuote.warranties_and_terms.length > 0 && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                      <h4 className="text-sm font-semibold text-amber-900 uppercase mb-2">Warranties & Terms</h4>
-                      <ul className="text-sm text-amber-800 space-y-1">
-                        {quote.aiGeneratedQuote.warranties_and_terms.map((term: string, idx: number) => (
-                          <li key={idx}>• {term}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Financing */}
-                  {quote.aiGeneratedQuote.financing_text && (
-                    <p className="text-sm text-slate-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      {quote.aiGeneratedQuote.financing_text}
-                    </p>
-                  )}
-
-                </div>
-              ) : (
-                <>
-                  <div className="border rounded-lg overflow-hidden mb-6">
-                    <div className="bg-[#d3b07d] text-white px-4 py-3">
-                      <h3 className="font-semibold">Line Items</h3>
-                    </div>
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-slate-50">
-                          <TableHead className="font-semibold">Description</TableHead>
-                          <TableHead className="text-center font-semibold">Qty</TableHead>
-                          <TableHead className="text-right font-semibold">Unit Price</TableHead>
-                          <TableHead className="text-right font-semibold">Amount</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {quote.lineItems && quote.lineItems.length > 0 ? (
-                          quote.lineItems.map((item, idx) => (
-                            <TableRow key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
-                              <TableCell className="font-medium">{item.description}</TableCell>
-                              <TableCell className="text-center">{item.quantity}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
-                              <TableCell className="text-right font-medium">{formatCurrency(item.lineTotal)}</TableCell>
-                            </TableRow>
-                          ))
-                        ) : (
-                          <TableRow>
-                            <TableCell colSpan={4} className="text-center text-slate-500 py-8">
-                              No line items
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-
-                  <div className="flex justify-end mb-8">
-                    <div className="w-72 bg-slate-50 rounded-lg p-4 space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Subtotal</span>
-                        <span>{formatCurrency(quote.subtotal)}</span>
-                      </div>
-                      <Separator className="my-2" />
-                      <div className="flex justify-between text-lg font-bold">
-                        <span>Total</span>
-                        <span className="text-[#711419]">{formatCurrency(quote.subtotal)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {quote.description && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-                  <h3 className="font-semibold text-amber-900 mb-2">Notes</h3>
-                  <p className="text-sm text-amber-800 whitespace-pre-wrap">{quote.description}</p>
-                </div>
-              )}
-
-              <div className="border-t pt-6 text-center text-sm text-slate-500">
-                <p className="font-medium text-slate-700">Thank you for choosing {COMPANY_INFO.name}!</p>
-                <p className="mt-1">Terms: Payment due upon completion. Prices valid for 30 days.</p>
-                <p className="mt-2">{COMPANY_INFO.phone} | {COMPANY_INFO.email} | {COMPANY_INFO.website}</p>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
@@ -2483,6 +3333,702 @@ export default function CrmQuoteDetail() {
           )}
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Present to Client Dialog - Fullscreen */}
+      <Dialog 
+        open={showPresentation} 
+        onOpenChange={(open) => {
+          if (!open) {
+            resetPresentationState();
+          }
+          setShowPresentation(open);
+        }}
+      >
+        <DialogContent className="max-w-full w-full h-full max-h-screen m-0 p-0 rounded-none overflow-auto">
+          <div className="min-h-screen bg-white">
+            {/* Exit button */}
+            <div className="fixed top-4 right-4 z-50">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  resetPresentationState();
+                  setShowPresentation(false);
+                }}
+                className="bg-white shadow-lg"
+                data-testid="button-exit-presentation"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Exit Presentation
+              </Button>
+            </div>
+
+            <div className="py-8 px-4 max-w-3xl mx-auto">
+              {/* Company Logo */}
+              <div className="flex justify-center mb-6 py-6">
+                <img 
+                  src={ghvacLogo} 
+                  alt="Giesbrecht HVAC" 
+                  className="h-20 sm:h-24 w-auto object-contain"
+                />
+              </div>
+
+              {/* Quote Header Card */}
+              <Card className="shadow-lg mb-6 bg-white border-0">
+                <CardHeader className="border-b" style={{ backgroundColor: BRAND_COLOR }}>
+                  <div className="flex items-center justify-between text-white">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      <CardTitle className="text-xl">Quote #{quote.quoteNumber}</CardTitle>
+                    </div>
+                    <span className="text-sm opacity-90">{formatPresentationDate(quote.createdAt)}</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="py-6 space-y-6 bg-white">
+                  {/* Customer Info */}
+                  <div className="bg-white rounded-lg p-4">
+                    <h3 className="font-semibold text-slate-700 mb-2">Prepared For</h3>
+                    <p className="font-medium text-slate-900">{quote.customerName || quote.customer?.name}</p>
+                    {quote.serviceAddress && (
+                      <p className="text-slate-600 text-sm">{quote.serviceAddress}</p>
+                    )}
+                  </div>
+
+                  {/* Quote Content - Options Mode */}
+                  {quote.quoteMode === "options" && quote.lineItems ? (
+                    <>
+                      <div>
+                        <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-2">Your Home Comfort Options</h3>
+                        <p className="text-sm sm:text-base text-slate-600">
+                          Please review the options below and select the one that best fits your needs.
+                        </p>
+                      </div>
+
+                      <div className="space-y-3 sm:space-y-4">
+                        {groupLineItemsByOption(quote.lineItems).map((option) => {
+                          const isSelected = presentationSelectedOption === option.tag;
+                          const whatsIncluded = getWhatsIncludedForOption(
+                            option.tag, 
+                            quote.aiGeneratedQuote?.whats_included as WhatsIncludedItem[] | undefined
+                          );
+                          return (
+                            <div 
+                              key={option.tag} 
+                              onClick={() => setPresentationSelectedOption(option.tag)}
+                              className={`border-2 rounded-lg overflow-hidden cursor-pointer transition-all bg-white ${
+                                isSelected 
+                                  ? "border-[#711419] ring-2 ring-[#711419]/20 shadow-md" 
+                                  : "border-slate-200 hover:border-slate-400"
+                              }`}
+                              data-testid={`presentation-option-${option.tag.toLowerCase().replace(/\s+/g, "-")}`}
+                            >
+                              <div className={`px-3 sm:px-4 py-4 flex justify-between items-center ${isSelected ? "bg-blue-50" : "bg-gray-50"}`}>
+                                <div className="flex items-center gap-2 sm:gap-3">
+                                  <div className={`w-6 h-6 sm:w-5 sm:h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                                    isSelected ? "border-[#711419] bg-[#711419]" : "border-slate-400"
+                                  }`}>
+                                    {isSelected && <div className="w-2.5 h-2.5 sm:w-2 sm:h-2 rounded-full bg-white" />}
+                                  </div>
+                                  <span className="font-semibold text-slate-900 text-base sm:text-lg">{option.tag}</span>
+                                </div>
+                                <span className="text-lg sm:text-xl font-bold" style={{ color: BRAND_COLOR }}>{formatPresentationCurrency(option.total)}</span>
+                              </div>
+                              <div className="p-3 sm:p-4 bg-white">
+                                {/* Show AI-generated category title if available */}
+                                {whatsIncluded.categoryTitle && (
+                                  <div className="mb-3 pb-2 border-b border-slate-200">
+                                    <p className="font-semibold text-slate-800 text-sm sm:text-base">{whatsIncluded.categoryTitle}</p>
+                                  </div>
+                                )}
+                                
+                                {option.items.map((item) => {
+                                  const equipmentImages = parseEquipmentImages(item.imageUrl);
+                                  return (
+                                    <div key={item.id} className="py-2 border-b border-slate-100 last:border-0">
+                                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                                        {equipmentImages ? (
+                                          <div className="flex-shrink-0">
+                                            <PresentationEquipmentImageGrid images={equipmentImages} />
+                                          </div>
+                                        ) : item.imageUrl && !item.imageUrl.startsWith('{') && (
+                                          <div className="flex-shrink-0">
+                                            <img 
+                                              src={item.imageUrl} 
+                                              alt={item.description}
+                                              className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border border-slate-200"
+                                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                            />
+                                          </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                          {/* Only show line item description if no AI category title */}
+                                          {!whatsIncluded.categoryTitle && (
+                                            <div className="font-medium text-slate-800 text-sm sm:text-base">{item.description}</div>
+                                          )}
+                                          {item.partNumber && (
+                                            <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
+                                          )}
+                                          <div className="flex justify-between items-center mt-1 text-sm text-slate-600">
+                                            <span>Qty: {parseFloat(item.quantity || "1")}</span>
+                                            <span className="font-medium text-slate-800">{formatPresentationCurrency(item.lineTotal)}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                                
+                                {whatsIncluded.items.length > 0 && (
+                                  <div className="mt-3 pt-3 border-t border-slate-200">
+                                    <p className="text-xs font-semibold text-slate-600 mb-2 uppercase tracking-wide">What's Included:</p>
+                                    <ul className="space-y-1">
+                                      {whatsIncluded.items.map((incItem, idx) => (
+                                        <li key={idx} className="flex items-start gap-2 text-sm text-slate-600">
+                                          <span className="text-[#711419] mt-0.5">•</span>
+                                          <span>{incItem}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {presentationSelectedOption ? (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                          <p className="text-green-800 font-medium">
+                            Selected: <strong>{presentationSelectedOption}</strong>
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
+                          <p className="text-amber-800 font-medium">
+                            Please select one of the options above to continue.
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    /* Single Quote Mode - Line Items Table */
+                    <>
+                      <div>
+                        <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-4">Quote Details</h3>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Description</TableHead>
+                              <TableHead className="text-right">Qty</TableHead>
+                              <TableHead className="text-right">Price</TableHead>
+                              <TableHead className="text-right">Total</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {quote.lineItems && quote.lineItems.length > 0 ? (
+                              quote.lineItems.map((item) => (
+                                <TableRow key={item.id}>
+                                  <TableCell>{item.description}</TableCell>
+                                  <TableCell className="text-right">{item.quantity}</TableCell>
+                                  <TableCell className="text-right">{formatPresentationCurrency(item.unitPrice)}</TableCell>
+                                  <TableCell className="text-right">{formatPresentationCurrency(item.lineTotal)}</TableCell>
+                                </TableRow>
+                              ))
+                            ) : (
+                              <TableRow>
+                                <TableCell colSpan={4} className="text-center text-slate-500 py-8">
+                                  No line items
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+
+                        <div className="mt-6 border-t pt-4">
+                          <div className="flex justify-between text-lg font-semibold">
+                            <span>Total</span>
+                            <span style={{ color: BRAND_COLOR }}>{formatPresentationCurrency(quote.total)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Signature Section or Already Approved Message */}
+              {quote.status === "accepted" ? (
+                <Card className="shadow-lg bg-white border-0">
+                  <CardContent className="py-12 text-center bg-white">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
+                      <CheckCircle className="h-10 w-10 text-green-600" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Quote Already Approved</h2>
+                    <p className="text-slate-600 mb-4">
+                      Quote #{quote.quoteNumber} was accepted on {quote.acceptedAt ? format(new Date(quote.acceptedAt), "MMMM d, yyyy 'at' h:mm a") : "a previous date"}
+                      {quote.signerName && ` by ${quote.signerName}`}.
+                    </p>
+                    <p className="text-sm text-slate-500">
+                      This quote has already been approved and cannot be signed again.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="shadow-lg bg-white border-0">
+                  <CardHeader className="bg-white">
+                    <CardTitle className="text-lg">Accept Quote</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6 bg-white">
+                    <PresentationSignaturePad onSignatureChange={setPresentationSignature} />
+
+                    <div className="space-y-2">
+                      <Label htmlFor="presentation-name">Printed Name</Label>
+                      <Input
+                        id="presentation-name"
+                        value={presentationName}
+                        onChange={(e) => setPresentationName(e.target.value)}
+                        placeholder="Enter your full name"
+                        data-testid="input-presentation-name"
+                      />
+                    </div>
+
+                    <div className="flex items-start space-x-3">
+                      <Checkbox 
+                        id="presentation-terms" 
+                        checked={presentationAgreed}
+                        onCheckedChange={(checked) => setPresentationAgreed(checked === true)}
+                        data-testid="checkbox-presentation-terms"
+                      />
+                      <label 
+                        htmlFor="presentation-terms" 
+                        className="text-sm text-slate-600 leading-tight cursor-pointer"
+                      >
+                        I agree to the terms and conditions of this quote. I authorize the work described above to be performed 
+                        and agree to pay the total amount upon completion of the work.
+                      </label>
+                    </div>
+
+                    <Button
+                      onClick={handlePresentationAccept}
+                      disabled={acceptInPersonMutation.isPending || isGeneratingPaymentLink}
+                      className="w-full py-6 text-lg"
+                      style={{ backgroundColor: BRAND_COLOR }}
+                      data-testid="button-presentation-accept"
+                    >
+                      {acceptInPersonMutation.isPending || isGeneratingPaymentLink ? (
+                        <>
+                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                          {isGeneratingPaymentLink ? "Opening Payment..." : "Processing..."}
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-5 w-5 mr-2" />
+                          Accept Quote
+                        </>
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showWhatsIncludedDialog} onOpenChange={setShowWhatsIncludedDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-800">
+              <Pencil className="h-4 w-4" />
+              Edit What's Included
+            </DialogTitle>
+            <DialogDescription>
+              Edit the items included in each package option. Empty items will be removed when saving.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            {editingWhatsIncluded.map((category, categoryIndex) => (
+              <div key={categoryIndex} className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h4 className="font-semibold text-sm text-blue-800 mb-3">{category.category}</h4>
+                <div className="space-y-2">
+                  {category.items.map((item, itemIndex) => (
+                    <div key={itemIndex} className="flex items-center gap-2">
+                      <Input
+                        value={item}
+                        onChange={(e) => handleWhatsIncludedItemChange(categoryIndex, itemIndex, e.target.value)}
+                        placeholder="Enter item..."
+                        className="flex-1 bg-white"
+                        data-testid={`input-whats-included-${categoryIndex}-${itemIndex}`}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleRemoveWhatsIncludedItem(categoryIndex, itemIndex)}
+                        data-testid={`btn-remove-item-${categoryIndex}-${itemIndex}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-100"
+                    onClick={() => handleAddWhatsIncludedItem(categoryIndex)}
+                    data-testid={`btn-add-item-${categoryIndex}`}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Item
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowWhatsIncludedDialog(false)}
+              data-testid="btn-cancel-whats-included"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveWhatsIncluded}
+              disabled={updateWhatsIncludedMutation.isPending || quote?.status !== "draft"}
+              className="bg-blue-600 hover:bg-blue-700"
+              data-testid="btn-save-whats-included"
+            >
+              {updateWhatsIncludedMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : quote?.status !== "draft" ? (
+                "Quote No Longer Editable"
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showWarrantiesDialog} onOpenChange={setShowWarrantiesDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-800">
+              <Pencil className="h-4 w-4" />
+              Edit Warranties & Terms
+            </DialogTitle>
+            <DialogDescription>
+              Edit the warranties and terms. Enter each term on a new line. Empty lines will be removed when saving.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              value={editingWarranties}
+              onChange={(e) => setEditingWarranties(e.target.value)}
+              placeholder="Enter warranties and terms, one per line..."
+              className="min-h-[200px] resize-y"
+              data-testid="textarea-warranties"
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowWarrantiesDialog(false)}
+              data-testid="btn-cancel-warranties"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveWarranties}
+              disabled={updateWarrantiesMutation.isPending || quote?.status !== "draft"}
+              className="bg-blue-600 hover:bg-blue-700"
+              data-testid="btn-save-warranties"
+            >
+              {updateWarrantiesMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : quote?.status !== "draft" ? (
+                "Quote No Longer Editable"
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showFinancingDialog} onOpenChange={setShowFinancingDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-800">
+              <Pencil className="h-4 w-4" />
+              Edit Financing Text
+            </DialogTitle>
+            <DialogDescription>
+              Edit the financing information displayed on the quote.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              value={editingFinancingText}
+              onChange={(e) => setEditingFinancingText(e.target.value)}
+              placeholder="Enter financing text..."
+              className="min-h-[150px] resize-y"
+              data-testid="textarea-financing"
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowFinancingDialog(false)}
+              data-testid="btn-cancel-financing"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveFinancing}
+              disabled={updateFinancingMutation.isPending || quote?.status !== "draft"}
+              className="bg-blue-600 hover:bg-blue-700"
+              data-testid="btn-save-financing"
+            >
+              {updateFinancingMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : quote?.status !== "draft" ? (
+                "Quote No Longer Editable"
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCreateProjectPrompt} onOpenChange={setShowCreateProjectPrompt}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-800">
+              <FolderKanban className="h-5 w-5" />
+              Create a Project?
+            </DialogTitle>
+            <DialogDescription>
+              Would you like to create a project for this accepted quote? This will help you track the installation progress and schedule work orders.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-slate-600">
+              Creating a project allows you to:
+            </p>
+            <ul className="mt-2 text-sm text-slate-600 list-disc list-inside space-y-1">
+              <li>Track installation progress</li>
+              <li>Schedule and manage work orders</li>
+              <li>Monitor expected vs actual revenue</li>
+            </ul>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateProjectPrompt(false)}
+              data-testid="btn-skip-create-project"
+            >
+              Not Now
+            </Button>
+            <Button
+              onClick={() => {
+                setShowCreateProjectPrompt(false);
+                setShowCreateProjectForm(true);
+              }}
+              className="bg-green-600 hover:bg-green-700"
+              data-testid="btn-open-create-project-form"
+            >
+              <FolderKanban className="h-4 w-4 mr-2" />
+              Create Project
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCreateProjectForm} onOpenChange={setShowCreateProjectForm}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-800">
+              <FolderKanban className="h-5 w-5" />
+              Create Project
+            </DialogTitle>
+            <DialogDescription>
+              Create a new project to track this installation. Fields have been pre-populated from the quote.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="project-title">Project Title *</Label>
+              <Input
+                id="project-title"
+                value={projectFormData.title}
+                onChange={(e) => setProjectFormData(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Enter project title..."
+                data-testid="input-project-title"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="project-type">Project Type</Label>
+                <Select
+                  value={projectFormData.projectType}
+                  onValueChange={(value) => setProjectFormData(prev => ({ ...prev, projectType: value }))}
+                >
+                  <SelectTrigger id="project-type" data-testid="select-project-type">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="INSTALL">Install</SelectItem>
+                    <SelectItem value="DUCT">Duct</SelectItem>
+                    <SelectItem value="COMMERCIAL">Commercial</SelectItem>
+                    <SelectItem value="CRAWLSPACE">Crawlspace</SelectItem>
+                    <SelectItem value="MAJOR_REPAIR">Major Repair</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="project-priority">Priority</Label>
+                <Select
+                  value={projectFormData.priority}
+                  onValueChange={(value) => setProjectFormData(prev => ({ ...prev, priority: value }))}
+                >
+                  <SelectTrigger id="project-priority" data-testid="select-project-priority">
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="project-expected-value">Expected Value ($)</Label>
+              <Input
+                id="project-expected-value"
+                type="number"
+                step="0.01"
+                min="0"
+                value={projectFormData.expectedValue}
+                onChange={(e) => setProjectFormData(prev => ({ ...prev, expectedValue: e.target.value }))}
+                placeholder="0.00"
+                data-testid="input-project-expected-value"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="project-description">Description</Label>
+              <Textarea
+                id="project-description"
+                value={projectFormData.description}
+                onChange={(e) => setProjectFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Enter project description..."
+                className="min-h-[80px] resize-y"
+                data-testid="textarea-project-description"
+              />
+            </div>
+
+            {(projectFormData.customerName || projectFormData.customerId) && (
+              <div className="p-3 bg-slate-50 rounded-lg border">
+                <p className="text-xs font-medium text-slate-500 mb-1">Customer</p>
+                <p className="text-sm font-medium text-slate-900">
+                  {projectFormData.customerName || `Customer ID: ${projectFormData.customerId.substring(0, 8)}...`}
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateProjectForm(false)}
+              data-testid="btn-cancel-create-project"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateProject}
+              disabled={createProjectMutation.isPending}
+              className="bg-green-600 hover:bg-green-700"
+              data-testid="btn-submit-create-project"
+            >
+              {createProjectMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <FolderKanban className="h-4 w-4 mr-2" />
+                  Create Project
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showFollowUpModal} onOpenChange={setShowFollowUpModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create Follow-up Work Order?</DialogTitle>
+            <DialogDescription>
+              This quote was accepted while the technician was working. Would you like to create a follow-up work order?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 py-4">
+            <Button
+              onClick={() => createFollowUpMutation.mutate("parts_needed")}
+              disabled={createFollowUpMutation.isPending}
+              className="w-full justify-start gap-2 h-auto py-4 px-4"
+              variant="outline"
+            >
+              <div className="flex flex-col items-start text-left">
+                <span className="font-semibold">Parts Needed</span>
+                <span className="text-sm text-muted-foreground font-normal">
+                  Create urgent work order in the Parts Needed queue
+                </span>
+              </div>
+            </Button>
+            <Button
+              onClick={() => createFollowUpMutation.mutate("schedule_now")}
+              disabled={createFollowUpMutation.isPending}
+              className="w-full justify-start gap-2 h-auto py-4 px-4"
+              variant="outline"
+            >
+              <div className="flex flex-col items-start text-left">
+                <span className="font-semibold">Schedule Now</span>
+                <span className="text-sm text-muted-foreground font-normal">
+                  Open work order form to schedule immediately
+                </span>
+              </div>
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowFollowUpModal(false)}>
+              Skip for now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </CrmLayout>
   );
 }

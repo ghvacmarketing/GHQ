@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -55,6 +56,7 @@ const INTEREST_LEVELS: { value: InterestLevel; label: string }[] = [
 ];
 
 export default function CrmAddProspect() {
+  usePageTitle("Add Prospect");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [mode, setMode] = useState<ProspectMode>("choose");

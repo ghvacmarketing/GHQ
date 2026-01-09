@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -67,6 +68,7 @@ const VISIT_TYPE_COLORS: Record<WorkOrderVisitType, string> = {
 };
 
 export default function CrmSettingsSubtypes() {
+  usePageTitle("Subtype Settings");
   const [, navigate] = useLocation();
   const { toast } = useToast();
 

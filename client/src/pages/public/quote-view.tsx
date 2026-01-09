@@ -7,27 +7,27 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, FileText, AlertCircle, Loader2 } from "lucide-react";
+import { CheckCircle2, FileText, AlertCircle, Loader2, CreditCard } from "lucide-react";
 import type { CrmQuote, CrmQuoteLineItem } from "@shared/schema";
 import ghvacLogo from "@assets/ghvac-logo.png";
 
 const BRAND_COLOR = "#711419";
 const BRAND_NAME = "Giesbrecht HVAC";
 
-function BrandEmblem() {
+function BrandLogo() {
   return (
-    <div className="flex justify-center mb-4">
+    <div className="flex justify-center mb-6 py-6">
       <img 
         src={ghvacLogo} 
         alt="Giesbrecht HVAC" 
-        className="h-16 sm:h-20 w-auto object-contain"
+        className="h-20 sm:h-24 w-auto object-contain"
       />
     </div>
   );
 }
 
 interface PublicQuoteData {
-  quote: CrmQuote;
+  quote: CrmQuote & { depositPercentage?: number };
   lineItems: CrmQuoteLineItem[];
 }
 
@@ -141,11 +141,16 @@ interface WhatsIncludedItem {
   items: string[];
 }
 
+interface WhatsIncludedResult {
+  categoryTitle: string;
+  items: string[];
+}
+
 function getWhatsIncludedForOption(
   optionTag: string, 
   whatsIncluded: WhatsIncludedItem[] | undefined
-): string[] {
-  if (!whatsIncluded || !Array.isArray(whatsIncluded)) return [];
+): WhatsIncludedResult {
+  if (!whatsIncluded || !Array.isArray(whatsIncluded)) return { categoryTitle: "", items: [] };
   
   const normalizedTag = optionTag.toLowerCase().trim();
   
@@ -155,7 +160,10 @@ function getWhatsIncludedForOption(
            normalizedCategory.startsWith(normalizedTag);
   });
   
-  return match?.items || [];
+  return {
+    categoryTitle: match?.category || "",
+    items: match?.items || []
+  };
 }
 
 function SignaturePad({ onSignatureChange }: { onSignatureChange: (dataUrl: string) => void }) {
@@ -284,14 +292,16 @@ function SignaturePad({ onSignatureChange }: { onSignatureChange: (dataUrl: stri
 }
 
 function QuoteAlreadyAccepted({ quote }: { quote: CrmQuote }) {
+  const depositAmount = quote.depositAmount ? parseFloat(quote.depositAmount.toString()) : 0;
+  const total = quote.total ? parseFloat(quote.total.toString()) : 0;
+  const remainingBalance = !isNaN(total) && !isNaN(depositAmount) ? total - depositAmount : 0;
+  const hasDeposit = !isNaN(depositAmount) && depositAmount > 0 && quote.depositPaidAt;
+  
   return (
     <div className="min-h-screen bg-slate-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">
-          <BrandEmblem />
-          <h1 className="text-2xl font-bold" style={{ color: BRAND_COLOR }}>
-            {BRAND_NAME}
-          </h1>
+          <BrandLogo />
         </div>
 
         <Card className="shadow-lg">
@@ -299,13 +309,38 @@ function QuoteAlreadyAccepted({ quote }: { quote: CrmQuote }) {
             <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
               <CheckCircle2 className="h-10 w-10 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">Quote Already Accepted</h2>
+            <h2 className="text-2xl font-bold text-slate-900 mb-2">Quote Approved!</h2>
+            
+            {quote.title && (
+              <p className="text-lg font-medium text-slate-700 mb-2">{quote.title}</p>
+            )}
+            {quote.selectedOption && (
+              <p className="text-slate-600 mb-2">Selected Option: <strong>{quote.selectedOption}</strong></p>
+            )}
+            
             <p className="text-slate-600 mb-4">
-              Quote #{quote.quoteNumber} was accepted on {formatDate(quote.acceptedAt)}
+              Quote #{quote.quoteNumber} was approved on {formatDate(quote.acceptedAt)}
               {quote.signerName && ` by ${quote.signerName}`}.
             </p>
+            
+            {hasDeposit && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 text-left">
+                <h3 className="font-semibold text-green-800 mb-2">Payment Received</h3>
+                <div className="space-y-1 text-sm text-green-700">
+                  <p>Deposit Paid: <strong>{formatCurrency(depositAmount)}</strong></p>
+                  <p>Payment Date: {formatDate(quote.depositPaidAt)}</p>
+                  {remainingBalance > 0 && (
+                    <p className="pt-2 border-t border-green-200 mt-2">
+                      Remaining Balance Due: <strong>{formatCurrency(remainingBalance)}</strong>
+                      <span className="text-xs block text-green-600">(Due upon completion of work)</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            
             <p className="text-sm text-slate-500">
-              If you have questions about your quote, please contact us at (830) 626-0408.
+              If you have questions about your quote, please contact us at (706) 826-0644.
             </p>
           </CardContent>
         </Card>
@@ -319,10 +354,7 @@ function QuoteSuccess({ quote }: { quote: CrmQuote }) {
     <div className="min-h-screen bg-slate-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">
-          <BrandEmblem />
-          <h1 className="text-2xl font-bold" style={{ color: BRAND_COLOR }}>
-            {BRAND_NAME}
-          </h1>
+          <BrandLogo />
         </div>
 
         <Card className="shadow-lg">
@@ -335,7 +367,7 @@ function QuoteSuccess({ quote }: { quote: CrmQuote }) {
               Thank you for accepting quote #{quote.quoteNumber}. We'll be in touch shortly to schedule your service.
             </p>
             <p className="text-sm text-slate-500">
-              If you have any questions, please contact us at (830) 626-0408.
+              If you have any questions, please contact us at (706) 826-0644.
             </p>
           </CardContent>
         </Card>
@@ -352,6 +384,10 @@ export default function PublicQuoteView() {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [isAccepted, setIsAccepted] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [paymentLinkLoading, setPaymentLinkLoading] = useState(false);
+  const [depositAmount, setDepositAmount] = useState<number>(0);
+  const [depositPaidAt, setDepositPaidAt] = useState<Date | null>(null);
+  const [depositVerifying, setDepositVerifying] = useState(false);
 
   const { data, isLoading, error } = useQuery<PublicQuoteData>({
     queryKey: ["/api/public/quotes", token],
@@ -391,6 +427,130 @@ export default function PublicQuoteView() {
       });
     },
   });
+
+  // Quote types that should show the 50% deposit payment link
+  const quote = data?.quote;
+  // Check if this is an install/proposal quote that should show deposit option
+  // Handle both database format (custom_install) and display format (Custom Install)
+  const quoteTypeNormalized = quote?.quoteType?.toLowerCase().replace(/\s+/g, '_') || "";
+  const isInstallQuote = ["custom_install", "proposal", "custom_service"].includes(quoteTypeNormalized);
+  
+  // Check if quote already has deposit paid when loaded
+  useEffect(() => {
+    if (quote?.depositPaidAt) {
+      setDepositPaidAt(new Date(quote.depositPaidAt));
+      if (quote.depositAmount) {
+        setDepositAmount(parseFloat(quote.depositAmount));
+      }
+    }
+  }, [quote?.depositPaidAt, quote?.depositAmount]);
+
+  // Track if we've already attempted verification to prevent infinite loops
+  const [verificationAttempted, setVerificationAttempted] = useState(false);
+  
+  // Verify deposit payment - runs ONLY on redirect from Stripe with payment=success
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentSuccess = params.get('payment');
+    
+    // Only verify if explicitly redirected from Stripe with success parameter
+    // AND we haven't already recorded a deposit, AND we're not currently verifying
+    const shouldVerify = quote?.id && !depositPaidAt && !depositVerifying && 
+      !verificationAttempted && paymentSuccess === 'success';
+    
+    if (shouldVerify) {
+      setDepositVerifying(true);
+      setVerificationAttempted(true);
+      
+      fetch(`/api/stripe/quote/${quote.id}/verify-deposit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+        .then(res => res.json())
+        .then(result => {
+          if (result.success) {
+            setDepositPaidAt(new Date(result.depositPaidAt));
+            setDepositAmount(result.depositAmount || 0);
+            if (result.selectedOption) {
+              setSelectedOption(result.selectedOption);
+            }
+            toast({
+              title: "Payment Successful!",
+              description: "Your deposit has been received. The quote has been accepted.",
+            });
+            // Clean up URL parameter
+            window.history.replaceState({}, '', window.location.pathname);
+          } else {
+            toast({
+              variant: "destructive",
+              title: "Payment Verification",
+              description: "We couldn't verify your payment. Please try again or contact us.",
+            });
+          }
+        })
+        .catch(err => {
+          console.error('Deposit verification error:', err);
+          toast({
+            variant: "destructive",
+            title: "Verification Error",
+            description: "Failed to verify payment. Please refresh the page.",
+          });
+        })
+        .finally(() => {
+          setDepositVerifying(false);
+        });
+    }
+  }, [quote?.id, depositPaidAt, depositVerifying, verificationAttempted, toast]);
+  
+  // Handle deposit payment button click - fetch payment link and redirect
+  const handlePayDeposit = async () => {
+    if (!quote?.id) return;
+    
+    // Validate signature and name before proceeding to payment
+    if (!signatureData) {
+      toast({ variant: "destructive", title: "Signature Required", description: "Please provide your signature before making payment." });
+      return;
+    }
+    if (!printedName.trim()) {
+      toast({ variant: "destructive", title: "Name Required", description: "Please enter your printed name before making payment." });
+      return;
+    }
+    
+    setPaymentLinkLoading(true);
+    try {
+      const response = await fetch(`/api/stripe/quote/${quote.id}/payment-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          selectedOption,
+          signatureImage: signatureData,
+          signerName: printedName.trim(),
+        }),
+      });
+      if (response.ok) {
+        const result = await response.json();
+        setDepositAmount(result.depositAmount);
+        // Redirect to the Stripe payment link
+        window.location.href = result.paymentLinkUrl;
+      } else {
+        const err = await response.json();
+        toast({
+          variant: "destructive",
+          title: "Payment Error",
+          description: err.error || "Failed to generate payment link. Please try again.",
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch payment link:", err);
+      toast({
+        variant: "destructive",
+        title: "Payment Error",
+        description: "Failed to connect to payment service. Please try again.",
+      });
+    } finally {
+      setPaymentLinkLoading(false);
+    }
+  };
 
   const handleSubmit = () => {
     if (!signatureData) {
@@ -433,10 +593,7 @@ export default function PublicQuoteView() {
       <div className="min-h-screen bg-slate-50 py-8 px-4">
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-8">
-            <BrandEmblem />
-            <h1 className="text-2xl font-bold" style={{ color: BRAND_COLOR }}>
-              {BRAND_NAME}
-            </h1>
+            <BrandLogo />
           </div>
 
           <Card className="shadow-lg">
@@ -449,7 +606,7 @@ export default function PublicQuoteView() {
                 {error?.message || "This quote link is invalid or has expired."}
               </p>
               <p className="text-sm text-slate-500 mt-4">
-                Please contact us at (830) 626-0408 for assistance.
+                Please contact us at (706) 826-0644 for assistance.
               </p>
             </CardContent>
           </Card>
@@ -458,25 +615,27 @@ export default function PublicQuoteView() {
     );
   }
 
-  const { quote, lineItems } = data;
+  // quote is already defined above for the useEffect, just get lineItems
+  const { lineItems } = data;
+  // Use the quote variable defined above (now guaranteed to exist since we passed the !data check)
+  const quoteData = quote!;
+  
+  // Get deposit percentage from API response (default to 50 if not provided)
+  const depositPercentage = (quoteData as any).depositPercentage ?? 50;
 
-  if (quote.status === "accepted") {
-    return <QuoteAlreadyAccepted quote={quote} />;
+  if (quoteData.status === "accepted") {
+    return <QuoteAlreadyAccepted quote={quoteData} />;
   }
 
   if (isAccepted) {
-    return <QuoteSuccess quote={quote} />;
+    return <QuoteSuccess quote={quoteData} />;
   }
 
   return (
     <div className="min-h-screen bg-slate-50 py-4 sm:py-8 px-3 sm:px-4">
       <div className="max-w-3xl mx-auto">
         <div className="text-center mb-8">
-          <BrandEmblem />
-          <h1 className="text-2xl font-bold" style={{ color: BRAND_COLOR }}>
-            {BRAND_NAME}
-          </h1>
-          <p className="text-slate-500">Professional HVAC Solutions</p>
+          <BrandLogo />
         </div>
 
         <Card className="shadow-lg mb-6">
@@ -484,22 +643,22 @@ export default function PublicQuoteView() {
             <div className="flex items-center justify-between text-white">
               <div className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                <CardTitle className="text-xl">Quote #{quote.quoteNumber}</CardTitle>
+                <CardTitle className="text-xl">Quote #{quoteData.quoteNumber}</CardTitle>
               </div>
-              <span className="text-sm opacity-90">{formatDate(quote.createdAt)}</span>
+              <span className="text-sm opacity-90">{formatDate(quoteData.createdAt)}</span>
             </div>
           </CardHeader>
           <CardContent className="py-6 space-y-6">
             <div className="bg-slate-50 rounded-lg p-4">
               <h3 className="font-semibold text-slate-700 mb-2">Prepared For</h3>
-              <p className="font-medium text-slate-900" data-testid="text-customer-name">{quote.customerName}</p>
-              {quote.serviceAddress && (
-                <p className="text-slate-600 text-sm" data-testid="text-service-address">{quote.serviceAddress}</p>
+              <p className="font-medium text-slate-900" data-testid="text-customer-name">{quoteData.customerName}</p>
+              {quoteData.serviceAddress && (
+                <p className="text-slate-600 text-sm" data-testid="text-service-address">{quoteData.serviceAddress}</p>
               )}
             </div>
 
             {/* Option-based quotes: show intro explaining this is a multi-option proposal */}
-            {quote.quoteMode === "options" ? (
+            {quoteData.quoteMode === "options" ? (
               <>
                 <div>
                   <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-2">Your Home Comfort Options</h3>
@@ -514,7 +673,7 @@ export default function PublicQuoteView() {
                     const isSelected = selectedOption === option.tag;
                     const whatsIncluded = getWhatsIncludedForOption(
                       option.tag, 
-                      quote.aiGeneratedQuote?.whats_included as WhatsIncludedItem[] | undefined
+                      quoteData.aiGeneratedQuote?.whats_included as WhatsIncludedItem[] | undefined
                     );
                     return (
                       <div 
@@ -539,6 +698,13 @@ export default function PublicQuoteView() {
                           <span className="text-lg sm:text-xl font-bold" style={{ color: BRAND_COLOR }}>{formatCurrency(option.total)}</span>
                         </div>
                         <div className="p-3 sm:p-4">
+                          {/* Show AI-generated category title if available */}
+                          {whatsIncluded.categoryTitle && (
+                            <div className="mb-3 pb-2 border-b border-slate-200">
+                              <p className="font-semibold text-slate-800 text-sm sm:text-base">{whatsIncluded.categoryTitle}</p>
+                            </div>
+                          )}
+                          
                           {option.items.map((item) => {
                             const equipmentImages = parseEquipmentImages(item.imageUrl);
                             return (
@@ -559,7 +725,10 @@ export default function PublicQuoteView() {
                                     </div>
                                   )}
                                   <div className="flex-1 min-w-0">
-                                    <div className="font-medium text-slate-800 text-sm sm:text-base">{item.description}</div>
+                                    {/* Only show line item description if no AI category title */}
+                                    {!whatsIncluded.categoryTitle && (
+                                      <div className="font-medium text-slate-800 text-sm sm:text-base">{item.description}</div>
+                                    )}
                                     {item.partNumber && (
                                       <div className="text-xs text-slate-500">Part #: {item.partNumber}</div>
                                     )}
@@ -573,11 +742,11 @@ export default function PublicQuoteView() {
                             );
                           })}
                           
-                          {whatsIncluded.length > 0 && (
+                          {whatsIncluded.items.length > 0 && (
                             <div className="mt-3 pt-3 border-t border-slate-200">
                               <p className="text-xs font-semibold text-slate-600 mb-2 uppercase tracking-wide">What's Included:</p>
                               <ul className="space-y-1">
-                                {whatsIncluded.map((item, idx) => (
+                                {whatsIncluded.items.map((item, idx) => (
                                   <li key={idx} className="flex items-start gap-2 text-sm text-slate-600">
                                     <span className="text-[#711419] mt-0.5">•</span>
                                     <span>{item}</span>
@@ -601,17 +770,17 @@ export default function PublicQuoteView() {
                 ) : (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
                     <p className="text-amber-800 font-medium">
-                      Please select one option above. Contact us at (830) 626-0408 to discuss which option is right for you.
+                      Please select one option above. Contact us at (706) 826-0644 to discuss which option is right for you.
                     </p>
                   </div>
                 )}
               </>
             ) : (
               <>
-                {(quote.title || quote.description) && (
+                {(quoteData.title || quoteData.description) && (
                   <div>
-                    {quote.title && <h3 className="text-lg font-semibold text-slate-900 mb-1">{quote.title}</h3>}
-                    {quote.description && <p className="text-slate-600">{quote.description}</p>}
+                    {quoteData.title && <h3 className="text-lg font-semibold text-slate-900 mb-1">{quoteData.title}</h3>}
+                    {quoteData.description && <p className="text-slate-600">{quoteData.description}</p>}
                   </div>
                 )}
 
@@ -627,9 +796,19 @@ export default function PublicQuoteView() {
                         </tr>
                       </thead>
                       <tbody>
-                        {lineItems.length > 0 ? (
-                          lineItems.map((item, idx) => {
+                        {(() => {
+                          // Filter out labor/internal line items from client view
+                          const clientVisibleItems = lineItems.filter(item => 
+                            item.lineType !== "labor" && item.lineType !== "other"
+                          );
+                          // For single line item quotes, display the sell price (quoteData.total) instead of actual cost
+                          const isSingleItem = clientVisibleItems.length === 1;
+                          
+                          return clientVisibleItems.length > 0 ? (
+                          clientVisibleItems.map((item, idx) => {
                             const equipmentImages = parseEquipmentImages(item.imageUrl);
+                            // Use quoteData.total for single item quotes to show sell price
+                            const displayPrice = isSingleItem ? quoteData.total : item.lineTotal;
                             return (
                               <tr key={item.id} className={idx % 2 === 1 ? "bg-slate-50" : ""}>
                                 <td className="px-4 py-3">
@@ -648,7 +827,7 @@ export default function PublicQuoteView() {
                                   </div>
                                 </td>
                                 <td className="text-center px-4 py-3 text-slate-600">{parseFloat(item.quantity || "1")}</td>
-                                <td className="text-right px-4 py-3 font-medium text-slate-900">{formatCurrency(item.lineTotal)}</td>
+                                <td className="text-right px-4 py-3 font-medium text-slate-900">{formatCurrency(displayPrice)}</td>
                               </tr>
                             );
                           })
@@ -658,41 +837,32 @@ export default function PublicQuoteView() {
                               No items listed
                             </td>
                           </tr>
-                        )}
+                        );
+                        })()}
                       </tbody>
                     </table>
                   </div>
                 </div>
 
                 <div className="bg-slate-50 rounded-lg p-4 space-y-2">
-                  <div className="flex justify-between text-slate-600">
-                    <span>Subtotal</span>
-                    <span>{formatCurrency(quote.subtotal)}</span>
-                  </div>
-                  {quote.laborTotal && parseFloat(quote.laborTotal) > 0 && (
-                    <div className="flex justify-between text-slate-600">
-                      <span>Labor</span>
-                      <span>{formatCurrency(quote.laborTotal)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-xl font-bold border-t pt-2" style={{ color: BRAND_COLOR }}>
+                  <div className="flex justify-between text-xl font-bold" style={{ color: BRAND_COLOR }}>
                     <span>Total</span>
-                    <span data-testid="text-quote-total">{formatCurrency(quote.total)}</span>
+                    <span data-testid="text-quote-total">{formatCurrency(quoteData.total)}</span>
                   </div>
                 </div>
               </>
             )}
 
-            {quote.validUntil && (
+            {quoteData.validUntil && (
               <p className="text-sm text-slate-500 text-center">
-                This quote is valid until {formatDate(quote.validUntil)}.
+                This quote is valid until {formatDate(quoteData.validUntil)}.
               </p>
             )}
           </CardContent>
         </Card>
 
         {/* Only show Terms & Conditions for install quotes (proposal and custom_install) */}
-        {quote.quoteType !== "quick" && quote.quoteType !== "custom_service" && (
+        {quoteData.quoteType !== "quick" && quoteData.quoteType !== "custom_service" && (
           <Card className="shadow-lg mb-6">
             <CardHeader>
               <CardTitle className="text-lg">Terms & Conditions</CardTitle>
@@ -700,7 +870,7 @@ export default function PublicQuoteView() {
             <CardContent className="space-y-3 text-sm text-slate-600">
               <p>1. All work will be performed by licensed and insured technicians.</p>
               <p>2. Payment is due upon completion of work unless otherwise agreed.</p>
-              <p>3. A 50% deposit may be required for equipment orders.</p>
+              <p>3. A {depositPercentage}% deposit may be required for equipment orders.</p>
               <p>4. Warranty terms vary by equipment and are provided separately.</p>
               <p>5. Additional charges may apply for unforeseen conditions discovered during work.</p>
               <p>6. Customer is responsible for providing reasonable access to work areas.</p>
@@ -736,39 +906,118 @@ export default function PublicQuoteView() {
                 data-testid="checkbox-agree-terms"
               />
               <label htmlFor="terms" className="text-sm text-slate-600 cursor-pointer leading-relaxed">
-                {quote.quoteType === "quick" || quote.quoteType === "custom_service" 
+                {quoteData.quoteType === "quick" || quoteData.quoteType === "custom_service" 
                   ? `By signing this document, I authorize ${BRAND_NAME} to perform the work described in this quote.`
                   : `I have read and agree to the terms and conditions above. By signing this document, I authorize ${BRAND_NAME} to perform the work described in this quote.`
                 }
               </label>
             </div>
 
-            <Button
-              onClick={handleSubmit}
-              disabled={signMutation.isPending || !signatureData || !printedName.trim() || !agreedToTerms || (quote.quoteMode === "options" && !selectedOption)}
-              className="w-full py-6 text-lg font-semibold"
-              style={{ backgroundColor: BRAND_COLOR }}
-              data-testid="button-accept-quote"
-            >
-              {signMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                "Accept Quote"
-              )}
-            </Button>
+            {/* Deposit Payment Section for Install Quotes - REQUIRED before accepting */}
+            {isInstallQuote && agreedToTerms && (
+              <div className="border-t border-slate-200 pt-4">
+                {depositVerifying ? (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-5 w-5 text-blue-700 animate-spin" />
+                      <span className="text-blue-800 font-medium">Verifying payment...</span>
+                    </div>
+                  </div>
+                ) : depositPaidAt ? (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center justify-center gap-2 mb-3">
+                      <CheckCircle2 className="h-6 w-6 text-green-700" />
+                      <h4 className="font-semibold text-green-800 text-lg">Quote Accepted!</h4>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 border border-green-200 mb-3">
+                      <p className="text-green-800 font-medium text-center mb-2">
+                        Your {formatCurrency(depositAmount)} deposit has been received.
+                      </p>
+                      {(quote?.selectedOption || selectedOption) && (
+                        <div className="border-t border-green-100 pt-3 mt-3">
+                          <p className="text-sm text-slate-600 text-center">
+                            Selected Package:
+                          </p>
+                          <p className="font-bold text-slate-800 text-center text-lg">
+                            {quote?.selectedOption || selectedOption}
+                          </p>
+                        </div>
+                      )}
+                      <p className="text-xs text-slate-500 text-center mt-3">
+                        Payment received on {formatDate(depositPaidAt)}
+                      </p>
+                    </div>
+                    <p className="text-sm text-green-700 text-center">
+                      Thank you! Your quote has been accepted and we will contact you shortly to schedule the work.
+                    </p>
+                    <p className="text-xs text-slate-500 text-center mt-2">
+                      The remaining balance will be due upon completion of the installation.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <CreditCard className="h-5 w-5 text-amber-700" />
+                      <h4 className="font-semibold text-amber-800">{depositPercentage}% Deposit Required</h4>
+                    </div>
+                    <p className="text-sm text-amber-700 mb-3">
+                      A {depositPercentage}% deposit is required before accepting this quote.
+                    </p>
+                    <Button
+                      onClick={handlePayDeposit}
+                      disabled={paymentLinkLoading || (quoteData.quoteMode === "options" && !selectedOption)}
+                      className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg font-semibold disabled:bg-slate-300"
+                      data-testid="button-pay-deposit"
+                    >
+                      {paymentLinkLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Generating Payment Link...
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="mr-2 h-5 w-5" />
+                          Pay {depositPercentage}% Deposit Now
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-amber-600 mt-2">Secure payment powered by Stripe</p>
+                  </div>
+                )}
+              </div>
+            )}
 
-            <p className="text-xs text-center text-slate-500">
-              By clicking "Accept Quote", you are electronically signing this agreement.
-            </p>
+            {/* Accept Quote button - shown for non-install quotes only (install quotes auto-accept on deposit payment) */}
+            {agreedToTerms && !isInstallQuote && (
+              <>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={signMutation.isPending || !signatureData || !printedName.trim() || (quoteData.quoteMode === "options" && !selectedOption)}
+                  className="w-full py-6 text-lg font-semibold"
+                  style={{ backgroundColor: BRAND_COLOR }}
+                  data-testid="button-accept-quote"
+                >
+                  {signMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Accept Quote"
+                  )}
+                </Button>
+
+                <p className="text-xs text-center text-slate-500">
+                  By clicking "Accept Quote", you are electronically signing this agreement.
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
         <footer className="text-center mt-8 text-sm text-slate-500">
           <p>{BRAND_NAME} • Professional HVAC Service Solutions</p>
-          <p>(830) 626-0408 • quotes@ghvac.work</p>
+          <p>(706) 826-0644 • quotes@ghvac.work</p>
         </footer>
       </div>
     </div>

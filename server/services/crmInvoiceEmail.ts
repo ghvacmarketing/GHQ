@@ -1,5 +1,9 @@
 import { Resend } from "resend";
 import type { CrmInvoice, CrmInvoiceLineItem } from "@shared/schema";
+import { crmInvoices } from "@shared/schema";
+import { getUncachableStripeClient } from "../stripeClient";
+import { db } from "../db";
+import { eq } from "drizzle-orm";
 
 const brandDefaults = {
   name: "Giesbrecht HVAC",
@@ -45,6 +49,57 @@ export interface CrmInvoiceEmailResult {
   fromEmail?: string;
   replyToEmail?: string;
   subject?: string;
+  paymentLinkUrl?: string;
+}
+
+// Generate a Stripe payment link for an invoice and store its ID for later deactivation
+async function generatePaymentLink(invoice: CrmInvoice): Promise<string | null> {
+  try {
+    const balanceDue = parseFloat(invoice.balanceDue?.toString() || invoice.total?.toString() || "0");
+    if (balanceDue <= 0) {
+      return null; // No balance due, no payment link needed
+    }
+
+    const stripe = await getUncachableStripeClient();
+    
+    const paymentLink = await stripe.paymentLinks.create({
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `Invoice #${invoice.invoiceNumber}`,
+              description: `Payment for HVAC Service Invoice`,
+            },
+            unit_amount: Math.round(balanceDue * 100), // Convert to cents
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: {
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        type: 'invoice_payment',
+      },
+      after_completion: {
+        type: 'redirect',
+        redirect: {
+          url: `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}/portal/invoice/${invoice.id}?payment=success`,
+        },
+      },
+    });
+
+    // Store the payment link ID on the invoice so it can be deactivated when marked as paid
+    await db.update(crmInvoices)
+      .set({ stripePaymentLinkId: paymentLink.id })
+      .where(eq(crmInvoices.id, invoice.id));
+    console.log(`[CRM Invoice Email] Stored payment link ID ${paymentLink.id} on invoice ${invoice.invoiceNumber}`);
+
+    return paymentLink.url;
+  } catch (error) {
+    console.error("Error generating payment link for invoice:", error);
+    return null;
+  }
 }
 
 export interface CrmInvoiceEmailOptions {
@@ -80,8 +135,20 @@ export async function sendCrmInvoiceEmail(
   console.log("[CRM Invoice Email] Sending invoice email FROM:", standardFromEmail, "REPLY-TO:", replyToEmail, "TO:", recipientEmail);
 
   const subject = `Your Invoice from ${brandName} - ${invoice.invoiceNumber}`;
-  const html = buildHtmlBody(invoice, lineItems, customerName, personalMessage, sentBy);
-  const text = buildTextBody(invoice, lineItems, customerName, personalMessage, sentBy);
+  
+  // Generate payment link for invoices with balance due
+  let paymentLinkUrl: string | null = null;
+  try {
+    paymentLinkUrl = await generatePaymentLink(invoice);
+    if (paymentLinkUrl) {
+      console.log("[CRM Invoice Email] Payment link generated:", paymentLinkUrl);
+    }
+  } catch (paymentLinkError) {
+    console.error("[CRM Invoice Email] Failed to generate payment link, continuing without it:", paymentLinkError);
+  }
+  
+  const html = buildHtmlBody(invoice, lineItems, customerName, personalMessage, sentBy, paymentLinkUrl);
+  const text = buildTextBody(invoice, lineItems, customerName, personalMessage, sentBy, paymentLinkUrl);
 
   try {
     const { data, error } = await resend.emails.send({
@@ -108,6 +175,7 @@ export async function sendCrmInvoiceEmail(
       fromEmail: standardFromEmail,
       replyToEmail,
       subject,
+      paymentLinkUrl: paymentLinkUrl || undefined,
     };
   } catch (err) {
     console.error("Error sending CRM invoice email:", err);
@@ -120,7 +188,8 @@ function buildTextBody(
   lineItems: CrmInvoiceLineItem[],
   customerName: string,
   personalMessage?: string,
-  sentBy?: string
+  sentBy?: string,
+  paymentLinkUrl?: string | null
 ): string {
   const lines: string[] = [];
   lines.push(`${brandDefaults.name} - Invoice ${invoice.invoiceNumber}`);
@@ -171,10 +240,20 @@ function buildTextBody(
   }
   lines.push("");
 
+  if (paymentLinkUrl) {
+    lines.push(`PAY ONLINE: ${paymentLinkUrl}`);
+    lines.push("");
+  }
+
   lines.push("To pay or ask questions about this invoice, please contact us at (706) 826-0644.");
   lines.push("");
   lines.push("Thank you for choosing Giesbrecht HVAC!");
+  lines.push("");
+  lines.push("Giesbrecht HVAC");
+  lines.push("(706) 826-0644");
+  lines.push("1530 Crescent Ct, Augusta, GA");
   if (sentBy) {
+    lines.push("");
     lines.push(`Sent by: ${sentBy}`);
   }
 
@@ -186,7 +265,8 @@ function buildHtmlBody(
   lineItems: CrmInvoiceLineItem[],
   customerName: string,
   personalMessage?: string,
-  sentBy?: string
+  sentBy?: string,
+  paymentLinkUrl?: string | null
 ): string {
   const brandName = brandDefaults.name;
   const brandColor = brandDefaults.color;
@@ -342,6 +422,16 @@ function buildHtmlBody(
             </td>
           </tr>
 
+          <!-- Pay Now Button (if balance due and payment link available) -->
+          ${paymentLinkUrl && balanceDue > 0 ? `
+          <tr>
+            <td class="px-24" style="padding:0 20px 16px 20px;text-align:center;">
+              <a href="${esc(paymentLinkUrl)}" style="display:inline-block;background:#22c55e;color:#ffffff;padding:18px 48px;border-radius:10px;text-decoration:none;font-weight:800;font-size:18px;box-shadow:0 4px 14px rgba(34,197,94,0.3);">Pay Now - ${esc(asCurrency(balanceDue))}</a>
+              <p style="margin:12px 0 0 0;font-size:13px;color:#6b7280;">Secure payment powered by Stripe</p>
+            </td>
+          </tr>
+          ` : ""}
+
           <!-- CTA -->
           <tr>
             <td class="px-24" style="padding:0 20px 24px 20px;text-align:center;">
@@ -354,7 +444,8 @@ function buildHtmlBody(
           <tr>
             <td style="background:#f3f4f6;padding:20px;text-align:center;">
               <p style="margin:0;font-weight:700;color:#111827;font-size:14px;">${esc(brandName)}</p>
-              <p style="margin:6px 0 0 0;font-size:12px;color:#6b7280;">Professional HVAC Service Solutions</p>
+              <p style="margin:6px 0 0 0;font-size:13px;color:#6b7280;">(706) 826-0644</p>
+              <p style="margin:4px 0 0 0;font-size:12px;color:#6b7280;">1530 Crescent Ct, Augusta, GA</p>
               ${sentBy ? `<p style="margin:8px 0 0 0;font-size:11px;color:#9ca3af;">Sent by: ${esc(sentBy)}</p>` : ""}
               <p style="margin:8px 0 0 0;font-size:11px;color:#9ca3af;">This is a transactional message regarding your invoice.</p>
             </td>

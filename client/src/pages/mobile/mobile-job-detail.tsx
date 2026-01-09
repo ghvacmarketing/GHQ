@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, useSearch } from "wouter";
-import { format } from "date-fns";
+import { format, addYears, addMonths } from "date-fns";
 import { 
   ArrowLeft, 
   Phone, 
@@ -30,8 +30,17 @@ import {
   Tag,
   Package,
   CreditCard,
-  Mail
+  Mail,
+  UserPlus,
+  Pencil,
+  CalendarIcon,
+  AlertTriangle,
+  RefreshCw,
+  FileCheck,
+  Minus
 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +53,9 @@ import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
@@ -83,11 +95,39 @@ type ChecklistResponseData = {
 
 type TabType = "overview" | "work" | "quote" | "invoice";
 
+interface TimeSlot {
+  start: string;
+  end: string;
+  label: string;
+  available: boolean;
+}
+
+interface RenewalInfo {
+  isRenewalVisit: boolean;
+  paymentType: "initial" | "renewal" | null;
+  renewalStatus: "none" | "pending" | "pending_payment" | "collected" | "declined";
+  agreementInfo: {
+    id: string;
+    agreementNumber: string;
+    price: number;
+    customerName: string;
+    billingPreference?: string;
+    status?: string;
+    agreementPlan?: string;
+  } | null;
+  visitInfo?: {
+    visitNumber: number;
+    totalVisitsInCycle: number;
+    targetDate: string;
+    isRenewalTrigger?: boolean;
+  } | null;
+}
+
 const statusConfig: Record<string, { label: string; className: string }> = {
   scheduled: { label: "Scheduled", className: "bg-slate-100 text-slate-700 border-slate-300" },
   dispatched: { label: "Dispatched", className: "bg-blue-100 text-blue-700 border-blue-300" },
-  en_route: { label: "En Route", className: "bg-yellow-100 text-yellow-700 border-yellow-300" },
-  on_site: { label: "On Site", className: "bg-green-100 text-green-700 border-green-300" },
+  en_route: { label: "Traveling", className: "bg-yellow-100 text-yellow-700 border-yellow-300" },
+  on_site: { label: "Working", className: "bg-green-100 text-green-700 border-green-300" },
   completed: { label: "Completed", className: "bg-slate-200 text-slate-600 border-slate-400" },
 };
 
@@ -120,18 +160,38 @@ function isNetworkError(error: unknown): boolean {
   return !navigator.onLine;
 }
 
+const pendingReasonLabels: Record<string, string> = {
+  waiting_on_parts: "Waiting on Parts",
+  waiting_on_customer: "Waiting on Customer",
+  waiting_for_next_job: "Waiting for Next Job",
+  lunch_break: "Lunch Break",
+  other: "Other",
+};
+
 function OverviewTab({ 
   workOrder, 
   checklistResponse,
   optimisticStatus,
   updateStatusMutation,
   handleStatusChange,
+  renewalInfo,
+  onCollectRenewal,
+  onDeclineRenewal,
+  onPendingChange,
+  pendingMutation,
+  optimisticPending,
 }: {
   workOrder: WorkOrderDetail;
   checklistResponse: ChecklistResponseData | null | undefined;
   optimisticStatus: WorkOrderStatus | null;
   updateStatusMutation: any;
   handleStatusChange: (status: WorkOrderStatus) => void;
+  renewalInfo: RenewalInfo | null | undefined;
+  onCollectRenewal: () => void;
+  onDeclineRenewal: () => void;
+  onPendingChange: (isPending: boolean, reason?: string, isReasonChange?: boolean) => void;
+  pendingMutation: any;
+  optimisticPending: { isPending: boolean; reason?: string } | null;
 }) {
   const [checklistAnswersOpen, setChecklistAnswersOpen] = useState(false);
   const displayStatus = optimisticStatus || workOrder.status;
@@ -152,7 +212,16 @@ function OverviewTab({
 
   return (
     <div className="space-y-4">
-      <div className="text-center mb-4">
+      <div className="text-center mb-4 flex items-center justify-center gap-2">
+        {(optimisticPending?.isPending ?? workOrder.isPending) && (
+          <Badge 
+            variant="outline" 
+            className={`text-lg px-4 py-1 bg-amber-100 text-amber-700 border-amber-300 ${optimisticPending ? 'opacity-70' : 'animate-pulse'}`}
+            data-testid="job-pending-badge"
+          >
+            Waiting{optimisticPending ? " (saving...)" : ""}
+          </Badge>
+        )}
         <Badge 
           variant="outline" 
           className={`text-lg px-4 py-1 ${status.className} ${optimisticStatus ? 'opacity-70' : ''}`}
@@ -162,6 +231,92 @@ function OverviewTab({
           {optimisticStatus && " (saving...)"}
         </Badge>
       </div>
+
+      {renewalInfo?.isRenewalVisit && renewalInfo.renewalStatus === "pending" && renewalInfo.agreementInfo && (
+        <Card className={renewalInfo.paymentType === "initial" ? "border-green-400 bg-green-50" : "border-amber-400 bg-amber-50"} data-testid="renewal-banner">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-start gap-3">
+              <div className={`p-2 rounded-full ${renewalInfo.paymentType === "initial" ? "bg-green-100" : "bg-amber-100"}`}>
+                {renewalInfo.paymentType === "initial" ? (
+                  <DollarSign className="h-5 w-5 text-green-600" />
+                ) : (
+                  <RefreshCw className="h-5 w-5 text-amber-600" />
+                )}
+              </div>
+              <div className="flex-1">
+                <h3 className={`font-semibold mb-1 ${renewalInfo.paymentType === "initial" ? "text-green-800" : "text-amber-800"}`}>
+                  {renewalInfo.paymentType === "initial" ? "First Visit - Collect Payment" : "Renewal Due"}
+                </h3>
+                <p className={`text-sm mb-2 ${renewalInfo.paymentType === "initial" ? "text-green-700" : "text-amber-700"}`}>
+                  {renewalInfo.paymentType === "initial" 
+                    ? `Collect first year payment to activate agreement (${renewalInfo.agreementInfo.agreementNumber})`
+                    : `Collect payment for next service period`}
+                </p>
+                <p className={`text-lg font-bold mb-3 ${renewalInfo.paymentType === "initial" ? "text-green-700" : "text-amber-700"}`}>
+                  ${parseFloat(String(renewalInfo.agreementInfo.price || 0)).toFixed(2)}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 min-h-[44px] flex-1"
+                    onClick={onCollectRenewal}
+                    data-testid="button-collect-renewal"
+                  >
+                    <DollarSign className="h-4 w-4 mr-1" />
+                    Collect Payment
+                  </Button>
+                  {renewalInfo.paymentType !== "initial" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-red-300 text-red-600 hover:bg-red-50 min-h-[44px] flex-1"
+                      onClick={onDeclineRenewal}
+                      data-testid="button-decline-renewal"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Customer Declined
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {renewalInfo?.isRenewalVisit && renewalInfo.renewalStatus === "pending_payment" && (
+        <Card className="border-blue-400 bg-blue-50" data-testid="renewal-pending-payment-banner">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-full bg-blue-100">
+                <Clock className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-blue-800">Invoice Created</h3>
+                <p className="text-sm text-blue-700">Awaiting payment confirmation</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {renewalInfo?.isRenewalVisit && renewalInfo.renewalStatus === "collected" && (
+        <div className="flex justify-center">
+          <Badge className="bg-green-100 text-green-700 border-green-300 px-4 py-2" data-testid="badge-renewal-collected">
+            <CheckCircle2 className="h-4 w-4 mr-2" />
+            Renewal Collected
+          </Badge>
+        </div>
+      )}
+
+      {renewalInfo?.isRenewalVisit && renewalInfo.renewalStatus === "declined" && (
+        <div className="flex justify-center">
+          <Badge className="bg-red-100 text-red-700 border-red-300 px-4 py-2" data-testid="badge-renewal-declined">
+            <X className="h-4 w-4 mr-2" />
+            Renewal Declined
+          </Badge>
+        </div>
+      )}
 
       <Card data-testid="customer-info-card">
         <CardHeader className="pb-2">
@@ -202,6 +357,54 @@ function OverviewTab({
         </CardContent>
       </Card>
 
+      {/* Maintenance Agreement Info Card */}
+      {renewalInfo?.visitInfo && renewalInfo.agreementInfo && (
+        <Card className="border-purple-200 bg-purple-50/50" data-testid="card-maintenance-info">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base text-purple-800">
+              <FileCheck className="h-4 w-4" />
+              Maintenance Agreement
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-slate-600">Agreement</span>
+              <span className="font-medium text-sm">{renewalInfo.agreementInfo.agreementNumber}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-slate-600">Visit Progress</span>
+              <span className="font-bold text-purple-700">
+                Visit {renewalInfo.visitInfo.visitNumber} of {renewalInfo.visitInfo.totalVisitsInCycle}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-slate-600">Billing</span>
+              <Badge variant="outline" className="text-xs">
+                {renewalInfo.agreementInfo.billingPreference === "pay_on_visit" ? "Pay on Visit" : "Auto Invoice"}
+              </Badge>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-slate-600">Status</span>
+              <Badge variant="outline" className={`text-xs ${
+                renewalInfo.agreementInfo.status === "active" ? "bg-green-100 text-green-700 border-green-300" :
+                renewalInfo.agreementInfo.status === "pending" ? "bg-amber-100 text-amber-700 border-amber-300" :
+                "bg-slate-100 text-slate-700 border-slate-300"
+              }`}>
+                {renewalInfo.agreementInfo.status === "active" ? "Active" : 
+                 renewalInfo.agreementInfo.status === "pending" ? "Pending Activation" :
+                 renewalInfo.agreementInfo.status || "Unknown"}
+              </Badge>
+            </div>
+            {renewalInfo.agreementInfo.agreementPlan && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-600">Plan</span>
+                <span className="text-sm font-medium">{renewalInfo.agreementInfo.agreementPlan}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {checklistResponse && checklistResponse.checklist && checklistResponse.summary && (
         <Card className="border-amber-200 bg-amber-50/30" data-testid="card-checklist-summary">
           <CardHeader className="pb-2">
@@ -213,6 +416,22 @@ function OverviewTab({
           <CardContent>
             <p className="text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-checklist-summary">
               {checklistResponse.summary}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {workOrder.dispatchNotes && (
+        <Card className="border-amber-200 bg-amber-50/50" data-testid="card-dispatch-notes">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Phone className="h-4 w-4 text-amber-600" />
+              Dispatch Notes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-dispatch-notes">
+              {workOrder.dispatchNotes}
             </p>
           </CardContent>
         </Card>
@@ -273,7 +492,7 @@ function OverviewTab({
               ) : null}
               {nextStatus === "dispatched" && "Mark Dispatched"}
               {nextStatus === "en_route" && "Start Driving"}
-              {nextStatus === "on_site" && "Arrive On Site"}
+              {nextStatus === "on_site" && "Start Working"}
               {nextStatus === "completed" && "Complete Job"}
             </Button>
           )}
@@ -286,6 +505,60 @@ function OverviewTab({
               </Badge>
             </div>
           )}
+
+          {displayStatus !== "completed" && displayStatus !== "scheduled" && (() => {
+            const isPending = optimisticPending?.isPending ?? workOrder.isPending ?? false;
+            const pendingReason = optimisticPending?.reason ?? workOrder.pendingReason ?? "waiting_on_parts";
+            return (
+              <div className="border-t pt-4 mt-4" data-testid="pending-toggle-section">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-amber-600" />
+                    <span className="text-sm font-medium">Mark as Waiting</span>
+                  </div>
+                  <Switch
+                    checked={isPending}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        onPendingChange(true, "waiting_on_parts", false);
+                      } else {
+                        onPendingChange(false, undefined, false);
+                      }
+                    }}
+                    disabled={pendingMutation.isPending}
+                    data-testid="pending-toggle"
+                  />
+                </div>
+                
+                {isPending && (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-slate-500">Reason</Label>
+                    <Select
+                      value={pendingReason}
+                      onValueChange={(value) => onPendingChange(true, value, true)}
+                      disabled={pendingMutation.isPending}
+                    >
+                      <SelectTrigger className="w-full" data-testid="pending-reason-select">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="waiting_on_parts">Waiting on Parts</SelectItem>
+                        <SelectItem value="waiting_on_customer">Waiting on Customer</SelectItem>
+                        <SelectItem value="waiting_for_next_job">Waiting for Next Job</SelectItem>
+                        <SelectItem value="lunch_break">Lunch Break</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {workOrder.pendingStartedAt && !optimisticPending && (
+                      <p className="text-xs text-amber-600">
+                        Waiting since {format(new Date(workOrder.pendingStartedAt), "h:mm a")}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 
@@ -536,6 +809,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       if (!res.ok) throw new Error("Failed to fetch quotes");
       return res.json();
     },
+    refetchInterval: 10000, // Auto-refresh every 10 seconds to catch customer acceptance
   });
 
   const quotes = quotesData?.quotes || [];
@@ -644,6 +918,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         taxTotal: "0",
         total: data.total.toFixed(2),
         status: "draft",
+        quoteType: "quick",
         assignedToId: selectedAssigneeId || undefined,
       });
       return response.json();
@@ -1486,7 +1761,17 @@ const invoiceStatusConfig: Record<string, { label: string; className: string }> 
   partial: { label: "Partial", className: "bg-amber-100 text-amber-700 border-amber-300" },
 };
 
-function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
+function InvoiceTab({ 
+  workOrder, 
+  renewalInfo, 
+  onCollectRenewal, 
+  onDeclineRenewal 
+}: { 
+  workOrder: WorkOrderDetail; 
+  renewalInfo?: RenewalInfo | null;
+  onCollectRenewal?: () => void;
+  onDeclineRenewal?: () => void;
+}) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -1507,8 +1792,30 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "check" | "card">("cash");
   const [paymentReference, setPaymentReference] = useState("");
   const [showInvoiceEmailDialog, setShowInvoiceEmailDialog] = useState(false);
+  const [generatingPaymentLinkForInvoice, setGeneratingPaymentLinkForInvoice] = useState<string | null>(null);
   const [invoiceEmailRecipient, setInvoiceEmailRecipient] = useState("");
   const [emailInvoiceId, setEmailInvoiceId] = useState<string | null>(null);
+  
+  // Agreement creation dialog state
+  const [showAgreementDialog, setShowAgreementDialog] = useState(false);
+  const [agreementNumberOfSystems, setAgreementNumberOfSystems] = useState(1);
+  const [agreementContractDate, setAgreementContractDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [agreementBillingPreference, setAgreementBillingPreference] = useState<"pay_on_visit" | "auto_invoice">("auto_invoice");
+  const [agreementAutoRenew, setAgreementAutoRenew] = useState(true);
+  const [agreementNotes, setAgreementNotes] = useState("");
+  const [agreementPayingNow, setAgreementPayingNow] = useState(false);
+  const [pendingCatalogItem, setPendingCatalogItem] = useState<CrmItem | null>(null);
+
+  // Calculate maintenance price based on number of systems
+  const calculateMaintenancePrice = (numSystems: number): number => {
+    let total = 0;
+    for (let i = 0; i < numSystems; i++) {
+      total += 229 - (10 * i);
+    }
+    return total;
+  };
+
+  const agreementPrice = calculateMaintenancePrice(agreementNumberOfSystems);
 
   const { data: invoicesData, isLoading: invoicesLoading, error: invoicesError } = useQuery<{ invoices: CrmInvoice[] }>({
     queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }],
@@ -1544,6 +1851,28 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
 
   const quotes = quotesData?.quotes || [];
   const acceptedQuotes = quotes.filter(q => q.status === "accepted");
+  
+  // Fetch ALL quotes for this customer (to allow creating invoice from any customer quote)
+  const { data: customerQuotesData, isLoading: customerQuotesLoading } = useQuery<{ quotes: (CrmQuote & { lineItems?: CrmQuoteLineItem[] })[] }>({
+    queryKey: ["/api/crm/quotes", "customer", workOrder.customerId],
+    queryFn: async () => {
+      if (!workOrder.customerId) return { quotes: [] };
+      const res = await fetch(`/api/crm/quotes?customerId=${workOrder.customerId}`, { credentials: "include" });
+      if (!res.ok) return { quotes: [] };
+      return res.json();
+    },
+    enabled: !!workOrder.customerId,
+  });
+
+  const customerQuotes = customerQuotesData?.quotes || [];
+  // Get accepted customer quotes that are NOT attached to this work order (deduplicate by ID)
+  const workOrderQuoteIds = new Set(acceptedQuotes.map(q => q.id));
+  const otherCustomerAcceptedQuotes = customerQuotes.filter(
+    q => q.status === "accepted" && !workOrderQuoteIds.has(q.id)
+  );
+  
+  // Combined: all accepted quotes available for invoice creation (already deduplicated)
+  const allAvailableQuotes = [...acceptedQuotes, ...otherCustomerAcceptedQuotes];
 
   // Fetch CRM items (for both catalog and discounts)
   const { data: crmItemsData, isLoading: itemsLoading } = useQuery<CrmItem[]>({
@@ -1654,6 +1983,8 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       toast({ title: "Invoice Created", description: "Your invoice has been created as a draft." });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
+      // Also invalidate customer quotes in case quote status changes
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", "customer", workOrder.customerId] });
       setShowCreateForm(false);
       setLineItems([]);
     },
@@ -1732,6 +2063,63 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     },
   });
 
+  // Create agreement mutation
+  const createAgreementMutation = useMutation({
+    mutationFn: async (data: {
+      numberOfSystems: number;
+      contractDate: string;
+      billingPreference: "pay_on_visit" | "auto_invoice";
+      autoRenew: boolean;
+      notes: string;
+      payingNow: boolean;
+    }) => {
+      const response = await apiRequest("POST", `/api/mobile/work-orders/${workOrder.id}/create-agreement`, data);
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || "Failed to create agreement");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.payingNow) {
+        toast({ title: "Agreement Created", description: "Maintenance agreement has been created and payment recorded." });
+      } else {
+        toast({ title: "Agreement Created", description: "Maintenance agreement has been created. Line item added to invoice." });
+        // Add the maintenance line item to the current invoice form
+        if (data.lineItemData) {
+          setLineItems([...lineItems, {
+            id: Date.now().toString(),
+            description: data.lineItemData.description,
+            quantity: 1,
+            unitPrice: parseFloat(data.lineItemData.unitPrice),
+            lineType: "maintenance",
+            fromCatalog: true,
+            isMaintenanceItem: true
+          }]);
+        }
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/agreements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", { workOrderId: workOrder.id }] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
+      setShowAgreementDialog(false);
+      setPendingCatalogItem(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to create agreement", variant: "destructive" });
+    },
+  });
+
+  const handleCreateAgreement = () => {
+    createAgreementMutation.mutate({
+      numberOfSystems: agreementNumberOfSystems,
+      contractDate: agreementContractDate,
+      billingPreference: agreementBillingPreference,
+      autoRenew: agreementAutoRenew,
+      notes: agreementNotes,
+      payingNow: agreementPayingNow,
+    });
+  };
+
   const openPaymentDialog = (invoice: CrmInvoice) => {
     setPaymentInvoiceId(invoice.id);
     const balanceDue = parseFloat(invoice.balanceDue || invoice.total || "0");
@@ -1739,6 +2127,42 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     setPaymentMethod("cash");
     setPaymentReference("");
     setShowPaymentDialog(true);
+  };
+
+  const handleTakePayment = async (invoice: CrmInvoice) => {
+    const balanceDue = parseFloat(invoice.balanceDue || invoice.total || "0");
+    if (balanceDue <= 0) {
+      toast({ title: "No Balance Due", description: "This invoice has already been paid.", variant: "destructive" });
+      return;
+    }
+    
+    setGeneratingPaymentLinkForInvoice(invoice.id);
+    try {
+      const response = await fetch(`/api/stripe/invoice/${invoice.id}/payment-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to create payment link");
+      }
+      
+      if (result.paymentLinkUrl) {
+        window.open(result.paymentLinkUrl, '_blank');
+      } else {
+        throw new Error("No payment link received");
+      }
+    } catch (error: any) {
+      toast({ 
+        title: "Error", 
+        description: error.message || "Failed to create payment link", 
+        variant: "destructive" 
+      });
+      setGeneratingPaymentLinkForInvoice(null);
+    }
   };
 
   const handleRecordPayment = () => {
@@ -1769,13 +2193,25 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
     const isPreventativeMaintenance = isMaintenance && 
       (item.name?.toLowerCase().includes("preventative") || item.name?.toLowerCase().includes("preventive"));
     
+    // If Preventative Maintenance is selected, open agreement creation dialog
     if (isPreventativeMaintenance) {
-      const existingMaintenanceCount = lineItems.filter(li => li.isMaintenanceItem).length;
-      // Base price $229, each additional system -$10
-      price = 229 - (existingMaintenanceCount * 10);
-      if (price < 0) price = 0;
+      setPendingCatalogItem(item);
+      setAgreementNumberOfSystems(1);
+      setAgreementContractDate(format(new Date(), "yyyy-MM-dd"));
+      setAgreementBillingPreference("auto_invoice");
+      setAgreementAutoRenew(true);
+      setAgreementNotes("");
+      setAgreementPayingNow(false);
+      setShowCatalog(false);
+      setCatalogSearch("");
+      setShowAgreementDialog(true);
+      return;
     }
-    // For custom maintenance items, use the catalog price (already set above)
+    
+    if (isMaintenance) {
+      // Use catalog price for non-PM maintenance items
+      price = parseFloat(item.rate || "0") || 0;
+    }
     
     // Map category to lineType
     const getLineType = (): InvoiceLineItem["lineType"] => {
@@ -1784,8 +2220,6 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       return "part";
     };
     
-    const discountApplied = isPreventativeMaintenance && price < 229;
-    
     setLineItems([...lineItems, { 
       id: Date.now().toString(), 
       description: item.name, 
@@ -1793,12 +2227,12 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       unitPrice: price,
       lineType: getLineType(),
       fromCatalog: true,
-      isMaintenanceItem: isPreventativeMaintenance // Only standard PM gets tiered pricing
+      isMaintenanceItem: false
     }]);
     setShowCatalog(false);
     setCatalogSearch("");
     setCatalogCategoryFilter("all");
-    toast({ title: "Item Added", description: item.name + (discountApplied ? ` (Multi-system discount: $${price})` : "") });
+    toast({ title: "Item Added", description: item.name });
   };
 
   // Add discount from catalogue
@@ -1922,6 +2356,69 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
 
   return (
     <div className="space-y-4">
+      {/* Pay-on-Visit Agreement Collect Payment Card */}
+      {renewalInfo?.isRenewalVisit && renewalInfo.renewalStatus === "pending" && renewalInfo.agreementInfo && (
+        <Card className={renewalInfo.paymentType === "initial" ? "border-green-400 bg-green-50" : "border-amber-400 bg-amber-50"} data-testid="invoice-tab-renewal-banner">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className={`p-2 rounded-full ${renewalInfo.paymentType === "initial" ? "bg-green-100" : "bg-amber-100"}`}>
+                {renewalInfo.paymentType === "initial" ? (
+                  <DollarSign className="h-5 w-5 text-green-600" />
+                ) : (
+                  <RefreshCw className="h-5 w-5 text-amber-600" />
+                )}
+              </div>
+              <div className="flex-1">
+                <h3 className={`font-semibold mb-1 ${renewalInfo.paymentType === "initial" ? "text-green-800" : "text-amber-800"}`}>
+                  {renewalInfo.paymentType === "initial" ? "First Visit - Collect Payment" : "Renewal Due"}
+                </h3>
+                <p className={`text-sm mb-2 ${renewalInfo.paymentType === "initial" ? "text-green-700" : "text-amber-700"}`}>
+                  {renewalInfo.paymentType === "initial" 
+                    ? `Collect first year payment to activate agreement (${renewalInfo.agreementInfo.agreementNumber})`
+                    : `Collect renewal payment for agreement (${renewalInfo.agreementInfo.agreementNumber})`}
+                </p>
+                <p className={`text-lg font-bold mb-3 ${renewalInfo.paymentType === "initial" ? "text-green-700" : "text-amber-700"}`}>
+                  ${parseFloat(String(renewalInfo.agreementInfo.price || 0)).toFixed(2)}
+                </p>
+                <Button
+                  className="w-full min-h-[44px] bg-green-600 hover:bg-green-700"
+                  onClick={onCollectRenewal}
+                  data-testid="button-invoice-tab-collect-payment"
+                >
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Collect Payment
+                </Button>
+                {renewalInfo.paymentType !== "initial" && onDeclineRenewal && (
+                  <Button
+                    variant="outline"
+                    className="w-full mt-2 min-h-[44px] border-red-300 text-red-600 hover:bg-red-50"
+                    onClick={onDeclineRenewal}
+                    data-testid="button-invoice-tab-decline-renewal"
+                  >
+                    Customer Declined
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Invoice Already Created Banner */}
+      {renewalInfo?.isRenewalVisit && renewalInfo.renewalStatus === "pending_payment" && (
+        <Card className="border-blue-400 bg-blue-50" data-testid="invoice-tab-pending-payment-banner">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Receipt className="h-5 w-5 text-blue-600" />
+              <div>
+                <h3 className="font-semibold text-blue-800">Invoice Created</h3>
+                <p className="text-sm text-blue-700">A renewal invoice has been generated and is awaiting payment.</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Existing Invoices List */}
       <Card data-testid="existing-invoices-card">
         <CardHeader className="pb-2">
@@ -2082,15 +2579,31 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                               Send Email
                             </Button>
                           )}
-                          {(invoice.status === "sent" || invoice.status === "partial") && (
-                            <Button
-                              className="w-full min-h-[44px] bg-green-600 hover:bg-green-700"
-                              onClick={() => openPaymentDialog(invoice)}
-                              data-testid={`button-record-payment-${invoice.id}`}
-                            >
-                              <CreditCard className="h-4 w-4 mr-2" />
-                              Record Payment
-                            </Button>
+                          {(invoice.status === "draft" || invoice.status === "sent" || invoice.status === "partial") && parseFloat(invoice.balanceDue || invoice.total || "0") > 0 && (
+                            <>
+                              <Button
+                                className="w-full min-h-[44px] bg-blue-600 hover:bg-blue-700"
+                                onClick={() => handleTakePayment(invoice)}
+                                disabled={generatingPaymentLinkForInvoice === invoice.id}
+                                data-testid={`button-take-payment-${invoice.id}`}
+                              >
+                                {generatingPaymentLinkForInvoice === invoice.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                ) : (
+                                  <CreditCard className="h-4 w-4 mr-2" />
+                                )}
+                                Take Card Payment
+                              </Button>
+                              <Button
+                                variant="outline"
+                                className="w-full min-h-[44px]"
+                                onClick={() => openPaymentDialog(invoice)}
+                                data-testid={`button-record-payment-${invoice.id}`}
+                              >
+                                <DollarSign className="h-4 w-4 mr-2" />
+                                Record Cash/Check
+                              </Button>
+                            </>
                           )}
                           <Button
                             variant="outline"
@@ -2135,7 +2648,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                   <Plus className="h-4 w-4 mr-2" />
                   Create Invoice
                 </Button>
-                {acceptedQuotes.length > 0 && (
+                {allAvailableQuotes.length > 0 && (
                   <Button
                     variant="outline"
                     className="w-full min-h-[48px] border-green-200 text-green-700 hover:bg-green-50"
@@ -2143,7 +2656,7 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
                     data-testid="button-create-invoice-from-quote"
                   >
                     <FileText className="h-4 w-4 mr-2" />
-                    Create from Quote ({acceptedQuotes.length})
+                    Create from Quote ({allAvailableQuotes.length})
                   </Button>
                 )}
               </div>
@@ -2592,37 +3105,83 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="flex-1 overflow-y-auto max-h-[300px] space-y-2">
-            {isLoadingQuote ? (
+          <div className="flex-1 overflow-y-auto max-h-[400px] space-y-4">
+            {(isLoadingQuote || customerQuotesLoading) ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-green-600" />
-                <span className="ml-2 text-sm text-slate-600">Loading quote...</span>
+                <span className="ml-2 text-sm text-slate-600">Loading quotes...</span>
               </div>
-            ) : acceptedQuotes.length === 0 ? (
+            ) : allAvailableQuotes.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-4">
-                No accepted quotes available for this work order.
+                No accepted quotes available.
               </p>
             ) : (
-              acceptedQuotes.map((quote) => (
-                <div
-                  key={quote.id}
-                  className="border rounded-lg p-3 hover:bg-green-50 cursor-pointer transition-colors"
-                  onClick={() => createFromQuote(quote)}
-                  data-testid={`quote-selection-${quote.id}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium">{quote.quoteNumber}</p>
-                      <p className="text-xs text-slate-500">
-                        Accepted: {quote.acceptedAt ? format(new Date(quote.acceptedAt), "MMM d, yyyy") : "Unknown"}
-                      </p>
+              <>
+                {/* Work Order Quotes Section */}
+                {acceptedQuotes.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                      This Work Order
+                    </p>
+                    <div className="space-y-2">
+                      {acceptedQuotes.map((quote) => (
+                        <div
+                          key={quote.id}
+                          className="border rounded-lg p-3 hover:bg-green-50 cursor-pointer transition-colors"
+                          onClick={() => createFromQuote(quote)}
+                          data-testid={`quote-selection-${quote.id}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium">{quote.quoteNumber}</p>
+                              <p className="text-xs text-slate-500">
+                                Accepted: {quote.acceptedAt ? format(new Date(quote.acceptedAt), "MMM d, yyyy") : "Unknown"}
+                              </p>
+                            </div>
+                            <span className="text-sm font-semibold text-green-700 ml-2">
+                              {formatCurrency(parseFloat(quote.total || "0"))}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <span className="text-sm font-semibold text-green-700 ml-2">
-                      {formatCurrency(parseFloat(quote.total || "0"))}
-                    </span>
                   </div>
-                </div>
-              ))
+                )}
+                
+                {/* Other Customer Quotes Section */}
+                {otherCustomerAcceptedQuotes.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                      Other Customer Quotes
+                    </p>
+                    <div className="space-y-2">
+                      {otherCustomerAcceptedQuotes.map((quote) => (
+                        <div
+                          key={quote.id}
+                          className="border border-blue-200 rounded-lg p-3 hover:bg-blue-50 cursor-pointer transition-colors"
+                          onClick={() => createFromQuote(quote)}
+                          data-testid={`quote-selection-customer-${quote.id}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium">{quote.quoteNumber}</p>
+                              <p className="text-xs text-slate-500">
+                                Accepted: {quote.acceptedAt ? format(new Date(quote.acceptedAt), "MMM d, yyyy") : "Unknown"}
+                              </p>
+                              {quote.title && (
+                                <p className="text-xs text-blue-600 truncate">{quote.title}</p>
+                              )}
+                            </div>
+                            <span className="text-sm font-semibold text-blue-700 ml-2">
+                              {formatCurrency(parseFloat(quote.total || "0"))}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
           
@@ -2779,6 +3338,189 @@ function InvoiceTab({ workOrder }: { workOrder: WorkOrderDetail }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Create Agreement Dialog */}
+      <Dialog open={showAgreementDialog} onOpenChange={(open) => { 
+        if (!open) { 
+          setShowAgreementDialog(false); 
+          setPendingCatalogItem(null);
+        } 
+      }}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileCheck className="h-5 w-5 text-[#711419]" />
+              Create Maintenance Agreement
+            </DialogTitle>
+            <DialogDescription>
+              Set up a preventative maintenance agreement for this customer.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-2">
+            {/* Customer Info (Auto-filled) */}
+            <div className="bg-slate-50 rounded-lg p-3 border">
+              <p className="text-xs text-slate-500 mb-1">Customer</p>
+              <p className="font-medium text-sm">{workOrder.customer?.name || "Unknown Customer"}</p>
+              {workOrder.property && (
+                <>
+                  <p className="text-xs text-slate-500 mt-2 mb-1">Property</p>
+                  <p className="text-sm text-slate-700">
+                    {[workOrder.property.address1, workOrder.property.city, workOrder.property.state, workOrder.property.zip].filter(Boolean).join(", ")}
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* Number of Systems */}
+            <div>
+              <Label className="text-sm font-medium">Number of Systems</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10"
+                  onClick={() => setAgreementNumberOfSystems(prev => Math.max(1, prev - 1))}
+                  disabled={agreementNumberOfSystems <= 1}
+                  data-testid="button-decrease-agreement-systems"
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <Input
+                  type="number"
+                  min="1"
+                  value={agreementNumberOfSystems}
+                  onChange={(e) => setAgreementNumberOfSystems(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-20 text-center min-h-[44px]"
+                  data-testid="input-agreement-systems"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10"
+                  onClick={() => setAgreementNumberOfSystems(prev => prev + 1)}
+                  data-testid="button-increase-agreement-systems"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                $229 first system, $10 discount per additional
+              </p>
+            </div>
+
+            {/* Price Display */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-green-800">Annual Agreement Price</span>
+                <span className="text-xl font-bold text-green-700">${agreementPrice.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {/* Contract Date */}
+            <div>
+              <Label className="text-sm font-medium">Contract Date</Label>
+              <Input
+                type="date"
+                value={agreementContractDate}
+                onChange={(e) => setAgreementContractDate(e.target.value)}
+                className="min-h-[44px] mt-1"
+                data-testid="input-agreement-contract-date"
+              />
+            </div>
+
+            {/* Billing Preference */}
+            <div>
+              <Label className="text-sm font-medium">Billing Preference</Label>
+              <Select value={agreementBillingPreference} onValueChange={(v: "pay_on_visit" | "auto_invoice") => setAgreementBillingPreference(v)}>
+                <SelectTrigger className="min-h-[44px] mt-1" data-testid="select-agreement-billing">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto_invoice">Auto Invoice (Bill Immediately)</SelectItem>
+                  <SelectItem value="pay_on_visit">Pay on Visit</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-500 mt-1">
+                {agreementBillingPreference === "auto_invoice" 
+                  ? "Customer will be invoiced when agreement is created" 
+                  : "Customer will pay when technician arrives for first visit"}
+              </p>
+            </div>
+
+            {/* Auto Renew */}
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <Label className="text-sm font-medium">Auto Renew</Label>
+                <p className="text-xs text-slate-500">Automatically renew agreement each year</p>
+              </div>
+              <Switch
+                checked={agreementAutoRenew}
+                onCheckedChange={setAgreementAutoRenew}
+                data-testid="switch-agreement-auto-renew"
+              />
+            </div>
+
+            {/* Customer Paying Now Toggle */}
+            <div className="flex items-center justify-between py-2 border-t pt-4">
+              <div>
+                <Label className="text-sm font-medium">Customer Paying Now?</Label>
+                <p className="text-xs text-slate-500">Collect payment immediately and activate agreement</p>
+              </div>
+              <Switch
+                checked={agreementPayingNow}
+                onCheckedChange={setAgreementPayingNow}
+                data-testid="switch-agreement-paying-now"
+              />
+            </div>
+
+            {/* Notes */}
+            <div>
+              <Label className="text-sm font-medium">Notes (Optional)</Label>
+              <Textarea
+                value={agreementNotes}
+                onChange={(e) => setAgreementNotes(e.target.value)}
+                placeholder="Any additional notes about this agreement..."
+                className="min-h-[80px] mt-1"
+                data-testid="textarea-agreement-notes"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => { 
+                setShowAgreementDialog(false); 
+                setPendingCatalogItem(null);
+              }}
+              className="min-h-[44px]"
+            >
+              Cancel
+            </Button>
+            <Button 
+              className="bg-[#711419] hover:bg-[#5a1014] min-h-[44px]"
+              onClick={handleCreateAgreement}
+              disabled={createAgreementMutation.isPending}
+              data-testid="button-create-agreement"
+            >
+              {createAgreementMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <FileCheck className="h-4 w-4 mr-2" />
+                  Create Agreement
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -2807,6 +3549,8 @@ export default function MobileJobDetail() {
   const [optimisticStatus, setOptimisticStatus] = useState<WorkOrderStatus | null>(null);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completionSummary, setCompletionSummary] = useState("");
+  const [showInvoiceReminder, setShowInvoiceReminder] = useState(false);
+  const [invoiceReminderType, setInvoiceReminderType] = useState<"activation" | "renewal">("activation");
 
   const { data: workOrder, isLoading } = useQuery<WorkOrderDetail>({
     queryKey: ["/api/crm/work-orders", params.id],
@@ -2834,6 +3578,201 @@ export default function MobileJobDetail() {
     enabled: !!params.id,
   });
 
+  const { data: renewalInfo, refetch: refetchRenewalInfo } = useQuery<RenewalInfo>({
+    queryKey: ["/api/mobile/work-orders", params.id, "renewal-info"],
+    queryFn: async () => {
+      const res = await fetch(`/api/mobile/work-orders/${params.id}/renewal-info`, { credentials: "include" });
+      if (!res.ok) {
+        if (res.status === 404) return { isRenewalVisit: false, paymentType: null, renewalStatus: "none" as const, agreementInfo: null, visitInfo: null };
+        throw new Error("Failed to fetch renewal info");
+      }
+      return res.json();
+    },
+    enabled: !!params.id,
+  });
+
+  const { data: currentUser } = useQuery<CrmUser>({
+    queryKey: ["/api/crm/auth/me"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/auth/me", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch current user");
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editSelectedDate, setEditSelectedDate] = useState<Date | undefined>(undefined);
+  const [editSelectedSlot, setEditSelectedSlot] = useState<{ start: string; end: string } | null>(null);
+
+  const [showCollectRenewalDialog, setShowCollectRenewalDialog] = useState(false);
+  const [showDeclineRenewalDialog, setShowDeclineRenewalDialog] = useState(false);
+  const [renewalPaymentMethod, setRenewalPaymentMethod] = useState<"cash" | "check" | "card">("cash");
+
+  const collectRenewalMutation = useMutation({
+    mutationFn: async ({ paymentMethod, paymentType }: { paymentMethod: string; paymentType: "initial" | "renewal" | null }) => {
+      const res = await apiRequest("POST", `/api/mobile/work-orders/${params.id}/collect-renewal`, {
+        paymentMethod,
+        paymentType,
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.message || "Failed to collect payment");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      const isInitial = data?.paymentType === "initial";
+      toast({ 
+        title: isInitial ? "Payment Collected" : "Renewal Collected", 
+        description: isInitial 
+          ? "Agreement has been activated. Invoice created for payment." 
+          : "Payment has been recorded successfully." 
+      });
+      setShowCollectRenewalDialog(false);
+      setRenewalPaymentMethod("cash");
+      refetchRenewalInfo();
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/mobile/work-orders", params.id, "renewal-info"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/agreements"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to collect payment", variant: "destructive" });
+    },
+  });
+
+  const declineRenewalMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/mobile/work-orders/${params.id}/decline-renewal`, {});
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.message || "Failed to record renewal decline");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Renewal Declined", description: "Customer decline has been recorded." });
+      setShowDeclineRenewalDialog(false);
+      refetchRenewalInfo();
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/mobile/work-orders", params.id, "renewal-info"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to record renewal decline", variant: "destructive" });
+    },
+  });
+
+  const isSupervisor = currentUser?.role === "supervisor";
+  const isAssignedToMe = workOrder?.assignedTechId === currentUser?.id;
+
+  type EditWorkOrderFormData = {
+    scheduledStart: string;
+    scheduledEnd: string;
+    priority: string;
+    title: string;
+    description: string;
+    dispatchNotes: string;
+    techNotes: string;
+  };
+
+  const editForm = useForm<EditWorkOrderFormData>({
+    defaultValues: {
+      scheduledStart: "",
+      scheduledEnd: "",
+      priority: "normal",
+      title: "",
+      description: "",
+      dispatchNotes: "",
+      techNotes: "",
+    },
+  });
+
+  useEffect(() => {
+    if (workOrder && showEditDialog) {
+      editForm.reset({
+        scheduledStart: workOrder.scheduledStart 
+          ? format(new Date(workOrder.scheduledStart), "yyyy-MM-dd'T'HH:mm") 
+          : "",
+        scheduledEnd: workOrder.scheduledEnd 
+          ? format(new Date(workOrder.scheduledEnd), "yyyy-MM-dd'T'HH:mm") 
+          : "",
+        priority: workOrder.priority || "normal",
+        title: workOrder.title || "",
+        description: workOrder.description || "",
+        dispatchNotes: workOrder.dispatchNotes || "",
+        techNotes: workOrder.techNotes || "",
+      });
+      if (workOrder.scheduledStart) {
+        setEditSelectedDate(new Date(workOrder.scheduledStart));
+        if (workOrder.scheduledEnd) {
+          setEditSelectedSlot({
+            start: new Date(workOrder.scheduledStart).toISOString(),
+            end: new Date(workOrder.scheduledEnd).toISOString(),
+          });
+        }
+      } else {
+        setEditSelectedDate(undefined);
+        setEditSelectedSlot(null);
+      }
+    }
+  }, [workOrder, showEditDialog, editForm]);
+
+  const { data: editAvailableSlots = [], isLoading: editSlotsLoading } = useQuery<TimeSlot[]>({
+    queryKey: ["/api/mobile/work-orders/available-slots", { date: editSelectedDate ? format(editSelectedDate, "yyyy-MM-dd") : null, techId: currentUser?.id }],
+    queryFn: async () => {
+      if (!editSelectedDate || !currentUser?.id) return [];
+      const dateStr = format(editSelectedDate, "yyyy-MM-dd");
+      const res = await fetch(`/api/mobile/work-orders/available-slots?date=${dateStr}&techId=${currentUser.id}`, { credentials: "include" });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.slots || [];
+    },
+    enabled: !!editSelectedDate && showEditDialog && !!currentUser?.id,
+  });
+
+  const assignToMeMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", `/api/mobile/work-orders/${params.id}/assign-to-me`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
+      toast({ title: "Work order assigned to you" });
+    },
+    onError: () => {
+      toast({ title: "Failed to assign work order", variant: "destructive" });
+    },
+  });
+
+  const editWorkOrderMutation = useMutation({
+    mutationFn: async (data: EditWorkOrderFormData) => {
+      await apiRequest("PATCH", `/api/mobile/work-orders/${params.id}`, {
+        scheduledStart: editSelectedSlot?.start || null,
+        scheduledEnd: editSelectedSlot?.end || null,
+        priority: data.priority,
+        title: data.title,
+        description: data.description,
+        dispatchNotes: data.dispatchNotes,
+        techNotes: data.techNotes,
+      });
+    },
+    onSuccess: () => {
+      setShowEditDialog(false);
+      setEditSelectedDate(undefined);
+      setEditSelectedSlot(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
+      toast({ title: "Work order updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update work order", variant: "destructive" });
+    },
+  });
+
+  const handleEditSubmit = (data: EditWorkOrderFormData) => {
+    editWorkOrderMutation.mutate(data);
+  };
+
   const updateStatusMutation = useMutation({
     mutationFn: async ({ newStatus, summary }: { newStatus: WorkOrderStatus; summary?: string }) => {
       setOptimisticStatus(newStatus);
@@ -2843,13 +3782,36 @@ export default function MobileJobDetail() {
       }
       await apiRequest("PATCH", `/api/crm/work-orders/${params.id}`, payload);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       setOptimisticStatus(null);
       setShowCompletionModal(false);
       setCompletionSummary("");
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", params.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
       toast({ title: "Status updated" });
+      
+      // Show invoice/renewal reminder for pay-on-visit agreements
+      const visitInfo = renewalInfo?.visitInfo;
+      const agreementInfo = renewalInfo?.agreementInfo;
+      if (
+        variables.newStatus === "completed" && 
+        visitInfo && 
+        agreementInfo?.billingPreference === "pay_on_visit"
+      ) {
+        // First visit of pending agreement - activation reminder
+        if (visitInfo.visitNumber === 1 && agreementInfo.status === "pending") {
+          setInvoiceReminderType("activation");
+          setShowInvoiceReminder(true);
+        }
+        // Last visit of cycle for active agreement - renewal reminder
+        else if (
+          visitInfo.visitNumber === visitInfo.totalVisitsInCycle &&
+          agreementInfo.status === "active"
+        ) {
+          setInvoiceReminderType("renewal");
+          setShowInvoiceReminder(true);
+        }
+      }
     },
     onError: (error, variables) => {
       if (isNetworkError(error)) {
@@ -2881,6 +3843,53 @@ export default function MobileJobDetail() {
       return;
     }
     updateStatusMutation.mutate({ newStatus: "completed", summary: completionSummary.trim() });
+  };
+
+  const [optimisticPending, setOptimisticPending] = useState<{ isPending: boolean; reason?: string } | null>(null);
+
+  const pendingMutation = useMutation({
+    mutationFn: async ({ isPending, pendingReason, isReasonChange }: { isPending: boolean; pendingReason?: string; isReasonChange?: boolean }) => {
+      const payload: any = { isPending };
+      const pendingStartedAt = isPending && !isReasonChange ? new Date().toISOString() : (isReasonChange ? undefined : null);
+      if (isPending) {
+        payload.pendingReason = pendingReason || "waiting_on_parts";
+        if (!isReasonChange) {
+          payload.pendingStartedAt = pendingStartedAt;
+        }
+      } else {
+        payload.pendingReason = null;
+        payload.pendingStartedAt = null;
+      }
+      await apiRequest("PATCH", `/api/crm/work-orders/${params.id}`, payload);
+      return { isPending, pendingReason: payload.pendingReason, pendingStartedAt: payload.pendingStartedAt };
+    },
+    onSuccess: (result, variables) => {
+      queryClient.setQueryData(["/api/crm/work-orders", params.id], (old: WorkOrderDetail | undefined) => {
+        if (!old) return old;
+        const updates: Partial<WorkOrderDetail> = {
+          isPending: result.isPending,
+          pendingReason: result.pendingReason,
+        };
+        if (result.pendingStartedAt !== undefined) {
+          updates.pendingStartedAt = result.pendingStartedAt;
+        }
+        return { ...old, ...updates };
+      });
+      setOptimisticPending(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
+      toast({ 
+        title: variables.isPending ? "Marked as waiting" : "Waiting status cleared"
+      });
+    },
+    onError: () => {
+      setOptimisticPending(null);
+      toast({ title: "Failed to update waiting status", variant: "destructive" });
+    },
+  });
+
+  const handlePendingChange = (isPending: boolean, reason?: string, isReasonChange?: boolean) => {
+    setOptimisticPending({ isPending, reason });
+    pendingMutation.mutate({ isPending, pendingReason: reason, isReasonChange });
   };
 
   const addNoteMutation = useMutation({
@@ -2964,20 +3973,51 @@ export default function MobileJobDetail() {
       <OfflineIndicator />
       <div className="flex flex-col h-full">
         <div className="flex-shrink-0 p-4 pb-2">
-          <button
-            onClick={() => {
-              if (activeTab !== "overview") {
-                setActiveTab("overview");
-              } else {
-                navigate("/mobile");
-              }
-            }}
-            className="flex items-center text-slate-600 hover:text-slate-800 min-h-[44px] min-w-[44px]"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="h-5 w-5 mr-1" />
-            <span>Back</span>
-          </button>
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => {
+                if (activeTab !== "overview") {
+                  setActiveTab("overview");
+                } else {
+                  navigate("/mobile");
+                }
+              }}
+              className="flex items-center text-slate-600 hover:text-slate-800 min-h-[44px] min-w-[44px]"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-5 w-5 mr-1" />
+              <span>Back</span>
+            </button>
+            
+            <div className="flex items-center gap-2">
+              {isSupervisor && !isAssignedToMe && (
+                <Button
+                  onClick={() => assignToMeMutation.mutate()}
+                  disabled={assignToMeMutation.isPending}
+                  className="bg-[#711419] hover:bg-[#5a1014] min-h-[44px]"
+                  data-testid="button-assign-to-me"
+                >
+                  {assignToMeMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  ) : (
+                    <UserPlus className="h-4 w-4 mr-1" />
+                  )}
+                  Assign to Me
+                </Button>
+              )}
+              {isSupervisor && isAssignedToMe && (
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowEditDialog(true)}
+                  className="min-h-[44px]"
+                  data-testid="button-edit-work-order"
+                >
+                  <Pencil className="h-4 w-4 mr-1" />
+                  Edit
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="flex-1 overflow-auto px-4 pb-24" data-testid="mobile-job-detail">
@@ -2988,6 +4028,12 @@ export default function MobileJobDetail() {
               optimisticStatus={optimisticStatus}
               updateStatusMutation={updateStatusMutation}
               handleStatusChange={handleStatusChange}
+              renewalInfo={renewalInfo}
+              onCollectRenewal={() => setShowCollectRenewalDialog(true)}
+              onDeclineRenewal={() => setShowDeclineRenewalDialog(true)}
+              onPendingChange={handlePendingChange}
+              pendingMutation={pendingMutation}
+              optimisticPending={optimisticPending}
             />
           )}
           {activeTab === "work" && (
@@ -2997,7 +4043,12 @@ export default function MobileJobDetail() {
             <QuoteTab workOrder={workOrder} />
           )}
           {activeTab === "invoice" && (
-            <InvoiceTab workOrder={workOrder} />
+            <InvoiceTab 
+              workOrder={workOrder} 
+              renewalInfo={renewalInfo}
+              onCollectRenewal={() => setShowCollectRenewalDialog(true)}
+              onDeclineRenewal={() => setShowDeclineRenewalDialog(true)}
+            />
           )}
         </div>
 
@@ -3076,6 +4127,436 @@ export default function MobileJobDetail() {
               )}
               Complete Job
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEditDialog} onOpenChange={(open) => {
+        setShowEditDialog(open);
+        if (!open) {
+          setEditSelectedDate(undefined);
+          setEditSelectedSlot(null);
+        }
+      }}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" data-testid="edit-work-order-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-slate-600" />
+              Edit Work Order
+            </DialogTitle>
+            <DialogDescription>
+              Update work order details below.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(handleEditSubmit)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Title</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Work order title..." 
+                        className="min-h-[44px]"
+                        data-testid="input-edit-title"
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="space-y-3">
+                <Label>Schedule</Label>
+                
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal min-h-[44px]"
+                      data-testid="button-edit-date-picker"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {editSelectedDate ? format(editSelectedDate, "EEEE, MMMM d, yyyy") : "Select a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={editSelectedDate}
+                      onSelect={(date) => {
+                        setEditSelectedDate(date);
+                        setEditSelectedSlot(null);
+                      }}
+                      disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                {editSelectedDate && (
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-500">Available Time Slots</Label>
+                    {editSlotsLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                        <span className="ml-2 text-sm text-slate-500">Loading slots...</span>
+                      </div>
+                    ) : editAvailableSlots.length === 0 ? (
+                      <p className="text-sm text-slate-500 py-2">No time slots available for this date</p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2">
+                        {editAvailableSlots.map((slot, idx) => {
+                          const isSelected = editSelectedSlot?.start === slot.start && editSelectedSlot?.end === slot.end;
+                          return (
+                            <Button
+                              key={idx}
+                              type="button"
+                              variant={isSelected ? "default" : "outline"}
+                              size="sm"
+                              disabled={!slot.available}
+                              onClick={() => setEditSelectedSlot({ start: slot.start, end: slot.end })}
+                              className={`text-xs ${
+                                isSelected
+                                  ? "bg-[#711419] hover:bg-[#5a1014] text-white"
+                                  : slot.available
+                                  ? "hover:bg-slate-100"
+                                  : "opacity-50 cursor-not-allowed bg-slate-100 text-slate-400"
+                              }`}
+                              data-testid={`edit-time-slot-${idx}`}
+                            >
+                              {slot.label}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {editSelectedSlot && (
+                  <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+                    <Clock className="h-4 w-4" />
+                    <span>
+                      {format(new Date(editSelectedSlot.start), "h:mm a")} - {format(new Date(editSelectedSlot.end), "h:mm a")}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <FormField
+                control={editForm.control}
+                name="priority"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Priority</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="min-h-[44px]" data-testid="select-edit-priority">
+                          <SelectValue placeholder="Select priority" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="normal">Normal</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="emergency">Emergency</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Work order description..."
+                        className="min-h-[80px]"
+                        data-testid="input-edit-description"
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="dispatchNotes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Dispatch Notes</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Notes for dispatch..."
+                        className="min-h-[80px]"
+                        data-testid="input-edit-dispatch-notes"
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="techNotes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tech Notes</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Technical notes..."
+                        className="min-h-[80px]"
+                        data-testid="input-edit-tech-notes"
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter className="flex gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowEditDialog(false)}
+                  disabled={editWorkOrderMutation.isPending}
+                  className="min-h-[44px]"
+                  data-testid="button-cancel-edit"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={editWorkOrderMutation.isPending}
+                  className="bg-[#711419] hover:bg-[#5a1014] min-h-[44px]"
+                  data-testid="button-save-edit"
+                >
+                  {editWorkOrderMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Check className="h-4 w-4 mr-2" />
+                  )}
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCollectRenewalDialog} onOpenChange={setShowCollectRenewalDialog}>
+        <DialogContent className="sm:max-w-md" data-testid="collect-renewal-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-green-600" />
+              {renewalInfo?.paymentType === "initial" ? "Collect First Year Payment" : "Collect Renewal Payment"}
+            </DialogTitle>
+            <DialogDescription>
+              {renewalInfo?.paymentType === "initial" 
+                ? "Collect payment to activate this maintenance agreement."
+                : "Confirm payment collection for the maintenance agreement renewal."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {renewalInfo?.agreementInfo && (
+              <div className={`rounded-lg p-4 space-y-2 ${renewalInfo.paymentType === "initial" ? "bg-green-50" : "bg-slate-50"}`}>
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">Agreement</span>
+                  <span className="text-sm font-medium">{renewalInfo.agreementInfo.agreementNumber}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">Customer</span>
+                  <span className="text-sm font-medium">{renewalInfo.agreementInfo.customerName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">Amount</span>
+                  <span className="text-lg font-bold text-green-600">${parseFloat(String(renewalInfo.agreementInfo.price || 0)).toFixed(2)}</span>
+                </div>
+                {renewalInfo.paymentType === "initial" && (
+                  <p className="text-xs text-green-700 mt-2 pt-2 border-t border-green-200">
+                    This is the first payment. Agreement will be activated after payment is recorded.
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Payment Method</Label>
+              <Select value={renewalPaymentMethod} onValueChange={(value: "cash" | "check" | "card") => setRenewalPaymentMethod(value)}>
+                <SelectTrigger className="min-h-[44px]" data-testid="select-renewal-payment-method">
+                  <SelectValue placeholder="Select payment method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="check">Check</SelectItem>
+                  <SelectItem value="card">Card</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowCollectRenewalDialog(false)}
+              disabled={collectRenewalMutation.isPending}
+              className="min-h-[44px]"
+              data-testid="button-cancel-collect-renewal"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => collectRenewalMutation.mutate({ paymentMethod: renewalPaymentMethod, paymentType: renewalInfo?.paymentType || null })}
+              disabled={collectRenewalMutation.isPending}
+              className="bg-green-600 hover:bg-green-700 min-h-[44px]"
+              data-testid="button-confirm-collect-renewal"
+            >
+              {collectRenewalMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+              )}
+              {renewalInfo?.paymentType === "initial" ? "Collect & Activate" : "Confirm Payment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeclineRenewalDialog} onOpenChange={setShowDeclineRenewalDialog}>
+        <DialogContent className="sm:max-w-md" data-testid="decline-renewal-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              Customer Declined Renewal
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure the customer has declined to renew their maintenance agreement?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {renewalInfo?.agreementInfo && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-2">
+                <p className="text-sm text-red-700">
+                  <strong>{renewalInfo.agreementInfo.customerName}</strong> is declining to renew agreement <strong>{renewalInfo.agreementInfo.agreementNumber}</strong> (${parseFloat(String(renewalInfo.agreementInfo.price || 0)).toFixed(2)}/year).
+                </p>
+                <p className="text-xs text-red-600">
+                  This action will be recorded. The office will be notified.
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowDeclineRenewalDialog(false)}
+              disabled={declineRenewalMutation.isPending}
+              className="min-h-[44px]"
+              data-testid="button-cancel-decline-renewal"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => declineRenewalMutation.mutate()}
+              disabled={declineRenewalMutation.isPending}
+              className="min-h-[44px]"
+              data-testid="button-confirm-decline-renewal"
+            >
+              {declineRenewalMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <X className="h-4 w-4 mr-2" />
+              )}
+              Confirm Decline
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Invoice/Renewal Reminder Dialog for Pay-on-Visit Agreements */}
+      <Dialog open={showInvoiceReminder} onOpenChange={setShowInvoiceReminder}>
+        <DialogContent className="sm:max-w-md" data-testid="invoice-reminder-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="h-5 w-5 text-amber-600" />
+              {invoiceReminderType === "activation" ? "Invoice Reminder" : "Renewal Reminder"}
+            </DialogTitle>
+            <DialogDescription>
+              This maintenance visit has been completed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
+              <p className="text-sm text-amber-800 font-medium">
+                {invoiceReminderType === "activation" 
+                  ? "Don't forget to invoice the customer for their maintenance agreement!" 
+                  : "This was the final visit of the cycle. Ask the customer if they'd like to renew their agreement."}
+              </p>
+              {renewalInfo?.agreementInfo && (
+                <div className="text-sm text-amber-700 space-y-1">
+                  <p>Agreement: <strong>{renewalInfo.agreementInfo.agreementNumber}</strong></p>
+                  <p>Amount: <strong>${parseFloat(String(renewalInfo.agreementInfo.price || 0)).toFixed(2)}</strong></p>
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter className={invoiceReminderType === "renewal" ? "flex-col gap-2 sm:flex-col" : ""}>
+            {invoiceReminderType === "activation" ? (
+              <Button
+                onClick={() => setShowInvoiceReminder(false)}
+                className="min-h-[44px] w-full"
+                data-testid="button-dismiss-invoice-reminder"
+              >
+                <Check className="h-4 w-4 mr-2" />
+                Got it
+              </Button>
+            ) : (
+              <>
+                <Button
+                  onClick={() => {
+                    setShowInvoiceReminder(false);
+                    setShowCollectRenewalDialog(true);
+                  }}
+                  className="min-h-[44px] w-full bg-green-600 hover:bg-green-700"
+                  data-testid="button-invoice-renewal"
+                >
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Invoice Renewal
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setShowInvoiceReminder(false);
+                    setShowDeclineRenewalDialog(true);
+                  }}
+                  className="min-h-[44px] w-full"
+                  data-testid="button-customer-declined"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Customer Declined
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowInvoiceReminder(false)}
+                  className="min-h-[44px] w-full"
+                  data-testid="button-dismiss-renewal-reminder"
+                >
+                  Remind Me Later
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
