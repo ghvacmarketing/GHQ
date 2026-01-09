@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, timestamp, boolean, json, integer, date } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, decimal, timestamp, boolean, json, integer, date, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -868,7 +868,10 @@ export const crmCustomers = pgTable("crm_customers", {
   convertedAt: timestamp("converted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  customerTypeIdx: index("crm_customers_customer_type_idx").on(table.customerType),
+  customerStatusIdx: index("crm_customers_customer_status_idx").on(table.customerStatus),
+}));
 
 // CRM Properties (addresses linked to customers)
 export const crmProperties = pgTable("crm_properties", {
@@ -957,7 +960,10 @@ export const crmJobs = pgTable("crm_jobs", {
   completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  customerIdIdx: index("crm_jobs_customer_id_idx").on(table.customerId),
+  statusIdx: index("crm_jobs_status_idx").on(table.status),
+}));
 
 // CRM Projects (big-ticket scope containers - $5k+ jobs)
 export const crmProjects = pgTable("crm_projects", {
@@ -1078,7 +1084,11 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   finalizedAt: timestamp("finalized_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  assignedTechIdIdx: index("crm_work_orders_assigned_tech_id_idx").on(table.assignedTechId),
+  statusIdx: index("crm_work_orders_status_idx").on(table.status),
+  scheduledStartIdx: index("crm_work_orders_scheduled_start_idx").on(table.scheduledStart),
+}));
 
 // CRM Quote Status and Scope
 export const crmQuoteStatusEnum = ["draft", "sent", "accepted", "declined", "expired", "converted"] as const;
@@ -1155,7 +1165,9 @@ export const crmQuotes = pgTable("crm_quotes", {
   signedAt: timestamp("signed_at"),
   // Email routing fields
   quoteCategory: text("quote_category").$type<QuoteCategory>(),
-});
+}, (table) => ({
+  statusIdx: index("crm_quotes_status_idx").on(table.status),
+}));
 
 // CRM Quote Line Items
 export const crmQuoteLineItems = pgTable("crm_quote_line_items", {
@@ -1242,7 +1254,9 @@ export const crmInvoices = pgTable("crm_invoices", {
   createdBy: varchar("created_by").references(() => crmUsers.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  statusIdx: index("crm_invoices_status_idx").on(table.status),
+}));
 
 // CRM Invoice Line Items
 export const crmInvoiceLineItems = pgTable("crm_invoice_line_items", {
@@ -1348,7 +1362,10 @@ export const crmJobAssignments = pgTable("crm_job_assignments", {
   startAt: timestamp("start_at"),
   endAt: timestamp("end_at"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  techUserIdIdx: index("crm_job_assignments_tech_user_id_idx").on(table.techUserId),
+  jobIdIdx: index("crm_job_assignments_job_id_idx").on(table.jobId),
+}));
 
 // CRM Job Status Events (timeline)
 export const crmJobStatusEvents = pgTable("crm_job_status_events", {

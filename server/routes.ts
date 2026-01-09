@@ -8939,6 +8939,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allCustomers = await db.select().from(crmCustomers);
       const allProperties = await db.select().from(crmProperties);
 
+      // Batch approach: Collect all data first, then batch insert
+      const accountsToInsert: any[] = [];
+      const customerToAccountData: Map<string, any> = new Map();
+
       for (const customer of allCustomers) {
         try {
           // Map customerType to AccountType
@@ -8955,8 +8959,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             accountStatus = "ACTIVE";
           }
 
-          // Create the Account
-          const [account] = await db.insert(crmAccounts).values({
+          const accountData = {
             displayName: customer.name,
             companyName: customer.companyName,
             accountType,
@@ -8964,70 +8967,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
             tags: customer.tags || [],
             sourceSystem: customer.sourceSystem || "migration",
             sourceId: customer.id,
-          }).returning();
-          results.accountsCreated++;
+          };
 
-          // Get properties for this customer
-          const customerProperties = allProperties.filter(p => p.customerId === customer.id);
-
-          if (customerProperties.length > 0) {
-            // Create a site for each property
-            for (let i = 0; i < customerProperties.length; i++) {
-              const prop = customerProperties[i];
-              await db.insert(crmSites).values({
-                accountId: account.id,
-                siteName: prop.notes || `Site ${i + 1}`,
-                address1: prop.address1,
-                address2: prop.address2,
-                city: prop.city,
-                state: prop.state,
-                zip: prop.zip,
-                isPrimary: i === 0,
-                notes: prop.notes,
-              });
-              results.sitesCreated++;
-            }
-          } else {
-            // Create a placeholder site
-            await db.insert(crmSites).values({
-              accountId: account.id,
-              siteName: "Primary Site",
-              address1: "Address pending",
-              city: "Unknown",
-              state: "GA",
-              zip: "00000",
-              isPrimary: true,
-            });
-            results.sitesCreated++;
-          }
-
-          // Create contact from customer's phone/email
-          if (customer.phone || customer.email) {
-            const nameParts = customer.name.split(" ");
-            const firstName = nameParts[0] || customer.name;
-            const lastName = nameParts.slice(1).join(" ") || undefined;
-
-            await db.insert(crmContacts).values({
-              accountId: account.id,
-              firstName,
-              lastName,
-              phone: customer.phone,
-              email: customer.email,
-              contactRole: "PRIMARY",
-              isPrimary: true,
-            });
-            results.contactsCreated++;
-          }
-
-          results.migrated.push({
-            customerId: customer.id,
-            customerName: customer.name,
-            accountId: account.id,
+          accountsToInsert.push(accountData);
+          customerToAccountData.set(customer.id, {
+            customer,
+            accountData,
+            properties: allProperties.filter(p => p.customerId === customer.id),
           });
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : String(err);
-          results.errors.push(`Failed to migrate customer ${customer.name} (${customer.id}): ${errorMsg}`);
+          results.errors.push(`Failed to prepare customer ${customer.name} (${customer.id}): ${errorMsg}`);
         }
+      }
+
+      // Batch insert all accounts
+      let createdAccounts: any[] = [];
+      if (accountsToInsert.length > 0) {
+        createdAccounts = await db.insert(crmAccounts).values(accountsToInsert).returning();
+        results.accountsCreated = createdAccounts.length;
+      }
+
+      // Create mapping from sourceId to account
+      const sourceIdToAccount = new Map(createdAccounts.map(acc => [acc.sourceId, acc]));
+
+      // Collect all sites and contacts to insert
+      const sitesToInsert: any[] = [];
+      const contactsToInsert: any[] = [];
+
+      for (const [customerId, data] of customerToAccountData.entries()) {
+        const account = sourceIdToAccount.get(customerId);
+        if (!account) continue;
+
+        const { customer, properties } = data;
+
+        // Create sites from properties
+        if (properties.length > 0) {
+          for (let i = 0; i < properties.length; i++) {
+            const prop = properties[i];
+            sitesToInsert.push({
+              accountId: account.id,
+              siteName: prop.notes || `Site ${i + 1}`,
+              address1: prop.address1,
+              address2: prop.address2,
+              city: prop.city,
+              state: prop.state,
+              zip: prop.zip,
+              isPrimary: i === 0,
+              notes: prop.notes,
+            });
+          }
+        } else {
+          // Create a placeholder site
+          sitesToInsert.push({
+            accountId: account.id,
+            siteName: "Primary Site",
+            address1: "Address pending",
+            city: "Unknown",
+            state: "GA",
+            zip: "00000",
+            isPrimary: true,
+          });
+        }
+
+        // Create contact from customer's phone/email
+        if (customer.phone || customer.email) {
+          const nameParts = customer.name.split(" ");
+          const firstName = nameParts[0] || customer.name;
+          const lastName = nameParts.slice(1).join(" ") || undefined;
+
+          contactsToInsert.push({
+            accountId: account.id,
+            firstName,
+            lastName,
+            phone: customer.phone,
+            email: customer.email,
+            contactRole: "PRIMARY",
+            isPrimary: true,
+          });
+        }
+
+        results.migrated.push({
+          customerId: customer.id,
+          customerName: customer.name,
+          accountId: account.id,
+        });
+      }
+
+      // Batch insert all sites
+      if (sitesToInsert.length > 0) {
+        await db.insert(crmSites).values(sitesToInsert);
+        results.sitesCreated = sitesToInsert.length;
+      }
+
+      // Batch insert all contacts
+      if (contactsToInsert.length > 0) {
+        await db.insert(crmContacts).values(contactsToInsert);
+        results.contactsCreated = contactsToInsert.length;
       }
 
       await logCrmAudit(
@@ -11813,27 +11849,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await tx.insert(maintenanceTaskSchedules).values(scheduleParsed.data);
           }
 
-          // Handle equipment (delete existing and insert new)
+          // Handle equipment (delete existing and batch insert new)
           if (Array.isArray(equipment)) {
             await tx.delete(maintenanceTaskEquipment).where(eq(maintenanceTaskEquipment.taskId, task.id));
-            for (const eq_item of equipment) {
-              const eqParsed = insertMaintenanceTaskEquipmentSchema.safeParse({ ...eq_item, taskId: task.id });
-              if (!eqParsed.success) {
-                throw new Error(`Invalid equipment data: ${JSON.stringify(eqParsed.error.flatten())}`);
-              }
-              await tx.insert(maintenanceTaskEquipment).values(eqParsed.data);
+
+            if (equipment.length > 0) {
+              const validatedEquipment = equipment.map(eq_item => {
+                const eqParsed = insertMaintenanceTaskEquipmentSchema.safeParse({ ...eq_item, taskId: task.id });
+                if (!eqParsed.success) {
+                  throw new Error(`Invalid equipment data: ${JSON.stringify(eqParsed.error.flatten())}`);
+                }
+                return eqParsed.data;
+              });
+              await tx.insert(maintenanceTaskEquipment).values(validatedEquipment);
             }
           }
 
-          // Handle parts (delete existing and insert new)
+          // Handle parts (delete existing and batch insert new)
           if (Array.isArray(parts)) {
             await tx.delete(maintenanceTaskParts).where(eq(maintenanceTaskParts.taskId, task.id));
-            for (const part of parts) {
-              const partParsed = insertMaintenanceTaskPartSchema.safeParse({ ...part, taskId: task.id });
-              if (!partParsed.success) {
-                throw new Error(`Invalid part data: ${JSON.stringify(partParsed.error.flatten())}`);
-              }
-              await tx.insert(maintenanceTaskParts).values(partParsed.data);
+
+            if (parts.length > 0) {
+              const validatedParts = parts.map(part => {
+                const partParsed = insertMaintenanceTaskPartSchema.safeParse({ ...part, taskId: task.id });
+                if (!partParsed.success) {
+                  throw new Error(`Invalid part data: ${JSON.stringify(partParsed.error.flatten())}`);
+                }
+                return partParsed.data;
+              });
+              await tx.insert(maintenanceTaskParts).values(validatedParts);
             }
           }
 
@@ -12739,13 +12783,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: discountValidation.error });
         }
         
-        for (const item of lineItems) {
-          const lineItemData = { ...item, invoiceId: invoice.id };
-          const lineItemParseResult = insertCrmInvoiceLineItemSchema.safeParse(lineItemData);
-          if (lineItemParseResult.success) {
-            const [createdItem] = await db.insert(crmInvoiceLineItems).values(lineItemParseResult.data).returning();
-            createdLineItems.push(createdItem);
-          }
+        // Batch insert: Validate all items first, then insert in one operation
+        const validatedItems = lineItems
+          .map(item => insertCrmInvoiceLineItemSchema.safeParse({ ...item, invoiceId: invoice.id }))
+          .filter(result => result.success)
+          .map(result => result.data);
+
+        if (validatedItems.length > 0) {
+          createdLineItems = await db.insert(crmInvoiceLineItems).values(validatedItems).returning();
         }
       }
       
@@ -12910,26 +12955,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [invoice] = await db.insert(crmInvoices).values(invoiceData).returning();
 
-      // Copy line items to invoice
-      const createdLineItems: CrmInvoiceLineItem[] = [];
-      for (const quoteItem of quoteLineItems) {
-        const invoiceLineItem = {
-          invoiceId: invoice.id,
-          lineType: quoteItem.lineType,
-          description: quoteItem.description,
-          partNumber: quoteItem.partNumber,
-          quantity: quoteItem.quantity,
-          unitPrice: quoteItem.unitPrice,
-          amount: quoteItem.lineTotal, // Required column - same as lineTotal
-          lineTotal: quoteItem.lineTotal,
-          sortOrder: quoteItem.sortOrder,
-          itemId: quoteItem.itemId,
-          isDiscountLine: quoteItem.isDiscountLine,
-          discountKind: quoteItem.discountKind,
-        };
-        const [createdItem] = await db.insert(crmInvoiceLineItems).values(invoiceLineItem).returning();
-        createdLineItems.push(createdItem);
-      }
+      // Copy line items to invoice - Batch insert for better performance
+      const invoiceLineItemsToInsert = quoteLineItems.map(quoteItem => ({
+        invoiceId: invoice.id,
+        lineType: quoteItem.lineType,
+        description: quoteItem.description,
+        partNumber: quoteItem.partNumber,
+        quantity: quoteItem.quantity,
+        unitPrice: quoteItem.unitPrice,
+        amount: quoteItem.lineTotal, // Required column - same as lineTotal
+        lineTotal: quoteItem.lineTotal,
+        sortOrder: quoteItem.sortOrder,
+        itemId: quoteItem.itemId,
+        isDiscountLine: quoteItem.isDiscountLine,
+        discountKind: quoteItem.discountKind,
+      }));
+
+      const createdLineItems = await db.insert(crmInvoiceLineItems).values(invoiceLineItemsToInsert).returning();
 
       // Update quote status to converted
       await db.update(crmQuotes)
