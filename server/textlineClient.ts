@@ -429,6 +429,82 @@ class TextlineClient {
   }
 
   /**
+   * Get messages for a conversation by phone number
+   * Uses the phone number endpoint which is more reliable
+   */
+  async getConversationMessagesByPhone(phoneNumber: string): Promise<{
+    messages: TextlineMessage[];
+    error?: string;
+  }> {
+    if (!this.isConfigured()) {
+      return { messages: [], error: "Textline API key not configured" };
+    }
+
+    try {
+      // Clean phone number for URL
+      const cleanPhone = phoneNumber.replace(/[^\d+]/g, "");
+      // Textline API: GET /api/conversations/phone_number/{phone}.json returns single conversation with posts
+      const url = `${TEXTLINE_BASE_URL}/api/conversations/phone_number/${encodeURIComponent(cleanPhone)}.json`;
+      console.log("[Textline] Fetching conversation by phone:", url);
+      
+      const response = await fetch(url, {
+        method: "GET",
+        headers: this.getHeaders(),
+      });
+
+      // Check content type before parsing
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("[Textline] Non-JSON response:", response.status, text.substring(0, 200));
+        return {
+          messages: [],
+          error: `API returned non-JSON response (${response.status}): ${text.substring(0, 100)}`,
+        };
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("[Textline] Get conversation by phone error:", data);
+        return {
+          messages: [],
+          error: data.error || data.errors || "Failed to fetch conversation by phone",
+        };
+      }
+
+      // Response has conversation object with posts array
+      const posts = data.conversation?.posts || data.posts || [];
+      console.log("[Textline] Fetched", posts.length, "messages for phone", cleanPhone);
+      
+      const mappedMessages: TextlineMessage[] = posts.map((post: any) => ({
+        uuid: post.uuid,
+        body: post.body || "",
+        direction: post.direction || (post.creator?.type === "customer" ? "inbound" : "outbound"),
+        created_at: post.created_at,
+        delivered_at: post.delivered_at,
+        read_at: post.read_at,
+        author: post.author ? {
+          uuid: post.author.uuid,
+          name: post.author.name || post.author.email,
+          email: post.author.email,
+        } : undefined,
+        attachments: post.attachments?.map((att: any) => ({
+          uuid: att.uuid,
+          url: att.url,
+          filename: att.filename,
+          content_type: att.content_type,
+        })),
+      }));
+
+      return { messages: mappedMessages };
+    } catch (error: any) {
+      console.error("[Textline] Get messages by phone exception:", error);
+      return { messages: [], error: error.message || "Network error" };
+    }
+  }
+
+  /**
    * Get messages for a conversation
    * Textline returns posts when you fetch a single conversation via /api/conversations/{uuid}.json
    */

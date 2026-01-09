@@ -17996,8 +17996,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       }
 
       // If this is a Textline conversation, fetch messages from Textline and cache them
-      if (conversation.externalSource === "textline" && conversation.externalConversationId && textlineClient.isConfigured()) {
-        const { messages: textlineMessages, error } = await textlineClient.getConversationMessages(conversation.externalConversationId);
+      // Use phone number approach as it's more reliable than UUID
+      if (conversation.externalSource === "textline" && conversation.phoneNumber && textlineClient.isConfigured()) {
+        const { messages: textlineMessages, error } = await textlineClient.getConversationMessagesByPhone(conversation.phoneNumber);
         
         if (!error && textlineMessages.length > 0) {
           // Get existing message external IDs to avoid duplicates
@@ -20901,8 +20902,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       }
 
       // If this is a Textline conversation, fetch messages from Textline and cache them
-      if (conversation.externalSource === "textline" && conversation.externalConversationId && textlineClient.isConfigured()) {
-        const { messages: textlineMessages, error } = await textlineClient.getConversationMessages(conversation.externalConversationId);
+      // Use phone number approach as it's more reliable than UUID
+      if (conversation.externalSource === "textline" && conversation.phoneNumber && textlineClient.isConfigured()) {
+        const { messages: textlineMessages, error } = await textlineClient.getConversationMessagesByPhone(conversation.phoneNumber);
         
         if (!error && textlineMessages.length > 0) {
           // Get existing message external IDs to avoid duplicates
