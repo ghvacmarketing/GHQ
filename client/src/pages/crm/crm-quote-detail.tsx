@@ -64,6 +64,7 @@ import {
   Edit,
   Monitor,
   Pencil,
+  FolderKanban,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -213,6 +214,19 @@ export default function CrmQuoteDetail() {
   const [editingLineItemData, setEditingLineItemData] = useState<{ description: string; quantity: string; unitPrice: string }>({ description: "", quantity: "", unitPrice: "" });
   const [showAddLineItemDialog, setShowAddLineItemDialog] = useState(false);
   const [newLineItemData, setNewLineItemData] = useState<{ description: string; quantity: string; unitPrice: string }>({ description: "", quantity: "1", unitPrice: "" });
+
+  const [showCreateProjectPrompt, setShowCreateProjectPrompt] = useState(false);
+  const [showCreateProjectForm, setShowCreateProjectForm] = useState(false);
+  const [projectFormData, setProjectFormData] = useState({
+    title: "",
+    projectType: "INSTALL",
+    expectedValue: "",
+    description: "",
+    priority: "normal",
+    customerId: "",
+    propertyId: "",
+    customerName: "",
+  });
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -745,6 +759,21 @@ export default function CrmQuoteDetail() {
       setPresentationAgreed(false);
       setPresentationSelectedOption(null);
       toast({ title: "Quote accepted!", description: "The client has accepted the quote in person." });
+
+      const quoteType = quote?.quoteType?.toLowerCase();
+      if (quoteType === "custom_install" || quoteType === "proposal") {
+        setProjectFormData({
+          title: quote?.title || `Project for ${quote?.quoteNumber || "Quote"}`,
+          projectType: "INSTALL",
+          expectedValue: quote?.total || "",
+          description: quote?.description || "",
+          priority: "normal",
+          customerId: quote?.customerId || quote?.accountId || "",
+          propertyId: quote?.propertyId || quote?.siteId || "",
+          customerName: quote?.customer?.name || quote?.customerName || "",
+        });
+        setShowCreateProjectPrompt(true);
+      }
     },
     onError: (error: Error) => {
       toast({ title: "Failed to accept quote", description: error.message, variant: "destructive" });
@@ -854,6 +883,21 @@ export default function CrmQuoteDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Quote accepted", description: "Quote status updated to accepted." });
+
+      const quoteType = quote?.quoteType?.toLowerCase();
+      if (quoteType === "custom_install" || quoteType === "proposal") {
+        setProjectFormData({
+          title: quote?.title || `Project for ${quote?.quoteNumber || "Quote"}`,
+          projectType: "INSTALL",
+          expectedValue: quote?.total || "",
+          description: quote?.description || "",
+          priority: "normal",
+          customerId: quote?.customerId || quote?.accountId || "",
+          propertyId: quote?.propertyId || quote?.siteId || "",
+          customerName: quote?.customer?.name || quote?.customerName || "",
+        });
+        setShowCreateProjectPrompt(true);
+      }
     },
     onError: (error: { message?: string; requiresOptionSelection?: boolean; availableOptions?: string[] } | Error) => {
       if ('requiresOptionSelection' in error && error.requiresOptionSelection && error.availableOptions) {
@@ -864,6 +908,76 @@ export default function CrmQuoteDetail() {
       toast({ title: "Failed to accept quote", description: (error as Error).message || "Unknown error", variant: "destructive" });
     },
   });
+
+  const createProjectMutation = useMutation({
+    mutationFn: async (data: {
+      customerId: string;
+      propertyId?: string;
+      title: string;
+      projectType: string;
+      expectedValue?: string;
+      description?: string;
+      priority?: string;
+      quoteId?: string;
+    }) => {
+      const res = await apiRequest("POST", "/api/crm/projects", data);
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to create project");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Project created",
+        description: "The project has been created successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects"] });
+      setShowCreateProjectForm(false);
+      setShowCreateProjectPrompt(false);
+      if (data?.id) {
+        navigate(`/crm/projects/${data.id}`);
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create project",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateProject = () => {
+    if (!projectFormData.customerId) {
+      toast({
+        title: "Missing customer",
+        description: "Cannot create project - no customer associated with this quote.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!projectFormData.title.trim()) {
+      toast({
+        title: "Title required",
+        description: "Please enter a project title.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createProjectMutation.mutate({
+      customerId: projectFormData.customerId,
+      propertyId: projectFormData.propertyId || undefined,
+      title: projectFormData.title.trim(),
+      projectType: projectFormData.projectType,
+      expectedValue: projectFormData.expectedValue || undefined,
+      description: projectFormData.description || undefined,
+      priority: projectFormData.priority || undefined,
+      quoteId: quoteId,
+    });
+  };
 
   const declineMutation = useMutation({
     mutationFn: async () => {
@@ -3574,6 +3688,177 @@ export default function CrmQuoteDetail() {
                 "Quote No Longer Editable"
               ) : (
                 "Save Changes"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCreateProjectPrompt} onOpenChange={setShowCreateProjectPrompt}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-800">
+              <FolderKanban className="h-5 w-5" />
+              Create a Project?
+            </DialogTitle>
+            <DialogDescription>
+              Would you like to create a project for this accepted quote? This will help you track the installation progress and schedule work orders.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-slate-600">
+              Creating a project allows you to:
+            </p>
+            <ul className="mt-2 text-sm text-slate-600 list-disc list-inside space-y-1">
+              <li>Track installation progress</li>
+              <li>Schedule and manage work orders</li>
+              <li>Monitor expected vs actual revenue</li>
+            </ul>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateProjectPrompt(false)}
+              data-testid="btn-skip-create-project"
+            >
+              Not Now
+            </Button>
+            <Button
+              onClick={() => {
+                setShowCreateProjectPrompt(false);
+                setShowCreateProjectForm(true);
+              }}
+              className="bg-green-600 hover:bg-green-700"
+              data-testid="btn-open-create-project-form"
+            >
+              <FolderKanban className="h-4 w-4 mr-2" />
+              Create Project
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCreateProjectForm} onOpenChange={setShowCreateProjectForm}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-800">
+              <FolderKanban className="h-5 w-5" />
+              Create Project
+            </DialogTitle>
+            <DialogDescription>
+              Create a new project to track this installation. Fields have been pre-populated from the quote.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="project-title">Project Title *</Label>
+              <Input
+                id="project-title"
+                value={projectFormData.title}
+                onChange={(e) => setProjectFormData(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Enter project title..."
+                data-testid="input-project-title"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="project-type">Project Type</Label>
+                <Select
+                  value={projectFormData.projectType}
+                  onValueChange={(value) => setProjectFormData(prev => ({ ...prev, projectType: value }))}
+                >
+                  <SelectTrigger id="project-type" data-testid="select-project-type">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="INSTALL">Install</SelectItem>
+                    <SelectItem value="DUCT">Duct</SelectItem>
+                    <SelectItem value="COMMERCIAL">Commercial</SelectItem>
+                    <SelectItem value="CRAWLSPACE">Crawlspace</SelectItem>
+                    <SelectItem value="MAJOR_REPAIR">Major Repair</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="project-priority">Priority</Label>
+                <Select
+                  value={projectFormData.priority}
+                  onValueChange={(value) => setProjectFormData(prev => ({ ...prev, priority: value }))}
+                >
+                  <SelectTrigger id="project-priority" data-testid="select-project-priority">
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="project-expected-value">Expected Value ($)</Label>
+              <Input
+                id="project-expected-value"
+                type="number"
+                step="0.01"
+                min="0"
+                value={projectFormData.expectedValue}
+                onChange={(e) => setProjectFormData(prev => ({ ...prev, expectedValue: e.target.value }))}
+                placeholder="0.00"
+                data-testid="input-project-expected-value"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="project-description">Description</Label>
+              <Textarea
+                id="project-description"
+                value={projectFormData.description}
+                onChange={(e) => setProjectFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Enter project description..."
+                className="min-h-[80px] resize-y"
+                data-testid="textarea-project-description"
+              />
+            </div>
+
+            {(projectFormData.customerName || projectFormData.customerId) && (
+              <div className="p-3 bg-slate-50 rounded-lg border">
+                <p className="text-xs font-medium text-slate-500 mb-1">Customer</p>
+                <p className="text-sm font-medium text-slate-900">
+                  {projectFormData.customerName || `Customer ID: ${projectFormData.customerId.substring(0, 8)}...`}
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateProjectForm(false)}
+              data-testid="btn-cancel-create-project"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateProject}
+              disabled={createProjectMutation.isPending}
+              className="bg-green-600 hover:bg-green-700"
+              data-testid="btn-submit-create-project"
+            >
+              {createProjectMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <FolderKanban className="h-4 w-4 mr-2" />
+                  Create Project
+                </>
               )}
             </Button>
           </DialogFooter>
