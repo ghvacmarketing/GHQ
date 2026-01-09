@@ -37,7 +37,7 @@ import type { CrmUser, QuickbooksConnection, QuickbooksAccount } from "@shared/s
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Download, Wallet, Zap } from "lucide-react";
+import { Download, Upload, Wallet, Zap } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -354,6 +354,39 @@ export default function CrmSettingsQuickBooks() {
     },
   });
 
+  const pushItemsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/quickbooks/items/push");
+      return response.json();
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks/items"] });
+      if (result.updated > 0) {
+        toast({
+          title: "Items Updated",
+          description: `Updated ${result.updated} items in QuickBooks with correct income account mappings.`,
+        });
+      } else if (result.skipped > 0) {
+        toast({
+          title: "Already Correct",
+          description: `All ${result.skipped} items already point to the correct income accounts.`,
+        });
+      } else {
+        toast({
+          title: "Nothing to Update",
+          description: "No items found to update.",
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Push Failed",
+        description: error.message || "Failed to push items to QuickBooks",
+        variant: "destructive",
+      });
+    },
+  });
+
   useEffect(() => {
     if (!authLoading && !currentUser) {
       navigate("/crm/login");
@@ -644,24 +677,45 @@ export default function CrmSettingsQuickBooks() {
                           </div>
                           
                           {mappedSubAccounts.length > 0 && (
-                            <div className="flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                              <div>
-                                <p className="font-medium text-amber-900">Activate P&L Routing</p>
-                                <p className="text-sm text-amber-700">Create QuickBooks Items to route invoice income to your sub-accounts</p>
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                                <div>
+                                  <p className="font-medium text-amber-900">Activate P&L Routing</p>
+                                  <p className="text-sm text-amber-700">Create QuickBooks Items to route invoice income to your sub-accounts</p>
+                                </div>
+                                <Button
+                                  onClick={() => provisionItemsMutation.mutate()}
+                                  disabled={provisionItemsMutation.isPending}
+                                  className="bg-amber-600 hover:bg-amber-700"
+                                  data-testid="btn-provision-items"
+                                >
+                                  {provisionItemsMutation.isPending ? (
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  ) : (
+                                    <Zap className="h-4 w-4 mr-2" />
+                                  )}
+                                  Provision Items
+                                </Button>
                               </div>
-                              <Button
-                                onClick={() => provisionItemsMutation.mutate()}
-                                disabled={provisionItemsMutation.isPending}
-                                className="bg-amber-600 hover:bg-amber-700"
-                                data-testid="btn-provision-items"
-                              >
-                                {provisionItemsMutation.isPending ? (
-                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                ) : (
-                                  <Zap className="h-4 w-4 mr-2" />
-                                )}
-                                Provision Items
-                              </Button>
+                              <div className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                <div>
+                                  <p className="font-medium text-blue-900">Fix P&L Routing</p>
+                                  <p className="text-sm text-blue-700">Update existing Items in QuickBooks to point to the correct sub-accounts</p>
+                                </div>
+                                <Button
+                                  onClick={() => pushItemsMutation.mutate()}
+                                  disabled={pushItemsMutation.isPending}
+                                  className="bg-blue-600 hover:bg-blue-700"
+                                  data-testid="btn-push-items"
+                                >
+                                  {pushItemsMutation.isPending ? (
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  ) : (
+                                    <Upload className="h-4 w-4 mr-2" />
+                                  )}
+                                  Push to QuickBooks
+                                </Button>
+                              </div>
                             </div>
                           )}
                           

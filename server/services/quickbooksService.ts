@@ -2737,6 +2737,258 @@ export async function createQuickbooksItem(
 }
 
 /**
+ * Update a QuickBooks Item's IncomeAccountRef to point to the correct sub-account.
+ * This is needed when Items were pulled from QuickBooks and point to wrong accounts.
+ */
+export async function updateQuickbooksItemIncomeAccount(
+  itemId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const conn = await getActiveConnection();
+    if (!conn) {
+      return { success: false, error: "No active QuickBooks connection" };
+    }
+    
+    // Get the CRM item with its linked income account
+    const [item] = await db.select()
+      .from(quickbooksItems)
+      .where(eq(quickbooksItems.id, itemId))
+      .limit(1);
+    
+    if (!item) {
+      return { success: false, error: "Item not found" };
+    }
+    
+    if (!item.quickbooksItemId) {
+      return { success: false, error: "Item has no QuickBooks ID" };
+    }
+    
+    if (!item.incomeAccountId) {
+      return { success: false, error: "Item has no linked income account" };
+    }
+    
+    // Get the linked income account
+    const [account] = await db.select()
+      .from(quickbooksAccounts)
+      .where(eq(quickbooksAccounts.id, item.incomeAccountId))
+      .limit(1);
+    
+    if (!account?.quickbooksAccountId) {
+      return { success: false, error: "Linked income account has no QuickBooks ID" };
+    }
+    
+    const qbo = getQuickBooksClient(conn);
+    
+    // First, get the current item from QuickBooks to get the SyncToken
+    return new Promise((resolve) => {
+      // @ts-ignore - getItem exists in node-quickbooks
+      qbo.getItem(item.quickbooksItemId, async (getErr: any, existingItem: any) => {
+        if (getErr) {
+          console.error("[QuickBooks] Error fetching item:", getErr);
+          resolve({ success: false, error: getErr.message || "Failed to fetch item" });
+          return;
+        }
+        
+        // Update the item with the correct IncomeAccountRef
+        const updatedItem = {
+          Id: item.quickbooksItemId,
+          SyncToken: existingItem.SyncToken,
+          sparse: true,
+          IncomeAccountRef: {
+            value: account.quickbooksAccountId,
+            name: account.fullyQualifiedName || account.name
+          }
+        };
+        
+        // @ts-ignore - updateItem exists in node-quickbooks
+        qbo.updateItem(updatedItem, async (updateErr: any, result: any) => {
+          if (updateErr) {
+            console.error("[QuickBooks] Error updating item:", updateErr);
+            resolve({ success: false, error: updateErr.message || "Failed to update item" });
+            return;
+          }
+          
+          // Update the CRM database
+          await db.update(quickbooksItems)
+            .set({
+              quickbooksIncomeAccountId: account.quickbooksAccountId,
+              syncToken: result.SyncToken,
+              lastSyncedAt: new Date(),
+              updatedAt: new Date()
+            })
+            .where(eq(quickbooksItems.id, itemId));
+          
+          console.log(`[QuickBooks] Updated item ${item.name} IncomeAccountRef to ${account.name}`);
+          resolve({ success: true });
+        });
+      });
+    });
+  } catch (error: any) {
+    console.error("[QuickBooks] Update item error:", error);
+    return { success: false, error: error.message || "Update failed" };
+  }
+}
+
+/**
+ * Push all Items to QuickBooks with correct IncomeAccountRef based on linked sub-accounts.
+ * This updates existing Items that were pulled from QuickBooks but pointed to wrong accounts.
+ * Falls back to category/property type lookup when incomeAccountId is not set.
+ */
+export async function pushAllItemsToQuickBooks(): Promise<{
+  success: boolean;
+  updated: number;
+  skipped: number;
+  errors: string[];
+}> {
+  const errors: string[] = [];
+  let updated = 0;
+  let skipped = 0;
+  
+  try {
+    const conn = await getActiveConnection();
+    if (!conn) {
+      return { success: false, updated: 0, skipped: 0, errors: ["No active QuickBooks connection"] };
+    }
+    
+    // Get all active items for this realm
+    const items = await db.select()
+      .from(quickbooksItems)
+      .where(and(
+        eq(quickbooksItems.realmId, conn.realmId),
+        eq(quickbooksItems.isActive, true)
+      ));
+    
+    // Get all sub-accounts for fallback lookup by category/property
+    const subAccounts = await db.select()
+      .from(quickbooksAccounts)
+      .where(and(
+        eq(quickbooksAccounts.realmId, conn.realmId),
+        eq(quickbooksAccounts.isActive, true),
+        eq(quickbooksAccounts.isParent, false)
+      ));
+    
+    // Build lookup: "categoryType:propertyType" -> account
+    const accountLookup = new Map<string, typeof subAccounts[0]>();
+    for (const acc of subAccounts) {
+      if (acc.categoryType && acc.propertyType) {
+        const normalizedProp = acc.propertyType.charAt(0).toUpperCase() + acc.propertyType.slice(1).toLowerCase();
+        accountLookup.set(`${acc.categoryType}:${normalizedProp}`, acc);
+      }
+    }
+    
+    console.log(`[QuickBooks Push] Found ${items.length} items to check`);
+    
+    const qbo = getQuickBooksClient(conn);
+    
+    for (const item of items) {
+      // Skip items without QB ID
+      if (!item.quickbooksItemId) {
+        console.log(`[QuickBooks Push] Skipping ${item.name} - no QB ID`);
+        skipped++;
+        continue;
+      }
+      
+      // Try to find the target account - first by incomeAccountId, then by category/property
+      let targetAccount: typeof subAccounts[0] | undefined;
+      
+      if (item.incomeAccountId) {
+        // Direct link exists
+        const [account] = await db.select()
+          .from(quickbooksAccounts)
+          .where(eq(quickbooksAccounts.id, item.incomeAccountId))
+          .limit(1);
+        targetAccount = account;
+      }
+      
+      if (!targetAccount && item.categoryType && item.propertyType) {
+        // Fall back to category/property lookup
+        const normalizedProp = item.propertyType.charAt(0).toUpperCase() + item.propertyType.slice(1).toLowerCase();
+        const lookupKey = `${item.categoryType}:${normalizedProp}`;
+        targetAccount = accountLookup.get(lookupKey);
+        
+        // If found, backfill the incomeAccountId
+        if (targetAccount) {
+          await db.update(quickbooksItems)
+            .set({ incomeAccountId: targetAccount.id, updatedAt: new Date() })
+            .where(eq(quickbooksItems.id, item.id));
+          console.log(`[QuickBooks Push] Backfilled incomeAccountId for ${item.name}`);
+        }
+      }
+      
+      if (!targetAccount?.quickbooksAccountId) {
+        console.log(`[QuickBooks Push] Skipping ${item.name} - no matching sub-account found`);
+        skipped++;
+        continue;
+      }
+      
+      // Check if the item already points to the correct account
+      if (item.quickbooksIncomeAccountId === targetAccount.quickbooksAccountId) {
+        console.log(`[QuickBooks Push] Skipping ${item.name} - already correct`);
+        skipped++;
+        continue;
+      }
+      
+      // Update the item in QuickBooks
+      try {
+        // Get current item from QB to get SyncToken
+        const existingItem = await new Promise<any>((resolve, reject) => {
+          // @ts-ignore - getItem exists in node-quickbooks
+          qbo.getItem(item.quickbooksItemId, (err: any, qbItem: any) => {
+            if (err) reject(err);
+            else resolve(qbItem);
+          });
+        });
+        
+        // Update with correct IncomeAccountRef
+        const updatedItem = {
+          Id: item.quickbooksItemId,
+          SyncToken: existingItem.SyncToken,
+          sparse: true,
+          IncomeAccountRef: {
+            value: targetAccount.quickbooksAccountId,
+            name: targetAccount.fullyQualifiedName || targetAccount.name
+          }
+        };
+        
+        const result = await new Promise<any>((resolve, reject) => {
+          // @ts-ignore - updateItem exists in node-quickbooks
+          qbo.updateItem(updatedItem, (err: any, qbItem: any) => {
+            if (err) reject(err);
+            else resolve(qbItem);
+          });
+        });
+        
+        // Update CRM database
+        await db.update(quickbooksItems)
+          .set({
+            incomeAccountId: targetAccount.id,
+            quickbooksIncomeAccountId: targetAccount.quickbooksAccountId,
+            syncToken: result.SyncToken,
+            lastSyncedAt: new Date(),
+            updatedAt: new Date()
+          })
+          .where(eq(quickbooksItems.id, item.id));
+        
+        console.log(`[QuickBooks Push] Updated ${item.name} -> ${targetAccount.name}`);
+        updated++;
+        
+      } catch (updateErr: any) {
+        const errMsg = `${item.name}: ${updateErr.message || updateErr}`;
+        console.error(`[QuickBooks Push] Error: ${errMsg}`);
+        errors.push(errMsg);
+      }
+    }
+    
+    console.log(`[QuickBooks Push] Complete: ${updated} updated, ${skipped} skipped, ${errors.length} errors`);
+    return { success: true, updated, skipped, errors };
+    
+  } catch (error: any) {
+    console.error("[QuickBooks Push] Error:", error);
+    return { success: false, updated, skipped, errors: [error.message || "Push failed"] };
+  }
+}
+
+/**
  * Pull existing items from QuickBooks
  */
 export async function pullItemsFromQuickBooks(): Promise<{ 
@@ -2933,26 +3185,28 @@ export async function provisionItemsForSubAccounts(): Promise<{
     const qbo = getQuickBooksClient(conn);
     
     for (const subAccount of subAccounts) {
-      // Skip if no category or property type mapping
-      if (!subAccount.categoryType || !subAccount.propertyType) {
-        console.log(`[QuickBooks Provision] Skipping ${subAccount.name} - no category/property mapping`);
-        skipped++;
-        continue;
-      }
-      
-      // Skip if item already exists for this account
+      // Skip if item already exists for this account (by incomeAccountId)
       if (itemsByAccountId.has(subAccount.id)) {
         console.log(`[QuickBooks Provision] Skipping ${subAccount.name} - item already linked`);
         skipped++;
         continue;
       }
       
-      // Skip if item already exists for this category:property combo
-      // Normalize casing to match the lookup map
-      const normalizedProperty = subAccount.propertyType.charAt(0).toUpperCase() + subAccount.propertyType.slice(1).toLowerCase();
-      const mappingKey = `${subAccount.categoryType}:${normalizedProperty}`;
-      if (itemsByMapping.has(mappingKey)) {
-        console.log(`[QuickBooks Provision] Skipping ${subAccount.name} - item already exists for ${mappingKey}`);
+      // For accounts with both category and property type, also check the mapping
+      if (subAccount.categoryType && subAccount.propertyType) {
+        // Normalize casing to match the lookup map
+        const normalizedProperty = subAccount.propertyType.charAt(0).toUpperCase() + subAccount.propertyType.slice(1).toLowerCase();
+        const mappingKey = `${subAccount.categoryType}:${normalizedProperty}`;
+        if (itemsByMapping.has(mappingKey)) {
+          console.log(`[QuickBooks Provision] Skipping ${subAccount.name} - item already exists for ${mappingKey}`);
+          skipped++;
+          continue;
+        }
+      }
+      
+      // Skip if no category type at all (can't create without category)
+      if (!subAccount.categoryType) {
+        console.log(`[QuickBooks Provision] Skipping ${subAccount.name} - no category type`);
         skipped++;
         continue;
       }
@@ -2997,8 +3251,12 @@ export async function provisionItemsForSubAccounts(): Promise<{
           lastSyncedAt: new Date()
         });
         
-        // Add to lookup so we don't create duplicates in this batch
-        itemsByMapping.set(mappingKey, {} as QuickbooksItem);
+        // Add to lookups so we don't create duplicates in this batch
+        itemsByAccountId.set(subAccount.id, {} as QuickbooksItem);
+        if (subAccount.propertyType) {
+          const normalizedProp = subAccount.propertyType.charAt(0).toUpperCase() + subAccount.propertyType.slice(1).toLowerCase();
+          itemsByMapping.set(`${subAccount.categoryType}:${normalizedProp}`, {} as QuickbooksItem);
+        }
         
         console.log(`[QuickBooks Provision] Created item "${createdItem.Name}" (QB ID: ${createdItem.Id}) for sub-account ${subAccount.name}`);
         provisioned++;

@@ -19943,6 +19943,23 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // POST /api/quickbooks/items/push - Push all items to QuickBooks with correct IncomeAccountRef
+  app.post("/api/quickbooks/items/push", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user || (user.role !== "owner" && user.role !== "admin")) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { pushAllItemsToQuickBooks } = await import("./services/quickbooksService");
+      const result = await pushAllItemsToQuickBooks();
+      res.json(result);
+    } catch (error: any) {
+      console.error("[QuickBooks] Push items error:", error);
+      res.status(500).json({ message: "Failed to push items", error: error.message });
+    }
+  });
+
   // POST /api/quickbooks/items - Create an item
   app.post("/api/quickbooks/items", requireCrmAuth, async (req, res) => {
     try {
