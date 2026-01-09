@@ -71,6 +71,7 @@ import {
   Wand2,
   Clipboard,
   ClipboardCheck,
+  Pencil,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -265,6 +266,12 @@ export default function CrmProjectDetail() {
   const [editEndDate, setEditEndDate] = useState<Date | undefined>();
   const [editEquipmentInfo, setEditEquipmentInfo] = useState("");
 
+  const [showEditProjectDialog, setShowEditProjectDialog] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editStatus, setEditStatus] = useState("");
+  const [editProjectType, setEditProjectType] = useState("");
+  const [editPriority, setEditPriority] = useState("");
+
   const timeOptions = (() => {
     const options: { value: string; label: string }[] = [];
     for (let hour = 8; hour <= 20; hour++) {
@@ -414,6 +421,15 @@ export default function CrmProjectDetail() {
       setEditEquipmentInfo(project.equipmentInfo || "");
     }
   }, [showEditScheduleDialog, project]);
+
+  useEffect(() => {
+    if (showEditProjectDialog && project) {
+      setEditTitle(project.title);
+      setEditStatus(project.status);
+      setEditProjectType(project.projectType);
+      setEditPriority(project.priority || "normal");
+    }
+  }, [showEditProjectDialog, project]);
 
   const generateLocalChecklistSummary = (): string => {
     if (checklistQuestions.length === 0) return "";
@@ -627,6 +643,22 @@ export default function CrmProjectDetail() {
     },
   });
 
+  const updateProjectDetailsMutation = useMutation({
+    mutationFn: async (data: { title: string; status: string; projectType: string; priority: string }) => {
+      const res = await apiRequest("PATCH", `/api/crm/projects/${projectId}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Project updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects"] });
+      setShowEditProjectDialog(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to update project", variant: "destructive" });
+    },
+  });
+
   const totalQuoted = (quotes || [])
     .filter((q) => q.status === "accepted")
     .reduce((sum, q) => sum + parseFloat(q.total?.toString() || "0"), 0);
@@ -721,7 +753,18 @@ export default function CrmProjectDetail() {
               Back
             </Button>
             <div>
-              <h1 className="text-2xl font-bold" data-testid="text-project-title">{project.title}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold" data-testid="text-project-title">{project.title}</h1>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setShowEditProjectDialog(true)}
+                  data-testid="button-edit-project"
+                >
+                  <Pencil className="w-4 h-4" />
+                </Button>
+              </div>
               {project.customer && (
                 <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                   <button
@@ -847,6 +890,82 @@ export default function CrmProjectDetail() {
                 disabled={updateScheduleMutation.isPending}
               >
                 {updateScheduleMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showEditProjectDialog} onOpenChange={setShowEditProjectDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Project</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Project Title <span className="text-red-500">*</span></Label>
+                <Input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="Enter project title"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={editStatus} onValueChange={setEditStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(projectStatusLabels).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Project Type</Label>
+                <Select value={editProjectType} onValueChange={setEditProjectType}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(projectTypeLabels).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Priority</Label>
+                <Select value={editPriority} onValueChange={setEditPriority}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowEditProjectDialog(false)}>Cancel</Button>
+              <Button 
+                onClick={() => {
+                  if (!editTitle.trim()) return;
+                  updateProjectDetailsMutation.mutate({
+                    title: editTitle,
+                    status: editStatus,
+                    projectType: editProjectType,
+                    priority: editPriority,
+                  });
+                }}
+                disabled={!editTitle.trim() || updateProjectDetailsMutation.isPending}
+                className="bg-[#711419] hover:bg-[#5a1014]"
+              >
+                {updateProjectDetailsMutation.isPending ? "Saving..." : "Save Changes"}
               </Button>
             </DialogFooter>
           </DialogContent>
