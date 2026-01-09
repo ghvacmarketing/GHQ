@@ -3356,6 +3356,11 @@ export async function getQuickBooksInvoiceDetails(qbInvoiceId: string): Promise<
 /**
  * Resync an existing invoice to QuickBooks with correct ItemRefs
  * This updates the invoice in QuickBooks to use the correct Items for P&L routing
+ * 
+ * Key matching logic:
+ * 1. Match QB lines to CRM lines by LineNum (QB) -> sortOrder (CRM)
+ * 2. Check for per-line property type override via item name keywords (Crawlspace, etc.)
+ * 3. For special items without standard propertyType, use name-based lookup
  */
 export async function resyncInvoiceToQuickBooks(crmInvoiceId: string): Promise<{
   success: boolean;
@@ -3388,25 +3393,50 @@ export async function resyncInvoiceToQuickBooks(crmInvoiceId: string): Promise<{
       return { success: false, error: "CRM Invoice not found" };
     }
     
-    // Get all items for lookup
-    const allItems = await db.select()
+    // Get all QuickBooks items for lookup
+    const allQbItems = await db.select()
       .from(quickbooksItems)
       .where(and(
         eq(quickbooksItems.realmId, conn.realmId),
         eq(quickbooksItems.isActive, true)
       ));
     
-    // Build item lookup
+    // Build multiple item lookup maps for flexible matching:
+    // 1. Standard lookup: categoryType:propertyType -> quickbooksItemId
+    // 2. Name-based lookup: normalized item name -> quickbooksItemId (for special items)
     const itemLookup = new Map<string, string>();
-    for (const qbItem of allItems) {
+    const itemNameLookup = new Map<string, string>();
+    
+    for (const qbItem of allQbItems) {
       if (qbItem.quickbooksItemId && qbItem.categoryType && qbItem.propertyType) {
         const normalizedProperty = qbItem.propertyType.charAt(0).toUpperCase() + qbItem.propertyType.slice(1).toLowerCase();
         const key = `${qbItem.categoryType}:${normalizedProperty}`;
         itemLookup.set(key, qbItem.quickbooksItemId);
       }
+      
+      // Name-based lookup for special items (Crawlspace, Promotional, etc.)
+      if (qbItem.quickbooksItemId && qbItem.name) {
+        const normalizedName = qbItem.name.toLowerCase().trim();
+        itemNameLookup.set(normalizedName, qbItem.quickbooksItemId);
+        
+        // Also add lookup by category + subtype extracted from name
+        const nameLower = qbItem.name.toLowerCase();
+        if (nameLower.includes("crawlspace")) {
+          const categoryKey = `${qbItem.categoryType}:Crawlspace`;
+          itemLookup.set(categoryKey, qbItem.quickbooksItemId);
+        }
+        if (nameLower.includes("promotional")) {
+          const categoryKey = `${qbItem.categoryType}:Promotional`;
+          itemLookup.set(categoryKey, qbItem.quickbooksItemId);
+        }
+        if (nameLower.includes("maintenance") && nameLower.includes("discount")) {
+          const categoryKey = `Discount:Maintenance`;
+          itemLookup.set(categoryKey, qbItem.quickbooksItemId);
+        }
+      }
     }
     
-    console.log(`[QuickBooks Resync] Item lookup: ${Array.from(itemLookup.entries()).map(([k, v]) => `${k}=${v}`).join(", ")}`);
+    console.log(`[QuickBooks Resync] Item lookup keys: ${Array.from(itemLookup.entries()).map(([k, v]) => `${k}=${v}`).join(", ")}`);
     
     // Get current invoice from QuickBooks
     const qbo = getQuickBooksClient(conn);
@@ -3428,15 +3458,15 @@ export async function resyncInvoiceToQuickBooks(crmInvoiceId: string): Promise<{
       crmItemsById.set(item.id, item);
     }
     
-    // Get property type from invoice or work order
-    let propertyType: "Residential" | "Commercial" = "Residential";
+    // Get invoice-level property type from invoice or work order
+    let invoicePropertyType: "Residential" | "Commercial" = "Residential";
     if (invoice.propertyId) {
       const [property] = await db.select()
         .from(crmProperties)
         .where(eq(crmProperties.id, invoice.propertyId))
         .limit(1);
       if (property?.propertyType) {
-        propertyType = property.propertyType === "commercial" ? "Commercial" : "Residential";
+        invoicePropertyType = property.propertyType === "commercial" ? "Commercial" : "Residential";
       }
     } else if (invoice.workOrderId) {
       const [workOrder] = await db.select()
@@ -3449,15 +3479,43 @@ export async function resyncInvoiceToQuickBooks(crmInvoiceId: string): Promise<{
           .where(eq(crmProperties.id, workOrder.propertyId))
           .limit(1);
         if (property?.propertyType) {
-          propertyType = property.propertyType === "commercial" ? "Commercial" : "Residential";
+          invoicePropertyType = property.propertyType === "commercial" ? "Commercial" : "Residential";
         }
       }
     }
     
-    // Get line items from CRM invoice
+    // Get line items from CRM invoice and build lookup map by sortOrder
     const lineItemsData = await db.select()
       .from(crmInvoiceLineItems)
       .where(eq(crmInvoiceLineItems.invoiceId, crmInvoiceId));
+    
+    // Build map of CRM line items by sortOrder (position) for stable matching
+    // sortOrder 0-indexed in CRM corresponds to LineNum 1-indexed in QuickBooks
+    // Use array to preserve order and avoid collisions when sortOrder is undefined
+    const crmLineItemsBySortOrder = new Map<number, typeof lineItemsData[0]>();
+    const crmLineItemsByIndex = new Map<number, typeof lineItemsData[0]>();
+    
+    for (let idx = 0; idx < lineItemsData.length; idx++) {
+      const lineItem = lineItemsData[idx];
+      // Store by index for guaranteed unique lookup
+      crmLineItemsByIndex.set(idx, lineItem);
+      // Also store by sortOrder if defined and unique
+      if (lineItem.sortOrder !== undefined && lineItem.sortOrder !== null) {
+        crmLineItemsBySortOrder.set(lineItem.sortOrder, lineItem);
+      }
+    }
+    
+    console.log(`[QuickBooks Resync] CRM line items by sortOrder: ${Array.from(crmLineItemsBySortOrder.keys()).join(", ")}`);
+    
+    // Helper function to determine property type override from item name
+    function getPropertyTypeFromItemName(itemName: string | null | undefined): "Crawlspace" | "Promotional" | "Maintenance" | null {
+      if (!itemName) return null;
+      const nameLower = itemName.toLowerCase();
+      if (nameLower.includes("crawlspace")) return "Crawlspace";
+      if (nameLower.includes("promotional")) return "Promotional";
+      if (nameLower.includes("maintenance") && nameLower.includes("discount")) return "Maintenance";
+      return null;
+    }
     
     // Build updated line items with correct ItemRef
     const updatedLines: any[] = [];
@@ -3465,37 +3523,120 @@ export async function resyncInvoiceToQuickBooks(crmInvoiceId: string): Promise<{
     for (let i = 0; i < existingInvoice.Line.length; i++) {
       const existingLine = existingInvoice.Line[i];
       
-      // Skip SubTotalLine
-      if (existingLine.DetailType === "SubTotalLineDetail") {
+      // Skip non-SalesItem lines (SubTotalLine, DiscountLine, etc.)
+      if (existingLine.DetailType === "SubTotalLineDetail" || 
+          existingLine.DetailType === "DiscountLineDetail" ||
+          existingLine.DetailType === "GroupLineDetail" ||
+          existingLine.DetailType === "DescriptionOnly") {
         updatedLines.push(existingLine);
         continue;
       }
       
-      // Find corresponding CRM line item
-      const crmLineItem = lineItemsData[i] || lineItemsData[0];
+      // Match by LineNum (QB) to sortOrder (CRM)
+      // QuickBooks LineNum is typically 1-indexed, CRM sortOrder is 0-indexed
+      // If LineNum is undefined/null, fall back to index but don't use lineItemsData[0] as default
+      let crmLineItem: typeof lineItemsData[0] | undefined = undefined;
+      
+      if (existingLine.LineNum !== undefined && existingLine.LineNum !== null) {
+        // LineNum is 1-indexed, sortOrder is 0-indexed
+        const sortOrderKey = existingLine.LineNum - 1;
+        crmLineItem = crmLineItemsBySortOrder.get(sortOrderKey);
+        
+        // If not found by LineNum-1, try exact LineNum (in case sortOrder is 1-indexed)
+        if (!crmLineItem) {
+          crmLineItem = crmLineItemsBySortOrder.get(existingLine.LineNum);
+        }
+      }
+      
+      // If still no match by LineNum, use a sales line counter to match by position
+      // This avoids index mismatch when QB has non-sales lines (subtotal, discount)
+      if (!crmLineItem) {
+        // Count how many SalesItemLineDetail lines we've seen so far
+        let salesLineIndex = 0;
+        for (let j = 0; j < i; j++) {
+          if (existingInvoice.Line[j].DetailType === "SalesItemLineDetail") {
+            salesLineIndex++;
+          }
+        }
+        crmLineItem = crmLineItemsByIndex.get(salesLineIndex);
+        if (crmLineItem) {
+          console.log(`[QuickBooks Resync] Line ${i}: No LineNum match, using sales line index ${salesLineIndex}`);
+        }
+      }
       
       if (existingLine.DetailType === "SalesItemLineDetail") {
         // Determine category type from CRM item
-        let categoryType: string | null = null;
+        let categoryType: string = "Service";
+        let crmItem: typeof allCrmItems[0] | undefined = undefined;
+        
         if (crmLineItem?.itemId) {
-          const crmItem = crmItemsById.get(crmLineItem.itemId);
+          crmItem = crmItemsById.get(crmLineItem.itemId);
           if (crmItem?.category) {
-            categoryType = crmItem.category.charAt(0).toUpperCase() + crmItem.category.slice(1).toLowerCase();
-            if (categoryType === "Service") categoryType = "Service";
-            else if (categoryType === "Install") categoryType = "Install";
-            else if (categoryType === "Maintenance") categoryType = "Maintenance";
-            else if (categoryType === "Discount") categoryType = "Discount";
+            const normalizedCategory = crmItem.category.charAt(0).toUpperCase() + crmItem.category.slice(1).toLowerCase();
+            if (normalizedCategory === "Service") categoryType = "Service";
+            else if (normalizedCategory === "Install") categoryType = "Install";
+            else if (normalizedCategory === "Maintenance") categoryType = "Maintenance";
+            else if (normalizedCategory === "Discount") categoryType = "Discount";
+            else categoryType = normalizedCategory;
           }
         }
         
-        // Default to Service if not determined
-        if (!categoryType) categoryType = "Service";
+        // Determine effective property type for this line
+        // 1. Check for per-line property type override from CRM item name
+        // 2. Check for special keywords (Crawlspace, Promotional, etc.)
+        // 3. Fall back to invoice-level property type
+        let effectivePropertyType: string = invoicePropertyType;
+        
+        // Check if CRM item has a special subtype override in its name
+        const itemNameOverride = getPropertyTypeFromItemName(crmItem?.name);
+        if (itemNameOverride) {
+          effectivePropertyType = itemNameOverride;
+          console.log(`[QuickBooks Resync] Line ${i}: Using item name override: ${itemNameOverride}`);
+        }
+        
+        // Also check the line item description for special keywords
+        const descriptionOverride = getPropertyTypeFromItemName(crmLineItem?.description);
+        if (descriptionOverride) {
+          effectivePropertyType = descriptionOverride;
+          console.log(`[QuickBooks Resync] Line ${i}: Using description override: ${descriptionOverride}`);
+        }
+        
+        // Check if the line item has a direct QuickBooks sub-account override
+        if (crmLineItem?.quickbooksSubAccountId) {
+          console.log(`[QuickBooks Resync] Line ${i}: Using direct quickbooksSubAccountId: ${crmLineItem.quickbooksSubAccountId}`);
+          // Note: quickbooksSubAccountId is for account, not item, but log for visibility
+        }
         
         // Look up the correct QuickBooks Item
-        const lookupKey = `${categoryType}:${propertyType}`;
-        const qbItemId = itemLookup.get(lookupKey);
+        let qbItemId: string | undefined = undefined;
         
-        console.log(`[QuickBooks Resync] Line ${i}: category=${categoryType}, property=${propertyType}, lookup=${lookupKey}, itemId=${qbItemId}`);
+        // Try standard lookup first: categoryType:effectivePropertyType
+        const lookupKey = `${categoryType}:${effectivePropertyType}`;
+        qbItemId = itemLookup.get(lookupKey);
+        
+        // If no match and effectivePropertyType is a special type, try name-based lookup
+        if (!qbItemId && itemNameOverride) {
+          // Try to find by partial name match
+          const searchName = `${categoryType} | ${itemNameOverride}`.toLowerCase();
+          for (const [name, id] of itemNameLookup) {
+            if (name.includes(searchName) || name.includes(itemNameOverride.toLowerCase())) {
+              qbItemId = id;
+              console.log(`[QuickBooks Resync] Line ${i}: Found by name lookup: ${name} -> ${id}`);
+              break;
+            }
+          }
+        }
+        
+        // If still no match, try falling back to invoice-level property type
+        if (!qbItemId && effectivePropertyType !== invoicePropertyType) {
+          const fallbackKey = `${categoryType}:${invoicePropertyType}`;
+          qbItemId = itemLookup.get(fallbackKey);
+          if (qbItemId) {
+            console.log(`[QuickBooks Resync] Line ${i}: Falling back to invoice property type: ${fallbackKey}`);
+          }
+        }
+        
+        console.log(`[QuickBooks Resync] Line ${i} (LineNum=${existingLine.LineNum}): category=${categoryType}, effectiveProperty=${effectivePropertyType}, lookup=${lookupKey}, itemId=${qbItemId || 'not found'}`);
         
         const updatedLine = {
           ...existingLine,
@@ -3520,6 +3661,7 @@ export async function resyncInvoiceToQuickBooks(crmInvoiceId: string): Promise<{
     };
     
     console.log(`[QuickBooks Resync] Updating invoice with lines:`, JSON.stringify(updatedLines.map(l => ({
+      LineNum: l.LineNum,
       Amount: l.Amount,
       ItemRef: l.SalesItemLineDetail?.ItemRef
     })), null, 2));

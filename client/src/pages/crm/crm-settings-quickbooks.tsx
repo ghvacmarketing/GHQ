@@ -387,6 +387,37 @@ export default function CrmSettingsQuickBooks() {
     },
   });
 
+  const [resyncInvoiceId, setResyncInvoiceId] = useState<string>("");
+  
+  const resyncInvoiceMutation = useMutation({
+    mutationFn: async (crmInvoiceId: string) => {
+      const response = await apiRequest("POST", `/api/quickbooks/invoice/${crmInvoiceId}/resync`);
+      return response.json();
+    },
+    onSuccess: (result: any) => {
+      if (result.success) {
+        toast({
+          title: "Invoice Resynced",
+          description: result.message || "Invoice updated with correct item mappings for P&L routing.",
+        });
+      } else {
+        toast({
+          title: "Resync Issue",
+          description: result.error || "Could not resync invoice",
+          variant: "destructive",
+        });
+      }
+      setResyncInvoiceId("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Resync Failed",
+        description: error.message || "Failed to resync invoice",
+        variant: "destructive",
+      });
+    },
+  });
+
   useEffect(() => {
     if (!authLoading && !currentUser) {
       navigate("/crm/login");
@@ -718,6 +749,38 @@ export default function CrmSettingsQuickBooks() {
                               </div>
                             </div>
                           )}
+                          
+                          {/* Resync Existing Invoices Section */}
+                          <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                            <div className="flex items-center justify-between gap-4">
+                              <div>
+                                <p className="font-medium text-amber-900">Resync Existing Invoices</p>
+                                <p className="text-sm text-amber-700">Update invoices already in QuickBooks with correct Item mappings for P&L</p>
+                              </div>
+                            </div>
+                            <div className="mt-3 flex gap-2 items-center">
+                              <Input
+                                placeholder="Enter CRM Invoice ID (e.g. abc123-...)"
+                                value={resyncInvoiceId}
+                                onChange={(e) => setResyncInvoiceId(e.target.value)}
+                                className="flex-1 max-w-md"
+                                data-testid="input-resync-invoice-id"
+                              />
+                              <Button
+                                onClick={() => resyncInvoiceId && resyncInvoiceMutation.mutate(resyncInvoiceId)}
+                                disabled={!resyncInvoiceId || resyncInvoiceMutation.isPending}
+                                className="bg-amber-600 hover:bg-amber-700"
+                                data-testid="btn-resync-invoice"
+                              >
+                                {resyncInvoiceMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="h-4 w-4 mr-2" />
+                                )}
+                                Resync Invoice
+                              </Button>
+                            </div>
+                          </div>
                           
                           <Accordion type="multiple" className="w-full" defaultValue={parentAccounts.map(p => p.id)}>
                             {parentAccounts.map((parent) => {
