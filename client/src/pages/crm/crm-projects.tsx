@@ -3,13 +3,14 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -49,10 +50,14 @@ import {
   Calendar,
   Check,
   ChevronsUpDown,
+  BarChart3,
+  LayoutGrid,
+  CalendarDays,
+  Activity,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
 import type { CrmUser, CrmProject, CrmProperty } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
@@ -179,7 +184,9 @@ export default function CrmProjects() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [searchInput, setSearchInput] = useState("");
-  const [activeTab, setActiveTab] = useState<FilterTab>("all");
+  const [activeFilterTab, setActiveFilterTab] = useState<FilterTab>("all");
+  const [activeTab, setActiveTab] = useState<"overview" | "pipeline" | "calendar">("pipeline");
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [page, setPage] = useState(1);
   
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -209,20 +216,20 @@ export default function CrmProjects() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, activeTab]);
+  }, [debouncedSearch, activeFilterTab]);
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("search", debouncedSearch);
     
-    if (activeTab !== "all") {
-      params.set("status", activeTab);
+    if (activeFilterTab !== "all") {
+      params.set("status", activeFilterTab);
     }
     
     params.set("page", String(page));
     params.set("limit", String(ITEMS_PER_PAGE));
     return params.toString();
-  }, [debouncedSearch, activeTab, page]);
+  }, [debouncedSearch, activeFilterTab, page]);
 
   const { data: projectsData, isLoading: projectsLoading } = useQuery<ProjectsResponse>({
     queryKey: ["/api/crm/projects", queryParams],
@@ -234,6 +241,16 @@ export default function CrmProjects() {
       return res.json();
     },
     enabled: !!currentUser,
+  });
+
+  const { data: statsData, isLoading: statsLoading } = useQuery<{
+    activeProjects: number;
+    pendingActions: number;
+    pipelineValue: number;
+    completionRate: string;
+    statusFunnel: Record<string, number>;
+  }>({
+    queryKey: ["/api/crm/projects/stats"],
   });
 
   const { data: customersData, isLoading: customersLoading } = useQuery<CustomersResponse>({
@@ -381,194 +398,385 @@ export default function CrmProjects() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="space-y-4">
-        {/* Search bar at top - DoorLoop style */}
-        <div className="flex justify-center mb-2">
-          <div className="relative w-full max-w-xl">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search projects..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
-              data-testid="input-search-projects"
-            />
-          </div>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <FolderKanban className="h-8 w-8 text-primary" />
+          <h1 className="text-2xl font-bold">Projects</h1>
         </div>
+        <Button onClick={() => setCreateDialogOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" /> New Project
+        </Button>
+      </div>
 
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900" data-testid="text-projects-title">
-              Projects
-            </h1>
-            <p className="text-sm text-slate-500">Total: {total}</p>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+        <TabsList className="grid w-full max-w-md grid-cols-3 mb-6">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="pipeline" className="flex items-center gap-2">
+            <LayoutGrid className="h-4 w-4" />
+            Pipeline
+          </TabsTrigger>
+          <TabsTrigger value="calendar" className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4" />
+            Calendar
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Active Projects</CardTitle>
+                <FolderKanban className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{statsLoading ? <Skeleton className="h-8 w-16" /> : statsData?.activeProjects ?? 0}</div>
+                <p className="text-xs text-muted-foreground">Projects in progress</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pending Actions</CardTitle>
+                <ClipboardList className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{statsLoading ? <Skeleton className="h-8 w-16" /> : statsData?.pendingActions ?? 0}</div>
+                <p className="text-xs text-muted-foreground">Need attention</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pipeline Value</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {statsLoading ? <Skeleton className="h-8 w-20" /> : `$${(statsData?.pipelineValue ?? 0).toLocaleString()}`}
+                </div>
+                <p className="text-xs text-muted-foreground">Active project value</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
+                <Activity className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{statsLoading ? <Skeleton className="h-8 w-16" /> : `${statsData?.completionRate ?? 0}%`}</div>
+                <p className="text-xs text-muted-foreground">Projects completed</p>
+              </CardContent>
+            </Card>
           </div>
-          <Button
-            size="sm"
-            className="bg-[#711419] hover:bg-[#5a1014] text-white"
-            onClick={() => setCreateDialogOpen(true)}
-            data-testid="button-create-project"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Create Project
-          </Button>
-        </div>
 
-        {/* Tabs styled like customer page - underline style */}
-        <div className="flex overflow-x-auto border-b border-slate-200">
-          {(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-                activeTab === tab
-                  ? "border-[#711419] text-[#711419]"
-                  : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-              }`}
-              data-testid={`tab-status-${tab}`}
-            >
-              {filterTabConfig[tab].label}
-            </button>
-          ))}
-        </div>
-
-        {projectsLoading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-48 rounded-xl" />
-            ))}
-          </div>
-        ) : projects.length === 0 ? (
-          <Card className="bg-white border shadow-sm">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <FolderKanban className="h-12 w-12 text-slate-300 mb-4" />
-              <p className="text-slate-500 text-center">No projects found</p>
-              <p className="text-slate-400 text-sm text-center mt-1">
-                Create a new project to get started
-              </p>
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle className="text-lg">Project Status Funnel</CardTitle>
+              <CardDescription>Click a status to filter the pipeline view</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+                {Object.entries(statusLabels).filter(([key]) => key !== "archived" && key !== "proposal_sent").map(([status, label]) => {
+                  const count = statsData?.statusFunnel?.[status] ?? 0;
+                  const colors = statusColors[status] || statusColors.lead;
+                  return (
+                    <button
+                      key={status}
+                      onClick={() => {
+                        setActiveFilterTab(status as FilterTab);
+                        setActiveTab("pipeline");
+                      }}
+                      className={cn(
+                        "p-4 rounded-lg border-2 transition-all hover:scale-105",
+                        colors.bg, colors.border
+                      )}
+                    >
+                      <div className={cn("text-2xl font-bold", colors.text)}>{count}</div>
+                      <div className="text-xs text-muted-foreground mt-1">{label}</div>
+                    </button>
+                  );
+                })}
+              </div>
             </CardContent>
           </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {projects.map((project) => {
-              const status = project.status || "lead";
-              const statusStyle = statusColors[status] || statusColors.lead;
-              const typeStyle = projectTypeColors[project.projectType] || projectTypeColors.INSTALL;
+        </TabsContent>
 
-              return (
-                <Card
-                  key={project.id}
-                  className="bg-white border shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => navigate(`/crm/projects/${project.id}`)}
-                  data-testid={`card-project-${project.id}`}
+        <TabsContent value="pipeline">
+          <div className="space-y-4">
+            {/* Search bar at top - DoorLoop style */}
+            <div className="flex justify-center mb-2">
+              <div className="relative w-full max-w-xl">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Search projects..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
+                  data-testid="input-search-projects"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500">Total: {total}</p>
+              </div>
+            </div>
+
+            {/* Status filter tabs - underline style */}
+            <div className="flex overflow-x-auto border-b border-slate-200">
+              {(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveFilterTab(tab)}
+                  className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                    activeFilterTab === tab
+                      ? "border-[#711419] text-[#711419]"
+                      : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+                  }`}
+                  data-testid={`tab-status-${tab}`}
                 >
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <h3 className="font-semibold text-slate-900 line-clamp-2 flex-1 mr-2">
-                        {project.title}
-                      </h3>
-                      <Badge
-                        className={cn(
-                          "text-xs border flex-shrink-0",
-                          statusStyle.bg,
-                          statusStyle.text,
-                          statusStyle.border
-                        )}
-                      >
-                        {statusLabels[status] || status}
-                      </Badge>
-                    </div>
+                  {filterTabConfig[tab].label}
+                </button>
+              ))}
+            </div>
 
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-slate-600">
-                        <span className="font-medium">Customer:</span>
-                        <span className="truncate">{project.customerName || "—"}</span>
-                      </div>
+            {projectsLoading ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-48 rounded-xl" />
+                ))}
+              </div>
+            ) : projects.length === 0 ? (
+              <Card className="bg-white border shadow-sm">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <FolderKanban className="h-12 w-12 text-slate-300 mb-4" />
+                  <p className="text-slate-500 text-center">No projects found</p>
+                  <p className="text-slate-400 text-sm text-center mt-1">
+                    Create a new project to get started
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {projects.map((project) => {
+                  const status = project.status || "lead";
+                  const statusStyle = statusColors[status] || statusColors.lead;
+                  const typeStyle = projectTypeColors[project.projectType] || projectTypeColors.INSTALL;
 
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          className={cn(
-                            "text-xs border",
-                            typeStyle.bg,
-                            typeStyle.text,
-                            typeStyle.border
-                          )}
-                        >
-                          {projectTypeLabels[project.projectType] || project.projectType}
-                        </Badge>
-                        {project.priority && project.priority !== "normal" && (
+                  return (
+                    <Card
+                      key={project.id}
+                      className="bg-white border shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => navigate(`/crm/projects/${project.id}`)}
+                      data-testid={`card-project-${project.id}`}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <h3 className="font-semibold text-slate-900 line-clamp-2 flex-1 mr-2">
+                            {project.title}
+                          </h3>
                           <Badge
                             className={cn(
-                              "text-xs border",
-                              priorityColors[project.priority]?.bg || "bg-slate-100",
-                              priorityColors[project.priority]?.text || "text-slate-600",
-                              priorityColors[project.priority]?.border || "border-slate-200"
+                              "text-xs border flex-shrink-0",
+                              statusStyle.bg,
+                              statusStyle.text,
+                              statusStyle.border
                             )}
                           >
-                            {project.priority}
+                            {statusLabels[status] || status}
                           </Badge>
-                        )}
-                      </div>
-
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                        <div className="flex items-center gap-1 text-sm">
-                          <DollarSign className="h-4 w-4 text-green-600" />
-                          <span className="font-medium text-green-700">
-                            {formatCurrency(project.expectedValue)}
-                          </span>
                         </div>
-                        {project.workOrderCount > 0 && (
-                          <div className="flex items-center gap-1 text-sm text-slate-500">
-                            <ClipboardList className="h-4 w-4" />
-                            <span>{project.workOrderCount} WO{project.workOrderCount !== 1 ? "s" : ""}</span>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <span className="font-medium">Customer:</span>
+                            <span className="truncate">{project.customerName || "—"}</span>
                           </div>
-                        )}
-                      </div>
 
-                      <div className="flex items-center gap-1 text-xs text-slate-400">
-                        <Calendar className="h-3 w-3" />
-                        <span>Created {formatDate(project.createdAt)}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              className={cn(
+                                "text-xs border",
+                                typeStyle.bg,
+                                typeStyle.text,
+                                typeStyle.border
+                              )}
+                            >
+                              {projectTypeLabels[project.projectType] || project.projectType}
+                            </Badge>
+                            {project.priority && project.priority !== "normal" && (
+                              <Badge
+                                className={cn(
+                                  "text-xs border",
+                                  priorityColors[project.priority]?.bg || "bg-slate-100",
+                                  priorityColors[project.priority]?.text || "text-slate-600",
+                                  priorityColors[project.priority]?.border || "border-slate-200"
+                                )}
+                              >
+                                {project.priority}
+                              </Badge>
+                            )}
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                            <div className="flex items-center gap-1 text-sm">
+                              <DollarSign className="h-4 w-4 text-green-600" />
+                              <span className="font-medium text-green-700">
+                                {formatCurrency(project.expectedValue)}
+                              </span>
+                            </div>
+                            {project.workOrderCount > 0 && (
+                              <div className="flex items-center gap-1 text-sm text-slate-500">
+                                <ClipboardList className="h-4 w-4" />
+                                <span>{project.workOrderCount} WO{project.workOrderCount !== 1 ? "s" : ""}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1 text-xs text-slate-400">
+                            <Calendar className="h-3 w-3" />
+                            <span>Created {formatDate(project.createdAt)}</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-4 border-t">
+                <p className="text-sm text-slate-500">
+                  Showing {(page - 1) * ITEMS_PER_PAGE + 1} to{" "}
+                  {Math.min(page * ITEMS_PER_PAGE, total)} of {total}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                    data-testid="button-prev-page"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm text-slate-600">
+                    Page {page} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                    data-testid="button-next-page"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+        </TabsContent>
 
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between pt-4 border-t">
-            <p className="text-sm text-slate-500">
-              Showing {(page - 1) * ITEMS_PER_PAGE + 1} to{" "}
-              {Math.min(page * ITEMS_PER_PAGE, total)} of {total}
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                data-testid="button-prev-page"
-              >
+        <TabsContent value="calendar">
+          <div className="space-y-4">
+            {/* Calendar Header */}
+            <div className="flex items-center justify-between mb-4">
+              <Button variant="outline" size="sm" onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="text-sm text-slate-600">
-                Page {page} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                data-testid="button-next-page"
-              >
+              <h2 className="text-lg font-semibold">{format(calendarMonth, "MMMM yyyy")}</h2>
+              <Button variant="outline" size="sm" onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
+
+            {/* Status Legend */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {Object.entries(statusColors).filter(([key]) => !["archived", "proposal_sent"].includes(key)).map(([status, colors]) => (
+                <div key={status} className="flex items-center gap-1.5 text-xs">
+                  <div className={cn("w-3 h-3 rounded", colors.bg, colors.border, "border")} />
+                  <span>{statusLabels[status]}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Calendar Grid */}
+            <div className="border rounded-lg overflow-hidden">
+              {/* Weekday headers */}
+              <div className="grid grid-cols-7 bg-muted">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
+                  <div key={day} className="p-2 text-center text-sm font-medium border-b">{day}</div>
+                ))}
+              </div>
+              
+              {/* Calendar days */}
+              <div className="grid grid-cols-7">
+                {(() => {
+                  const monthStart = startOfMonth(calendarMonth);
+                  const monthEnd = endOfMonth(calendarMonth);
+                  const startDate = startOfWeek(monthStart);
+                  const endDate = endOfWeek(monthEnd);
+                  const days = eachDayOfInterval({ start: startDate, end: endDate });
+                  
+                  return days.map(day => {
+                    const isCurrentMonth = isSameMonth(day, calendarMonth);
+                    
+                    const dayProjects = projectsData?.projects?.filter(project => {
+                      if (!project.startDate && !project.endDate) return false;
+                      const projectStart = project.startDate ? new Date(project.startDate) : null;
+                      const projectEnd = project.endDate ? new Date(project.endDate) : projectStart;
+                      if (!projectStart) return false;
+                      return isWithinInterval(day, { start: projectStart, end: projectEnd || projectStart }) ||
+                             isSameDay(day, projectStart) ||
+                             (projectEnd && isSameDay(day, projectEnd));
+                    }) || [];
+                    
+                    return (
+                      <div
+                        key={day.toISOString()}
+                        className={cn(
+                          "min-h-[100px] p-1 border-b border-r relative",
+                          !isCurrentMonth && "bg-muted/50 text-muted-foreground"
+                        )}
+                      >
+                        <div className="text-xs font-medium mb-1">{format(day, "d")}</div>
+                        <div className="space-y-1 overflow-hidden">
+                          {dayProjects.slice(0, 3).map(project => {
+                            const colors = statusColors[project.status] || statusColors.lead;
+                            return (
+                              <button
+                                key={project.id}
+                                onClick={() => navigate(`/crm/projects/${project.id}`)}
+                                className={cn(
+                                  "w-full text-left text-xs p-1 rounded truncate",
+                                  colors.bg, colors.text
+                                )}
+                                title={`${project.customerName || "Customer"} - ${project.title}`}
+                              >
+                                {project.customerName || project.title}
+                              </button>
+                            );
+                          })}
+                          {dayProjects.length > 3 && (
+                            <div className="text-xs text-muted-foreground">+{dayProjects.length - 3} more</div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent className="max-w-lg">
