@@ -12508,9 +12508,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/crm/projects - List all projects with filters (OPTIMIZED - batch loading)
   app.get("/api/crm/projects", requireCrmAuth, async (req, res) => {
     try {
-      const { status, customerId, hasUpcomingWorkOrders, noWorkOrdersYet, agingApproved, page = "1", limit = "25" } = req.query;
+      const { status, customerId, hasUpcomingWorkOrders, noWorkOrdersYet, agingApproved, hasSchedule, page = "1", limit = "25" } = req.query;
       const pageNum = parseInt(page as string, 10) || 1;
-      const limitNum = Math.min(50, parseInt(limit as string, 10) || 25);
+      // Allow higher limit for calendar view (hasSchedule=true)
+      const maxLimit = hasSchedule === "true" ? 1000 : 50;
+      const limitNum = Math.min(maxLimit, parseInt(limit as string, 10) || 25);
       const offset = (pageNum - 1) * limitNum;
 
       const conditions = [];
@@ -12526,6 +12528,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (customerId) {
         conditions.push(eq(crmProjects.customerId, customerId as string));
+      }
+
+      // Filter for projects with scheduled dates (for calendar view)
+      if (hasSchedule === "true") {
+        conditions.push(isNotNull(crmProjects.startDate));
       }
 
       let query = db.select().from(crmProjects);

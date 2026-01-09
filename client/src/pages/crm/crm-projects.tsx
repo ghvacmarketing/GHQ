@@ -253,6 +253,28 @@ export default function CrmProjects() {
     queryKey: ["/api/crm/projects/stats"],
   });
 
+  // Separate query for calendar view - fetches all scheduled projects without pagination
+  const calendarQueryParams = useMemo(() => {
+    const monthStart = startOfMonth(calendarMonth);
+    const monthEnd = endOfMonth(calendarMonth);
+    const params = new URLSearchParams();
+    params.set("hasSchedule", "true");
+    params.set("limit", "1000"); // Get all scheduled projects
+    return params.toString();
+  }, [calendarMonth]);
+
+  const { data: calendarProjectsData, isLoading: calendarLoading } = useQuery<ProjectsResponse>({
+    queryKey: ["/api/crm/projects/calendar", calendarQueryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/projects?${calendarQueryParams}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch calendar projects");
+      return res.json();
+    },
+    enabled: !!currentUser && activeTab === "calendar",
+  });
+
   const { data: customersData, isLoading: customersLoading } = useQuery<CustomersResponse>({
     queryKey: ["/api/crm/customers", debouncedCustomerSearch],
     queryFn: async () => {
@@ -806,6 +828,11 @@ export default function CrmProjects() {
             </div>
 
             {/* Calendar Grid */}
+            {calendarLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+              </div>
+            ) : (
             <div className="border rounded-lg overflow-hidden">
               {/* Weekday headers */}
               <div className="grid grid-cols-7 bg-muted">
@@ -826,14 +853,15 @@ export default function CrmProjects() {
                   return days.map(day => {
                     const isCurrentMonth = isSameMonth(day, calendarMonth);
                     
-                    const dayProjects = projectsData?.projects?.filter(project => {
+                    const dayProjects = calendarProjectsData?.projects?.filter(project => {
                       if (!project.startDate && !project.endDate) return false;
-                      const projectStart = project.startDate ? new Date(project.startDate) : null;
-                      const projectEnd = project.endDate ? new Date(project.endDate) : projectStart;
+                      const projectStart = project.startDate ? startOfDay(new Date(project.startDate)) : null;
+                      const projectEnd = project.endDate ? startOfDay(new Date(project.endDate)) : projectStart;
                       if (!projectStart) return false;
-                      return isWithinInterval(day, { start: projectStart, end: projectEnd || projectStart }) ||
-                             isSameDay(day, projectStart) ||
-                             (projectEnd && isSameDay(day, projectEnd));
+                      const dayStart = startOfDay(day);
+                      return isSameDay(dayStart, projectStart) ||
+                             (projectEnd && isSameDay(dayStart, projectEnd)) ||
+                             (projectEnd && isAfter(dayStart, projectStart) && isBefore(dayStart, projectEnd));
                     }) || [];
                     
                     return (
@@ -872,6 +900,7 @@ export default function CrmProjects() {
                 })()}
               </div>
             </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
