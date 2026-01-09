@@ -1058,6 +1058,16 @@ export const dispatchQueueStageEnum = [
 ] as const;
 export type DispatchQueueStage = typeof dispatchQueueStageEnum[number];
 
+// Pending Reason - why a tech is waiting during a job
+export const pendingReasonEnum = [
+  "waiting_on_parts",
+  "waiting_on_customer", 
+  "waiting_for_next_job",
+  "lunch_break",
+  "other"
+] as const;
+export type PendingReason = typeof pendingReasonEnum[number];
+
 export const crmWorkOrders = pgTable("crm_work_orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   customerId: varchar("customer_id").references(() => crmCustomers.id),
@@ -1093,6 +1103,9 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),
   finalizedAt: timestamp("finalized_at"),
+  isPending: boolean("is_pending").default(false),
+  pendingReason: text("pending_reason").$type<PendingReason>(),
+  pendingStartedAt: timestamp("pending_started_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
