@@ -526,11 +526,11 @@ export default function CrmProjects() {
             </CardContent>
           </Card>
 
-          {/* Upcoming Milestones & Deadlines */}
+          {/* Scheduled Projects */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Upcoming Milestones & Deadlines</CardTitle>
-              <CardDescription>Projects with start or end dates in the next 14 days</CardDescription>
+              <CardTitle className="text-lg">Scheduled Projects</CardTitle>
+              <CardDescription>Projects with scheduled dates in the next 14 days</CardDescription>
             </CardHeader>
             <CardContent>
               {projectsLoading ? (
@@ -543,34 +543,33 @@ export default function CrmProjects() {
                 const today = startOfDay(new Date());
                 const twoWeeksOut = addDays(today, 14);
                 
-                const upcomingMilestones: Array<{
-                  project: ProjectWithDetails;
-                  milestoneType: "start" | "end";
-                  date: Date;
-                }> = [];
-                
-                projects.forEach(project => {
-                  if (project.startDate) {
-                    const startDate = startOfDay(new Date(project.startDate));
-                    if (!isBefore(startDate, today) && !isAfter(startDate, twoWeeksOut)) {
-                      upcomingMilestones.push({ project, milestoneType: "start", date: startDate });
-                    }
-                  }
-                  if (project.endDate) {
-                    const endDate = startOfDay(new Date(project.endDate));
-                    if (!isBefore(endDate, today) && !isAfter(endDate, twoWeeksOut)) {
-                      upcomingMilestones.push({ project, milestoneType: "end", date: endDate });
-                    }
-                  }
+                // Get unique projects with dates in the next 14 days
+                const upcomingProjects = projects.filter(project => {
+                  if (!project.startDate && !project.endDate) return false;
+                  const startDate = project.startDate ? startOfDay(new Date(project.startDate)) : null;
+                  const endDate = project.endDate ? startOfDay(new Date(project.endDate)) : null;
+                  
+                  // Include if start or end date is within 14 days
+                  const startInRange = startDate && !isBefore(startDate, today) && !isAfter(startDate, twoWeeksOut);
+                  const endInRange = endDate && !isBefore(endDate, today) && !isAfter(endDate, twoWeeksOut);
+                  // Also include if project spans today (started before, ends after)
+                  const spansToday = startDate && endDate && isBefore(startDate, today) && isAfter(endDate, today);
+                  
+                  return startInRange || endInRange || spansToday;
+                });
+
+                // Sort by earliest date (start date first, then end date)
+                upcomingProjects.sort((a, b) => {
+                  const aDate = a.startDate ? new Date(a.startDate) : (a.endDate ? new Date(a.endDate) : new Date());
+                  const bDate = b.startDate ? new Date(b.startDate) : (b.endDate ? new Date(b.endDate) : new Date());
+                  return aDate.getTime() - bDate.getTime();
                 });
                 
-                upcomingMilestones.sort((a, b) => a.date.getTime() - b.date.getTime());
-                
-                if (upcomingMilestones.length === 0) {
+                if (upcomingProjects.length === 0) {
                   return (
                     <div className="text-center py-8 text-muted-foreground">
                       <Calendar className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                      <p>No upcoming milestones in the next 14 days</p>
+                      <p>No scheduled projects in the next 14 days</p>
                       <p className="text-sm mt-1">Set start/end dates on projects to see them here</p>
                     </div>
                   );
@@ -578,44 +577,64 @@ export default function CrmProjects() {
                 
                 return (
                   <div className="space-y-3">
-                    {upcomingMilestones.slice(0, 10).map((milestone, idx) => {
-                      const statusStyle = statusColors[milestone.project.status] || statusColors.lead;
-                      const daysAway = Math.ceil((milestone.date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                    {upcomingProjects.slice(0, 10).map((project) => {
+                      const statusStyle = statusColors[project.status] || statusColors.lead;
+                      const startDate = project.startDate ? startOfDay(new Date(project.startDate)) : null;
+                      const endDate = project.endDate ? startOfDay(new Date(project.endDate)) : null;
+                      
+                      const startDaysAway = startDate ? Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
+                      const endDaysAway = endDate ? Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
+                      
+                      const formatDaysAway = (days: number) => {
+                        if (days < 0) return `${Math.abs(days)}d ago`;
+                        if (days === 0) return "Today";
+                        if (days === 1) return "Tomorrow";
+                        return `In ${days}d`;
+                      };
                       
                       return (
                         <button
-                          key={`${milestone.project.id}-${milestone.milestoneType}-${idx}`}
-                          onClick={() => navigate(`/crm/projects/${milestone.project.id}`)}
+                          key={project.id}
+                          onClick={() => navigate(`/crm/projects/${project.id}`)}
                           className="w-full text-left p-4 rounded-lg border hover:bg-muted/50 transition-colors flex items-center justify-between gap-4"
                         >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium truncate">{milestone.project.title}</span>
+                              <span className="font-medium truncate">{project.title}</span>
                               <Badge className={cn("text-xs", statusStyle.bg, statusStyle.text, statusStyle.border)}>
-                                {statusLabels[milestone.project.status] || milestone.project.status}
+                                {statusLabels[project.status] || project.status}
                               </Badge>
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              {milestone.project.customerName || "No customer"}
+                              {project.customerName || "No customer"}
                             </div>
                           </div>
-                          <div className="text-right flex-shrink-0">
-                            <div className={cn(
-                              "text-sm font-medium",
-                              milestone.milestoneType === "end" ? "text-orange-600" : "text-blue-600"
-                            )}>
-                              {milestone.milestoneType === "start" ? "Starts" : "Ends"} {format(milestone.date, "MMM d")}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {daysAway === 0 ? "Today" : daysAway === 1 ? "Tomorrow" : `In ${daysAway} days`}
-                            </div>
+                          <div className="text-right flex-shrink-0 space-y-0.5">
+                            {startDate && (
+                              <div className="text-sm">
+                                <span className="text-blue-600 font-medium">{format(startDate, "MMM d")}</span>
+                                <span className="text-xs text-muted-foreground ml-1">({formatDaysAway(startDaysAway!)})</span>
+                              </div>
+                            )}
+                            {endDate && startDate && endDate.getTime() !== startDate.getTime() && (
+                              <div className="text-sm">
+                                <span className="text-orange-600 font-medium">{format(endDate, "MMM d")}</span>
+                                <span className="text-xs text-muted-foreground ml-1">({formatDaysAway(endDaysAway!)})</span>
+                              </div>
+                            )}
+                            {endDate && !startDate && (
+                              <div className="text-sm">
+                                <span className="text-orange-600 font-medium">{format(endDate, "MMM d")}</span>
+                                <span className="text-xs text-muted-foreground ml-1">({formatDaysAway(endDaysAway!)})</span>
+                              </div>
+                            )}
                           </div>
                         </button>
                       );
                     })}
-                    {upcomingMilestones.length > 10 && (
+                    {upcomingProjects.length > 10 && (
                       <p className="text-sm text-center text-muted-foreground pt-2">
-                        +{upcomingMilestones.length - 10} more milestones
+                        +{upcomingProjects.length - 10} more projects
                       </p>
                     )}
                   </div>
