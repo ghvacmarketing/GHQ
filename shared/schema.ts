@@ -1132,6 +1132,7 @@ export const crmQuotes = pgTable("crm_quotes", {
   validUntil: timestamp("valid_until"),
   sentAt: timestamp("sent_at"),
   viewedAt: timestamp("viewed_at"),
+  viewCount: integer("view_count").default(0),
   acceptedAt: timestamp("accepted_at"),
   declinedAt: timestamp("declined_at"),
   createdById: varchar("created_by_id"),

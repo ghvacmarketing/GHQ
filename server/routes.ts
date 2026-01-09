@@ -18876,12 +18876,41 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Quote not found or link is invalid" });
       }
 
-      // Track that the quote was viewed (first view only)
-      if (!quote.viewedAt) {
-        await db.update(crmQuotes)
-          .set({ viewedAt: new Date(), updatedAt: new Date() })
-          .where(eq(crmQuotes.id, quote.id));
-      }
+      // Track quote views - update viewedAt (first view) and increment viewCount (every view)
+      const now = new Date();
+      const currentViewCount = quote.viewCount || 0;
+      const isFirstView = !quote.viewedAt;
+      
+      await db.update(crmQuotes)
+        .set({ 
+          viewedAt: quote.viewedAt || now, // Only set on first view
+          viewCount: currentViewCount + 1,
+          updatedAt: now 
+        })
+        .where(eq(crmQuotes.id, quote.id));
+      
+      // Log the view event in quote email logs (for activity history)
+      await db.insert(quoteEmailLogs).values({
+        quoteId: quote.id,
+        direction: "system",
+        fromEmail: "system",
+        recipientEmail: quote.customerEmail || "",
+        recipientName: quote.customerName,
+        subject: isFirstView ? `Quote ${quote.quoteNumber} - First Viewed` : `Quote ${quote.quoteNumber} - Viewed Again`,
+        textContent: isFirstView 
+          ? `Quote was viewed for the first time by the customer`
+          : `Quote was viewed again by the customer (view #${currentViewCount + 1})`,
+        status: "sent",
+        isManual: false,
+        personalMessage: JSON.stringify({
+          eventType: "quote_viewed",
+          viewCount: currentViewCount + 1,
+          isFirstView,
+          viewedAt: now.toISOString(),
+        }),
+      });
+      
+      console.log(`[QuoteView] Quote ${quote.quoteNumber} viewed (view #${currentViewCount + 1})`);
 
       const lineItems = await db.select().from(crmQuoteLineItems)
         .where(eq(crmQuoteLineItems.quoteId, quote.id))
