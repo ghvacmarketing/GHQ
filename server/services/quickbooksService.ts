@@ -2904,12 +2904,16 @@ export async function provisionItemsForSubAccounts(): Promise<{
     
     console.log(`[QuickBooks Provision] Found ${subAccounts.length} sub-accounts to check`);
     
-    // Get all existing items for this realm
+    // Get all existing ACTIVE items for this realm (ignore inactive items)
     const existingItems = await db.select()
       .from(quickbooksItems)
-      .where(eq(quickbooksItems.realmId, conn.realmId));
+      .where(and(
+        eq(quickbooksItems.realmId, conn.realmId),
+        eq(quickbooksItems.isActive, true)
+      ));
     
     // Build a lookup by incomeAccountId and by categoryType:propertyType
+    // Normalize casing to ensure consistent lookups
     const itemsByAccountId = new Map<string, QuickbooksItem>();
     const itemsByMapping = new Map<string, QuickbooksItem>();
     for (const item of existingItems) {
@@ -2917,9 +2921,14 @@ export async function provisionItemsForSubAccounts(): Promise<{
         itemsByAccountId.set(item.incomeAccountId, item);
       }
       if (item.categoryType && item.propertyType) {
-        itemsByMapping.set(`${item.categoryType}:${item.propertyType}`, item);
+        // Normalize casing: categoryType stays as-is, propertyType is capitalized
+        const normalizedProperty = item.propertyType.charAt(0).toUpperCase() + item.propertyType.slice(1).toLowerCase();
+        const key = `${item.categoryType}:${normalizedProperty}`;
+        itemsByMapping.set(key, item);
       }
     }
+    
+    console.log(`[QuickBooks Provision] Existing item mappings: ${Array.from(itemsByMapping.keys()).join(", ")}`);
     
     const qbo = getQuickBooksClient(conn);
     
@@ -2939,7 +2948,9 @@ export async function provisionItemsForSubAccounts(): Promise<{
       }
       
       // Skip if item already exists for this category:property combo
-      const mappingKey = `${subAccount.categoryType}:${subAccount.propertyType}`;
+      // Normalize casing to match the lookup map
+      const normalizedProperty = subAccount.propertyType.charAt(0).toUpperCase() + subAccount.propertyType.slice(1).toLowerCase();
+      const mappingKey = `${subAccount.categoryType}:${normalizedProperty}`;
       if (itemsByMapping.has(mappingKey)) {
         console.log(`[QuickBooks Provision] Skipping ${subAccount.name} - item already exists for ${mappingKey}`);
         skipped++;
@@ -2947,7 +2958,8 @@ export async function provisionItemsForSubAccounts(): Promise<{
       }
       
       // Create a new Item in QuickBooks for this sub-account
-      const itemName = subAccount.fullyQualifiedName || subAccount.name;
+      // Use the short name (without parent prefix) for the item name to match existing items
+      const itemName = subAccount.name; // e.g., "Service | Residential" not "Service:Service | Residential"
       const qbItem = {
         Name: itemName.substring(0, 100), // QB has 100 char limit
         Description: `Income routing for ${subAccount.fullyQualifiedName || subAccount.name}`,
@@ -2957,6 +2969,8 @@ export async function provisionItemsForSubAccounts(): Promise<{
           name: subAccount.fullyQualifiedName || subAccount.name 
         }
       };
+      
+      console.log(`[QuickBooks Provision] Creating item: ${itemName} for account ${subAccount.quickbooksAccountId}`);
       
       try {
         const createdItem = await new Promise<any>((resolve, reject) => {
