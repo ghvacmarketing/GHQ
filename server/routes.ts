@@ -22670,7 +22670,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // ============================================================================
   
   // Get financing link (public endpoint for quote presentation)
-  app.get("/api/app-settings/financing-link", async (req, res) => {
+  app.get("/api/public/financing-link", async (req, res) => {
     try {
       const [setting] = await db.select()
         .from(appSettings)

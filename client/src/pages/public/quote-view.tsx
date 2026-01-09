@@ -430,9 +430,9 @@ export default function PublicQuoteView() {
 
   // Fetch financing link for install quotes
   const { data: financingData } = useQuery<{ financingLink: string; isDefault: boolean }>({
-    queryKey: ["/api/app-settings/financing-link"],
+    queryKey: ["/api/public/financing-link"],
     queryFn: async () => {
-      const response = await fetch("/api/app-settings/financing-link");
+      const response = await fetch("/api/public/financing-link");
       if (!response.ok) return { financingLink: "", isDefault: true };
       return response.json();
     },
