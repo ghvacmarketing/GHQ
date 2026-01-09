@@ -171,14 +171,13 @@ const filterTabConfig: Record<FilterTab, { label: string; shortLabel: string }> 
   unassigned: { label: "Unassigned", shortLabel: "Unassigned" },
 };
 
-type UnassignedCategory = "needs_scheduling" | "ready_to_dispatch" | "waiting_on_parts" | "needs_approval" | "on_hold";
+type UnassignedCategory = "parts_needed" | "parts_ordered" | "parts_arrived" | "scheduled";
 
 const unassignedCategoryConfig: Record<UnassignedCategory, { label: string; description: string }> = {
-  needs_scheduling: { label: "Needs Scheduling", description: "No time set" },
-  ready_to_dispatch: { label: "Ready to Dispatch", description: "Time set but no tech" },
-  waiting_on_parts: { label: "Waiting on Parts", description: "" },
-  needs_approval: { label: "Needs Approval", description: "" },
-  on_hold: { label: "On Hold", description: "" },
+  parts_needed: { label: "Parts Needed", description: "" },
+  parts_ordered: { label: "Parts Ordered", description: "" },
+  parts_arrived: { label: "Parts Arrived", description: "" },
+  scheduled: { label: "Scheduled", description: "" },
 };
 
 export default function CrmWorkOrders() {
@@ -549,7 +548,7 @@ export default function CrmWorkOrders() {
     // Apply tab-based status filtering (for tabs not handled server-side)
     if (activeTab === "unassigned") {
       // Unassigned work orders - no tech assigned or in queue stages
-      const unassignedStages = ["NeedsScheduling", "ReadyToDispatch", "WaitingOnParts", "NeedsApproval", "OnHold"];
+      const unassignedStages = ["PartsNeeded", "PartsOrdered", "PartsArrived", "Scheduled"];
       orders = orders.filter(wo => 
         !wo.assignedTechId || 
         (wo.dispatchQueueStage && unassignedStages.includes(wo.dispatchQueueStage))
@@ -592,24 +591,24 @@ export default function CrmWorkOrders() {
     if (activeTab !== "unassigned") return null;
     
     const categories: Record<UnassignedCategory, EnrichedWorkOrder[]> = {
-      needs_scheduling: [],
-      ready_to_dispatch: [],
-      waiting_on_parts: [],
-      needs_approval: [],
-      on_hold: [],
+      parts_needed: [],
+      parts_ordered: [],
+      parts_arrived: [],
+      scheduled: [],
     };
     
     filteredWorkOrders.forEach(wo => {
-      if (wo.dispatchQueueStage === "WaitingOnParts") {
-        categories.waiting_on_parts.push(wo);
-      } else if (wo.dispatchQueueStage === "NeedsApproval") {
-        categories.needs_approval.push(wo);
-      } else if (wo.dispatchQueueStage === "OnHold") {
-        categories.on_hold.push(wo);
-      } else if (!wo.scheduledStart) {
-        categories.needs_scheduling.push(wo);
+      if (wo.dispatchQueueStage === "PartsNeeded") {
+        categories.parts_needed.push(wo);
+      } else if (wo.dispatchQueueStage === "PartsOrdered") {
+        categories.parts_ordered.push(wo);
+      } else if (wo.dispatchQueueStage === "PartsArrived") {
+        categories.parts_arrived.push(wo);
+      } else if (wo.dispatchQueueStage === "Scheduled") {
+        categories.scheduled.push(wo);
       } else if (!wo.assignedTechId) {
-        categories.ready_to_dispatch.push(wo);
+        // Default unassigned work orders to "Parts Needed" column
+        categories.parts_needed.push(wo);
       }
     });
     
@@ -1094,7 +1093,7 @@ export default function CrmWorkOrders() {
           </Card>
         ) : activeTab === "unassigned" && categorizedUnassigned ? (
           <div className="w-full">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {(Object.keys(unassignedCategoryConfig) as UnassignedCategory[]).map((category) => {
                 const config = unassignedCategoryConfig[category];
                 const categoryOrders = categorizedUnassigned[category];

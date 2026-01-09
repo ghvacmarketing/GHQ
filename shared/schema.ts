@@ -1049,7 +1049,11 @@ export const dispatchQueueStageEnum = [
   "WaitingOnParts",
   "NeedsApproval",
   "OnHold",
-  "CallbackPriority"
+  "CallbackPriority",
+  "PartsNeeded",
+  "PartsOrdered",
+  "PartsArrived",
+  "Scheduled"
 ] as const;
 export type DispatchQueueStage = typeof dispatchQueueStageEnum[number];
 
