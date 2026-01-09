@@ -58,7 +58,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const CATEGORY_TYPES = ["Service", "Install", "Maintenance", "Discount"] as const;
-const PROPERTY_TYPES = ["Residential", "Commercial", "None"] as const;
+const PROPERTY_TYPES = ["Residential", "Commercial"] as const;
 
 type CategoryType = typeof CATEGORY_TYPES[number];
 type PropertyType = typeof PROPERTY_TYPES[number];
