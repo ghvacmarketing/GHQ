@@ -2782,3 +2782,17 @@ export const insertQuickbooksItemSchema = createInsertSchema(quickbooksItems).om
 
 export type InsertQuickbooksItem = z.infer<typeof insertQuickbooksItemSchema>;
 export type QuickbooksItem = typeof quickbooksItems.$inferSelect;
+
+// App Settings - key-value store for application configuration
+export const appSettings = pgTable("app_settings", {
+  key: varchar("key", { length: 255 }).primaryKey(),
+  value: text("value"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAppSettingSchema = createInsertSchema(appSettings);
+export type InsertAppSetting = z.infer<typeof insertAppSettingSchema>;
+export type AppSetting = typeof appSettings.$inferSelect;
+
+// Default financing link for install quotes
+export const DEFAULT_FINANCING_LINK = "https://projects.greensky.com/merchantloanapplication?apptype=short&merchant=81087766&dealerplan=2832&channel=External-Button-03";
