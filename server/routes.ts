@@ -19038,6 +19038,33 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   }
 
+  // GET /api/admin/settings/automated-sms - Get automated SMS enabled status
+  app.get("/api/admin/settings/automated-sms", requireCrmAdmin, async (req, res) => {
+    try {
+      const setting = await storage.getSetting("automated_sms_enabled");
+      const enabled = setting ? setting.value !== "false" : true;
+      return res.json({ enabled });
+    } catch (error) {
+      console.error("Error getting automated SMS setting:", error);
+      return res.status(500).json({ message: "Failed to get setting" });
+    }
+  });
+
+  // PUT /api/admin/settings/automated-sms - Update automated SMS enabled status
+  app.put("/api/admin/settings/automated-sms", requireCrmAdmin, async (req, res) => {
+    try {
+      const { enabled } = req.body;
+      if (typeof enabled !== "boolean") {
+        return res.status(400).json({ message: "enabled must be a boolean" });
+      }
+      await storage.setSetting("automated_sms_enabled", enabled ? "true" : "false");
+      return res.json({ enabled });
+    } catch (error) {
+      console.error("Error updating automated SMS setting:", error);
+      return res.status(500).json({ message: "Failed to update setting" });
+    }
+  });
+
   // POST /api/admin/trigger-maintenance-reminders - Manually trigger maintenance reminders
   app.post("/api/admin/trigger-maintenance-reminders", requireCrmAuth, async (req, res) => {
     const user = await getCurrentCrmUser(req);

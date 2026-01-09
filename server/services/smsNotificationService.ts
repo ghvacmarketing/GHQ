@@ -40,6 +40,14 @@ export async function sendAutomatedSms(params: SendAutomatedSmsParams): Promise<
   } = params;
 
   try {
+    const automatedSmsSetting = await storage.getSetting("automated_sms_enabled");
+    if (automatedSmsSetting && automatedSmsSetting.value === "false") {
+      return {
+        success: false,
+        errorMessage: "Automated SMS is disabled",
+      };
+    }
+
     const adapter = getMessagingAdapter();
     
     let conversation = await storage.getMessagingConversationByPhone(phoneNumber);

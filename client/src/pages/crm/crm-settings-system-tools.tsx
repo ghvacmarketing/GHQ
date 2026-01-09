@@ -7,7 +7,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Bell, RefreshCw, Loader2, CheckCircle2, AlertCircle, FileText, Search, Send } from "lucide-react";
+import { ArrowLeft, Bell, RefreshCw, Loader2, CheckCircle2, AlertCircle, FileText, Search, Send, MessageSquare } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser } from "@shared/schema";
 
@@ -67,6 +69,7 @@ interface InvoiceTriggerResult {
 export default function CrmSettingsSystemTools() {
   usePageTitle("System Tools");
   const [, navigate] = useLocation();
+  const { toast } = useToast();
   const [isRunningReminders, setIsRunningReminders] = useState(false);
   const [isRunningRenewals, setIsRunningRenewals] = useState(false);
   const [reminderResult, setReminderResult] = useState<{ success: boolean; summary?: ReminderSummary; error?: string } | null>(null);
@@ -78,6 +81,10 @@ export default function CrmSettingsSystemTools() {
   const [selectedAgreement, setSelectedAgreement] = useState<AgreementOption | null>(null);
   const [isSendingInvoice, setIsSendingInvoice] = useState(false);
   const [invoiceResult, setInvoiceResult] = useState<InvoiceTriggerResult | null>(null);
+  
+  const [automatedSmsEnabled, setAutomatedSmsEnabled] = useState(true);
+  const [isLoadingSmsToggle, setIsLoadingSmsToggle] = useState(true);
+  const [isUpdatingSmsToggle, setIsUpdatingSmsToggle] = useState(false);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -89,6 +96,63 @@ export default function CrmSettingsSystemTools() {
       navigate("/crm/login");
     }
   }, [authLoading, currentUser, navigate]);
+
+  useEffect(() => {
+    const fetchSmsToggle = async () => {
+      try {
+        const res = await fetch("/api/admin/settings/automated-sms", {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAutomatedSmsEnabled(data.enabled);
+        }
+      } catch (err) {
+        console.error("Failed to fetch SMS toggle:", err);
+      } finally {
+        setIsLoadingSmsToggle(false);
+      }
+    };
+    if (currentUser && (currentUser.role === "owner" || currentUser.role === "admin")) {
+      fetchSmsToggle();
+    }
+  }, [currentUser]);
+
+  const handleToggleSms = async (enabled: boolean) => {
+    setIsUpdatingSmsToggle(true);
+    try {
+      const res = await fetch("/api/admin/settings/automated-sms", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ enabled }),
+      });
+      if (res.ok) {
+        setAutomatedSmsEnabled(enabled);
+        toast({
+          title: enabled ? "SMS Enabled" : "SMS Disabled",
+          description: enabled 
+            ? "Automated SMS notifications are now enabled" 
+            : "Automated SMS notifications are now disabled",
+        });
+      } else {
+        const data = await res.json();
+        toast({
+          title: "Error",
+          description: data.message || "Failed to update setting",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Network error - please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingSmsToggle(false);
+    }
+  };
 
   const handleTriggerReminders = async () => {
     setIsRunningReminders(true);
@@ -241,6 +305,56 @@ export default function CrmSettingsSystemTools() {
         </p>
 
         <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-orange-100">
+                    <MessageSquare className="h-5 w-5 text-orange-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">Automated SMS Messages</CardTitle>
+                    <CardDescription>
+                      Enable or disable all outbound automated SMS notifications including maintenance reminders and work order status updates
+                    </CardDescription>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {isLoadingSmsToggle ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                  ) : (
+                    <>
+                      {isUpdatingSmsToggle && (
+                        <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                      )}
+                      <Switch
+                        checked={automatedSmsEnabled}
+                        onCheckedChange={handleToggleSms}
+                        disabled={isUpdatingSmsToggle}
+                        data-testid="switch-automated-sms"
+                      />
+                    </>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-sm ${automatedSmsEnabled ? 'text-green-600' : 'text-slate-500'}`}>
+                {automatedSmsEnabled ? (
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Automated SMS notifications are enabled</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>Automated SMS notifications are disabled</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <div className="flex items-center gap-3">
