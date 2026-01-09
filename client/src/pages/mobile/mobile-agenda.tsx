@@ -50,7 +50,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   scheduled: { label: "Scheduled", className: "bg-slate-100 text-slate-700 border-slate-300" },
   dispatched: { label: "Dispatched", className: "bg-blue-100 text-blue-700 border-blue-300" },
   en_route: { label: "Traveling", className: "bg-yellow-100 text-yellow-700 border-yellow-300" },
-  on_site: { label: "On Site", className: "bg-green-100 text-green-700 border-green-300" },
+  on_site: { label: "Working", className: "bg-green-100 text-green-700 border-green-300" },
   completed: { label: "Completed", className: "bg-slate-200 text-slate-600 border-slate-400" },
 };
 

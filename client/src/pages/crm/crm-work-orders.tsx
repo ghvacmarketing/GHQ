@@ -131,7 +131,7 @@ const statusLabels: Record<string, string> = {
   scheduled: "Scheduled",
   dispatched: "Dispatched",
   en_route: "Traveling",
-  on_site: "On Site",
+  on_site: "Working",
   completed: "Completed",
   cancelled: "Cancelled",
 };
@@ -1457,7 +1457,7 @@ export default function CrmWorkOrders() {
 
                 {selectedWorkOrder.status === "on_site" && (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                    <p className="text-sm text-amber-800 font-medium">Technician is on site</p>
+                    <p className="text-sm text-amber-800 font-medium">Technician is working</p>
                     <p className="text-xs text-amber-600">Assignment and schedule cannot be changed while work is in progress.</p>
                   </div>
                 )}

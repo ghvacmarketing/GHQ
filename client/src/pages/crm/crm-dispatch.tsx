@@ -320,7 +320,7 @@ const statusLabels: Record<string, string> = {
   scheduled: "Scheduled",
   dispatched: "Dispatched",
   en_route: "Traveling",
-  on_site: "On Site",
+  on_site: "Working",
   completed: "Completed",
   cancelled: "Cancelled",
 };
@@ -2854,7 +2854,7 @@ export default function CrmDispatch() {
     scheduled: "Scheduled",
     dispatched: "Dispatched",
     en_route: "Traveling",
-    on_site: "On Site",
+    on_site: "Working",
     completed: "Completed"
   };
 
@@ -3017,7 +3017,7 @@ export default function CrmDispatch() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
-                        <span className="text-sm text-slate-700">On Site</span>
+                        <span className="text-sm text-slate-700">Working</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />

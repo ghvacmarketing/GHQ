@@ -37,7 +37,7 @@ const statusLabels: Record<string, string> = {
   scheduled: "Scheduled",
   dispatched: "Dispatched",
   en_route: "Traveling",
-  on_site: "On Site",
+  on_site: "Working",
   completed: "Completed",
   cancelled: "Cancelled",
 };
