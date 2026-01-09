@@ -974,6 +974,11 @@ export default function CrmWorkOrderDetail() {
                   >
                     {statusLabels[workOrder.status] || workOrder.status}
                   </Badge>
+                  {workOrder.isPending && (
+                    <Badge className="bg-amber-100 text-amber-800 border border-amber-200">
+                      Waiting
+                    </Badge>
+                  )}
                   <Badge
                     variant="outline"
                     data-testid="badge-visit-type"
@@ -1197,6 +1202,78 @@ export default function CrmWorkOrderDetail() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Pending Status Toggle */}
+            <Card className={`shadow-sm mb-6 ${workOrder.isPending ? 'border-amber-300 bg-amber-50/30' : ''}`}>
+              <CardHeader className="pb-3 border-b bg-slate-50/50">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <Clock className="h-4 w-4 text-[#711419]" />
+                  Technician Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      id="isPending"
+                      checked={workOrder.isPending || false}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          updateWorkOrderMutation.mutate({
+                            updates: { 
+                              isPending: true, 
+                              pendingReason: "waiting_for_next_job",
+                              pendingStartedAt: new Date()
+                            }
+                          });
+                        } else {
+                          updateWorkOrderMutation.mutate({
+                            updates: { 
+                              isPending: false, 
+                              pendingReason: null,
+                              pendingStartedAt: null
+                            }
+                          });
+                        }
+                      }}
+                      disabled={updateWorkOrderMutation.isPending}
+                    />
+                    <Label htmlFor="isPending" className="text-sm font-medium">
+                      Technician is currently waiting
+                    </Label>
+                  </div>
+                  {workOrder.isPending && (
+                    <div className="flex-1">
+                      <Select
+                        value={workOrder.pendingReason || "waiting_for_next_job"}
+                        onValueChange={(value) => {
+                          updateWorkOrderMutation.mutate({
+                            updates: { pendingReason: value as any }
+                          });
+                        }}
+                        disabled={updateWorkOrderMutation.isPending}
+                      >
+                        <SelectTrigger className="w-full sm:w-[250px]">
+                          <SelectValue placeholder="Select reason" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="waiting_on_parts">Waiting on Parts</SelectItem>
+                          <SelectItem value="waiting_on_customer">Waiting on Customer</SelectItem>
+                          <SelectItem value="waiting_for_next_job">Waiting for Next Job</SelectItem>
+                          <SelectItem value="lunch_break">Lunch Break</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+                {workOrder.isPending && workOrder.pendingStartedAt && (
+                  <p className="text-xs text-amber-600 mt-3">
+                    Waiting since {format(new Date(workOrder.pendingStartedAt), "h:mm a")}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
 
             {checklistResponse && checklistResponse.checklist && (
               <Card className="shadow-sm mb-6 border-amber-200 bg-amber-50/30" data-testid="card-service-checklist">
