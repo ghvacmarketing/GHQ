@@ -136,6 +136,20 @@ const statusLabels: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
+const dispatchQueueStageLabels: Record<string, string> = {
+  PartsNeeded: "Parts Needed",
+  PartsOrdered: "Parts Ordered",
+  PartsArrived: "Parts Arrived",
+  Scheduled: "Scheduled",
+};
+
+const dispatchQueueStageColors: Record<string, { bg: string; text: string; border: string }> = {
+  PartsNeeded: { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-200" },
+  PartsOrdered: { bg: "bg-yellow-100", text: "text-yellow-700", border: "border-yellow-200" },
+  PartsArrived: { bg: "bg-green-100", text: "text-green-700", border: "border-green-200" },
+  Scheduled: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
+};
+
 const visitTypeLabels: Record<string, string> = {
   SERVICE: "Service",
   INSTALL: "Install",
@@ -1170,7 +1184,14 @@ export default function CrmWorkOrders() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {filteredWorkOrders.map((wo) => {
-              const statusStyle = statusColors[wo.status] || statusColors.scheduled;
+              // For unassigned work orders with dispatchQueueStage, show the queue stage badge instead of status
+              const isUnassignedWithQueueStage = !wo.assignedTechId && wo.dispatchQueueStage && wo.dispatchQueueStage !== "Scheduled";
+              const badgeStyle = isUnassignedWithQueueStage 
+                ? (dispatchQueueStageColors[wo.dispatchQueueStage!] || statusColors.scheduled)
+                : (statusColors[wo.status] || statusColors.scheduled);
+              const badgeLabel = isUnassignedWithQueueStage 
+                ? (dispatchQueueStageLabels[wo.dispatchQueueStage!] || statusLabels[wo.status])
+                : statusLabels[wo.status];
               const visitStyle = visitTypeColors[wo.visitType || "SERVICE"] || visitTypeColors.SERVICE;
               
               return (
@@ -1186,10 +1207,10 @@ export default function CrmWorkOrders() {
                         {wo.customer?.name || "—"}
                       </p>
                       <Badge 
-                        className={`${statusStyle.bg} ${statusStyle.text} border ${statusStyle.border} text-xs shrink-0`}
+                        className={`${badgeStyle.bg} ${badgeStyle.text} border ${badgeStyle.border} text-xs shrink-0`}
                         data-testid={`badge-status-${wo.id}`}
                       >
-                        {statusLabels[wo.status]}
+                        {badgeLabel}
                       </Badge>
                     </div>
 
