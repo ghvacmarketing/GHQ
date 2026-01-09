@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, FileText, AlertCircle, Loader2, CreditCard } from "lucide-react";
+import { CheckCircle2, FileText, AlertCircle, Loader2, CreditCard, ExternalLink } from "lucide-react";
 import type { CrmQuote, CrmQuoteLineItem } from "@shared/schema";
 import ghvacLogo from "@assets/ghvac-logo.png";
 
@@ -426,6 +426,17 @@ export default function PublicQuoteView() {
         description: err.message,
       });
     },
+  });
+
+  // Fetch financing link for install quotes
+  const { data: financingData } = useQuery<{ financingLink: string; isDefault: boolean }>({
+    queryKey: ["/api/app-settings/financing-link"],
+    queryFn: async () => {
+      const response = await fetch("/api/app-settings/financing-link");
+      if (!response.ok) return { financingLink: "", isDefault: true };
+      return response.json();
+    },
+    enabled: true,
   });
 
   // Quote types that should show the 50% deposit payment link
@@ -982,6 +993,26 @@ export default function PublicQuoteView() {
                       )}
                     </Button>
                     <p className="text-xs text-amber-600 mt-2">Secure payment powered by Stripe</p>
+                    
+                    {financingData?.financingLink && (
+                      <>
+                        <div className="flex items-center gap-3 my-4">
+                          <div className="flex-1 h-px bg-amber-300" />
+                          <span className="text-sm font-medium text-amber-700">OR</span>
+                          <div className="flex-1 h-px bg-amber-300" />
+                        </div>
+                        <Button
+                          onClick={() => window.open(financingData.financingLink, '_blank')}
+                          variant="outline"
+                          className="w-full sm:w-auto border-blue-500 text-blue-700 hover:bg-blue-50 px-8 py-3 text-lg font-semibold"
+                          data-testid="button-apply-financing"
+                        >
+                          <ExternalLink className="mr-2 h-5 w-5" />
+                          Apply for Financing
+                        </Button>
+                        <p className="text-xs text-blue-600 mt-2">Low monthly payments available</p>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
