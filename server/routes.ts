@@ -20684,7 +20684,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       const entries = await storage.getTimeEntries(filters);
       
       // Enrich with technician names
-      const users = await storage.getCrmUsers();
+      const users = await db.select().from(crmUsers);
       const userMap = new Map(users.map((u) => [u.id, u.name]));
       const enrichedEntries = entries.map((entry) => ({
         ...entry,
@@ -20767,7 +20767,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         );
 
       // Get all users (technicians)
-      const users = await storage.getCrmUsers();
+      const users = await db.select().from(crmUsers);
       const techUsers = users.filter(u => ["tech", "supervisor", "sales"].includes(u.role || ""));
 
       // Calculate breakdown for each technician

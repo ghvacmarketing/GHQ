@@ -190,6 +190,10 @@ export default function CrmQuoteDetail() {
   const [presentationSelectedOption, setPresentationSelectedOption] = useState<string | null>(null);
   const [showWhatsIncludedDialog, setShowWhatsIncludedDialog] = useState(false);
   const [editingWhatsIncluded, setEditingWhatsIncluded] = useState<Array<{ category: string; items: string[] }>>([]);
+  const [showWarrantiesDialog, setShowWarrantiesDialog] = useState(false);
+  const [editingWarranties, setEditingWarranties] = useState("");
+  const [showFinancingDialog, setShowFinancingDialog] = useState(false);
+  const [editingFinancingText, setEditingFinancingText] = useState("");
   const [isVerifyingDeposit, setIsVerifyingDeposit] = useState(false);
   const [isGeneratingPaymentLink, setIsGeneratingPaymentLink] = useState(false);
   const [editingLineItemId, setEditingLineItemId] = useState<string | null>(null);
@@ -381,7 +385,7 @@ export default function CrmQuoteDetail() {
   const updateWhatsIncludedMutation = useMutation({
     mutationFn: async (whatsIncluded: Array<{ category: string; items: string[] }>) => {
       const updatedAiGeneratedQuote = {
-        ...quote?.aiGeneratedQuote,
+        ...(quote?.aiGeneratedQuote ?? {}),
         whats_included: whatsIncluded,
       };
       const res = await fetch(`/api/crm/quotes/${quoteId}`, {
@@ -467,6 +471,110 @@ export default function CrmQuoteDetail() {
       items: cat.items.filter(item => item.trim() !== ""),
     }));
     updateWhatsIncludedMutation.mutate(cleanedData);
+  };
+
+  const updateWarrantiesMutation = useMutation({
+    mutationFn: async (warranties: string[]) => {
+      const updatedAiGeneratedQuote = {
+        ...(quote?.aiGeneratedQuote ?? {}),
+        warranties_and_terms: warranties,
+      };
+      const res = await fetch(`/api/crm/quotes/${quoteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ aiGeneratedQuote: updatedAiGeneratedQuote }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || result.message || "Failed to update Warranties & Terms");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      setShowWarrantiesDialog(false);
+      toast({ title: "Warranties & Terms updated", description: "The Warranties & Terms section has been saved." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update Warranties & Terms", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleOpenWarrantiesDialog = () => {
+    if (quote?.aiGeneratedQuote?.warranties_and_terms) {
+      setEditingWarranties(quote.aiGeneratedQuote.warranties_and_terms.join("\n"));
+    } else {
+      setEditingWarranties("");
+    }
+    setShowWarrantiesDialog(true);
+  };
+
+  const handleSaveWarranties = () => {
+    if (quote?.status !== "draft") {
+      toast({
+        title: "Cannot Save Changes",
+        description: "This quote is no longer a draft. Changes cannot be saved.",
+        variant: "destructive",
+      });
+      setShowWarrantiesDialog(false);
+      return;
+    }
+    
+    const warrantiesArray = editingWarranties
+      .split("\n")
+      .map(line => line.trim())
+      .filter(line => line !== "");
+    updateWarrantiesMutation.mutate(warrantiesArray);
+  };
+
+  const updateFinancingMutation = useMutation({
+    mutationFn: async (financingText: string) => {
+      const updatedAiGeneratedQuote = {
+        ...(quote?.aiGeneratedQuote ?? {}),
+        financing_text: financingText,
+      };
+      const res = await fetch(`/api/crm/quotes/${quoteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ aiGeneratedQuote: updatedAiGeneratedQuote }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || result.message || "Failed to update Financing Text");
+      }
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      setShowFinancingDialog(false);
+      toast({ title: "Financing text updated", description: "The financing text has been saved." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update financing text", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleOpenFinancingDialog = () => {
+    setEditingFinancingText(quote?.aiGeneratedQuote?.financing_text || "");
+    setShowFinancingDialog(true);
+  };
+
+  const handleSaveFinancing = () => {
+    if (quote?.status !== "draft") {
+      toast({
+        title: "Cannot Save Changes",
+        description: "This quote is no longer a draft. Changes cannot be saved.",
+        variant: "destructive",
+      });
+      setShowFinancingDialog(false);
+      return;
+    }
+    
+    updateFinancingMutation.mutate(editingFinancingText.trim());
   };
 
   const updateLineItemMutation = useMutation({
@@ -2262,7 +2370,21 @@ export default function CrmQuoteDetail() {
               
               {quote.aiGeneratedQuote.warranties_and_terms && quote.aiGeneratedQuote.warranties_and_terms.length > 0 && (
                 <div className="pt-3 border-t">
-                  <h4 className="text-xs font-semibold text-slate-500 uppercase mb-2">Warranties & Terms</h4>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-semibold text-slate-500 uppercase">Warranties & Terms</h4>
+                    {quote.status === "draft" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        onClick={handleOpenWarrantiesDialog}
+                        data-testid="btn-edit-warranties"
+                      >
+                        <Pencil className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
+                    )}
+                  </div>
                   <ul className="text-xs text-slate-600 space-y-1">
                     {quote.aiGeneratedQuote.warranties_and_terms.map((term: string, idx: number) => (
                       <li key={idx}>• {term}</li>
@@ -2272,9 +2394,26 @@ export default function CrmQuoteDetail() {
               )}
               
               {quote.aiGeneratedQuote.financing_text && (
-                <p className="text-sm text-slate-600 pt-2 border-t">
-                  {quote.aiGeneratedQuote.financing_text}
-                </p>
+                <div className="pt-2 border-t">
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="text-xs font-semibold text-slate-500 uppercase">Financing</h4>
+                    {quote.status === "draft" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        onClick={handleOpenFinancingDialog}
+                        data-testid="btn-edit-financing"
+                      >
+                        <Pencil className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-600">
+                    {quote.aiGeneratedQuote.financing_text}
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -3316,6 +3455,104 @@ export default function CrmQuoteDetail() {
               data-testid="btn-save-whats-included"
             >
               {updateWhatsIncludedMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : quote?.status !== "draft" ? (
+                "Quote No Longer Editable"
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showWarrantiesDialog} onOpenChange={setShowWarrantiesDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-800">
+              <Pencil className="h-4 w-4" />
+              Edit Warranties & Terms
+            </DialogTitle>
+            <DialogDescription>
+              Edit the warranties and terms. Enter each term on a new line. Empty lines will be removed when saving.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              value={editingWarranties}
+              onChange={(e) => setEditingWarranties(e.target.value)}
+              placeholder="Enter warranties and terms, one per line..."
+              className="min-h-[200px] resize-y"
+              data-testid="textarea-warranties"
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowWarrantiesDialog(false)}
+              data-testid="btn-cancel-warranties"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveWarranties}
+              disabled={updateWarrantiesMutation.isPending || quote?.status !== "draft"}
+              className="bg-blue-600 hover:bg-blue-700"
+              data-testid="btn-save-warranties"
+            >
+              {updateWarrantiesMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : quote?.status !== "draft" ? (
+                "Quote No Longer Editable"
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showFinancingDialog} onOpenChange={setShowFinancingDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-800">
+              <Pencil className="h-4 w-4" />
+              Edit Financing Text
+            </DialogTitle>
+            <DialogDescription>
+              Edit the financing information displayed on the quote.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              value={editingFinancingText}
+              onChange={(e) => setEditingFinancingText(e.target.value)}
+              placeholder="Enter financing text..."
+              className="min-h-[150px] resize-y"
+              data-testid="textarea-financing"
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowFinancingDialog(false)}
+              data-testid="btn-cancel-financing"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveFinancing}
+              disabled={updateFinancingMutation.isPending || quote?.status !== "draft"}
+              className="bg-blue-600 hover:bg-blue-700"
+              data-testid="btn-save-financing"
+            >
+              {updateFinancingMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Saving...
