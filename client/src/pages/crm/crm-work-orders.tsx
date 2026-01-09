@@ -1123,7 +1123,6 @@ export default function CrmWorkOrders() {
                         </div>
                       ) : (
                         categoryOrders.map((wo) => {
-                          const statusStyle = statusColors[wo.status] || statusColors.scheduled;
                           const visitStyle = visitTypeColors[wo.visitType || "SERVICE"] || visitTypeColors.SERVICE;
                           
                           return (
@@ -1138,9 +1137,6 @@ export default function CrmWorkOrders() {
                                   <p className="font-semibold text-slate-900 text-sm truncate flex-1">
                                     {wo.customer?.name || "—"}
                                   </p>
-                                  <Badge className={`${statusStyle.bg} ${statusStyle.text} border ${statusStyle.border} text-xs shrink-0`}>
-                                    {statusLabels[wo.status]}
-                                  </Badge>
                                 </div>
                                 
                                 {wo.workSubtype && wo.workSubtype !== "Other" && (
