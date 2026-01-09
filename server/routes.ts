@@ -20985,6 +20985,35 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Invoice not found" });
       }
 
+      // Track invoice view - use atomic increment and always update status if 'sent'
+      if (invoice.status !== 'draft') {
+        const updateData: any = { 
+          viewCount: sql`COALESCE(${crmInvoices.viewCount}, 0) + 1`
+        };
+        
+        // Set viewedAt only on first view
+        if (!invoice.viewedAt) {
+          updateData.viewedAt = new Date();
+        }
+        
+        // Always update status from 'sent' to 'viewed' (handles resend scenario)
+        if (invoice.status === 'sent') {
+          updateData.status = 'viewed';
+        }
+        
+        const [updated] = await db.update(crmInvoices)
+          .set(updateData)
+          .where(eq(crmInvoices.id, id))
+          .returning({ viewCount: crmInvoices.viewCount, viewedAt: crmInvoices.viewedAt, status: crmInvoices.status });
+        
+        // Update the invoice object with new values
+        if (updated) {
+          invoice.viewCount = updated.viewCount;
+          invoice.viewedAt = updated.viewedAt;
+          invoice.status = updated.status;
+        }
+      }
+
       // Get line items
       const lineItems = await db.select()
         .from(crmInvoiceLineItems)

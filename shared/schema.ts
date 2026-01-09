@@ -1283,7 +1283,7 @@ export type InsertQuoteEmailLog = z.infer<typeof insertQuoteEmailLogSchema>;
 export type QuoteEmailLog = typeof quoteEmailLogs.$inferSelect;
 
 // CRM Invoice Status
-export const crmInvoiceStatusEnum = ["draft", "sent", "paid", "void", "partial"] as const;
+export const crmInvoiceStatusEnum = ["draft", "sent", "viewed", "paid", "void", "partial"] as const;
 export type CrmInvoiceStatus = typeof crmInvoiceStatusEnum[number];
 
 // CRM Invoices (can be tied to a Work Order, Project, or standalone)
@@ -1315,6 +1315,8 @@ export const crmInvoices = pgTable("crm_invoices", {
   quoteId: varchar("quote_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  viewedAt: timestamp("viewed_at"),
+  viewCount: integer("view_count").default(0),
 }, (table) => ({
   statusIdx: index("crm_invoices_status_idx").on(table.status),
 }));

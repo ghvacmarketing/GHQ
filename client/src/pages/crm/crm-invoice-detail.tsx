@@ -94,6 +94,7 @@ type InvoiceDetailWithItems = CrmInvoice & {
 const statusLabels: Record<CrmInvoiceStatus, string> = {
   draft: "Draft",
   sent: "Sent",
+  viewed: "Viewed",
   partial: "Partial",
   paid: "Paid",
   void: "Void",
@@ -102,6 +103,7 @@ const statusLabels: Record<CrmInvoiceStatus, string> = {
 const statusColors: Record<CrmInvoiceStatus, string> = {
   draft: "bg-slate-100 text-slate-700 border-slate-200",
   sent: "bg-blue-100 text-blue-700 border-blue-200",
+  viewed: "bg-purple-100 text-purple-700 border-purple-200",
   partial: "bg-amber-100 text-amber-700 border-amber-200",
   paid: "bg-green-100 text-green-700 border-green-200",
   void: "bg-red-100 text-red-700 border-red-200",
@@ -999,7 +1001,17 @@ export default function CrmInvoiceDetail() {
             <CardTitle className="text-base flex items-center gap-2">
               <Inbox className="h-4 w-4" />
               Email Inbox
+              {invoice.viewCount && invoice.viewCount > 0 && (
+                <Badge variant="outline" className="ml-auto bg-purple-100 text-purple-700 border-purple-300">
+                  Viewed {invoice.viewCount} time{invoice.viewCount > 1 ? 's' : ''}
+                </Badge>
+              )}
             </CardTitle>
+            {invoice.viewedAt && (
+              <p className="text-xs text-slate-500 mt-1">
+                First viewed: {format(new Date(invoice.viewedAt), "MMM d, yyyy 'at' h:mm a")}
+              </p>
+            )}
           </CardHeader>
           <CardContent>
             {emailLogsLoading ? (
