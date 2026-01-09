@@ -2,23 +2,7 @@ import { storage } from "../storage";
 import { getMessagingAdapter } from "./messaging/adapters";
 import type { SmsNotificationType, InsertCrmMessagingMessage } from "@shared/schema";
 
-export const SMS_TEMPLATES = {
-  MAINTENANCE_REMINDER_10_DAY: "Hi! Your scheduled maintenance visit is coming up in 10 days. Please call us to confirm your appointment. - GHVAC",
-  MAINTENANCE_REMINDER_5_DAY: "Reminder: Your maintenance visit is in 5 days. Please call to schedule if you haven't already. - GHVAC",
-  WORK_ORDER_EN_ROUTE: "Your GHVAC technician is on the way! They should arrive shortly.",
-  WORK_ORDER_ON_SITE: "Your GHVAC technician has arrived and is ready to help!",
-  INVOICE_SMS_TEMPLATE: (invoiceNumber: string, paymentLink: string) => 
-    `Your invoice #${invoiceNumber} is ready. Pay online: ${paymentLink} - GHVAC`,
-} as const;
-
-const TEMPLATE_KEY_MAP: Record<string, keyof typeof SMS_TEMPLATES> = {
-  sms_template_maintenance_10_day: "MAINTENANCE_REMINDER_10_DAY",
-  sms_template_maintenance_5_day: "MAINTENANCE_REMINDER_5_DAY",
-  sms_template_work_order_en_route: "WORK_ORDER_EN_ROUTE",
-  sms_template_work_order_on_site: "WORK_ORDER_ON_SITE",
-  sms_template_invoice: "INVOICE_SMS_TEMPLATE",
-};
-
+// Default SMS templates - used as fallback when database values are not set
 const DEFAULT_TEMPLATES: Record<string, string> = {
   sms_template_maintenance_10_day: "Hi! Your scheduled maintenance visit is coming up in 10 days. Please call us to confirm your appointment. - GHVAC",
   sms_template_maintenance_5_day: "Reminder: Your maintenance visit is in 5 days. Please call to schedule if you haven't already. - GHVAC",

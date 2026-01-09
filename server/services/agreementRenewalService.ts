@@ -2,7 +2,7 @@ import { db } from "../db";
 import { crmAgreements, crmInvoices, crmInvoiceLineItems, crmCustomers, invoiceEmailLogs, type CrmAgreement, type CrmInvoice, type CrmInvoiceLineItem } from "@shared/schema";
 import { eq, and, sql, lte, isNotNull } from "drizzle-orm";
 import { sendCrmInvoiceEmail } from "./crmInvoiceEmail";
-import { sendAutomatedSms, SMS_TEMPLATES } from "./smsNotificationService";
+import { sendAutomatedSms, getInvoiceSmsTemplate } from "./smsNotificationService";
 import { toZonedTime, format } from "date-fns-tz";
 import { addYears, addMonths, addWeeks } from "date-fns";
 
@@ -160,7 +160,7 @@ export async function processSingleAgreementRenewal(agreement: CrmAgreement): Pr
         // Send SMS with payment link if customer has phone and payment link was generated
         if (customerPhone && emailResult.paymentLinkUrl && agreement.customerId) {
           try {
-            const smsBody = SMS_TEMPLATES.INVOICE_SMS_TEMPLATE(invoiceNumber, emailResult.paymentLinkUrl);
+            const smsBody = await getInvoiceSmsTemplate(invoiceNumber, emailResult.paymentLinkUrl);
             const smsResult = await sendAutomatedSms({
               customerId: agreement.customerId,
               phoneNumber: customerPhone,

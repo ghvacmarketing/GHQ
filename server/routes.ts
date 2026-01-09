@@ -33,7 +33,7 @@ import { refreshWeather, scheduleWeatherRefresh, getWeatherData } from "./weathe
 import { scheduleWeatherImpactJobs } from "./weather-impact-service";
 import { scheduleAgreementRenewals, processAgreementRenewals, processSingleAgreementRenewal } from "./services/agreementRenewalService";
 import { scheduleMaintenanceReminders, processMaintenanceReminders } from "./services/maintenanceReminderService";
-import { sendAutomatedSms, SMS_TEMPLATES, hasNotificationBeenSent } from "./services/smsNotificationService";
+import { sendAutomatedSms, hasNotificationBeenSent, getWorkOrderEnRouteTemplate, getWorkOrderOnSiteTemplate, getInvoiceSmsTemplate } from "./services/smsNotificationService";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
 import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword, isSupervisor } from "./crm-auth";
 import cookieParser from "cookie-parser";
@@ -11006,8 +11006,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               if (!alreadySent) {
                 const messageBody = status === "en_route" 
-                  ? SMS_TEMPLATES.WORK_ORDER_EN_ROUTE 
-                  : SMS_TEMPLATES.WORK_ORDER_ON_SITE;
+                  ? await getWorkOrderEnRouteTemplate() 
+                  : await getWorkOrderOnSiteTemplate();
                 
                 const smsResult = await sendAutomatedSms({
                   customerId,
@@ -14648,10 +14648,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const protocol = req.protocol || 'https';
                 const paymentLink = `${protocol}://${host}/portal/invoice/${invoice.id}`;
                 
+                const invoiceSmsBody = await getInvoiceSmsTemplate(invoice.invoiceNumber, paymentLink);
                 const smsResult = await sendAutomatedSms({
                   customerId: invoice.customerId,
                   phoneNumber: customer.phone,
-                  messageBody: SMS_TEMPLATES.INVOICE_SMS_TEMPLATE(invoice.invoiceNumber, paymentLink),
+                  messageBody: invoiceSmsBody,
                   notificationType: "invoice_sms",
                   invoiceId: invoice.id,
                 });

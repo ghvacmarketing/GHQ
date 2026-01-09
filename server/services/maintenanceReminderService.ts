@@ -6,7 +6,8 @@ import { addDays } from "date-fns";
 import {
   sendAutomatedSms,
   hasNotificationBeenSent,
-  SMS_TEMPLATES,
+  getMaintenance10DayTemplate,
+  getMaintenance5DayTemplate,
 } from "./smsNotificationService";
 
 const APP_TIMEZONE = "America/New_York";
@@ -151,18 +152,20 @@ export async function processMaintenanceReminders(): Promise<DailyReminderSummar
     console.log(`[MaintenanceReminder] Processing reminders for date: ${todayStr}`);
     console.log(`[MaintenanceReminder] Looking for visits on: ${tenDaysStr} (10-day) and ${fiveDaysStr} (5-day)`);
 
+    const tenDayTemplate = await getMaintenance10DayTemplate();
     const tenDayResults = await processRemindersForDate(
       tenDaysStr,
       "10_day",
       "maintenance_reminder_10_day",
-      SMS_TEMPLATES.MAINTENANCE_REMINDER_10_DAY
+      tenDayTemplate
     );
 
+    const fiveDayTemplate = await getMaintenance5DayTemplate();
     const fiveDayResults = await processRemindersForDate(
       fiveDaysStr,
       "5_day",
       "maintenance_reminder_5_day",
-      SMS_TEMPLATES.MAINTENANCE_REMINDER_5_DAY
+      fiveDayTemplate
     );
 
     summary.results = [...tenDayResults, ...fiveDayResults];
