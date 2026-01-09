@@ -19550,6 +19550,89 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // SMS Templates configuration
+  const SMS_TEMPLATE_CONFIG = [
+    { key: "sms_template_maintenance_10_day", description: "Maintenance 10-Day Reminder", defaultValue: "Hi! Your scheduled maintenance visit is coming up in 10 days. Please call us to confirm your appointment. - GHVAC" },
+    { key: "sms_template_maintenance_5_day", description: "Maintenance 5-Day Reminder", defaultValue: "Reminder: Your maintenance visit is in 5 days. Please call to schedule if you haven't already. - GHVAC" },
+    { key: "sms_template_work_order_en_route", description: "Technician En Route", defaultValue: "Your GHVAC technician is on the way! They should arrive shortly." },
+    { key: "sms_template_work_order_on_site", description: "Technician On Site", defaultValue: "Your GHVAC technician has arrived and is ready to help!" },
+    { key: "sms_template_invoice", description: "Invoice Payment (uses {invoiceNumber} and {paymentLink} placeholders)", defaultValue: "Your invoice #{invoiceNumber} is ready. Pay online: {paymentLink} - GHVAC" },
+  ];
+
+  // GET /api/admin/settings/sms-templates - Get all SMS templates
+  app.get("/api/admin/settings/sms-templates", requireCrmAdmin, async (req, res) => {
+    try {
+      const templates = await Promise.all(
+        SMS_TEMPLATE_CONFIG.map(async (config) => {
+          const setting = await storage.getSetting(config.key);
+          return {
+            key: config.key,
+            description: config.description,
+            value: setting?.value || config.defaultValue,
+            defaultValue: config.defaultValue,
+          };
+        })
+      );
+      return res.json({ templates });
+    } catch (error) {
+      console.error("Error getting SMS templates:", error);
+      return res.status(500).json({ message: "Failed to get SMS templates" });
+    }
+  });
+
+  // PUT /api/admin/settings/sms-templates - Update SMS templates
+  app.put("/api/admin/settings/sms-templates", requireCrmAdmin, async (req, res) => {
+    try {
+      const { templates } = req.body;
+      if (!Array.isArray(templates)) {
+        return res.status(400).json({ message: "templates must be an array" });
+      }
+      
+      const validKeys = SMS_TEMPLATE_CONFIG.map(c => c.key);
+      for (const template of templates) {
+        if (!template.key || typeof template.value !== "string") {
+          return res.status(400).json({ message: "Each template must have a key and value" });
+        }
+        if (!validKeys.includes(template.key)) {
+          return res.status(400).json({ message: `Invalid template key: ${template.key}` });
+        }
+        await storage.setSetting(template.key, template.value);
+      }
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating SMS templates:", error);
+      return res.status(500).json({ message: "Failed to update SMS templates" });
+    }
+  });
+
+  // GET /api/admin/settings/automated-email - Get automated email enabled status
+  app.get("/api/admin/settings/automated-email", requireCrmAdmin, async (req, res) => {
+    try {
+      const setting = await storage.getSetting("automated_email_enabled");
+      const enabled = setting ? setting.value !== "false" : true;
+      return res.json({ enabled });
+    } catch (error) {
+      console.error("Error getting automated email setting:", error);
+      return res.status(500).json({ message: "Failed to get setting" });
+    }
+  });
+
+  // PUT /api/admin/settings/automated-email - Update automated email enabled status
+  app.put("/api/admin/settings/automated-email", requireCrmAdmin, async (req, res) => {
+    try {
+      const { enabled } = req.body;
+      if (typeof enabled !== "boolean") {
+        return res.status(400).json({ message: "enabled must be a boolean" });
+      }
+      await storage.setSetting("automated_email_enabled", enabled ? "true" : "false");
+      return res.json({ enabled });
+    } catch (error) {
+      console.error("Error updating automated email setting:", error);
+      return res.status(500).json({ message: "Failed to update setting" });
+    }
+  });
+
   // POST /api/admin/trigger-maintenance-reminders - Manually trigger maintenance reminders
   app.post("/api/admin/trigger-maintenance-reminders", requireCrmAuth, async (req, res) => {
     const user = await getCurrentCrmUser(req);

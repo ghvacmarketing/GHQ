@@ -7,11 +7,20 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Bell, RefreshCw, Loader2, CheckCircle2, AlertCircle, FileText, Search, Send, MessageSquare } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { ArrowLeft, Bell, RefreshCw, Loader2, CheckCircle2, AlertCircle, FileText, Search, Send, MessageSquare, Mail, ChevronDown, ChevronUp, RotateCcw } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { CrmUser } from "@shared/schema";
+
+interface SmsTemplate {
+  key: string;
+  description: string;
+  value: string;
+  defaultValue: string;
+}
 
 interface ReminderResult {
   visitId: string;
@@ -86,6 +95,15 @@ export default function CrmSettingsSystemTools() {
   const [isLoadingSmsToggle, setIsLoadingSmsToggle] = useState(true);
   const [isUpdatingSmsToggle, setIsUpdatingSmsToggle] = useState(false);
 
+  const [automatedEmailEnabled, setAutomatedEmailEnabled] = useState(true);
+  const [isLoadingEmailToggle, setIsLoadingEmailToggle] = useState(true);
+  const [isUpdatingEmailToggle, setIsUpdatingEmailToggle] = useState(false);
+
+  const [smsTemplates, setSmsTemplates] = useState<SmsTemplate[]>([]);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
+  const [isSavingTemplates, setIsSavingTemplates] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
@@ -113,8 +131,43 @@ export default function CrmSettingsSystemTools() {
         setIsLoadingSmsToggle(false);
       }
     };
+
+    const fetchEmailToggle = async () => {
+      try {
+        const res = await fetch("/api/admin/settings/automated-email", {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAutomatedEmailEnabled(data.enabled);
+        }
+      } catch (err) {
+        console.error("Failed to fetch email toggle:", err);
+      } finally {
+        setIsLoadingEmailToggle(false);
+      }
+    };
+
+    const fetchTemplates = async () => {
+      try {
+        const res = await fetch("/api/admin/settings/sms-templates", {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSmsTemplates(data.templates);
+        }
+      } catch (err) {
+        console.error("Failed to fetch SMS templates:", err);
+      } finally {
+        setIsLoadingTemplates(false);
+      }
+    };
+
     if (currentUser && (currentUser.role === "owner" || currentUser.role === "admin" || currentUser.role === "supervisor")) {
       fetchSmsToggle();
+      fetchEmailToggle();
+      fetchTemplates();
     }
   }, [currentUser]);
 
@@ -151,6 +204,85 @@ export default function CrmSettingsSystemTools() {
       });
     } finally {
       setIsUpdatingSmsToggle(false);
+    }
+  };
+
+  const handleToggleEmail = async (enabled: boolean) => {
+    setIsUpdatingEmailToggle(true);
+    try {
+      const res = await fetch("/api/admin/settings/automated-email", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ enabled }),
+      });
+      if (res.ok) {
+        setAutomatedEmailEnabled(enabled);
+        toast({
+          title: enabled ? "Email Enabled" : "Email Disabled",
+          description: enabled 
+            ? "Automated email sending is now enabled" 
+            : "Automated email sending is now disabled",
+        });
+      } else {
+        const data = await res.json();
+        toast({
+          title: "Error",
+          description: data.message || "Failed to update setting",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Network error - please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingEmailToggle(false);
+    }
+  };
+
+  const handleTemplateChange = (key: string, value: string) => {
+    setSmsTemplates(prev => prev.map(t => t.key === key ? { ...t, value } : t));
+  };
+
+  const handleResetTemplate = (key: string) => {
+    setSmsTemplates(prev => prev.map(t => t.key === key ? { ...t, value: t.defaultValue } : t));
+  };
+
+  const handleSaveTemplates = async () => {
+    setIsSavingTemplates(true);
+    try {
+      const res = await fetch("/api/admin/settings/sms-templates", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ 
+          templates: smsTemplates.map(t => ({ key: t.key, value: t.value })) 
+        }),
+      });
+      if (res.ok) {
+        toast({
+          title: "Templates Saved",
+          description: "SMS templates have been updated successfully",
+        });
+      } else {
+        const data = await res.json();
+        toast({
+          title: "Error",
+          description: data.message || "Failed to save templates",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Network error - please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingTemplates(false);
     }
   };
 
@@ -352,6 +484,136 @@ export default function CrmSettingsSystemTools() {
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-purple-100">
+                    <Mail className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">Automated Emails</CardTitle>
+                    <CardDescription>
+                      Enable or disable all automated email sending (quotes, invoices, notifications)
+                    </CardDescription>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {isLoadingEmailToggle ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                  ) : (
+                    <>
+                      {isUpdatingEmailToggle && (
+                        <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                      )}
+                      <Switch
+                        checked={automatedEmailEnabled}
+                        onCheckedChange={handleToggleEmail}
+                        disabled={isUpdatingEmailToggle}
+                        data-testid="switch-automated-email"
+                      />
+                    </>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-sm ${automatedEmailEnabled ? 'text-green-600' : 'text-slate-500'}`}>
+                {automatedEmailEnabled ? (
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Automated email sending is enabled</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>Automated email sending is disabled</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-teal-100">
+                  <MessageSquare className="h-5 w-5 text-teal-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Message Templates</CardTitle>
+                  <CardDescription>
+                    Customize the SMS templates used for automated notifications
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoadingTemplates ? (
+                <div className="flex items-center gap-2 text-slate-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Loading templates...</span>
+                </div>
+              ) : (
+                <Collapsible open={templatesOpen} onOpenChange={setTemplatesOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between" data-testid="button-expand-templates">
+                      <span>{templatesOpen ? "Hide Templates" : "Show Templates"}</span>
+                      {templatesOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-4 space-y-6">
+                    {smsTemplates.map((template) => (
+                      <div key={template.key} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-sm font-medium text-slate-700">{template.description}</label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleResetTemplate(template.key)}
+                            disabled={template.value === template.defaultValue}
+                            className="text-slate-500 hover:text-slate-700"
+                            data-testid={`button-reset-${template.key}`}
+                          >
+                            <RotateCcw className="h-3 w-3 mr-1" />
+                            Reset
+                          </Button>
+                        </div>
+                        <Textarea
+                          value={template.value}
+                          onChange={(e) => handleTemplateChange(template.key, e.target.value)}
+                          rows={2}
+                          className="resize-none"
+                          data-testid={`textarea-${template.key}`}
+                        />
+                        {template.key === "sms_template_invoice" && (
+                          <p className="text-xs text-slate-500">
+                            Use {"{invoiceNumber}"} and {"{paymentLink}"} as placeholders
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      onClick={handleSaveTemplates}
+                      disabled={isSavingTemplates}
+                      className="w-full"
+                      data-testid="button-save-templates"
+                    >
+                      {isSavingTemplates ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save All Templates"
+                      )}
+                    </Button>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
             </CardContent>
           </Card>
 

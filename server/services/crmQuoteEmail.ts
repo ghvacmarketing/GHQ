@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import type { CrmQuote, CrmQuoteLineItem } from "@shared/schema";
+import { storage } from "../storage";
 
 const brandDefaults = {
   name: "Giesbrecht HVAC",
@@ -61,12 +62,17 @@ export async function sendCrmQuoteEmail(
   sentBy?: string,
   options?: CrmQuoteEmailOptions
 ): Promise<CrmQuoteEmailResult> {
+  const emailSetting = await storage.getSetting("automated_email_enabled");
+  if (emailSetting && emailSetting.value === "false") {
+    console.log("[CRM Email] Automated emails are disabled");
+    return { success: false, error: "Automated emails are disabled" };
+  }
+
   const apiKey = process.env.RESEND_API_KEY;
   const fallbackEmail = process.env.FROM_EMAIL || "quotes@ghvac.work";
   const brandName = brandDefaults.name;
   const brandColor = brandDefaults.color;
 
-  // Debug: log first 15 chars of API key to verify correct key is loaded
   console.log("[CRM Email] API Key prefix:", apiKey ? apiKey.substring(0, 15) + "..." : "NOT SET");
 
   if (!apiKey) {

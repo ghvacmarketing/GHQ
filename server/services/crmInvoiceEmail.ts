@@ -4,6 +4,7 @@ import { crmInvoices } from "@shared/schema";
 import { getUncachableStripeClient } from "../stripeClient";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
+import { storage } from "../storage";
 
 const brandDefaults = {
   name: "Giesbrecht HVAC",
@@ -117,6 +118,12 @@ export async function sendCrmInvoiceEmail(
   sentBy?: string,
   options?: CrmInvoiceEmailOptions
 ): Promise<CrmInvoiceEmailResult> {
+  const emailSetting = await storage.getSetting("automated_email_enabled");
+  if (emailSetting && emailSetting.value === "false") {
+    console.log("[CRM Invoice Email] Automated emails are disabled");
+    return { success: false, error: "Automated emails are disabled" };
+  }
+
   const apiKey = process.env.RESEND_API_KEY;
   const brandName = brandDefaults.name;
 
