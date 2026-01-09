@@ -61,7 +61,7 @@ const CATEGORY_TYPES = ["Service", "Install", "Maintenance", "Discount"] as cons
 const PROPERTY_TYPES = ["Residential", "Commercial"] as const;
 
 type CategoryType = typeof CATEGORY_TYPES[number];
-type PropertyType = typeof PROPERTY_TYPES[number];
+type PropertyType = typeof PROPERTY_TYPES[number] | "none";
 
 interface ConnectionStatus {
   connected: boolean;
@@ -1094,6 +1094,7 @@ export default function CrmSettingsQuickBooks() {
                   <SelectValue placeholder="Select property type" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
                   {PROPERTY_TYPES.map((type) => (
                     <SelectItem key={type} value={type}>
                       {type}
