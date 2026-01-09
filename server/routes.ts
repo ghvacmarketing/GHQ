@@ -19041,12 +19041,12 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       console.log(`[PublicSign] Quote ${quote.quoteNumber} signed and accepted by ${signerName.trim()} from IP ${signerIp}`);
 
-      // Auto-create follow-up work order if quote is attached to a working/completed work order (only for custom_service and quick types, AND has service items)
-      const followUpQuoteTypes = ["custom_service", "quick"];
+      // Auto-create follow-up work order if quote is attached to a work order AND has service items
+      // Service quote types (quick, custom_service) always trigger; other types need service items check
       console.log(`[PublicSign] Quote ${quote.quoteNumber}: workOrderId=${quote.workOrderId}, quoteType=${updated.quoteType}`);
       
-      if (quote.workOrderId && followUpQuoteTypes.includes(updated.quoteType || "")) {
-        // Check if quote has service-type items (not just maintenance)
+      if (quote.workOrderId) {
+        // Check if quote has service-type items (service, labor, parts - not just maintenance)
         const hasServiceLineItems = await hasServiceItems(quote.id);
         console.log(`[PublicSign] Quote ${quote.quoteNumber}: hasServiceLineItems=${hasServiceLineItems}`);
         
@@ -19072,7 +19072,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           console.log(`[PublicSign] Quote ${quote.quoteNumber} has no service items, skipping follow-up work order creation`);
         }
       } else {
-        console.log(`[PublicSign] Quote ${quote.quoteNumber}: skipping follow-up (no workOrderId or wrong quoteType)`);
+        console.log(`[PublicSign] Quote ${quote.quoteNumber}: skipping follow-up (no workOrderId)`);
       }
 
       return res.json({ 

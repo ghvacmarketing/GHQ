@@ -840,6 +840,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
         taxTotal: "0",
         total: data.total.toFixed(2),
         status: "draft",
+        quoteType: "quick",
         assignedToId: selectedAssigneeId || undefined,
       });
       return response.json();
