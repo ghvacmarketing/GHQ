@@ -161,6 +161,7 @@ type FilterTab = "all" | "scheduled" | "in_progress" | "completed" | "ready_to_i
 
 const filterTabConfig: Record<FilterTab, { label: string; shortLabel: string }> = {
   all: { label: "All", shortLabel: "All" },
+  unassigned: { label: "Unassigned", shortLabel: "Unassigned" },
   scheduled: { label: "Scheduled", shortLabel: "Scheduled" },
   in_progress: { label: "In Progress", shortLabel: "Active" },
   completed: { label: "Completed", shortLabel: "Done" },
@@ -168,7 +169,6 @@ const filterTabConfig: Record<FilterTab, { label: string; shortLabel: string }> 
   invoiced: { label: "Invoiced / Awaiting Payment", shortLabel: "Invoiced" },
   closed: { label: "Closed", shortLabel: "Closed" },
   cancelled: { label: "Cancelled", shortLabel: "Cancelled" },
-  unassigned: { label: "Unassigned", shortLabel: "Unassigned" },
 };
 
 type UnassignedCategory = "parts_needed" | "parts_ordered" | "parts_arrived" | "scheduled";

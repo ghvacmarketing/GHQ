@@ -16086,9 +16086,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }),
       });
 
-      // Check if follow-up work order choice is needed
+      // Check if follow-up work order choice is needed (only for custom_service and quick_quote types)
       let followUpContext = null;
-      if (existing.workOrderId) {
+      const followUpQuoteTypes = ["custom_service", "quick_quote"];
+      if (existing.workOrderId && followUpQuoteTypes.includes(existing.quoteType || "")) {
         const [parentWorkOrder] = await db.select().from(crmWorkOrders)
           .where(eq(crmWorkOrders.id, existing.workOrderId)).limit(1);
         
@@ -16245,9 +16246,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Quote ${existing.quoteNumber} accepted in person by ${signerName.trim()}, presented by ${user.name || user.email}`);
 
-      // Check if follow-up work order choice is needed
+      // Check if follow-up work order choice is needed (only for custom_service and quick_quote types)
       let followUpContext = null;
-      if (existing.workOrderId) {
+      const followUpQuoteTypes = ["custom_service", "quick_quote"];
+      if (existing.workOrderId && followUpQuoteTypes.includes(existing.quoteType || "")) {
         const [parentWorkOrder] = await db.select().from(crmWorkOrders)
           .where(eq(crmWorkOrders.id, existing.workOrderId)).limit(1);
         
@@ -18957,8 +18959,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       console.log(`Quote ${quote.quoteNumber} signed and accepted by ${signerName.trim()} from IP ${signerIp}`);
 
-      // Auto-create follow-up work order if quote is attached to a working/completed work order
-      if (quote.workOrderId) {
+      // Auto-create follow-up work order if quote is attached to a working/completed work order (only for custom_service and quick_quote types)
+      const followUpQuoteTypes = ["custom_service", "quick_quote"];
+      if (quote.workOrderId && followUpQuoteTypes.includes(updated.quoteType || "")) {
         const [parentWorkOrder] = await db.select().from(crmWorkOrders)
           .where(eq(crmWorkOrders.id, quote.workOrderId)).limit(1);
         
