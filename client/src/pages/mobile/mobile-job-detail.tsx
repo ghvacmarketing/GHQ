@@ -732,6 +732,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
       if (!res.ok) throw new Error("Failed to fetch quotes");
       return res.json();
     },
+    refetchInterval: 10000, // Auto-refresh every 10 seconds to catch customer acceptance
   });
 
   const quotes = quotesData?.quotes || [];
