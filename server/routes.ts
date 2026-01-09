@@ -17996,11 +17996,35 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       }
 
       // If this is a Textline conversation, fetch messages from Textline and cache them
-      // Use phone number approach as it's more reliable than UUID
-      if (conversation.externalSource === "textline" && conversation.phoneNumber && textlineClient.isConfigured()) {
-        const { messages: textlineMessages, error } = await textlineClient.getConversationMessagesByPhone(conversation.phoneNumber);
+      // Try phone number first (more reliable), fall back to UUID
+      if (conversation.externalSource === "textline" && textlineClient.isConfigured()) {
+        let textlineMessages: any[] = [];
         
-        if (!error && textlineMessages.length > 0) {
+        // Try phone number first if available
+        if (conversation.phoneNumber) {
+          try {
+            const phoneResult = await textlineClient.getConversationMessagesByPhone(conversation.phoneNumber);
+            if (!phoneResult.error) {
+              textlineMessages = phoneResult.messages;
+            }
+          } catch (e) {
+            console.error("[Textline] Phone lookup failed, will try UUID:", e);
+          }
+        }
+        
+        // Fall back to UUID if phone failed or wasn't available
+        if (textlineMessages.length === 0 && conversation.externalConversationId) {
+          try {
+            const uuidResult = await textlineClient.getConversationMessages(conversation.externalConversationId);
+            if (!uuidResult.error) {
+              textlineMessages = uuidResult.messages;
+            }
+          } catch (e) {
+            console.error("[Textline] UUID lookup failed:", e);
+          }
+        }
+        
+        if (textlineMessages.length > 0) {
           // Get existing message external IDs to avoid duplicates
           const existingMessages = await storage.getMessagesForConversation(id);
           const existingExternalIds = new Set(existingMessages.map(m => m.externalMessageId).filter(Boolean));
@@ -19855,7 +19879,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         });
       }
       
-      const validPropertyTypes = ["Residential", "Commercial"];
+      const validPropertyTypes = ["Residential", "Commercial", "None"];
       if (!validPropertyTypes.includes(propertyType)) {
         return res.status(400).json({ 
           message: `propertyType must be one of: ${validPropertyTypes.join(", ")}` 
@@ -20902,11 +20926,35 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       }
 
       // If this is a Textline conversation, fetch messages from Textline and cache them
-      // Use phone number approach as it's more reliable than UUID
-      if (conversation.externalSource === "textline" && conversation.phoneNumber && textlineClient.isConfigured()) {
-        const { messages: textlineMessages, error } = await textlineClient.getConversationMessagesByPhone(conversation.phoneNumber);
+      // Try phone number first (more reliable), fall back to UUID
+      if (conversation.externalSource === "textline" && textlineClient.isConfigured()) {
+        let textlineMessages: any[] = [];
         
-        if (!error && textlineMessages.length > 0) {
+        // Try phone number first if available
+        if (conversation.phoneNumber) {
+          try {
+            const phoneResult = await textlineClient.getConversationMessagesByPhone(conversation.phoneNumber);
+            if (!phoneResult.error) {
+              textlineMessages = phoneResult.messages;
+            }
+          } catch (e) {
+            console.error("[Textline] Phone lookup failed, will try UUID:", e);
+          }
+        }
+        
+        // Fall back to UUID if phone failed or wasn't available
+        if (textlineMessages.length === 0 && conversation.externalConversationId) {
+          try {
+            const uuidResult = await textlineClient.getConversationMessages(conversation.externalConversationId);
+            if (!uuidResult.error) {
+              textlineMessages = uuidResult.messages;
+            }
+          } catch (e) {
+            console.error("[Textline] UUID lookup failed:", e);
+          }
+        }
+        
+        if (textlineMessages.length > 0) {
           // Get existing message external IDs to avoid duplicates
           const existingMessages = await storage.getMessagesForConversation(id);
           const existingExternalIds = new Set(existingMessages.map(m => m.externalMessageId).filter(Boolean));
