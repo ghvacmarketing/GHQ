@@ -846,19 +846,21 @@ export default function CrmProjects() {
                 {(() => {
                   const monthStart = startOfMonth(calendarMonth);
                   const monthEnd = endOfMonth(calendarMonth);
-                  const startDate = startOfWeek(monthStart);
-                  const endDate = endOfWeek(monthEnd);
-                  const days = eachDayOfInterval({ start: startDate, end: endDate });
+                  const calendarStart = startOfWeek(monthStart);
+                  const calendarEnd = endOfWeek(monthEnd);
+                  const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
                   
-                  return days.map(day => {
+                  return days.map((day, dayIndex) => {
                     const isCurrentMonth = isSameMonth(day, calendarMonth);
+                    const dayStart = startOfDay(day);
+                    const isStartOfWeek = dayIndex % 7 === 0;
+                    const isEndOfWeek = dayIndex % 7 === 6;
                     
                     const dayProjects = calendarProjectsData?.projects?.filter(project => {
                       if (!project.startDate && !project.endDate) return false;
                       const projectStart = project.startDate ? startOfDay(new Date(project.startDate)) : null;
                       const projectEnd = project.endDate ? startOfDay(new Date(project.endDate)) : projectStart;
                       if (!projectStart) return false;
-                      const dayStart = startOfDay(day);
                       return isSameDay(dayStart, projectStart) ||
                              (projectEnd && isSameDay(dayStart, projectEnd)) ||
                              (projectEnd && isAfter(dayStart, projectStart) && isBefore(dayStart, projectEnd));
@@ -868,30 +870,46 @@ export default function CrmProjects() {
                       <div
                         key={day.toISOString()}
                         className={cn(
-                          "min-h-[100px] p-1 border-b border-r relative",
+                          "min-h-[100px] border-b border-r relative",
                           !isCurrentMonth && "bg-muted/50 text-muted-foreground"
                         )}
                       >
-                        <div className="text-xs font-medium mb-1">{format(day, "d")}</div>
-                        <div className="space-y-1 overflow-hidden">
+                        <div className="text-xs font-medium p-1">{format(day, "d")}</div>
+                        <div className="space-y-0.5 overflow-hidden">
                           {dayProjects.slice(0, 3).map(project => {
                             const colors = statusColors[project.status] || statusColors.lead;
+                            const projectStart = project.startDate ? startOfDay(new Date(project.startDate)) : null;
+                            const projectEnd = project.endDate ? startOfDay(new Date(project.endDate)) : projectStart;
+                            
+                            const isFirst = projectStart && isSameDay(dayStart, projectStart);
+                            const isLast = projectEnd && isSameDay(dayStart, projectEnd);
+                            const isSingleDay = isFirst && isLast;
+                            
+                            // For multi-day events, handle week boundaries
+                            const showRoundedLeft = isFirst || isStartOfWeek;
+                            const showRoundedRight = isLast || isEndOfWeek;
+                            
                             return (
                               <button
                                 key={project.id}
                                 onClick={() => navigate(`/crm/projects/${project.id}`)}
                                 className={cn(
-                                  "w-full text-left text-xs p-1 rounded truncate",
-                                  colors.bg, colors.text
+                                  "w-full text-left text-xs py-1 px-1.5 truncate h-6",
+                                  colors.bg, colors.text,
+                                  isSingleDay && "rounded mx-0.5",
+                                  !isSingleDay && showRoundedLeft && !showRoundedRight && "rounded-l ml-0.5",
+                                  !isSingleDay && !showRoundedLeft && showRoundedRight && "rounded-r mr-0.5",
+                                  !isSingleDay && showRoundedLeft && showRoundedRight && "rounded mx-0.5",
+                                  !isSingleDay && !showRoundedLeft && !showRoundedRight && ""
                                 )}
                                 title={`${project.customerName || "Customer"} - ${project.title}`}
                               >
-                                {project.customerName || project.title}
+                                {(isFirst || isStartOfWeek) ? (project.customerName || project.title) : ""}
                               </button>
                             );
                           })}
                           {dayProjects.length > 3 && (
-                            <div className="text-xs text-muted-foreground">+{dayProjects.length - 3} more</div>
+                            <div className="text-xs text-muted-foreground px-1">+{dayProjects.length - 3} more</div>
                           )}
                         </div>
                       </div>
