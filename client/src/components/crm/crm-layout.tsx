@@ -182,8 +182,8 @@ function SidebarContent({
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-900">
-      <div className="p-4 border-b border-slate-700">
+    <div className="flex flex-col h-full bg-gradient-to-b from-slate-900 via-slate-900 to-[#1a1015]">
+      <div className="p-4 border-b border-slate-700/50">
         <div className="flex items-center gap-3">
           <img src={ghqLogo} alt="GHQ Logo" className="h-10 w-10 rounded-lg object-contain" />
           <div>
@@ -223,7 +223,7 @@ function SidebarContent({
         </div>
       </div>
 
-      <div className="p-3 border-t border-slate-700">
+      <div className="p-3 border-t border-slate-700/50">
         {currentUser?.role !== "tech" && (
           <Link href="/mobile" onClick={onItemClick}>
             <div
