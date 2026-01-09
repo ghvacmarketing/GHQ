@@ -12773,9 +12773,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Project not found" });
       }
 
+      // Pre-process date fields to convert ISO strings to Date objects
+      const body = { ...req.body };
+      if (body.startDate !== undefined) {
+        body.startDate = body.startDate ? new Date(body.startDate) : null;
+      }
+      if (body.endDate !== undefined) {
+        body.endDate = body.endDate ? new Date(body.endDate) : null;
+      }
+      if (body.proposalSentAt !== undefined) {
+        body.proposalSentAt = body.proposalSentAt ? new Date(body.proposalSentAt) : null;
+      }
+      if (body.approvedAt !== undefined) {
+        body.approvedAt = body.approvedAt ? new Date(body.approvedAt) : null;
+      }
+      if (body.completedAt !== undefined) {
+        body.completedAt = body.completedAt ? new Date(body.completedAt) : null;
+      }
+      if (body.closedAt !== undefined) {
+        body.closedAt = body.closedAt ? new Date(body.closedAt) : null;
+      }
+
       const allowedFields = insertCrmProjectSchema.partial();
-      const result = allowedFields.safeParse(req.body);
+      const result = allowedFields.safeParse(body);
       if (!result.success) {
+        console.error("Project update validation error:", result.error.flatten().fieldErrors);
         return res.status(400).json({
           message: "Invalid request body",
           errors: result.error.flatten().fieldErrors,
