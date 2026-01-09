@@ -735,12 +735,20 @@ export default function CrmQuotes() {
                         {formatDate(quote.createdAt)}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={statusColors[quote.status || "draft"] || statusColors.draft}
-                        >
-                          {statusLabels[quote.status || "draft"] || quote.status}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant="outline"
+                            className={statusColors[quote.status || "draft"] || statusColors.draft}
+                          >
+                            {statusLabels[quote.status || "draft"] || quote.status}
+                          </Badge>
+                          {(quote.viewCount || 0) > 0 && (
+                            <span className="flex items-center gap-1 text-xs text-purple-600" title={`Viewed ${quote.viewCount} time${quote.viewCount === 1 ? "" : "s"}`}>
+                              <Eye className="h-3 w-3" />
+                              {quote.viewCount}
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right font-medium text-slate-900">
                         {formatCurrency(getDisplayAmount(quote))}

@@ -65,6 +65,7 @@ import {
   Monitor,
   Pencil,
   FolderKanban,
+  Eye,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -2128,6 +2129,18 @@ export default function CrmQuoteDetail() {
                   <span className="text-sm">{formatDate(quote.sentAt)}</span>
                 </div>
               )}
+              {quote.viewedAt && (
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">First Viewed</span>
+                  <span className="text-sm">{formatDate(quote.viewedAt)}</span>
+                </div>
+              )}
+              {(quote.viewCount || 0) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-sm text-slate-500">View Count</span>
+                  <span className="text-sm font-medium text-purple-600">{quote.viewCount} {quote.viewCount === 1 ? "view" : "views"}</span>
+                </div>
+              )}
               <div className="flex justify-between items-center">
                 <span className="text-sm text-slate-500">Assigned To</span>
                 {isEditingAssignment ? (
@@ -2633,7 +2646,7 @@ export default function CrmQuoteDetail() {
                   const hasContent = log.htmlContent || log.textContent;
                   
                   // Parse system event metadata
-                  let systemEventData: { eventType?: string; signerName?: string; signedAt?: string; acceptedAt?: string; markedByUser?: string } | null = null;
+                  let systemEventData: { eventType?: string; signerName?: string; signedAt?: string; acceptedAt?: string; markedByUser?: string; viewCount?: number; isFirstView?: boolean; viewedAt?: string } | null = null;
                   if (isSystemEvent && log.personalMessage) {
                     try {
                       systemEventData = JSON.parse(log.personalMessage);
@@ -2656,6 +2669,53 @@ export default function CrmQuoteDetail() {
                   
                   // Render system events differently
                   if (isSystemEvent) {
+                    const eventType = systemEventData?.eventType;
+                    
+                    // Handle quote view events
+                    if (eventType === "quote_viewed") {
+                      const viewCount = systemEventData?.viewCount || 1;
+                      const isFirstView = systemEventData?.isFirstView;
+                      const eventTime = systemEventData?.viewedAt || log.sentAt;
+                      
+                      return (
+                        <div
+                          key={log.id}
+                          className="rounded-lg border overflow-hidden bg-purple-50 border-purple-200"
+                          data-testid={`email-log-${log.id}`}
+                        >
+                          <div className="p-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Eye className="h-4 w-4 text-purple-600 flex-shrink-0" />
+                                  <span className="font-medium text-sm text-purple-800">
+                                    {isFirstView ? "Quote First Viewed by Customer" : "Quote Viewed Again"}
+                                  </span>
+                                </div>
+                                
+                                <div className="flex items-center gap-2 text-xs text-purple-600">
+                                  <Clock className="h-3 w-3" />
+                                  <span>
+                                    {eventTime
+                                      ? format(new Date(eventTime), "MMM d, yyyy 'at' h:mm a")
+                                      : "—"}
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              <Badge
+                                variant="outline"
+                                className="bg-purple-100 text-purple-700 border-purple-300"
+                              >
+                                View #{viewCount}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    // Handle signature/acceptance events (default system event type)
                     const eventTime = systemEventData?.signedAt || systemEventData?.acceptedAt || log.sentAt;
                     const signerName = systemEventData?.signerName || log.recipientName;
                     
