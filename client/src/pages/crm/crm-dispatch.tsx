@@ -1437,6 +1437,15 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
       style={style}
       data-testid={`workorder-card-${workOrder.id}`}
     >
+      {workOrder.isPending && (
+        <div 
+          className="absolute top-0.5 left-3 w-5 h-5 rounded-full bg-red-600 flex items-center justify-center z-10"
+          data-testid={`pending-icon-${workOrder.id}`}
+          title="Waiting"
+        >
+          <Clock className="h-3 w-3 text-white" />
+        </div>
+      )}
       {workOrder.priority && workOrder.priority !== "normal" && (
         <div 
           className={`absolute top-0.5 right-1 px-1 py-0 text-[9px] font-bold rounded ${priorityStyle.bg} ${priorityStyle.text}`}
@@ -1474,12 +1483,7 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
         }}
       >
         <div className="flex items-center gap-1">
-          <p className="text-xs font-medium truncate flex-1">{workOrder.customerName}</p>
-          {workOrder.isPending && (
-            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm bg-amber-400 text-amber-900 animate-pulse">
-              WAITING
-            </span>
-          )}
+          <p className={`text-xs font-medium truncate flex-1 ${workOrder.isPending ? 'ml-5' : ''}`}>{workOrder.customerName}</p>
           {workOrder.status !== "scheduled" && (
             <span 
               className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm ${
@@ -1495,7 +1499,7 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
             </span>
           )}
         </div>
-        <p className="text-xs truncate opacity-70">{workOrder.propertyAddress || "No address"}</p>
+        <p className={`text-xs truncate opacity-70 ${workOrder.isPending ? 'ml-5' : ''}`}>{workOrder.propertyAddress || "No address"}</p>
       </div>
     </div>
   );
@@ -1515,6 +1519,14 @@ function WorkOrderCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
       className={`rounded border-l-4 ${jobColors.bg} ${jobColors.border} ${jobColors.text} ${statusStripe} px-3 py-1 shadow-md cursor-grabbing flex flex-col justify-center relative ${isCompletedStatus ? 'opacity-60' : ''}`}
       style={{ width: `${widthPx}px`, height: '48px' }}
     >
+      {workOrder.isPending && (
+        <div 
+          className="absolute top-0.5 left-3 w-5 h-5 rounded-full bg-red-600 flex items-center justify-center z-10"
+          title="Waiting"
+        >
+          <Clock className="h-3 w-3 text-white" />
+        </div>
+      )}
       {workOrder.priority && workOrder.priority !== "normal" && (
         <div 
           className={`absolute top-0.5 right-1 px-1 py-0 text-[9px] font-bold rounded ${priorityStyle.bg} ${priorityStyle.text}`}
@@ -1523,12 +1535,7 @@ function WorkOrderCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
         </div>
       )}
       <div className="flex items-center gap-1">
-        <p className="text-xs font-medium truncate flex-1">{workOrder.customerName}</p>
-        {workOrder.isPending && (
-          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm bg-amber-400 text-amber-900 animate-pulse">
-            WAITING
-          </span>
-        )}
+        <p className={`text-xs font-medium truncate flex-1 ${workOrder.isPending ? 'ml-5' : ''}`}>{workOrder.customerName}</p>
         {workOrder.status !== "scheduled" && (
           <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm ${
             workOrder.status === 'dispatched' ? 'bg-purple-600 text-white' :
@@ -1541,7 +1548,7 @@ function WorkOrderCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
           </span>
         )}
       </div>
-      <p className="text-xs truncate opacity-70">{workOrder.propertyAddress || "No address"}</p>
+      <p className={`text-xs truncate opacity-70 ${workOrder.isPending ? 'ml-5' : ''}`}>{workOrder.propertyAddress || "No address"}</p>
     </div>
   );
 }
