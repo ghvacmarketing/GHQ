@@ -10471,6 +10471,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // For MAINTENANCE visit types, verify property has an active maintenance agreement
+      // and hasn't already reached max visits for the current cycle
       if (result.data.visitType === "MAINTENANCE") {
         const activeAgreement = await db.select()
           .from(crmAgreements)
@@ -10482,6 +10483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               eq(crmAgreements.status, "grace_period")
             )
           ))
+          .orderBy(desc(crmAgreements.createdAt))
           .limit(1);
         
         if (activeAgreement.length === 0) {
@@ -10489,6 +10491,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
             message: "Cannot schedule maintenance work order",
             error: "NO_MAINTENANCE_AGREEMENT",
             details: "This property does not have an active maintenance agreement. Please create a maintenance agreement first or select a different visit type."
+          });
+        }
+        
+        // Check if all visits for this cycle have been scheduled/completed
+        const agreement = activeAgreement[0];
+        const totalVisits = agreement.visitsPerPeriod || 2;
+        
+        // Count all non-cancelled MAINTENANCE work orders for this property since agreement activation
+        const startDate = agreement.activationDate 
+          ? new Date(agreement.activationDate) 
+          : new Date(agreement.startDate || agreement.createdAt || '2020-01-01');
+        
+        const existingVisits = await db.select({ count: count() })
+          .from(crmWorkOrders)
+          .where(
+            and(
+              eq(crmWorkOrders.propertyId, propertyId),
+              eq(crmWorkOrders.visitType, "MAINTENANCE"),
+              ne(crmWorkOrders.status, "cancelled"),
+              gte(crmWorkOrders.createdAt, startDate)
+            )
+          );
+        
+        const visitCount = Number(existingVisits[0]?.count || 0);
+        
+        if (visitCount >= totalVisits) {
+          return res.status(400).json({ 
+            message: "Cannot schedule maintenance work order",
+            error: "MAX_VISITS_REACHED",
+            details: `This property has already reached the maximum of ${totalVisits} maintenance visits for this billing cycle. The agreement must be renewed before scheduling additional maintenance visits.`,
+            visitInfo: {
+              currentVisits: visitCount,
+              maxVisits: totalVisits,
+              agreementId: agreement.id,
+              agreementNumber: agreement.agreementNumber
+            }
           });
         }
       }

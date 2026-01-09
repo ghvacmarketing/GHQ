@@ -1136,7 +1136,14 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
   }, []);
 
   const getWorkOrdersForTech = (techId: string) => {
-    return workOrders.filter(wo => wo.assignedTechId === techId && wo.scheduledStart);
+    const selectedDateStr = getLocalDateString(selectedDate);
+    return workOrders.filter(wo => {
+      if (wo.assignedTechId !== techId) return false;
+      if (!wo.scheduledStart) return false;
+      // Only count work orders for the selected date
+      const woDateStr = getLocalDateString(wo.scheduledStart);
+      return woDateStr === selectedDateStr;
+    });
   };
 
   if (technicians.length === 0) {
