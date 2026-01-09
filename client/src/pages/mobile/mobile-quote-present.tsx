@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { ArrowLeft, X, FileText, CheckCircle, Loader2, CreditCard, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, X, FileText, CheckCircle, Loader2, CreditCard, CheckCircle2, DollarSign, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -71,6 +71,17 @@ export default function MobileQuotePresent() {
 
   // Get deposit percentage from quote data (already fetched with CRM quote API)
   const depositPercentage = (quote as any)?.depositPercentage ?? 50;
+
+  // Fetch financing link for deposit quotes
+  const { data: financingData } = useQuery<{ financingLink: string; isDefault: boolean }>({
+    queryKey: ["/api/app-settings/financing-link"],
+    queryFn: async () => {
+      const res = await fetch("/api/app-settings/financing-link", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch financing link");
+      return res.json();
+    },
+    enabled: !!quote && DEPOSIT_QUOTE_TYPES.includes(quote?.quoteType?.toLowerCase() || ""),
+  });
 
   // Check if quote already has deposit paid when loaded
   useEffect(() => {
@@ -262,6 +273,18 @@ export default function MobileQuotePresent() {
     } finally {
       setPaymentLinkLoading(false);
     }
+  };
+
+  const handleApplyFinancing = () => {
+    if (!financingData?.financingLink) {
+      toast({ 
+        title: "Financing Unavailable", 
+        description: "Financing link is not configured. Please contact support.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    window.open(financingData.financingLink, '_blank');
   };
 
   if (isLoading) {
@@ -612,28 +635,50 @@ export default function MobileQuotePresent() {
                           <CreditCard className="h-5 w-5 text-amber-700" />
                           <h4 className="font-semibold text-amber-800">{depositPercentage}% Deposit Required</h4>
                         </div>
-                        <p className="text-sm text-amber-700 mb-3">
+                        <p className="text-sm text-amber-700 mb-4">
                           A {depositPercentage}% deposit is required before accepting this quote.
                         </p>
-                        <Button
-                          onClick={handlePayDeposit}
-                          disabled={paymentLinkLoading || (quote.quoteMode === "options" && !selectedOption)}
-                          className="w-full min-h-[56px] text-lg bg-green-600 hover:bg-green-700"
-                          data-testid="button-pay-deposit"
-                        >
-                          {paymentLinkLoading ? (
-                            <>
-                              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                              Generating Payment Link...
-                            </>
-                          ) : (
-                            <>
-                              <CreditCard className="h-5 w-5 mr-2" />
-                              Pay {depositPercentage}% Deposit Now
-                            </>
-                          )}
-                        </Button>
-                        <p className="text-xs text-amber-600 mt-2">Secure payment powered by Stripe</p>
+                        
+                        <div className="space-y-3">
+                          <Button
+                            onClick={handlePayDeposit}
+                            disabled={paymentLinkLoading || (quote.quoteMode === "options" && !selectedOption)}
+                            className="w-full min-h-[56px] text-lg bg-green-600 hover:bg-green-700"
+                            data-testid="button-pay-deposit"
+                          >
+                            {paymentLinkLoading ? (
+                              <>
+                                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                                Generating Payment Link...
+                              </>
+                            ) : (
+                              <>
+                                <CreditCard className="h-5 w-5 mr-2" />
+                                Pay Deposit via Stripe
+                              </>
+                            )}
+                          </Button>
+                          
+                          <div className="flex items-center gap-3 my-2">
+                            <div className="flex-1 h-px bg-amber-300" />
+                            <span className="text-xs text-amber-700 font-medium">OR</span>
+                            <div className="flex-1 h-px bg-amber-300" />
+                          </div>
+                          
+                          <Button
+                            onClick={handleApplyFinancing}
+                            disabled={quote.quoteMode === "options" && !selectedOption}
+                            variant="outline"
+                            className="w-full min-h-[56px] text-lg border-amber-400 text-amber-800 hover:bg-amber-100"
+                            data-testid="button-apply-financing"
+                          >
+                            <DollarSign className="h-5 w-5 mr-2" />
+                            Apply for Financing
+                            <ExternalLink className="h-4 w-4 ml-2" />
+                          </Button>
+                        </div>
+                        
+                        <p className="text-xs text-amber-600 mt-3">Stripe payments are processed securely. Financing opens in a new tab.</p>
                       </div>
                     )}
                   </div>

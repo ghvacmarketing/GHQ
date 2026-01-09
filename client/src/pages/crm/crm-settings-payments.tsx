@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, CreditCard, Loader2 } from "lucide-react";
+import { ArrowLeft, CreditCard, Loader2, DollarSign, RotateCcw } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmUser } from "@shared/schema";
@@ -18,6 +18,8 @@ export default function CrmSettingsPayments() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [depositPercentage, setDepositPercentage] = useState<number>(50);
+  const [financingLink, setFinancingLink] = useState<string>("");
+  const [isFinancingDefault, setIsFinancingDefault] = useState<boolean>(true);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -29,11 +31,23 @@ export default function CrmSettingsPayments() {
     enabled: !!currentUser,
   });
 
+  const { data: financingSettings, isLoading: financingLoading } = useQuery<{ financingLink: string; isDefault: boolean }>({
+    queryKey: ["/api/app-settings/financing-link"],
+    enabled: !!currentUser,
+  });
+
   useEffect(() => {
     if (settings?.depositPercentage) {
       setDepositPercentage(settings.depositPercentage);
     }
   }, [settings]);
+
+  useEffect(() => {
+    if (financingSettings) {
+      setFinancingLink(financingSettings.financingLink);
+      setIsFinancingDefault(financingSettings.isDefault);
+    }
+  }, [financingSettings]);
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
@@ -61,7 +75,47 @@ export default function CrmSettingsPayments() {
     },
   });
 
-  if (authLoading || settingsLoading) {
+  const saveFinancingMutation = useMutation({
+    mutationFn: async (link: string) => {
+      const res = await apiRequest("PUT", "/api/app-settings/financing-link", {
+        financingLink: link,
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to save financing link");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/app-settings/financing-link"] });
+      toast({ title: "Settings saved", description: "Financing link updated successfully." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to save", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const resetFinancingMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/app-settings/financing-link");
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to reset financing link");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/app-settings/financing-link"] });
+      setFinancingLink(data.financingLink || "");
+      setIsFinancingDefault(true);
+      toast({ title: "Settings reset", description: "Financing link reset to default." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to reset", description: error.message, variant: "destructive" });
+    },
+  });
+
+  if (authLoading || settingsLoading || financingLoading) {
     return (
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="max-w-2xl mx-auto">
@@ -103,6 +157,32 @@ export default function CrmSettingsPayments() {
       return;
     }
     saveMutation.mutate(depositPercentage);
+  };
+
+  const handleSaveFinancing = () => {
+    if (!financingLink.trim()) {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a valid financing link URL",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      new URL(financingLink.trim());
+    } catch {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a valid URL (e.g., https://example.com)",
+        variant: "destructive",
+      });
+      return;
+    }
+    saveFinancingMutation.mutate(financingLink.trim());
+  };
+
+  const handleResetFinancing = () => {
+    resetFinancingMutation.mutate();
   };
 
   return (
@@ -175,6 +255,89 @@ export default function CrmSettingsPayments() {
                 "Save Settings"
               )}
             </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Financing Options
+            </CardTitle>
+            <CardDescription>
+              Configure the financing application link shown to customers
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="financing-link">Financing Application URL</Label>
+                {isFinancingDefault ? (
+                  <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">Using Default</span>
+                ) : (
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Custom URL</span>
+                )}
+              </div>
+              <Input
+                id="financing-link"
+                type="url"
+                placeholder="https://example.com/apply"
+                value={financingLink}
+                onChange={(e) => setFinancingLink(e.target.value)}
+                className="w-full"
+                data-testid="input-financing-link"
+              />
+              <p className="text-sm text-slate-500">
+                This link will be shown as a financing option when customers view quotes that require a deposit.
+              </p>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-lg space-y-2">
+              <h4 className="font-medium text-slate-700">How It Works</h4>
+              <ul className="text-sm text-slate-600 space-y-1">
+                <li>• Customers can choose to pay the deposit via Stripe or apply for financing</li>
+                <li>• The financing button opens this link in a new tab</li>
+                <li>• You can customize the link to your preferred financing provider</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={handleSaveFinancing}
+                disabled={saveFinancingMutation.isPending}
+                className="bg-[#d3b07d] hover:bg-[#c4a06e]"
+                data-testid="button-save-financing"
+              >
+                {saveFinancingMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Financing Link"
+                )}
+              </Button>
+              {!isFinancingDefault && (
+                <Button
+                  variant="outline"
+                  onClick={handleResetFinancing}
+                  disabled={resetFinancingMutation.isPending}
+                  data-testid="button-reset-financing"
+                >
+                  {resetFinancingMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Resetting...
+                    </>
+                  ) : (
+                    <>
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Reset to Default
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
