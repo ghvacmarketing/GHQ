@@ -1088,6 +1088,7 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   invoiceId: varchar("invoice_id"),
   sourceQuoteId: varchar("source_quote_id").references(() => crmQuotes.id, { onDelete: "set null" }),
   dispatchedAt: timestamp("dispatched_at"),
+  enRouteAt: timestamp("en_route_at"),
   onSiteAt: timestamp("on_site_at"),
   startedAt: timestamp("started_at"),
   completedAt: timestamp("completed_at"),

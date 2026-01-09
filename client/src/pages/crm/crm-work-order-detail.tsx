@@ -157,6 +157,20 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
+function formatDuration(start: Date, end: Date): string {
+  const diffMs = end.getTime() - start.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const hours = Math.floor(diffMins / 60);
+  const mins = diffMins % 60;
+  
+  if (hours === 0) {
+    return `${mins}m`;
+  } else if (mins === 0) {
+    return `${hours}h`;
+  }
+  return `${hours}h ${mins}m`;
+}
+
 const workOrderStatusColors: Record<string, { bg: string; text: string; border: string }> = {
   scheduled: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
   dispatched: { bg: "bg-yellow-100", text: "text-yellow-700", border: "border-yellow-200" },
@@ -910,6 +924,14 @@ export default function CrmWorkOrderDetail() {
             >
               <Pencil className="h-4 w-4 md:mr-2" />
               <span className="hidden md:inline">Edit</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="timeline"
+              data-testid="tab-timeline"
+              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
+            >
+              <Clock className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Timeline</span>
             </TabsTrigger>
           </TabsList>
 
@@ -2027,6 +2049,147 @@ export default function CrmWorkOrderDetail() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="timeline" className="mt-6">
+            {!workOrder.dispatchedAt ? (
+              <Card className="shadow-sm">
+                <CardContent className="py-16 text-center">
+                  <Clock className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-slate-700 mb-2">No Dispatch Timeline Available</h3>
+                  <p className="text-slate-500">Dispatch this work order to see the timeline of status changes.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="shadow-sm">
+                <CardHeader className="pb-4 border-b bg-slate-50/50">
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                    <Clock className="h-4 w-4 text-[#711419]" />
+                    Dispatch Timeline
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <div className="relative">
+                    {/* Horizontal Timeline */}
+                    <div className="flex items-start justify-between relative">
+                      {/* Timeline connector line */}
+                      <div className="absolute top-5 left-0 right-0 h-1 bg-slate-200" />
+                      <div 
+                        className="absolute top-5 left-0 h-1 bg-[#711419] transition-all duration-300"
+                        style={{
+                          width: workOrder.completedAt ? '100%' 
+                            : workOrder.onSiteAt ? '75%' 
+                            : workOrder.enRouteAt ? '50%' 
+                            : workOrder.dispatchedAt ? '25%' 
+                            : '0%'
+                        }}
+                      />
+                      
+                      {/* Dispatched */}
+                      <div className="relative z-10 flex flex-col items-center text-center w-1/4">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          workOrder.dispatchedAt ? 'bg-[#711419] text-white' : 'bg-slate-200 text-slate-400'
+                        }`}>
+                          <CheckCircle className="h-5 w-5" />
+                        </div>
+                        <div className="mt-3">
+                          <p className="font-medium text-sm text-slate-900">Dispatched</p>
+                          {workOrder.dispatchedAt && (
+                            <>
+                              <p className="text-xs text-slate-500 mt-1">
+                                {format(new Date(workOrder.dispatchedAt), "MMM d, h:mm a")}
+                              </p>
+                              {workOrder.enRouteAt && (
+                                <p className="text-xs text-emerald-600 mt-1">
+                                  Duration: {formatDuration(new Date(workOrder.dispatchedAt), new Date(workOrder.enRouteAt))}
+                                </p>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* En Route */}
+                      <div className="relative z-10 flex flex-col items-center text-center w-1/4">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          workOrder.enRouteAt ? 'bg-[#711419] text-white' : 'bg-slate-200 text-slate-400'
+                        }`}>
+                          {workOrder.enRouteAt ? <CheckCircle className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+                        </div>
+                        <div className="mt-3">
+                          <p className="font-medium text-sm text-slate-900">En Route</p>
+                          {workOrder.enRouteAt && (
+                            <>
+                              <p className="text-xs text-slate-500 mt-1">
+                                {format(new Date(workOrder.enRouteAt), "MMM d, h:mm a")}
+                              </p>
+                              {workOrder.onSiteAt && (
+                                <p className="text-xs text-emerald-600 mt-1">
+                                  Duration: {formatDuration(new Date(workOrder.enRouteAt), new Date(workOrder.onSiteAt))}
+                                </p>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* On Site */}
+                      <div className="relative z-10 flex flex-col items-center text-center w-1/4">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          workOrder.onSiteAt ? 'bg-[#711419] text-white' : 'bg-slate-200 text-slate-400'
+                        }`}>
+                          {workOrder.onSiteAt ? <CheckCircle className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+                        </div>
+                        <div className="mt-3">
+                          <p className="font-medium text-sm text-slate-900">On Site</p>
+                          {workOrder.onSiteAt && (
+                            <>
+                              <p className="text-xs text-slate-500 mt-1">
+                                {format(new Date(workOrder.onSiteAt), "MMM d, h:mm a")}
+                              </p>
+                              {workOrder.completedAt && (
+                                <p className="text-xs text-emerald-600 mt-1">
+                                  Duration: {formatDuration(new Date(workOrder.onSiteAt), new Date(workOrder.completedAt))}
+                                </p>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Completed */}
+                      <div className="relative z-10 flex flex-col items-center text-center w-1/4">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          workOrder.completedAt ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-400'
+                        }`}>
+                          {workOrder.completedAt ? <CheckCircle className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+                        </div>
+                        <div className="mt-3">
+                          <p className="font-medium text-sm text-slate-900">Completed</p>
+                          {workOrder.completedAt && (
+                            <p className="text-xs text-slate-500 mt-1">
+                              {format(new Date(workOrder.completedAt), "MMM d, h:mm a")}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Total Duration Summary */}
+                    {workOrder.dispatchedAt && workOrder.completedAt && (
+                      <div className="mt-8 pt-6 border-t">
+                        <div className="flex items-center justify-center gap-2 text-center">
+                          <Clock className="h-5 w-5 text-[#711419]" />
+                          <span className="text-lg font-semibold text-slate-900">
+                            Total Time: {formatDuration(new Date(workOrder.dispatchedAt), new Date(workOrder.completedAt))}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
 

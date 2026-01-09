@@ -10635,6 +10635,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (status === "dispatched" && existingWorkOrder.status !== "dispatched" && !existingWorkOrder.dispatchedAt) {
         updateData.dispatchedAt = new Date();
       }
+      if (status === "en_route" && existingWorkOrder.status !== "en_route" && !existingWorkOrder.enRouteAt) {
+        updateData.enRouteAt = new Date();
+      }
       if (status === "on_site" && existingWorkOrder.status !== "on_site" && !existingWorkOrder.onSiteAt) {
         updateData.onSiteAt = new Date();
       }
