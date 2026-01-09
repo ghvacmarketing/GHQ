@@ -248,7 +248,12 @@ function buildTextBody(
   lines.push("To pay or ask questions about this invoice, please contact us at (706) 826-0644.");
   lines.push("");
   lines.push("Thank you for choosing Giesbrecht HVAC!");
+  lines.push("");
+  lines.push("Giesbrecht HVAC");
+  lines.push("(706) 826-0644");
+  lines.push("1530 Crescent Ct, Augusta, GA");
   if (sentBy) {
+    lines.push("");
     lines.push(`Sent by: ${sentBy}`);
   }
 
@@ -439,7 +444,8 @@ function buildHtmlBody(
           <tr>
             <td style="background:#f3f4f6;padding:20px;text-align:center;">
               <p style="margin:0;font-weight:700;color:#111827;font-size:14px;">${esc(brandName)}</p>
-              <p style="margin:6px 0 0 0;font-size:12px;color:#6b7280;">Professional HVAC Service Solutions</p>
+              <p style="margin:6px 0 0 0;font-size:13px;color:#6b7280;">(706) 826-0644</p>
+              <p style="margin:4px 0 0 0;font-size:12px;color:#6b7280;">1530 Crescent Ct, Augusta, GA</p>
               ${sentBy ? `<p style="margin:8px 0 0 0;font-size:11px;color:#9ca3af;">Sent by: ${esc(sentBy)}</p>` : ""}
               <p style="margin:8px 0 0 0;font-size:11px;color:#9ca3af;">This is a transactional message regarding your invoice.</p>
             </td>

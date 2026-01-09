@@ -230,8 +230,7 @@ function buildTextBody(
   lines.push("");
   lines.push("Giesbrecht HVAC");
   lines.push("(706) 826-0644");
-  lines.push("3914 Mike Padgett Hwy");
-  lines.push("Augusta, GA 30906");
+  lines.push("1530 Crescent Ct, Augusta, GA");
   lines.push("");
   lines.push("Licensed & Insured | Serving Augusta, GA and surrounding areas");
 
@@ -406,8 +405,7 @@ function buildHtmlBody(
             <td style="background:#f3f4f6;padding:24px 20px;text-align:center;border-top:1px solid #e5e7eb;">
               <p style="margin:0;font-weight:700;color:#111827;font-size:15px;">${esc(brandName)}</p>
               <p style="margin:8px 0 0 0;font-size:13px;color:#6b7280;">(706) 826-0644</p>
-              <p style="margin:8px 0 0 0;font-size:12px;color:#6b7280;">3914 Mike Padgett Hwy</p>
-              <p style="margin:2px 0 0 0;font-size:12px;color:#6b7280;">Augusta, GA 30906</p>
+              <p style="margin:8px 0 0 0;font-size:12px;color:#6b7280;">1530 Crescent Ct, Augusta, GA</p>
               <p style="margin:12px 0 0 0;font-size:11px;color:#9ca3af;">Licensed &amp; Insured | Serving Augusta, GA and surrounding areas</p>
             </td>
           </tr>
