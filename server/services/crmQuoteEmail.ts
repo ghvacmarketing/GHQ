@@ -7,6 +7,26 @@ const brandDefaults = {
   color: "#711419",
 };
 
+const EMAIL_TEMPLATE_DEFAULTS = {
+  subject: "Your Quote from {brand_name} - {quote_number}",
+  intro: "Thank you for considering {brand_name} for your HVAC needs. We've prepared a detailed quote for you to review.",
+  signature: "Thank you for choosing {brand_name}. We look forward to serving you!",
+};
+
+async function getEmailTemplate(key: string, defaultValue: string): Promise<string> {
+  const setting = await storage.getSetting(key);
+  return setting?.value || defaultValue;
+}
+
+function replacePlaceholders(template: string, data: Record<string, string>): string {
+  let result = template;
+  for (const [key, value] of Object.entries(data)) {
+    // Case-insensitive replacement to handle any casing of placeholders
+    result = result.replace(new RegExp(`\\{${key}\\}`, 'gi'), value);
+  }
+  return result;
+}
+
 function asCurrency(v: string | number, locale = "en-US", currency = "USD") {
   const n = typeof v === "string" ? Number(v.replace(/[^0-9.-]/g, "")) : Number(v);
   if (Number.isNaN(n)) return String(v);
@@ -110,9 +130,29 @@ export async function sendCrmQuoteEmail(
     item.lineType !== "labor" && item.lineType !== "other"
   );
 
-  const subject = `Your Quote from ${brandName} - ${quote.quoteNumber}`;
-  const html = buildHtmlBody(quote, clientVisibleItems, personalMessage, sentBy, options?.quoteViewUrl);
-  const text = buildTextBody(quote, clientVisibleItems, personalMessage, sentBy, options?.quoteViewUrl);
+  // Calculate quote total for placeholder replacement
+  const quoteTotal = clientVisibleItems.reduce((sum, item) => sum + parseFloat(item.lineTotal || "0"), 0);
+  
+  // Fetch email templates
+  const subjectTemplate = await getEmailTemplate("email_template_quote_subject", EMAIL_TEMPLATE_DEFAULTS.subject);
+  const introTemplate = await getEmailTemplate("email_template_quote_intro", EMAIL_TEMPLATE_DEFAULTS.intro);
+  const signatureTemplate = await getEmailTemplate("email_template_quote_signature", EMAIL_TEMPLATE_DEFAULTS.signature);
+  
+  // Prepare placeholder data
+  const placeholderData: Record<string, string> = {
+    brand_name: brandName,
+    quote_number: quote.quoteNumber || "",
+    customer_name: quote.customerName || "Valued Customer",
+    quote_total: asCurrency(quoteTotal),
+  };
+  
+  // Replace placeholders in templates
+  const subject = replacePlaceholders(subjectTemplate, placeholderData);
+  const introText = replacePlaceholders(introTemplate, placeholderData);
+  const signatureText = replacePlaceholders(signatureTemplate, placeholderData);
+  
+  const html = buildHtmlBody(quote, clientVisibleItems, personalMessage, sentBy, options?.quoteViewUrl, introText, signatureText);
+  const text = buildTextBody(quote, clientVisibleItems, personalMessage, sentBy, options?.quoteViewUrl, introText, signatureText);
 
   try {
     const { data, error } = await resend.emails.send({
@@ -191,7 +231,9 @@ function buildTextBody(
   lineItems: CrmQuoteLineItem[],
   personalMessage?: string,
   sentBy?: string,
-  quoteViewUrl?: string
+  quoteViewUrl?: string,
+  introText?: string,
+  signatureText?: string
 ): string {
   const lines: string[] = [];
   lines.push(`${brandDefaults.name}`);
@@ -215,8 +257,7 @@ function buildTextBody(
     lines.push(`Service Location: ${quote.serviceAddress}`);
   }
   lines.push("");
-  lines.push("Thank you for considering Giesbrecht HVAC for your HVAC needs.");
-  lines.push("We've prepared a detailed quote for you to review.");
+  lines.push(introText || "Thank you for considering Giesbrecht HVAC for your HVAC needs. We've prepared a detailed quote for you to review.");
   lines.push("");
 
   if (personalMessage) {
@@ -259,7 +300,9 @@ function buildHtmlBody(
   lineItems: CrmQuoteLineItem[],
   personalMessage?: string,
   sentBy?: string,
-  quoteViewUrl?: string
+  quoteViewUrl?: string,
+  introText?: string,
+  signatureText?: string
 ): string {
   const brandName = brandDefaults.name;
   const brandColor = brandDefaults.color;
@@ -353,7 +396,7 @@ function buildHtmlBody(
             <td class="px-24" style="padding:20px 20px 16px 20px;">
               <h2 style="margin:0;color:#111827;font-size:20px;font-weight:600;">Your Quote is Ready!</h2>
               <p style="margin:10px 0 0 0;color:#6b7280;font-size:14px;line-height:1.5;">
-                Thank you for considering ${esc(brandName)} for your HVAC needs. We've prepared a detailed quote for you to review.
+                ${esc(introText || "Thank you for considering " + brandName + " for your HVAC needs. We've prepared a detailed quote for you to review.")}
               </p>
             </td>
           </tr>

@@ -12,6 +12,26 @@ const brandDefaults = {
   logoUrl: "https://images.squarespace-cdn.com/content/v1/65b2790c0b83175df7337294/93a31506-d2ae-4e07-958b-c86d0c49f7cd/GHVAC-icons.png?format=200w",
 };
 
+const EMAIL_TEMPLATE_DEFAULTS = {
+  subject: "Your Invoice from {brand_name} - {invoice_number}",
+  intro: "Please find your invoice details below. Thank you for your business.",
+  signature: "Thank you for choosing {brand_name}. We appreciate your business!",
+};
+
+async function getEmailTemplate(key: string, defaultValue: string): Promise<string> {
+  const setting = await storage.getSetting(key);
+  return setting?.value || defaultValue;
+}
+
+function replacePlaceholders(template: string, data: Record<string, string>): string {
+  let result = template;
+  for (const [key, value] of Object.entries(data)) {
+    // Case-insensitive replacement to handle any casing of placeholders
+    result = result.replace(new RegExp(`\\{${key}\\}`, 'gi'), value);
+  }
+  return result;
+}
+
 function asCurrency(v: string | number, locale = "en-US", currency = "USD") {
   const n = typeof v === "string" ? Number(v.replace(/[^0-9.-]/g, "")) : Number(v);
   if (Number.isNaN(n)) return String(v);
@@ -141,8 +161,6 @@ export async function sendCrmInvoiceEmail(
   
   console.log("[CRM Invoice Email] Sending invoice email FROM:", standardFromEmail, "REPLY-TO:", replyToEmail, "TO:", recipientEmail);
 
-  const subject = `Your Invoice from ${brandName} - ${invoice.invoiceNumber}`;
-  
   // Generate payment link for invoices with balance due
   let paymentLinkUrl: string | null = null;
   try {
@@ -154,8 +172,31 @@ export async function sendCrmInvoiceEmail(
     console.error("[CRM Invoice Email] Failed to generate payment link, continuing without it:", paymentLinkError);
   }
   
-  const html = buildHtmlBody(invoice, lineItems, customerName, personalMessage, sentBy, paymentLinkUrl);
-  const text = buildTextBody(invoice, lineItems, customerName, personalMessage, sentBy, paymentLinkUrl);
+  // Fetch email templates
+  const subjectTemplate = await getEmailTemplate("email_template_invoice_subject", EMAIL_TEMPLATE_DEFAULTS.subject);
+  const introTemplate = await getEmailTemplate("email_template_invoice_intro", EMAIL_TEMPLATE_DEFAULTS.intro);
+  const signatureTemplate = await getEmailTemplate("email_template_invoice_signature", EMAIL_TEMPLATE_DEFAULTS.signature);
+  
+  // Calculate balance due for placeholder replacement
+  const balanceDue = parseFloat(invoice.balanceDue || invoice.total || "0");
+  const dueDateFormatted = invoice.dueDate ? formatDate(invoice.dueDate) : "";
+  
+  // Prepare placeholder data
+  const placeholderData: Record<string, string> = {
+    brand_name: brandName,
+    invoice_number: invoice.invoiceNumber || "",
+    customer_name: customerName,
+    balance_due: asCurrency(balanceDue),
+    due_date: dueDateFormatted,
+  };
+  
+  // Replace placeholders in templates
+  const subject = replacePlaceholders(subjectTemplate, placeholderData);
+  const introText = replacePlaceholders(introTemplate, placeholderData);
+  const signatureText = replacePlaceholders(signatureTemplate, placeholderData);
+  
+  const html = buildHtmlBody(invoice, lineItems, customerName, personalMessage, sentBy, paymentLinkUrl, introText, signatureText);
+  const text = buildTextBody(invoice, lineItems, customerName, personalMessage, sentBy, paymentLinkUrl, introText, signatureText);
 
   try {
     const { data, error } = await resend.emails.send({
@@ -196,10 +237,15 @@ function buildTextBody(
   customerName: string,
   personalMessage?: string,
   sentBy?: string,
-  paymentLinkUrl?: string | null
+  paymentLinkUrl?: string | null,
+  introText?: string,
+  signatureText?: string
 ): string {
   const lines: string[] = [];
   lines.push(`${brandDefaults.name} - Invoice ${invoice.invoiceNumber}`);
+  lines.push("");
+
+  lines.push(introText || "Please find your invoice details below. Thank you for your business.");
   lines.push("");
 
   if (personalMessage) {
@@ -254,7 +300,7 @@ function buildTextBody(
 
   lines.push("To pay or ask questions about this invoice, please contact us at (706) 826-0644.");
   lines.push("");
-  lines.push("Thank you for choosing Giesbrecht HVAC!");
+  lines.push(signatureText || "Thank you for choosing Giesbrecht HVAC!");
   lines.push("");
   lines.push("Giesbrecht HVAC");
   lines.push("(706) 826-0644");
@@ -273,7 +319,9 @@ function buildHtmlBody(
   customerName: string,
   personalMessage?: string,
   sentBy?: string,
-  paymentLinkUrl?: string | null
+  paymentLinkUrl?: string | null,
+  introText?: string,
+  signatureText?: string
 ): string {
   const brandName = brandDefaults.name;
   const brandColor = brandDefaults.color;

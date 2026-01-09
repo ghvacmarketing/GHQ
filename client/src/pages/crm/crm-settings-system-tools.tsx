@@ -22,6 +22,14 @@ interface SmsTemplate {
   defaultValue: string;
 }
 
+interface EmailTemplate {
+  key: string;
+  description: string;
+  value: string;
+  defaultValue: string;
+  placeholders: string;
+}
+
 interface ReminderResult {
   visitId: string;
   agreementNumber: string;
@@ -104,6 +112,11 @@ export default function CrmSettingsSystemTools() {
   const [isSavingTemplates, setIsSavingTemplates] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
 
+  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
+  const [isLoadingEmailTemplates, setIsLoadingEmailTemplates] = useState(true);
+  const [isSavingEmailTemplates, setIsSavingEmailTemplates] = useState(false);
+  const [emailTemplatesOpen, setEmailTemplatesOpen] = useState(false);
+
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
@@ -164,10 +177,27 @@ export default function CrmSettingsSystemTools() {
       }
     };
 
+    const fetchEmailTemplates = async () => {
+      try {
+        const res = await fetch("/api/admin/settings/email-templates", {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setEmailTemplates(data.templates);
+        }
+      } catch (err) {
+        console.error("Failed to fetch email templates:", err);
+      } finally {
+        setIsLoadingEmailTemplates(false);
+      }
+    };
+
     if (currentUser && (currentUser.role === "owner" || currentUser.role === "admin" || currentUser.role === "supervisor")) {
       fetchSmsToggle();
       fetchEmailToggle();
       fetchTemplates();
+      fetchEmailTemplates();
     }
   }, [currentUser]);
 
@@ -283,6 +313,49 @@ export default function CrmSettingsSystemTools() {
       });
     } finally {
       setIsSavingTemplates(false);
+    }
+  };
+
+  const handleEmailTemplateChange = (key: string, value: string) => {
+    setEmailTemplates(prev => prev.map(t => t.key === key ? { ...t, value } : t));
+  };
+
+  const handleResetEmailTemplate = (key: string) => {
+    setEmailTemplates(prev => prev.map(t => t.key === key ? { ...t, value: t.defaultValue } : t));
+  };
+
+  const handleSaveEmailTemplates = async () => {
+    setIsSavingEmailTemplates(true);
+    try {
+      const res = await fetch("/api/admin/settings/email-templates", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ 
+          templates: emailTemplates.map(t => ({ key: t.key, value: t.value })) 
+        }),
+      });
+      if (res.ok) {
+        toast({
+          title: "Templates Saved",
+          description: "Email templates have been updated successfully",
+        });
+      } else {
+        const data = await res.json();
+        toast({
+          title: "Error",
+          description: data.message || "Failed to save templates",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Network error - please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingEmailTemplates(false);
     }
   };
 
@@ -609,6 +682,120 @@ export default function CrmSettingsSystemTools() {
                         </>
                       ) : (
                         "Save All Templates"
+                      )}
+                    </Button>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-purple-100">
+                  <Mail className="h-5 w-5 text-purple-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Email Templates</CardTitle>
+                  <CardDescription>
+                    Customize the email templates used for quotes and invoices
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoadingEmailTemplates ? (
+                <div className="flex items-center gap-2 text-slate-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Loading email templates...</span>
+                </div>
+              ) : (
+                <Collapsible open={emailTemplatesOpen} onOpenChange={setEmailTemplatesOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between" data-testid="button-expand-email-templates">
+                      <span>{emailTemplatesOpen ? "Hide Email Templates" : "Show Email Templates"}</span>
+                      {emailTemplatesOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-4 space-y-6">
+                    <div className="space-y-4">
+                      <h4 className="font-medium text-slate-900 border-b pb-2">Quote Email Templates</h4>
+                      {emailTemplates.filter(t => t.key.includes('quote')).map((template) => (
+                        <div key={template.key} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium text-slate-700">{template.description}</label>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleResetEmailTemplate(template.key)}
+                              disabled={template.value === template.defaultValue}
+                              className="text-slate-500 hover:text-slate-700"
+                              data-testid={`button-reset-${template.key}`}
+                            >
+                              <RotateCcw className="h-3 w-3 mr-1" />
+                              Reset
+                            </Button>
+                          </div>
+                          <Textarea
+                            value={template.value}
+                            onChange={(e) => handleEmailTemplateChange(template.key, e.target.value)}
+                            rows={template.key.includes('subject') ? 1 : 2}
+                            className="resize-none"
+                            data-testid={`textarea-${template.key}`}
+                          />
+                          <p className="text-xs text-slate-500">
+                            Placeholders: {template.placeholders}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="font-medium text-slate-900 border-b pb-2">Invoice Email Templates</h4>
+                      {emailTemplates.filter(t => t.key.includes('invoice')).map((template) => (
+                        <div key={template.key} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium text-slate-700">{template.description}</label>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleResetEmailTemplate(template.key)}
+                              disabled={template.value === template.defaultValue}
+                              className="text-slate-500 hover:text-slate-700"
+                              data-testid={`button-reset-${template.key}`}
+                            >
+                              <RotateCcw className="h-3 w-3 mr-1" />
+                              Reset
+                            </Button>
+                          </div>
+                          <Textarea
+                            value={template.value}
+                            onChange={(e) => handleEmailTemplateChange(template.key, e.target.value)}
+                            rows={template.key.includes('subject') ? 1 : 2}
+                            className="resize-none"
+                            data-testid={`textarea-${template.key}`}
+                          />
+                          <p className="text-xs text-slate-500">
+                            Placeholders: {template.placeholders}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <Button
+                      onClick={handleSaveEmailTemplates}
+                      disabled={isSavingEmailTemplates}
+                      className="w-full"
+                      data-testid="button-save-email-templates"
+                    >
+                      {isSavingEmailTemplates ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save All Email Templates"
                       )}
                     </Button>
                   </CollapsibleContent>

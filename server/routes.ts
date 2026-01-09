@@ -19634,6 +19634,64 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // Email Templates configuration
+  const EMAIL_TEMPLATE_CONFIG = [
+    { key: "email_template_quote_subject", description: "Quote Email Subject", defaultValue: "Your Quote from {brand_name} - {quote_number}", placeholders: "{brand_name}, {quote_number}, {customer_name}, {quote_total}" },
+    { key: "email_template_quote_intro", description: "Quote Email Introduction", defaultValue: "Thank you for considering {brand_name} for your HVAC needs. We've prepared a detailed quote for you to review.", placeholders: "{brand_name}, {quote_number}, {customer_name}, {quote_total}" },
+    { key: "email_template_quote_signature", description: "Quote Email Signature", defaultValue: "Thank you for choosing {brand_name}. We look forward to serving you!", placeholders: "{brand_name}, {quote_number}, {customer_name}, {quote_total}" },
+    { key: "email_template_invoice_subject", description: "Invoice Email Subject", defaultValue: "Your Invoice from {brand_name} - {invoice_number}", placeholders: "{brand_name}, {invoice_number}, {customer_name}, {balance_due}, {due_date}" },
+    { key: "email_template_invoice_intro", description: "Invoice Email Introduction", defaultValue: "Please find your invoice details below. Thank you for your business.", placeholders: "{brand_name}, {invoice_number}, {customer_name}, {balance_due}, {due_date}" },
+    { key: "email_template_invoice_signature", description: "Invoice Email Signature", defaultValue: "Thank you for choosing {brand_name}. We appreciate your business!", placeholders: "{brand_name}, {invoice_number}, {customer_name}, {balance_due}, {due_date}" },
+  ];
+
+  // GET /api/admin/settings/email-templates - Get all email templates
+  app.get("/api/admin/settings/email-templates", requireCrmAdmin, async (req, res) => {
+    try {
+      const templates = await Promise.all(
+        EMAIL_TEMPLATE_CONFIG.map(async (config) => {
+          const setting = await storage.getSetting(config.key);
+          return {
+            key: config.key,
+            description: config.description,
+            value: setting?.value || config.defaultValue,
+            defaultValue: config.defaultValue,
+            placeholders: config.placeholders,
+          };
+        })
+      );
+      return res.json({ templates });
+    } catch (error) {
+      console.error("Error getting email templates:", error);
+      return res.status(500).json({ message: "Failed to get email templates" });
+    }
+  });
+
+  // PUT /api/admin/settings/email-templates - Update email templates
+  app.put("/api/admin/settings/email-templates", requireCrmAdmin, async (req, res) => {
+    try {
+      const { templates } = req.body;
+      if (!Array.isArray(templates)) {
+        return res.status(400).json({ message: "templates must be an array" });
+      }
+      
+      const validKeys = EMAIL_TEMPLATE_CONFIG.map(c => c.key);
+      for (const template of templates) {
+        if (!template.key || typeof template.value !== "string") {
+          return res.status(400).json({ message: "Each template must have a key and value" });
+        }
+        if (!validKeys.includes(template.key)) {
+          return res.status(400).json({ message: `Invalid template key: ${template.key}` });
+        }
+        await storage.setSetting(template.key, template.value);
+      }
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating email templates:", error);
+      return res.status(500).json({ message: "Failed to update email templates" });
+    }
+  });
+
   // POST /api/admin/trigger-maintenance-reminders - Manually trigger maintenance reminders
   app.post("/api/admin/trigger-maintenance-reminders", requireCrmAuth, async (req, res) => {
     const user = await getCurrentCrmUser(req);
