@@ -116,6 +116,7 @@ const tabFilters = [
   { key: "all", label: "All" },
   { key: "draft", label: "Draft" },
   { key: "sent", label: "Sent" },
+  { key: "viewed", label: "Viewed" },
   { key: "accepted", label: "Approved" },
   { key: "converted", label: "Converted" },
   { key: "declined", label: "Declined" },
@@ -306,11 +307,15 @@ export default function CrmQuotes() {
 
   // Count quotes by status for tab badges
   const statusCounts = useMemo(() => {
-    if (!quotesData?.quotes) return { draft: 0, sent: 0, accepted: 0, converted: 0, declined: 0, expired: 0 };
-    const counts = { draft: 0, sent: 0, accepted: 0, converted: 0, declined: 0, expired: 0 };
+    if (!quotesData?.quotes) return { draft: 0, sent: 0, viewed: 0, accepted: 0, converted: 0, declined: 0, expired: 0 };
+    const counts = { draft: 0, sent: 0, viewed: 0, accepted: 0, converted: 0, declined: 0, expired: 0 };
     quotesData.quotes.forEach((quote) => {
       const status = quote.status || "draft";
       if (status in counts) counts[status as keyof typeof counts]++;
+      // Count "viewed" tab: quotes with status="sent" AND viewCount > 0
+      if (status === "sent" && (quote.viewCount || 0) > 0) {
+        counts.viewed++;
+      }
     });
     return counts;
   }, [quotesData?.quotes]);
@@ -336,7 +341,12 @@ export default function CrmQuotes() {
 
     // Tab filter (status-based)
     if (activeTab !== "all") {
-      filtered = filtered.filter((quote) => quote.status === activeTab);
+      if (activeTab === "viewed") {
+        // "Viewed" tab: quotes with status="sent" AND viewCount > 0
+        filtered = filtered.filter((quote) => quote.status === "sent" && (quote.viewCount || 0) > 0);
+      } else {
+        filtered = filtered.filter((quote) => quote.status === activeTab);
+      }
     }
 
     // Quote type filter is handled server-side, no client-side filtering needed
