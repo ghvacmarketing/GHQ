@@ -2016,7 +2016,6 @@ export default function CrmDispatch() {
     setWoTitle("");
     setWoDescription("");
     setVisitType("SERVICE");
-    setWorkCategory("Service");
     setWorkSubtype("Other");
     setScheduledDate(selectedDate);
     setStartTime("08:00");
