@@ -10641,6 +10641,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (status === "on_site" && existingWorkOrder.status !== "on_site" && !existingWorkOrder.onSiteAt) {
         updateData.onSiteAt = new Date();
       }
+      if (status === "completed" && existingWorkOrder.status !== "completed" && !existingWorkOrder.completedAt) {
+        updateData.completedAt = new Date();
+      }
       
       if (assignedTechId !== undefined) updateData.assignedTechId = assignedTechId;
       if (scheduledStart !== undefined) updateData.scheduledStart = scheduledStart ? new Date(scheduledStart) : null;
