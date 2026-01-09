@@ -2208,7 +2208,13 @@ export default function CrmDispatch() {
       if (!selectedPropertyId) throw new Error("Property is required");
       if (!woTitle.trim()) throw new Error("Title is required");
       if (!woDescription.trim()) throw new Error("Description is required");
-      if (!scheduledDate) throw new Error("Scheduled date is required");
+      
+      const effectiveTechId = assignedTechId === "unassigned" ? null : assignedTechId;
+      
+      // Only require scheduled date if a technician is assigned
+      if (effectiveTechId && !scheduledDate) {
+        throw new Error("Scheduled date is required when assigning a technician");
+      }
       
       // Validate required checklist questions are answered
       if (!areRequiredQuestionsAnswered()) {
@@ -2220,16 +2226,19 @@ export default function CrmDispatch() {
         throw new Error(`Please answer required checklist questions: ${missingQuestions.map(q => q.question).join(", ")}`);
       }
 
-      const [startHours, startMinutes] = startTime.split(":").map(Number);
-      const [endHours, endMinutes] = endTime.split(":").map(Number);
+      // Only calculate scheduled times if a tech is assigned
+      let scheduledStartUTC: Date | null = null;
+      let scheduledEndUTC: Date | null = null;
       
-      // Create dates in local timezone and convert to UTC for storage
-      const scheduledStartUTC = createLocalDateTime(scheduledDate, startHours, startMinutes);
-      const scheduledEndUTC = createLocalDateTime(scheduledDate, endHours, endMinutes);
+      if (effectiveTechId && scheduledDate) {
+        const [startHours, startMinutes] = startTime.split(":").map(Number);
+        const [endHours, endMinutes] = endTime.split(":").map(Number);
+        
+        // Create dates in local timezone and convert to UTC for storage
+        scheduledStartUTC = createLocalDateTime(scheduledDate, startHours, startMinutes);
+        scheduledEndUTC = createLocalDateTime(scheduledDate, endHours, endMinutes);
 
-      // Frontend pre-check for scheduling conflicts (if a technician is assigned)
-      const effectiveTechId = assignedTechId === "unassigned" ? null : assignedTechId;
-      if (effectiveTechId) {
+        // Frontend pre-check for scheduling conflicts
         const conflict = checkSchedulingConflict(localWorkOrders, effectiveTechId, scheduledStartUTC, scheduledEndUTC);
         if (conflict) {
           const techName = technicians.find(t => t.id === effectiveTechId)?.name || "This technician";
@@ -2251,11 +2260,11 @@ export default function CrmDispatch() {
         description: finalDescription,
         visitType,
         workSubtype,
-        scheduledStart: scheduledStartUTC.toISOString(),
-        scheduledEnd: scheduledEndUTC.toISOString(),
-        assignedTechId: assignedTechId === "unassigned" ? null : assignedTechId,
+        scheduledStart: scheduledStartUTC ? scheduledStartUTC.toISOString() : null,
+        scheduledEnd: scheduledEndUTC ? scheduledEndUTC.toISOString() : null,
+        assignedTechId: effectiveTechId,
         priority,
-        status: "scheduled",
+        status: effectiveTechId ? "scheduled" : "scheduled",
       });
       const workOrder = await res.json();
 
@@ -3972,56 +3981,6 @@ export default function CrmDispatch() {
             )}
 
             <div className="space-y-2">
-              <Label>Scheduled Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {scheduledDate ? format(scheduledDate, "PPP") : "Pick a date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={scheduledDate}
-                    onSelect={setScheduledDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Start Time</Label>
-                <Select value={startTime} onValueChange={setStartTime}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {timeOptions.map((t) => (
-                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>End Time</Label>
-                <Select value={endTime} onValueChange={setEndTime}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {timeOptions.map((t) => (
-                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
               <Label>Assign Technician</Label>
               <Select value={assignedTechId} onValueChange={setAssignedTechId}>
                 <SelectTrigger>
@@ -4035,6 +3994,60 @@ export default function CrmDispatch() {
                 </SelectContent>
               </Select>
             </div>
+
+            {assignedTechId !== "unassigned" && (
+              <>
+                <div className="space-y-2">
+                  <Label>Scheduled Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start text-left">
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {scheduledDate ? format(scheduledDate, "PPP") : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={scheduledDate}
+                        onSelect={setScheduledDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Start Time</Label>
+                    <Select value={startTime} onValueChange={setStartTime}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timeOptions.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>End Time</Label>
+                    <Select value={endTime} onValueChange={setEndTime}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timeOptions.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="space-y-2">
               <Label>Title *</Label>
