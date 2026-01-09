@@ -2921,16 +2921,9 @@ export async function pushAllItemsToQuickBooks(): Promise<{
         continue;
       }
       
-      // Check if the item already points to the correct account
-      if (item.quickbooksIncomeAccountId === targetAccount.quickbooksAccountId) {
-        console.log(`[QuickBooks Push] Skipping ${item.name} - already correct`);
-        skipped++;
-        continue;
-      }
-      
       // Update the item in QuickBooks
       try {
-        // Get current item from QB to get SyncToken
+        // Get current item from QB to check actual IncomeAccountRef and get SyncToken
         const existingItem = await new Promise<any>((resolve, reject) => {
           // @ts-ignore - getItem exists in node-quickbooks
           qbo.getItem(item.quickbooksItemId, (err: any, qbItem: any) => {
@@ -2938,6 +2931,26 @@ export async function pushAllItemsToQuickBooks(): Promise<{
             else resolve(qbItem);
           });
         });
+        
+        // Check if the ACTUAL QuickBooks item already points to the correct account
+        const actualIncomeAccountId = existingItem.IncomeAccountRef?.value;
+        if (actualIncomeAccountId === targetAccount.quickbooksAccountId) {
+          // Also sync our CRM database to match
+          if (item.quickbooksIncomeAccountId !== targetAccount.quickbooksAccountId) {
+            await db.update(quickbooksItems)
+              .set({ 
+                quickbooksIncomeAccountId: targetAccount.quickbooksAccountId,
+                incomeAccountId: targetAccount.id,
+                updatedAt: new Date() 
+              })
+              .where(eq(quickbooksItems.id, item.id));
+          }
+          console.log(`[QuickBooks Push] Skipping ${item.name} - QB already correct (actual: ${actualIncomeAccountId})`);
+          skipped++;
+          continue;
+        }
+        
+        console.log(`[QuickBooks Push] Updating ${item.name}: ${actualIncomeAccountId} -> ${targetAccount.quickbooksAccountId}`);
         
         // Update with correct IncomeAccountRef
         const updatedItem = {
