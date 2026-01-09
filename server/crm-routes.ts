@@ -135,32 +135,35 @@ router.get("/customers", requireCrmAuth, async (req: Request, res: Response) => 
     }
 
     if (user.role === "tech") {
-      const assignments = await db
-        .select({ jobId: crmJobAssignments.jobId })
-        .from(crmJobAssignments)
-        .where(eq(crmJobAssignments.techUserId, user.id));
-
-      if (assignments.length === 0) {
-        return res.json([]);
-      }
-
-      const jobIds = assignments.map((a) => a.jobId);
-      const jobs = await db
-        .select({ customerId: crmJobs.customerId })
-        .from(crmJobs)
-        .where(inArray(crmJobs.id, jobIds));
-
-      const customerIds = Array.from(new Set(jobs.map((j) => j.customerId)));
-      if (customerIds.length === 0) {
-        return res.json([]);
-      }
-
-      const customers = await db
-        .select()
+      // Optimized: Single query using JOINs instead of 3 separate queries
+      const customersResult = await db
+        .selectDistinct({
+          id: crmCustomers.id,
+          name: crmCustomers.name,
+          companyName: crmCustomers.companyName,
+          email: crmCustomers.email,
+          phone: crmCustomers.phone,
+          address: crmCustomers.address,
+          city: crmCustomers.city,
+          state: crmCustomers.state,
+          zip: crmCustomers.zip,
+          customerType: crmCustomers.customerType,
+          customerStatus: crmCustomers.customerStatus,
+          tags: crmCustomers.tags,
+          notes: crmCustomers.notes,
+          createdAt: crmCustomers.createdAt,
+          updatedAt: crmCustomers.updatedAt,
+          sourceSystem: crmCustomers.sourceSystem,
+          sourceId: crmCustomers.sourceId,
+          assignedSalesRepId: crmCustomers.assignedSalesRepId,
+        })
         .from(crmCustomers)
-        .where(inArray(crmCustomers.id, customerIds));
+        .innerJoin(crmJobs, eq(crmJobs.customerId, crmCustomers.id))
+        .innerJoin(crmJobAssignments, eq(crmJobAssignments.jobId, crmJobs.id))
+        .where(eq(crmJobAssignments.techUserId, user.id))
+        .orderBy(desc(crmCustomers.createdAt));
 
-      return res.json(customers);
+      return res.json(customersResult);
     }
 
     return res.status(403).json({ message: "Forbidden" });
