@@ -12628,6 +12628,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/projects/stats - Get project overview statistics
+  app.get("/api/crm/projects/stats", requireCrmAuth, async (req, res) => {
+    try {
+      // Get all projects for stats calculation
+      const allProjects = await db.select().from(crmProjects);
+      
+      const activeStatuses = ["lead", "equipment_ordered", "equipment_arrived", "approved", "in_progress"];
+      const pendingStatuses = ["lead", "equipment_ordered"];
+      
+      const activeProjects = allProjects.filter(p => activeStatuses.includes(p.status));
+      const pendingActions = allProjects.filter(p => pendingStatuses.includes(p.status));
+      const completedProjects = allProjects.filter(p => p.status === "completed");
+      
+      // Calculate pipeline value from expectedValue of active projects
+      const pipelineValue = activeProjects.reduce((sum, p) => {
+        const val = p.expectedValue ? parseFloat(String(p.expectedValue)) : 0;
+        return sum + val;
+      }, 0);
+      
+      // Calculate completion rate
+      const totalNonCancelled = allProjects.filter(p => p.status !== "cancelled").length;
+      const completionRate = totalNonCancelled > 0 
+        ? ((completedProjects.length / totalNonCancelled) * 100).toFixed(1)
+        : "0.0";
+      
+      // Count by status
+      const statusFunnel = {
+        lead: allProjects.filter(p => p.status === "lead").length,
+        equipment_ordered: allProjects.filter(p => p.status === "equipment_ordered").length,
+        equipment_arrived: allProjects.filter(p => p.status === "equipment_arrived").length,
+        approved: allProjects.filter(p => p.status === "approved").length,
+        in_progress: allProjects.filter(p => p.status === "in_progress").length,
+        completed: completedProjects.length,
+        closed: allProjects.filter(p => p.status === "closed").length,
+        cancelled: allProjects.filter(p => p.status === "cancelled").length,
+      };
+      
+      return res.json({
+        activeProjects: activeProjects.length,
+        pendingActions: pendingActions.length,
+        pipelineValue,
+        completionRate,
+        statusFunnel,
+      });
+    } catch (error) {
+      console.error("Error fetching project stats:", error);
+      return res.status(500).json({ message: "Failed to fetch project stats" });
+    }
+  });
+
   // GET /api/crm/projects/:id - Get single project with related work orders
   app.get("/api/crm/projects/:id", requireCrmAuth, async (req, res) => {
     try {

@@ -777,10 +777,21 @@ export default function CrmQuoteDetail() {
 
       const quoteType = quote?.quoteType?.toLowerCase();
       if (quoteType === "custom_install" || quoteType === "proposal") {
+        const getExpectedValue = () => {
+          // For options mode, calculate selected option total
+          if (quote?.quoteMode === "options" && data.selectedOption && quote?.lineItems) {
+            const optionItems = quote.lineItems.filter(li => li.optionTag === data.selectedOption);
+            const optionTotal = optionItems.reduce((sum, li) => sum + (parseFloat(li.lineTotal || '0')), 0);
+            return optionTotal > 0 ? String(optionTotal) : (quote?.total || "");
+          }
+          // For single mode, use quote total
+          return quote?.total || "";
+        };
+
         setProjectFormData({
           title: quote?.title || `Project for ${quote?.quoteNumber || "Quote"}`,
           projectType: "INSTALL",
-          expectedValue: quote?.total || "",
+          expectedValue: getExpectedValue(),
           description: quote?.description || "",
           priority: "normal",
           customerId: quote?.customerId || quote?.accountId || "",
@@ -906,10 +917,21 @@ export default function CrmQuoteDetail() {
 
       const quoteType = quote?.quoteType?.toLowerCase();
       if (quoteType === "custom_install" || quoteType === "proposal") {
+        const getExpectedValue = () => {
+          // For options mode, calculate selected option total
+          if (quote?.quoteMode === "options" && data.selectedOption && quote?.lineItems) {
+            const optionItems = quote.lineItems.filter(li => li.optionTag === data.selectedOption);
+            const optionTotal = optionItems.reduce((sum, li) => sum + (parseFloat(li.lineTotal || '0')), 0);
+            return optionTotal > 0 ? String(optionTotal) : (quote?.total || "");
+          }
+          // For single mode, use quote total
+          return quote?.total || "";
+        };
+
         setProjectFormData({
           title: quote?.title || `Project for ${quote?.quoteNumber || "Quote"}`,
           projectType: "INSTALL",
-          expectedValue: quote?.total || "",
+          expectedValue: getExpectedValue(),
           description: quote?.description || "",
           priority: "normal",
           customerId: quote?.customerId || quote?.accountId || "",
