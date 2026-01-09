@@ -10434,6 +10434,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Property not found" });
       }
 
+      // Block maintenance work orders if property has a pending auto-invoice agreement
+      const visitType = req.body.visitType;
+      if (visitType === "MAINTENANCE") {
+        const pendingAgreements = await db.select()
+          .from(crmAgreements)
+          .where(and(
+            eq(crmAgreements.propertyId, propertyId),
+            eq(crmAgreements.status, "pending"),
+            eq(crmAgreements.billingPreference, "auto_invoice")
+          ));
+        
+        if (pendingAgreements.length > 0) {
+          return res.status(400).json({ 
+            message: "Cannot schedule maintenance visit - this property has a pending maintenance agreement. Please wait until the agreement is active (first payment received)." 
+          });
+        }
+      }
+
       // If jobId is provided, verify it exists
       if (jobId) {
         const [job] = await db.select().from(crmJobs).where(eq(crmJobs.id, jobId));
