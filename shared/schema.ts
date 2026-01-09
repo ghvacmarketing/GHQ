@@ -1217,6 +1217,8 @@ export const crmQuotes = pgTable("crm_quotes", {
   depositAmount: decimal("deposit_amount", { precision: 10, scale: 2 }),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   stripePaymentLinkId: text("stripe_payment_link_id"),
+  // Link to auto-generated deposit invoice
+  depositInvoiceId: varchar("deposit_invoice_id"),
 }, (table) => ({
   statusIdx: index("crm_quotes_status_idx").on(table.status),
 }));
@@ -1308,6 +1310,9 @@ export const crmInvoices = pgTable("crm_invoices", {
   stripePaymentLinkId: text("stripe_payment_link_id"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => crmUsers.id),
+  // Deposit invoice tracking
+  isDepositInvoice: boolean("is_deposit_invoice").default(false),
+  quoteId: varchar("quote_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({

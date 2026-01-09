@@ -1,7 +1,28 @@
 import { getStripeSync, getUncachableStripeClient } from './stripeClient';
 import { db } from './db';
-import { crmInvoices, crmQuotes, crmAgreements, maintenanceVisits } from '@shared/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { crmInvoices, crmInvoiceLineItems, crmQuotes, crmAgreements, maintenanceVisits } from '@shared/schema';
+import { eq, and, inArray, sql, desc } from 'drizzle-orm';
+import { autoSyncInvoice, autoSyncPayment } from './services/quickbooksService';
+
+async function generateDepositInvoiceNumber(): Promise<string> {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).replace(/-/g, "");
+  const prefix = `DEP-${dateStr}-`;
+  
+  const todayInvoices = await db.select({ invoiceNumber: crmInvoices.invoiceNumber })
+    .from(crmInvoices)
+    .where(sql`${crmInvoices.invoiceNumber} LIKE ${prefix + '%'}`)
+    .orderBy(desc(crmInvoices.invoiceNumber))
+    .limit(1);
+  
+  let nextNum = 1;
+  if (todayInvoices.length > 0) {
+    const lastNum = parseInt(todayInvoices[0].invoiceNumber.slice(-3)) || 0;
+    nextNum = lastNum + 1;
+  }
+  
+  return `${prefix}${String(nextNum).padStart(3, "0")}`;
+}
 
 export class WebhookHandlers {
   static async processWebhook(payload: Buffer, signature: string): Promise<void> {
@@ -152,6 +173,74 @@ export class WebhookHandlers {
               console.log(`[Webhook] Quote ${quote.quoteNumber} auto-accepted after deposit payment - amount: $${depositAmount}, option: ${selectedOption}`);
             } else {
               console.log(`[Webhook] Quote ${quote.quoteNumber} deposit recorded - amount: $${depositAmount}, option: ${selectedOption}`);
+            }
+
+            // Create a deposit invoice automatically (with idempotency check)
+            try {
+              // Skip if deposit invoice was already created (handles Stripe webhook retries)
+              if (quote.depositInvoiceId) {
+                console.log(`[Webhook] Deposit invoice already exists for quote ${quoteId}, skipping creation`);
+              } else {
+              const depositInvoiceNumber = await generateDepositInvoiceNumber();
+              
+              // Get the selected option details for description if in options mode
+              let depositDescription = `Deposit for Quote #${quote.quoteNumber}`;
+              if (selectedOption && quote.quoteMode === "options") {
+                depositDescription = `Deposit for ${selectedOption} - Quote #${quote.quoteNumber}`;
+              }
+
+              // Create the deposit invoice - marked as paid since we just received payment
+              const [depositInvoice] = await db.insert(crmInvoices).values({
+                invoiceNumber: depositInvoiceNumber,
+                customerId: quote.accountId || null,
+                propertyId: quote.siteId || null,
+                projectId: quote.projectId || null,
+                workOrderId: quote.jobId || null,
+                quoteId: quote.id,
+                status: "paid" as const,
+                subtotal: depositAmount.toFixed(2),
+                laborTotal: "0",
+                total: depositAmount.toFixed(2),
+                amountPaid: depositAmount.toFixed(2),
+                balanceDue: "0.00",
+                paidAt: now,
+                notes: depositDescription,
+                isDepositInvoice: true,
+              }).returning();
+
+              console.log(`[Webhook] Created deposit invoice ${depositInvoiceNumber} for $${depositAmount}`);
+
+              // Create a line item for the deposit
+              await db.insert(crmInvoiceLineItems).values({
+                invoiceId: depositInvoice.id,
+                description: depositDescription,
+                quantity: "1",
+                unitPrice: depositAmount.toFixed(2),
+                lineTotal: depositAmount.toFixed(2),
+                sortOrder: 0,
+              });
+
+              // Link the deposit invoice back to the quote
+              await db.update(crmQuotes)
+                .set({ depositInvoiceId: depositInvoice.id })
+                .where(eq(crmQuotes.id, quoteId));
+
+              // Auto-sync to QuickBooks if connected (fire and forget)
+              autoSyncInvoice(depositInvoice.id).catch(err => {
+                console.error(`[Webhook] Failed to sync deposit invoice to QuickBooks:`, err);
+              });
+
+              // Also sync the payment
+              if (paymentIntentId) {
+                autoSyncPayment(depositInvoice.id, paymentIntentId).catch(err => {
+                  console.error(`[Webhook] Failed to sync deposit payment to QuickBooks:`, err);
+                });
+              }
+              }
+
+            } catch (invoiceError) {
+              console.error(`[Webhook] Failed to create deposit invoice for quote ${quoteId}:`, invoiceError);
+              // Don't fail the webhook - deposit is still recorded on the quote
             }
           } else {
             console.log(`[Webhook] Quote ${quoteId} not found`);
