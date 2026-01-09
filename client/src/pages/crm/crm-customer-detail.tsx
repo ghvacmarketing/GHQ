@@ -5354,7 +5354,7 @@ export default function CrmCustomerDetail() {
           propertyDialogOpen={propertyDialogOpen}
           setPropertyDialogOpen={setPropertyDialogOpen}
           onOpenAddPropertyDialog={handleOpenAddPropertyDialog}
-          onViewQuote={(quoteId) => navigate(`/crm/quotes/${quoteId}?from=customer&customerId=${id}&tab=quotes`)}
+          onViewQuote={(quoteId) => navigate(`/crm/quotes/${quoteId}?from=customer&customerId=${customerId}&tab=quotes`)}
           onViewWorkOrder={(id) => navigate(`/crm/work-orders/${id}`)}
           onViewProject={(id) => navigate(`/crm/projects/${id}`)}
           onViewInvoice={(id) => navigate(`/crm/invoices/${id}`)}
