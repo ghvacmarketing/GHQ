@@ -1704,6 +1704,7 @@ export default function CrmDispatch() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [newNote, setNewNote] = useState("");
   const [dispatchNote, setDispatchNote] = useState("");
+  const [workOrderDescription, setWorkOrderDescription] = useState("");
   const { toast } = useToast();
   
   const weekDates = useMemo(() => getWeekDates(selectedDate), [selectedDate]);
@@ -1753,10 +1754,12 @@ export default function CrmDispatch() {
   const selectedWorkOrder = selectedWorkOrderId ? localWorkOrders.find(wo => wo.id === selectedWorkOrderId) : null;
 
   const handleWorkOrderClick = useCallback((workOrderId: string) => {
+    const wo = localWorkOrders.find(w => w.id === workOrderId);
     setSelectedWorkOrderId(workOrderId);
     setIsSheetOpen(true);
     setNewNote("");
-  }, []);
+    setWorkOrderDescription(wo?.description || "");
+  }, [localWorkOrders]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -2308,6 +2311,22 @@ export default function CrmDispatch() {
       }
     });
   }, [selectedWorkOrderId, dispatchNote, localWorkOrders, updateWorkOrderMutation, toast]);
+
+  const handleSaveWorkOrderDetails = useCallback(() => {
+    if (!selectedWorkOrderId) return;
+    
+    updateWorkOrderMutation.mutate({
+      workOrderId: selectedWorkOrderId,
+      updates: { description: workOrderDescription },
+    }, {
+      onSuccess: () => {
+        toast({ title: "Details saved", description: "Work order details have been updated" });
+        setLocalWorkOrders(prev => prev.map(wo => 
+          wo.id === selectedWorkOrderId ? { ...wo, description: workOrderDescription } : wo
+        ));
+      }
+    });
+  }, [selectedWorkOrderId, workOrderDescription, updateWorkOrderMutation, toast]);
 
   const handleQuickAssign = useCallback((workOrderId: string, techId: string) => {
     const newTech = technicians.find(t => t.id === techId);
@@ -3283,35 +3302,22 @@ export default function CrmDispatch() {
                 <Separator />
 
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-900">Work Order Summary</h3>
-                  {selectedWorkOrder.completionSummary && (
-                    <div className="bg-green-50 border border-green-200 rounded p-3 text-sm" data-testid="completion-summary">
-                      <div className="flex items-center gap-2 text-green-700 font-medium mb-1">
-                        <CheckSquare className="h-4 w-4" />
-                        Completion Summary
-                      </div>
-                      <p className="text-slate-700 whitespace-pre-wrap">{selectedWorkOrder.completionSummary}</p>
-                    </div>
-                  )}
-                  {selectedWorkOrder.techNotes && (
-                    <div className="bg-slate-50 rounded p-3 text-sm whitespace-pre-wrap" data-testid="tech-notes">
-                      {selectedWorkOrder.techNotes}
-                    </div>
-                  )}
+                  <h3 className="text-sm font-semibold text-slate-900">Work Order Details</h3>
+                  <p className="text-xs text-slate-500">Description of the work to be performed.</p>
                   <Textarea
-                    placeholder="Add notes..."
-                    value={newNote}
-                    onChange={(e) => setNewNote(e.target.value)}
+                    placeholder="Enter work order details..."
+                    value={workOrderDescription}
+                    onChange={(e) => setWorkOrderDescription(e.target.value)}
                     className="min-h-[80px]"
-                    data-testid="textarea-notes"
+                    data-testid="textarea-work-order-details"
                   />
                   <Button 
                     size="sm" 
-                    onClick={handleSaveNotes}
-                    disabled={!newNote.trim() || updateWorkOrderMutation.isPending}
-                    data-testid="button-save-notes"
+                    onClick={handleSaveWorkOrderDetails}
+                    disabled={updateWorkOrderMutation.isPending}
+                    data-testid="button-save-work-order-details"
                   >
-                    Save Notes
+                    Save Details
                   </Button>
                 </div>
 
@@ -3342,6 +3348,42 @@ export default function CrmDispatch() {
                     data-testid="button-save-dispatch-notes"
                   >
                     Save Dispatch Notes
+                  </Button>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-slate-900">Technician Notes</h3>
+                  <p className="text-xs text-slate-500">Notes added by the technician during or after completion.</p>
+                  {selectedWorkOrder.completionSummary && (
+                    <div className="bg-green-50 border border-green-200 rounded p-3 text-sm" data-testid="completion-summary">
+                      <div className="flex items-center gap-2 text-green-700 font-medium mb-1">
+                        <CheckSquare className="h-4 w-4" />
+                        Completion Summary
+                      </div>
+                      <p className="text-slate-700 whitespace-pre-wrap">{selectedWorkOrder.completionSummary}</p>
+                    </div>
+                  )}
+                  {selectedWorkOrder.techNotes && (
+                    <div className="bg-slate-50 rounded p-3 text-sm whitespace-pre-wrap" data-testid="tech-notes">
+                      {selectedWorkOrder.techNotes}
+                    </div>
+                  )}
+                  <Textarea
+                    placeholder="Add notes..."
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    className="min-h-[80px]"
+                    data-testid="textarea-notes"
+                  />
+                  <Button 
+                    size="sm" 
+                    onClick={handleSaveNotes}
+                    disabled={!newNote.trim() || updateWorkOrderMutation.isPending}
+                    data-testid="button-save-notes"
+                  >
+                    Save Notes
                   </Button>
                 </div>
 
