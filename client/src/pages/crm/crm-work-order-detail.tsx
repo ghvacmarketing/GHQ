@@ -333,9 +333,14 @@ export default function CrmWorkOrderDetail() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   
   // Timeline editing state
-  const [editingTimestamp, setEditingTimestamp] = useState<"dispatchedAt" | "enRouteAt" | "onSiteAt" | "completedAt" | null>(null);
+  const [editingTimestamp, setEditingTimestamp] = useState<"dispatchedAt" | null>(null);
   const [editDate, setEditDate] = useState<Date | undefined>(undefined);
   const [editTime, setEditTime] = useState<string>("");
+  
+  // Duration editing state (hours and minutes)
+  const [editingDuration, setEditingDuration] = useState<"dispatched_to_enroute" | "enroute_to_onsite" | "onsite_to_completed" | null>(null);
+  const [editHours, setEditHours] = useState<number>(0);
+  const [editMinutes, setEditMinutes] = useState<number>(0);
 
   const [quoteSearch, setQuoteSearch] = useState("");
   const [quoteStatusFilter, setQuoteStatusFilter] = useState("all");
@@ -672,7 +677,7 @@ export default function CrmWorkOrderDetail() {
     }
   };
 
-  const openTimestampEdit = (field: "dispatchedAt" | "enRouteAt" | "onSiteAt" | "completedAt", currentValue: string | Date | null) => {
+  const openTimestampEdit = (field: "dispatchedAt", currentValue: string | Date | null) => {
     if (currentValue) {
       const date = new Date(currentValue);
       setEditDate(date);
@@ -697,6 +702,99 @@ export default function CrmWorkOrderDetail() {
     setEditingTimestamp(null);
     setEditDate(undefined);
     setEditTime("");
+  };
+
+  const openDurationEdit = (phase: "dispatched_to_enroute" | "enroute_to_onsite" | "onsite_to_completed") => {
+    if (!workOrder) return;
+    
+    let startTime: Date | null = null;
+    let endTime: Date | null = null;
+    
+    if (phase === "dispatched_to_enroute" && workOrder.dispatchedAt && workOrder.enRouteAt) {
+      startTime = new Date(workOrder.dispatchedAt);
+      endTime = new Date(workOrder.enRouteAt);
+    } else if (phase === "enroute_to_onsite" && workOrder.enRouteAt && workOrder.onSiteAt) {
+      startTime = new Date(workOrder.enRouteAt);
+      endTime = new Date(workOrder.onSiteAt);
+    } else if (phase === "onsite_to_completed" && workOrder.onSiteAt && workOrder.completedAt) {
+      startTime = new Date(workOrder.onSiteAt);
+      endTime = new Date(workOrder.completedAt);
+    }
+    
+    if (startTime && endTime) {
+      const diffMs = endTime.getTime() - startTime.getTime();
+      const totalMinutes = Math.floor(diffMs / (1000 * 60));
+      setEditHours(Math.floor(totalMinutes / 60));
+      setEditMinutes(totalMinutes % 60);
+    } else {
+      setEditHours(0);
+      setEditMinutes(0);
+    }
+    
+    setEditingDuration(phase);
+  };
+
+  const getPreviewTimestamp = (): Date | null => {
+    if (!workOrder || !editingDuration) return null;
+    
+    const totalMinutes = editHours * 60 + editMinutes;
+    let baseTime: Date | null = null;
+    
+    if (editingDuration === "dispatched_to_enroute" && workOrder.dispatchedAt) {
+      baseTime = new Date(workOrder.dispatchedAt);
+    } else if (editingDuration === "enroute_to_onsite" && workOrder.enRouteAt) {
+      baseTime = new Date(workOrder.enRouteAt);
+    } else if (editingDuration === "onsite_to_completed" && workOrder.onSiteAt) {
+      baseTime = new Date(workOrder.onSiteAt);
+    }
+    
+    if (baseTime) {
+      return new Date(baseTime.getTime() + totalMinutes * 60 * 1000);
+    }
+    return null;
+  };
+
+  const handleSaveDuration = () => {
+    if (!workOrder || !editingDuration) return;
+    
+    const totalMinutes = editHours * 60 + editMinutes;
+    const updates: Partial<CrmWorkOrder> = {};
+    
+    if (editingDuration === "dispatched_to_enroute" && workOrder.dispatchedAt) {
+      const newEnRouteAt = new Date(new Date(workOrder.dispatchedAt).getTime() + totalMinutes * 60 * 1000);
+      updates.enRouteAt = newEnRouteAt;
+      
+      // Cascade: if onSiteAt exists, maintain its duration from enRouteAt
+      if (workOrder.enRouteAt && workOrder.onSiteAt) {
+        const oldDuration = new Date(workOrder.onSiteAt).getTime() - new Date(workOrder.enRouteAt).getTime();
+        updates.onSiteAt = new Date(newEnRouteAt.getTime() + oldDuration);
+        
+        // Cascade: if completedAt exists, maintain its duration from onSiteAt
+        if (workOrder.completedAt) {
+          const workDuration = new Date(workOrder.completedAt).getTime() - new Date(workOrder.onSiteAt).getTime();
+          updates.completedAt = new Date((updates.onSiteAt as Date).getTime() + workDuration);
+        }
+      }
+    } else if (editingDuration === "enroute_to_onsite" && workOrder.enRouteAt) {
+      const newOnSiteAt = new Date(new Date(workOrder.enRouteAt).getTime() + totalMinutes * 60 * 1000);
+      updates.onSiteAt = newOnSiteAt;
+      
+      // Cascade: if completedAt exists, maintain its duration from onSiteAt
+      if (workOrder.onSiteAt && workOrder.completedAt) {
+        const workDuration = new Date(workOrder.completedAt).getTime() - new Date(workOrder.onSiteAt).getTime();
+        updates.completedAt = new Date(newOnSiteAt.getTime() + workDuration);
+      }
+    } else if (editingDuration === "onsite_to_completed" && workOrder.onSiteAt) {
+      updates.completedAt = new Date(new Date(workOrder.onSiteAt).getTime() + totalMinutes * 60 * 1000);
+    }
+    
+    if (Object.keys(updates).length > 0) {
+      updateWorkOrderMutation.mutate({ updates });
+    }
+    
+    setEditingDuration(null);
+    setEditHours(0);
+    setEditMinutes(0);
   };
 
   const handleUpdateStatus = () => {
@@ -2136,9 +2234,13 @@ export default function CrmWorkOrderDetail() {
                                 <Pencil className="h-3 w-3" />
                               </button>
                               {workOrder.enRouteAt && (
-                                <p className="text-xs text-emerald-600 mt-1">
+                                <button
+                                  onClick={() => openDurationEdit("dispatched_to_enroute")}
+                                  className="text-xs text-emerald-600 mt-1 hover:text-emerald-800 hover:underline flex items-center gap-1 mx-auto"
+                                >
                                   Duration: {formatDuration(new Date(workOrder.dispatchedAt), new Date(workOrder.enRouteAt))}
-                                </p>
+                                  <Pencil className="h-3 w-3" />
+                                </button>
                               )}
                             </>
                           )}
@@ -2156,17 +2258,17 @@ export default function CrmWorkOrderDetail() {
                           <p className="font-medium text-sm text-slate-900">Traveling</p>
                           {workOrder.enRouteAt && (
                             <>
-                              <button
-                                onClick={() => openTimestampEdit("enRouteAt", workOrder.enRouteAt)}
-                                className="text-xs text-slate-500 mt-1 hover:text-blue-600 hover:underline flex items-center gap-1 mx-auto"
-                              >
+                              <p className="text-xs text-slate-500 mt-1">
                                 {format(new Date(workOrder.enRouteAt), "MMM d, h:mm a")}
-                                <Pencil className="h-3 w-3" />
-                              </button>
+                              </p>
                               {workOrder.onSiteAt && (
-                                <p className="text-xs text-emerald-600 mt-1">
+                                <button
+                                  onClick={() => openDurationEdit("enroute_to_onsite")}
+                                  className="text-xs text-emerald-600 mt-1 hover:text-emerald-800 hover:underline flex items-center gap-1 mx-auto"
+                                >
                                   Duration: {formatDuration(new Date(workOrder.enRouteAt), new Date(workOrder.onSiteAt))}
-                                </p>
+                                  <Pencil className="h-3 w-3" />
+                                </button>
                               )}
                             </>
                           )}
@@ -2184,17 +2286,17 @@ export default function CrmWorkOrderDetail() {
                           <p className="font-medium text-sm text-slate-900">Working</p>
                           {workOrder.onSiteAt && (
                             <>
-                              <button
-                                onClick={() => openTimestampEdit("onSiteAt", workOrder.onSiteAt)}
-                                className="text-xs text-slate-500 mt-1 hover:text-blue-600 hover:underline flex items-center gap-1 mx-auto"
-                              >
+                              <p className="text-xs text-slate-500 mt-1">
                                 {format(new Date(workOrder.onSiteAt), "MMM d, h:mm a")}
-                                <Pencil className="h-3 w-3" />
-                              </button>
+                              </p>
                               {workOrder.completedAt && (
-                                <p className="text-xs text-emerald-600 mt-1">
+                                <button
+                                  onClick={() => openDurationEdit("onsite_to_completed")}
+                                  className="text-xs text-emerald-600 mt-1 hover:text-emerald-800 hover:underline flex items-center gap-1 mx-auto"
+                                >
                                   Duration: {formatDuration(new Date(workOrder.onSiteAt), new Date(workOrder.completedAt))}
-                                </p>
+                                  <Pencil className="h-3 w-3" />
+                                </button>
                               )}
                             </>
                           )}
@@ -2211,13 +2313,9 @@ export default function CrmWorkOrderDetail() {
                         <div className="mt-3">
                           <p className="font-medium text-sm text-slate-900">Completed</p>
                           {workOrder.completedAt && (
-                            <button
-                              onClick={() => openTimestampEdit("completedAt", workOrder.completedAt)}
-                              className="text-xs text-slate-500 mt-1 hover:text-blue-600 hover:underline flex items-center gap-1 mx-auto"
-                            >
+                            <p className="text-xs text-slate-500 mt-1">
                               {format(new Date(workOrder.completedAt), "MMM d, h:mm a")}
-                              <Pencil className="h-3 w-3" />
-                            </button>
+                            </p>
                           )}
                         </div>
                       </div>
@@ -2355,11 +2453,9 @@ export default function CrmWorkOrderDetail() {
         <Dialog open={!!editingTimestamp} onOpenChange={(open) => !open && setEditingTimestamp(null)}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Edit Timestamp</DialogTitle>
+              <DialogTitle>Edit Dispatched Time</DialogTitle>
               <DialogDescription>
-                Adjust the {editingTimestamp === "dispatchedAt" ? "dispatched" : 
-                  editingTimestamp === "enRouteAt" ? "traveling" : 
-                  editingTimestamp === "onSiteAt" ? "working" : "completed"} time
+                Adjust when this work order was dispatched
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -2398,6 +2494,62 @@ export default function CrmWorkOrderDetail() {
               <Button 
                 onClick={handleSaveTimestamp}
                 disabled={updateWorkOrderMutation.isPending || !editDate || !editTime}
+              >
+                {updateWorkOrderMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!editingDuration} onOpenChange={(open) => !open && setEditingDuration(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Duration</DialogTitle>
+              <DialogDescription>
+                {editingDuration === "dispatched_to_enroute" ? "Time from dispatched to traveling" :
+                  editingDuration === "enroute_to_onsite" ? "Travel time to job site" :
+                  "Time spent working on site"}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="flex gap-4">
+                <div className="flex-1 space-y-2">
+                  <Label>Hours</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="23"
+                    value={editHours}
+                    onChange={(e) => setEditHours(Math.max(0, parseInt(e.target.value) || 0))}
+                  />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <Label>Minutes</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={editMinutes}
+                    onChange={(e) => setEditMinutes(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                  />
+                </div>
+              </div>
+              {getPreviewTimestamp() && (
+                <div className="p-3 bg-slate-100 rounded-md">
+                  <p className="text-sm text-slate-600">
+                    <span className="font-medium">New end time: </span>
+                    {format(getPreviewTimestamp()!, "MMM d, h:mm a")}
+                  </p>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingDuration(null)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveDuration}
+                disabled={updateWorkOrderMutation.isPending}
               >
                 {updateWorkOrderMutation.isPending ? "Saving..." : "Save"}
               </Button>
