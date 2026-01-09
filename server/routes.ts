@@ -22352,8 +22352,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       const workOrderId = req.params.workOrderId;
       const { numberOfSystems, contractDate, startDate, billingPreference, autoRenew, notes, payingNow } = req.body;
 
-      // Validate required fields
-      if (!numberOfSystems || !contractDate || !startDate || !billingPreference) {
+      // Validate required fields (startDate is now optional - defaults to contractDate + 1 month)
+      if (!numberOfSystems || !contractDate || !billingPreference) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
@@ -22389,9 +22389,11 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         totalPrice += 229 - (10 * i);
       }
 
-      // Parse dates
-      const parsedStartDate = new Date(startDate);
+      // Parse dates - startDate defaults to contractDate + 1 month if not provided
       const parsedContractDate = new Date(contractDate);
+      const parsedStartDate = startDate 
+        ? new Date(startDate) 
+        : new Date(parsedContractDate.getFullYear(), parsedContractDate.getMonth() + 1, parsedContractDate.getDate());
       const endDate = new Date(parsedStartDate);
       endDate.setFullYear(endDate.getFullYear() + 1);
       const nextServiceDate = new Date(parsedStartDate);

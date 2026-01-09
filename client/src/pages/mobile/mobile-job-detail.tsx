@@ -1723,7 +1723,6 @@ function InvoiceTab({
   const [showAgreementDialog, setShowAgreementDialog] = useState(false);
   const [agreementNumberOfSystems, setAgreementNumberOfSystems] = useState(1);
   const [agreementContractDate, setAgreementContractDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [agreementStartDate, setAgreementStartDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [agreementBillingPreference, setAgreementBillingPreference] = useState<"pay_on_visit" | "auto_invoice">("auto_invoice");
   const [agreementAutoRenew, setAgreementAutoRenew] = useState(true);
   const [agreementNotes, setAgreementNotes] = useState("");
@@ -1992,7 +1991,6 @@ function InvoiceTab({
     mutationFn: async (data: {
       numberOfSystems: number;
       contractDate: string;
-      startDate: string;
       billingPreference: "pay_on_visit" | "auto_invoice";
       autoRenew: boolean;
       notes: string;
@@ -2038,7 +2036,6 @@ function InvoiceTab({
     createAgreementMutation.mutate({
       numberOfSystems: agreementNumberOfSystems,
       contractDate: agreementContractDate,
-      startDate: agreementStartDate,
       billingPreference: agreementBillingPreference,
       autoRenew: agreementAutoRenew,
       notes: agreementNotes,
@@ -2124,7 +2121,6 @@ function InvoiceTab({
       setPendingCatalogItem(item);
       setAgreementNumberOfSystems(1);
       setAgreementContractDate(format(new Date(), "yyyy-MM-dd"));
-      setAgreementStartDate(format(new Date(), "yyyy-MM-dd"));
       setAgreementBillingPreference("auto_invoice");
       setAgreementAutoRenew(true);
       setAgreementNotes("");
@@ -3355,18 +3351,6 @@ function InvoiceTab({
                 onChange={(e) => setAgreementContractDate(e.target.value)}
                 className="min-h-[44px] mt-1"
                 data-testid="input-agreement-contract-date"
-              />
-            </div>
-
-            {/* Start Date */}
-            <div>
-              <Label className="text-sm font-medium">Start Date</Label>
-              <Input
-                type="date"
-                value={agreementStartDate}
-                onChange={(e) => setAgreementStartDate(e.target.value)}
-                className="min-h-[44px] mt-1"
-                data-testid="input-agreement-start-date"
               />
             </div>
 
