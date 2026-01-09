@@ -5810,10 +5810,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const conditions: any[] = [];
 
       if (searchTerm) {
-        const searchPattern = `%${searchTerm}%`;
-        conditions.push(
-          sql`(LOWER(${crmCustomers.name}) LIKE ${searchPattern} OR LOWER(${crmCustomers.email}) LIKE ${searchPattern} OR ${crmCustomers.phone} LIKE ${searchPattern} OR LOWER(${crmCustomers.fullAddress}) LIKE ${searchPattern})`
-        );
+        // Split search into words and require ALL words to match (for multi-word searches like "catherine davis")
+        const searchWords = searchTerm.split(/\s+/).filter(w => w.length > 0);
+        
+        if (searchWords.length > 1) {
+          // Multi-word search: ALL words must be found in name OR address
+          const wordConditions = searchWords.map(word => {
+            const wordPattern = `%${word}%`;
+            return sql`(LOWER(${crmCustomers.name}) LIKE ${wordPattern} OR LOWER(${crmCustomers.fullAddress}) LIKE ${wordPattern})`;
+          });
+          conditions.push(sql`(${sql.join(wordConditions, sql` AND `)})`);
+        } else {
+          // Single word search: match in any field
+          const searchPattern = `%${searchTerm}%`;
+          conditions.push(
+            sql`(LOWER(${crmCustomers.name}) LIKE ${searchPattern} OR LOWER(${crmCustomers.email}) LIKE ${searchPattern} OR ${crmCustomers.phone} LIKE ${searchPattern} OR LOWER(${crmCustomers.fullAddress}) LIKE ${searchPattern})`
+          );
+        }
       }
 
       if (customerType && customerType !== "all") {

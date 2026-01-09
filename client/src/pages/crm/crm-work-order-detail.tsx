@@ -2109,7 +2109,7 @@ export default function CrmWorkOrderDetail() {
                         </div>
                       </div>
                       
-                      {/* En Route */}
+                      {/* Traveling */}
                       <div className="relative z-10 flex flex-col items-center text-center w-1/4">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                           workOrder.enRouteAt ? 'bg-[#711419] text-white' : 'bg-slate-200 text-slate-400'
@@ -2117,7 +2117,7 @@ export default function CrmWorkOrderDetail() {
                           {workOrder.enRouteAt ? <CheckCircle className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
                         </div>
                         <div className="mt-3">
-                          <p className="font-medium text-sm text-slate-900">En Route</p>
+                          <p className="font-medium text-sm text-slate-900">Traveling</p>
                           {workOrder.enRouteAt && (
                             <>
                               <p className="text-xs text-slate-500 mt-1">
@@ -2133,7 +2133,7 @@ export default function CrmWorkOrderDetail() {
                         </div>
                       </div>
                       
-                      {/* On Site */}
+                      {/* Working */}
                       <div className="relative z-10 flex flex-col items-center text-center w-1/4">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                           workOrder.onSiteAt ? 'bg-[#711419] text-white' : 'bg-slate-200 text-slate-400'
@@ -2141,7 +2141,7 @@ export default function CrmWorkOrderDetail() {
                           {workOrder.onSiteAt ? <CheckCircle className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
                         </div>
                         <div className="mt-3">
-                          <p className="font-medium text-sm text-slate-900">On Site</p>
+                          <p className="font-medium text-sm text-slate-900">Working</p>
                           {workOrder.onSiteAt && (
                             <>
                               <p className="text-xs text-slate-500 mt-1">
