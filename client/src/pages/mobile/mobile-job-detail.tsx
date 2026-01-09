@@ -160,6 +160,14 @@ function isNetworkError(error: unknown): boolean {
   return !navigator.onLine;
 }
 
+const pendingReasonLabels: Record<string, string> = {
+  waiting_on_parts: "Waiting on Parts",
+  waiting_on_customer: "Waiting on Customer",
+  waiting_for_next_job: "Waiting for Next Job",
+  lunch_break: "Lunch Break",
+  other: "Other",
+};
+
 function OverviewTab({ 
   workOrder, 
   checklistResponse,
@@ -169,6 +177,9 @@ function OverviewTab({
   renewalInfo,
   onCollectRenewal,
   onDeclineRenewal,
+  onPendingChange,
+  pendingMutation,
+  optimisticPending,
 }: {
   workOrder: WorkOrderDetail;
   checklistResponse: ChecklistResponseData | null | undefined;
@@ -178,6 +189,9 @@ function OverviewTab({
   renewalInfo: RenewalInfo | null | undefined;
   onCollectRenewal: () => void;
   onDeclineRenewal: () => void;
+  onPendingChange: (isPending: boolean, reason?: string, isReasonChange?: boolean) => void;
+  pendingMutation: any;
+  optimisticPending: { isPending: boolean; reason?: string } | null;
 }) {
   const [checklistAnswersOpen, setChecklistAnswersOpen] = useState(false);
   const displayStatus = optimisticStatus || workOrder.status;
@@ -198,7 +212,16 @@ function OverviewTab({
 
   return (
     <div className="space-y-4">
-      <div className="text-center mb-4">
+      <div className="text-center mb-4 flex items-center justify-center gap-2">
+        {(optimisticPending?.isPending ?? workOrder.isPending) && (
+          <Badge 
+            variant="outline" 
+            className={`text-lg px-4 py-1 bg-amber-100 text-amber-700 border-amber-300 ${optimisticPending ? 'opacity-70' : 'animate-pulse'}`}
+            data-testid="job-pending-badge"
+          >
+            Waiting{optimisticPending ? " (saving...)" : ""}
+          </Badge>
+        )}
         <Badge 
           variant="outline" 
           className={`text-lg px-4 py-1 ${status.className} ${optimisticStatus ? 'opacity-70' : ''}`}
@@ -482,6 +505,60 @@ function OverviewTab({
               </Badge>
             </div>
           )}
+
+          {displayStatus !== "completed" && displayStatus !== "scheduled" && (() => {
+            const isPending = optimisticPending?.isPending ?? workOrder.isPending ?? false;
+            const pendingReason = optimisticPending?.reason ?? workOrder.pendingReason ?? "waiting_on_parts";
+            return (
+              <div className="border-t pt-4 mt-4" data-testid="pending-toggle-section">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-amber-600" />
+                    <span className="text-sm font-medium">Mark as Waiting</span>
+                  </div>
+                  <Switch
+                    checked={isPending}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        onPendingChange(true, "waiting_on_parts", false);
+                      } else {
+                        onPendingChange(false, undefined, false);
+                      }
+                    }}
+                    disabled={pendingMutation.isPending}
+                    data-testid="pending-toggle"
+                  />
+                </div>
+                
+                {isPending && (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-slate-500">Reason</Label>
+                    <Select
+                      value={pendingReason}
+                      onValueChange={(value) => onPendingChange(true, value, true)}
+                      disabled={pendingMutation.isPending}
+                    >
+                      <SelectTrigger className="w-full" data-testid="pending-reason-select">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="waiting_on_parts">Waiting on Parts</SelectItem>
+                        <SelectItem value="waiting_on_customer">Waiting on Customer</SelectItem>
+                        <SelectItem value="waiting_for_next_job">Waiting for Next Job</SelectItem>
+                        <SelectItem value="lunch_break">Lunch Break</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {workOrder.pendingStartedAt && !optimisticPending && (
+                      <p className="text-xs text-amber-600">
+                        Waiting since {format(new Date(workOrder.pendingStartedAt), "h:mm a")}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 
@@ -3768,6 +3845,53 @@ export default function MobileJobDetail() {
     updateStatusMutation.mutate({ newStatus: "completed", summary: completionSummary.trim() });
   };
 
+  const [optimisticPending, setOptimisticPending] = useState<{ isPending: boolean; reason?: string } | null>(null);
+
+  const pendingMutation = useMutation({
+    mutationFn: async ({ isPending, pendingReason, isReasonChange }: { isPending: boolean; pendingReason?: string; isReasonChange?: boolean }) => {
+      const payload: any = { isPending };
+      const pendingStartedAt = isPending && !isReasonChange ? new Date().toISOString() : (isReasonChange ? undefined : null);
+      if (isPending) {
+        payload.pendingReason = pendingReason || "waiting_on_parts";
+        if (!isReasonChange) {
+          payload.pendingStartedAt = pendingStartedAt;
+        }
+      } else {
+        payload.pendingReason = null;
+        payload.pendingStartedAt = null;
+      }
+      await apiRequest("PATCH", `/api/crm/work-orders/${params.id}`, payload);
+      return { isPending, pendingReason: payload.pendingReason, pendingStartedAt: payload.pendingStartedAt };
+    },
+    onSuccess: (result, variables) => {
+      queryClient.setQueryData(["/api/crm/work-orders", params.id], (old: WorkOrderDetail | undefined) => {
+        if (!old) return old;
+        const updates: Partial<WorkOrderDetail> = {
+          isPending: result.isPending,
+          pendingReason: result.pendingReason,
+        };
+        if (result.pendingStartedAt !== undefined) {
+          updates.pendingStartedAt = result.pendingStartedAt;
+        }
+        return { ...old, ...updates };
+      });
+      setOptimisticPending(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
+      toast({ 
+        title: variables.isPending ? "Marked as waiting" : "Waiting status cleared"
+      });
+    },
+    onError: () => {
+      setOptimisticPending(null);
+      toast({ title: "Failed to update waiting status", variant: "destructive" });
+    },
+  });
+
+  const handlePendingChange = (isPending: boolean, reason?: string, isReasonChange?: boolean) => {
+    setOptimisticPending({ isPending, reason });
+    pendingMutation.mutate({ isPending, pendingReason: reason, isReasonChange });
+  };
+
   const addNoteMutation = useMutation({
     mutationFn: async (note: string) => {
       const existingNotes = workOrder?.techNotes ?? "";
@@ -3907,6 +4031,9 @@ export default function MobileJobDetail() {
               renewalInfo={renewalInfo}
               onCollectRenewal={() => setShowCollectRenewalDialog(true)}
               onDeclineRenewal={() => setShowDeclineRenewalDialog(true)}
+              onPendingChange={handlePendingChange}
+              pendingMutation={pendingMutation}
+              optimisticPending={optimisticPending}
             />
           )}
           {activeTab === "work" && (
