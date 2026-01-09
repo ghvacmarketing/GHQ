@@ -264,6 +264,41 @@ async function checkSchedulingConflict(
   return { hasConflict: false };
 }
 
+// Helper function to create follow-up work order when quote is accepted
+async function createFollowUpWorkOrder(
+  quote: typeof crmQuotes.$inferSelect,
+  parentWorkOrder: typeof crmWorkOrders.$inferSelect,
+  options: { dispatchQueueStage: "PartsNeeded" | "Scheduled", assignedTechId?: string | null }
+): Promise<typeof crmWorkOrders.$inferSelect | null> {
+  // Check if follow-up already exists for this quote
+  const [existing] = await db.select().from(crmWorkOrders)
+    .where(eq(crmWorkOrders.sourceQuoteId, quote.id)).limit(1);
+  if (existing) return null;
+
+  // Get next work order number
+  const lastWO = await db.select({ workOrderNumber: crmWorkOrders.workOrderNumber })
+    .from(crmWorkOrders).orderBy(desc(crmWorkOrders.workOrderNumber)).limit(1);
+  const nextNumber = (lastWO[0]?.workOrderNumber || 0) + 1;
+
+  const [newWorkOrder] = await db.insert(crmWorkOrders).values({
+    customerId: parentWorkOrder.customerId,
+    propertyId: parentWorkOrder.propertyId,
+    projectId: parentWorkOrder.projectId,
+    sourceQuoteId: quote.id,
+    workOrderNumber: nextNumber,
+    assignedTechId: options.assignedTechId || null,
+    visitType: "SERVICE",
+    workSubtype: "Other",
+    title: `Follow-up: ${quote.title || quote.quoteNumber}`,
+    description: quote.description || `Follow-up work order for accepted quote ${quote.quoteNumber}`,
+    status: "scheduled",
+    priority: "urgent",
+    dispatchQueueStage: options.dispatchQueueStage,
+  }).returning();
+
+  return newWorkOrder;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Trust proxy for Replit's infrastructure
   app.set('trust proxy', 1);
@@ -16051,7 +16086,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }),
       });
 
-      return res.json(updated);
+      // Check if follow-up work order choice is needed
+      let followUpContext = null;
+      if (existing.workOrderId) {
+        const [parentWorkOrder] = await db.select().from(crmWorkOrders)
+          .where(eq(crmWorkOrders.id, existing.workOrderId)).limit(1);
+        
+        if (parentWorkOrder && (parentWorkOrder.status === "on_site" || parentWorkOrder.status === "completed")) {
+          followUpContext = {
+            customerId: parentWorkOrder.customerId,
+            propertyId: parentWorkOrder.propertyId,
+            projectId: parentWorkOrder.projectId,
+            quoteId: existing.id,
+            quoteTitle: existing.title || existing.quoteNumber,
+          };
+        }
+      }
+
+      return res.json({
+        ...updated,
+        requiresFollowUpChoice: !!followUpContext,
+        followUpContext,
+      });
     } catch (error) {
       console.error("Error marking quote as accepted:", error);
       return res.status(500).json({ message: "Failed to mark quote as accepted" });
@@ -16189,10 +16245,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Quote ${existing.quoteNumber} accepted in person by ${signerName.trim()}, presented by ${user.name || user.email}`);
 
+      // Check if follow-up work order choice is needed
+      let followUpContext = null;
+      if (existing.workOrderId) {
+        const [parentWorkOrder] = await db.select().from(crmWorkOrders)
+          .where(eq(crmWorkOrders.id, existing.workOrderId)).limit(1);
+        
+        if (parentWorkOrder && (parentWorkOrder.status === "on_site" || parentWorkOrder.status === "completed")) {
+          followUpContext = {
+            customerId: parentWorkOrder.customerId,
+            propertyId: parentWorkOrder.propertyId,
+            projectId: parentWorkOrder.projectId,
+            quoteId: existing.id,
+            quoteTitle: existing.title || existing.quoteNumber,
+          };
+        }
+      }
+
       return res.json({ 
         success: true, 
         message: "Quote accepted successfully",
         quote: updated,
+        requiresFollowUpChoice: !!followUpContext,
+        followUpContext,
       });
     } catch (error) {
       console.error("Error accepting quote in person:", error);
@@ -16242,6 +16317,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error marking quote as declined:", error);
       return res.status(500).json({ message: "Failed to mark quote as declined" });
+    }
+  });
+
+  // POST /api/crm/quotes/:id/create-follow-up-work-order - Create follow-up work order for accepted quote
+  app.post("/api/crm/quotes/:id/create-follow-up-work-order", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const { mode } = req.body; // "parts_needed" or "schedule_now"
+      if (!mode || !["parts_needed", "schedule_now"].includes(mode)) {
+        return res.status(400).json({ message: "Invalid mode. Must be 'parts_needed' or 'schedule_now'" });
+      }
+
+      const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
+      if (!quote) return res.status(404).json({ message: "Quote not found" });
+      if (quote.status !== "accepted") return res.status(400).json({ message: "Quote must be accepted first" });
+      if (!quote.workOrderId) return res.status(400).json({ message: "Quote is not attached to a work order" });
+
+      const [parentWorkOrder] = await db.select().from(crmWorkOrders)
+        .where(eq(crmWorkOrders.id, quote.workOrderId)).limit(1);
+      if (!parentWorkOrder) return res.status(404).json({ message: "Parent work order not found" });
+
+      if (mode === "parts_needed") {
+        const followUpWO = await createFollowUpWorkOrder(quote, parentWorkOrder, {
+          dispatchQueueStage: "PartsNeeded",
+        });
+        if (!followUpWO) {
+          return res.status(400).json({ message: "Follow-up work order already exists for this quote" });
+        }
+        await logCrmAudit(user.id, "workorder.created", "crm_work_order", followUpWO.id, 
+          { source: "quote_follow_up", quoteId: quote.id }, req.ip);
+        return res.json({ workOrder: followUpWO, mode: "parts_needed" });
+      } else {
+        // Return context for manual scheduling
+        return res.json({
+          mode: "schedule_now",
+          context: {
+            customerId: parentWorkOrder.customerId,
+            propertyId: parentWorkOrder.propertyId,
+            projectId: parentWorkOrder.projectId,
+            sourceQuoteId: quote.id,
+            suggestedTitle: `Follow-up: ${quote.title || quote.quoteNumber}`,
+            suggestedDescription: quote.description || `Follow-up work order for accepted quote ${quote.quoteNumber}`,
+          }
+        });
+      }
+    } catch (error) {
+      console.error("Error creating follow-up work order:", error);
+      return res.status(500).json({ message: "Failed to create follow-up work order" });
     }
   });
 
@@ -18792,6 +18917,21 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       });
 
       console.log(`Quote ${quote.quoteNumber} signed and accepted by ${signerName.trim()} from IP ${signerIp}`);
+
+      // Auto-create follow-up work order if quote is attached to a working/completed work order
+      if (quote.workOrderId) {
+        const [parentWorkOrder] = await db.select().from(crmWorkOrders)
+          .where(eq(crmWorkOrders.id, quote.workOrderId)).limit(1);
+        
+        if (parentWorkOrder && (parentWorkOrder.status === "on_site" || parentWorkOrder.status === "completed")) {
+          const followUpWO = await createFollowUpWorkOrder(updated, parentWorkOrder, {
+            dispatchQueueStage: "PartsNeeded",
+          });
+          if (followUpWO) {
+            console.log(`Auto-created follow-up work order ${followUpWO.workOrderNumber} for quote ${quote.quoteNumber}`);
+          }
+        }
+      }
 
       return res.json({ 
         success: true, 
