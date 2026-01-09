@@ -273,12 +273,17 @@ async function createFollowUpWorkOrder(
   // Check if follow-up already exists for this quote
   const [existing] = await db.select().from(crmWorkOrders)
     .where(eq(crmWorkOrders.sourceQuoteId, quote.id)).limit(1);
-  if (existing) return null;
+  if (existing) {
+    console.log(`[createFollowUpWorkOrder] Follow-up WO already exists for quote ${quote.id}`);
+    return null;
+  }
 
   // Get next work order number
   const lastWO = await db.select({ workOrderNumber: crmWorkOrders.workOrderNumber })
     .from(crmWorkOrders).orderBy(desc(crmWorkOrders.workOrderNumber)).limit(1);
   const nextNumber = (lastWO[0]?.workOrderNumber || 0) + 1;
+
+  console.log(`[createFollowUpWorkOrder] Creating follow-up WO #${nextNumber} for quote ${quote.id}, stage: ${options.dispatchQueueStage}`);
 
   const [newWorkOrder] = await db.insert(crmWorkOrders).values({
     customerId: parentWorkOrder.customerId,
@@ -296,7 +301,50 @@ async function createFollowUpWorkOrder(
     dispatchQueueStage: options.dispatchQueueStage,
   }).returning();
 
+  console.log(`[createFollowUpWorkOrder] Created follow-up WO ${newWorkOrder.id} for quote ${quote.id}`);
+
   return newWorkOrder;
+}
+
+// Helper function to check if a quote contains service-type items (not just maintenance)
+async function hasServiceItems(quoteId: string): Promise<boolean> {
+  // Fetch quote line items with their linked crm_items
+  const lineItems = await db.select({
+    lineId: crmQuoteLineItems.id,
+    itemId: crmQuoteLineItems.itemId,
+    lineType: crmQuoteLineItems.lineType,
+    itemCategory: crmItems.category,
+    itemType: crmItems.itemType,
+  })
+  .from(crmQuoteLineItems)
+  .leftJoin(crmItems, eq(crmQuoteLineItems.itemId, crmItems.id))
+  .where(eq(crmQuoteLineItems.quoteId, quoteId));
+
+  // Check if any line item is a service item
+  // Service items have category = 'service' OR itemType = 'service'
+  // We want to trigger follow-up modal only if there are service items
+  for (const item of lineItems) {
+    // Skip discount lines
+    if (item.lineType === 'discount') continue;
+    
+    // If linked to a crm_item, check its category/itemType
+    if (item.itemId) {
+      if (item.itemCategory === 'service' || item.itemType === 'service') {
+        return true;
+      }
+    } else {
+      // For line items without linked crm_item, check lineType
+      // labor, service, part, and other line types indicate service work
+      // (maintenance-only quotes typically use items from the catalog with category='maintenance')
+      if (item.lineType === 'service' || item.lineType === 'labor' || item.lineType === 'part') {
+        return true;
+      }
+    }
+  }
+
+  // If no service items found, check if ALL items are maintenance (return false)
+  // Otherwise if there are install/parts items but no service, also return false
+  return false;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -16086,21 +16134,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }),
       });
 
-      // Check if follow-up work order choice is needed (only for custom_service and quick types)
+      // Check if follow-up work order choice is needed (only for custom_service and quick types, AND has service items)
       let followUpContext = null;
       const followUpQuoteTypes = ["custom_service", "quick"];
       if (existing.workOrderId && followUpQuoteTypes.includes(existing.quoteType || "")) {
-        const [parentWorkOrder] = await db.select().from(crmWorkOrders)
-          .where(eq(crmWorkOrders.id, existing.workOrderId)).limit(1);
-        
-        if (parentWorkOrder && (parentWorkOrder.status === "on_site" || parentWorkOrder.status === "completed")) {
-          followUpContext = {
-            customerId: parentWorkOrder.customerId,
-            propertyId: parentWorkOrder.propertyId,
-            projectId: parentWorkOrder.projectId,
-            quoteId: existing.id,
-            quoteTitle: existing.title || existing.quoteNumber,
-          };
+        // Check if quote has service-type items (not just maintenance)
+        const hasServiceLineItems = await hasServiceItems(existing.id);
+        if (hasServiceLineItems) {
+          const [parentWorkOrder] = await db.select().from(crmWorkOrders)
+            .where(eq(crmWorkOrders.id, existing.workOrderId)).limit(1);
+          
+          if (parentWorkOrder && (parentWorkOrder.status === "on_site" || parentWorkOrder.status === "completed")) {
+            followUpContext = {
+              customerId: parentWorkOrder.customerId,
+              propertyId: parentWorkOrder.propertyId,
+              projectId: parentWorkOrder.projectId,
+              quoteId: existing.id,
+              quoteTitle: existing.title || existing.quoteNumber,
+            };
+          }
         }
       }
 
@@ -16246,21 +16298,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Quote ${existing.quoteNumber} accepted in person by ${signerName.trim()}, presented by ${user.name || user.email}`);
 
-      // Check if follow-up work order choice is needed (only for custom_service and quick types)
+      // Check if follow-up work order choice is needed (only for custom_service and quick types, AND has service items)
       let followUpContext = null;
       const followUpQuoteTypes = ["custom_service", "quick"];
       if (existing.workOrderId && followUpQuoteTypes.includes(existing.quoteType || "")) {
-        const [parentWorkOrder] = await db.select().from(crmWorkOrders)
-          .where(eq(crmWorkOrders.id, existing.workOrderId)).limit(1);
-        
-        if (parentWorkOrder && (parentWorkOrder.status === "on_site" || parentWorkOrder.status === "completed")) {
-          followUpContext = {
-            customerId: parentWorkOrder.customerId,
-            propertyId: parentWorkOrder.propertyId,
-            projectId: parentWorkOrder.projectId,
-            quoteId: existing.id,
-            quoteTitle: existing.title || existing.quoteNumber,
-          };
+        // Check if quote has service-type items (not just maintenance)
+        const hasServiceLineItems = await hasServiceItems(existing.id);
+        if (hasServiceLineItems) {
+          const [parentWorkOrder] = await db.select().from(crmWorkOrders)
+            .where(eq(crmWorkOrders.id, existing.workOrderId)).limit(1);
+          
+          if (parentWorkOrder && (parentWorkOrder.status === "on_site" || parentWorkOrder.status === "completed")) {
+            followUpContext = {
+              customerId: parentWorkOrder.customerId,
+              propertyId: parentWorkOrder.propertyId,
+              projectId: parentWorkOrder.projectId,
+              quoteId: existing.id,
+              quoteTitle: existing.title || existing.quoteNumber,
+            };
+          }
         }
       }
 
@@ -16329,31 +16385,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) return res.status(401).json({ message: "Unauthorized" });
 
       const { mode } = req.body; // "parts_needed" or "schedule_now"
+      console.log(`[create-follow-up-work-order] Request for quote ${req.params.id}, mode: ${mode}`);
+      
       if (!mode || !["parts_needed", "schedule_now"].includes(mode)) {
         return res.status(400).json({ message: "Invalid mode. Must be 'parts_needed' or 'schedule_now'" });
       }
 
       const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
-      if (!quote) return res.status(404).json({ message: "Quote not found" });
-      if (quote.status !== "accepted") return res.status(400).json({ message: "Quote must be accepted first" });
-      if (!quote.workOrderId) return res.status(400).json({ message: "Quote is not attached to a work order" });
+      if (!quote) {
+        console.log(`[create-follow-up-work-order] Quote ${req.params.id} not found`);
+        return res.status(404).json({ message: "Quote not found" });
+      }
+      console.log(`[create-follow-up-work-order] Found quote ${quote.quoteNumber}, status: ${quote.status}, workOrderId: ${quote.workOrderId}`);
+      
+      if (quote.status !== "accepted") {
+        console.log(`[create-follow-up-work-order] Quote ${quote.quoteNumber} is not accepted (status: ${quote.status})`);
+        return res.status(400).json({ message: "Quote must be accepted first" });
+      }
+      if (!quote.workOrderId) {
+        console.log(`[create-follow-up-work-order] Quote ${quote.quoteNumber} is not attached to a work order`);
+        return res.status(400).json({ message: "Quote is not attached to a work order" });
+      }
 
       const [parentWorkOrder] = await db.select().from(crmWorkOrders)
         .where(eq(crmWorkOrders.id, quote.workOrderId)).limit(1);
-      if (!parentWorkOrder) return res.status(404).json({ message: "Parent work order not found" });
+      if (!parentWorkOrder) {
+        console.log(`[create-follow-up-work-order] Parent work order ${quote.workOrderId} not found`);
+        return res.status(404).json({ message: "Parent work order not found" });
+      }
+      console.log(`[create-follow-up-work-order] Found parent work order ${parentWorkOrder.id}, status: ${parentWorkOrder.status}`);
 
       if (mode === "parts_needed") {
+        console.log(`[create-follow-up-work-order] Creating parts_needed follow-up WO for quote ${quote.quoteNumber}`);
         const followUpWO = await createFollowUpWorkOrder(quote, parentWorkOrder, {
           dispatchQueueStage: "PartsNeeded",
         });
         if (!followUpWO) {
+          console.log(`[create-follow-up-work-order] Follow-up WO already exists for quote ${quote.id}`);
           return res.status(400).json({ message: "Follow-up work order already exists for this quote" });
         }
+        console.log(`[create-follow-up-work-order] Created follow-up WO ${followUpWO.id} with stage PartsNeeded`);
         await logCrmAudit(user.id, "workorder.created", "crm_work_order", followUpWO.id, 
           { source: "quote_follow_up", quoteId: quote.id }, req.ip);
         return res.json({ workOrder: followUpWO, mode: "parts_needed" });
       } else {
         // Return context for manual scheduling
+        console.log(`[create-follow-up-work-order] Returning schedule_now context for quote ${quote.quoteNumber}`);
         return res.json({
           mode: "schedule_now",
           context: {
@@ -16367,7 +16444,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
     } catch (error) {
-      console.error("Error creating follow-up work order:", error);
+      console.error("[create-follow-up-work-order] Error:", error);
       return res.status(500).json({ message: "Failed to create follow-up work order" });
     }
   });
@@ -18959,19 +19036,25 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       console.log(`Quote ${quote.quoteNumber} signed and accepted by ${signerName.trim()} from IP ${signerIp}`);
 
-      // Auto-create follow-up work order if quote is attached to a working/completed work order (only for custom_service and quick types)
+      // Auto-create follow-up work order if quote is attached to a working/completed work order (only for custom_service and quick types, AND has service items)
       const followUpQuoteTypes = ["custom_service", "quick"];
       if (quote.workOrderId && followUpQuoteTypes.includes(updated.quoteType || "")) {
-        const [parentWorkOrder] = await db.select().from(crmWorkOrders)
-          .where(eq(crmWorkOrders.id, quote.workOrderId)).limit(1);
-        
-        if (parentWorkOrder && (parentWorkOrder.status === "on_site" || parentWorkOrder.status === "completed")) {
-          const followUpWO = await createFollowUpWorkOrder(updated, parentWorkOrder, {
-            dispatchQueueStage: "PartsNeeded",
-          });
-          if (followUpWO) {
-            console.log(`Auto-created follow-up work order ${followUpWO.workOrderNumber} for quote ${quote.quoteNumber}`);
+        // Check if quote has service-type items (not just maintenance)
+        const hasServiceLineItems = await hasServiceItems(quote.id);
+        if (hasServiceLineItems) {
+          const [parentWorkOrder] = await db.select().from(crmWorkOrders)
+            .where(eq(crmWorkOrders.id, quote.workOrderId)).limit(1);
+          
+          if (parentWorkOrder && (parentWorkOrder.status === "on_site" || parentWorkOrder.status === "completed")) {
+            const followUpWO = await createFollowUpWorkOrder(updated, parentWorkOrder, {
+              dispatchQueueStage: "PartsNeeded",
+            });
+            if (followUpWO) {
+              console.log(`Auto-created follow-up work order ${followUpWO.workOrderNumber} for quote ${quote.quoteNumber}`);
+            }
           }
+        } else {
+          console.log(`Quote ${quote.quoteNumber} has no service items, skipping follow-up work order creation`);
         }
       }
 

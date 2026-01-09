@@ -1748,6 +1748,9 @@ export default function CrmDispatch() {
   const [showChecklist, setShowChecklist] = useState(true);
   const [checklistLoading, setChecklistLoading] = useState(false);
   const [checklistId, setChecklistId] = useState<string | null>(null);
+  
+  // Track source quote ID when creating follow-up work order from quote acceptance
+  const [sourceQuoteId, setSourceQuoteId] = useState<string | null>(null);
 
   const debouncedCustomerSearch = useDebounce(customerSearch, 300);
   
@@ -2006,7 +2009,55 @@ export default function CrmDispatch() {
     setChecklistAnswers({});
     setShowChecklist(true);
     setChecklistId(null);
+    // Reset source quote ID
+    setSourceQuoteId(null);
   };
+
+  // Auto-open work order creation dialog when URL params are present (from quote acceptance flow)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const createWO = params.get("createWO");
+    const customerId = params.get("customerId");
+    const propertyId = params.get("propertyId");
+    const projectId = params.get("projectId");
+    const quoteId = params.get("sourceQuoteId");
+    const title = params.get("title");
+    const description = params.get("description");
+
+    if (createWO === "true" && customerId) {
+      // Fetch the customer by ID and set up the form
+      const fetchCustomerAndOpenDialog = async () => {
+        try {
+          const res = await fetch(`/api/crm/customers/${customerId}`, {
+            credentials: "include",
+          });
+          if (res.ok) {
+            const customer = await res.json();
+            const customerWithInfo: CustomerWithInfo = {
+              id: customer.id,
+              name: customer.name,
+              customerType: customer.customerType || "residential",
+              fullAddress: customer.fullAddress || null,
+            };
+            setSelectedCustomer(customerWithInfo);
+            setSelectedPropertyId(propertyId || "");
+            setSelectedProjectId(projectId || "");
+            setWoTitle(title ? decodeURIComponent(title) : "");
+            setWoDescription(description ? decodeURIComponent(description) : "");
+            setSourceQuoteId(quoteId || null);
+            setCreateDialogOpen(true);
+
+            // Clear URL params after reading
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState({}, "", cleanUrl);
+          }
+        } catch (error) {
+          console.error("Failed to fetch customer for work order creation:", error);
+        }
+      };
+      fetchCustomerAndOpenDialog();
+    }
+  }, []);
 
   // Fetch checklist questions when SERVICE is selected and workSubtype changes
   useEffect(() => {
@@ -2156,6 +2207,7 @@ export default function CrmDispatch() {
         customerId: selectedCustomer.id,
         propertyId: selectedPropertyId || null,
         projectId: selectedProjectId || null,
+        sourceQuoteId: sourceQuoteId || null,
         title: woTitle.trim(),
         description: finalDescription,
         visitType,
