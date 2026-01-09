@@ -268,7 +268,7 @@ async function checkSchedulingConflict(
 async function createFollowUpWorkOrder(
   quote: typeof crmQuotes.$inferSelect,
   parentWorkOrder: typeof crmWorkOrders.$inferSelect,
-  options: { dispatchQueueStage: "PartsNeeded" | "Scheduled", assignedTechId?: string | null }
+  options: { dispatchQueueStage: "WaitingOnParts" | "ReadyToDispatch", assignedTechId?: string | null }
 ): Promise<typeof crmWorkOrders.$inferSelect | null> {
   // Check if follow-up already exists for this quote
   const [existing] = await db.select().from(crmWorkOrders)
@@ -285,8 +285,8 @@ async function createFollowUpWorkOrder(
 
   console.log(`[createFollowUpWorkOrder] Creating follow-up WO #${nextNumber} for quote ${quote.id}, stage: ${options.dispatchQueueStage}`);
 
-  // For PartsNeeded stage, use specific subtype; otherwise inherit from parent or use default
-  const workSubtype = options.dispatchQueueStage === "PartsNeeded" 
+  // For WaitingOnParts stage, use specific subtype; otherwise inherit from parent or use default
+  const workSubtype = options.dispatchQueueStage === "WaitingOnParts" 
     ? "Service Call: Part Replacement" 
     : parentWorkOrder.workSubtype || "Other";
 
@@ -16456,13 +16456,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (mode === "parts_needed") {
         console.log(`[create-follow-up-work-order] Creating parts_needed follow-up WO for quote ${quote.quoteNumber}`);
         const followUpWO = await createFollowUpWorkOrder(quote, parentWorkOrder, {
-          dispatchQueueStage: "PartsNeeded",
+          dispatchQueueStage: "WaitingOnParts",
         });
         if (!followUpWO) {
           console.log(`[create-follow-up-work-order] Follow-up WO already exists for quote ${quote.id}`);
           return res.status(400).json({ message: "Follow-up work order already exists for this quote" });
         }
-        console.log(`[create-follow-up-work-order] Created follow-up WO ${followUpWO.id} with stage PartsNeeded`);
+        console.log(`[create-follow-up-work-order] Created follow-up WO ${followUpWO.id} with stage WaitingOnParts`);
         await logCrmAudit(user.id, "workorder.created", "crm_work_order", followUpWO.id, 
           { source: "quote_follow_up", quoteId: quote.id }, req.ip);
         return res.json({ workOrder: followUpWO, mode: "parts_needed" });
@@ -19120,7 +19120,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           
           if (parentWorkOrder && (parentWorkOrder.status === "on_site" || parentWorkOrder.status === "completed")) {
             const followUpWO = await createFollowUpWorkOrder(updated, parentWorkOrder, {
-              dispatchQueueStage: "PartsNeeded",
+              dispatchQueueStage: "WaitingOnParts",
             });
             if (followUpWO) {
               console.log(`[PublicSign] Auto-created follow-up work order ${followUpWO.workOrderNumber} for quote ${quote.quoteNumber}`);

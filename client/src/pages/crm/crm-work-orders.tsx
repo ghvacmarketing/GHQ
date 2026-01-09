@@ -137,17 +137,19 @@ const statusLabels: Record<string, string> = {
 };
 
 const dispatchQueueStageLabels: Record<string, string> = {
-  PartsNeeded: "Parts Needed",
-  PartsOrdered: "Parts Ordered",
-  PartsArrived: "Parts Arrived",
-  Scheduled: "Scheduled",
+  WaitingOnParts: "Waiting on Parts",
+  NeedsApproval: "Needs Approval",
+  OnHold: "On Hold",
+  CallbackPriority: "Callback/Priority",
+  ReadyToDispatch: "Ready to Dispatch",
 };
 
 const dispatchQueueStageColors: Record<string, { bg: string; text: string; border: string }> = {
-  PartsNeeded: { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-200" },
-  PartsOrdered: { bg: "bg-yellow-100", text: "text-yellow-700", border: "border-yellow-200" },
-  PartsArrived: { bg: "bg-green-100", text: "text-green-700", border: "border-green-200" },
-  Scheduled: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
+  WaitingOnParts: { bg: "bg-amber-100", text: "text-amber-700", border: "border-amber-200" },
+  NeedsApproval: { bg: "bg-purple-100", text: "text-purple-700", border: "border-purple-200" },
+  OnHold: { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-300" },
+  CallbackPriority: { bg: "bg-red-100", text: "text-red-700", border: "border-red-200" },
+  ReadyToDispatch: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
 };
 
 const visitTypeLabels: Record<string, string> = {
@@ -185,13 +187,14 @@ const filterTabConfig: Record<FilterTab, { label: string; shortLabel: string }> 
   cancelled: { label: "Cancelled", shortLabel: "Cancelled" },
 };
 
-type UnassignedCategory = "parts_needed" | "parts_ordered" | "parts_arrived" | "scheduled";
+type UnassignedCategory = "waiting_on_parts" | "needs_approval" | "on_hold" | "callback_priority" | "ready_to_dispatch";
 
 const unassignedCategoryConfig: Record<UnassignedCategory, { label: string; description: string }> = {
-  parts_needed: { label: "Parts Needed", description: "" },
-  parts_ordered: { label: "Parts Ordered", description: "" },
-  parts_arrived: { label: "Parts Arrived", description: "" },
-  scheduled: { label: "Scheduled", description: "" },
+  waiting_on_parts: { label: "Waiting on Parts", description: "" },
+  needs_approval: { label: "Needs Approval", description: "" },
+  on_hold: { label: "On Hold", description: "" },
+  callback_priority: { label: "Callback/Priority", description: "" },
+  ready_to_dispatch: { label: "Ready to Dispatch", description: "" },
 };
 
 export default function CrmWorkOrders() {
@@ -563,7 +566,7 @@ export default function CrmWorkOrders() {
     // Apply tab-based status filtering (for tabs not handled server-side)
     if (activeTab === "unassigned") {
       // Unassigned work orders - no tech assigned or in queue stages
-      const unassignedStages = ["PartsNeeded", "PartsOrdered", "PartsArrived", "Scheduled"];
+      const unassignedStages = ["WaitingOnParts", "NeedsApproval", "OnHold", "CallbackPriority", "ReadyToDispatch"];
       orders = orders.filter(wo => 
         !wo.assignedTechId || 
         (wo.dispatchQueueStage && unassignedStages.includes(wo.dispatchQueueStage))
@@ -606,24 +609,27 @@ export default function CrmWorkOrders() {
     if (activeTab !== "unassigned") return null;
     
     const categories: Record<UnassignedCategory, EnrichedWorkOrder[]> = {
-      parts_needed: [],
-      parts_ordered: [],
-      parts_arrived: [],
-      scheduled: [],
+      waiting_on_parts: [],
+      needs_approval: [],
+      on_hold: [],
+      callback_priority: [],
+      ready_to_dispatch: [],
     };
     
     filteredWorkOrders.forEach(wo => {
-      if (wo.dispatchQueueStage === "PartsNeeded") {
-        categories.parts_needed.push(wo);
-      } else if (wo.dispatchQueueStage === "PartsOrdered") {
-        categories.parts_ordered.push(wo);
-      } else if (wo.dispatchQueueStage === "PartsArrived") {
-        categories.parts_arrived.push(wo);
-      } else if (wo.dispatchQueueStage === "Scheduled") {
-        categories.scheduled.push(wo);
+      if (wo.dispatchQueueStage === "WaitingOnParts") {
+        categories.waiting_on_parts.push(wo);
+      } else if (wo.dispatchQueueStage === "NeedsApproval") {
+        categories.needs_approval.push(wo);
+      } else if (wo.dispatchQueueStage === "OnHold") {
+        categories.on_hold.push(wo);
+      } else if (wo.dispatchQueueStage === "CallbackPriority") {
+        categories.callback_priority.push(wo);
+      } else if (wo.dispatchQueueStage === "ReadyToDispatch") {
+        categories.ready_to_dispatch.push(wo);
       } else if (!wo.assignedTechId) {
-        // Default unassigned work orders to "Parts Needed" column
-        categories.parts_needed.push(wo);
+        // Default unassigned work orders to "Waiting on Parts" column
+        categories.waiting_on_parts.push(wo);
       }
     });
     
