@@ -1475,6 +1475,11 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
       >
         <div className="flex items-center gap-1">
           <p className="text-xs font-medium truncate flex-1">{workOrder.customerName}</p>
+          {workOrder.isPending && (
+            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm bg-amber-400 text-amber-900 animate-pulse">
+              WAITING
+            </span>
+          )}
           {workOrder.status !== "scheduled" && (
             <span 
               className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm ${
@@ -1519,6 +1524,11 @@ function WorkOrderCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
       )}
       <div className="flex items-center gap-1">
         <p className="text-xs font-medium truncate flex-1">{workOrder.customerName}</p>
+        {workOrder.isPending && (
+          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm bg-amber-400 text-amber-900 animate-pulse">
+            WAITING
+          </span>
+        )}
         {workOrder.status !== "scheduled" && (
           <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm ${
             workOrder.status === 'dispatched' ? 'bg-purple-600 text-white' :
@@ -3319,12 +3329,19 @@ export default function CrmDispatch() {
                     
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-500">Status</span>
-                      <Badge 
-                        className={`${statusColors[selectedWorkOrder.status]?.bg} ${statusColors[selectedWorkOrder.status]?.text} ${statusColors[selectedWorkOrder.status]?.border} border`}
-                        data-testid="badge-status"
-                      >
-                        {statusLabels[selectedWorkOrder.status] || selectedWorkOrder.status}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        {selectedWorkOrder.isPending && (
+                          <Badge className="bg-amber-100 text-amber-800 border border-amber-200">
+                            Waiting
+                          </Badge>
+                        )}
+                        <Badge 
+                          className={`${statusColors[selectedWorkOrder.status]?.bg} ${statusColors[selectedWorkOrder.status]?.text} ${statusColors[selectedWorkOrder.status]?.border} border`}
+                          data-testid="badge-status"
+                        >
+                          {statusLabels[selectedWorkOrder.status] || selectedWorkOrder.status}
+                        </Badge>
+                      </div>
                     </div>
                     
                     <div className="flex items-center justify-between">
