@@ -322,6 +322,8 @@ export async function askCrmHelp(question: string): Promise<CrmHelpResponse> {
   }
 
   try {
+    console.log("[CRM Help AI] Processing question:", question);
+    
     const response = await openai.chat.completions.create({
       model: "gpt-5-mini",
       messages: [
@@ -352,8 +354,11 @@ Return JSON with:
       max_completion_tokens: 500,
     });
 
+    console.log("[CRM Help AI] Response received:", response.choices[0]?.message?.content?.substring(0, 100));
+    
     const content = response.choices[0]?.message?.content;
     if (!content) {
+      console.log("[CRM Help AI] No content in response");
       return {
         answer: "I couldn't process your question. Please try rephrasing it.",
         relatedTopics: [],
