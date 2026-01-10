@@ -1442,11 +1442,16 @@ function UnassignedQueueSection({
   }, [filteredWorkOrders]);
 
   const stageOrder: DispatchQueueStage[] = [
+    "NeedsScheduling",
+    "ReadyToDispatch",
+    "CallbackPriority",
     "WaitingOnParts",
     "NeedsApproval",
     "OnHold",
-    "CallbackPriority",
-    "ReadyToDispatch",
+    "PartsNeeded",
+    "PartsOrdered",
+    "PartsArrived",
+    "Scheduled",
   ];
 
   return (
