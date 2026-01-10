@@ -9,19 +9,24 @@ const BOUNCIE_API_BASE = "https://api.bouncie.dev/v1";
 interface BouncieVehicle {
   imei: string;
   nickName?: string;
-  make?: string;
-  model?: string;
-  year?: string;
   vin?: string;
-  licensePlate?: string;
+  model?: {
+    make: string;
+    name: string;
+    year: number;
+  };
   stats?: {
-    lastGps?: {
-      latitude: number;
-      longitude: number;
-      timestamp: string;
-      speed: number;
-      heading: number;
+    lastUpdated?: string;
+    location?: {
+      lat: number;
+      lon: number;
+      heading?: number;
+      address?: string | null;
     };
+    speed?: number;
+    isRunning?: boolean;
+    odometer?: number;
+    fuelLevel?: number;
   };
 }
 
@@ -246,16 +251,15 @@ export class BouncieService {
         imei: bv.imei,
         vehicleName: bv.nickName || `Vehicle ${bv.imei.slice(-4)}`,
         nickname: bv.nickName,
-        vehicleMake: bv.make,
-        vehicleModel: bv.model,
-        vehicleYear: bv.year,
+        vehicleMake: bv.model?.make,
+        vehicleModel: bv.model?.name,
+        vehicleYear: bv.model?.year?.toString(),
         vin: bv.vin,
-        licensePlate: bv.licensePlate,
-        lastLatitude: bv.stats?.lastGps?.latitude?.toString(),
-        lastLongitude: bv.stats?.lastGps?.longitude?.toString(),
-        lastSpeed: bv.stats?.lastGps?.speed?.toString(),
-        lastHeading: bv.stats?.lastGps?.heading,
-        lastLocationUpdatedAt: bv.stats?.lastGps?.timestamp ? new Date(bv.stats.lastGps.timestamp) : null,
+        lastLatitude: bv.stats?.location?.lat?.toString(),
+        lastLongitude: bv.stats?.location?.lon?.toString(),
+        lastSpeed: bv.stats?.speed?.toString(),
+        lastHeading: bv.stats?.location?.heading,
+        lastLocationUpdatedAt: bv.stats?.lastUpdated ? new Date(bv.stats.lastUpdated) : null,
         updatedAt: new Date(),
       };
 
@@ -286,14 +290,14 @@ export class BouncieService {
       const vehicles = await this.fetchVehiclesFromBouncie();
       
       for (const bv of vehicles) {
-        if (bv.stats?.lastGps) {
+        if (bv.stats?.location) {
           await db.update(bouncieVehicles)
             .set({
-              lastLatitude: bv.stats.lastGps.latitude?.toString(),
-              lastLongitude: bv.stats.lastGps.longitude?.toString(),
-              lastSpeed: bv.stats.lastGps.speed?.toString(),
-              lastHeading: bv.stats.lastGps.heading,
-              lastLocationUpdatedAt: new Date(bv.stats.lastGps.timestamp),
+              lastLatitude: bv.stats.location.lat?.toString(),
+              lastLongitude: bv.stats.location.lon?.toString(),
+              lastSpeed: bv.stats.speed?.toString(),
+              lastHeading: bv.stats.location.heading,
+              lastLocationUpdatedAt: bv.stats.lastUpdated ? new Date(bv.stats.lastUpdated) : new Date(),
               updatedAt: new Date(),
             })
             .where(eq(bouncieVehicles.imei, bv.imei));
@@ -306,3 +310,47 @@ export class BouncieService {
 }
 
 export const bouncieService = new BouncieService();
+
+let bouncieRefreshInterval: NodeJS.Timeout | null = null;
+
+export function startBouncieBackgroundSync(intervalMinutes: number = 5) {
+  if (bouncieRefreshInterval) {
+    clearInterval(bouncieRefreshInterval);
+  }
+  
+  console.log(`[Bouncie] Starting background sync every ${intervalMinutes} minutes`);
+  
+  // Run initial sync after 30 seconds to let the app start up
+  setTimeout(async () => {
+    try {
+      if (bouncieService.isConfigured()) {
+        console.log("[Bouncie] Running initial background sync...");
+        await bouncieService.refreshLocations();
+        console.log("[Bouncie] Initial sync complete");
+      }
+    } catch (error) {
+      console.error("[Bouncie] Initial sync failed:", error);
+    }
+  }, 30000);
+  
+  // Then run periodically
+  bouncieRefreshInterval = setInterval(async () => {
+    try {
+      if (bouncieService.isConfigured()) {
+        console.log("[Bouncie] Running background location refresh...");
+        await bouncieService.refreshLocations();
+        console.log("[Bouncie] Background refresh complete");
+      }
+    } catch (error) {
+      console.error("[Bouncie] Background refresh failed:", error);
+    }
+  }, intervalMinutes * 60 * 1000);
+}
+
+export function stopBouncieBackgroundSync() {
+  if (bouncieRefreshInterval) {
+    clearInterval(bouncieRefreshInterval);
+    bouncieRefreshInterval = null;
+    console.log("[Bouncie] Background sync stopped");
+  }
+}

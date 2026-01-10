@@ -30,6 +30,7 @@ import { syncCustomersFromSheet, getCustomerSyncStatus, resetSyncHash, startAuto
 import { generateQuoteWithAI, createQuoteConversation, getConversationHistory, type QuoteGenerationInput } from "./services/quote-generation";
 import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorStore, getOrCreateVectorStore, seedVectorStoreWithSalesBook, uploadCRMKnowledgeBase } from "./services/vector-store";
 import { refreshWeather, scheduleWeatherRefresh, getWeatherData } from "./weather-service";
+import { startBouncieBackgroundSync } from "./services/bouncieService";
 import { scheduleWeatherImpactJobs } from "./weather-impact-service";
 import { scheduleAgreementRenewals, processAgreementRenewals, processSingleAgreementRenewal } from "./services/agreementRenewalService";
 import { scheduleMaintenanceReminders, processMaintenanceReminders } from "./services/maintenanceReminderService";
@@ -23172,12 +23173,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(400).json({ message: "Not connected to Bouncie. Please connect first." });
       }
 
-      // Build redirect URI for potential token exchange
-      const host = req.headers.host || "localhost:5000";
-      const protocol = req.headers["x-forwarded-proto"] || "https";
-      const redirectUri = `${protocol}://${host}/api/bouncie/callback`;
-
-      const result = await bouncieService.syncVehicles(redirectUri);
+      const result = await bouncieService.syncVehicles();
       return res.json({ 
         success: true, 
         message: `Synced ${result.total} vehicles (${result.created} new, ${result.updated} updated)`,
@@ -23486,6 +23482,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
     // Start maintenance reminder job (sends 10-day and 5-day SMS reminders for upcoming visits)
     scheduleMaintenanceReminders();
+
+    // Start Bouncie fleet location sync (every 5 minutes for real-time GPS tracking)
+    startBouncieBackgroundSync(5);
 
     // Seed vector store with sales book if empty (async, don't block startup)
     seedVectorStoreWithSalesBook().then(success => {
