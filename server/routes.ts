@@ -23139,8 +23139,12 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(400).json({ message: "Bouncie credentials not configured" });
       }
 
-      // Developer portal codes don't need a redirect_uri
-      const tokenResponse = await bouncieService.exchangeCodeForToken(authorizationCode);
+      // Build the redirect URI - must match what's registered in Bouncie Developer Portal
+      const host = req.headers.host || "localhost:5000";
+      const protocol = req.headers["x-forwarded-proto"] || "https";
+      const redirectUri = `${protocol}://${host}/api/bouncie/callback`;
+
+      const tokenResponse = await bouncieService.exchangeCodeForToken(authorizationCode, redirectUri);
 
       const tokenExpiresAt = new Date(Date.now() + tokenResponse.expires_in * 1000);
       
