@@ -351,14 +351,14 @@ Return JSON with:
         }
       ],
       response_format: { type: "json_object" },
-      max_completion_tokens: 500,
+      max_completion_tokens: 1000,
     });
 
-    console.log("[CRM Help AI] Response received:", response.choices[0]?.message?.content?.substring(0, 100));
+    console.log("[CRM Help AI] Full response:", JSON.stringify(response, null, 2));
     
     const content = response.choices[0]?.message?.content;
     if (!content) {
-      console.log("[CRM Help AI] No content in response");
+      console.log("[CRM Help AI] No content in response - finish_reason:", response.choices[0]?.finish_reason);
       return {
         answer: "I couldn't process your question. Please try rephrasing it.",
         relatedTopics: [],
