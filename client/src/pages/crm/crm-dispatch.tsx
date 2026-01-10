@@ -884,7 +884,10 @@ function TrucksMapView({ technicians }: TrucksMapViewProps) {
       <CardContent className="flex-1 p-0">
         <div className="flex h-full">
           <FleetMap 
-            vehicles={vehicles} 
+            vehicles={vehicles.map(v => ({
+              ...v,
+              technicianName: v.technicianId ? (technicians.find(t => t.id === v.technicianId)?.name || null) : null
+            }))} 
             selectedVehicleId={selectedVehicleId}
             onVehicleClick={handleVehicleClick}
           />

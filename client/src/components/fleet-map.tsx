@@ -24,10 +24,11 @@ interface FleetMapProps {
   onVehicleClick?: (vehicleId: string) => void;
 }
 
-function createArrowIcon(vehicleName: string, heading: number, isMoving: boolean, isActive: boolean, isSelected: boolean) {
+function createArrowIcon(vehicleName: string, technicianName: string | null | undefined, heading: number, isMoving: boolean, isActive: boolean, isSelected: boolean) {
   const arrowColor = !isActive ? "#94a3b8" : isMoving ? "#22c55e" : "#2563eb";
   const rotation = heading || 0;
-  const shortName = vehicleName.length > 15 ? vehicleName.substring(0, 13) + '...' : vehicleName;
+  const displayName = technicianName || vehicleName;
+  const shortName = displayName.length > 15 ? displayName.substring(0, 13) + '...' : displayName;
   const borderStyle = isSelected ? '3px solid #f59e0b' : 'none';
   const glowStyle = isSelected ? 'filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.8));' : '';
   
@@ -173,6 +174,7 @@ export function FleetMap({ vehicles, selectedVehicleId, onVehicleClick }: FleetM
               position={[lat, lng]}
               icon={createArrowIcon(
                 vehicle.vehicleName,
+                vehicle.technicianName,
                 heading,
                 isMoving,
                 vehicle.isActive !== false,
