@@ -54,19 +54,25 @@ export class BouncieService {
     return `${BOUNCIE_AUTH_URL}?${params.toString()}`;
   }
 
-  async exchangeCodeForToken(code: string, redirectUri: string): Promise<TokenResponse> {
+  async exchangeCodeForToken(code: string, redirectUri?: string): Promise<TokenResponse> {
+    const payload: Record<string, string> = {
+      client_id: this.clientId,
+      client_secret: this.clientSecret,
+      grant_type: "authorization_code",
+      code,
+    };
+    
+    // Only include redirect_uri if provided (not needed for developer portal codes)
+    if (redirectUri) {
+      payload.redirect_uri = redirectUri;
+    }
+
     const response = await fetch(BOUNCIE_TOKEN_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        client_id: this.clientId,
-        client_secret: this.clientSecret,
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: redirectUri,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
