@@ -154,7 +154,7 @@ export class BouncieService {
 
     const response = await fetch(`${BOUNCIE_API_BASE}/vehicles`, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: accessToken,
         "Content-Type": "application/json",
       },
     });
@@ -177,7 +177,7 @@ export class BouncieService {
             // Retry the request with the new token
             const retryResponse = await fetch(`${BOUNCIE_API_BASE}/vehicles`, {
               headers: {
-                Authorization: `Bearer ${tokenResponse.access_token}`,
+                Authorization: tokenResponse.access_token,
                 "Content-Type": "application/json",
               },
             });
