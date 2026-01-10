@@ -837,6 +837,27 @@ export const crmAuditLog = pgTable("crm_audit_log", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Bouncie Vehicle Tracking
+export const bouncieVehicles = pgTable("bouncie_vehicles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  technicianId: varchar("technician_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  deviceId: text("device_id").notNull(),
+  vehicleName: text("vehicle_name").notNull(),
+  vehicleMake: text("vehicle_make"),
+  vehicleModel: text("vehicle_model"),
+  vehicleYear: text("vehicle_year"),
+  licensePlate: text("license_plate"),
+  vin: text("vin"),
+  lastLatitude: decimal("last_latitude", { precision: 10, scale: 7 }),
+  lastLongitude: decimal("last_longitude", { precision: 10, scale: 7 }),
+  lastLocationUpdatedAt: timestamp("last_location_updated_at"),
+  lastSpeed: decimal("last_speed", { precision: 5, scale: 1 }),
+  lastHeading: integer("last_heading"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // CRM Customer Type and Status Enums
 export const crmCustomerTypeEnum = ["residential", "commercial", "property_manager"] as const;
 export type CrmCustomerType = typeof crmCustomerTypeEnum[number];
@@ -2127,6 +2148,12 @@ export const insertCrmAuditLogSchema = createInsertSchema(crmAuditLog).omit({
   createdAt: true,
 });
 
+export const insertBouncieVehicleSchema = createInsertSchema(bouncieVehicles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertCrmWorkOrderSchema = createInsertSchema(crmWorkOrders).omit({
   id: true,
   createdAt: true,
@@ -2160,6 +2187,8 @@ export type CrmUser = typeof crmUsers.$inferSelect;
 export type CrmSession = typeof crmSessions.$inferSelect;
 export type InsertCrmAuditLog = z.infer<typeof insertCrmAuditLogSchema>;
 export type CrmAuditLogEntry = typeof crmAuditLog.$inferSelect;
+export type InsertBouncieVehicle = z.infer<typeof insertBouncieVehicleSchema>;
+export type BouncieVehicle = typeof bouncieVehicles.$inferSelect;
 export type InsertCrmCustomer = z.infer<typeof insertCrmCustomerSchema>;
 export type CrmCustomer = typeof crmCustomers.$inferSelect;
 export type InsertCrmProperty = z.infer<typeof insertCrmPropertySchema>;
