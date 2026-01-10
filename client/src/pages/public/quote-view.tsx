@@ -291,9 +291,20 @@ function SignaturePad({ onSignatureChange }: { onSignatureChange: (dataUrl: stri
   );
 }
 
-function QuoteAlreadyAccepted({ quote }: { quote: CrmQuote }) {
+function QuoteAlreadyAccepted({ quote, lineItems }: { quote: CrmQuote; lineItems: CrmQuoteLineItem[] }) {
   const depositAmount = quote.depositAmount ? parseFloat(quote.depositAmount.toString()) : 0;
-  const total = quote.total ? parseFloat(quote.total.toString()) : 0;
+  
+  // For multi-option quotes, calculate the selected option's total instead of overall quote total
+  let total = quote.total ? parseFloat(quote.total.toString()) : 0;
+  
+  if (quote.quoteMode === "options" && quote.selectedOption && lineItems.length > 0) {
+    // Calculate total from selected option's line items only
+    const selectedOptionItems = lineItems.filter(item => item.optionTag === quote.selectedOption);
+    if (selectedOptionItems.length > 0) {
+      total = selectedOptionItems.reduce((sum, item) => sum + parseFloat(item.lineTotal || "0"), 0);
+    }
+  }
+  
   const remainingBalance = !isNaN(total) && !isNaN(depositAmount) ? total - depositAmount : 0;
   const hasDeposit = !isNaN(depositAmount) && depositAmount > 0 && quote.depositPaidAt;
   
@@ -635,7 +646,7 @@ export default function PublicQuoteView() {
   const depositPercentage = (quoteData as any).depositPercentage ?? 50;
 
   if (quoteData.status === "accepted") {
-    return <QuoteAlreadyAccepted quote={quoteData} />;
+    return <QuoteAlreadyAccepted quote={quoteData} lineItems={lineItems} />;
   }
 
   if (isAccepted) {
