@@ -49,9 +49,25 @@ When creating or editing an invoice, the "Auto Pay" or "Auto Invoice" option mea
 - **Expired**: Grace period passed without payment. Agreement is no longer active.
 - **Cancelled**: Agreement was manually cancelled.
 
-### Billing Preferences
-- **Auto Invoice**: System automatically generates and sends renewal invoices. Customer pays remotely.
-- **Pay on Visit**: Technician collects payment during the maintenance visit. No automatic invoicing.
+### Billing Preferences (IMPORTANT: Choose when creating agreement)
+When creating a new maintenance agreement, you must choose a billing preference:
+
+- **Auto Invoice (autopay)**: 
+  * System automatically generates and sends renewal invoices when due
+  * Customer receives invoice via email with payment link
+  * Payment is collected remotely via Stripe
+  * Best for: Customers who prefer to pay online without technician involvement
+  * Renewal invoices are sent automatically based on nextInvoiceDate
+  
+- **Pay on Visit**: 
+  * NO automatic invoicing - technician collects payment in person
+  * Payment is collected during the actual maintenance visit
+  * Best for: Customers who prefer to pay cash/check on-site
+  * No emails or automatic billing sent to customer
+
+### Which Billing Preference Should I Choose?
+- Choose **Auto Invoice** if the customer wants hands-off automatic billing and will pay by credit card online
+- Choose **Pay on Visit** if the customer prefers to pay cash, check, or in-person during the maintenance appointment
 
 ### Agreement Lifecycle
 1. Agreement created → Status: "Pending", isInitialCycle: true
@@ -107,17 +123,22 @@ When creating or editing an invoice, the "Auto Pay" or "Auto Invoice" option mea
 ## PROJECTS
 
 ### Project Statuses (Pipeline)
-- **Lead**: Initial inquiry, qualifying the opportunity
+- **New (Lead)**: Initial inquiry, qualifying the opportunity
 - **Proposal Sent**: Quote/proposal delivered to customer
-- **Approved**: Customer accepted, work is authorized
+- **Equipment Ordered**: Equipment has been ordered for the project
+- **Equipment Arrived**: Equipment received, ready for installation
 - **In Progress**: Active work underway
 - **Completed**: All work finished
 - **Closed**: Finalized, invoiced, and archived
+- **Cancelled**: Project was cancelled
+
+### Project Status Flow
+Projects follow this simplified flow: New → Equipment Ordered → Equipment Arrived → In Progress → Completed → Closed
 
 ### Project Scheduling
-- Projects can have start and end dates
-- Displayed on the calendar view as continuous bars
-- Scheduled projects appear in the Overview section
+- Projects REQUIRE start and end dates when created
+- Displayed on the calendar view as continuous colored bars
+- All projects appear on the Calendar tab by date range
 
 ### Project Value
 - **Expected Value**: Populated when a quote is accepted
@@ -256,6 +277,11 @@ Classes route revenue to proper income accounts for P&L reporting:
 
 ## COMMON QUESTIONS
 
+### "What's the difference between auto invoice and pay per visit / pay on visit?"
+When creating a maintenance agreement, you choose how payments are collected:
+- **Auto Invoice (autopay)**: The system automatically sends invoices and the customer pays online via credit card. No technician involvement needed for payment.
+- **Pay on Visit (pay per visit)**: The technician collects payment in person during the maintenance appointment. No automatic invoices are sent. Use this for customers who prefer to pay cash or check on-site.
+
 ### "What happens when I mark a work order as complete?"
 The work order status changes to "Completed". If linked to a maintenance agreement, the visit is marked complete. No automatic invoice is created - you create invoices separately.
 
@@ -263,13 +289,19 @@ The work order status changes to "Completed". If linked to a maintenance agreeme
 Check: 1) Status must be "Active" (not Pending), 2) isInitialCycle must be false, 3) Billing preference must be "Auto Invoice" not "Pay on Visit", 4) nextInvoiceDate must be reached.
 
 ### "How do I collect payment for a maintenance visit?"
-Two options: 1) For auto_invoice agreements, invoices are sent automatically. 2) For pay_on_visit agreements, the technician collects payment on-site and records it manually.
+Two options: 1) For auto_invoice agreements, invoices are sent automatically and customer pays online. 2) For pay_on_visit agreements, the technician collects payment on-site and records it manually.
 
 ### "What's the difference between a Work Order and a Project?"
 Work Orders are individual appointments/visits. Projects are larger scope containers ($5k+) that can contain multiple work orders. Use projects for multi-phase installations; use work orders for single visits.
 
 ### "How do I convert a quote to an invoice?"
 After the quote is accepted: 1) Go to the quote detail page, 2) Click "Create Invoice from Quote", 3) Review and adjust line items if needed, 4) Save and send the invoice.
+
+### "How do I create a new project?"
+Go to Projects page, click "New Project", fill in the customer, title, project type, start date, and end date. All projects require date ranges so they appear on the calendar.
+
+### "What are the project statuses?"
+Projects follow this flow: New → Equipment Ordered → Equipment Arrived → In Progress → Completed → Closed. When you add equipment info to a new project, it automatically moves to "Equipment Ordered".
 `;
 
 export interface CrmHelpResponse {
