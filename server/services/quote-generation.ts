@@ -8,8 +8,57 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
+// CRM Knowledge Base - comprehensive system knowledge for AI context
+const CRM_KNOWLEDGE_CONTEXT = `
+## GHVAC CRM KNOWLEDGE
+
+### Pricing Rules
+- Elite Package: 20% discount on combined total (includes 10-Year Maintenance, Labor Warranty, Install Bundle, Ducting)
+- Maximum discretionary discount: 10% without manager approval
+- Financing: 67 months standard, monthly = total / 67
+- Overhead multiplier: 1.3-1.5x material cost
+
+### Customer Types
+- Residential: Single-family homes, condos - routes to "Residential" accounts
+- Commercial: Businesses, offices - routes to "Commercial" accounts  
+- Property Managers: Multiple properties, must select type per location
+
+### Service Categories
+- Service: Diagnostic/repair visits
+- Install: New equipment, replacements ($5k+ typically)
+- Maintenance: Preventive scheduled visits
+- Crawlspace: Encapsulation, moisture control
+
+### Quote Types
+- Custom Install: High-value, deposit required, financing options shown
+- Service: Repairs, may not need deposit
+- Proposal: Formal proposals, triggers project on acceptance
+
+### Equipment Sizing (Tonnage)
+- 1.5 ton: 600-900 sq ft | 2.0 ton: 901-1,200 sq ft | 2.5 ton: 1,201-1,500 sq ft
+- 3.0 ton: 1,501-1,800 sq ft | 3.5 ton: 1,801-2,100 sq ft | 4.0 ton: 2,101-2,400 sq ft
+- 5.0 ton: 2,401-3,000 sq ft
+
+### Common Brands
+Trane, Carrier, Lennox, Rheem, Goodman, Daikin, Aprilaire (air quality)
+
+### Elite Package Value Points
+- 10-year maintenance coverage (10 annual tune-ups)
+- Labor warranty on all repairs
+- Priority scheduling
+- Parts discount on future needs
+- Peace of mind protection
+
+### Handling Objections
+- "Too expensive": Emphasize quality, longevity (15-20yr), warranty, financing options
+- "Need discount": Max 10% discretionary, Elite already saves 20%
+- "How long will it last": Quality systems 15-20+ years with maintenance
+`;
+
 // System instruction block - always sent with every request (SINGLE mode - combined quote)
 const SYSTEM_INSTRUCTIONS = `You are GHVAC's professional HVAC quoting assistant. Generate professional "Comprehensive Home Comfort Proposal" documents.
+
+${CRM_KNOWLEDGE_CONTEXT}
 
 DOCUMENT FORMAT (FOLLOW EXACTLY):
 1. quote_title: Format as "$TOTAL [Descriptive Title]" (e.g., "$25,599.00 Premium 3-Ton Trane HVAC System"). Do NOT use "OPTION:" prefix - this is a single combined quote.
@@ -42,6 +91,8 @@ All prices must be numbers (not strings). Format prices as numbers, frontend han
 
 // System instructions for OPTIONS mode - customer picks ONE option
 const SYSTEM_INSTRUCTIONS_OPTIONS = `You are GHVAC's professional HVAC quoting assistant. Generate a "Comprehensive Home Comfort Proposal" with MULTIPLE OPTIONS for the customer to choose from.
+
+${CRM_KNOWLEDGE_CONTEXT}
 
 CRITICAL: This is an OPTIONS proposal. The customer will SELECT ONE OPTION, not buy all of them.
 

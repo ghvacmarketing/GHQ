@@ -28,7 +28,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { syncCustomersFromSheet, getCustomerSyncStatus, resetSyncHash, startAutoSync } from "./services/customer-sync";
 import { generateQuoteWithAI, createQuoteConversation, getConversationHistory, type QuoteGenerationInput } from "./services/quote-generation";
-import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorStore, getOrCreateVectorStore, seedVectorStoreWithSalesBook } from "./services/vector-store";
+import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorStore, getOrCreateVectorStore, seedVectorStoreWithSalesBook, uploadCRMKnowledgeBase } from "./services/vector-store";
 import { refreshWeather, scheduleWeatherRefresh, getWeatherData } from "./weather-service";
 import { scheduleWeatherImpactJobs } from "./weather-impact-service";
 import { scheduleAgreementRenewals, processAgreementRenewals, processSingleAgreementRenewal } from "./services/agreementRenewalService";
@@ -1835,6 +1835,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error seeding vector store:", error);
       res.status(500).json({ message: "Error seeding vector store" });
+    }
+  });
+
+  app.post("/api/admin/vector-store/upload-crm-knowledge", requireAdminAuth, async (req, res) => {
+    try {
+      const { isVectorStoreUnavailable } = await import("./services/vector-store");
+      
+      if (isVectorStoreUnavailable()) {
+        return res.status(503).json({ 
+          message: "Vector store API not available in this environment.",
+          available: false
+        });
+      }
+      
+      const success = await uploadCRMKnowledgeBase();
+      if (success) {
+        const files = await listVectorStoreFiles();
+        res.json({ message: "CRM knowledge base uploaded successfully", files, available: true });
+      } else {
+        res.status(400).json({ message: "CRM knowledge base file not found or already uploaded" });
+      }
+    } catch (error) {
+      console.error("Error uploading CRM knowledge base:", error);
+      res.status(500).json({ message: "Error uploading CRM knowledge base" });
     }
   });
 

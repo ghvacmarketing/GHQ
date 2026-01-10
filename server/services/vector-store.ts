@@ -235,6 +235,40 @@ export async function seedVectorStoreWithSalesBook(): Promise<boolean> {
   }
 }
 
+export async function uploadCRMKnowledgeBase(): Promise<boolean> {
+  if (vectorStoreUnavailable) {
+    console.log("Vector store unavailable, skipping CRM knowledge base upload.");
+    return false;
+  }
+
+  try {
+    await getOrCreateVectorStore();
+    
+    const files = await listVectorStoreFiles();
+    const hasKnowledgeBase = files.some(f => f.filename.includes("crm-knowledge-base"));
+    
+    if (hasKnowledgeBase) {
+      console.log("CRM knowledge base already in vector store.");
+      return true;
+    }
+
+    const kbPath = path.join(process.cwd(), "server", "data", "crm-knowledge-base.md");
+    
+    if (!fs.existsSync(kbPath)) {
+      console.log("CRM knowledge base file not found.");
+      return false;
+    }
+
+    console.log("Uploading CRM knowledge base to vector store...");
+    await uploadFileToVectorStore(kbPath, "crm-knowledge-base.md");
+    console.log("CRM knowledge base uploaded successfully.");
+    return true;
+  } catch (error) {
+    console.error("Error uploading CRM knowledge base:", error);
+    return false;
+  }
+}
+
 export function isVectorStoreUnavailable(): boolean {
   return vectorStoreUnavailable;
 }
