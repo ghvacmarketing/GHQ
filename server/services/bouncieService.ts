@@ -34,20 +34,24 @@ interface TokenResponse {
 export class BouncieService {
   private clientId: string;
   private clientSecret: string;
-  private apiKey: string;
+  private authorizationCode: string;  // Long-lived auth code from Developer Portal
+  private redirectUri: string;         // Registered redirect URI
+  private cachedAccessToken: string | null = null;
+  private cachedTokenExpiresAt: Date | null = null;
 
   constructor() {
     this.clientId = process.env.BOUNCIE_CLIENT_ID || "";
     this.clientSecret = process.env.BOUNCIE_CLIENT_SECRET || "";
-    this.apiKey = process.env.BOUNCIE_API_KEY || "";
+    this.authorizationCode = process.env.BOUNCIE_API_KEY || "";  // The auth code from Developer Portal
+    this.redirectUri = process.env.BOUNCIE_REDIRECT_URI || "";   // Must match the registered URI in Bouncie Developer Portal
   }
 
   isConfigured(): boolean {
-    return Boolean(this.apiKey || (this.clientId && this.clientSecret));
+    return Boolean(this.authorizationCode && this.clientId && this.clientSecret);
   }
   
   hasApiKey(): boolean {
-    return Boolean(this.apiKey);
+    return Boolean(this.authorizationCode);
   }
 
   getAuthorizationUrl(redirectUri: string, state?: string): string {
@@ -60,25 +64,23 @@ export class BouncieService {
     return `${BOUNCIE_AUTH_URL}?${params.toString()}`;
   }
 
-  async exchangeCodeForToken(code: string, redirectUri?: string): Promise<TokenResponse> {
-    const payload: Record<string, string> = {
-      client_id: this.clientId,
-      client_secret: this.clientSecret,
-      grant_type: "authorization_code",
-      code,
-    };
-    
-    // Only include redirect_uri if provided (not needed for developer portal codes)
-    if (redirectUri) {
-      payload.redirect_uri = redirectUri;
-    }
+  async exchangeCodeForToken(code: string, redirectUri: string): Promise<TokenResponse> {
+    // Bouncie expects form-urlencoded data, not JSON
+    const params = new URLSearchParams();
+    params.append("client_id", this.clientId);
+    params.append("client_secret", this.clientSecret);
+    params.append("grant_type", "authorization_code");
+    params.append("code", code);
+    params.append("redirect_uri", redirectUri);
+
+    console.log("[BouncieService] Exchanging code for token with redirect_uri:", redirectUri);
 
     const response = await fetch(BOUNCIE_TOKEN_URL, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: JSON.stringify(payload),
+      body: params.toString(),
     });
 
     if (!response.ok) {
@@ -114,17 +116,58 @@ export class BouncieService {
   }
 
   async getAccessToken(): Promise<string | null> {
-    // If API key is configured, use it directly
-    if (this.apiKey) {
-      return this.apiKey;
+    // Check if we have a cached token that's still valid (with 60s buffer)
+    if (this.cachedAccessToken && this.cachedTokenExpiresAt) {
+      const bufferTime = 60 * 1000; // 60 second buffer
+      if (this.cachedTokenExpiresAt.getTime() - bufferTime > Date.now()) {
+        return this.cachedAccessToken;
+      }
     }
+
+    // Check database for valid token
     const settings = await this.getSettings();
-    return settings?.accessToken || null;
+    if (settings?.accessToken && settings?.tokenExpiresAt) {
+      const bufferTime = 60 * 1000;
+      if (settings.tokenExpiresAt.getTime() - bufferTime > Date.now()) {
+        this.cachedAccessToken = settings.accessToken;
+        this.cachedTokenExpiresAt = settings.tokenExpiresAt;
+        return settings.accessToken;
+      }
+    }
+
+    // Need to exchange auth code for a fresh token
+    if (!this.authorizationCode) {
+      return null;
+    }
+
+    try {
+      console.log("[BouncieService] Exchanging authorization code for access token...");
+      const tokenResponse = await this.exchangeCodeForToken(this.authorizationCode, this.redirectUri);
+      const tokenExpiresAt = new Date(Date.now() + tokenResponse.expires_in * 1000);
+      
+      // Cache in memory
+      this.cachedAccessToken = tokenResponse.access_token;
+      this.cachedTokenExpiresAt = tokenExpiresAt;
+      
+      // Save to database
+      await this.saveSettings({
+        authorizationCode: this.authorizationCode,
+        accessToken: tokenResponse.access_token,
+        tokenExpiresAt,
+        connectedAt: new Date(),
+      });
+      
+      console.log("[BouncieService] Successfully obtained access token, expires at:", tokenExpiresAt);
+      return tokenResponse.access_token;
+    } catch (error) {
+      console.error("[BouncieService] Failed to exchange auth code for token:", error);
+      return null;
+    }
   }
 
   async isConnected(): Promise<boolean> {
-    // If API key is configured, we're always connected
-    if (this.apiKey) {
+    // If auth code is configured, we're connected (can exchange for token)
+    if (this.authorizationCode && this.clientId && this.clientSecret) {
       return true;
     }
     const settings = await this.getSettings();
@@ -146,47 +189,37 @@ export class BouncieService {
     }
   }
 
-  async fetchVehiclesFromBouncie(redirectUri?: string): Promise<BouncieVehicle[]> {
-    let accessToken = await this.getAccessToken();
+  async fetchVehiclesFromBouncie(): Promise<BouncieVehicle[]> {
+    const accessToken = await this.getAccessToken();
     if (!accessToken) {
-      throw new Error("Not connected to Bouncie. Please connect first.");
+      throw new Error("Not connected to Bouncie. Please check your credentials (Client ID, Client Secret, Authorization Code, and Redirect URI).");
     }
 
+    console.log("[BouncieService] Fetching vehicles from Bouncie API...");
     const response = await fetch(`${BOUNCIE_API_BASE}/vehicles`, {
       headers: {
-        Authorization: accessToken,
+        Authorization: accessToken,  // Bouncie API expects token without "Bearer" prefix
         "Content-Type": "application/json",
       },
     });
 
     if (!response.ok) {
       if (response.status === 401) {
-        // If we have an API key set, it might be an authorization code that needs to be exchanged
-        if (this.apiKey && redirectUri) {
-          console.log("[BouncieService] Token invalid, attempting to exchange API key as authorization code...");
-          try {
-            const tokenResponse = await this.exchangeCodeForToken(this.apiKey, redirectUri);
-            const tokenExpiresAt = new Date(Date.now() + tokenResponse.expires_in * 1000);
-            await this.saveSettings({
-              authorizationCode: this.apiKey,
-              accessToken: tokenResponse.access_token,
-              tokenExpiresAt,
-              connectedAt: new Date(),
-            });
-            
-            // Retry the request with the new token
-            const retryResponse = await fetch(`${BOUNCIE_API_BASE}/vehicles`, {
-              headers: {
-                Authorization: tokenResponse.access_token,
-                "Content-Type": "application/json",
-              },
-            });
-            
-            if (retryResponse.ok) {
-              return retryResponse.json();
-            }
-          } catch (exchangeError) {
-            console.error("[BouncieService] Failed to exchange code:", exchangeError);
+        // Clear cached token and try once more with fresh token
+        this.cachedAccessToken = null;
+        this.cachedTokenExpiresAt = null;
+        
+        const freshToken = await this.getAccessToken();
+        if (freshToken) {
+          const retryResponse = await fetch(`${BOUNCIE_API_BASE}/vehicles`, {
+            headers: {
+              Authorization: freshToken,
+              "Content-Type": "application/json",
+            },
+          });
+          
+          if (retryResponse.ok) {
+            return retryResponse.json();
           }
         }
         throw new Error("Bouncie authorization expired. Please reconnect.");
@@ -198,8 +231,8 @@ export class BouncieService {
     return response.json();
   }
 
-  async syncVehicles(redirectUri?: string): Promise<{ created: number; updated: number; total: number }> {
-    const bouncieVehiclesList = await this.fetchVehiclesFromBouncie(redirectUri);
+  async syncVehicles(): Promise<{ created: number; updated: number; total: number }> {
+    const bouncieVehiclesList = await this.fetchVehiclesFromBouncie();
     let created = 0;
     let updated = 0;
 
