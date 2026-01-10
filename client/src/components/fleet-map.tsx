@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { useEffect, useRef, useState } from "react";
+import { MapContainer, TileLayer, Marker, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -23,24 +23,57 @@ interface FleetMapProps {
   onVehicleClick?: (vehicleId: string) => void;
 }
 
-const truckIconSvg = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="32" height="32">
-  <circle cx="12" cy="12" r="11" fill="FILL_COLOR" stroke="white" stroke-width="2"/>
-  <path d="M7 16.5C7 17.33 6.33 18 5.5 18S4 17.33 4 16.5 4.67 15 5.5 15s1.5.67 1.5 1.5zM20 16.5c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5.67-1.5 1.5-1.5 1.5.67 1.5 1.5zM14 7h3l3 4v4h-2M14 7H4v9h2M7 16h10" 
-        fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>
-`;
-
-function createTruckIcon(isMoving: boolean, isActive: boolean) {
-  const color = !isActive ? "#94a3b8" : isMoving ? "#22c55e" : "#711419";
-  const svg = truckIconSvg.replace("FILL_COLOR", color);
+function createLabeledTruckIcon(vehicleName: string, technicianName: string | null | undefined, isMoving: boolean, isActive: boolean, isSelected: boolean) {
+  const bgColor = !isActive ? "#94a3b8" : isMoving ? "#22c55e" : "#711419";
+  const statusDot = isMoving 
+    ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:4px;animation:pulse 1.5s infinite;"></span>'
+    : '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#94a3b8;margin-right:4px;"></span>';
+  
+  const shortName = vehicleName.length > 20 ? vehicleName.substring(0, 18) + '...' : vehicleName;
+  const techDisplay = technicianName ? technicianName.split(' ')[0] : 'Unassigned';
+  
+  const borderStyle = isSelected ? '3px solid #2563eb' : '2px solid white';
+  const shadowStyle = isSelected ? '0 4px 12px rgba(37, 99, 235, 0.4)' : '0 2px 8px rgba(0,0,0,0.3)';
+  
+  const html = `
+    <div style="display:flex;flex-direction:column;align-items:center;pointer-events:auto;">
+      <div style="
+        background:${bgColor};
+        color:white;
+        padding:6px 10px;
+        border-radius:8px;
+        font-size:11px;
+        font-weight:600;
+        white-space:nowrap;
+        box-shadow:${shadowStyle};
+        border:${borderStyle};
+        min-width:80px;
+        text-align:center;
+      ">
+        <div style="display:flex;align-items:center;justify-content:center;gap:2px;">
+          ${statusDot}
+          <span>${shortName}</span>
+        </div>
+        <div style="font-size:10px;font-weight:400;opacity:0.9;margin-top:2px;">
+          ${techDisplay}
+        </div>
+      </div>
+      <div style="
+        width:0;
+        height:0;
+        border-left:8px solid transparent;
+        border-right:8px solid transparent;
+        border-top:8px solid ${bgColor};
+        margin-top:-1px;
+      "></div>
+    </div>
+  `;
   
   return L.divIcon({
-    html: svg,
-    className: "truck-marker",
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -16],
+    html,
+    className: "truck-label-marker",
+    iconSize: [120, 60],
+    iconAnchor: [60, 60],
   });
 }
 
@@ -55,7 +88,7 @@ function FitBounds({ vehicles }: { vehicles: Vehicle[] }) {
       validVehicles.map(v => [parseFloat(v.lastLatitude!), parseFloat(v.lastLongitude!)] as [number, number])
     );
     
-    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
+    map.fitBounds(bounds, { padding: [80, 80], maxZoom: 12 });
   }, [vehicles, map]);
   
   return null;
@@ -106,15 +139,24 @@ export function FleetMap({ vehicles, selectedVehicleId, onVehicleClick }: FleetM
   return (
     <div className="flex-1 min-h-[400px] relative">
       <style>{`
-        .truck-marker {
-          background: none;
-          border: none;
+        .truck-label-marker {
+          background: none !important;
+          border: none !important;
         }
-        .leaflet-popup-content-wrapper {
+        .leaflet-tooltip {
+          background: white;
+          border: 1px solid #e2e8f0;
           border-radius: 8px;
+          padding: 8px 12px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          font-size: 12px;
         }
-        .leaflet-popup-content {
-          margin: 12px;
+        .leaflet-tooltip-top:before {
+          border-top-color: #e2e8f0;
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
         }
       `}</style>
       <MapContainer
@@ -124,8 +166,9 @@ export function FleetMap({ vehicles, selectedVehicleId, onVehicleClick }: FleetM
         ref={mapRef}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          maxZoom={19}
         />
         <FitBounds vehicles={vehiclesWithLocation} />
         
@@ -134,49 +177,46 @@ export function FleetMap({ vehicles, selectedVehicleId, onVehicleClick }: FleetM
           const lng = parseFloat(vehicle.lastLongitude!);
           const speed = vehicle.lastSpeed ? parseFloat(vehicle.lastSpeed) : 0;
           const isMoving = speed > 0;
+          const isSelected = selectedVehicleId === vehicle.id;
           
           return (
             <Marker
               key={vehicle.id}
               position={[lat, lng]}
-              icon={createTruckIcon(isMoving, vehicle.isActive !== false)}
+              icon={createLabeledTruckIcon(
+                vehicle.vehicleName,
+                vehicle.technicianName,
+                isMoving,
+                vehicle.isActive !== false,
+                isSelected
+              )}
               eventHandlers={{
                 click: () => onVehicleClick?.(vehicle.id),
               }}
             >
-              <Popup>
-                <div className="min-w-[200px]">
+              <Tooltip direction="top" offset={[0, -65]} opacity={1}>
+                <div className="min-w-[180px]">
                   <div className="font-semibold text-slate-800 mb-1">{vehicle.vehicleName}</div>
-                  {vehicle.technicianName && (
-                    <div className="text-sm text-slate-600 mb-2">
-                      Assigned to: {vehicle.technicianName}
+                  {vehicle.vehicleMake && vehicle.vehicleModel && (
+                    <div className="text-xs text-slate-500 mb-1">
+                      {vehicle.vehicleYear} {vehicle.vehicleMake} {vehicle.vehicleModel}
                     </div>
                   )}
-                  <div className="text-xs text-slate-500 space-y-1">
-                    {vehicle.vehicleMake && vehicle.vehicleModel && (
-                      <div>{vehicle.vehicleYear} {vehicle.vehicleMake} {vehicle.vehicleModel}</div>
+                  <div className="text-xs text-slate-500 flex items-center gap-1">
+                    {isMoving ? (
+                      <span className="text-green-600 font-medium">Moving at {Math.round(speed)} mph</span>
+                    ) : (
+                      <span className="text-slate-500">Parked</span>
                     )}
-                    <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center gap-1 ${isMoving ? 'text-green-600' : 'text-slate-500'}`}>
-                        {isMoving ? (
-                          <>
-                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                            Moving at {Math.round(speed)} mph
-                          </>
-                        ) : (
-                          <>
-                            <span className="w-2 h-2 rounded-full bg-slate-400" />
-                            Parked
-                          </>
-                        )}
-                      </span>
-                    </div>
-                    <div className="text-slate-400">
-                      Updated: {formatTimeAgo(vehicle.lastLocationUpdatedAt)}
-                    </div>
+                  </div>
+                  <div className="text-xs text-slate-400 mt-1">
+                    Updated: {formatTimeAgo(vehicle.lastLocationUpdatedAt)}
+                  </div>
+                  <div className="text-xs text-blue-600 mt-2 font-medium">
+                    Click for details →
                   </div>
                 </div>
-              </Popup>
+              </Tooltip>
             </Marker>
           );
         })}

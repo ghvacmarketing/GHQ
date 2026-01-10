@@ -260,6 +260,9 @@ export class BouncieService {
         lastSpeed: bv.stats?.speed?.toString(),
         lastHeading: bv.stats?.location?.heading,
         lastLocationUpdatedAt: bv.stats?.lastUpdated ? new Date(bv.stats.lastUpdated) : null,
+        odometer: bv.stats?.odometer?.toString(),
+        fuelLevel: bv.stats?.fuelLevel?.toString(),
+        isRunning: bv.stats?.isRunning || false,
         updatedAt: new Date(),
       };
 
@@ -298,6 +301,9 @@ export class BouncieService {
               lastSpeed: bv.stats.speed?.toString(),
               lastHeading: bv.stats.location.heading,
               lastLocationUpdatedAt: bv.stats.lastUpdated ? new Date(bv.stats.lastUpdated) : new Date(),
+              odometer: bv.stats.odometer?.toString(),
+              fuelLevel: bv.stats.fuelLevel?.toString(),
+              isRunning: bv.stats.isRunning || false,
               updatedAt: new Date(),
             })
             .where(eq(bouncieVehicles.imei, bv.imei));

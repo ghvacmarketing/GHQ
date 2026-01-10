@@ -12,6 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -797,12 +798,16 @@ interface BouncieVehicle {
   vehicleMake: string | null;
   vehicleModel: string | null;
   vehicleYear: string | null;
+  vin: string | null;
   licensePlate: string | null;
   lastLatitude: string | null;
   lastLongitude: string | null;
   lastLocationUpdatedAt: string | null;
   lastSpeed: string | null;
   lastHeading: number | null;
+  odometer: string | null;
+  fuelLevel: string | null;
+  isRunning: boolean | null;
   isActive: boolean;
 }
 
@@ -811,6 +816,8 @@ interface TrucksMapViewProps {
 }
 
 function TrucksMapView({ technicians }: TrucksMapViewProps) {
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+
   const { data: vehicles = [], isLoading } = useQuery<BouncieVehicle[]>({
     queryKey: ["/api/bouncie/vehicles"],
   });
@@ -828,6 +835,15 @@ function TrucksMapView({ technicians }: TrucksMapViewProps) {
   const formatLastUpdate = (timestamp: string | null) => {
     if (!timestamp) return "Never";
     return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
+  };
+
+  const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
+  const handleVehicleClick = (vehicleId: string) => {
+    setSelectedVehicleId(vehicleId);
+  };
+
+  const handleCloseSheet = () => {
+    setSelectedVehicleId(null);
   };
 
   if (isLoading) {
@@ -867,10 +883,12 @@ function TrucksMapView({ technicians }: TrucksMapViewProps) {
       </CardHeader>
       <CardContent className="flex-1 p-0">
         <div className="flex h-full">
-          {/* Fleet Map with real-time vehicle locations */}
-          <FleetMap vehicles={vehicles} />
+          <FleetMap 
+            vehicles={vehicles} 
+            selectedVehicleId={selectedVehicleId}
+            onVehicleClick={handleVehicleClick}
+          />
 
-          {/* Vehicle sidebar */}
           <div className="w-80 border-l bg-white flex flex-col">
             <div className="p-3 border-b bg-slate-50">
               <h4 className="text-sm font-semibold text-slate-700">
@@ -888,47 +906,180 @@ function TrucksMapView({ technicians }: TrucksMapViewProps) {
                     </Link>
                   </div>
                 ) : (
-                  vehicles.map(vehicle => (
-                    <div
-                      key={vehicle.id}
-                      className="p-3 rounded-lg border bg-white hover:bg-slate-50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2.5 h-2.5 rounded-full ${vehicle.isActive ? 'bg-green-500' : 'bg-slate-300'}`} />
-                          <span className="font-medium text-slate-800">{vehicle.vehicleName}</span>
-                        </div>
-                        {vehicle.lastSpeed && parseFloat(vehicle.lastSpeed) > 0 && (
-                          <Badge variant="outline" className="text-xs">
-                            {Math.round(parseFloat(vehicle.lastSpeed))} mph
-                          </Badge>
+                  vehicles.map(vehicle => {
+                    const isSelected = selectedVehicleId === vehicle.id;
+                    return (
+                      <div
+                        key={vehicle.id}
+                        onClick={() => handleVehicleClick(vehicle.id)}
+                        className={cn(
+                          "p-3 rounded-lg border bg-white hover:bg-slate-50 transition-colors cursor-pointer",
+                          isSelected && "ring-2 ring-[#711419] bg-slate-50"
                         )}
-                      </div>
-                      <div className="text-xs text-slate-500 space-y-1">
-                        <div className="flex items-center gap-1.5">
-                          <User className="h-3 w-3" />
-                          {getTechnicianName(vehicle.technicianId)}
-                        </div>
-                        {vehicle.vehicleMake && vehicle.vehicleModel && (
-                          <div className="text-slate-400">
-                            {vehicle.vehicleYear} {vehicle.vehicleMake} {vehicle.vehicleModel}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2.5 h-2.5 rounded-full ${vehicle.isActive ? 'bg-green-500' : 'bg-slate-300'}`} />
+                            <span className="font-medium text-slate-800">{vehicle.vehicleName}</span>
                           </div>
-                        )}
-                        {vehicle.lastLocationUpdatedAt && (
-                          <div className="flex items-center gap-1.5 text-slate-400">
-                            <Clock className="h-3 w-3" />
-                            Updated {formatLastUpdate(vehicle.lastLocationUpdatedAt)}
+                          {vehicle.lastSpeed && parseFloat(vehicle.lastSpeed) > 0 && (
+                            <Badge variant="outline" className="text-xs">
+                              {Math.round(parseFloat(vehicle.lastSpeed))} mph
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-500 space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <User className="h-3 w-3" />
+                            {getTechnicianName(vehicle.technicianId)}
                           </div>
-                        )}
+                          {vehicle.vehicleMake && vehicle.vehicleModel && (
+                            <div className="text-slate-400">
+                              {vehicle.vehicleYear} {vehicle.vehicleMake} {vehicle.vehicleModel}
+                            </div>
+                          )}
+                          {vehicle.lastLocationUpdatedAt && (
+                            <div className="flex items-center gap-1.5 text-slate-400">
+                              <Clock className="h-3 w-3" />
+                              Updated {formatLastUpdate(vehicle.lastLocationUpdatedAt)}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </ScrollArea>
           </div>
         </div>
       </CardContent>
+
+      <Sheet open={!!selectedVehicle} onOpenChange={(open) => !open && handleCloseSheet()}>
+        <SheetContent className="w-[400px] sm:w-[450px]">
+          {selectedVehicle && (
+            <>
+              <SheetHeader>
+                <div className="flex items-center gap-3">
+                  <div className={`w-3 h-3 rounded-full ${selectedVehicle.isActive ? 'bg-green-500' : 'bg-slate-300'}`} />
+                  <div>
+                    <SheetTitle className="text-lg">{selectedVehicle.vehicleName}</SheetTitle>
+                    <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-0.5">
+                      <User className="h-3.5 w-3.5" />
+                      {getTechnicianName(selectedVehicle.technicianId)}
+                    </p>
+                  </div>
+                </div>
+              </SheetHeader>
+
+              <Tabs defaultValue="stats" className="mt-6">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="stats">Stats</TabsTrigger>
+                  <TabsTrigger value="details">Details</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="stats" className="mt-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 rounded-lg bg-slate-50 border">
+                      <div className="text-xs text-slate-500 mb-1">Odometer</div>
+                      <div className="text-lg font-semibold text-slate-800">
+                        {selectedVehicle.odometer 
+                          ? `${Math.round(parseFloat(selectedVehicle.odometer)).toLocaleString()} mi`
+                          : "N/A"
+                        }
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-lg bg-slate-50 border">
+                      <div className="text-xs text-slate-500 mb-1">Fuel Level</div>
+                      <div className="text-lg font-semibold text-slate-800">
+                        {selectedVehicle.fuelLevel !== null && selectedVehicle.fuelLevel !== undefined
+                          ? `${Math.round(parseFloat(selectedVehicle.fuelLevel))}%`
+                          : "N/A"
+                        }
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-lg bg-slate-50 border">
+                      <div className="text-xs text-slate-500 mb-1">Speed</div>
+                      <div className="text-lg font-semibold text-slate-800">
+                        {selectedVehicle.lastSpeed 
+                          ? `${Math.round(parseFloat(selectedVehicle.lastSpeed))} mph`
+                          : "0 mph"
+                        }
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-lg bg-slate-50 border">
+                      <div className="text-xs text-slate-500 mb-1">Status</div>
+                      <div className="flex items-center gap-2">
+                        {selectedVehicle.lastSpeed && parseFloat(selectedVehicle.lastSpeed) > 0 ? (
+                          <>
+                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                            <span className="text-lg font-semibold text-green-600">Running</span>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-2 h-2 rounded-full bg-slate-400" />
+                            <span className="text-lg font-semibold text-slate-600">Parked</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-slate-50 border">
+                    <div className="text-xs text-slate-500 mb-1">Last Updated</div>
+                    <div className="text-sm font-medium text-slate-800">
+                      {selectedVehicle.lastLocationUpdatedAt 
+                        ? format(new Date(selectedVehicle.lastLocationUpdatedAt), "MMM d, yyyy 'at' h:mm a")
+                        : "Never"
+                      }
+                    </div>
+                    {selectedVehicle.lastLocationUpdatedAt && (
+                      <div className="text-xs text-slate-500 mt-1">
+                        ({formatDistanceToNow(new Date(selectedVehicle.lastLocationUpdatedAt), { addSuffix: true })})
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="details" className="mt-4 space-y-3">
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center py-2 border-b">
+                      <span className="text-sm text-slate-500">Make</span>
+                      <span className="text-sm font-medium text-slate-800">
+                        {selectedVehicle.vehicleMake || "N/A"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b">
+                      <span className="text-sm text-slate-500">Model</span>
+                      <span className="text-sm font-medium text-slate-800">
+                        {selectedVehicle.vehicleModel || "N/A"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b">
+                      <span className="text-sm text-slate-500">Year</span>
+                      <span className="text-sm font-medium text-slate-800">
+                        {selectedVehicle.vehicleYear || "N/A"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b">
+                      <span className="text-sm text-slate-500">VIN</span>
+                      <span className="text-sm font-medium text-slate-800 font-mono">
+                        {selectedVehicle.vin || "N/A"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b">
+                      <span className="text-sm text-slate-500">License Plate</span>
+                      <span className="text-sm font-medium text-slate-800">
+                        {selectedVehicle.licensePlate || "N/A"}
+                      </span>
+                    </div>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </Card>
   );
 }
