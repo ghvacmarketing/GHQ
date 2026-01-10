@@ -38,6 +38,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import {
   Search,
   ChevronLeft,
@@ -104,14 +105,13 @@ type CustomersResponse = {
 
 const ITEMS_PER_PAGE = 25;
 
-type FilterTab = "all" | "lead" | "equipment_ordered" | "equipment_arrived" | "approved" | "in_progress" | "completed" | "closed" | "cancelled";
+type FilterTab = "all" | "lead" | "equipment_ordered" | "equipment_arrived" | "in_progress" | "completed" | "closed" | "cancelled";
 
 const filterTabConfig: Record<FilterTab, { label: string }> = {
   all: { label: "All Projects" },
-  lead: { label: "New / Needs Scheduling" },
+  lead: { label: "New" },
   equipment_ordered: { label: "Equipment Ordered" },
   equipment_arrived: { label: "Equipment Arrived" },
-  approved: { label: "Scheduled" },
   in_progress: { label: "In Progress" },
   completed: { label: "Completed" },
   closed: { label: "Closed" },
@@ -121,7 +121,6 @@ const filterTabConfig: Record<FilterTab, { label: string }> = {
 const statusColors: Record<string, { bg: string; text: string; border: string }> = {
   lead: { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-200" },
   proposal_sent: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
-  approved: { bg: "bg-green-100", text: "text-green-700", border: "border-green-200" },
   equipment_ordered: { bg: "bg-yellow-100", text: "text-yellow-700", border: "border-yellow-200" },
   equipment_arrived: { bg: "bg-lime-100", text: "text-lime-700", border: "border-lime-200" },
   in_progress: { bg: "bg-amber-100", text: "text-amber-700", border: "border-amber-200" },
@@ -134,7 +133,6 @@ const statusColors: Record<string, { bg: string; text: string; border: string }>
 const statusLabels: Record<string, string> = {
   lead: "New",
   proposal_sent: "Proposal Sent",
-  approved: "Scheduled",
   equipment_ordered: "Equipment Ordered",
   equipment_arrived: "Equipment Arrived",
   in_progress: "In Progress",
@@ -199,6 +197,8 @@ export default function CrmProjects() {
   const [expectedValue, setExpectedValue] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<string>("normal");
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
 
   const debouncedSearch = useDebounce(searchInput, 300);
   const debouncedCustomerSearch = useDebounce(customerSearch, 300);
@@ -314,6 +314,8 @@ export default function CrmProjects() {
       expectedValue?: string;
       description?: string;
       priority?: string;
+      startDate: string;
+      endDate: string;
     }) => {
       return apiRequest("POST", "/api/crm/projects", data);
     },
@@ -344,6 +346,8 @@ export default function CrmProjects() {
     setExpectedValue("");
     setDescription("");
     setPriority("normal");
+    setStartDate(undefined);
+    setEndDate(undefined);
   };
 
   const handleCreateProject = () => {
@@ -351,6 +355,16 @@ export default function CrmProjects() {
       toast({
         title: "Missing required fields",
         description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Date range is required so projects appear on calendar
+    if (!startDate || !endDate) {
+      toast({
+        title: "Schedule required",
+        description: "Please select a start and end date for the project.",
         variant: "destructive",
       });
       return;
@@ -374,6 +388,8 @@ export default function CrmProjects() {
       expectedValue: expectedValue || undefined,
       description: description || undefined,
       priority: priority || undefined,
+      startDate: format(startDate, "yyyy-MM-dd"),
+      endDate: format(endDate, "yyyy-MM-dd"),
     });
   };
 
@@ -1086,6 +1102,67 @@ export default function CrmProjects() {
               </Select>
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Start Date *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !startDate && "text-muted-foreground"
+                      )}
+                      data-testid="button-start-date"
+                    >
+                      <CalendarDays className="mr-2 h-4 w-4" />
+                      {startDate ? format(startDate, "MMM d, yyyy") : "Select start"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarPicker
+                      mode="single"
+                      selected={startDate}
+                      onSelect={(date) => {
+                        setStartDate(date);
+                        if (date && (!endDate || endDate < date)) {
+                          setEndDate(date);
+                        }
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2">
+                <Label>End Date *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !endDate && "text-muted-foreground"
+                      )}
+                      data-testid="button-end-date"
+                    >
+                      <CalendarDays className="mr-2 h-4 w-4" />
+                      {endDate ? format(endDate, "MMM d, yyyy") : "Select end"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarPicker
+                      mode="single"
+                      selected={endDate}
+                      onSelect={setEndDate}
+                      disabled={(date) => startDate ? date < startDate : false}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="expectedValue">Expected Value</Label>
               <div className="relative">
@@ -1143,7 +1220,7 @@ export default function CrmProjects() {
             </Button>
             <Button
               onClick={handleCreateProject}
-              disabled={createProjectMutation.isPending || !selectedCustomer || !title || !projectType || (sites.length > 0 && !selectedSite)}
+              disabled={createProjectMutation.isPending || !selectedCustomer || !title || !projectType || !startDate || !endDate || (sites.length > 0 && !selectedSite)}
               data-testid="button-submit-create"
             >
               {createProjectMutation.isPending ? (

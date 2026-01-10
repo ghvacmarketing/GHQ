@@ -12905,8 +12905,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (status === "proposal_sent" && !existing.proposalSentAt) {
         updateData.proposalSentAt = new Date();
-      } else if (status === "approved" && !existing.approvedAt) {
-        updateData.approvedAt = new Date();
       } else if (status === "completed" && !existing.completedAt) {
         updateData.completedAt = new Date();
       } else if (status === "closed" && !existing.closedAt) {
@@ -13218,9 +13216,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [activity] = await db.insert(projectActivities).values(result.data).returning();
 
       // When equipment_status activity is created, automatically update project status to equipment_ordered
-      // if current status is lead, proposal_sent, or approved
+      // if current status is lead or proposal_sent
       if (activityType === "equipment_status") {
-        const eligibleStatuses = ["lead", "proposal_sent", "approved"];
+        const eligibleStatuses = ["lead", "proposal_sent"];
         if (eligibleStatuses.includes(project.status)) {
           await db
             .update(crmProjects)

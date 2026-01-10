@@ -956,7 +956,7 @@ export const crmJobStatusEnum = ["new", "scheduled", "dispatched", "en_route", "
 export type CrmJobStatus = typeof crmJobStatusEnum[number];
 
 // Project Status Enum (pipeline-style)
-export const projectStatusEnum = ["lead", "proposal_sent", "approved", "equipment_ordered", "equipment_arrived", "in_progress", "completed", "closed", "archived"] as const;
+export const projectStatusEnum = ["lead", "proposal_sent", "equipment_ordered", "equipment_arrived", "in_progress", "completed", "closed", "cancelled", "archived"] as const;
 export type ProjectStatus = typeof projectStatusEnum[number];
 
 // Project Type Enum
