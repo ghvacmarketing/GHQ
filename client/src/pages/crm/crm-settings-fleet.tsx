@@ -65,13 +65,13 @@ interface BouncieStatus {
 
 interface Vehicle {
   id: string;
-  name: string;
+  vehicleName: string;
   technicianId: string | null;
   technicianName?: string;
   deviceId: string | null;
-  make: string | null;
-  model: string | null;
-  year: number | null;
+  vehicleMake: string | null;
+  vehicleModel: string | null;
+  vehicleYear: string | null;
   licensePlate: string | null;
   vin: string | null;
   isActive: boolean;
@@ -83,23 +83,23 @@ interface Technician {
 }
 
 interface VehicleFormData {
-  name: string;
+  vehicleName: string;
   technicianId: string;
   deviceId: string;
-  make: string;
-  model: string;
-  year: string;
+  vehicleMake: string;
+  vehicleModel: string;
+  vehicleYear: string;
   licensePlate: string;
   vin: string;
 }
 
 const emptyFormData: VehicleFormData = {
-  name: "",
+  vehicleName: "",
   technicianId: "",
   deviceId: "",
-  make: "",
-  model: "",
-  year: "",
+  vehicleMake: "",
+  vehicleModel: "",
+  vehicleYear: "",
   licensePlate: "",
   vin: "",
 };
@@ -144,12 +144,12 @@ export default function CrmSettingsFleet() {
   const createVehicleMutation = useMutation({
     mutationFn: async (data: VehicleFormData) => {
       const payload = {
-        name: data.name,
+        vehicleName: data.vehicleName,
         technicianId: data.technicianId || null,
         deviceId: data.deviceId || null,
-        make: data.make || null,
-        model: data.model || null,
-        year: data.year ? parseInt(data.year) : null,
+        vehicleMake: data.vehicleMake || null,
+        vehicleModel: data.vehicleModel || null,
+        vehicleYear: data.vehicleYear || null,
         licensePlate: data.licensePlate || null,
         vin: data.vin || null,
       };
@@ -169,12 +169,12 @@ export default function CrmSettingsFleet() {
   const updateVehicleMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: VehicleFormData }) => {
       const payload = {
-        name: data.name,
+        vehicleName: data.vehicleName,
         technicianId: data.technicianId || null,
         deviceId: data.deviceId || null,
-        make: data.make || null,
-        model: data.model || null,
-        year: data.year ? parseInt(data.year) : null,
+        vehicleMake: data.vehicleMake || null,
+        vehicleModel: data.vehicleModel || null,
+        vehicleYear: data.vehicleYear || null,
         licensePlate: data.licensePlate || null,
         vin: data.vin || null,
       };
@@ -207,7 +207,7 @@ export default function CrmSettingsFleet() {
   });
 
   const handleAddVehicle = () => {
-    if (!formData.name.trim()) {
+    if (!formData.vehicleName.trim()) {
       toast({ title: "Error", description: "Vehicle name is required.", variant: "destructive" });
       return;
     }
@@ -216,7 +216,7 @@ export default function CrmSettingsFleet() {
 
   const handleEditVehicle = () => {
     if (!editingVehicle) return;
-    if (!formData.name.trim()) {
+    if (!formData.vehicleName.trim()) {
       toast({ title: "Error", description: "Vehicle name is required.", variant: "destructive" });
       return;
     }
@@ -226,12 +226,12 @@ export default function CrmSettingsFleet() {
   const openEditDialog = (vehicle: Vehicle) => {
     setEditingVehicle(vehicle);
     setFormData({
-      name: vehicle.name,
+      vehicleName: vehicle.vehicleName,
       technicianId: vehicle.technicianId || "",
       deviceId: vehicle.deviceId || "",
-      make: vehicle.make || "",
-      model: vehicle.model || "",
-      year: vehicle.year?.toString() || "",
+      vehicleMake: vehicle.vehicleMake || "",
+      vehicleModel: vehicle.vehicleModel || "",
+      vehicleYear: vehicle.vehicleYear || "",
       licensePlate: vehicle.licensePlate || "",
       vin: vehicle.vin || "",
     });
@@ -263,11 +263,11 @@ export default function CrmSettingsFleet() {
   const VehicleFormContent = () => (
     <div className="grid gap-4 py-4">
       <div className="grid gap-2">
-        <Label htmlFor="name">Vehicle Name *</Label>
+        <Label htmlFor="vehicleName">Vehicle Name *</Label>
         <Input
-          id="name"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          id="vehicleName"
+          value={formData.vehicleName}
+          onChange={(e) => setFormData({ ...formData, vehicleName: e.target.value })}
           placeholder="e.g., Service Van #1"
         />
       </div>
@@ -301,31 +301,30 @@ export default function CrmSettingsFleet() {
       </div>
       <div className="grid grid-cols-3 gap-4">
         <div className="grid gap-2">
-          <Label htmlFor="make">Make</Label>
+          <Label htmlFor="vehicleMake">Make</Label>
           <Input
-            id="make"
-            value={formData.make}
-            onChange={(e) => setFormData({ ...formData, make: e.target.value })}
+            id="vehicleMake"
+            value={formData.vehicleMake}
+            onChange={(e) => setFormData({ ...formData, vehicleMake: e.target.value })}
             placeholder="e.g., Ford"
           />
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="model">Model</Label>
+          <Label htmlFor="vehicleModel">Model</Label>
           <Input
-            id="model"
-            value={formData.model}
-            onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+            id="vehicleModel"
+            value={formData.vehicleModel}
+            onChange={(e) => setFormData({ ...formData, vehicleModel: e.target.value })}
             placeholder="e.g., Transit"
           />
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="year">Year</Label>
+          <Label htmlFor="vehicleYear">Year</Label>
           <Input
-            id="year"
-            value={formData.year}
-            onChange={(e) => setFormData({ ...formData, year: e.target.value })}
+            id="vehicleYear"
+            value={formData.vehicleYear}
+            onChange={(e) => setFormData({ ...formData, vehicleYear: e.target.value })}
             placeholder="e.g., 2023"
-            type="number"
           />
         </div>
       </div>
@@ -465,11 +464,11 @@ export default function CrmSettingsFleet() {
                 <TableBody>
                   {vehicles.map((vehicle) => {
                     const techName = technicians.find((t) => t.id === vehicle.technicianId)?.name || vehicle.technicianName;
-                    const makeModelYear = [vehicle.make, vehicle.model, vehicle.year].filter(Boolean).join(" ") || "—";
+                    const makeModelYear = [vehicle.vehicleMake, vehicle.vehicleModel, vehicle.vehicleYear].filter(Boolean).join(" ") || "—";
 
                     return (
                       <TableRow key={vehicle.id}>
-                        <TableCell className="font-medium">{vehicle.name}</TableCell>
+                        <TableCell className="font-medium">{vehicle.vehicleName}</TableCell>
                         <TableCell>{techName || <span className="text-muted-foreground">Unassigned</span>}</TableCell>
                         <TableCell className="font-mono text-sm">{vehicle.deviceId || "—"}</TableCell>
                         <TableCell>{makeModelYear}</TableCell>
@@ -560,7 +559,7 @@ export default function CrmSettingsFleet() {
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Vehicle</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete "{confirmDelete?.name}"? This action cannot be undone.
+                Are you sure you want to delete "{confirmDelete?.vehicleName}"? This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
