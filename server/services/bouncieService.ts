@@ -146,8 +146,8 @@ export class BouncieService {
     }
   }
 
-  async fetchVehiclesFromBouncie(): Promise<BouncieVehicle[]> {
-    const accessToken = await this.getAccessToken();
+  async fetchVehiclesFromBouncie(redirectUri?: string): Promise<BouncieVehicle[]> {
+    let accessToken = await this.getAccessToken();
     if (!accessToken) {
       throw new Error("Not connected to Bouncie. Please connect first.");
     }
@@ -161,6 +161,34 @@ export class BouncieService {
 
     if (!response.ok) {
       if (response.status === 401) {
+        // If we have an API key set, it might be an authorization code that needs to be exchanged
+        if (this.apiKey && redirectUri) {
+          console.log("[BouncieService] Token invalid, attempting to exchange API key as authorization code...");
+          try {
+            const tokenResponse = await this.exchangeCodeForToken(this.apiKey, redirectUri);
+            const tokenExpiresAt = new Date(Date.now() + tokenResponse.expires_in * 1000);
+            await this.saveSettings({
+              authorizationCode: this.apiKey,
+              accessToken: tokenResponse.access_token,
+              tokenExpiresAt,
+              connectedAt: new Date(),
+            });
+            
+            // Retry the request with the new token
+            const retryResponse = await fetch(`${BOUNCIE_API_BASE}/vehicles`, {
+              headers: {
+                Authorization: `Bearer ${tokenResponse.access_token}`,
+                "Content-Type": "application/json",
+              },
+            });
+            
+            if (retryResponse.ok) {
+              return retryResponse.json();
+            }
+          } catch (exchangeError) {
+            console.error("[BouncieService] Failed to exchange code:", exchangeError);
+          }
+        }
         throw new Error("Bouncie authorization expired. Please reconnect.");
       }
       const error = await response.text();
@@ -170,8 +198,8 @@ export class BouncieService {
     return response.json();
   }
 
-  async syncVehicles(): Promise<{ created: number; updated: number; total: number }> {
-    const bouncieVehiclesList = await this.fetchVehiclesFromBouncie();
+  async syncVehicles(redirectUri?: string): Promise<{ created: number; updated: number; total: number }> {
+    const bouncieVehiclesList = await this.fetchVehiclesFromBouncie(redirectUri);
     let created = 0;
     let updated = 0;
 

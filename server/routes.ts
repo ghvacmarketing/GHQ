@@ -23172,7 +23172,12 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(400).json({ message: "Not connected to Bouncie. Please connect first." });
       }
 
-      const result = await bouncieService.syncVehicles();
+      // Build redirect URI for potential token exchange
+      const host = req.headers.host || "localhost:5000";
+      const protocol = req.headers["x-forwarded-proto"] || "https";
+      const redirectUri = `${protocol}://${host}/api/bouncie/callback`;
+
+      const result = await bouncieService.syncVehicles(redirectUri);
       return res.json({ 
         success: true, 
         message: `Synced ${result.total} vehicles (${result.created} new, ${result.updated} updated)`,
