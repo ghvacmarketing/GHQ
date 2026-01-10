@@ -885,21 +885,73 @@ export default function CrmProjects() {
                   const calendarEnd = endOfWeek(monthEnd);
                   const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
                   
+                  // Assign lanes to projects for consistent vertical positioning
+                  const projectLanes = new Map<string, number>();
+                  const allProjects = calendarProjectsData?.projects || [];
+                  
+                  // Sort projects by start date, then by duration (longer first)
+                  const sortedProjects = [...allProjects]
+                    .filter(p => p.startDate)
+                    .sort((a, b) => {
+                      const aStart = new Date(a.startDate!).getTime();
+                      const bStart = new Date(b.startDate!).getTime();
+                      if (aStart !== bStart) return aStart - bStart;
+                      const aEnd = a.endDate ? new Date(a.endDate).getTime() : aStart;
+                      const bEnd = b.endDate ? new Date(b.endDate).getTime() : bStart;
+                      return (bEnd - bStart) - (aEnd - aStart);
+                    });
+                  
+                  // Assign each project to a lane
+                  sortedProjects.forEach(project => {
+                    const projectStart = startOfDay(new Date(project.startDate!));
+                    const projectEnd = project.endDate ? startOfDay(new Date(project.endDate)) : projectStart;
+                    
+                    // Find first available lane
+                    let lane = 0;
+                    while (true) {
+                      let laneAvailable = true;
+                      const entries = Array.from(projectLanes.entries());
+                      for (let i = 0; i < entries.length; i++) {
+                        const [otherId, otherLane] = entries[i];
+                        if (otherLane !== lane) continue;
+                        const other = sortedProjects.find(p => p.id === otherId);
+                        if (!other) continue;
+                        const otherStart = startOfDay(new Date(other.startDate!));
+                        const otherEnd = other.endDate ? startOfDay(new Date(other.endDate)) : otherStart;
+                        // Check if ranges overlap
+                        if (!(isAfter(projectStart, otherEnd) || isBefore(projectEnd, otherStart))) {
+                          laneAvailable = false;
+                          break;
+                        }
+                      }
+                      if (laneAvailable) break;
+                      lane++;
+                    }
+                    projectLanes.set(project.id, lane);
+                  });
+                  
                   return days.map((day, dayIndex) => {
                     const isCurrentMonth = isSameMonth(day, calendarMonth);
                     const dayStart = startOfDay(day);
                     const isStartOfWeek = dayIndex % 7 === 0;
                     const isEndOfWeek = dayIndex % 7 === 6;
                     
-                    const dayProjects = calendarProjectsData?.projects?.filter(project => {
-                      if (!project.startDate && !project.endDate) return false;
-                      const projectStart = project.startDate ? startOfDay(new Date(project.startDate)) : null;
+                    const dayProjects = allProjects.filter(project => {
+                      if (!project.startDate) return false;
+                      const projectStart = startOfDay(new Date(project.startDate));
                       const projectEnd = project.endDate ? startOfDay(new Date(project.endDate)) : projectStart;
-                      if (!projectStart) return false;
                       return isSameDay(dayStart, projectStart) ||
-                             (projectEnd && isSameDay(dayStart, projectEnd)) ||
-                             (projectEnd && isAfter(dayStart, projectStart) && isBefore(dayStart, projectEnd));
-                    }) || [];
+                             isSameDay(dayStart, projectEnd) ||
+                             (isAfter(dayStart, projectStart) && isBefore(dayStart, projectEnd));
+                    });
+                    
+                    // Sort by lane for consistent rendering
+                    const sortedDayProjects = [...dayProjects].sort((a, b) => 
+                      (projectLanes.get(a.id) || 0) - (projectLanes.get(b.id) || 0)
+                    );
+                    
+                    // Get max lane for this day to create proper spacing
+                    const maxLane = Math.max(0, ...sortedDayProjects.map(p => projectLanes.get(p.id) || 0));
                     
                     return (
                       <div
@@ -910,17 +962,19 @@ export default function CrmProjects() {
                         )}
                       >
                         <div className="text-xs font-medium p-1">{format(day, "d")}</div>
-                        <div className="space-y-0.5 overflow-hidden">
-                          {dayProjects.slice(0, 3).map(project => {
+                        <div className="relative" style={{ height: `${Math.min(maxLane + 1, 3) * 24 + 4}px` }}>
+                          {sortedDayProjects.slice(0, 3).map(project => {
+                            const lane = projectLanes.get(project.id) || 0;
+                            if (lane > 2) return null; // Only show first 3 lanes
+                            
                             const colors = statusColors[project.status] || statusColors.lead;
-                            const projectStart = project.startDate ? startOfDay(new Date(project.startDate)) : null;
+                            const projectStart = startOfDay(new Date(project.startDate!));
                             const projectEnd = project.endDate ? startOfDay(new Date(project.endDate)) : projectStart;
                             
-                            const isFirst = projectStart && isSameDay(dayStart, projectStart);
-                            const isLast = projectEnd && isSameDay(dayStart, projectEnd);
+                            const isFirst = isSameDay(dayStart, projectStart);
+                            const isLast = isSameDay(dayStart, projectEnd);
                             const isSingleDay = isFirst && isLast;
                             
-                            // For multi-day events, handle week boundaries
                             const showRoundedLeft = isFirst || isStartOfWeek;
                             const showRoundedRight = isLast || isEndOfWeek;
                             
@@ -929,24 +983,24 @@ export default function CrmProjects() {
                                 key={project.id}
                                 onClick={() => navigate(`/crm/projects/${project.id}`)}
                                 className={cn(
-                                  "w-full text-left text-xs py-1 px-1.5 truncate h-6",
+                                  "absolute left-0 right-0 text-left text-xs py-1 px-1.5 truncate h-5",
                                   colors.bg, colors.text,
                                   isSingleDay && "rounded mx-0.5",
                                   !isSingleDay && showRoundedLeft && !showRoundedRight && "rounded-l ml-0.5",
                                   !isSingleDay && !showRoundedLeft && showRoundedRight && "rounded-r mr-0.5",
-                                  !isSingleDay && showRoundedLeft && showRoundedRight && "rounded mx-0.5",
-                                  !isSingleDay && !showRoundedLeft && !showRoundedRight && ""
+                                  !isSingleDay && showRoundedLeft && showRoundedRight && "rounded mx-0.5"
                                 )}
+                                style={{ top: `${lane * 22}px` }}
                                 title={`${project.customerName || "Customer"} - ${project.title}`}
                               >
                                 {(isFirst || isStartOfWeek) ? (project.customerName || project.title) : ""}
                               </button>
                             );
                           })}
-                          {dayProjects.length > 3 && (
-                            <div className="text-xs text-muted-foreground px-1">+{dayProjects.length - 3} more</div>
-                          )}
                         </div>
+                        {dayProjects.length > 3 && (
+                          <div className="text-xs text-muted-foreground px-1 absolute bottom-0.5">+{dayProjects.length - 3} more</div>
+                        )}
                       </div>
                     );
                   });
@@ -1063,7 +1117,7 @@ export default function CrmProjects() {
                     <SelectContent>
                       {sites.map((site) => (
                         <SelectItem key={site.id} value={site.id}>
-                          {site.siteName || site.address1}
+                          {site.tenantName || site.address1}
                           {site.city && `, ${site.city}`}
                         </SelectItem>
                       ))}
