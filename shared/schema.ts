@@ -924,6 +924,7 @@ export const crmCustomers = pgTable("crm_customers", {
   convertedAt: timestamp("converted_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  lastReviewRequestAt: timestamp("last_review_request_at"),
 }, (table) => ({
   customerTypeIdx: index("crm_customers_customer_type_idx").on(table.customerType),
   customerStatusIdx: index("crm_customers_customer_status_idx").on(table.customerStatus),
@@ -2605,6 +2606,7 @@ export const smsNotificationTypeEnum = [
   "work_order_en_route",
   "work_order_on_site",
   "invoice_sms",
+  "review_request",
 ] as const;
 export type SmsNotificationType = typeof smsNotificationTypeEnum[number];
 
@@ -2635,6 +2637,33 @@ export const insertSmsNotificationLogSchema = createInsertSchema(smsNotification
 
 export type InsertSmsNotificationLog = z.infer<typeof insertSmsNotificationLogSchema>;
 export type SmsNotificationLog = typeof smsNotificationLog.$inferSelect;
+
+// =============================================
+// MARKETING CAMPAIGNS
+// =============================================
+
+export const marketingCampaigns = pgTable("marketing_campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  type: text("type").$type<"review_request" | "follow_up" | "promotion">().notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  totalSent: integer("total_sent").default(0).notNull(),
+  totalDelivered: integer("total_delivered").default(0),
+  totalClicked: integer("total_clicked").default(0),
+  lastSentAt: timestamp("last_sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertMarketingCampaignSchema = createInsertSchema(marketingCampaigns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMarketingCampaign = z.infer<typeof insertMarketingCampaignSchema>;
+export type MarketingCampaign = typeof marketingCampaigns.$inferSelect;
 
 // =============================================
 // QUICKBOOKS INTEGRATION
