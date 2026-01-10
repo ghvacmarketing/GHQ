@@ -55,24 +55,23 @@ export class BouncieService {
   }
 
   async exchangeCodeForToken(code: string, redirectUri: string): Promise<TokenResponse> {
-    const params = new URLSearchParams({
-      client_id: this.clientId,
-      client_secret: this.clientSecret,
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: redirectUri,
-    });
-
     const response = await fetch(BOUNCIE_TOKEN_URL, {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type": "application/json",
       },
-      body: params.toString(),
+      body: JSON.stringify({
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: redirectUri,
+      }),
     });
 
     if (!response.ok) {
       const error = await response.text();
+      console.error("[BouncieService] Token exchange failed:", response.status, error);
       throw new Error(`Failed to exchange code for token: ${error}`);
     }
 
