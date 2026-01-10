@@ -23035,23 +23035,125 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // GET /api/bouncie/status - Return Bouncie connection status
   app.get("/api/bouncie/status", async (req, res) => {
     try {
-      const bouncieClientId = process.env.BOUNCIE_CLIENT_ID;
-      const bouncieClientSecret = process.env.BOUNCIE_CLIENT_SECRET;
+      const { bouncieService } = await import("./services/bouncieService");
+      
+      const configured = bouncieService.isConfigured();
+      const connected = await bouncieService.isConnected();
+      const settings = await bouncieService.getSettings();
 
-      const connected = !!(bouncieClientId && bouncieClientSecret);
-
-      // Get the most recent vehicle update as lastSync timestamp
-      const lastVehicle = await db.select({ updatedAt: bouncieVehicles.updatedAt })
-        .from(bouncieVehicles)
-        .orderBy(desc(bouncieVehicles.updatedAt))
-        .limit(1);
-
-      const lastSync = lastVehicle.length > 0 ? lastVehicle[0].updatedAt?.toISOString() ?? null : null;
-
-      return res.json({ connected, lastSync });
+      return res.json({ 
+        configured,
+        connected, 
+        lastSync: settings?.lastSyncAt?.toISOString() ?? null,
+        connectedAt: settings?.connectedAt?.toISOString() ?? null,
+      });
     } catch (error) {
       console.error("Error fetching Bouncie status:", error);
       return res.status(500).json({ message: "Failed to fetch Bouncie status" });
+    }
+  });
+
+  // GET /api/bouncie/connect - Redirect to Bouncie OAuth authorization
+  app.get("/api/bouncie/connect", async (req, res) => {
+    try {
+      const { bouncieService } = await import("./services/bouncieService");
+      
+      if (!bouncieService.isConfigured()) {
+        return res.status(400).json({ message: "Bouncie credentials not configured" });
+      }
+
+      const host = req.headers.host || "localhost:5000";
+      const protocol = req.headers["x-forwarded-proto"] || "https";
+      const redirectUri = `${protocol}://${host}/api/bouncie/callback`;
+      
+      const authUrl = bouncieService.getAuthorizationUrl(redirectUri, "crm-connect");
+      return res.redirect(authUrl);
+    } catch (error) {
+      console.error("Error initiating Bouncie connection:", error);
+      return res.status(500).json({ message: "Failed to initiate Bouncie connection" });
+    }
+  });
+
+  // GET /api/bouncie/callback - Handle OAuth callback from Bouncie
+  app.get("/api/bouncie/callback", async (req, res) => {
+    try {
+      const { bouncieService } = await import("./services/bouncieService");
+      const { code, state, error: authError } = req.query;
+
+      if (authError) {
+        console.error("Bouncie OAuth error:", authError);
+        return res.redirect("/crm/settings/fleet?error=auth_denied");
+      }
+
+      if (!code || typeof code !== "string") {
+        return res.redirect("/crm/settings/fleet?error=no_code");
+      }
+
+      const host = req.headers.host || "localhost:5000";
+      const protocol = req.headers["x-forwarded-proto"] || "https";
+      const redirectUri = `${protocol}://${host}/api/bouncie/callback`;
+
+      const tokenResponse = await bouncieService.exchangeCodeForToken(code, redirectUri);
+
+      const tokenExpiresAt = new Date(Date.now() + tokenResponse.expires_in * 1000);
+      
+      await bouncieService.saveSettings({
+        authorizationCode: code,
+        accessToken: tokenResponse.access_token,
+        tokenExpiresAt,
+        connectedAt: new Date(),
+      });
+
+      return res.redirect("/crm/settings/fleet?success=connected");
+    } catch (error) {
+      console.error("Error handling Bouncie callback:", error);
+      return res.redirect("/crm/settings/fleet?error=token_exchange_failed");
+    }
+  });
+
+  // POST /api/bouncie/disconnect - Disconnect from Bouncie
+  app.post("/api/bouncie/disconnect", async (req, res) => {
+    try {
+      const { bouncieService } = await import("./services/bouncieService");
+      await bouncieService.disconnect();
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error disconnecting Bouncie:", error);
+      return res.status(500).json({ message: "Failed to disconnect from Bouncie" });
+    }
+  });
+
+  // POST /api/bouncie/sync - Sync vehicles from Bouncie
+  app.post("/api/bouncie/sync", async (req, res) => {
+    try {
+      const { bouncieService } = await import("./services/bouncieService");
+      
+      const connected = await bouncieService.isConnected();
+      if (!connected) {
+        return res.status(400).json({ message: "Not connected to Bouncie. Please connect first." });
+      }
+
+      const result = await bouncieService.syncVehicles();
+      return res.json({ 
+        success: true, 
+        message: `Synced ${result.total} vehicles (${result.created} new, ${result.updated} updated)`,
+        ...result,
+      });
+    } catch (error: any) {
+      console.error("Error syncing Bouncie vehicles:", error);
+      return res.status(500).json({ message: error.message || "Failed to sync vehicles" });
+    }
+  });
+
+  // POST /api/bouncie/refresh-locations - Refresh vehicle locations
+  app.post("/api/bouncie/refresh-locations", async (req, res) => {
+    try {
+      const { bouncieService } = await import("./services/bouncieService");
+      await bouncieService.refreshLocations();
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error refreshing locations:", error);
+      return res.status(500).json({ message: "Failed to refresh locations" });
     }
   });
 

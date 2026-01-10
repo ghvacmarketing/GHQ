@@ -837,17 +837,32 @@ export const crmAuditLog = pgTable("crm_audit_log", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Bouncie OAuth Settings (stored in database for security)
+export const bouncieSettings = pgTable("bouncie_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  authorizationCode: text("authorization_code"),
+  accessToken: text("access_token"),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  connectedAt: timestamp("connected_at"),
+  lastSyncAt: timestamp("last_sync_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Bouncie Vehicle Tracking
 export const bouncieVehicles = pgTable("bouncie_vehicles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  technicianId: varchar("technician_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
-  deviceId: text("device_id").notNull(),
+  technicianId: varchar("technician_id").references(() => crmUsers.id, { onDelete: "set null" }),
+  technicianName: text("technician_name"),
+  deviceId: text("device_id"),
+  imei: text("imei"),
   vehicleName: text("vehicle_name").notNull(),
   vehicleMake: text("vehicle_make"),
   vehicleModel: text("vehicle_model"),
   vehicleYear: text("vehicle_year"),
   licensePlate: text("license_plate"),
   vin: text("vin"),
+  nickname: text("nickname"),
   lastLatitude: decimal("last_latitude", { precision: 10, scale: 7 }),
   lastLongitude: decimal("last_longitude", { precision: 10, scale: 7 }),
   lastLocationUpdatedAt: timestamp("last_location_updated_at"),

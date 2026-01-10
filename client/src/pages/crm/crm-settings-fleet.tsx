@@ -53,14 +53,18 @@ import {
   CheckCircle,
   XCircle,
   ExternalLink,
+  RefreshCw,
+  Unplug,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmUser } from "@shared/schema";
 
 interface BouncieStatus {
+  configured: boolean;
   connected: boolean;
-  message?: string;
+  lastSync: string | null;
+  connectedAt: string | null;
 }
 
 interface Vehicle {
@@ -205,6 +209,40 @@ export default function CrmSettingsFleet() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/bouncie/sync");
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bouncie/vehicles"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bouncie/status"] });
+      toast({ 
+        title: "Sync Complete", 
+        description: data.message || `Synced ${data.total} vehicles`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Sync Failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/bouncie/disconnect");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bouncie/status"] });
+      toast({ title: "Disconnected", description: "Bouncie connection has been removed." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleConnect = () => {
+    window.location.href = "/api/bouncie/connect";
+  };
 
   const handleAddVehicle = () => {
     if (!formData.vehicleName.trim()) {
@@ -380,21 +418,72 @@ export default function CrmSettingsFleet() {
             {statusLoading ? (
               <Skeleton className="h-16 w-full" />
             ) : bouncieStatus?.connected ? (
-              <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-200">
-                <CheckCircle className="h-6 w-6 text-green-600" />
-                <div>
-                  <p className="font-medium text-green-800">Bouncie Connected</p>
-                  <p className="text-sm text-green-600">Your Bouncie integration is active and tracking vehicles.</p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle className="h-6 w-6 text-green-600" />
+                    <div>
+                      <p className="font-medium text-green-800">Bouncie Connected</p>
+                      <p className="text-sm text-green-600">
+                        {bouncieStatus.lastSync 
+                          ? `Last synced: ${new Date(bouncieStatus.lastSync).toLocaleString()}`
+                          : "Connected - click Sync to pull vehicles"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => syncMutation.mutate()}
+                      disabled={syncMutation.isPending}
+                    >
+                      {syncMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                      )}
+                      Sync Vehicles
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => disconnectMutation.mutate()}
+                      disabled={disconnectMutation.isPending}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Unplug className="h-4 w-4 mr-2" />
+                      Disconnect
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : bouncieStatus?.configured ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-amber-50 rounded-lg border border-amber-200">
+                  <div className="flex items-center gap-3">
+                    <XCircle className="h-6 w-6 text-amber-600" />
+                    <div>
+                      <p className="font-medium text-amber-800">Bouncie Not Connected</p>
+                      <p className="text-sm text-amber-600">
+                        Credentials configured. Click Connect to authorize with Bouncie.
+                      </p>
+                    </div>
+                  </div>
+                  <Button onClick={handleConnect}>
+                    <LinkIcon className="h-4 w-4 mr-2" />
+                    Connect to Bouncie
+                  </Button>
                 </div>
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-lg border border-amber-200">
-                  <XCircle className="h-6 w-6 text-amber-600" />
+                <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <XCircle className="h-6 w-6 text-slate-400" />
                   <div>
-                    <p className="font-medium text-amber-800">Bouncie Not Connected</p>
-                    <p className="text-sm text-amber-600">
-                      To connect Bouncie, add your BOUNCIE_CLIENT_ID and BOUNCIE_CLIENT_SECRET to your environment secrets
+                    <p className="font-medium text-slate-800">Bouncie Not Configured</p>
+                    <p className="text-sm text-slate-600">
+                      Add BOUNCIE_CLIENT_ID and BOUNCIE_CLIENT_SECRET to your environment secrets to enable fleet tracking.
                     </p>
                   </div>
                 </div>
