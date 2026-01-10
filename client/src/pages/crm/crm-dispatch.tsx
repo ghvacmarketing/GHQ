@@ -81,6 +81,7 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { format, formatDistanceToNow } from "date-fns";
+import { FleetMap } from "@/components/fleet-map";
 import { createLocalDateTime, formatLocal, formatLocalDateTime, getLocalStartOfDay, getLocalEndOfDay, getLocalDateString, getTodayLocalDateString, APP_TIMEZONE } from "@/lib/timezone";
 import { formatInTimeZone } from "date-fns-tz";
 
@@ -866,24 +867,8 @@ function TrucksMapView({ technicians }: TrucksMapViewProps) {
       </CardHeader>
       <CardContent className="flex-1 p-0">
         <div className="flex h-full">
-          {/* Map placeholder - will be replaced with actual Google Maps */}
-          <div className="flex-1 bg-slate-100 relative flex items-center justify-center min-h-[400px]">
-            <div className="text-center p-8">
-              <MapPin className="h-16 w-16 text-slate-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-slate-600 mb-2">
-                Real-Time Fleet Map
-              </h3>
-              <p className="text-sm text-slate-500 max-w-md">
-                Connect your Bouncie devices to see your fleet vehicles in real-time on this map.
-                Go to Fleet Settings to configure your Bouncie integration.
-              </p>
-              {vehicles.length > 0 && vehicles.some(v => v.lastLatitude && v.lastLongitude) && (
-                <div className="mt-4 text-xs text-slate-400">
-                  {vehicles.filter(v => v.lastLatitude && v.lastLongitude).length} vehicles with location data
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Fleet Map with real-time vehicle locations */}
+          <FleetMap vehicles={vehicles} />
 
           {/* Vehicle sidebar */}
           <div className="w-80 border-l bg-white flex flex-col">
