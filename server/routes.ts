@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
@@ -23025,6 +23025,161 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error) {
       console.error("Error creating agreement:", error);
       return res.status(500).json({ message: "Failed to create agreement" });
+    }
+  });
+
+  // ============================================================================
+  // Bouncie Fleet Tracking API
+  // ============================================================================
+
+  // GET /api/bouncie/status - Return Bouncie connection status
+  app.get("/api/bouncie/status", async (req, res) => {
+    try {
+      const bouncieClientId = process.env.BOUNCIE_CLIENT_ID;
+      const bouncieClientSecret = process.env.BOUNCIE_CLIENT_SECRET;
+
+      const connected = !!(bouncieClientId && bouncieClientSecret);
+
+      // Get the most recent vehicle update as lastSync timestamp
+      const lastVehicle = await db.select({ updatedAt: bouncieVehicles.updatedAt })
+        .from(bouncieVehicles)
+        .orderBy(desc(bouncieVehicles.updatedAt))
+        .limit(1);
+
+      const lastSync = lastVehicle.length > 0 ? lastVehicle[0].updatedAt?.toISOString() ?? null : null;
+
+      return res.json({ connected, lastSync });
+    } catch (error) {
+      console.error("Error fetching Bouncie status:", error);
+      return res.status(500).json({ message: "Failed to fetch Bouncie status" });
+    }
+  });
+
+  // GET /api/bouncie/vehicles - List all vehicles
+  app.get("/api/bouncie/vehicles", async (req, res) => {
+    try {
+      const vehicles = await db.select().from(bouncieVehicles).orderBy(asc(bouncieVehicles.createdAt));
+      return res.json(vehicles);
+    } catch (error) {
+      console.error("Error fetching vehicles:", error);
+      return res.status(500).json({ message: "Failed to fetch vehicles" });
+    }
+  });
+
+  // POST /api/bouncie/vehicles - Create a new vehicle
+  app.post("/api/bouncie/vehicles", async (req, res) => {
+    try {
+      const body = req.body;
+
+      // Validate required fields
+      if (!body.vehicleName) {
+        return res.status(400).json({ message: "vehicleName is required" });
+      }
+
+      // Parse and validate body with schema
+      const parsed = insertBouncieVehicleSchema.safeParse(body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid vehicle data", errors: parsed.error.flatten() });
+      }
+
+      // Create vehicle
+      const [vehicle] = await db.insert(bouncieVehicles).values(parsed.data).returning();
+
+      return res.status(201).json(vehicle);
+    } catch (error) {
+      console.error("Error creating vehicle:", error);
+      return res.status(500).json({ message: "Failed to create vehicle" });
+    }
+  });
+
+  // PATCH /api/bouncie/vehicles/:id - Update a vehicle
+  app.patch("/api/bouncie/vehicles/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const body = req.body;
+
+      // Verify vehicle exists
+      const [existing] = await db.select().from(bouncieVehicles).where(eq(bouncieVehicles.id, id));
+      if (!existing) {
+        return res.status(404).json({ message: "Vehicle not found" });
+      }
+
+      // Parse and validate update data (use partial schema validation)
+      const updateData = insertBouncieVehicleSchema.partial().safeParse(body);
+      if (!updateData.success) {
+        return res.status(400).json({ message: "Invalid vehicle data", errors: updateData.error.flatten() });
+      }
+
+      // Update vehicle with updatedAt timestamp
+      const [updated] = await db.update(bouncieVehicles)
+        .set({
+          ...updateData.data,
+          updatedAt: new Date(),
+        })
+        .where(eq(bouncieVehicles.id, id))
+        .returning();
+
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error updating vehicle:", error);
+      return res.status(500).json({ message: "Failed to update vehicle" });
+    }
+  });
+
+  // DELETE /api/bouncie/vehicles/:id - Delete a vehicle
+  app.delete("/api/bouncie/vehicles/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Verify vehicle exists before deletion
+      const [existing] = await db.select().from(bouncieVehicles).where(eq(bouncieVehicles.id, id));
+      if (!existing) {
+        return res.status(404).json({ message: "Vehicle not found" });
+      }
+
+      // Delete vehicle
+      await db.delete(bouncieVehicles).where(eq(bouncieVehicles.id, id));
+
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting vehicle:", error);
+      return res.status(500).json({ message: "Failed to delete vehicle" });
+    }
+  });
+
+  // POST /api/bouncie/vehicles/:id/assign - Assign vehicle to technician
+  app.post("/api/bouncie/vehicles/:id/assign", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { technicianId } = req.body;
+
+      // Verify vehicle exists
+      const [existing] = await db.select().from(bouncieVehicles).where(eq(bouncieVehicles.id, id));
+      if (!existing) {
+        return res.status(404).json({ message: "Vehicle not found" });
+      }
+
+      // If technicianId is provided, verify technician exists
+      if (technicianId) {
+        const [technician] = await db.select().from(crmUsers).where(eq(crmUsers.id, technicianId));
+        if (!technician) {
+          return res.status(404).json({ message: "Technician not found" });
+        }
+      }
+
+      // Update vehicle with new technician assignment
+      const [updated] = await db.update(bouncieVehicles)
+        .set({
+          technicianId: technicianId ?? null,
+          updatedAt: new Date(),
+        })
+        .where(eq(bouncieVehicles.id, id))
+        .returning();
+
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error assigning vehicle:", error);
+      return res.status(500).json({ message: "Failed to assign vehicle" });
     }
   });
 
