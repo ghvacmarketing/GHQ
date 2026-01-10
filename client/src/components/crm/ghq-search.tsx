@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   Dialog,
@@ -19,7 +19,11 @@ import {
   Loader2,
   SearchX,
   Sparkles,
+  HelpCircle,
+  MessageCircle,
+  Send,
 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
 interface SearchResultItem {
   id: number;
@@ -157,11 +161,19 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
+interface HelpResponse {
+  answer: string;
+  relatedTopics: string[];
+  confidence: "high" | "medium" | "low";
+}
+
 export function GhqSearch() {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [aiEnabled, setAiEnabled] = useState(true);
+  const [mode, setMode] = useState<"search" | "help">("search");
+  const [helpAnswer, setHelpAnswer] = useState<HelpResponse | null>(null);
   const debouncedQuery = useDebounce(searchQuery, 300);
   const [, navigate] = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -169,7 +181,17 @@ export function GhqSearch() {
 
   const { data, isLoading } = useQuery<SearchResponse>({
     queryKey: [`/api/crm/ghq/search?q=${encodeURIComponent(debouncedQuery)}&ai=${aiEnabled}`],
-    enabled: debouncedQuery.length >= 2,
+    enabled: debouncedQuery.length >= 2 && mode === "search",
+  });
+
+  const helpMutation = useMutation({
+    mutationFn: async (question: string) => {
+      const response = await apiRequest("POST", "/api/crm/help", { question });
+      return response.json() as Promise<HelpResponse>;
+    },
+    onSuccess: (data) => {
+      setHelpAnswer(data);
+    },
   });
 
   const flatResults = useCallback(() => {
@@ -204,9 +226,16 @@ export function GhqSearch() {
     if (open) {
       setSearchQuery("");
       setSelectedIndex(0);
+      setHelpAnswer(null);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
+
+  const handleAskHelp = () => {
+    if (searchQuery.trim().length >= 3) {
+      helpMutation.mutate(searchQuery.trim());
+    }
+  };
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -214,6 +243,14 @@ export function GhqSearch() {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (mode === "help") {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          handleAskHelp();
+        }
+        return;
+      }
+
       if (allResults.length === 0) return;
 
       if (e.key === "ArrowDown") {
@@ -233,7 +270,7 @@ export function GhqSearch() {
         }
       }
     },
-    [allResults, selectedIndex, navigate]
+    [allResults, selectedIndex, navigate, mode, handleAskHelp]
   );
 
   const handleResultClick = (category: CategoryKey, item: SearchResultItem) => {
@@ -356,6 +393,68 @@ export function GhqSearch() {
     );
   };
 
+  const renderHelpResults = () => {
+    if (searchQuery.length < 3) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+          <HelpCircle className="h-12 w-12 mb-3 opacity-50" />
+          <p className="text-sm">Ask a question about the CRM</p>
+          <p className="text-xs mt-1 opacity-70">e.g., "What does auto pay mean for invoices?"</p>
+        </div>
+      );
+    }
+
+    if (helpMutation.isPending) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+          <Loader2 className="h-8 w-8 animate-spin mb-3" />
+          <p className="text-sm">Thinking...</p>
+        </div>
+      );
+    }
+
+    if (helpAnswer) {
+      return (
+        <div className="p-4 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-white" />
+            </div>
+            <div className="flex-1 space-y-3">
+              <div className="bg-slate-800 rounded-lg p-4 text-slate-200 text-sm leading-relaxed whitespace-pre-wrap">
+                {helpAnswer.answer}
+              </div>
+              {helpAnswer.relatedTopics.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  <span className="text-xs text-slate-500">Related:</span>
+                  {helpAnswer.relatedTopics.map((topic, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        setSearchQuery(topic);
+                        helpMutation.mutate(topic);
+                      }}
+                      className="text-xs px-2 py-1 rounded bg-slate-800 text-purple-300 hover:bg-slate-700 transition-colors"
+                    >
+                      {topic}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+        <MessageCircle className="h-12 w-12 mb-3 opacity-50" />
+        <p className="text-sm">Press Enter to ask your question</p>
+      </div>
+    );
+  };
+
   return (
     <>
       <button
@@ -373,55 +472,110 @@ export function GhqSearch() {
           data-testid="dialog-ghq-search"
           onKeyDown={handleKeyDown}
         >
+          <div className="border-b border-slate-700">
+            <div className="flex">
+              <button
+                onClick={() => { setMode("search"); setHelpAnswer(null); }}
+                className={`flex-1 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                  mode === "search"
+                    ? "text-white border-b-2 border-[#711419] bg-slate-800/50"
+                    : "text-slate-400 hover:text-slate-300"
+                }`}
+              >
+                <Search className="h-4 w-4" />
+                Search
+              </button>
+              <button
+                onClick={() => { setMode("help"); setHelpAnswer(null); }}
+                className={`flex-1 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                  mode === "help"
+                    ? "text-white border-b-2 border-purple-500 bg-purple-900/20"
+                    : "text-slate-400 hover:text-slate-300"
+                }`}
+              >
+                <HelpCircle className="h-4 w-4" />
+                Ask AI
+              </button>
+            </div>
+          </div>
+
           <div className="p-4 border-b border-slate-700">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+              {mode === "search" ? (
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+              ) : (
+                <MessageCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-purple-400" />
+              )}
               <Input
                 ref={inputRef}
                 type="text"
-                placeholder="Search customers, work orders, invoices..."
+                placeholder={mode === "search" ? "Search customers, work orders, invoices..." : "Ask about CRM features..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 h-12 bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-[#711419]"
+                className={`pl-10 pr-20 h-12 bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 ${
+                  mode === "help" ? "focus-visible:ring-purple-500" : "focus-visible:ring-[#711419]"
+                }`}
                 data-testid="input-ghq-search"
               />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">
-                <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">Esc</kbd>
-                <span className="mx-1">to close</span>
-              </div>
+              {mode === "help" && searchQuery.length >= 3 && (
+                <button
+                  onClick={handleAskHelp}
+                  disabled={helpMutation.isPending}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded flex items-center gap-1 transition-colors disabled:opacity-50"
+                >
+                  <Send className="h-3 w-3" />
+                  Ask
+                </button>
+              )}
+              {mode === "search" && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">
+                  <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">Esc</kbd>
+                </div>
+              )}
             </div>
           </div>
 
           <ScrollArea className="max-h-[60vh]">
-            <div className="p-2">{renderResults()}</div>
+            <div className="p-2">
+              {mode === "search" ? renderResults() : renderHelpResults()}
+            </div>
           </ScrollArea>
 
           <div className="px-4 py-2 border-t border-slate-700 flex items-center gap-4 text-xs text-slate-500">
-            <button
-              onClick={() => setAiEnabled(!aiEnabled)}
-              className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
-                aiEnabled
-                  ? "bg-purple-900/50 text-purple-300 border border-purple-700/50"
-                  : "bg-slate-800 text-slate-400 border border-slate-700"
-              }`}
-              data-testid="toggle-ai-search"
-            >
-              <Sparkles className="h-3 w-3" />
-              <span>AI {aiEnabled ? "On" : "Off"}</span>
-            </button>
-            <div className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">↑</kbd>
-              <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">↓</kbd>
-              <span className="ml-1">to navigate</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">Enter</kbd>
-              <span className="ml-1">to select</span>
-            </div>
+            {mode === "search" && (
+              <>
+                <button
+                  onClick={() => setAiEnabled(!aiEnabled)}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
+                    aiEnabled
+                      ? "bg-purple-900/50 text-purple-300 border border-purple-700/50"
+                      : "bg-slate-800 text-slate-400 border border-slate-700"
+                  }`}
+                  data-testid="toggle-ai-search"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  <span>AI {aiEnabled ? "On" : "Off"}</span>
+                </button>
+                <div className="flex items-center gap-1">
+                  <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">↑</kbd>
+                  <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">↓</kbd>
+                  <span className="ml-1">navigate</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">Enter</kbd>
+                  <span className="ml-1">select</span>
+                </div>
+              </>
+            )}
+            {mode === "help" && (
+              <div className="flex items-center gap-2 text-purple-300">
+                <Sparkles className="h-3 w-3" />
+                <span>AI-powered CRM help</span>
+              </div>
+            )}
             <div className="flex items-center gap-1 ml-auto">
               <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">⌘</kbd>
               <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">K</kbd>
-              <span className="ml-1">to open search</span>
             </div>
           </div>
         </DialogContent>

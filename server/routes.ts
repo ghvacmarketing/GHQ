@@ -1862,6 +1862,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/crm/help", requireCrmAuth, async (req, res) => {
+    try {
+      const { question } = req.body;
+      if (!question || typeof question !== "string") {
+        return res.status(400).json({ message: "Question is required" });
+      }
+      
+      const { askCrmHelp } = await import("./services/crmHelpAI");
+      const result = await askCrmHelp(question);
+      res.json(result);
+    } catch (error) {
+      console.error("Error in CRM help:", error);
+      res.status(500).json({ message: "Error processing help request" });
+    }
+  });
+
   // Optimized initial data endpoint - reduces 3 API calls to 1
   app.get("/api/initial-data", async (req, res) => {
     try {
