@@ -55,18 +55,20 @@ export class BouncieService {
   }
 
   async exchangeCodeForToken(code: string, redirectUri: string): Promise<TokenResponse> {
+    const params = new URLSearchParams({
+      client_id: this.clientId,
+      client_secret: this.clientSecret,
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: redirectUri,
+    });
+
     const response = await fetch(BOUNCIE_TOKEN_URL, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: JSON.stringify({
-        client_id: this.clientId,
-        client_secret: this.clientSecret,
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: redirectUri,
-      }),
+      body: params.toString(),
     });
 
     if (!response.ok) {
@@ -133,7 +135,7 @@ export class BouncieService {
 
     const response = await fetch(`${BOUNCIE_API_BASE}/vehicles`, {
       headers: {
-        Authorization: accessToken,
+        Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
     });
