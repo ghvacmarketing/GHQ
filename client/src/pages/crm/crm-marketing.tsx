@@ -209,7 +209,7 @@ export default function CrmMarketing() {
                     Google Review Requests
                   </CardTitle>
                   <CardDescription className="mt-1">
-                    Automatically request reviews 2 hours after work order completion
+                    Automatically request reviews immediately after work order completion
                   </CardDescription>
                 </div>
                 <Badge variant={reviewCampaign?.isActive !== false ? "default" : "secondary"}>
@@ -228,8 +228,8 @@ export default function CrmMarketing() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 bg-slate-50 rounded-lg border">
-                  <p className="text-xs text-slate-500">Delay After Completion</p>
-                  <p className="text-sm font-medium text-slate-700">2 hours</p>
+                  <p className="text-xs text-slate-500">Timing</p>
+                  <p className="text-sm font-medium text-slate-700">Immediately</p>
                 </div>
                 <div className="p-3 bg-slate-50 rounded-lg border">
                   <p className="text-xs text-slate-500">Cooldown Period</p>

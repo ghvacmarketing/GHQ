@@ -15,7 +15,7 @@ const APP_TIMEZONE = "America/New_York";
 const DEFAULT_REVIEW_TEMPLATE = "Thanks for choosing GHVAC! We'd love your feedback - please leave us a Google review: {reviewLink} - GHVAC";
 
 const REVIEW_COOLDOWN_MONTHS = 6;
-const REVIEW_DELAY_HOURS = 2;
+const REVIEW_DELAY_HOURS = 0; // Send immediately after work order completion
 
 export interface ReviewRequestResult {
   workOrderId: string;
@@ -66,7 +66,7 @@ async function updateCampaignStats(sentCount: number): Promise<void> {
       await db.insert(marketingCampaigns).values({
         name: "Google Review Requests",
         type: "review_request",
-        description: "Automated review requests sent 2 hours after work order completion",
+        description: "Automated review requests sent immediately after work order completion",
         isActive: automationEnabled,
         totalSent: sentCount,
         lastSentAt: sentCount > 0 ? new Date() : null,

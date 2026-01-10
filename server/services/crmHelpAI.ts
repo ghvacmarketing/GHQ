@@ -1,9 +1,352 @@
 import OpenAI from "openai";
+import { db } from "../db";
+import { crmWorkOrders, crmAgreements, crmCustomers, crmProjects, crmInvoices, crmQuotes } from "@shared/schema";
+import { eq, gte, lte, and, or, sql, desc, isNull, isNotNull } from "drizzle-orm";
+import { addDays, subDays, format, startOfDay, endOfDay } from "date-fns";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
+
+interface LiveDataContext {
+  upcomingWorkOrders?: any[];
+  todaysWorkOrders?: any[];
+  activeAgreements?: any[];
+  pendingAgreements?: any[];
+  expiringAgreements?: any[];
+  recentInvoices?: any[];
+  unpaidInvoices?: any[];
+  openProjects?: any[];
+  recentQuotes?: any[];
+  stats?: {
+    totalCustomers: number;
+    activeAgreements: number;
+    scheduledWorkOrders: number;
+    unpaidInvoices: number;
+  };
+}
+
+async function detectDataNeed(question: string): Promise<string[]> {
+  const lowerQ = question.toLowerCase();
+  const needs: string[] = [];
+  
+  if (lowerQ.includes("work order") || lowerQ.includes("appointment") || lowerQ.includes("schedule") || 
+      lowerQ.includes("upcoming") || lowerQ.includes("today") || lowerQ.includes("tomorrow") ||
+      lowerQ.includes("this week") || lowerQ.includes("next week")) {
+    needs.push("workOrders");
+  }
+  if (lowerQ.includes("agreement") || lowerQ.includes("maintenance") || lowerQ.includes("contract") ||
+      lowerQ.includes("expir") || lowerQ.includes("renew")) {
+    needs.push("agreements");
+  }
+  if (lowerQ.includes("invoice") || lowerQ.includes("unpaid") || lowerQ.includes("payment") ||
+      lowerQ.includes("owed") || lowerQ.includes("outstanding") || lowerQ.includes("bill")) {
+    needs.push("invoices");
+  }
+  if (lowerQ.includes("project") || lowerQ.includes("install") || lowerQ.includes("job")) {
+    needs.push("projects");
+  }
+  if (lowerQ.includes("quote") || lowerQ.includes("proposal") || lowerQ.includes("estimate")) {
+    needs.push("quotes");
+  }
+  if (lowerQ.includes("how many") || lowerQ.includes("total") || lowerQ.includes("count") || 
+      lowerQ.includes("stats") || lowerQ.includes("overview") || lowerQ.includes("summary")) {
+    needs.push("stats");
+  }
+  
+  return needs.length > 0 ? needs : ["stats"];
+}
+
+async function fetchLiveData(needs: string[]): Promise<LiveDataContext> {
+  const context: LiveDataContext = {};
+  const now = new Date();
+  const today = startOfDay(now);
+  const endToday = endOfDay(now);
+  const nextWeek = addDays(now, 7);
+  const next30Days = addDays(now, 30);
+  
+  try {
+    if (needs.includes("workOrders")) {
+      const upcoming = await db
+        .select({
+          id: crmWorkOrders.id,
+          workOrderNumber: crmWorkOrders.workOrderNumber,
+          title: crmWorkOrders.title,
+          status: crmWorkOrders.status,
+          scheduledStart: crmWorkOrders.scheduledStart,
+          visitType: crmWorkOrders.visitType,
+          customerName: crmCustomers.name,
+        })
+        .from(crmWorkOrders)
+        .leftJoin(crmCustomers, eq(crmWorkOrders.customerId, crmCustomers.id))
+        .where(
+          and(
+            gte(crmWorkOrders.scheduledStart, now),
+            lte(crmWorkOrders.scheduledStart, next30Days)
+          )
+        )
+        .orderBy(crmWorkOrders.scheduledStart)
+        .limit(20);
+      context.upcomingWorkOrders = upcoming;
+
+      const todays = await db
+        .select({
+          id: crmWorkOrders.id,
+          workOrderNumber: crmWorkOrders.workOrderNumber,
+          title: crmWorkOrders.title,
+          status: crmWorkOrders.status,
+          scheduledStart: crmWorkOrders.scheduledStart,
+          visitType: crmWorkOrders.visitType,
+          customerName: crmCustomers.name,
+        })
+        .from(crmWorkOrders)
+        .leftJoin(crmCustomers, eq(crmWorkOrders.customerId, crmCustomers.id))
+        .where(
+          and(
+            gte(crmWorkOrders.scheduledStart, today),
+            lte(crmWorkOrders.scheduledStart, endToday)
+          )
+        )
+        .orderBy(crmWorkOrders.scheduledStart)
+        .limit(20);
+      context.todaysWorkOrders = todays;
+    }
+
+    if (needs.includes("agreements")) {
+      const active = await db
+        .select({
+          id: crmAgreements.id,
+          agreementNumber: crmAgreements.agreementNumber,
+          name: crmAgreements.name,
+          status: crmAgreements.status,
+          customerName: crmCustomers.name,
+          nextVisitDate: crmAgreements.nextVisitDate,
+          expirationDate: crmAgreements.expirationDate,
+        })
+        .from(crmAgreements)
+        .leftJoin(crmCustomers, eq(crmAgreements.customerId, crmCustomers.id))
+        .where(eq(crmAgreements.status, "active"))
+        .orderBy(crmAgreements.nextVisitDate)
+        .limit(15);
+      context.activeAgreements = active;
+
+      const pending = await db
+        .select({
+          id: crmAgreements.id,
+          agreementNumber: crmAgreements.agreementNumber,
+          name: crmAgreements.name,
+          status: crmAgreements.status,
+          customerName: crmCustomers.name,
+        })
+        .from(crmAgreements)
+        .leftJoin(crmCustomers, eq(crmAgreements.customerId, crmCustomers.id))
+        .where(eq(crmAgreements.status, "pending"))
+        .limit(10);
+      context.pendingAgreements = pending;
+
+      const expiring = await db
+        .select({
+          id: crmAgreements.id,
+          agreementNumber: crmAgreements.agreementNumber,
+          name: crmAgreements.name,
+          status: crmAgreements.status,
+          customerName: crmCustomers.name,
+          expirationDate: crmAgreements.expirationDate,
+        })
+        .from(crmAgreements)
+        .leftJoin(crmCustomers, eq(crmAgreements.customerId, crmCustomers.id))
+        .where(
+          and(
+            eq(crmAgreements.status, "active"),
+            lte(crmAgreements.expirationDate, next30Days),
+            gte(crmAgreements.expirationDate, now)
+          )
+        )
+        .orderBy(crmAgreements.expirationDate)
+        .limit(10);
+      context.expiringAgreements = expiring;
+    }
+
+    if (needs.includes("invoices")) {
+      const unpaid = await db
+        .select({
+          id: crmInvoices.id,
+          invoiceNumber: crmInvoices.invoiceNumber,
+          totalAmount: crmInvoices.totalAmount,
+          status: crmInvoices.status,
+          customerName: crmCustomers.name,
+          sentAt: crmInvoices.sentAt,
+        })
+        .from(crmInvoices)
+        .leftJoin(crmCustomers, eq(crmInvoices.customerId, crmCustomers.id))
+        .where(eq(crmInvoices.status, "sent"))
+        .orderBy(desc(crmInvoices.sentAt))
+        .limit(15);
+      context.unpaidInvoices = unpaid;
+
+      const recent = await db
+        .select({
+          id: crmInvoices.id,
+          invoiceNumber: crmInvoices.invoiceNumber,
+          totalAmount: crmInvoices.totalAmount,
+          status: crmInvoices.status,
+          customerName: crmCustomers.name,
+        })
+        .from(crmInvoices)
+        .leftJoin(crmCustomers, eq(crmInvoices.customerId, crmCustomers.id))
+        .orderBy(desc(crmInvoices.createdAt))
+        .limit(10);
+      context.recentInvoices = recent;
+    }
+
+    if (needs.includes("projects")) {
+      const open = await db
+        .select({
+          id: crmProjects.id,
+          title: crmProjects.title,
+          status: crmProjects.status,
+          projectType: crmProjects.projectType,
+          startDate: crmProjects.startDate,
+          endDate: crmProjects.endDate,
+          expectedValue: crmProjects.expectedValue,
+          customerName: crmCustomers.name,
+        })
+        .from(crmProjects)
+        .leftJoin(crmCustomers, eq(crmProjects.customerId, crmCustomers.id))
+        .where(
+          or(
+            eq(crmProjects.status, "lead"),
+            eq(crmProjects.status, "proposal_sent"),
+            eq(crmProjects.status, "equipment_ordered"),
+            eq(crmProjects.status, "equipment_arrived"),
+            eq(crmProjects.status, "in_progress")
+          )
+        )
+        .orderBy(crmProjects.startDate)
+        .limit(15);
+      context.openProjects = open;
+    }
+
+    if (needs.includes("quotes")) {
+      const recent = await db
+        .select({
+          id: crmQuotes.id,
+          quoteNumber: crmQuotes.quoteNumber,
+          title: crmQuotes.title,
+          status: crmQuotes.status,
+          totalAmount: crmQuotes.totalAmount,
+          customerName: crmCustomers.name,
+        })
+        .from(crmQuotes)
+        .leftJoin(crmCustomers, eq(crmQuotes.customerId, crmCustomers.id))
+        .orderBy(desc(crmQuotes.createdAt))
+        .limit(10);
+      context.recentQuotes = recent;
+    }
+
+    if (needs.includes("stats")) {
+      const [customerCount] = await db.select({ count: sql<number>`count(*)::int` }).from(crmCustomers);
+      const [agreementCount] = await db.select({ count: sql<number>`count(*)::int` }).from(crmAgreements).where(eq(crmAgreements.status, "active"));
+      const [woCount] = await db.select({ count: sql<number>`count(*)::int` }).from(crmWorkOrders).where(and(eq(crmWorkOrders.status, "scheduled"), gte(crmWorkOrders.scheduledStart, now)));
+      const [invoiceCount] = await db.select({ count: sql<number>`count(*)::int` }).from(crmInvoices).where(eq(crmInvoices.status, "sent"));
+      
+      context.stats = {
+        totalCustomers: customerCount?.count || 0,
+        activeAgreements: agreementCount?.count || 0,
+        scheduledWorkOrders: woCount?.count || 0,
+        unpaidInvoices: invoiceCount?.count || 0,
+      };
+    }
+  } catch (error) {
+    console.error("[CRM Help AI] Error fetching live data:", error);
+  }
+
+  return context;
+}
+
+function formatLiveDataForPrompt(context: LiveDataContext): string {
+  const sections: string[] = [];
+  const today = format(new Date(), "EEEE, MMMM d, yyyy");
+  
+  sections.push(`\n\n## LIVE DATA (as of ${today})\n`);
+  
+  if (context.stats) {
+    sections.push(`### Current Stats
+- Total Customers: ${context.stats.totalCustomers}
+- Active Maintenance Agreements: ${context.stats.activeAgreements}
+- Scheduled Work Orders: ${context.stats.scheduledWorkOrders}
+- Unpaid Invoices: ${context.stats.unpaidInvoices}`);
+  }
+
+  if (context.todaysWorkOrders && context.todaysWorkOrders.length > 0) {
+    sections.push(`### Today's Work Orders (${context.todaysWorkOrders.length} scheduled)`);
+    context.todaysWorkOrders.forEach(wo => {
+      const time = wo.scheduledStart ? format(new Date(wo.scheduledStart), "h:mm a") : "TBD";
+      sections.push(`- ${wo.workOrderNumber || wo.title}: ${wo.customerName || "Unknown"} at ${time} (${wo.status})`);
+    });
+  }
+
+  if (context.upcomingWorkOrders && context.upcomingWorkOrders.length > 0) {
+    sections.push(`### Upcoming Work Orders (next 30 days)`);
+    context.upcomingWorkOrders.slice(0, 10).forEach(wo => {
+      const date = wo.scheduledStart ? format(new Date(wo.scheduledStart), "MMM d") : "TBD";
+      sections.push(`- ${wo.workOrderNumber || wo.title}: ${wo.customerName || "Unknown"} on ${date} (${wo.visitType || wo.status})`);
+    });
+    if (context.upcomingWorkOrders.length > 10) {
+      sections.push(`... and ${context.upcomingWorkOrders.length - 10} more`);
+    }
+  }
+
+  if (context.activeAgreements && context.activeAgreements.length > 0) {
+    sections.push(`### Active Maintenance Agreements (${context.activeAgreements.length} total)`);
+    context.activeAgreements.slice(0, 8).forEach(a => {
+      const nextVisit = a.nextVisitDate ? format(new Date(a.nextVisitDate), "MMM d") : "Not scheduled";
+      sections.push(`- ${a.agreementNumber || a.name}: ${a.customerName || "Unknown"} - Next visit: ${nextVisit}`);
+    });
+  }
+
+  if (context.pendingAgreements && context.pendingAgreements.length > 0) {
+    sections.push(`### Pending Agreements (awaiting first payment): ${context.pendingAgreements.length}`);
+    context.pendingAgreements.forEach(a => {
+      sections.push(`- ${a.agreementNumber || a.name}: ${a.customerName || "Unknown"}`);
+    });
+  }
+
+  if (context.expiringAgreements && context.expiringAgreements.length > 0) {
+    sections.push(`### Agreements Expiring Soon (next 30 days)`);
+    context.expiringAgreements.forEach(a => {
+      const exp = a.expirationDate ? format(new Date(a.expirationDate), "MMM d") : "TBD";
+      sections.push(`- ${a.agreementNumber || a.name}: ${a.customerName || "Unknown"} - Expires: ${exp}`);
+    });
+  }
+
+  if (context.unpaidInvoices && context.unpaidInvoices.length > 0) {
+    sections.push(`### Unpaid Invoices (${context.unpaidInvoices.length} outstanding)`);
+    context.unpaidInvoices.slice(0, 8).forEach(inv => {
+      const amount = inv.totalAmount ? `$${parseFloat(inv.totalAmount).toFixed(2)}` : "TBD";
+      sections.push(`- ${inv.invoiceNumber}: ${inv.customerName || "Unknown"} - ${amount}`);
+    });
+  }
+
+  if (context.openProjects && context.openProjects.length > 0) {
+    sections.push(`### Open Projects (${context.openProjects.length} in progress)`);
+    context.openProjects.slice(0, 8).forEach(p => {
+      const value = p.expectedValue ? `$${parseFloat(p.expectedValue).toLocaleString()}` : "TBD";
+      sections.push(`- ${p.title}: ${p.customerName || "Unknown"} (${p.status}) - ${value}`);
+    });
+  }
+
+  if (context.recentQuotes && context.recentQuotes.length > 0) {
+    sections.push(`### Recent Quotes`);
+    context.recentQuotes.slice(0, 5).forEach(q => {
+      const amount = q.totalAmount ? `$${parseFloat(q.totalAmount).toFixed(2)}` : "TBD";
+      sections.push(`- ${q.quoteNumber || q.title}: ${q.customerName || "Unknown"} - ${amount} (${q.status})`);
+    });
+  }
+
+  return sections.join("\n");
+}
 
 const CRM_FUNCTIONALITY_KNOWLEDGE = `
 # GHVAC CRM System - Complete Feature Guide
@@ -308,42 +651,62 @@ export interface CrmHelpResponse {
   answer: string;
   relatedTopics: string[];
   confidence: "high" | "medium" | "low";
+  hasLiveData?: boolean;
 }
 
-const helpCache = new Map<string, { result: CrmHelpResponse; timestamp: number }>();
-const CACHE_TTL = 1000 * 60 * 60; // 1 hour cache
+const helpCache = new Map<string, { result: CrmHelpResponse; timestamp: number; hasLiveData: boolean }>();
+const CACHE_TTL_STATIC = 1000 * 60 * 60; // 1 hour for static help questions
+const CACHE_TTL_LIVE = 1000 * 60 * 5; // 5 minutes for live data questions
 
 export async function askCrmHelp(question: string): Promise<CrmHelpResponse> {
   const normalizedQuestion = question.toLowerCase().trim();
   
+  // Detect what live data might be needed
+  const dataNeeds = await detectDataNeed(question);
+  const needsLiveData = dataNeeds.length > 0;
+  const cacheTTL = needsLiveData ? CACHE_TTL_LIVE : CACHE_TTL_STATIC;
+  
   const cached = helpCache.get(normalizedQuestion);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+  if (cached && Date.now() - cached.timestamp < cacheTTL) {
     return cached.result;
   }
 
   try {
-    console.log("[CRM Help AI] Processing question:", question);
+    console.log("[CRM Help AI] Processing question:", question, "Data needs:", dataNeeds);
+    
+    // Fetch live data if needed
+    let liveDataSection = "";
+    if (needsLiveData) {
+      const liveData = await fetchLiveData(dataNeeds);
+      liveDataSection = formatLiveDataForPrompt(liveData);
+      console.log("[CRM Help AI] Fetched live data for:", dataNeeds.join(", "));
+    }
+    
+    const systemPrompt = `You are GHVAC's CRM help assistant. You can answer questions about how the CRM system works AND provide information about current business data like upcoming work orders, agreements, invoices, and projects.
+
+${CRM_FUNCTIONALITY_KNOWLEDGE}
+${liveDataSection}
+
+Rules:
+1. Answer questions about CRM functionality using the knowledge base
+2. For questions about current data (upcoming appointments, agreements, invoices, etc.), use the LIVE DATA section
+3. Use plain language, avoid jargon
+4. Give specific, actionable answers with real data when available
+5. If asked about specific records, provide the details from live data
+6. Keep answers concise but informative
+7. If live data shows no results, say so clearly
+
+Return JSON with:
+- answer: Your helpful response (string) - include specific data when relevant
+- relatedTopics: Array of 1-3 related feature areas the user might want to know about
+- confidence: "high" if directly from data/knowledge base, "medium" if inferred, "low" if uncertain`;
     
     const response = await openai.chat.completions.create({
       model: "gpt-5-mini",
       messages: [
         {
           role: "system",
-          content: `You are GHVAC's CRM help assistant. Answer questions about how the CRM system works using the knowledge base below. Be concise, helpful, and specific.
-
-${CRM_FUNCTIONALITY_KNOWLEDGE}
-
-Rules:
-1. Only answer questions about CRM functionality - redirect other questions
-2. Use plain language, avoid jargon
-3. Give specific, actionable answers
-4. If unsure, say so and suggest where to find help
-5. Keep answers under 200 words unless explaining a complex process
-
-Return JSON with:
-- answer: Your helpful response (string)
-- relatedTopics: Array of 1-3 related feature areas the user might want to know about
-- confidence: "high" if directly covered in knowledge base, "medium" if inferred, "low" if uncertain`
+          content: systemPrompt
         },
         {
           role: "user",
@@ -351,10 +714,8 @@ Return JSON with:
         }
       ],
       response_format: { type: "json_object" },
-      max_completion_tokens: 1000,
+      max_completion_tokens: 1500,
     });
-
-    console.log("[CRM Help AI] Full response:", JSON.stringify(response, null, 2));
     
     const content = response.choices[0]?.message?.content;
     if (!content) {
@@ -372,9 +733,10 @@ Return JSON with:
       answer: parsed.answer || "I don't have information about that feature.",
       relatedTopics: Array.isArray(parsed.relatedTopics) ? parsed.relatedTopics.slice(0, 3) : [],
       confidence: parsed.confidence || "medium",
+      hasLiveData: needsLiveData,
     };
 
-    helpCache.set(normalizedQuestion, { result, timestamp: Date.now() });
+    helpCache.set(normalizedQuestion, { result, timestamp: Date.now(), hasLiveData: needsLiveData });
     
     return result;
   } catch (error) {
