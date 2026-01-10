@@ -82,7 +82,7 @@ PRICING LAYOUT (CRITICAL):
 
 OUTPUT STRUCTURE:
 - whats_included: Array of {category: string, items: string[]} - group benefits by component
-- additional_enhancements: Optional upgrades that can be added (empty array if none)
+- additional_enhancements: ALWAYS return empty array [] - do NOT suggest additional upgrades
 - warranties_and_terms: 4-6 key warranty/term bullet points
 - next_steps: 2-3 actionable next steps
 - financing_text: Monthly payment info
