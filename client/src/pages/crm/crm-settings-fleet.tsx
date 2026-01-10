@@ -274,14 +274,14 @@ export default function CrmSettingsFleet() {
       <div className="grid gap-2">
         <Label htmlFor="technician">Assigned Technician</Label>
         <Select
-          value={formData.technicianId}
-          onValueChange={(value) => setFormData({ ...formData, technicianId: value })}
+          value={formData.technicianId || "unassigned"}
+          onValueChange={(value) => setFormData({ ...formData, technicianId: value === "unassigned" ? "" : value })}
         >
           <SelectTrigger>
             <SelectValue placeholder="Select a technician" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Unassigned</SelectItem>
+            <SelectItem value="unassigned">Unassigned</SelectItem>
             {technicians.map((tech) => (
               <SelectItem key={tech.id} value={tech.id}>
                 {tech.name}

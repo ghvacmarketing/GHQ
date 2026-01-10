@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, ClipboardList, ChevronRight, Tags, Clock, CreditCard, Wrench, BookOpen, Upload } from "lucide-react";
+import { Shield, Users, ClipboardList, ChevronRight, Tags, Clock, CreditCard, Wrench, BookOpen, Upload, Truck } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser } from "@shared/schema";
 
@@ -76,6 +76,12 @@ const settingsCategories: SettingsCategory[] = [
         description: "Connect and sync with QuickBooks Online",
         href: "/crm/settings/quickbooks",
         icon: BookOpen,
+      },
+      {
+        title: "Fleet Tracking",
+        description: "Manage vehicles and Bouncie GPS integration",
+        href: "/crm/settings/fleet",
+        icon: Truck,
       },
     ],
   },
