@@ -13688,19 +13688,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate invoice number
       const invoiceNumber = await generateInvoiceNumber();
 
-      // For install/proposal quotes, use the quote's total (sell price) which includes 
-      // overhead, profit margins, etc. Only fall back to summing line items for 
-      // service quotes or if quote total is not set.
+      // Calculate subtotal from the line items
+      // For multi-option quotes with a selected option, always sum the filtered line items
+      // (which only contain the selected option's items at this point)
+      // For single-option quotes, use the quote's total if available (includes sell price margins)
       let subtotal = 0;
-      const quoteTotal = parseFloat(quote.total || "0");
       
-      if (quoteTotal > 0) {
-        // Use the quote's total (sell price) for install quotes
-        subtotal = quoteTotal;
-      } else {
-        // Fall back to summing line items for service quotes
+      if (quote.quoteMode === "options" && optionToUse) {
+        // For multi-option quotes, sum the selected option's line items
         for (const item of quoteLineItems) {
           subtotal += parseFloat(item.lineTotal || "0");
+        }
+      } else {
+        // For single-option quotes, use quote.total if available (preserves sell price)
+        const quoteTotal = parseFloat(quote.total || "0");
+        if (quoteTotal > 0) {
+          subtotal = quoteTotal;
+        } else {
+          // Fall back to summing line items
+          for (const item of quoteLineItems) {
+            subtotal += parseFloat(item.lineTotal || "0");
+          }
         }
       }
 
