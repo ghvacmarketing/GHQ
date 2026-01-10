@@ -77,6 +77,7 @@ import {
   Phone,
   Clipboard,
   ClipboardCheck,
+  Truck,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { format, formatDistanceToNow } from "date-fns";
@@ -786,6 +787,166 @@ const weekCardColors: Record<string, { bg: string; border: string }> = {
   completed: { bg: "bg-green-100", border: "border-l-green-500" },
   cancelled: { bg: "bg-red-100", border: "border-l-red-400" },
 };
+
+interface BouncieVehicle {
+  id: string;
+  technicianId: string | null;
+  deviceId: string | null;
+  vehicleName: string;
+  vehicleMake: string | null;
+  vehicleModel: string | null;
+  vehicleYear: string | null;
+  licensePlate: string | null;
+  lastLatitude: string | null;
+  lastLongitude: string | null;
+  lastLocationUpdatedAt: string | null;
+  lastSpeed: string | null;
+  lastHeading: number | null;
+  isActive: boolean;
+}
+
+interface TrucksMapViewProps {
+  technicians: Technician[];
+}
+
+function TrucksMapView({ technicians }: TrucksMapViewProps) {
+  const { data: vehicles = [], isLoading } = useQuery<BouncieVehicle[]>({
+    queryKey: ["/api/bouncie/vehicles"],
+  });
+
+  const { data: bouncieStatus } = useQuery<{ connected: boolean; lastSync: string | null }>({
+    queryKey: ["/api/bouncie/status"],
+  });
+
+  const getTechnicianName = (techId: string | null) => {
+    if (!techId) return "Unassigned";
+    const tech = technicians.find(t => t.id === techId);
+    return tech?.name || "Unknown";
+  };
+
+  const formatLastUpdate = (timestamp: string | null) => {
+    if (!timestamp) return "Never";
+    return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
+  };
+
+  if (isLoading) {
+    return (
+      <Card className="h-full flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="h-full flex flex-col">
+      <CardHeader className="pb-3 border-b">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Truck className="h-5 w-5 text-[#711419]" />
+              Fleet Tracking
+            </CardTitle>
+            {bouncieStatus?.connected ? (
+              <Badge className="bg-green-100 text-green-700 border-green-200">
+                Bouncie Connected
+              </Badge>
+            ) : (
+              <Badge className="bg-amber-100 text-amber-700 border-amber-200">
+                Bouncie Not Connected
+              </Badge>
+            )}
+          </div>
+          <Link href="/crm/settings/fleet">
+            <Button variant="outline" size="sm" className="text-slate-600">
+              <Wrench className="h-4 w-4 mr-1.5" />
+              Configure Fleet
+            </Button>
+          </Link>
+        </div>
+      </CardHeader>
+      <CardContent className="flex-1 p-0">
+        <div className="flex h-full">
+          {/* Map placeholder - will be replaced with actual Google Maps */}
+          <div className="flex-1 bg-slate-100 relative flex items-center justify-center min-h-[400px]">
+            <div className="text-center p-8">
+              <MapPin className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-slate-600 mb-2">
+                Real-Time Fleet Map
+              </h3>
+              <p className="text-sm text-slate-500 max-w-md">
+                Connect your Bouncie devices to see your fleet vehicles in real-time on this map.
+                Go to Fleet Settings to configure your Bouncie integration.
+              </p>
+              {vehicles.length > 0 && vehicles.some(v => v.lastLatitude && v.lastLongitude) && (
+                <div className="mt-4 text-xs text-slate-400">
+                  {vehicles.filter(v => v.lastLatitude && v.lastLongitude).length} vehicles with location data
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Vehicle sidebar */}
+          <div className="w-80 border-l bg-white flex flex-col">
+            <div className="p-3 border-b bg-slate-50">
+              <h4 className="text-sm font-semibold text-slate-700">
+                Vehicles ({vehicles.length})
+              </h4>
+            </div>
+            <ScrollArea className="flex-1">
+              <div className="p-2 space-y-2">
+                {vehicles.length === 0 ? (
+                  <div className="text-center py-8 text-sm text-slate-500">
+                    <Truck className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                    No vehicles configured
+                    <Link href="/crm/settings/fleet" className="block mt-2 text-[#711419] hover:underline">
+                      Add vehicles
+                    </Link>
+                  </div>
+                ) : (
+                  vehicles.map(vehicle => (
+                    <div
+                      key={vehicle.id}
+                      className="p-3 rounded-lg border bg-white hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2.5 h-2.5 rounded-full ${vehicle.isActive ? 'bg-green-500' : 'bg-slate-300'}`} />
+                          <span className="font-medium text-slate-800">{vehicle.vehicleName}</span>
+                        </div>
+                        {vehicle.lastSpeed && parseFloat(vehicle.lastSpeed) > 0 && (
+                          <Badge variant="outline" className="text-xs">
+                            {Math.round(parseFloat(vehicle.lastSpeed))} mph
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="text-xs text-slate-500 space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <User className="h-3 w-3" />
+                          {getTechnicianName(vehicle.technicianId)}
+                        </div>
+                        {vehicle.vehicleMake && vehicle.vehicleModel && (
+                          <div className="text-slate-400">
+                            {vehicle.vehicleYear} {vehicle.vehicleMake} {vehicle.vehicleModel}
+                          </div>
+                        )}
+                        {vehicle.lastLocationUpdatedAt && (
+                          <div className="flex items-center gap-1.5 text-slate-400">
+                            <Clock className="h-3 w-3" />
+                            Updated {formatLastUpdate(vehicle.lastLocationUpdatedAt)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 interface WeekDispatchBoardProps {
   technicians: Technician[];
@@ -1696,7 +1857,7 @@ function enrichWorkOrder(wo: any): DispatchWorkOrder {
   };
 }
 
-type ViewMode = "day" | "week";
+type ViewMode = "day" | "week" | "trucks";
 
 function getWeekDates(date: Date): Date[] {
   const d = new Date(date);
@@ -3037,7 +3198,7 @@ export default function CrmDispatch() {
                 Dispatch Board
               </h1>
               <p className="text-sm text-slate-500">
-                {viewMode === "day" ? "Daily Schedule" : "Weekly Schedule"} - {localWorkOrders.length} work orders
+                {viewMode === "day" ? "Daily Schedule" : viewMode === "week" ? "Weekly Schedule" : "Fleet Tracking"} {viewMode !== "trucks" && `- ${localWorkOrders.length} work orders`}
               </p>
             </div>
             
@@ -3063,6 +3224,18 @@ export default function CrmDispatch() {
                 data-testid="button-view-week"
               >
                 Week
+              </button>
+              <button
+                onClick={() => setViewMode("trucks")}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-1.5 ${
+                  viewMode === "trucks" 
+                    ? "text-[#711419] border-[#711419]" 
+                    : "text-slate-500 border-transparent hover:text-slate-700"
+                }`}
+                data-testid="button-view-trucks"
+              >
+                <Truck className="h-4 w-4" />
+                Trucks
               </button>
             </div>
           </div>
@@ -3222,7 +3395,9 @@ export default function CrmDispatch() {
           <div ref={dispatchBoardRef} className="flex flex-col flex-1 min-h-0 gap-4 overflow-hidden">
             {/* Scrollable Technician Schedule - vertical scroll here, horizontal inside component */}
             <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
-              {viewMode === "day" ? (
+              {viewMode === "trucks" ? (
+                <TrucksMapView technicians={technicians} />
+              ) : viewMode === "day" ? (
                 <TechnicianScheduleBoard
                   technicians={technicians}
                   workOrders={localWorkOrders.filter(wo => wo.assignedTechId)}
@@ -3246,7 +3421,8 @@ export default function CrmDispatch() {
               )}
             </div>
             
-            {/* Fixed Unassigned Queue */}
+            {/* Fixed Unassigned Queue - hidden in trucks view */}
+            {viewMode !== "trucks" && (
             <div className="flex-shrink-0 max-h-[280px] overflow-y-auto overflow-x-hidden">
               <UnassignedQueueSection
                 workOrders={unassignedWorkOrders}
@@ -3259,6 +3435,7 @@ export default function CrmDispatch() {
                 selectedDate={selectedDate}
               />
             </div>
+            )}
           </div>
           
           {/* Drag Overlay - only shows when dragging from queue */}
