@@ -185,9 +185,9 @@ function SidebarContent({
     <div className="flex flex-col h-full bg-gradient-to-b from-slate-900 via-slate-900 to-[#1a1015]">
       <div className="p-4 border-b border-slate-700/50">
         <div className="flex items-center gap-3">
-          <img src={ghqLogo} alt="GHQ Logo" className="h-10 w-10 rounded-lg object-contain" />
+          <img src={ghqLogo} alt="GHQ Logo" className="h-10 w-10 rounded-lg object-contain brightness-0 invert" />
           <div>
-            <h1 className="text-lg font-bold text-[#711419]" data-testid="text-sidebar-title">
+            <h1 className="text-lg font-bold text-white" data-testid="text-sidebar-title">
               GHQ
             </h1>
             <p className="text-xs text-slate-400">Management System</p>
@@ -317,7 +317,7 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
             </Sheet>
             <div className="flex items-center gap-2">
               <img src={ghqLogo} alt="GHQ Logo" className="h-7 w-7 rounded object-contain" />
-              <span className="font-bold text-[#711419]" data-testid="text-mobile-title">
+              <span className="font-bold text-slate-800" data-testid="text-mobile-title">
                 GHQ
               </span>
             </div>

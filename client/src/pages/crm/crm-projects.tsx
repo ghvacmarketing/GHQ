@@ -183,7 +183,19 @@ export default function CrmProjects() {
   const { toast } = useToast();
   const [searchInput, setSearchInput] = useState("");
   const [activeFilterTab, setActiveFilterTab] = useState<FilterTab>("all");
-  const [activeTab, setActiveTab] = useState<"overview" | "pipeline" | "calendar">("pipeline");
+  
+  // Read initial tab from URL query param
+  const getInitialTab = (): "overview" | "pipeline" | "calendar" => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      if (tab === "calendar" || tab === "overview" || tab === "pipeline") {
+        return tab;
+      }
+    }
+    return "pipeline";
+  };
+  const [activeTab, setActiveTab] = useState<"overview" | "pipeline" | "calendar">(getInitialTab);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [page, setPage] = useState(1);
   

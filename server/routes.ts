@@ -12779,8 +12779,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const result = insertCrmProjectSchema.safeParse(req.body);
+      // Pre-process date fields to convert ISO strings to Date objects
+      // Append T12:00:00 to date-only strings to avoid timezone offset issues
+      const body = { ...req.body };
+      if (body.startDate !== undefined) {
+        if (body.startDate && typeof body.startDate === 'string' && !body.startDate.includes('T')) {
+          body.startDate = new Date(`${body.startDate}T12:00:00`);
+        } else {
+          body.startDate = body.startDate ? new Date(body.startDate) : null;
+        }
+      }
+      if (body.endDate !== undefined) {
+        if (body.endDate && typeof body.endDate === 'string' && !body.endDate.includes('T')) {
+          body.endDate = new Date(`${body.endDate}T12:00:00`);
+        } else {
+          body.endDate = body.endDate ? new Date(body.endDate) : null;
+        }
+      }
+
+      const result = insertCrmProjectSchema.safeParse(body);
       if (!result.success) {
+        console.error("Project validation errors:", result.error.flatten());
         return res.status(400).json({
           message: "Invalid project data",
           errors: result.error.flatten(),

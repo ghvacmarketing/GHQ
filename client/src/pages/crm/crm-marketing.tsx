@@ -69,10 +69,8 @@ export default function CrmMarketing() {
 
   const saveSettingsMutation = useMutation({
     mutationFn: async (settings: Partial<ReviewAutomationSettings>) => {
-      return apiRequest("/api/admin/settings/review-automation", {
-        method: "PUT",
-        body: JSON.stringify(settings),
-      });
+      const res = await apiRequest("PUT", "/api/admin/settings/review-automation", settings);
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/review-automation"] });
@@ -86,7 +84,8 @@ export default function CrmMarketing() {
 
   const triggerReviewsMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("/api/admin/trigger-review-requests", { method: "POST" });
+      const res = await apiRequest("POST", "/api/admin/trigger-review-requests");
+      return res.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/marketing/campaigns"] });
