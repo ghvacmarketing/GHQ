@@ -1001,17 +1001,31 @@ export default function CrmInvoiceDetail() {
             <CardTitle className="text-base flex items-center gap-2">
               <Inbox className="h-4 w-4" />
               Email Inbox
-              {invoice.viewCount && invoice.viewCount > 0 && (
-                <Badge variant="outline" className="ml-auto bg-purple-100 text-purple-700 border-purple-300">
-                  Viewed {invoice.viewCount} time{invoice.viewCount > 1 ? 's' : ''}
-                </Badge>
-              )}
+              <div className="ml-auto flex gap-2">
+                {invoice.paymentLinkClickCount && invoice.paymentLinkClickCount > 0 && (
+                  <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                    Payment link clicked {invoice.paymentLinkClickCount} time{invoice.paymentLinkClickCount > 1 ? 's' : ''}
+                  </Badge>
+                )}
+                {invoice.viewCount && invoice.viewCount > 0 && (
+                  <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-300">
+                    Viewed {invoice.viewCount} time{invoice.viewCount > 1 ? 's' : ''}
+                  </Badge>
+                )}
+              </div>
             </CardTitle>
-            {invoice.viewedAt && (
-              <p className="text-xs text-slate-500 mt-1">
-                First viewed: {format(new Date(invoice.viewedAt), "MMM d, yyyy 'at' h:mm a")}
-              </p>
-            )}
+            <div className="space-y-1">
+              {invoice.lastPaymentLinkClickedAt && (
+                <p className="text-xs text-green-600">
+                  Last payment link click: {format(new Date(invoice.lastPaymentLinkClickedAt), "MMM d, yyyy 'at' h:mm a")}
+                </p>
+              )}
+              {invoice.viewedAt && (
+                <p className="text-xs text-slate-500">
+                  First viewed: {format(new Date(invoice.viewedAt), "MMM d, yyyy 'at' h:mm a")}
+                </p>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {emailLogsLoading ? (

@@ -1311,6 +1311,7 @@ export const crmInvoices = pgTable("crm_invoices", {
   paymentMethod: text("payment_method"),
   paymentReference: text("payment_reference"),
   stripePaymentLinkId: text("stripe_payment_link_id"),
+  stripePaymentLinkUrl: text("stripe_payment_link_url"),
   notes: text("notes"),
   createdBy: varchar("created_by").references(() => crmUsers.id),
   // Deposit invoice tracking
@@ -1320,6 +1321,9 @@ export const crmInvoices = pgTable("crm_invoices", {
   updatedAt: timestamp("updated_at").defaultNow(),
   viewedAt: timestamp("viewed_at"),
   viewCount: integer("view_count").default(0),
+  // Payment link click tracking
+  paymentLinkClickCount: integer("payment_link_click_count").default(0),
+  lastPaymentLinkClickedAt: timestamp("last_payment_link_clicked_at"),
 }, (table) => ({
   statusIdx: index("crm_invoices_status_idx").on(table.status),
 }));

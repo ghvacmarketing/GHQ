@@ -198,13 +198,23 @@ router.post("/api/stripe/invoice/:invoiceId/payment-link", async (req, res) => {
       },
     });
 
-    // Store the payment link ID on the invoice for later verification
+    // Store the payment link ID and URL on the invoice for later verification and tracking
     await db.update(crmInvoices)
-      .set({ stripePaymentLinkId: paymentLink.id })
+      .set({ 
+        stripePaymentLinkId: paymentLink.id,
+        stripePaymentLinkUrl: paymentLink.url,
+      })
       .where(eq(crmInvoices.id, invoiceId));
 
+    // Build tracking URL using request host for non-Replit environments
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.headers.host || process.env.REPLIT_DOMAINS?.split(',')[0] || 'localhost:5000';
+    const baseUrl = `${protocol}://${host}`;
+    const trackingUrl = `${baseUrl}/api/public/invoice/${invoiceId}/pay`;
+
     res.json({
-      paymentLinkUrl: paymentLink.url,
+      paymentLinkUrl: trackingUrl, // Use tracking URL instead of direct Stripe URL
+      directStripeUrl: paymentLink.url, // Also provide direct URL for admin reference
       paymentLinkId: paymentLink.id,
       amountDue,
       invoiceTotal: parseFloat(invoice.total?.toString() || "0"),

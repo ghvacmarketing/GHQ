@@ -23029,6 +23029,71 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   });
 
   // ============================================================================
+  // Public Invoice Payment Link Tracking
+  // ============================================================================
+  
+  // Track click on invoice payment link and redirect to Stripe
+  app.get("/api/public/invoice/:invoiceId/pay", async (req, res) => {
+    try {
+      const { invoiceId } = req.params;
+      
+      // Get the invoice
+      const [invoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.id, invoiceId));
+      if (!invoice) {
+        return res.status(404).send("Invoice not found");
+      }
+      
+      // Check if invoice has a stored Stripe payment link URL
+      // For legacy invoices without stored URL, show a friendly error
+      if (!invoice.stripePaymentLinkUrl) {
+        // If the invoice has a stripePaymentLinkId, the admin can regenerate the link
+        if (invoice.stripePaymentLinkId) {
+          console.log(`[InvoicePaymentClick] Invoice ${invoice.invoiceNumber} has legacy payment link ID but no URL stored`);
+        }
+        return res.status(400).send("Payment link expired or not available. Please contact us for a new payment link.");
+      }
+      
+      // Track the click - increment payment link click count and update last clicked timestamp
+      const now = new Date();
+      const currentClickCount = invoice.paymentLinkClickCount || 0;
+      
+      await db.update(crmInvoices)
+        .set({
+          paymentLinkClickCount: currentClickCount + 1,
+          lastPaymentLinkClickedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(crmInvoices.id, invoiceId));
+      
+      // Log the click event in invoice email logs for activity history
+      await db.insert(invoiceEmailLogs).values({
+        invoiceId: invoice.id,
+        direction: "system",
+        fromEmail: "system",
+        recipientEmail: "system@tracking",
+        recipientName: "Customer",
+        subject: `Payment Link Clicked - Invoice ${invoice.invoiceNumber}`,
+        textContent: `Customer clicked the payment link (click #${currentClickCount + 1})`,
+        status: "sent",
+        isManual: false,
+        personalMessage: JSON.stringify({
+          eventType: "payment_link_clicked",
+          clickCount: currentClickCount + 1,
+          clickedAt: now.toISOString(),
+        }),
+      });
+      
+      console.log(`[InvoicePaymentClick] Invoice ${invoice.invoiceNumber} payment link clicked (click #${currentClickCount + 1})`);
+      
+      // Redirect to the Stripe payment link
+      res.redirect(invoice.stripePaymentLinkUrl);
+    } catch (error) {
+      console.error("Error tracking invoice payment link click:", error);
+      res.status(500).send("An error occurred");
+    }
+  });
+  
+  // ============================================================================
   // App Settings API - Financing Link
   // ============================================================================
   
