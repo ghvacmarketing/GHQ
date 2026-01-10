@@ -23123,6 +23123,42 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // POST /api/bouncie/connect-with-code - Connect using authorization code from developer portal
+  app.post("/api/bouncie/connect-with-code", async (req, res) => {
+    try {
+      const { bouncieService } = await import("./services/bouncieService");
+      const { authorizationCode } = req.body;
+
+      if (!authorizationCode) {
+        return res.status(400).json({ message: "Authorization code is required" });
+      }
+
+      if (!bouncieService.isConfigured()) {
+        return res.status(400).json({ message: "Bouncie credentials not configured" });
+      }
+
+      const host = req.headers.host || "localhost:5000";
+      const protocol = req.headers["x-forwarded-proto"] || "https";
+      const redirectUri = `${protocol}://${host}/api/bouncie/callback`;
+
+      const tokenResponse = await bouncieService.exchangeCodeForToken(authorizationCode, redirectUri);
+
+      const tokenExpiresAt = new Date(Date.now() + tokenResponse.expires_in * 1000);
+      
+      await bouncieService.saveSettings({
+        authorizationCode,
+        accessToken: tokenResponse.access_token,
+        tokenExpiresAt,
+        connectedAt: new Date(),
+      });
+
+      return res.json({ success: true, message: "Successfully connected to Bouncie" });
+    } catch (error: any) {
+      console.error("Error connecting with code:", error);
+      return res.status(500).json({ message: error.message || "Failed to connect with authorization code" });
+    }
+  });
+
   // POST /api/bouncie/sync - Sync vehicles from Bouncie
   app.post("/api/bouncie/sync", async (req, res) => {
     try {

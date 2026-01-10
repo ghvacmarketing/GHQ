@@ -118,6 +118,7 @@ export default function CrmSettingsFleet() {
   const [confirmDelete, setConfirmDelete] = useState<Vehicle | null>(null);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [formData, setFormData] = useState<VehicleFormData>(emptyFormData);
+  const [authCode, setAuthCode] = useState("");
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -240,8 +241,26 @@ export default function CrmSettingsFleet() {
     },
   });
 
-  const handleConnect = () => {
-    window.location.href = "/api/bouncie/connect";
+  const connectWithCodeMutation = useMutation({
+    mutationFn: async (code: string) => {
+      return apiRequest("POST", "/api/bouncie/connect-with-code", { authorizationCode: code });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bouncie/status"] });
+      setAuthCode("");
+      toast({ title: "Connected!", description: "Successfully connected to Bouncie. Click Sync to import vehicles." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Connection Failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleConnectWithCode = () => {
+    if (!authCode.trim()) {
+      toast({ title: "Error", description: "Please enter your authorization code from the Bouncie Developer Portal.", variant: "destructive" });
+      return;
+    }
+    connectWithCodeMutation.mutate(authCode.trim());
   };
 
   const handleAddVehicle = () => {
@@ -460,20 +479,47 @@ export default function CrmSettingsFleet() {
               </div>
             ) : bouncieStatus?.configured ? (
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-amber-50 rounded-lg border border-amber-200">
-                  <div className="flex items-center gap-3">
+                <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                  <div className="flex items-center gap-3 mb-4">
                     <XCircle className="h-6 w-6 text-amber-600" />
                     <div>
                       <p className="font-medium text-amber-800">Bouncie Not Connected</p>
                       <p className="text-sm text-amber-600">
-                        Credentials configured. Click Connect to authorize with Bouncie.
+                        Enter your Authorization Code from the Bouncie Developer Portal to connect.
                       </p>
                     </div>
                   </div>
-                  <Button onClick={handleConnect}>
-                    <LinkIcon className="h-4 w-4 mr-2" />
-                    Connect to Bouncie
-                  </Button>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Paste your Authorization Code here..."
+                      value={authCode}
+                      onChange={(e) => setAuthCode(e.target.value)}
+                      className="flex-1 font-mono text-sm"
+                    />
+                    <Button 
+                      onClick={handleConnectWithCode}
+                      disabled={connectWithCodeMutation.isPending || !authCode.trim()}
+                    >
+                      {connectWithCodeMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <LinkIcon className="h-4 w-4 mr-2" />
+                      )}
+                      Connect
+                    </Button>
+                  </div>
+                  <p className="text-xs text-amber-600 mt-2">
+                    Find your Authorization Code in the{" "}
+                    <a 
+                      href="https://www.bouncie.dev/login" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="underline hover:text-amber-800"
+                    >
+                      Bouncie Developer Portal
+                    </a>
+                    {" "}under Users & Devices.
+                  </p>
                 </div>
               </div>
             ) : (
