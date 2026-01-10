@@ -23038,12 +23038,14 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       const { bouncieService } = await import("./services/bouncieService");
       
       const configured = bouncieService.isConfigured();
+      const hasApiKey = bouncieService.hasApiKey();
       const connected = await bouncieService.isConnected();
       const settings = await bouncieService.getSettings();
 
       return res.json({ 
         configured,
-        connected, 
+        connected,
+        hasApiKey,
         lastSync: settings?.lastSyncAt?.toISOString() ?? null,
         connectedAt: settings?.connectedAt?.toISOString() ?? null,
       });

@@ -34,14 +34,20 @@ interface TokenResponse {
 export class BouncieService {
   private clientId: string;
   private clientSecret: string;
+  private apiKey: string;
 
   constructor() {
     this.clientId = process.env.BOUNCIE_CLIENT_ID || "";
     this.clientSecret = process.env.BOUNCIE_CLIENT_SECRET || "";
+    this.apiKey = process.env.BOUNCIE_API_KEY || "";
   }
 
   isConfigured(): boolean {
-    return Boolean(this.clientId && this.clientSecret);
+    return Boolean(this.apiKey || (this.clientId && this.clientSecret));
+  }
+  
+  hasApiKey(): boolean {
+    return Boolean(this.apiKey);
   }
 
   getAuthorizationUrl(redirectUri: string, state?: string): string {
@@ -108,11 +114,19 @@ export class BouncieService {
   }
 
   async getAccessToken(): Promise<string | null> {
+    // If API key is configured, use it directly
+    if (this.apiKey) {
+      return this.apiKey;
+    }
     const settings = await this.getSettings();
     return settings?.accessToken || null;
   }
 
   async isConnected(): Promise<boolean> {
+    // If API key is configured, we're always connected
+    if (this.apiKey) {
+      return true;
+    }
     const settings = await this.getSettings();
     return Boolean(settings?.accessToken);
   }

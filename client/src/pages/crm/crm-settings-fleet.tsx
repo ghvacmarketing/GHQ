@@ -63,6 +63,7 @@ import type { CrmUser } from "@shared/schema";
 interface BouncieStatus {
   configured: boolean;
   connected: boolean;
+  hasApiKey: boolean;
   lastSync: string | null;
   connectedAt: string | null;
 }
@@ -442,7 +443,9 @@ export default function CrmSettingsFleet() {
                   <div className="flex items-center gap-3">
                     <CheckCircle className="h-6 w-6 text-green-600" />
                     <div>
-                      <p className="font-medium text-green-800">Bouncie Connected</p>
+                      <p className="font-medium text-green-800">
+                        {bouncieStatus.hasApiKey ? "Bouncie Connected via API Key" : "Bouncie Connected"}
+                      </p>
                       <p className="text-sm text-green-600">
                         {bouncieStatus.lastSync 
                           ? `Last synced: ${new Date(bouncieStatus.lastSync).toLocaleString()}`
@@ -464,16 +467,18 @@ export default function CrmSettingsFleet() {
                       )}
                       Sync Vehicles
                     </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => disconnectMutation.mutate()}
-                      disabled={disconnectMutation.isPending}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Unplug className="h-4 w-4 mr-2" />
-                      Disconnect
-                    </Button>
+                    {!bouncieStatus.hasApiKey && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => disconnectMutation.mutate()}
+                        disabled={disconnectMutation.isPending}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Unplug className="h-4 w-4 mr-2" />
+                        Disconnect
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
