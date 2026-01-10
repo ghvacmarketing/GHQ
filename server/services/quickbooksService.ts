@@ -785,24 +785,41 @@ export async function syncInvoiceToQuickBooks(
           console.log(`[QuickBooks SubAccount] Item ${item.itemId} has no category set`);
         }
       } else if (!item.isDiscountLine && !item.itemId && !hasExplicitItemRef) {
-        // Priority 3: For line items without itemId (e.g., maintenance agreement renewals),
-        // try to infer category from description
-        const description = (item.description || "").toLowerCase();
+        // Priority 3: For line items without itemId (e.g., install quotes, maintenance renewals),
+        // first check lineType, then try to infer category from description
         let inferredClassType: "Service" | "Install" | "Maintenance" | null = null;
         
-        if (description.includes("maintenance") || description.includes("preventative") || description.includes("agreement")) {
-          inferredClassType = "Maintenance";
-        } else if (description.includes("install") || description.includes("installation")) {
+        // Check lineType first - this is set correctly for proposal/install quotes
+        const lineType = item.lineType?.toLowerCase() || "";
+        if (lineType === "install") {
           inferredClassType = "Install";
-        } else if (description.includes("service") || description.includes("repair") || description.includes("diagnostic")) {
+        } else if (lineType === "maintenance") {
+          inferredClassType = "Maintenance";
+        } else if (lineType === "service") {
           inferredClassType = "Service";
+        } else {
+          // Fall back to description inference
+          const description = (item.description || "").toLowerCase();
+          
+          if (description.includes("maintenance") || description.includes("preventative") || description.includes("agreement")) {
+            inferredClassType = "Maintenance";
+          } else if (description.includes("install") || description.includes("installation") || description.includes("package")) {
+            inferredClassType = "Install";
+          } else if (description.includes("service") || description.includes("repair") || description.includes("diagnostic")) {
+            inferredClassType = "Service";
+          } else if (description.includes("deposit")) {
+            // Deposit line items - try to infer from context
+            if (description.includes("install") || description.includes("package") || description.includes("ton")) {
+              inferredClassType = "Install";
+            }
+          }
         }
         
         lineClassType = inferredClassType;
         lineSubType = propertyTypeToSubType(propertyType);
         
         if (!inferredClassType) {
-          console.log(`[QuickBooks SubAccount] No itemId and couldn't infer category from description: "${item.description}"`);
+          console.log(`[QuickBooks SubAccount] No itemId and couldn't infer category from lineType(${lineType}) or description: "${item.description}"`);
         } else if (!propertyType) {
           console.log(`[QuickBooks SubAccount] No property type for line item: "${item.description}"`);
         }

@@ -1,6 +1,6 @@
 import { getStripeSync, getUncachableStripeClient } from './stripeClient';
 import { db } from './db';
-import { crmInvoices, crmInvoiceLineItems, crmQuotes, crmAgreements, maintenanceVisits } from '@shared/schema';
+import { crmInvoices, crmInvoiceLineItems, crmQuotes, crmAgreements, maintenanceVisits, crmWorkOrders } from '@shared/schema';
 import { eq, and, inArray, sql, desc } from 'drizzle-orm';
 import { autoSyncInvoice, autoSyncPayment } from './services/quickbooksService';
 
@@ -189,13 +189,38 @@ export class WebhookHandlers {
                 depositDescription = `Deposit for ${selectedOption} - Quote #${quote.quoteNumber}`;
               }
 
+              // Determine work order - check quote fields (workOrderId, jobId) and project work orders
+              let workOrderId = quote.workOrderId || quote.jobId || null;
+              
+              // If no work order directly on quote, try to find one from the project
+              if (!workOrderId && quote.projectId) {
+                const projectWorkOrders = await db.select({ id: crmWorkOrders.id })
+                  .from(crmWorkOrders)
+                  .where(eq(crmWorkOrders.projectId, quote.projectId))
+                  .orderBy(desc(crmWorkOrders.createdAt))
+                  .limit(1);
+                if (projectWorkOrders.length > 0) {
+                  workOrderId = projectWorkOrders[0].id;
+                  console.log(`[Webhook] Found work order ${workOrderId} from project ${quote.projectId}`);
+                }
+              }
+
+              // Determine lineType based on quote category or type
+              // Priority: 1) quoteCategory if explicitly set, 2) quoteType for known types
+              // "proposal" was historically used for install quotes, so treat it as install if no quoteCategory is set
+              const isInstallQuote = 
+                quote.quoteCategory === "install" || 
+                quote.quoteType === "custom_install" ||
+                (quote.quoteCategory === null && quote.quoteType === "proposal");
+              const lineType: "part" | "install" = isInstallQuote ? "install" : "part";
+
               // Create the deposit invoice - marked as paid since we just received payment
               const [depositInvoice] = await db.insert(crmInvoices).values({
                 invoiceNumber: depositInvoiceNumber,
-                customerId: quote.accountId || null,
-                propertyId: quote.siteId || null,
+                customerId: quote.accountId || quote.customerId || null,
+                propertyId: quote.siteId || quote.propertyId || null,
                 projectId: quote.projectId || null,
-                workOrderId: quote.jobId || null,
+                workOrderId: workOrderId,
                 quoteId: quote.id,
                 status: "paid" as const,
                 subtotal: depositAmount.toFixed(2),
@@ -208,12 +233,13 @@ export class WebhookHandlers {
                 isDepositInvoice: true,
               }).returning();
 
-              console.log(`[Webhook] Created deposit invoice ${depositInvoiceNumber} for $${depositAmount}`);
+              console.log(`[Webhook] Created deposit invoice ${depositInvoiceNumber} for $${depositAmount} (workOrder: ${workOrderId})`);
 
-              // Create a line item for the deposit
+              // Create a line item for the deposit with correct lineType for P&L mapping
               await db.insert(crmInvoiceLineItems).values({
                 invoiceId: depositInvoice.id,
                 description: depositDescription,
+                lineType: lineType,
                 quantity: "1",
                 unitPrice: depositAmount.toFixed(2),
                 lineTotal: depositAmount.toFixed(2),

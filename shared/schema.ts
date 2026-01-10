@@ -1231,7 +1231,7 @@ export const crmQuotes = pgTable("crm_quotes", {
 export const crmQuoteLineItems = pgTable("crm_quote_line_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   quoteId: varchar("quote_id").notNull().references(() => crmQuotes.id, { onDelete: "cascade" }),
-  lineType: text("line_type").$type<"part" | "labor" | "service" | "other" | "discount">().notNull().default("part"),
+  lineType: text("line_type").$type<"part" | "labor" | "service" | "other" | "discount" | "install" | "maintenance">().notNull().default("part"),
   description: text("description").notNull(),
   partNumber: text("part_number"),
   quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
@@ -1328,7 +1328,7 @@ export const crmInvoices = pgTable("crm_invoices", {
 export const crmInvoiceLineItems = pgTable("crm_invoice_line_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   invoiceId: varchar("invoice_id").notNull().references(() => crmInvoices.id, { onDelete: "cascade" }),
-  lineType: text("line_type").$type<"part" | "labor" | "service" | "other" | "discount">().notNull().default("part"),
+  lineType: text("line_type").$type<"part" | "labor" | "service" | "other" | "discount" | "install" | "maintenance">().notNull().default("part"),
   description: text("description").notNull(),
   partNumber: text("part_number"),
   quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("1"),

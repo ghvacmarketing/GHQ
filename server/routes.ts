@@ -15814,6 +15814,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (projectId) scope = "project";
       else if (workOrderId) scope = "work_order";
 
+      // Determine if this is an install or service quote when quoteType is explicitly provided
+      // "proposal" and "custom_install" are install types, "quick" and "custom_service" are service types
+      // Only set quoteCategory when we have an explicit quoteType to avoid misclassifying legacy/missing types
+      let quoteCategory: "install" | "service" | null = null;
+      if (quoteType === "proposal" || quoteType === "custom_install") {
+        quoteCategory = "install";
+      } else if (quoteType === "quick" || quoteType === "custom_service") {
+        quoteCategory = "service";
+      }
+      const isInstallQuote = quoteCategory === "install";
+
       // Create the quote
       const [newQuote] = await db.insert(crmQuotes).values({
         quoteNumber,
@@ -15837,11 +15848,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         acceptedBy: quoteStatus === "approved" ? user.name : null,
         aiGeneratedQuote: aiGeneratedQuote || null,
         quoteMode: quoteMode || null,
-        quoteType: quoteType || "proposal",
+        quoteType: quoteType || null,
+        quoteCategory: quoteCategory,
         assignedToId: assignedToId || null,
       }).returning();
 
       // Create line items
+      // Determine lineType based on quoteType - install quotes should use "install" lineType
+      const defaultLineType = isInstallQuote ? "install" : "part";
+      
       const createdLineItems = [];
       let sortOrder = 0;
       for (const item of lineItems) {
@@ -15853,7 +15868,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const [createdItem] = await db.insert(crmQuoteLineItems).values({
           quoteId: newQuote.id,
-          lineType: "part",
+          lineType: item.lineType || defaultLineType,
           description: item.description.trim(),
           quantity: quantity.toString(),
           unitPrice: unitPrice.toString(),
