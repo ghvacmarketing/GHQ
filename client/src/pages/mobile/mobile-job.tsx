@@ -101,10 +101,11 @@ export default function MobileJob() {
     },
   });
 
-  const isSupervisor = currentUser?.role === 'supervisor';
+  // Supervisor, tech, and sales can all see future jobs
+  const canViewFutureJobs = currentUser?.role === 'supervisor' || currentUser?.role === 'tech' || currentUser?.role === 'sales';
 
-  // Supervisors see future jobs (next 30 days), others see today only
-  const queryDateEnd = isSupervisor ? futureEndStr : todayEnd;
+  // Supervisor, tech, and sales see future jobs (next 30 days), others see today only
+  const queryDateEnd = canViewFutureJobs ? futureEndStr : todayEnd;
   
   const { data: workOrders = [], isLoading: ordersLoading } = useQuery<WorkOrderWithDetails[]>({
     queryKey: ["/api/crm/work-orders", { dateFrom: todayStart, dateTo: queryDateEnd, techId: (currentUser?.role === 'tech' || currentUser?.role === 'sales' || currentUser?.role === 'supervisor') ? currentUser?.id : undefined }],
@@ -317,17 +318,17 @@ export default function MobileJob() {
     );
   }, [workOrders]);
 
-  // For supervisors: show all jobs (today + future), for others: only today
+  // For users who can view future jobs: show all jobs (today + future), for others: only today
   const displayedJobs = useMemo(() => {
     return workOrders
       .filter(wo => {
         if (!wo.scheduledStart) return false;
-        // For non-supervisors, filter to today only
-        if (!isSupervisor) {
+        // For those who can't view future jobs, filter to today only
+        if (!canViewFutureJobs) {
           const localStart = toLocalTime(wo.scheduledStart);
           return isToday(localStart);
         }
-        return true; // Supervisors see all fetched jobs (today + next 30 days)
+        return true; // Users with future view permission see all fetched jobs (today + next 30 days)
       })
       .sort((a, b) => {
         const statusOrder: Record<string, number> = { on_site: 0, en_route: 1, dispatched: 2, scheduled: 3, completed: 4 };
@@ -338,11 +339,11 @@ export default function MobileJob() {
         const bStart = b.scheduledStart ? new Date(b.scheduledStart).getTime() : 0;
         return aStart - bStart;
       });
-  }, [workOrders, isSupervisor]);
+  }, [workOrders, canViewFutureJobs]);
 
-  // Group jobs by date for supervisors
+  // Group jobs by date for users who can view future jobs
   const groupedJobsByDate = useMemo(() => {
-    if (!isSupervisor) return null;
+    if (!canViewFutureJobs) return null;
     
     const groups: { dateKey: string; dateLabel: string; jobs: WorkOrderWithDetails[] }[] = [];
     const dateMap = new Map<string, WorkOrderWithDetails[]>();
@@ -382,7 +383,7 @@ export default function MobileJob() {
     });
     
     return groups;
-  }, [displayedJobs, isSupervisor]);
+  }, [displayedJobs, canViewFutureJobs]);
 
   useEffect(() => {
     if (activeJob) {
@@ -427,10 +428,10 @@ export default function MobileJob() {
           <div className="flex items-center gap-2">
             <Wrench className="h-6 w-6 text-[#711419]" />
             <h1 className="text-xl font-semibold text-slate-800">
-              {isSupervisor ? "My Jobs" : "Today's Jobs"}
+              {canViewFutureJobs ? "My Jobs" : "Today's Jobs"}
             </h1>
           </div>
-          {isSupervisor && (
+          {currentUser?.role === 'supervisor' && (
             <Button 
               onClick={() => setShowCreateDialog(true)}
               className="bg-[#711419] hover:bg-[#5a1014]"
@@ -458,7 +459,7 @@ export default function MobileJob() {
               </Button>
             </CardContent>
           </Card>
-        ) : isSupervisor && groupedJobsByDate ? (
+        ) : canViewFutureJobs && groupedJobsByDate ? (
           <div className="space-y-4">
             {groupedJobsByDate.map((group) => (
               <div key={group.dateKey} data-testid={`date-group-${group.dateKey}`}>

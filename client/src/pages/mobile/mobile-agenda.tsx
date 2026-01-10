@@ -451,8 +451,8 @@ export default function MobileAgenda() {
   const todayEnd = getLocalEndOfDay(today).toISOString();
   const { isOnline } = useOnlineStatus();
   const [isFromCache, setIsFromCache] = useState(false);
-  // Supervisors can toggle between viewing all techs or just their own work orders
-  const [supervisorViewAll, setSupervisorViewAll] = useState(true);
+  // Users with view-all permission can toggle between viewing all techs or just their own work orders
+  const [viewAllTechs, setViewAllTechs] = useState<boolean | null>(null);
 
   const { data: currentUser, isLoading: isLoadingUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -465,10 +465,15 @@ export default function MobileAgenda() {
     gcTime: 24 * 60 * 60 * 1000,
   });
 
-  const isSupervisor = currentUser?.role === 'supervisor';
+  // Supervisor, tech, and sales can toggle between viewing all jobs or just their own
+  const canToggleView = currentUser?.role === 'supervisor' || currentUser?.role === 'tech' || currentUser?.role === 'sales';
+  // Owner/admin always see all jobs without needing a toggle
+  const isOwnerOrAdmin = currentUser?.role === 'owner' || currentUser?.role === 'admin';
+  // Set default: supervisors default to All Techs, tech/sales default to My Jobs
+  const effectiveViewAll = viewAllTechs ?? (currentUser?.role === 'supervisor');
   // Determine if we should filter by tech ID
-  const shouldFilterByTech = (currentUser?.role === 'tech' || currentUser?.role === 'sales') || 
-                              (isSupervisor && !supervisorViewAll);
+  // Owner/admin never filter, toggle users filter based on their selection
+  const shouldFilterByTech = isOwnerOrAdmin ? false : (canToggleView ? !effectiveViewAll : true);
 
   const { data: workOrders, isLoading: isLoadingOrders, error, isError } = useQuery<WorkOrderWithDetails[]>({
     queryKey: ["/api/crm/work-orders", { dateFrom: todayStart, dateTo: todayEnd, techId: shouldFilterByTech ? currentUser?.id : undefined }],
@@ -520,7 +525,7 @@ export default function MobileAgenda() {
     refetchOnWindowFocus: true,
   });
 
-  // Fetch all technicians when supervisor is viewing all techs
+  // Fetch all technicians when viewing all techs
   const { data: technicians = [] } = useQuery<{ id: string; name: string; role: string }[]>({
     queryKey: ["/api/crm/users", "technicians-for-agenda"],
     queryFn: async () => {
@@ -532,7 +537,7 @@ export default function MobileAgenda() {
         ['tech', 'sales', 'supervisor', 'owner', 'admin'].includes(u.role) && u.isActive
       );
     },
-    enabled: isSupervisor && supervisorViewAll,
+    enabled: (canToggleView && effectiveViewAll) || isOwnerOrAdmin,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -551,8 +556,9 @@ export default function MobileAgenda() {
     return aTime - bTime;
   });
 
-  // Group work orders by technician when supervisor views all techs
-  const groupedByTech = isSupervisor && supervisorViewAll 
+  // Group work orders by technician when viewing all techs
+  const showGroupedView = isOwnerOrAdmin || (canToggleView && effectiveViewAll);
+  const groupedByTech = showGroupedView 
     ? todaysOrders.reduce((acc, wo) => {
         const techId = wo.assignedTechId || 'unassigned';
         if (!acc[techId]) {
@@ -610,12 +616,12 @@ export default function MobileAgenda() {
             {formatLocal(today, "MMMM d, yyyy")}
           </p>
           
-          {isSupervisor && (
-            <div className="mt-3 flex items-center justify-center gap-2" data-testid="supervisor-view-toggle">
+          {canToggleView && (
+            <div className="mt-3 flex items-center justify-center gap-2" data-testid="view-toggle">
               <button
-                onClick={() => setSupervisorViewAll(true)}
+                onClick={() => setViewAllTechs(true)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-l-full transition-colors ${
-                  supervisorViewAll 
+                  effectiveViewAll 
                     ? "bg-[#711419] text-white" 
                     : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-300"
                 }`}
@@ -625,9 +631,9 @@ export default function MobileAgenda() {
                 All Techs
               </button>
               <button
-                onClick={() => setSupervisorViewAll(false)}
+                onClick={() => setViewAllTechs(false)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-r-full transition-colors ${
-                  !supervisorViewAll 
+                  !effectiveViewAll 
                     ? "bg-[#711419] text-white" 
                     : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-300"
                 }`}
@@ -680,7 +686,7 @@ export default function MobileAgenda() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
-                  {isSupervisor && supervisorViewAll ? "All Technicians" : "Today's Jobs"}
+                  {showGroupedView ? "All Technicians" : "Today's Jobs"}
                 </h3>
                 <Badge variant="secondary" className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold">
                   {todaysOrders.length}
@@ -694,12 +700,12 @@ export default function MobileAgenda() {
                   <ClipboardList className="h-10 w-10 text-slate-300 mb-2" />
                   <h3 className="text-sm font-medium text-slate-600 mb-1">No Jobs Today</h3>
                   <p className="text-slate-400 text-xs">
-                    {isSupervisor && supervisorViewAll 
+                    {showGroupedView 
                       ? "No work orders scheduled for any technician today." 
                       : "You have no work orders scheduled for today."}
                   </p>
                 </div>
-              ) : isSupervisor && supervisorViewAll && groupedByTech ? (
+              ) : showGroupedView && groupedByTech ? (
                 <div className="space-y-4" data-testid="agenda-grouped-list">
                   {sortedTechIds.map((techId) => {
                     const techOrders = groupedByTech[techId];
