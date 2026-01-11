@@ -23725,8 +23725,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(400).json({ message: "Please select a date and time" });
       }
 
-      // Clean phone number for duplicate check
-      const cleanPhoneForCheck = phone.replace(/\D/g, '');
+      // Normalize inputs for duplicate check
+      const cleanPhoneForCheck = phone.replace(/\D/g, '').slice(-10);
+      const normalizedEmail = email.trim().toLowerCase();
 
       // Check for duplicate bookings within last 24 hours from same phone or email
       const oneDayAgo = new Date();
@@ -23749,14 +23750,16 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
             .where(eq(crmCustomers.id, booking.customerId));
           
           if (customer) {
-            const customerPhone = (customer.phone || "").replace(/\D/g, '');
-            if (customerPhone && cleanPhoneForCheck.slice(-10) === customerPhone.slice(-10)) {
-              return res.status(400).json({ 
-                message: "You already have a booking request pending. We'll contact you soon to schedule your appointment.",
-                duplicateBooking: true
-              });
-            }
-            if (customer.email && email.toLowerCase() === customer.email.toLowerCase()) {
+            // Check phone match (normalized to last 10 digits)
+            const customerPhone = (customer.phone || "").replace(/\D/g, '').slice(-10);
+            const phoneMatch = cleanPhoneForCheck.length >= 10 && customerPhone.length >= 10 && 
+                               cleanPhoneForCheck === customerPhone;
+            
+            // Check email match (case-insensitive, trimmed)
+            const customerEmail = (customer.email || "").trim().toLowerCase();
+            const emailMatch = normalizedEmail && customerEmail && normalizedEmail === customerEmail;
+            
+            if (phoneMatch || emailMatch) {
               return res.status(400).json({ 
                 message: "You already have a booking request pending. We'll contact you soon to schedule your appointment.",
                 duplicateBooking: true
