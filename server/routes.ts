@@ -23737,6 +23737,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       // Try to find existing customer by phone or email
       let customerId: string | null = null;
       let propertyId: string | null = null;
+      let existingCustomer: typeof crmCustomers.$inferSelect | null = null;
 
       const existingByPhone = await db.select()
         .from(crmCustomers)
@@ -23745,6 +23746,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       if (existingByPhone.length > 0) {
         customerId = existingByPhone[0].id;
+        existingCustomer = existingByPhone[0];
       } else {
         const existingByEmail = await db.select()
           .from(crmCustomers)
@@ -23753,6 +23755,24 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
         if (existingByEmail.length > 0) {
           customerId = existingByEmail[0].id;
+          existingCustomer = existingByEmail[0];
+        }
+      }
+
+      // If existing customer found, update their name if it looks like an address
+      // (FieldEdge imported customers often have addresses as names)
+      if (existingCustomer && customerId) {
+        const existingName = existingCustomer.name || "";
+        const nameContainsNumber = /^\d/.test(existingName) || /\d{3,}/.test(existingName);
+        const nameLooksLikeAddress = nameContainsNumber || existingName.toLowerCase().includes(" ln") || 
+          existingName.toLowerCase().includes(" rd") || existingName.toLowerCase().includes(" st") ||
+          existingName.toLowerCase().includes(" dr") || existingName.toLowerCase().includes(" ave");
+        
+        if (nameLooksLikeAddress) {
+          await db.update(crmCustomers)
+            .set({ name: customerName })
+            .where(eq(crmCustomers.id, customerId));
+          console.log(`[OnlineBooking] Updated customer name from "${existingName}" to "${customerName}"`);
         }
       }
 
