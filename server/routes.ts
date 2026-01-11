@@ -23703,6 +23703,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         serviceType,
         problems,
         systemType,
+        projectType,
+        timeline,
         selectedDate,
         selectedTimeSlot,
         firstName,
@@ -23791,16 +23793,37 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         .from(crmWorkOrders);
       const nextWoNumber = (maxWoResult[0]?.max as number || 0) + 1;
 
-      // Format problems for description
-      const problemsText = problems && problems.length > 0 
-        ? `Issues: ${problems.join(", ")}` 
-        : "";
-      const systemText = systemType ? `System Type: ${systemType}` : "";
-      const notesText = notes ? `Customer Notes: ${notes}` : "";
+      // Build comprehensive description with all booking info
+      const descriptionParts: string[] = [];
+      
+      if (systemType) {
+        descriptionParts.push(`System Type: ${systemType}`);
+      }
+      
+      if (problems && problems.length > 0) {
+        descriptionParts.push(`Issues/Reasons: ${problems.join(", ")}`);
+      }
+      
+      if (projectType) {
+        const projectTypeLabel = projectType === "replacement" ? "Replacement" : "New Installation";
+        descriptionParts.push(`Project Type: ${projectTypeLabel}`);
+      }
+      
+      if (timeline) {
+        const timelineLabels: Record<string, string> = {
+          next_week: "Next week",
+          within_month: "Within the month",
+          in_two_months: "In two months",
+          asap: "As soon as possible",
+        };
+        descriptionParts.push(`Timeline: ${timelineLabels[timeline] || timeline}`);
+      }
+      
+      if (notes) {
+        descriptionParts.push(`Customer Notes: ${notes}`);
+      }
 
-      const description = [problemsText, systemText, notesText]
-        .filter(Boolean)
-        .join("\n");
+      const description = descriptionParts.join("\n");
 
       // Determine visit type
       const visitType = serviceType === "consultation" ? "SALES" : "SERVICE";
