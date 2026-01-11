@@ -1657,7 +1657,8 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           gte(crmWorkOrders.scheduledStart, startDate),
-          lte(crmWorkOrders.scheduledStart, endDate)
+          lte(crmWorkOrders.scheduledStart, endDate),
+          or(eq(crmWorkOrders.isHistorical, false), isNull(crmWorkOrders.isHistorical))
         )
       )
       .orderBy(asc(crmWorkOrders.scheduledStart));
@@ -1677,7 +1678,8 @@ export class DatabaseStorage implements IStorage {
           and(
             eq(crmWorkOrders.assignedTechId, techId),
             gte(crmWorkOrders.scheduledStart, startOfDay),
-            lte(crmWorkOrders.scheduledStart, endOfDay)
+            lte(crmWorkOrders.scheduledStart, endOfDay),
+            or(eq(crmWorkOrders.isHistorical, false), isNull(crmWorkOrders.isHistorical))
           )
         )
         .orderBy(asc(crmWorkOrders.scheduledStart));
@@ -1686,19 +1688,24 @@ export class DatabaseStorage implements IStorage {
     return await db
       .select()
       .from(crmWorkOrders)
-      .where(eq(crmWorkOrders.assignedTechId, techId))
+      .where(
+        and(
+          eq(crmWorkOrders.assignedTechId, techId),
+          or(eq(crmWorkOrders.isHistorical, false), isNull(crmWorkOrders.isHistorical))
+        )
+      )
       .orderBy(asc(crmWorkOrders.scheduledStart));
   }
 
   async getUnassignedWorkOrders(): Promise<CrmWorkOrder[]> {
-    // Get unassigned work orders that are not completed or cancelled
     return await db
       .select()
       .from(crmWorkOrders)
       .where(
         and(
           isNull(crmWorkOrders.assignedTechId),
-          notInArray(crmWorkOrders.status, ['completed', 'cancelled'])
+          notInArray(crmWorkOrders.status, ['completed', 'cancelled']),
+          or(eq(crmWorkOrders.isHistorical, false), isNull(crmWorkOrders.isHistorical))
         )
       )
       .orderBy(desc(crmWorkOrders.createdAt));

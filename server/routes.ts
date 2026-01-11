@@ -35,6 +35,7 @@ import { scheduleWeatherImpactJobs } from "./weather-impact-service";
 import { scheduleAgreementRenewals, processAgreementRenewals, processSingleAgreementRenewal } from "./services/agreementRenewalService";
 import { scheduleMaintenanceReminders, processMaintenanceReminders } from "./services/maintenanceReminderService";
 import { startReviewRequestScheduler, processReviewRequests, syncCampaignActiveStatus } from "./services/reviewRequestService";
+import { runFullFieldEdgeImport } from "./services/fieldEdgeImport";
 import { sendAutomatedSms, hasNotificationBeenSent, getWorkOrderEnRouteTemplate, getWorkOrderOnSiteTemplate, getInvoiceSmsTemplate } from "./services/smsNotificationService";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
 import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword, isSupervisor } from "./crm-auth";
@@ -23553,6 +23554,31 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error) {
       console.error("Error triggering review requests:", error);
       res.status(500).json({ message: "Failed to process review requests" });
+    }
+  });
+
+  // POST /api/admin/import-fieldedge - Import historical data from FieldEdge CSV files
+  app.post("/api/admin/import-fieldedge", requireCrmAdmin, async (req, res) => {
+    try {
+      console.log("[FieldEdge Import] Starting import via API...");
+      const result = await runFullFieldEdgeImport();
+      res.json({ 
+        success: true, 
+        workOrders: {
+          imported: result.workOrders.imported,
+          skipped: result.workOrders.skipped,
+          errors: result.workOrders.errors.length
+        },
+        invoices: {
+          imported: result.invoices.imported,
+          linked: result.invoices.linked,
+          skipped: result.invoices.skipped,
+          errors: result.invoices.errors.length
+        }
+      });
+    } catch (error: any) {
+      console.error("Error running FieldEdge import:", error);
+      res.status(500).json({ message: "Failed to import FieldEdge data", error: error.message });
     }
   });
 
