@@ -23725,6 +23725,47 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(400).json({ message: "Please select a date and time" });
       }
 
+      // Clean phone number for duplicate check
+      const cleanPhoneForCheck = phone.replace(/\D/g, '');
+
+      // Check for duplicate bookings within last 24 hours from same phone or email
+      const oneDayAgo = new Date();
+      oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+
+      const recentBookings = await db.select()
+        .from(crmWorkOrders)
+        .where(
+          and(
+            eq(crmWorkOrders.bookingSource, "online"),
+            gte(crmWorkOrders.createdAt, oneDayAgo)
+          )
+        );
+
+      // Check if any recent booking matches this phone or email
+      for (const booking of recentBookings) {
+        if (booking.customerId) {
+          const [customer] = await db.select()
+            .from(crmCustomers)
+            .where(eq(crmCustomers.id, booking.customerId));
+          
+          if (customer) {
+            const customerPhone = (customer.phone || "").replace(/\D/g, '');
+            if (customerPhone && cleanPhoneForCheck.slice(-10) === customerPhone.slice(-10)) {
+              return res.status(400).json({ 
+                message: "You already have a booking request pending. We'll contact you soon to schedule your appointment.",
+                duplicateBooking: true
+              });
+            }
+            if (customer.email && email.toLowerCase() === customer.email.toLowerCase()) {
+              return res.status(400).json({ 
+                message: "You already have a booking request pending. We'll contact you soon to schedule your appointment.",
+                duplicateBooking: true
+              });
+            }
+          }
+        }
+      }
+
       const customerName = `${firstName} ${lastName}`;
       const fullAddress = `${address}, ${city}, GA ${zipCode}`;
 

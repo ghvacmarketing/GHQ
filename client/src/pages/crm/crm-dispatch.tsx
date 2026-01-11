@@ -2002,7 +2002,7 @@ function enrichWorkOrder(wo: any): DispatchWorkOrder {
     propertyAddress,
     jobType: wo.job?.jobType || "Service",
     priority: wo.job?.priority || "normal",
-    description: wo.job?.description || null,
+    description: wo.description || wo.job?.description || null,
     techName: wo.tech?.name || null,
   };
 }

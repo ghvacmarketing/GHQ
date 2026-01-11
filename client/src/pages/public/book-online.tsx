@@ -121,13 +121,23 @@ export default function BookOnline() {
     return SERVICE_CALL_STEPS;
   };
 
+  const [bookingError, setBookingError] = useState("");
+
   const submitBooking = useMutation({
     mutationFn: async (bookingData: BookingData) => {
       const response = await apiRequest("POST", "/api/public/book", bookingData);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to submit booking");
+      }
       return response.json();
     },
     onSuccess: () => {
+      setBookingError("");
       setStep("confirm");
+    },
+    onError: (error: Error) => {
+      setBookingError(error.message);
     },
   });
 
@@ -624,6 +634,11 @@ export default function BookOnline() {
                 />
               </div>
             </div>
+            {bookingError && (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
+                {bookingError}
+              </div>
+            )}
           </div>
         );
 
