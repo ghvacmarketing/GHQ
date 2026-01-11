@@ -332,29 +332,6 @@ export default function CrmCustomers() {
           >
             Agreements ({statsData?.withAgreements?.toLocaleString() || 0})
           </button>
-          <div className="border-l border-slate-200 mx-2" />
-          <button
-            onClick={() => { setSourceFilter("crm"); setHasAgreement(false); }}
-            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              sourceFilter === "crm"
-                ? "border-[#711419] text-[#711419]"
-                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-            }`}
-            data-testid="tab-source-crm"
-          >
-            CRM Only ({customersData?.sources?.crm?.count?.toLocaleString() || 0})
-          </button>
-          <button
-            onClick={() => { setSourceFilter("fieldedge"); setHasAgreement(false); }}
-            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              sourceFilter === "fieldedge"
-                ? "border-[#711419] text-[#711419]"
-                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-            }`}
-            data-testid="tab-source-fieldedge"
-          >
-            FieldEdge ({customersData?.sources?.fieldedge?.count?.toLocaleString() || 0})
-          </button>
         </div>
 
         <Card className="bg-white border shadow-sm overflow-hidden">
