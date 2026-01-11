@@ -31,6 +31,7 @@ type CustomerWithAddress = CrmCustomer & {
   fullAddress: string | null;
   origin?: 'crm_customers' | 'crm_accounts';
   accountId?: string | null;
+  source?: 'crm' | 'fieldedge';
 };
 
 type CustomersResponse = {
@@ -40,6 +41,14 @@ type CustomersResponse = {
     limit: number;
     total: number;
     totalPages: number;
+  };
+  sources?: {
+    crm: { count: number };
+    fieldedge: {
+      count: number;
+      lastRefresh: string | null;
+      error: string | null;
+    };
   };
 };
 
@@ -62,6 +71,7 @@ export default function CrmCustomers() {
   const [customerType, setCustomerType] = useState("all");
   const [statusTab, setStatusTab] = useState("all");
   const [hasAgreement, setHasAgreement] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState<"all" | "crm" | "fieldedge">("all");
   const [page, setPage] = useState(1);
 
   const debouncedSearch = useDebounce(searchInput, 300);
@@ -88,7 +98,7 @@ export default function CrmCustomers() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, customerType, statusTab, hasAgreement]);
+  }, [debouncedSearch, customerType, statusTab, hasAgreement, sourceFilter]);
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
@@ -106,15 +116,18 @@ export default function CrmCustomers() {
     if (hasAgreement) {
       params.set("hasAgreement", "true");
     }
+    if (sourceFilter !== "all") {
+      params.set("source", sourceFilter);
+    }
     params.set("page", String(page));
     params.set("limit", String(ITEMS_PER_PAGE));
     return params.toString();
-  }, [debouncedSearch, customerType, statusTab, hasAgreement, page]);
+  }, [debouncedSearch, customerType, statusTab, hasAgreement, sourceFilter, page]);
 
   const { data: customersData, isLoading: customersLoading } = useQuery<CustomersResponse>({
-    queryKey: ["/api/crm/customers", queryParams],
+    queryKey: ["/api/crm/customers/merged", queryParams],
     queryFn: async () => {
-      const res = await fetch(`/api/crm/customers?${queryParams}`, {
+      const res = await fetch(`/api/crm/customers/merged?${queryParams}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch customers");
@@ -241,9 +254,9 @@ export default function CrmCustomers() {
         {/* Tabs styled like projects page - underline style */}
         <div className="flex overflow-x-auto border-b border-slate-200">
           <button
-            onClick={() => { setStatusTab("all"); setCustomerType("all"); setHasAgreement(false); }}
+            onClick={() => { setStatusTab("all"); setCustomerType("all"); setHasAgreement(false); setSourceFilter("all"); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              statusTab === "all" && customerType === "all" && !hasAgreement
+              statusTab === "all" && customerType === "all" && !hasAgreement && sourceFilter === "all"
                 ? "border-[#711419] text-[#711419]"
                 : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
@@ -252,9 +265,9 @@ export default function CrmCustomers() {
             All ({statsData?.total?.toLocaleString() || 0})
           </button>
           <button
-            onClick={() => { setStatusTab("prospects"); setCustomerType("all"); setHasAgreement(false); }}
+            onClick={() => { setStatusTab("prospects"); setCustomerType("all"); setHasAgreement(false); setSourceFilter("all"); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              statusTab === "prospects" && !hasAgreement
+              statusTab === "prospects" && !hasAgreement && sourceFilter === "all"
                 ? "border-[#711419] text-[#711419]"
                 : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
@@ -263,9 +276,9 @@ export default function CrmCustomers() {
             Prospects ({statsData?.prospects?.toLocaleString() || 0})
           </button>
           <button
-            onClick={() => { setStatusTab("customers"); setCustomerType("all"); setHasAgreement(false); }}
+            onClick={() => { setStatusTab("customers"); setCustomerType("all"); setHasAgreement(false); setSourceFilter("all"); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              statusTab === "customers" && !hasAgreement
+              statusTab === "customers" && !hasAgreement && sourceFilter === "all"
                 ? "border-[#711419] text-[#711419]"
                 : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
@@ -275,9 +288,9 @@ export default function CrmCustomers() {
           </button>
           <div className="border-l border-slate-200 mx-2" />
           <button
-            onClick={() => { setCustomerType("Residential"); setStatusTab("all"); setHasAgreement(false); }}
+            onClick={() => { setCustomerType("Residential"); setStatusTab("all"); setHasAgreement(false); setSourceFilter("all"); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              customerType === "Residential" && !hasAgreement
+              customerType === "Residential" && !hasAgreement && sourceFilter === "all"
                 ? "border-[#711419] text-[#711419]"
                 : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
@@ -286,9 +299,9 @@ export default function CrmCustomers() {
             Residential
           </button>
           <button
-            onClick={() => { setCustomerType("Commercial"); setStatusTab("all"); setHasAgreement(false); }}
+            onClick={() => { setCustomerType("Commercial"); setStatusTab("all"); setHasAgreement(false); setSourceFilter("all"); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              customerType === "Commercial" && !hasAgreement
+              customerType === "Commercial" && !hasAgreement && sourceFilter === "all"
                 ? "border-[#711419] text-[#711419]"
                 : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
@@ -297,9 +310,9 @@ export default function CrmCustomers() {
             Commercial
           </button>
           <button
-            onClick={() => { setCustomerType("Property Manager"); setStatusTab("all"); setHasAgreement(false); }}
+            onClick={() => { setCustomerType("Property Manager"); setStatusTab("all"); setHasAgreement(false); setSourceFilter("all"); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              customerType === "Property Manager" && !hasAgreement
+              customerType === "Property Manager" && !hasAgreement && sourceFilter === "all"
                 ? "border-[#711419] text-[#711419]"
                 : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
@@ -309,7 +322,7 @@ export default function CrmCustomers() {
           </button>
           <div className="border-l border-slate-200 mx-2" />
           <button
-            onClick={() => { setHasAgreement(true); setCustomerType("all"); setStatusTab("all"); }}
+            onClick={() => { setHasAgreement(true); setCustomerType("all"); setStatusTab("all"); setSourceFilter("all"); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
               hasAgreement
                 ? "border-[#711419] text-[#711419]"
@@ -318,6 +331,29 @@ export default function CrmCustomers() {
             data-testid="tab-has-agreements"
           >
             Agreements ({statsData?.withAgreements?.toLocaleString() || 0})
+          </button>
+          <div className="border-l border-slate-200 mx-2" />
+          <button
+            onClick={() => { setSourceFilter("crm"); setHasAgreement(false); }}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+              sourceFilter === "crm"
+                ? "border-[#711419] text-[#711419]"
+                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+            }`}
+            data-testid="tab-source-crm"
+          >
+            CRM Only ({customersData?.sources?.crm?.count?.toLocaleString() || 0})
+          </button>
+          <button
+            onClick={() => { setSourceFilter("fieldedge"); setHasAgreement(false); }}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+              sourceFilter === "fieldedge"
+                ? "border-[#711419] text-[#711419]"
+                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+            }`}
+            data-testid="tab-source-fieldedge"
+          >
+            FieldEdge ({customersData?.sources?.fieldedge?.count?.toLocaleString() || 0})
           </button>
         </div>
 
@@ -369,7 +405,14 @@ export default function CrmCustomers() {
                       }}
                     >
                       <TableCell className="font-medium text-slate-900">
-                        {customer.name}
+                        <div className="flex items-center gap-2">
+                          {customer.name}
+                          {customer.source === 'fieldedge' && (
+                            <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 text-xs">
+                              FE
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge

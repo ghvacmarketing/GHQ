@@ -36,6 +36,7 @@ import { scheduleAgreementRenewals, processAgreementRenewals, processSingleAgree
 import { scheduleMaintenanceReminders, processMaintenanceReminders } from "./services/maintenanceReminderService";
 import { startReviewRequestScheduler, processReviewRequests, syncCampaignActiveStatus } from "./services/reviewRequestService";
 import { runFullFieldEdgeImport } from "./services/fieldEdgeImport";
+import { fieldEdgeCustomerService, type FieldEdgeCustomer } from "./services/fieldedge-customers";
 import { sendAutomatedSms, hasNotificationBeenSent, getWorkOrderEnRouteTemplate, getWorkOrderOnSiteTemplate, getInvoiceSmsTemplate } from "./services/smsNotificationService";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
 import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword, isSupervisor } from "./crm-auth";
@@ -5970,6 +5971,190 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/customers/merged - List customers from both CRM database and FieldEdge Google Sheet
+  // Returns unified list with source metadata for each customer
+  app.get("/api/crm/customers/merged", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const {
+        search,
+        customerType,
+        customerStatus,
+        source,
+        page = "1",
+        limit = "25",
+      } = req.query as Record<string, string | undefined>;
+
+      const pageNum = Math.max(1, parseInt(page) || 1);
+      const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 25));
+      const searchTerm = search?.trim().toLowerCase() || "";
+
+      // Get CRM customers from database
+      const crmConditions: any[] = [];
+
+      if (searchTerm) {
+        const searchWords = searchTerm.split(/\s+/).filter(w => w.length > 0);
+        if (searchWords.length > 1) {
+          const wordConditions = searchWords.map(word => {
+            const wordPattern = `%${word}%`;
+            return sql`(LOWER(${crmCustomers.name}) LIKE ${wordPattern} OR LOWER(${crmCustomers.fullAddress}) LIKE ${wordPattern})`;
+          });
+          crmConditions.push(sql`(${sql.join(wordConditions, sql` AND `)})`);
+        } else {
+          const searchPattern = `%${searchTerm}%`;
+          crmConditions.push(
+            sql`(LOWER(${crmCustomers.name}) LIKE ${searchPattern} OR LOWER(${crmCustomers.email}) LIKE ${searchPattern} OR ${crmCustomers.phone} LIKE ${searchPattern} OR LOWER(${crmCustomers.fullAddress}) LIKE ${searchPattern})`
+          );
+        }
+      }
+
+      if (customerType && customerType !== "all") {
+        crmConditions.push(sql`LOWER(${crmCustomers.customerType}) = LOWER(${customerType})`);
+      }
+
+      if (customerStatus && customerStatus !== "all") {
+        crmConditions.push(sql`LOWER(${crmCustomers.customerStatus}) = LOWER(${customerStatus})`);
+      }
+
+      const whereClause = crmConditions.length > 0 ? and(...crmConditions) : undefined;
+
+      // Get all CRM customers (we'll paginate the merged list)
+      const crmResults = await db
+        .select()
+        .from(crmCustomers)
+        .where(whereClause)
+        .orderBy(desc(crmCustomers.createdAt));
+
+      // Transform CRM customers with source tag
+      const crmCustomerList = crmResults.map(c => ({
+        id: c.id,
+        name: c.name,
+        customerType: c.customerType,
+        customerStatus: c.customerStatus,
+        fullAddress: c.fullAddress,
+        phone: c.phone,
+        email: c.email,
+        leadSource: c.leadSource,
+        createdAt: c.createdAt,
+        salesStage: c.salesStage,
+        source: 'crm' as const,
+      }));
+
+      // Get FieldEdge customers from cache
+      let fieldEdgeResults = fieldEdgeCustomerService.getCustomers();
+
+      // Apply filters to FieldEdge customers
+      if (searchTerm) {
+        fieldEdgeResults = fieldEdgeResults.filter(c => {
+          const searchWords = searchTerm.split(/\s+/).filter(w => w.length > 0);
+          if (searchWords.length > 1) {
+            return searchWords.every(word =>
+              c.displayName.toLowerCase().includes(word) ||
+              c.fullAddress?.toLowerCase().includes(word)
+            );
+          }
+          return c.displayName.toLowerCase().includes(searchTerm) ||
+            c.email?.toLowerCase().includes(searchTerm) ||
+            c.phone?.includes(searchTerm) ||
+            c.fullAddress?.toLowerCase().includes(searchTerm);
+        });
+      }
+
+      if (customerType && customerType !== "all") {
+        fieldEdgeResults = fieldEdgeResults.filter(c =>
+          c.customerType?.toLowerCase() === customerType.toLowerCase()
+        );
+      }
+
+      if (customerStatus && customerStatus !== "all") {
+        fieldEdgeResults = fieldEdgeResults.filter(c =>
+          c.customerStatus.toLowerCase() === customerStatus.toLowerCase()
+        );
+      }
+
+      // Transform FieldEdge customers to match CRM customer format
+      const fieldEdgeCustomerList = fieldEdgeResults.map(c => ({
+        id: c.id,
+        name: c.displayName,
+        customerType: c.customerType,
+        customerStatus: c.customerStatus,
+        fullAddress: c.fullAddress,
+        phone: c.phone,
+        email: c.email,
+        leadSource: c.leadSource,
+        createdAt: c.createdAt,
+        salesStage: null,
+        source: 'fieldedge' as const,
+      }));
+
+      // Helper to normalize phone numbers for comparison (digits only)
+      const normalizePhone = (phone: string | null): string => {
+        if (!phone) return '';
+        return phone.replace(/\D/g, '');
+      };
+
+      // Merge and deduplicate based on matching criteria
+      // CRM customers take priority - remove FieldEdge duplicates
+      const crmPhones = new Set(crmCustomerList.map(c => normalizePhone(c.phone)).filter(p => p.length >= 10));
+      const crmEmails = new Set(crmCustomerList.map(c => c.email?.toLowerCase().trim()).filter(Boolean));
+      const crmNames = new Set(crmCustomerList.map(c => c.name.toLowerCase().trim()));
+
+      const uniqueFieldEdge = fieldEdgeCustomerList.filter(feCustomer => {
+        // Check if this FieldEdge customer exists in CRM by normalized phone, email, or exact name match
+        const normalizedPhone = normalizePhone(feCustomer.phone);
+        if (normalizedPhone.length >= 10 && crmPhones.has(normalizedPhone)) return false;
+        if (feCustomer.email && crmEmails.has(feCustomer.email.toLowerCase().trim())) return false;
+        if (crmNames.has(feCustomer.name.toLowerCase().trim())) return false;
+        return true;
+      });
+
+      // Combine lists - CRM first, then FieldEdge
+      let allCustomers = [...crmCustomerList, ...uniqueFieldEdge];
+
+      // Filter by source if specified
+      if (source === 'crm') {
+        allCustomers = allCustomers.filter(c => c.source === 'crm');
+      } else if (source === 'fieldedge') {
+        allCustomers = allCustomers.filter(c => c.source === 'fieldedge');
+      }
+
+      // Sort by name
+      allCustomers.sort((a, b) => a.name.localeCompare(b.name));
+
+      const total = allCustomers.length;
+      const offset = (pageNum - 1) * limitNum;
+      const paginatedCustomers = allCustomers.slice(offset, offset + limitNum);
+
+      // Get cache status
+      const cacheStatus = fieldEdgeCustomerService.getCacheStatus();
+
+      return res.json({
+        customers: paginatedCustomers,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum),
+        },
+        sources: {
+          crm: { count: crmCustomerList.length },
+          fieldedge: {
+            count: uniqueFieldEdge.length,
+            lastRefresh: cacheStatus.lastFetchTime,
+            error: cacheStatus.error,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching merged customers:", error);
+      return res.status(500).json({ message: "Failed to fetch customers" });
+    }
+  });
+
   // POST /api/crm/customers - Create customer (ADMIN/SALES only)
   app.post("/api/crm/customers", requireCrmSalesOrAbove, async (req, res) => {
     try {
@@ -6099,6 +6284,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(403).json({ message: "Access denied" });
         }
         return res.json({ ...crmCustomer, origin: 'crm_customers' });
+      }
+
+      // Check FieldEdge cache for customers from Google Sheets
+      if (customerId.startsWith('fieldedge-')) {
+        const fieldEdgeCustomer = fieldEdgeCustomerService.getCustomerById(customerId);
+        if (fieldEdgeCustomer) {
+          return res.json({
+            id: fieldEdgeCustomer.id,
+            name: fieldEdgeCustomer.displayName,
+            companyName: null,
+            customerType: fieldEdgeCustomer.customerType,
+            customerStatus: fieldEdgeCustomer.customerStatus,
+            phone: fieldEdgeCustomer.phone,
+            email: fieldEdgeCustomer.email,
+            notes: null,
+            fullAddress: fieldEdgeCustomer.fullAddress,
+            leadSource: fieldEdgeCustomer.leadSource,
+            createdAt: fieldEdgeCustomer.createdAt,
+            origin: 'fieldedge' as const,
+            source: 'fieldedge' as const,
+          });
+        }
       }
 
       // Fall back to legacy customers table for older records

@@ -6,6 +6,7 @@ import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
 import { startBackgroundSyncScheduler } from "./services/quickbooksService";
+import { fieldEdgeCustomerService } from "./services/fieldedge-customers";
 
 const app = express();
 
@@ -180,5 +181,8 @@ app.use((req, res, next) => {
     
     // Start QuickBooks background sync scheduler
     startBackgroundSyncScheduler();
+    
+    // Start FieldEdge customer cache with 5-minute refresh
+    fieldEdgeCustomerService.startAutoRefresh(5);
   });
 })();

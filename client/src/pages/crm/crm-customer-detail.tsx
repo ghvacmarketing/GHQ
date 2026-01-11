@@ -4096,15 +4096,17 @@ export default function CrmCustomerDetail() {
           </Button>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button 
-              variant="outline"
-              onClick={openEditDialog}
-              data-testid="button-edit-customer"
-            >
-              <Pencil className="h-4 w-4 mr-2" />
-              Edit Customer
-            </Button>
-            {currentUser && ["admin", "owner", "sales"].includes(currentUser.role) && (
+            {(customer as any).source !== 'fieldedge' && (
+              <Button 
+                variant="outline"
+                onClick={openEditDialog}
+                data-testid="button-edit-customer"
+              >
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit Customer
+              </Button>
+            )}
+            {currentUser && ["admin", "owner", "sales"].includes(currentUser.role) && (customer as any).source !== 'fieldedge' && (
               <div className="flex items-center gap-3 border rounded-lg px-3 py-1.5">
                 <span className="text-sm text-muted-foreground">Customer Portal</span>
                 <Switch
@@ -4132,7 +4134,7 @@ export default function CrmCustomerDetail() {
                 )}
               </div>
             )}
-            {canDeleteCustomer && (
+            {canDeleteCustomer && (customer as any).source !== 'fieldedge' && (
               <Button 
                 variant="outline"
                 onClick={() => setDeleteDialogOpen(true)}
@@ -4145,6 +4147,23 @@ export default function CrmCustomerDetail() {
             )}
           </div>
         </div>
+
+        {/* FieldEdge Source Banner */}
+        {(customer as any).source === 'fieldedge' && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 flex items-center gap-3">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                <span className="text-orange-600 text-sm font-bold">FE</span>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-orange-800">FieldEdge Customer</p>
+              <p className="text-xs text-orange-600">
+                This customer is synced from your FieldEdge Google Sheet. Some features may be limited until you add them to the CRM.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* New Job Dialog */}
         <Dialog open={createDialogOpen} onOpenChange={(open) => !open && handleCloseDialog()}>
