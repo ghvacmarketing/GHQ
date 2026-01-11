@@ -350,25 +350,23 @@ export async function backfillWorkOrderCustomers(
   }
 }
 
-if (require.main === module) {
-  const invoiceCsv = process.argv[2] || 'attached_assets/Invoices_2026-01-11_1768098863640.csv';
-  const woCsv = process.argv[3] || 'attached_assets/Work_Orders_2026-01-11_1768098866873.csv';
-  const dryRun = process.argv.includes('--dry-run');
-  
-  (async () => {
-    try {
-      console.log('=== Work Order Backfill ===');
-      const woResult = await backfillWorkOrderCustomers(woCsv, dryRun);
-      console.log('Work Order Results:', woResult);
-      
-      console.log('\n=== Invoice Backfill ===');
-      const invResult = await backfillInvoiceCustomers(invoiceCsv, dryRun);
-      console.log('Invoice Results:', invResult);
-      
-      process.exit(0);
-    } catch (err) {
-      console.error('Backfill failed:', err);
-      process.exit(1);
-    }
-  })();
-}
+const dryRun = process.argv.includes('--dry-run');
+const invoiceCsv = 'attached_assets/Invoices_2026-01-11_1768098863640.csv';
+const woCsv = 'attached_assets/Work_Orders_2026-01-11_1768098866873.csv';
+
+(async () => {
+  try {
+    console.log('=== Work Order Backfill ===');
+    const woResult = await backfillWorkOrderCustomers(woCsv, dryRun);
+    console.log('Work Order Results:', woResult);
+    
+    console.log('\n=== Invoice Backfill ===');
+    const invResult = await backfillInvoiceCustomers(invoiceCsv, dryRun);
+    console.log('Invoice Results:', invResult);
+    
+    process.exit(0);
+  } catch (err) {
+    console.error('Backfill failed:', err);
+    process.exit(1);
+  }
+})();
