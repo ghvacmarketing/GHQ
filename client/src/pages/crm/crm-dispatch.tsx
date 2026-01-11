@@ -140,27 +140,27 @@ const visitTypeLabels: Record<string, string> = {
 
 const queueStageLabels: Record<DispatchQueueStage, string> = {
   NeedsScheduling: "Needs Scheduling",
-  ReadyToDispatch: "Ready to Schedule",
   WaitingOnParts: "Waiting on Parts",
-  NeedsApproval: "Needs Approval",
+  PartsArrived: "Parts Arrived",
   OnHold: "On Hold",
+  ReadyToDispatch: "Ready to Schedule",
+  NeedsApproval: "Needs Approval",
   CallbackPriority: "Callback/Priority",
   PartsNeeded: "Parts Needed",
   PartsOrdered: "Parts Ordered",
-  PartsArrived: "Parts Arrived",
   Scheduled: "Scheduled",
 };
 
 const queueStageColors: Record<DispatchQueueStage, { bg: string; border: string; text: string; badge: string }> = {
   NeedsScheduling: { bg: "bg-slate-50", border: "border-slate-200", text: "text-slate-700", badge: "bg-slate-500" },
-  ReadyToDispatch: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700", badge: "bg-blue-500" },
   WaitingOnParts: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700", badge: "bg-amber-500" },
-  NeedsApproval: { bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-700", badge: "bg-purple-500" },
+  PartsArrived: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700", badge: "bg-green-500" },
   OnHold: { bg: "bg-gray-50", border: "border-gray-300", text: "text-gray-700", badge: "bg-gray-500" },
+  ReadyToDispatch: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700", badge: "bg-blue-500" },
+  NeedsApproval: { bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-700", badge: "bg-purple-500" },
   CallbackPriority: { bg: "bg-red-50", border: "border-red-200", text: "text-red-700", badge: "bg-red-500" },
   PartsNeeded: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700", badge: "bg-orange-500" },
   PartsOrdered: { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700", badge: "bg-yellow-500" },
-  PartsArrived: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700", badge: "bg-green-500" },
   Scheduled: { bg: "bg-cyan-50", border: "border-cyan-200", text: "text-cyan-700", badge: "bg-cyan-500" },
 };
 
@@ -366,12 +366,6 @@ function getWorkOrderDisplayTimes(workOrder: DispatchWorkOrder): { startHour: nu
 function getEffectiveQueueStage(workOrder: DispatchWorkOrder): DispatchQueueStage {
   if (workOrder.dispatchQueueStage) {
     return workOrder.dispatchQueueStage as DispatchQueueStage;
-  }
-  if (!workOrder.scheduledStart) {
-    return "NeedsScheduling";
-  }
-  if (!workOrder.assignedTechId) {
-    return "ReadyToDispatch";
   }
   return "NeedsScheduling";
 }
@@ -613,11 +607,10 @@ function DraggableQueueCard({
             <AlertCircle className="h-3 w-3" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="NeedsScheduling" className="text-xs">Needs Scheduling</SelectItem>
             <SelectItem value="WaitingOnParts" className="text-xs">Waiting on Parts</SelectItem>
-            <SelectItem value="NeedsApproval" className="text-xs">Needs Approval</SelectItem>
+            <SelectItem value="PartsArrived" className="text-xs">Parts Arrived</SelectItem>
             <SelectItem value="OnHold" className="text-xs">On Hold</SelectItem>
-            <SelectItem value="CallbackPriority" className="text-xs">Callback/Priority</SelectItem>
-            <SelectItem value="ReadyToDispatch" className="text-xs">Ready to Dispatch</SelectItem>
           </SelectContent>
         </Select>
         
