@@ -1173,6 +1173,8 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   totalPendingMinutes: integer("total_pending_minutes").default(0),
   isHistorical: boolean("is_historical").default(false),
   fieldEdgeWoNumber: text("field_edge_wo_number"),
+  bookingSource: text("booking_source").$type<"phone" | "online" | "walk_in" | "referral">(),
+  preferredTimeSlot: text("preferred_time_slot"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({

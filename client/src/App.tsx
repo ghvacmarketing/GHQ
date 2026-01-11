@@ -25,6 +25,7 @@ import EmployeePortal from "@/pages/employee-portal";
 import EmployeePortalLogin from "@/pages/employee-portal-login";
 import EmployeePortalAdmin from "@/pages/employee-portal-admin";
 import NotFound from "@/pages/not-found";
+import BookOnline from "@/pages/public/book-online";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import GlobalPasswordGate from "@/components/GlobalPasswordGate";
 
@@ -225,6 +226,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/book" component={BookOnline} />
       <Route path="/quote" component={QuoteGenerator} />
       <Route path="/quote/edit/:id" component={QuoteEdit} />
       <Route path="/history" component={QuotesHistory} />

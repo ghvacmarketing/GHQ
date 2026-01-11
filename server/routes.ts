@@ -23692,6 +23692,170 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   });
 
   // ============================================================================
+  // Public Online Booking API
+  // ============================================================================
+
+  // POST /api/public/book - Submit online booking (creates work order in NeedsScheduling queue)
+  app.post("/api/public/book", async (req, res) => {
+    try {
+      const {
+        zipCode,
+        serviceType,
+        problems,
+        systemType,
+        selectedDate,
+        selectedTimeSlot,
+        firstName,
+        lastName,
+        email,
+        phone,
+        address,
+        city,
+        notes,
+      } = req.body;
+
+      // Validate required fields
+      if (!firstName || !lastName || !email || !phone || !address || !city) {
+        return res.status(400).json({ message: "Missing required customer information" });
+      }
+
+      if (!selectedDate || !selectedTimeSlot) {
+        return res.status(400).json({ message: "Please select a date and time" });
+      }
+
+      const customerName = `${firstName} ${lastName}`;
+      const fullAddress = `${address}, ${city}, GA ${zipCode}`;
+
+      // Clean phone number
+      const cleanPhone = phone.replace(/\D/g, '');
+      const formattedPhone = cleanPhone.length === 10 
+        ? `${cleanPhone.slice(0,3)}-${cleanPhone.slice(3,6)}-${cleanPhone.slice(6)}`
+        : phone;
+
+      // Try to find existing customer by phone or email
+      let customerId: string | null = null;
+      let propertyId: string | null = null;
+
+      const existingByPhone = await db.select()
+        .from(crmCustomers)
+        .where(ilike(crmCustomers.phone, `%${cleanPhone.slice(-10)}%`))
+        .limit(1);
+
+      if (existingByPhone.length > 0) {
+        customerId = existingByPhone[0].id;
+      } else {
+        const existingByEmail = await db.select()
+          .from(crmCustomers)
+          .where(ilike(crmCustomers.email, email))
+          .limit(1);
+
+        if (existingByEmail.length > 0) {
+          customerId = existingByEmail[0].id;
+        }
+      }
+
+      // If no existing customer, create one
+      if (!customerId) {
+        const [newCustomer] = await db.insert(crmCustomers).values({
+          name: customerName,
+          email: email,
+          phone: formattedPhone,
+          customerStatus: "Customer",
+          customerType: "Residential",
+          leadSource: "Online Booking",
+        }).returning();
+        customerId = newCustomer.id;
+
+        // Create property for new customer
+        const [newProperty] = await db.insert(crmProperties).values({
+          customerId: customerId,
+          name: "Primary",
+          address: fullAddress,
+          propertyType: "residential",
+        }).returning();
+        propertyId = newProperty.id;
+      } else {
+        // Get existing property
+        const existingProperty = await db.select()
+          .from(crmProperties)
+          .where(eq(crmProperties.customerId, customerId))
+          .limit(1);
+        
+        if (existingProperty.length > 0) {
+          propertyId = existingProperty[0].id;
+        }
+      }
+
+      // Generate work order number
+      const maxWoResult = await db.select({ max: sql`MAX(work_order_number)` })
+        .from(crmWorkOrders);
+      const nextWoNumber = (maxWoResult[0]?.max as number || 0) + 1;
+
+      // Format problems for description
+      const problemsText = problems && problems.length > 0 
+        ? `Issues: ${problems.join(", ")}` 
+        : "";
+      const systemText = systemType ? `System Type: ${systemType}` : "";
+      const notesText = notes ? `Customer Notes: ${notes}` : "";
+
+      const description = [problemsText, systemText, notesText]
+        .filter(Boolean)
+        .join("\n");
+
+      // Determine visit type
+      const visitType = serviceType === "consultation" ? "SALES" : "SERVICE";
+      const title = serviceType === "consultation" 
+        ? "Comfort Consultation (Online Booking)"
+        : "HVAC Service Call (Online Booking)";
+
+      // Format preferred time slot for display
+      const timeSlotMap: Record<string, string> = {
+        "09:00-11:00": "9 AM - 11 AM",
+        "11:00-13:00": "11 AM - 1 PM",
+        "13:00-15:00": "1 PM - 3 PM",
+        "15:00-17:00": "3 PM - 5 PM",
+      };
+      const preferredTimeDisplay = timeSlotMap[selectedTimeSlot] || selectedTimeSlot;
+      const preferredDate = new Date(selectedDate);
+      const formattedDate = preferredDate.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+
+      // Create work order with NeedsScheduling status and online booking source
+      const [workOrder] = await db.insert(crmWorkOrders).values({
+        customerId,
+        propertyId,
+        workOrderNumber: nextWoNumber,
+        title,
+        description,
+        visitType: visitType as any,
+        workSubtype: serviceType === "consultation" ? "Comfort Consultation" : "Service Call",
+        status: "scheduled",
+        priority: "normal",
+        dispatchQueueStage: "NeedsScheduling",
+        bookingSource: "online",
+        preferredTimeSlot: `${formattedDate} ${preferredTimeDisplay}`,
+        dispatchNotes: `ONLINE BOOKING - Preferred time: ${formattedDate} ${preferredTimeDisplay}`,
+      }).returning();
+
+      console.log(`[OnlineBooking] Created work order #${nextWoNumber} for ${customerName} (${email})`);
+
+      // TODO: Send confirmation email to customer
+
+      res.json({
+        success: true,
+        workOrderNumber: nextWoNumber,
+        message: "Booking submitted successfully",
+      });
+    } catch (error) {
+      console.error("Error processing online booking:", error);
+      res.status(500).json({ message: "Failed to process booking" });
+    }
+  });
+
+  // ============================================================================
   // Marketing Campaigns API
   // ============================================================================
 
