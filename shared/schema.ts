@@ -1171,6 +1171,8 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   pendingReason: text("pending_reason").$type<PendingReason>(),
   pendingStartedAt: timestamp("pending_started_at"),
   totalPendingMinutes: integer("total_pending_minutes").default(0),
+  isHistorical: boolean("is_historical").default(false),
+  fieldEdgeWoNumber: text("field_edge_wo_number"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -1364,6 +1366,10 @@ export const crmInvoices = pgTable("crm_invoices", {
   // Payment link click tracking
   paymentLinkClickCount: integer("payment_link_click_count").default(0),
   lastPaymentLinkClickedAt: timestamp("last_payment_link_clicked_at"),
+  // FieldEdge import tracking
+  isHistorical: boolean("is_historical").default(false),
+  fieldEdgeInvoiceNumber: text("field_edge_invoice_number"),
+  fieldEdgeWoNumber: text("field_edge_wo_number"),
 }, (table) => ({
   statusIdx: index("crm_invoices_status_idx").on(table.status),
 }));
