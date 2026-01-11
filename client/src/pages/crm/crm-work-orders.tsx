@@ -76,12 +76,21 @@ const WORK_SUBTYPE_TO_SERVICE_TYPE: Record<string, string> = {
   "No Heat": "NO_HEAT",
   "No Cool": "NO_AC",
   "Water Leak": "WATER_LEAK",
+  "Strange Noise": "STRANGE_NOISE",
+  "Thermostat Issue": "THERMOSTAT_ISSUE",
   "Electrical": "OTHER",
   "Thermostat": "THERMOSTAT_ISSUE",
   "Airflow": "OTHER",
   "Noise": "STRANGE_NOISE",
   "IAQ": "OTHER",
   "Other": "OTHER",
+  "A/C Repair": "NO_AC",
+  "AC Repair": "NO_AC",
+  "Heating Repair": "NO_HEAT",
+  "Furnace Repair": "NO_HEAT",
+  "Heat Pump Repair": "NO_HEAT",
+  "Ductless Repair": "NO_AC",
+  "Mini Split Repair": "NO_AC",
 };
 
 type CustomerWithInfo = {
@@ -340,13 +349,7 @@ export default function CrmWorkOrders() {
       return;
     }
 
-    const serviceType = WORK_SUBTYPE_TO_SERVICE_TYPE[workSubtype];
-    if (!serviceType) {
-      setChecklistQuestions([]);
-      setChecklistAnswers({});
-      setChecklistId(null);
-      return;
-    }
+    const serviceType = WORK_SUBTYPE_TO_SERVICE_TYPE[workSubtype] || "OTHER";
 
     setChecklistLoading(true);
     fetch(`/api/crm/checklists/${serviceType}`, { credentials: "include" })

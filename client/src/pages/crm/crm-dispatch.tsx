@@ -112,6 +112,13 @@ const WORK_SUBTYPE_TO_SERVICE_TYPE: Record<string, string> = {
   "Noise": "STRANGE_NOISE",
   "IAQ": "OTHER",
   "Other": "OTHER",
+  "A/C Repair": "NO_AC",
+  "AC Repair": "NO_AC",
+  "Heating Repair": "NO_HEAT",
+  "Furnace Repair": "NO_HEAT",
+  "Heat Pump Repair": "NO_HEAT",
+  "Ductless Repair": "NO_AC",
+  "Mini Split Repair": "NO_AC",
 };
 
 type CustomerWithInfo = {
@@ -2411,13 +2418,7 @@ export default function CrmDispatch() {
       return;
     }
 
-    const serviceType = WORK_SUBTYPE_TO_SERVICE_TYPE[workSubtype];
-    if (!serviceType) {
-      setChecklistQuestions([]);
-      setChecklistAnswers({});
-      setChecklistId(null);
-      return;
-    }
+    const serviceType = WORK_SUBTYPE_TO_SERVICE_TYPE[workSubtype] || "OTHER";
 
     setChecklistLoading(true);
     fetch(`/api/crm/checklists/${serviceType}`, { credentials: "include" })
