@@ -1596,7 +1596,6 @@ function UnassignedQueueSection({
     "WaitingOnParts",
     "PartsArrived",
     "OnHold",
-    "ReadyToDispatch",
   ];
 
   return (
