@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, Link } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -134,12 +134,22 @@ const quoteTypeFilters = [
 export default function CrmQuotes() {
   usePageTitle("Quotes");
   const [, navigate] = useLocation();
+  const queryClientInstance = useQueryClient();
   const { toast } = useToast();
   const [searchInput, setSearchInput] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [page, setPage] = useState(1);
   const [selectedQuote, setSelectedQuote] = useState<CrmQuote | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+
+  // Prefetch quote detail on hover for instant navigation
+  const prefetchQuote = (quoteId: string) => {
+    queryClientInstance.prefetchQuery({
+      queryKey: [`/api/crm/quotes/${quoteId}`],
+      queryFn: getQueryFn({ on401: "throw" }),
+      staleTime: 2 * 60 * 1000, // Cache prefetched data for 2 minutes
+    });
+  };
   
   // Sorting state
   const [sortField, setSortField] = useState<SortField>("createdAt");
@@ -715,6 +725,8 @@ export default function CrmQuotes() {
                       key={quote.id}
                       className="cursor-pointer hover:bg-slate-50 transition-colors"
                       data-testid={`row-quote-${quote.id}`}
+                      onMouseEnter={() => prefetchQuote(quote.id)}
+                      onTouchStart={() => prefetchQuote(quote.id)}
                       onClick={() => navigate(`/crm/quotes/${quote.id}`)}
                     >
                       <TableCell className="font-medium text-slate-900">
