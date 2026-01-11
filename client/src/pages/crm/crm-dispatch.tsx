@@ -140,7 +140,7 @@ const visitTypeLabels: Record<string, string> = {
 
 const queueStageLabels: Record<DispatchQueueStage, string> = {
   NeedsScheduling: "Needs Scheduling",
-  ReadyToDispatch: "Ready to Dispatch",
+  ReadyToDispatch: "Ready to Schedule",
   WaitingOnParts: "Waiting on Parts",
   NeedsApproval: "Needs Approval",
   OnHold: "On Hold",
@@ -1592,16 +1592,10 @@ function UnassignedQueueSection({
   }, [filteredWorkOrders]);
 
   const stageOrder: DispatchQueueStage[] = [
-    "NeedsScheduling",
-    "ReadyToDispatch",
-    "CallbackPriority",
     "WaitingOnParts",
-    "NeedsApproval",
-    "OnHold",
-    "PartsNeeded",
-    "PartsOrdered",
     "PartsArrived",
-    "Scheduled",
+    "OnHold",
+    "ReadyToDispatch",
   ];
 
   return (

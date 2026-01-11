@@ -5,14 +5,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle2, Loader2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle2, Loader2, MapPin, ArrowRight } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-import { format, addDays, isBefore, startOfDay } from "date-fns";
+import { format, addDays, startOfDay } from "date-fns";
 
 const SERVICE_CALL_PRICE = 147;
 const CONSULTATION_PRICE = 0;
 
-const PROBLEM_OPTIONS = [
+const PROBLEM_OPTIONS_SERVICE = [
   "No cooling",
   "No Heating",
   "Thermostat issue",
@@ -22,7 +23,13 @@ const PROBLEM_OPTIONS = [
   "Other issue",
 ];
 
-const SYSTEM_TYPES = [
+const PROBLEM_OPTIONS_CONSULTATION = [
+  "It's old!",
+  "I just want an upgrade!",
+  "No heating or cooling",
+];
+
+const SYSTEM_TYPES_SERVICE = [
   "Central Air (Split System)",
   "Heat Pump",
   "Ductless Mini Split",
@@ -30,6 +37,20 @@ const SYSTEM_TYPES = [
   "Furnace",
   "Boiler",
   "I'm not sure",
+];
+
+const SYSTEM_TYPES_CONSULTATION = [
+  "Heat Pump",
+  "Package Unit",
+  "Mini Split",
+  "Central Air",
+];
+
+const TIMELINE_OPTIONS = [
+  { label: "Next week", value: "next_week" },
+  { label: "Within the month", value: "within_month" },
+  { label: "In two months", value: "in_two_months" },
+  { label: "As soon as possible!", value: "asap" },
 ];
 
 const TIME_SLOTS = [
@@ -48,13 +69,15 @@ const SERVICE_AREA_ZIPS = [
   "30809", "30813", "30815", "30816", "30817", "30819",
 ];
 
-type Step = "zip" | "service" | "problem" | "system" | "datetime" | "info" | "confirm";
+type Step = "zip" | "service" | "problem" | "system" | "projectType" | "timeline" | "datetime" | "info" | "confirm";
 
 interface BookingData {
   zipCode: string;
-  serviceType: "service_call" | "consultation";
+  serviceType: "service_call" | "consultation" | "";
   problems: string[];
   systemType: string;
+  projectType: "replacement" | "installation" | "";
+  timeline: string;
   selectedDate: Date | null;
   selectedTimeSlot: string;
   firstName: string;
@@ -66,13 +89,18 @@ interface BookingData {
   notes: string;
 }
 
+const SERVICE_CALL_STEPS: Step[] = ["zip", "service", "problem", "system", "datetime", "info"];
+const CONSULTATION_STEPS: Step[] = ["zip", "service", "system", "problem", "projectType", "timeline", "datetime", "info"];
+
 export default function BookOnline() {
   const [step, setStep] = useState<Step>("zip");
   const [data, setData] = useState<BookingData>({
     zipCode: "",
-    serviceType: "service_call",
+    serviceType: "",
     problems: [],
     systemType: "",
+    projectType: "",
+    timeline: "",
     selectedDate: null,
     selectedTimeSlot: "",
     firstName: "",
@@ -86,6 +114,13 @@ export default function BookOnline() {
   const [dateOffset, setDateOffset] = useState(0);
   const [zipError, setZipError] = useState("");
 
+  const getStepSequence = (): Step[] => {
+    if (data.serviceType === "consultation") {
+      return CONSULTATION_STEPS;
+    }
+    return SERVICE_CALL_STEPS;
+  };
+
   const submitBooking = useMutation({
     mutationFn: async (bookingData: BookingData) => {
       const response = await apiRequest("POST", "/api/public/book", bookingData);
@@ -97,7 +132,7 @@ export default function BookOnline() {
   });
 
   const handleNext = () => {
-    const stepOrder: Step[] = ["zip", "service", "problem", "system", "datetime", "info"];
+    const stepOrder = getStepSequence();
     const currentIndex = stepOrder.indexOf(step);
     
     if (currentIndex < stepOrder.length - 1) {
@@ -106,11 +141,27 @@ export default function BookOnline() {
   };
 
   const handleBack = () => {
-    const stepOrder: Step[] = ["zip", "service", "problem", "system", "datetime", "info"];
+    const stepOrder = getStepSequence();
     const currentIndex = stepOrder.indexOf(step);
     
     if (currentIndex > 0) {
       setStep(stepOrder[currentIndex - 1]);
+    }
+  };
+
+  const handleServiceSelect = (serviceType: "service_call" | "consultation") => {
+    setData({ 
+      ...data, 
+      serviceType, 
+      problems: [], 
+      systemType: "",
+      projectType: "",
+      timeline: ""
+    });
+    if (serviceType === "consultation") {
+      setStep("system");
+    } else {
+      setStep("problem");
     }
   };
 
@@ -147,11 +198,15 @@ export default function BookOnline() {
       case "zip":
         return data.zipCode.length === 5;
       case "service":
-        return true;
+        return data.serviceType !== "";
       case "problem":
-        return data.serviceType === "consultation" || data.problems.length > 0;
+        return data.problems.length > 0;
       case "system":
-        return data.serviceType === "consultation" || data.systemType !== "";
+        return data.systemType !== "";
+      case "projectType":
+        return data.projectType !== "";
+      case "timeline":
+        return data.timeline !== "";
       case "datetime":
         return data.selectedDate !== null && data.selectedTimeSlot !== "";
       case "info":
@@ -165,17 +220,32 @@ export default function BookOnline() {
     return data.serviceType === "service_call" ? SERVICE_CALL_PRICE : CONSULTATION_PRICE;
   };
 
+  const getProgressValue = () => {
+    const stepOrder = getStepSequence();
+    const currentIndex = stepOrder.indexOf(step);
+    if (currentIndex <= 1) return 0;
+    return ((currentIndex - 1) / (stepOrder.length - 2)) * 100;
+  };
+
+  const getProblemOptions = () => {
+    return data.serviceType === "consultation" ? PROBLEM_OPTIONS_CONSULTATION : PROBLEM_OPTIONS_SERVICE;
+  };
+
+  const getSystemTypes = () => {
+    return data.serviceType === "consultation" ? SYSTEM_TYPES_CONSULTATION : SYSTEM_TYPES_SERVICE;
+  };
+
   const renderSidebar = () => {
-    if (step === "zip" || step === "confirm") return null;
+    if (step === "zip" || step === "service" || step === "confirm") return null;
 
     return (
-      <Card className="w-80 h-fit sticky top-4">
-        <CardHeader className="pb-3">
+      <Card className="w-80 h-fit sticky top-4 shadow-lg">
+        <CardHeader className="pb-3 border-b">
           <CardTitle className="text-lg">
             {data.serviceType === "service_call" ? "HVAC Service Call" : "Comfort Consultation"}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm">
+        <CardContent className="space-y-3 text-sm pt-4">
           {data.selectedDate && (
             <div className="flex items-center gap-2 text-gray-600">
               <Calendar className="h-4 w-4" />
@@ -189,8 +259,10 @@ export default function BookOnline() {
             </div>
           )}
           <div className="border-t pt-3 flex justify-between items-center">
-            <span className="text-gray-600">Service Call</span>
-            <span className="text-lg font-semibold text-red-600">${getPrice()}</span>
+            <span className="text-gray-600">Service</span>
+            <span className={`text-xl font-bold ${getPrice() === 0 ? "text-green-600" : "text-[#722F37]"}`}>
+              {getPrice() === 0 ? "Free" : `$${getPrice()}`}
+            </span>
           </div>
         </CardContent>
       </Card>
@@ -201,76 +273,86 @@ export default function BookOnline() {
     switch (step) {
       case "zip":
         return (
-          <div className="max-w-md mx-auto space-y-6">
-            <div className="text-center">
-              <h1 className="text-3xl font-bold mb-2">Book Your Appointment</h1>
-              <p className="text-gray-600">Enter your zip code to check if we service your area</p>
-            </div>
-            <div className="space-y-4">
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="max-w-md w-full text-center space-y-8">
               <div>
-                <Label htmlFor="zipCode">Zip Code</Label>
-                <Input
-                  id="zipCode"
-                  type="text"
-                  placeholder="30901"
-                  maxLength={5}
-                  value={data.zipCode}
-                  onChange={(e) => setData({ ...data, zipCode: e.target.value.replace(/\D/g, "") })}
-                  className="text-lg py-6"
-                />
-                {zipError && <p className="text-red-600 text-sm mt-2">{zipError}</p>}
+                <h1 className="text-4xl font-bold text-gray-900 mb-3">Book Online</h1>
+                <p className="text-lg text-gray-600">Let's get started by entering your ZIP code.</p>
               </div>
-              <Button
-                className="w-full py-6 text-lg bg-[#722F37] hover:bg-[#5a252c]"
-                disabled={!canProceed()}
-                onClick={validateZip}
-              >
-                Check Availability
-              </Button>
+              <div className="space-y-4">
+                <div className="flex items-center bg-white rounded-full border-2 border-gray-200 overflow-hidden shadow-sm focus-within:border-[#722F37] focus-within:ring-2 focus-within:ring-[#722F37]/20 transition-all">
+                  <div className="pl-4 pr-2">
+                    <MapPin className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Enter ZIP code"
+                    maxLength={5}
+                    value={data.zipCode}
+                    onChange={(e) => setData({ ...data, zipCode: e.target.value.replace(/\D/g, "") })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && data.zipCode.length === 5) {
+                        validateZip();
+                      }
+                    }}
+                    className="flex-1 py-4 px-2 text-lg outline-none bg-transparent"
+                  />
+                  <button
+                    onClick={validateZip}
+                    disabled={data.zipCode.length !== 5}
+                    className="m-1 w-12 h-12 rounded-full bg-[#722F37] hover:bg-[#5a252c] disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                  >
+                    <ArrowRight className="h-5 w-5 text-white" />
+                  </button>
+                </div>
+                {zipError && (
+                  <p className="text-red-600 text-sm bg-red-50 p-3 rounded-lg">{zipError}</p>
+                )}
+              </div>
             </div>
           </div>
         );
 
       case "service":
         return (
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">Select Service</h1>
+          <div className="max-w-3xl mx-auto space-y-8">
+            <div className="text-center">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Select Service</h1>
               <p className="text-gray-600">What type of appointment do you need?</p>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card
-                className={`cursor-pointer transition-all hover:shadow-md ${
-                  data.serviceType === "service_call" ? "ring-2 ring-[#722F37]" : ""
-                }`}
-                onClick={() => setData({ ...data, serviceType: "service_call" })}
-              >
-                <CardHeader>
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+                <CardHeader className="bg-gray-50 border-b">
                   <CardTitle className="text-xl">HVAC Service Call</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600 text-sm mb-4">
-                    For low priority services. We require a 48 hour lead time for online bookings.
-                    For emergency service needs, call (706) 826-0644.
-                  </p>
                   <p className="text-2xl font-bold text-[#722F37]">${SERVICE_CALL_PRICE}</p>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-4">
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    This is for low priority services as we require a 48 hour lead time for online bookings. For any emergency service needs, call (706)-826-0644.
+                  </p>
+                  <Button 
+                    className="w-full bg-[#722F37] hover:bg-[#5a252c]"
+                    onClick={() => handleServiceSelect("service_call")}
+                  >
+                    Book Now
+                  </Button>
                 </CardContent>
               </Card>
-              <Card
-                className={`cursor-pointer transition-all hover:shadow-md ${
-                  data.serviceType === "consultation" ? "ring-2 ring-[#722F37]" : ""
-                }`}
-                onClick={() => setData({ ...data, serviceType: "consultation" })}
-              >
-                <CardHeader>
+              <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+                <CardHeader className="bg-gray-50 border-b">
                   <CardTitle className="text-xl">Comfort Consultation</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600 text-sm mb-4">
-                    For consultations, we typically request at least 72 hours' notice.
-                    If you need an earlier appointment, please give us a call.
-                  </p>
                   <p className="text-2xl font-bold text-green-600">Free</p>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-4">
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    For consultations, we typically request at least 72 hours' notice for online bookings. However, if you need an earlier appointment, please give us a call.
+                  </p>
+                  <Button 
+                    className="w-full bg-[#722F37] hover:bg-[#5a252c]"
+                    onClick={() => handleServiceSelect("consultation")}
+                  >
+                    Book Now
+                  </Button>
                 </CardContent>
               </Card>
             </div>
@@ -283,21 +365,17 @@ export default function BookOnline() {
             <div>
               <h1 className="text-3xl font-bold mb-2">
                 {data.serviceType === "consultation" 
-                  ? "Any current issues with your HVAC system?" 
+                  ? "What's going on with your system?" 
                   : "What is the problem with your HVAC system?"}
               </h1>
-              <p className="text-gray-600">
-                {data.serviceType === "consultation" 
-                  ? "Select any that apply (optional - skip if none)" 
-                  : "Select all that apply"}
-              </p>
+              <p className="text-gray-600">Select all that apply</p>
             </div>
             <div className="space-y-3">
-              {PROBLEM_OPTIONS.map((problem) => (
+              {getProblemOptions().map((problem) => (
                 <div
                   key={problem}
-                  className={`flex items-center gap-3 p-4 border rounded-lg cursor-pointer transition-all hover:bg-gray-50 ${
-                    data.problems.includes(problem) ? "border-[#722F37] bg-red-50" : ""
+                  className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-all hover:bg-gray-50 ${
+                    data.problems.includes(problem) ? "border-[#722F37] bg-red-50" : "border-gray-200"
                   }`}
                   onClick={() => {
                     const newProblems = data.problems.includes(problem)
@@ -306,7 +384,7 @@ export default function BookOnline() {
                     setData({ ...data, problems: newProblems });
                   }}
                 >
-                  <Checkbox checked={data.problems.includes(problem)} />
+                  <Checkbox checked={data.problems.includes(problem)} className="border-2" />
                   <span className="text-lg">{problem}</span>
                 </div>
               ))}
@@ -319,18 +397,14 @@ export default function BookOnline() {
           <div className="space-y-6">
             <div>
               <h1 className="text-3xl font-bold mb-2">What type of system do you have?</h1>
-              <p className="text-gray-600">
-                {data.serviceType === "consultation" 
-                  ? "Select your HVAC system type (optional - skip if unsure)" 
-                  : "Select your HVAC system type"}
-              </p>
+              <p className="text-gray-600">Select your HVAC system type</p>
             </div>
             <div className="space-y-3">
-              {SYSTEM_TYPES.map((type) => (
+              {getSystemTypes().map((type) => (
                 <div
                   key={type}
-                  className={`flex items-center gap-3 p-4 border rounded-lg cursor-pointer transition-all hover:bg-gray-50 ${
-                    data.systemType === type ? "border-[#722F37] bg-red-50" : ""
+                  className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-all hover:bg-gray-50 ${
+                    data.systemType === type ? "border-[#722F37] bg-red-50" : "border-gray-200"
                   }`}
                   onClick={() => setData({ ...data, systemType: type })}
                 >
@@ -345,6 +419,65 @@ export default function BookOnline() {
                   </div>
                   <span className="text-lg">{type}</span>
                 </div>
+              ))}
+            </div>
+          </div>
+        );
+
+      case "projectType":
+        return (
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Do you want a replacement or a new installation?</h1>
+              <p className="text-gray-600">Select one option</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <button
+                className={`p-6 border-2 rounded-xl text-center transition-all hover:bg-gray-50 ${
+                  data.projectType === "replacement" 
+                    ? "border-[#722F37] bg-red-50" 
+                    : "border-gray-200"
+                }`}
+                onClick={() => setData({ ...data, projectType: "replacement" })}
+              >
+                <span className="text-xl font-medium">Replacement</span>
+                <p className="text-gray-500 text-sm mt-1">Replace an existing system</p>
+              </button>
+              <button
+                className={`p-6 border-2 rounded-xl text-center transition-all hover:bg-gray-50 ${
+                  data.projectType === "installation" 
+                    ? "border-[#722F37] bg-red-50" 
+                    : "border-gray-200"
+                }`}
+                onClick={() => setData({ ...data, projectType: "installation" })}
+              >
+                <span className="text-xl font-medium">Installation</span>
+                <p className="text-gray-500 text-sm mt-1">Install a brand new system</p>
+              </button>
+            </div>
+          </div>
+        );
+
+      case "timeline":
+        return (
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">What is your timeline?</h1>
+              <p className="text-gray-600">When do you need this completed?</p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              {TIMELINE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  className={`p-5 border-2 rounded-xl text-center transition-all hover:bg-gray-50 ${
+                    data.timeline === option.value 
+                      ? "border-[#722F37] bg-red-50" 
+                      : "border-gray-200"
+                  }`}
+                  onClick={() => setData({ ...data, timeline: option.value })}
+                >
+                  <span className="text-lg font-medium">{option.label}</span>
+                </button>
               ))}
             </div>
           </div>
@@ -372,10 +505,10 @@ export default function BookOnline() {
                 {dates.map((date) => (
                   <button
                     key={date.toISOString()}
-                    className={`flex-shrink-0 flex flex-col items-center px-4 py-3 rounded-lg border transition-all ${
+                    className={`flex-shrink-0 flex flex-col items-center px-4 py-3 rounded-xl border-2 transition-all ${
                       data.selectedDate?.toDateString() === date.toDateString()
                         ? "bg-[#722F37] text-white border-[#722F37]"
-                        : "hover:bg-gray-50"
+                        : "border-gray-200 hover:bg-gray-50"
                     }`}
                     onClick={() => setData({ ...data, selectedDate: date })}
                   >
@@ -397,10 +530,10 @@ export default function BookOnline() {
               {TIME_SLOTS.map((slot) => (
                 <button
                   key={slot.value}
-                  className={`p-4 rounded-lg border text-center transition-all ${
+                  className={`p-4 rounded-xl border-2 text-center transition-all ${
                     data.selectedTimeSlot === slot.value
                       ? "bg-[#722F37] text-white border-[#722F37]"
-                      : "hover:bg-gray-50"
+                      : "border-gray-200 hover:bg-gray-50"
                   }`}
                   onClick={() => setData({ ...data, selectedTimeSlot: slot.value })}
                 >
@@ -425,6 +558,7 @@ export default function BookOnline() {
                   id="firstName"
                   value={data.firstName}
                   onChange={(e) => setData({ ...data, firstName: e.target.value })}
+                  className="mt-1"
                 />
               </div>
               <div>
@@ -433,6 +567,7 @@ export default function BookOnline() {
                   id="lastName"
                   value={data.lastName}
                   onChange={(e) => setData({ ...data, lastName: e.target.value })}
+                  className="mt-1"
                 />
               </div>
               <div>
@@ -442,6 +577,7 @@ export default function BookOnline() {
                   type="email"
                   value={data.email}
                   onChange={(e) => setData({ ...data, email: e.target.value })}
+                  className="mt-1"
                 />
               </div>
               <div>
@@ -451,6 +587,7 @@ export default function BookOnline() {
                   type="tel"
                   value={data.phone}
                   onChange={(e) => setData({ ...data, phone: e.target.value })}
+                  className="mt-1"
                 />
               </div>
               <div className="md:col-span-2">
@@ -460,6 +597,7 @@ export default function BookOnline() {
                   value={data.address}
                   onChange={(e) => setData({ ...data, address: e.target.value })}
                   placeholder="123 Main Street"
+                  className="mt-1"
                 />
               </div>
               <div>
@@ -468,11 +606,12 @@ export default function BookOnline() {
                   id="city"
                   value={data.city}
                   onChange={(e) => setData({ ...data, city: e.target.value })}
+                  className="mt-1"
                 />
               </div>
               <div>
                 <Label htmlFor="zip">Zip Code</Label>
-                <Input id="zip" value={data.zipCode} disabled />
+                <Input id="zip" value={data.zipCode} disabled className="mt-1 bg-gray-50" />
               </div>
               <div className="md:col-span-2">
                 <Label htmlFor="notes">Additional Notes (optional)</Label>
@@ -481,6 +620,7 @@ export default function BookOnline() {
                   value={data.notes}
                   onChange={(e) => setData({ ...data, notes: e.target.value })}
                   placeholder="Gate code, best time to call, etc."
+                  className="mt-1"
                 />
               </div>
             </div>
@@ -498,8 +638,8 @@ export default function BookOnline() {
               Thank you for booking with us. We've received your appointment request and will
               contact you shortly to confirm the details.
             </p>
-            <Card>
-              <CardContent className="pt-6 text-left space-y-2">
+            <Card className="shadow-lg">
+              <CardContent className="pt-6 text-left space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Service:</span>
                   <span className="font-medium">
@@ -518,6 +658,12 @@ export default function BookOnline() {
                     <span className="font-medium">
                       {TIME_SLOTS.find(s => s.value === data.selectedTimeSlot)?.label}
                     </span>
+                  </div>
+                )}
+                {data.serviceType === "consultation" && data.projectType && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Project Type:</span>
+                    <span className="font-medium capitalize">{data.projectType}</span>
                   </div>
                 )}
               </CardContent>
@@ -539,49 +685,28 @@ export default function BookOnline() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto p-6">
-        {step !== "confirm" && step !== "zip" && (
-          <div className="mb-8">
-            <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
-              {["Service", "Details", "Date & Time", "Your Info"].map((label, i) => {
-                const stepMap = { service: 0, problem: 1, system: 1, datetime: 2, info: 3 };
-                const currentStepIndex = stepMap[step as keyof typeof stepMap] ?? 0;
-                const isActive = i === currentStepIndex;
-                const isComplete = i < currentStepIndex;
-                return (
-                  <div key={label} className="flex items-center gap-2">
-                    {i > 0 && <div className="w-8 h-px bg-gray-300" />}
-                    <div
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        isActive
-                          ? "bg-[#722F37] text-white"
-                          : isComplete
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-200 text-gray-500"
-                      }`}
-                    >
-                      {label}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+      {step !== "zip" && step !== "service" && step !== "confirm" && (
+        <div className="bg-white border-b shadow-sm">
+          <div className="max-w-6xl mx-auto px-6 py-4">
+            <Progress value={getProgressValue()} className="h-2" />
           </div>
-        )}
+        </div>
+      )}
 
+      <div className="max-w-6xl mx-auto p-6">
         <div className="flex gap-8">
           <div className="flex-1">
             {renderStep()}
 
-            {step !== "confirm" && step !== "zip" && (
+            {step !== "confirm" && step !== "zip" && step !== "service" && (
               <div className="flex gap-4 mt-8">
-                <Button variant="outline" onClick={handleBack}>
+                <Button variant="outline" onClick={handleBack} className="px-6">
                   <ChevronLeft className="h-4 w-4 mr-2" />
                   Back
                 </Button>
                 {step === "info" ? (
                   <Button
-                    className="flex-1 bg-[#722F37] hover:bg-[#5a252c]"
+                    className="flex-1 bg-[#722F37] hover:bg-[#5a252c] py-6"
                     disabled={!canProceed() || submitBooking.isPending}
                     onClick={handleSubmit}
                   >
@@ -596,7 +721,7 @@ export default function BookOnline() {
                   </Button>
                 ) : (
                   <Button
-                    className="flex-1 bg-[#722F37] hover:bg-[#5a252c]"
+                    className="flex-1 bg-[#722F37] hover:bg-[#5a252c] py-6"
                     disabled={!canProceed()}
                     onClick={handleNext}
                   >
