@@ -62,7 +62,6 @@ import {
   Clipboard,
   ClipboardCheck,
   Link2,
-  History,
 } from "lucide-react";
 import {
   DropdownMenu,
