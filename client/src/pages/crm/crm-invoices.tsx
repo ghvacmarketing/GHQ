@@ -145,13 +145,15 @@ export default function CrmInvoices() {
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
     if (statusFilter !== "all") params.set("status", statusFilter);
+    params.set("page", page.toString());
+    params.set("limit", ITEMS_PER_PAGE.toString());
     return params.toString();
-  }, [statusFilter]);
+  }, [statusFilter, page]);
 
   const { data: invoicesResponse, isLoading: invoicesLoading } = useQuery<{ invoices: InvoiceWithRelations[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>({
     queryKey: ["/api/crm/invoices", queryParams],
     queryFn: async () => {
-      const res = await fetch(`/api/crm/invoices${queryParams ? `?${queryParams}` : ""}`, {
+      const res = await fetch(`/api/crm/invoices?${queryParams}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch invoices");
@@ -248,12 +250,10 @@ export default function CrmInvoices() {
     return filtered;
   }, [invoicesData, debouncedSearch]);
 
-  const paginatedInvoices = useMemo(() => {
-    const start = (page - 1) * ITEMS_PER_PAGE;
-    return filteredInvoices.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredInvoices, page]);
+  const paginatedInvoices = filteredInvoices;
 
-  const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE);
+  const totalPages = invoicesResponse?.pagination?.totalPages || 1;
+  const totalInvoices = invoicesResponse?.pagination?.total || 0;
 
   const formatCurrency = (value: string | number | null) => {
     if (value === null || value === undefined) return "$0.00";
@@ -721,11 +721,11 @@ export default function CrmInvoices() {
             </Table>
           </div>
 
-          {totalPages > 1 && (
+          {totalPages >= 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t bg-slate-50">
               <p className="text-sm text-slate-600">
                 Showing {((page - 1) * ITEMS_PER_PAGE) + 1} to{" "}
-                {Math.min(page * ITEMS_PER_PAGE, filteredInvoices.length)} of {filteredInvoices.length} invoices
+                {Math.min(page * ITEMS_PER_PAGE, totalInvoices)} of {totalInvoices.toLocaleString()} invoices
               </p>
               <div className="flex items-center gap-2">
                 <Button
