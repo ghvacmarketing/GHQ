@@ -100,11 +100,6 @@ export default function BookOnline() {
     const stepOrder: Step[] = ["zip", "service", "problem", "system", "datetime", "info"];
     const currentIndex = stepOrder.indexOf(step);
     
-    if (step === "service" && data.serviceType === "consultation") {
-      setStep("datetime");
-      return;
-    }
-    
     if (currentIndex < stepOrder.length - 1) {
       setStep(stepOrder[currentIndex + 1]);
     }
@@ -113,11 +108,6 @@ export default function BookOnline() {
   const handleBack = () => {
     const stepOrder: Step[] = ["zip", "service", "problem", "system", "datetime", "info"];
     const currentIndex = stepOrder.indexOf(step);
-    
-    if (step === "datetime" && data.serviceType === "consultation") {
-      setStep("service");
-      return;
-    }
     
     if (currentIndex > 0) {
       setStep(stepOrder[currentIndex - 1]);
@@ -159,9 +149,9 @@ export default function BookOnline() {
       case "service":
         return true;
       case "problem":
-        return data.problems.length > 0;
+        return data.serviceType === "consultation" || data.problems.length > 0;
       case "system":
-        return data.systemType !== "";
+        return data.serviceType === "consultation" || data.systemType !== "";
       case "datetime":
         return data.selectedDate !== null && data.selectedTimeSlot !== "";
       case "info":
@@ -291,8 +281,16 @@ export default function BookOnline() {
         return (
           <div className="space-y-6">
             <div>
-              <h1 className="text-3xl font-bold mb-2">What is the problem with your HVAC system?</h1>
-              <p className="text-gray-600">Select all that apply</p>
+              <h1 className="text-3xl font-bold mb-2">
+                {data.serviceType === "consultation" 
+                  ? "Any current issues with your HVAC system?" 
+                  : "What is the problem with your HVAC system?"}
+              </h1>
+              <p className="text-gray-600">
+                {data.serviceType === "consultation" 
+                  ? "Select any that apply (optional - skip if none)" 
+                  : "Select all that apply"}
+              </p>
             </div>
             <div className="space-y-3">
               {PROBLEM_OPTIONS.map((problem) => (
@@ -321,7 +319,11 @@ export default function BookOnline() {
           <div className="space-y-6">
             <div>
               <h1 className="text-3xl font-bold mb-2">What type of system do you have?</h1>
-              <p className="text-gray-600">Select your HVAC system type</p>
+              <p className="text-gray-600">
+                {data.serviceType === "consultation" 
+                  ? "Select your HVAC system type (optional - skip if unsure)" 
+                  : "Select your HVAC system type"}
+              </p>
             </div>
             <div className="space-y-3">
               {SYSTEM_TYPES.map((type) => (

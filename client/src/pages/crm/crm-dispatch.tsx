@@ -516,6 +516,12 @@ function DraggableQueueCard({
             {visitTypeLabels[workOrder.visitType || "SERVICE"] || workOrder.visitType}
           </Badge>
           
+          {workOrder.bookingSource === "online" && (
+            <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200 text-[10px]">
+              Online
+            </Badge>
+          )}
+          
           {workOrder.workSubtype && workOrder.workSubtype !== "Other" && (
             <span className="text-slate-600">{workOrder.workSubtype}</span>
           )}
@@ -664,6 +670,11 @@ function QueueCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
         <Badge variant="outline" className={`${visitTypeColor.bg} ${visitTypeColor.text} border-0 text-[10px]`}>
           {visitTypeLabels[workOrder.visitType || "SERVICE"] || workOrder.visitType}
         </Badge>
+        {workOrder.bookingSource === "online" && (
+          <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200 text-[10px]">
+            Online
+          </Badge>
+        )}
       </div>
     </div>
   );
@@ -3694,6 +3705,15 @@ export default function CrmDispatch() {
                         {technicians.find(t => t.id === selectedWorkOrder.assignedTechId)?.name || selectedWorkOrder.techName || "Unassigned"}
                       </span>
                     </div>
+
+                    {selectedWorkOrder.bookingSource === "online" && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-500">Source</span>
+                        <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200">
+                          Online Booking
+                        </Badge>
+                      </div>
+                    )}
 
                     {selectedWorkOrder.customerPhone && (
                       <div className="flex items-center justify-between">
