@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle2, Loader2, MapPin, ArrowRight } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { format, addDays, startOfDay } from "date-fns";
+import redlogo from "@assets/redlogo.webp";
 
 const SERVICE_CALL_PRICE = 147;
 const CONSULTATION_PRICE = 0;
@@ -693,11 +694,12 @@ export default function BookOnline() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-[#722F37] text-white py-4 px-6">
-        <div className="max-w-6xl mx-auto flex items-center gap-4">
-          <div className="text-2xl font-bold">GHVAC</div>
-          <div className="text-sm opacity-80">Online Booking</div>
-        </div>
+      <div className="py-6 px-6 flex justify-center">
+        <img 
+          src={redlogo} 
+          alt="GHVAC" 
+          className="h-16 w-auto"
+        />
       </div>
 
       {step !== "zip" && step !== "service" && step !== "confirm" && (
