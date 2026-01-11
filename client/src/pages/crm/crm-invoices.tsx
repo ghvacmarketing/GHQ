@@ -597,7 +597,7 @@ export default function CrmInvoices() {
             <h1 className="text-xl font-bold text-slate-900" data-testid="text-invoices-title">
               Invoices
             </h1>
-            <p className="text-sm text-slate-500">Total: {filteredInvoices.length}</p>
+            <p className="text-sm text-slate-500">Total: {totalInvoices.toLocaleString()}</p>
           </div>
           <Button 
             size="sm" 

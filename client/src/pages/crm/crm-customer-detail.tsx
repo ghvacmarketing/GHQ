@@ -62,6 +62,7 @@ import {
   Clipboard,
   ClipboardCheck,
   Link2,
+  History,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -1379,8 +1380,9 @@ function CustomerTabbedView({
   const setupComplete = hasAtLeastOneSite && hasOpsContact && hasAPContact;
   const completedSteps = [hasAtLeastOneSite, hasOpsContact, hasAPContact].filter(Boolean).length;
 
-  const upcomingWorkOrders = crmWorkOrders?.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status)) || [];
-  const completedWorkOrders = crmWorkOrders?.filter(wo => ["completed", "invoiced", "paid"].includes(wo.status)) || [];
+  const upcomingWorkOrders = crmWorkOrders?.filter(wo => ["scheduled", "dispatched", "en_route", "on_site"].includes(wo.status) && !wo.isHistorical) || [];
+  const completedWorkOrders = crmWorkOrders?.filter(wo => ["completed", "invoiced", "paid"].includes(wo.status) && !wo.isHistorical) || [];
+  const historicalWorkOrders = crmWorkOrders?.filter(wo => wo.isHistorical === true) || [];
 
   const getCustomerIcon = () => {
     if (isPropertyManager) return <Building2 className="h-5 w-5 text-purple-600" />;
@@ -1879,6 +1881,49 @@ function CustomerTabbedView({
             )}
           </CardContent>
         </Card>
+
+        {historicalWorkOrders.length > 0 && (
+          <Card data-testid="card-historical-wo-tab">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <History className="h-5 w-5 text-slate-500" />
+                Service History - FieldEdge ({historicalWorkOrders.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {historicalWorkOrders.slice(0, 12).map((wo) => (
+                  <div 
+                    key={wo.id}
+                    className="p-4 border rounded-lg border-slate-200 bg-slate-50/50"
+                    data-testid={`card-historical-wo-${wo.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h4 className="font-medium text-sm line-clamp-1">{wo.title || wo.visitType}</h4>
+                      <Badge variant="outline" className="text-xs shrink-0 bg-slate-100">
+                        Historical
+                      </Badge>
+                    </div>
+                    <Badge className="text-xs bg-slate-100 text-slate-600">
+                      {wo.visitType?.replace(/_/g, " ") || "Service"}
+                    </Badge>
+                    {wo.scheduledStart && (
+                      <div className="flex items-center gap-1 text-xs text-slate-500 mt-2">
+                        <CalendarIcon className="h-3 w-3" />
+                        {format(new Date(wo.scheduledStart), "MMM d, yyyy")}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {historicalWorkOrders.length > 12 && (
+                <p className="text-sm text-slate-500 text-center mt-4">
+                  Showing 12 of {historicalWorkOrders.length} historical records
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </TabsContent>
 
       {/* Projects Tab */}
