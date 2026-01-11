@@ -75,6 +75,30 @@ class FieldEdgeCustomerService {
     return phone.replace(/\D/g, '');
   }
 
+  private formatDisplayName(rawName: string | undefined): string {
+    if (!rawName) return 'Unknown';
+    
+    const name = rawName.trim();
+    if (!name) return 'Unknown';
+    
+    // Remove leading special characters and quotes
+    let cleanName = name.replace(/^["'&\s]+/, '').replace(/["']+$/, '');
+    
+    // Check if name is in "Last, First" format
+    if (cleanName.includes(',')) {
+      const parts = cleanName.split(',').map(p => p.trim());
+      if (parts.length >= 2 && parts[1]) {
+        // Reverse to "First Last" format
+        const firstName = parts[1];
+        const lastName = parts[0];
+        return `${firstName} ${lastName}`.trim();
+      }
+    }
+    
+    // Return as-is if not in comma format
+    return cleanName || name;
+  }
+
   private transformRowToCustomer(row: SheetRow): FieldEdgeCustomer {
     let customerType = row["Customer Type"]?.trim() || null;
     if (!customerType) {
@@ -84,7 +108,7 @@ class FieldEdgeCustomerService {
 
     return {
       id: this.generateStableId(row),
-      displayName: row["Display Name"]?.trim() || 'Unknown',
+      displayName: this.formatDisplayName(row["Display Name"]),
       customerType,
       customerStatus,
       fullAddress: row["Full Address"]?.trim() || null,
