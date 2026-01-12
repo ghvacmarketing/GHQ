@@ -24460,9 +24460,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
   // Defer expensive startup operations to run after server is ready (allows health checks to pass)
   setTimeout(() => {
-    // Customer auto-sync disabled - using CSV import instead
-    // startAutoSync(10);
-    // console.log('Customer auto-sync started (every 10 minutes)');
+    // Customer auto-sync from Google Sheets (every 1 minute with delta-only updates)
+    startAutoSync(1);
+    console.log('Customer auto-sync started (every 1 minute)');
 
     // Start daily weather refresh
     scheduleWeatherRefresh();

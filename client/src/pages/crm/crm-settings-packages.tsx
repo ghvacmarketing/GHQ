@@ -42,10 +42,6 @@ import {
   TrendingUp,
   TrendingDown,
   History,
-  FileSpreadsheet,
-  ExternalLink,
-  AlertCircle,
-  Download,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
@@ -79,14 +75,6 @@ export default function CrmSettingsPackages() {
 
   const { data: packages } = useQuery<any[]>({
     queryKey: ["/api/pricebook/packages"],
-    enabled: !!currentUser,
-  });
-
-  const { data: sheetsStatus, isLoading: sheetsStatusLoading } = useQuery<{
-    configured: boolean;
-    spreadsheetId?: string;
-  }>({
-    queryKey: ["/api/pricebook/sheets/status"],
     enabled: !!currentUser,
   });
 
@@ -140,31 +128,6 @@ export default function CrmSettingsPackages() {
     onError: (error: Error) => {
       toast({
         title: "Failed to apply adjustment",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const syncSheetsMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/pricebook/sheets/sync");
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to sync from Google Sheets");
-      }
-      return res.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/pricebook/packages"] });
-      toast({
-        title: "Sync Completed",
-        description: `Synced ${data.hvacPackages} HVAC packages from Google Sheet`,
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Sync Failed",
         description: error.message,
         variant: "destructive",
       });
@@ -431,125 +394,6 @@ export default function CrmSettingsPackages() {
                   <History className="h-8 w-8 mx-auto mb-2 text-slate-300" />
                   <p>No price adjustments have been made yet</p>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileSpreadsheet className="h-5 w-5" />
-                Google Sheets Integration
-              </CardTitle>
-              <CardDescription>
-                Sync package prices from a Google Sheet
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-blue-800">Step 1: Export Current Packages</p>
-                    <p className="text-sm text-blue-600">
-                      Download all packages as a CSV to import into Google Sheets
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => window.open("/api/pricebook/packages/export", "_blank")}
-                    className="border-blue-300 text-blue-700 hover:bg-blue-100"
-                    data-testid="button-export-packages"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export CSV
-                  </Button>
-                </div>
-              </div>
-
-              {sheetsStatusLoading ? (
-                <div className="p-4 bg-slate-50 rounded-lg">
-                  <Skeleton className="h-16 w-full" />
-                </div>
-              ) : !sheetsStatus?.configured ? (
-                <>
-                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                    <p className="font-medium text-amber-800 mb-2">Step 2: Create Google Sheet</p>
-                    <ol className="text-sm text-amber-700 list-decimal list-inside space-y-1">
-                      <li>Create a new Google Sheet with a tab named <strong>HVAC_Packages</strong></li>
-                      <li>Import the CSV data (File → Import → Upload)</li>
-                      <li>Share the sheet (set to "Anyone with the link can view")</li>
-                      <li>Copy the spreadsheet ID from the URL</li>
-                    </ol>
-                  </div>
-                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                    <p className="text-sm text-amber-800">
-                      <AlertCircle className="h-4 w-4 inline mr-2" />
-                      Step 3: Set the{" "}
-                      <code className="bg-amber-100 px-2 py-1 rounded font-mono text-xs">
-                        PRICEBOOK_SHEETS_ID
-                      </code>{" "}
-                      environment variable to enable syncing.
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="p-4 bg-slate-50 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-slate-700">Status</p>
-                        <p className="text-sm text-slate-600">
-                          Configured{" "}
-                          <span className="text-slate-500">
-                            (ID: {sheetsStatus.spreadsheetId?.slice(0, 8)}...)
-                          </span>
-                        </p>
-                      </div>
-                      <Badge className="bg-green-100 text-green-700">Connected</Badge>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <Button
-                      variant="outline"
-                      onClick={() => syncSheetsMutation.mutate()}
-                      disabled={syncSheetsMutation.isPending}
-                      data-testid="button-sync-sheet"
-                    >
-                      {syncSheetsMutation.isPending ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Syncing...
-                        </>
-                      ) : (
-                        <>
-                          <FileSpreadsheet className="h-4 w-4 mr-2" />
-                          Sync from Sheet
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        window.open(
-                          `https://docs.google.com/spreadsheets/d/${sheetsStatus.spreadsheetId}`,
-                          "_blank"
-                        )
-                      }
-                      className="text-slate-600 hover:text-slate-900"
-                      data-testid="button-open-sheet"
-                    >
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      Open Google Sheet
-                    </Button>
-                  </div>
-
-                  <p className="text-sm text-slate-500">
-                    Click "Sync from Sheet" to import the latest HVAC package prices from your
-                    Google Sheet.
-                  </p>
-                </>
               )}
             </CardContent>
           </Card>

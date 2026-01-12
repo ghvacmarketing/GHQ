@@ -52,7 +52,7 @@ class CustomerSyncService {
 
   constructor() {
     this.apiKey = process.env.GOOGLE_SHEETS_API_KEY || '';
-    this.sheetId = process.env.FIELDEDGE_CUSTOMER_SHEET_ID || '1POeQRuDUTia0BUYsVmEsBOqW6BDBvfL5qyKv-GQICU0';
+    this.sheetId = process.env.FIELDEDGE_CUSTOMER_SHEET_ID || '1lgIiOZ7JiOkzBdY_qXCK0f1LrFi6Bk3TVwy0078O9Ds';
     
     if (!this.apiKey) {
       console.warn('Google Sheets API key not configured for customer sync');
@@ -177,12 +177,31 @@ class CustomerSyncService {
     };
   }
 
+  private async getFirstSheetName(): Promise<string> {
+    const url = `${this.baseUrl}/${this.sheetId}?fields=sheets.properties&key=${this.apiKey}`;
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error('Failed to get sheet metadata');
+    }
+    
+    const data = await response.json();
+    if (data.sheets && data.sheets.length > 0) {
+      return data.sheets[0].properties.title;
+    }
+    throw new Error('No sheets found in spreadsheet');
+  }
+
   private async fetchSheetData(): Promise<SheetRow[]> {
     if (!this.apiKey) {
       throw new Error('Google Sheets API key not configured');
     }
 
-    const range = encodeURIComponent('Sheet1');
+    // Auto-detect the first sheet name
+    const sheetName = await this.getFirstSheetName();
+    console.log(`Using sheet tab: "${sheetName}"`);
+    
+    const range = encodeURIComponent(sheetName);
     const url = `${this.baseUrl}/${this.sheetId}/values/${range}?key=${this.apiKey}`;
 
     console.log('Fetching customer data from Google Sheets...');

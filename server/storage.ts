@@ -997,11 +997,21 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    // Step 4: Update existing customers (individual updates for now, could be optimized further)
+    // Step 4: Update existing customers - only update sheet-sourced fields, preserve CRM-only data
     for (const { id, data } of toUpdate) {
       try {
         await db.update(customers)
-          .set({ ...data, lastSyncedAt: new Date() })
+          .set({
+            displayName: data.displayName,
+            customerType: data.customerType,
+            customerStatus: data.customerStatus,
+            fullAddress: data.fullAddress,
+            phone: data.phone,
+            email: data.email,
+            leadSource: data.leadSource,
+            checksum: data.checksum,
+            lastSyncedAt: new Date(),
+          })
           .where(eq(customers.id, id));
         updated++;
       } catch (e) {
