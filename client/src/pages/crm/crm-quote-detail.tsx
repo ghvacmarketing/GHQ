@@ -251,8 +251,8 @@ export default function CrmQuoteDetail() {
       return res.json();
     },
     enabled: !!quoteId && !!currentUser,
-    staleTime: 0, // Always consider data stale to enable refetching
-    refetchInterval: 10000, // Auto-refresh every 10 seconds to catch status updates
+    staleTime: 2 * 60 * 1000, // Cache for 2 minutes for better performance
+    refetchInterval: 60000, // Only refresh every 60 seconds instead of 10
   });
 
   const { data: emailLogs = [], isLoading: emailLogsLoading } = useQuery<QuoteEmailLog[]>({

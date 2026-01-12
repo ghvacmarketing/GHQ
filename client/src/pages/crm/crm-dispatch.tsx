@@ -1935,7 +1935,8 @@ export default function CrmDispatch() {
       return res.json();
     },
     enabled: !!currentUser,
-    refetchInterval: 10000,
+    staleTime: 2 * 60 * 1000, // Cache for 2 minutes for better performance
+    refetchInterval: 60000, // Only refresh every 60 seconds instead of 10
   });
 
   // Time breakdown data for the selected date

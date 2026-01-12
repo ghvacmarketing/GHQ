@@ -549,7 +549,8 @@ export default function CrmWorkOrders() {
       return res.json();
     },
     enabled: !!currentUser,
-    refetchInterval: 15000, // Auto-refresh every 15 seconds to catch new work orders
+    staleTime: 2 * 60 * 1000, // Cache for 2 minutes for better performance
+    refetchInterval: 60000, // Only refresh every 60 seconds instead of 15
   });
 
   const filteredWorkOrders = useMemo(() => {
