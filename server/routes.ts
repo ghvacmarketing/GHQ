@@ -24399,39 +24399,76 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       let hvacPackagesCount = 0;
 
-      // Import HVAC packages
+      // Import HVAC packages - UPDATE existing, preserve images
       try {
         const packages = await packageSheetsService.importPackagesFromSheet();
         
         if (packages.length > 0) {
-          // Delete all existing packages and insert fresh data
-          await db.delete(pricebookPackages);
+          let updated = 0;
+          let inserted = 0;
           
-          // Insert all packages (images are preserved from existing data if available)
           for (const pkg of packages) {
-            await db.insert(pricebookPackages).values({
-              unitType: pkg.unitType,
-              tier: pkg.tier,
-              tonnage: pkg.tonnage,
-              packageLevel: pkg.packageLevel,
-              monthlyPayment: pkg.monthlyPayment,
-              totalInvestment: pkg.totalInvestment,
-              outdoorBrand: pkg.outdoorBrand || null,
-              outdoorModel: pkg.outdoorModel || null,
-              outdoorName: pkg.outdoorName || null,
-              coilModel: pkg.coilModel || null,
-              coilName: pkg.coilName || null,
-              indoorHeatModel: pkg.indoorHeatModel || null,
-              indoorHeatName: pkg.indoorHeatName || null,
-              thermostatModel: pkg.thermostatModel || null,
-              thermostatName: pkg.thermostatName || null,
-              accessoryModels: pkg.accessoryModels || null,
-              isActive: true,
-            });
+            // Find existing package by composite key
+            const existing = await db
+              .select()
+              .from(pricebookPackages)
+              .where(
+                and(
+                  eq(pricebookPackages.unitType, pkg.unitType),
+                  eq(pricebookPackages.tier, pkg.tier),
+                  eq(pricebookPackages.tonnage, pkg.tonnage),
+                  eq(pricebookPackages.packageLevel, pkg.packageLevel)
+                )
+              )
+              .limit(1);
+            
+            if (existing.length > 0) {
+              // UPDATE existing package - preserve image URLs
+              await db
+                .update(pricebookPackages)
+                .set({
+                  monthlyPayment: pkg.monthlyPayment,
+                  totalInvestment: pkg.totalInvestment,
+                  outdoorBrand: pkg.outdoorBrand || existing[0].outdoorBrand,
+                  outdoorModel: pkg.outdoorModel || existing[0].outdoorModel,
+                  outdoorName: pkg.outdoorName || existing[0].outdoorName,
+                  coilModel: pkg.coilModel || existing[0].coilModel,
+                  coilName: pkg.coilName || existing[0].coilName,
+                  indoorHeatModel: pkg.indoorHeatModel || existing[0].indoorHeatModel,
+                  indoorHeatName: pkg.indoorHeatName || existing[0].indoorHeatName,
+                  thermostatModel: pkg.thermostatModel || existing[0].thermostatModel,
+                  thermostatName: pkg.thermostatName || existing[0].thermostatName,
+                  accessoryModels: pkg.accessoryModels || existing[0].accessoryModels,
+                })
+                .where(eq(pricebookPackages.id, existing[0].id));
+              updated++;
+            } else {
+              // INSERT new package (no existing images to preserve)
+              await db.insert(pricebookPackages).values({
+                unitType: pkg.unitType,
+                tier: pkg.tier,
+                tonnage: pkg.tonnage,
+                packageLevel: pkg.packageLevel,
+                monthlyPayment: pkg.monthlyPayment,
+                totalInvestment: pkg.totalInvestment,
+                outdoorBrand: pkg.outdoorBrand || null,
+                outdoorModel: pkg.outdoorModel || null,
+                outdoorName: pkg.outdoorName || null,
+                coilModel: pkg.coilModel || null,
+                coilName: pkg.coilName || null,
+                indoorHeatModel: pkg.indoorHeatModel || null,
+                indoorHeatName: pkg.indoorHeatName || null,
+                thermostatModel: pkg.thermostatModel || null,
+                thermostatName: pkg.thermostatName || null,
+                accessoryModels: pkg.accessoryModels || null,
+                isActive: true,
+              });
+              inserted++;
+            }
           }
           
-          hvacPackagesCount = packages.length;
-          console.log(`Pricebook sync: Imported ${hvacPackagesCount} HVAC packages`);
+          hvacPackagesCount = updated + inserted;
+          console.log(`Pricebook sync: Updated ${updated}, inserted ${inserted} HVAC packages`);
         }
       } catch (error: any) {
         console.error("Error syncing HVAC packages:", error);
