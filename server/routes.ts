@@ -24399,16 +24399,49 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       let hvacPackagesCount = 0;
 
-      // Import HVAC packages
+      // Import HVAC packages - upsert to preserve images and only update changed data
+      let updatedCount = 0;
+      let insertedCount = 0;
       try {
         const packages = await packageSheetsService.importPackagesFromSheet();
         
-        if (packages.length > 0) {
-          // Delete all existing packages and insert fresh data
-          await db.delete(pricebookPackages);
+        for (const pkg of packages) {
+          // Look for existing package by unique key
+          const existing = await db
+            .select()
+            .from(pricebookPackages)
+            .where(
+              and(
+                eq(pricebookPackages.unitType, pkg.unitType),
+                eq(pricebookPackages.tier, pkg.tier),
+                eq(pricebookPackages.tonnage, pkg.tonnage),
+                eq(pricebookPackages.packageLevel, pkg.packageLevel)
+              )
+            )
+            .limit(1);
           
-          // Insert all packages (images are preserved from existing data if available)
-          for (const pkg of packages) {
+          if (existing.length > 0) {
+            // Update existing - preserve image URLs
+            await db
+              .update(pricebookPackages)
+              .set({
+                monthlyPayment: pkg.monthlyPayment,
+                totalInvestment: pkg.totalInvestment,
+                outdoorBrand: pkg.outdoorBrand || existing[0].outdoorBrand,
+                outdoorModel: pkg.outdoorModel || existing[0].outdoorModel,
+                outdoorName: pkg.outdoorName || existing[0].outdoorName,
+                coilModel: pkg.coilModel || existing[0].coilModel,
+                coilName: pkg.coilName || existing[0].coilName,
+                indoorHeatModel: pkg.indoorHeatModel || existing[0].indoorHeatModel,
+                indoorHeatName: pkg.indoorHeatName || existing[0].indoorHeatName,
+                thermostatModel: pkg.thermostatModel || existing[0].thermostatModel,
+                thermostatName: pkg.thermostatName || existing[0].thermostatName,
+                accessoryModels: pkg.accessoryModels || existing[0].accessoryModels,
+              })
+              .where(eq(pricebookPackages.id, existing[0].id));
+            updatedCount++;
+          } else {
+            // Insert new package
             await db.insert(pricebookPackages).values({
               unitType: pkg.unitType,
               tier: pkg.tier,
@@ -24428,11 +24461,12 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
               accessoryModels: pkg.accessoryModels || null,
               isActive: true,
             });
+            insertedCount++;
           }
-          
-          hvacPackagesCount = packages.length;
-          console.log(`Pricebook sync: Imported ${hvacPackagesCount} HVAC packages`);
         }
+        
+        hvacPackagesCount = updatedCount + insertedCount;
+        console.log(`Pricebook sync: Updated ${updatedCount}, Inserted ${insertedCount} HVAC packages`);
       } catch (error: any) {
         console.error("Error syncing HVAC packages:", error);
       }
@@ -24451,6 +24485,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       res.json({
         message: "Pricebook sync completed",
         hvacPackages: hvacPackagesCount,
+        updated: updatedCount,
+        inserted: insertedCount,
       });
     } catch (error: any) {
       console.error("Error during pricebook sheets sync:", error);
