@@ -146,6 +146,43 @@ export default function CrmCustomers() {
     enabled: !!currentUser,
   });
 
+  // Background prefetch next page of customers for instant pagination
+  useEffect(() => {
+    if (!customersData || !currentUser) return;
+
+    const totalPages = customersData.pagination?.totalPages || 0;
+    if (page < totalPages) {
+      // Prefetch next page in the background
+      const nextPageParams = new URLSearchParams();
+      if (debouncedSearch) nextPageParams.set("search", debouncedSearch);
+      if (customerType !== "all") nextPageParams.set("customerType", customerType);
+      if (statusTab !== "all") {
+        const statusMap: Record<string, string> = {
+          prospects: "prospect",
+          customers: "customer",
+        };
+        if (statusMap[statusTab]) {
+          nextPageParams.set("customerStatus", statusMap[statusTab]);
+        }
+      }
+      if (hasAgreement) nextPageParams.set("hasAgreement", "true");
+      nextPageParams.set("page", String(page + 1));
+      nextPageParams.set("limit", String(ITEMS_PER_PAGE));
+
+      queryClient.prefetchQuery({
+        queryKey: ["/api/crm/customers", nextPageParams.toString()],
+        queryFn: async () => {
+          const res = await fetch(`/api/crm/customers?${nextPageParams.toString()}`, {
+            credentials: "include",
+          });
+          if (!res.ok) throw new Error("Failed to fetch customers");
+          return res.json();
+        },
+        staleTime: 5 * 60 * 1000,
+      });
+    }
+  }, [customersData, page, debouncedSearch, customerType, statusTab, hasAgreement, currentUser, queryClient]);
+
   const formatCustomerType = (type: string | null) => {
     if (!type) return "Residential";
     const normalizedType = type.toLowerCase();

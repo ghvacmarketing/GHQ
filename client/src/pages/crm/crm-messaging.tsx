@@ -158,7 +158,8 @@ export default function CrmMessaging() {
       if (!res.ok) throw new Error("Failed to fetch conversations");
       return res.json();
     },
-    refetchInterval: 5000,
+    staleTime: 30000, // Cache for 30 seconds
+    refetchInterval: 30000, // Refresh every 30 seconds instead of 5
   });
 
   const { data: conversationDetail, isLoading: loadingDetail } = useQuery<ConversationDetail>({
@@ -171,7 +172,8 @@ export default function CrmMessaging() {
       return res.json();
     },
     enabled: !!selectedConversationId,
-    refetchInterval: 5000,
+    staleTime: 30000, // Cache for 30 seconds
+    refetchInterval: 30000, // Refresh every 30 seconds instead of 5
   });
 
   const sendMessageMutation = useMutation({

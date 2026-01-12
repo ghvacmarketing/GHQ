@@ -2252,7 +2252,9 @@ export default function CrmDispatch() {
       return res.json();
     },
     enabled: !!currentUser,
-    refetchInterval: 10000,
+    staleTime: 2 * 60 * 1000, // Cache for 2 minutes for better performance
+    refetchInterval: 60000, // Refresh every 60 seconds to catch sync updates
+    refetchIntervalInBackground: true, // Keep syncing even when tab is not focused
   });
 
   // Time breakdown data for the selected date
