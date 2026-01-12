@@ -24073,6 +24073,90 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // GET /api/pricebook/packages/export - Export all packages as CSV for Google Sheets
+  app.get("/api/pricebook/packages/export", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      // Fetch all HVAC packages
+      const hvacPackages = await db
+        .select()
+        .from(pricebookPackages)
+        .where(eq(pricebookPackages.isActive, true))
+        .orderBy(
+          asc(pricebookPackages.unitType),
+          asc(pricebookPackages.tier),
+          asc(pricebookPackages.tonnage),
+          asc(pricebookPackages.packageLevel)
+        );
+
+      // Fetch all crawlspace tiers
+      const tiers = await db
+        .select()
+        .from(crawlspaceTiers)
+        .where(eq(crawlspaceTiers.isActive, true))
+        .orderBy(asc(crawlspaceTiers.name));
+
+      // CSV headers for HVAC packages (matching Google Sheets import format)
+      const hvacHeaders = [
+        "unitType", "tier", "tonnage", "packageLevel", "monthlyPayment", "totalInvestment",
+        "outdoorBrand", "outdoorModel", "outdoorName", "coilModel", "coilName",
+        "indoorHeatModel", "indoorHeatName", "thermostatModel", "thermostatName",
+        "accessoryModels", "outdoorImageUrl", "thermostatImageUrl", "furnaceImageUrl"
+      ];
+
+      // Build HVAC CSV rows
+      const hvacRows = hvacPackages.map(pkg => [
+        pkg.unitType,
+        pkg.tier,
+        pkg.tonnage,
+        pkg.packageLevel,
+        (pkg.monthlyPayment / 100).toFixed(2),
+        (pkg.totalInvestment / 100).toFixed(2),
+        pkg.outdoorBrand || "",
+        pkg.outdoorModel || "",
+        pkg.outdoorName || "",
+        pkg.coilModel || "",
+        pkg.coilName || "",
+        pkg.indoorHeatModel || "",
+        pkg.indoorHeatName || "",
+        pkg.thermostatModel || "",
+        pkg.thermostatName || "",
+        pkg.accessoryModels || "",
+        pkg.outdoorImageUrl || "",
+        pkg.thermostatImageUrl || "",
+        pkg.furnaceImageUrl || ""
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
+
+      // CSV headers for crawlspace tiers
+      const crawlspaceHeaders = ["name", "milThickness", "rollPrice", "description"];
+
+      // Build crawlspace CSV rows
+      const crawlspaceRows = tiers.map(tier => [
+        tier.name,
+        tier.milThickness,
+        (tier.rollPrice / 100).toFixed(2),
+        tier.description || ""
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
+
+      // Combine into single CSV with section markers
+      const csv = [
+        "=== HVAC_Packages (copy to HVAC_Packages tab) ===",
+        hvacHeaders.join(","),
+        ...hvacRows,
+        "",
+        "=== Crawlspace_Tiers (copy to Crawlspace_Tiers tab) ===",
+        crawlspaceHeaders.join(","),
+        ...crawlspaceRows
+      ].join("\n");
+
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", "attachment; filename=pricebook-packages.csv");
+      res.send(csv);
+    } catch (error: any) {
+      console.error("Error exporting packages:", error);
+      res.status(500).json({ message: "Failed to export packages", error: error.message });
+    }
+  });
+
   // POST /api/pricebook/packages/import - Import packages from JSON
   app.post("/api/pricebook/packages/import", requireCrmSalesOrAbove, async (req, res) => {
     try {

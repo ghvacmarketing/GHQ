@@ -45,6 +45,7 @@ import {
   FileSpreadsheet,
   ExternalLink,
   AlertCircle,
+  Download,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
@@ -446,6 +447,26 @@ export default function CrmSettingsPackages() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-blue-800">Step 1: Export Current Packages</p>
+                    <p className="text-sm text-blue-600">
+                      Download all packages as a CSV to import into Google Sheets
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.open("/api/pricebook/packages/export", "_blank")}
+                    className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                    data-testid="button-export-packages"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export CSV
+                  </Button>
+                </div>
+              </div>
+
               {sheetsStatusLoading ? (
                 <div className="p-4 bg-slate-50 rounded-lg">
                   <Skeleton className="h-16 w-full" />
@@ -453,19 +474,24 @@ export default function CrmSettingsPackages() {
               ) : !sheetsStatus?.configured ? (
                 <>
                   <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="font-medium text-amber-800 mb-2">Step 2: Create Google Sheet</p>
+                    <ol className="text-sm text-amber-700 list-decimal list-inside space-y-1">
+                      <li>Create a new Google Sheet with two tabs: <strong>HVAC_Packages</strong> and <strong>Crawlspace_Tiers</strong></li>
+                      <li>Import the CSV data into the appropriate tabs</li>
+                      <li>Share the sheet (set to "Anyone with the link can view")</li>
+                      <li>Copy the spreadsheet ID from the URL</li>
+                    </ol>
+                  </div>
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
                     <p className="text-sm text-amber-800">
                       <AlertCircle className="h-4 w-4 inline mr-2" />
-                      Google Sheets integration is not configured. Set the{" "}
+                      Step 3: Set the{" "}
                       <code className="bg-amber-100 px-2 py-1 rounded font-mono text-xs">
                         PRICEBOOK_SHEETS_ID
                       </code>{" "}
                       environment variable to enable syncing.
                     </p>
                   </div>
-                  <p className="text-sm text-slate-500">
-                    Google Sheets integration allows you to manage package prices in a spreadsheet
-                    and sync them with the system automatically.
-                  </p>
                 </>
               ) : (
                 <>
