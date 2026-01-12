@@ -1530,8 +1530,11 @@ export default function CrmProposalBuilder() {
   }, [customTonnage]);
 
   const unitTypes = useMemo(() => {
-    return Array.from(new Set(packages.map(p => p.unitType)));
-  }, []);
+    const allTypes = Array.from(new Set(packages.map(p => p.unitType)));
+    // Order: HVAC systems first (GP, PHP, SGA, SHP), then Ducting, then Mini-Split
+    const orderedTypes = ["GP", "PHP", "SGA", "SHP", "Ducting", "Mini-Split"];
+    return orderedTypes.filter(t => allTypes.includes(t));
+  }, [packages]);
 
   const tiersForUnitType = useMemo(() => {
     if (!selectedUnitType) return [];

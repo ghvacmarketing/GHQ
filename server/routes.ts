@@ -24059,14 +24059,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           asc(pricebookPackages.packageLevel)
         );
 
-      // Convert cents to dollars for response
-      const packagesWithDollars = packages.map(pkg => ({
-        ...pkg,
-        monthlyPayment: (pkg.monthlyPayment / 100).toFixed(2),
-        totalInvestment: (pkg.totalInvestment / 100).toFixed(2),
-      }));
-
-      res.json(packagesWithDollars);
+      // Return raw cent values - frontend handles conversion
+      res.json(packages);
     } catch (error: any) {
       console.error("Error fetching pricebook packages:", error);
       res.status(500).json({ message: "Failed to fetch packages", error: error.message });
