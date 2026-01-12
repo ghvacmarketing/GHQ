@@ -4,6 +4,7 @@ import { useLocation, Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
+import { DndContext, DragOverlay, useDraggable, useDroppable, closestCenter, DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -203,6 +204,107 @@ const unassignedCategoryConfig: Record<UnassignedCategory, { label: string; desc
   on_hold: { label: "On Hold", description: "" },
 };
 
+const categoryToDispatchStage: Record<UnassignedCategory, string> = {
+  needs_scheduling: "NeedsScheduling",
+  waiting_on_parts: "WaitingOnParts",
+  parts_arrived: "PartsArrived",
+  on_hold: "OnHold",
+};
+
+function DraggableWorkOrderCard({ wo, visitStyle, onClick }: { 
+  wo: EnrichedWorkOrder; 
+  visitStyle: { bg: string; text: string };
+  onClick: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: wo.id,
+    data: { workOrder: wo },
+  });
+
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    opacity: isDragging ? 0.5 : 1,
+  } : undefined;
+
+  return (
+    <Card
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className={cn(
+        "bg-white border shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing",
+        isDragging && "ring-2 ring-blue-400"
+      )}
+      onClick={onClick}
+      data-testid={`card-work-order-${wo.id}`}
+    >
+      <CardContent className="p-3">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <p className="font-semibold text-slate-900 text-sm truncate flex-1">
+            {wo.customer?.name || "—"}
+          </p>
+        </div>
+        
+        {wo.workSubtype && wo.workSubtype !== "Other" && (
+          <p className="text-xs text-slate-600 truncate mb-2">
+            {wo.workSubtype}
+          </p>
+        )}
+
+        <div className="flex items-center gap-1.5 mt-2 pt-2 border-t">
+          <Badge className={cn("text-[10px] px-1.5 py-0.5", visitStyle.bg, visitStyle.text)}>
+            {wo.visitType || "Service"}
+          </Badge>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DroppableColumn({ 
+  category, 
+  config, 
+  children, 
+  count 
+}: { 
+  category: UnassignedCategory; 
+  config: { label: string; description: string };
+  children: React.ReactNode;
+  count: number;
+}) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: category,
+  });
+
+  return (
+    <div 
+      ref={setNodeRef}
+      className={cn(
+        "bg-slate-100 rounded-lg border border-slate-200 transition-colors",
+        isOver && "bg-blue-50 border-blue-300"
+      )}
+      data-testid={`kanban-column-${category}`}
+    >
+      <div className="p-3 border-b border-slate-200 bg-slate-50 rounded-t-lg">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-slate-800 text-sm">{config.label}</h3>
+            {config.description && (
+              <p className="text-xs text-slate-500">{config.description}</p>
+            )}
+          </div>
+          <Badge variant="secondary" className="text-xs">{count}</Badge>
+        </div>
+      </div>
+      
+      <div className="p-2 space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto min-h-[100px]">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function CrmWorkOrders() {
   usePageTitle("Work Orders");
   const [, navigate] = useLocation();
@@ -269,6 +371,9 @@ export default function CrmWorkOrders() {
   
   // Dynamic maintenance subtypes (includes custom agreement types)
   const [maintenanceSubtypes, setMaintenanceSubtypes] = useState<string[]>(["Preventative Maintenance"]);
+  
+  // Drag and drop state for unassigned kanban
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
   
   // Generate 30-minute interval time options from 8 AM to 8 PM
   const timeOptions = (() => {
@@ -662,6 +767,35 @@ export default function CrmWorkOrders() {
       toast({ title: "Update failed", description: error.message, variant: "destructive" });
     },
   });
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragId(event.active.id as string);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDragId(null);
+    const { active, over } = event;
+    
+    if (!over) return;
+    
+    const workOrderId = active.id as string;
+    const targetCategory = over.id as UnassignedCategory;
+    
+    // Find the work order being dragged
+    const draggedOrder = filteredWorkOrders.find(wo => wo.id === workOrderId);
+    if (!draggedOrder) return;
+    
+    // Get the new dispatch stage
+    const newDispatchStage = categoryToDispatchStage[targetCategory];
+    
+    // Only update if the stage is different
+    if (draggedOrder.dispatchQueueStage !== newDispatchStage) {
+      updateWorkOrderMutation.mutate({
+        id: workOrderId,
+        updates: { dispatchQueueStage: newDispatchStage as any },
+      });
+    }
+  };
 
   const resetCreateForm = () => {
     setSelectedCustomer(null);
@@ -1120,31 +1254,24 @@ export default function CrmWorkOrders() {
             </CardContent>
           </Card>
         ) : activeTab === "unassigned" && categorizedUnassigned ? (
-          <div className="w-full">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {(Object.keys(unassignedCategoryConfig) as UnassignedCategory[]).map((category) => {
-                const config = unassignedCategoryConfig[category];
-                const categoryOrders = categorizedUnassigned[category];
-                
-                return (
-                  <div 
-                    key={category} 
-                    className="bg-slate-100 rounded-lg border border-slate-200"
-                    data-testid={`kanban-column-${category}`}
-                  >
-                    <div className="p-3 border-b border-slate-200 bg-slate-50 rounded-t-lg">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-semibold text-slate-800 text-sm">{config.label}</h3>
-                          {config.description && (
-                            <p className="text-xs text-slate-500">{config.description}</p>
-                          )}
-                        </div>
-                        <Badge variant="secondary" className="text-xs">{categoryOrders.length}</Badge>
-                      </div>
-                    </div>
-                    
-                    <div className="p-2 space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto">
+          <DndContext 
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="w-full">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {(Object.keys(unassignedCategoryConfig) as UnassignedCategory[]).map((category) => {
+                  const config = unassignedCategoryConfig[category];
+                  const categoryOrders = categorizedUnassigned[category];
+                  
+                  return (
+                    <DroppableColumn 
+                      key={category}
+                      category={category}
+                      config={config}
+                      count={categoryOrders.length}
+                    >
                       {categoryOrders.length === 0 ? (
                         <div className="py-8 text-center">
                           <p className="text-slate-400 text-xs">No work orders</p>
@@ -1154,48 +1281,24 @@ export default function CrmWorkOrders() {
                           const visitStyle = visitTypeColors[wo.visitType || "SERVICE"] || visitTypeColors.SERVICE;
                           
                           return (
-                            <Card
+                            <DraggableWorkOrderCard
                               key={wo.id}
                               className="bg-white border shadow-sm hover:shadow-md transition-shadow cursor-pointer"
                               onMouseEnter={() => prefetchWorkOrder(wo.id)}
                               onTouchStart={() => prefetchWorkOrder(wo.id)}
+                              wo={wo}
+                              visitStyle={visitStyle}
                               onClick={() => handleOpenDetail(wo)}
-                              data-testid={`card-work-order-${wo.id}`}
-                            >
-                              <CardContent className="p-3">
-                                <div className="flex items-start justify-between gap-2 mb-2">
-                                  <p className="font-semibold text-slate-900 text-sm truncate flex-1">
-                                    {wo.customer?.name || "—"}
-                                  </p>
-                                </div>
-                                
-                                {wo.workSubtype && wo.workSubtype !== "Other" && (
-                                  <p className="text-xs text-slate-600 truncate mb-2">
-                                    {wo.workSubtype}
-                                  </p>
-                                )}
-
-                                <div className="flex items-center gap-1.5 mt-2 pt-2 border-t">
-                                  <Badge className={`${visitStyle.bg} ${visitStyle.text} text-xs`}>
-                                    {visitTypeLabels[wo.visitType || "SERVICE"]}
-                                  </Badge>
-                                  {wo.priority && wo.priority !== "normal" && (
-                                    <Badge className="bg-orange-100 text-orange-700 text-xs">
-                                      {wo.priority.charAt(0).toUpperCase() + wo.priority.slice(1)}
-                                    </Badge>
-                                  )}
-                                </div>
-                              </CardContent>
-                            </Card>
+                            />
                           );
                         })
                       )}
-                    </div>
-                  </div>
-                );
-              })}
+                    </DroppableColumn>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          </DndContext>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {filteredWorkOrders.map((wo) => {
