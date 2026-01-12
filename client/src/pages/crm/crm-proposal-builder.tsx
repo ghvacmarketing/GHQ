@@ -185,15 +185,15 @@ type CartItem = CartPackage | CustomBuildCart | CrawlspaceCartItem | CrawlspaceS
 
 const components: PricebookComponent[] = componentsData as PricebookComponent[];
 
-// Transform API packages to frontend format (cents to dollars as strings)
+// Transform API packages to frontend format (API already returns dollars as strings)
 function transformApiPackages(apiPackages: ApiPricebookPackage[]): PricebookPackage[] {
   return apiPackages.map(pkg => ({
     unitType: pkg.unitType,
     tier: pkg.tier,
     tonnage: pkg.tonnage,
     packageLevel: pkg.packageLevel,
-    monthlyPayment: (pkg.monthlyPayment / 100).toFixed(2),
-    totalInvestment: (pkg.totalInvestment / 100).toFixed(2),
+    monthlyPayment: String(pkg.monthlyPayment),
+    totalInvestment: String(pkg.totalInvestment),
     outdoorBrand: pkg.outdoorBrand,
     outdoorModel: pkg.outdoorModel,
     outdoorName: pkg.outdoorName,
