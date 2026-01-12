@@ -15,6 +15,7 @@ import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
+import { packageSheetsService } from "./services/package-sheets-sync";
 import { emailService } from "./services/email";
 import { trelloService } from "./services/trello";
 import { voiceService } from "./services/voice";
@@ -24305,6 +24306,124 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error: any) {
       console.error("Error fetching price adjustments:", error);
       res.status(500).json({ message: "Failed to fetch adjustments", error: error.message });
+    }
+  });
+
+  // GET /api/pricebook/sheets/status - Check if Google Sheets sync is configured
+  app.get("/api/pricebook/sheets/status", requireCrmAuth, async (req, res) => {
+    try {
+      const configured = packageSheetsService.isConfigured();
+      res.json({
+        configured,
+        spreadsheetId: configured ? packageSheetsService.getSpreadsheetId() : undefined,
+      });
+    } catch (error: any) {
+      console.error("Error checking sheets status:", error);
+      res.status(500).json({ message: "Failed to check sheets status", error: error.message });
+    }
+  });
+
+  // POST /api/pricebook/sheets/sync - Sync packages from Google Sheets
+  app.post("/api/pricebook/sheets/sync", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      if (!packageSheetsService.isConfigured()) {
+        return res.status(400).json({
+          message: "Google Sheets sync not configured. Set PRICEBOOK_SHEETS_ID environment variable.",
+        });
+      }
+
+      const crmUser = getCurrentCrmUser(req);
+      console.log(`Pricebook sheets sync initiated by ${crmUser?.email || 'unknown'}`);
+
+      let hvacPackagesCount = 0;
+      let crawlspaceTiersCount = 0;
+
+      // Import HVAC packages
+      try {
+        const packages = await packageSheetsService.importPackagesFromSheet();
+        
+        if (packages.length > 0) {
+          // Delete all existing packages and insert fresh data
+          await db.delete(pricebookPackages);
+          
+          // Insert all packages
+          for (const pkg of packages) {
+            await db.insert(pricebookPackages).values({
+              unitType: pkg.unitType,
+              tier: pkg.tier,
+              tonnage: pkg.tonnage,
+              packageLevel: pkg.packageLevel,
+              monthlyPayment: pkg.monthlyPayment,
+              totalInvestment: pkg.totalInvestment,
+              outdoorBrand: pkg.outdoorBrand || null,
+              outdoorModel: pkg.outdoorModel || null,
+              outdoorName: pkg.outdoorName || null,
+              coilModel: pkg.coilModel || null,
+              coilName: pkg.coilName || null,
+              indoorHeatModel: pkg.indoorHeatModel || null,
+              indoorHeatName: pkg.indoorHeatName || null,
+              thermostatModel: pkg.thermostatModel || null,
+              thermostatName: pkg.thermostatName || null,
+              accessoryModels: pkg.accessoryModels || null,
+              outdoorImageUrl: pkg.outdoorImageUrl || null,
+              thermostatImageUrl: pkg.thermostatImageUrl || null,
+              furnaceImageUrl: pkg.furnaceImageUrl || null,
+              isActive: true,
+            });
+          }
+          
+          hvacPackagesCount = packages.length;
+          console.log(`Pricebook sync: Imported ${hvacPackagesCount} HVAC packages`);
+        }
+      } catch (error: any) {
+        console.error("Error syncing HVAC packages:", error);
+      }
+
+      // Import crawlspace tiers
+      try {
+        const tiers = await packageSheetsService.importCrawlspaceTiersFromSheet();
+        
+        if (tiers.length > 0) {
+          // Delete all existing tiers and insert fresh data
+          await db.delete(crawlspaceTiers);
+          
+          // Insert all tiers
+          for (const tier of tiers) {
+            await db.insert(crawlspaceTiers).values({
+              name: tier.name,
+              milThickness: tier.milThickness,
+              rollPrice: tier.rollPrice,
+              description: tier.description || null,
+              isActive: true,
+            });
+          }
+          
+          crawlspaceTiersCount = tiers.length;
+          console.log(`Pricebook sync: Imported ${crawlspaceTiersCount} crawlspace tiers`);
+        }
+      } catch (error: any) {
+        console.error("Error syncing crawlspace tiers:", error);
+      }
+
+      // Log the sync action
+      if (crmUser) {
+        await logCrmAudit(
+          crmUser.id,
+          "pricebook_sheets_sync",
+          "pricebook",
+          undefined,
+          { hvacPackagesCount, crawlspaceTiersCount }
+        );
+      }
+
+      res.json({
+        message: "Pricebook sync completed",
+        hvacPackages: hvacPackagesCount,
+        crawlspaceTiers: crawlspaceTiersCount,
+      });
+    } catch (error: any) {
+      console.error("Error during pricebook sheets sync:", error);
+      res.status(500).json({ message: "Failed to sync from sheets", error: error.message });
     }
   });
 

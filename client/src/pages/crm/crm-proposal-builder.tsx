@@ -27,9 +27,41 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import redlogo from "@assets/redlogo.webp";
-import packagesData from "@assets/pricebook-packages.json";
 import componentsData from "@assets/pricebook-components.json";
 import type { Customer, CrmUser, CrmCustomer, QuotePart } from "@shared/schema";
+
+// API response types for pricebook data
+type ApiPricebookPackage = {
+  id: number;
+  unitType: string;
+  tier: string;
+  tonnage: string;
+  packageLevel: string;
+  monthlyPayment: number; // cents
+  totalInvestment: number; // cents
+  outdoorBrand: string;
+  outdoorModel: string;
+  outdoorName: string;
+  coilModel: string | null;
+  coilName: string | null;
+  indoorHeatModel: string | null;
+  indoorHeatName: string | null;
+  thermostatModel: string | null;
+  thermostatName: string | null;
+  accessoryModels: string | null;
+  outdoorImageUrl: string | null;
+  coilImageUrl: string | null;
+  furnaceImageUrl: string | null;
+  thermostatImageUrl: string | null;
+};
+
+type ApiCrawlspaceTier = {
+  id: number;
+  name: string;
+  milThickness: number;
+  rollPrice: number; // cents
+  description: string;
+};
 
 // Simplified CRM customer type for proposal builder
 type CrmCustomerForProposal = {
@@ -151,8 +183,44 @@ type CrawlspaceCartItem = {
 
 type CartItem = CartPackage | CustomBuildCart | CrawlspaceCartItem | CrawlspaceServicesCartItem;
 
-const packages: PricebookPackage[] = packagesData as PricebookPackage[];
 const components: PricebookComponent[] = componentsData as PricebookComponent[];
+
+// Transform API packages to frontend format (cents to dollars as strings)
+function transformApiPackages(apiPackages: ApiPricebookPackage[]): PricebookPackage[] {
+  return apiPackages.map(pkg => ({
+    unitType: pkg.unitType,
+    tier: pkg.tier,
+    tonnage: pkg.tonnage,
+    packageLevel: pkg.packageLevel,
+    monthlyPayment: (pkg.monthlyPayment / 100).toFixed(2),
+    totalInvestment: (pkg.totalInvestment / 100).toFixed(2),
+    outdoorBrand: pkg.outdoorBrand,
+    outdoorModel: pkg.outdoorModel,
+    outdoorName: pkg.outdoorName,
+    coilModel: pkg.coilModel || "",
+    coilName: pkg.coilName || "",
+    indoorHeatModel: pkg.indoorHeatModel || "",
+    indoorHeatName: pkg.indoorHeatName || "",
+    thermostatModel: pkg.thermostatModel || "",
+    thermostatName: pkg.thermostatName || "",
+    accessoryModels: pkg.accessoryModels || "",
+    outdoorImageUrl: pkg.outdoorImageUrl || undefined,
+    coilImageUrl: pkg.coilImageUrl || undefined,
+    furnaceImageUrl: pkg.furnaceImageUrl || undefined,
+    thermostatImageUrl: pkg.thermostatImageUrl || undefined,
+  }));
+}
+
+// Transform API crawlspace tiers to frontend format (cents to dollars)
+function transformApiCrawlspaceTiers(apiTiers: ApiCrawlspaceTier[]): CrawlspaceTier[] {
+  return apiTiers.map(tier => ({
+    id: `crawl-${tier.milThickness}mil`,
+    name: tier.name,
+    milThickness: tier.milThickness,
+    rollPrice: tier.rollPrice / 100,
+    description: tier.description,
+  }));
+}
 
 const UNIT_TYPE_INFO: Record<string, { name: string; description: string; icon: typeof Package }> = {
   SGA: { name: "SGA", description: "Split Gas Air system for heating and cooling", icon: Thermometer },
@@ -351,12 +419,6 @@ type CrawlspaceTier = {
   description: string;
   rollPrice: number;
 };
-
-const CRAWLSPACE_TIERS: CrawlspaceTier[] = [
-  { id: "crawl-10mil", name: "Essential", milThickness: 10, rollPrice: 167.99, description: "10 Mil Non-Reinforced Liner + Aprilaire E100 Dehumidifier" },
-  { id: "crawl-12mil", name: "Premium", milThickness: 12, rollPrice: 307.99, description: "12 Mil Economy Liner + Aprilaire E070 Dehumidifier" },
-  { id: "crawl-20mil", name: "Ultimate", milThickness: 20, rollPrice: 559.99, description: "20 Mil Reinforced Liner + Aprilaire E070 Dehumidifier" }
-];
 
 // Crawlspace Services Pricing (add-on services based on square footage)
 const CRAWLSPACE_SERVICES = {
@@ -732,6 +794,30 @@ export default function CrmProposalBuilder() {
   const { data: currentUser, isLoading: isLoadingUser } = useQuery<CrmUser>({
     queryKey: ["/api/crm/auth/me"],
   });
+  
+  // Fetch packages from API
+  const { data: packagesData, isLoading: isLoadingPackages } = useQuery<ApiPricebookPackage[]>({
+    queryKey: ['/api/pricebook/packages'],
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+  
+  // Fetch crawlspace tiers from API
+  const { data: crawlspaceTiersData, isLoading: isLoadingCrawlspaceTiers } = useQuery<ApiCrawlspaceTier[]>({
+    queryKey: ['/api/pricebook/crawlspace-tiers'],
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+  
+  // Transform API data to frontend format
+  const packages: PricebookPackage[] = useMemo(() => {
+    if (!packagesData) return [];
+    return transformApiPackages(packagesData);
+  }, [packagesData]);
+  
+  const crawlspaceTiers: CrawlspaceTier[] = useMemo(() => {
+    if (!crawlspaceTiersData) return [];
+    return transformApiCrawlspaceTiers(crawlspaceTiersData);
+  }, [crawlspaceTiersData]);
+  
   const [activeTab, setActiveTab] = useState<string>("preset");
   const [selectedUnitType, setSelectedUnitType] = useState<string | null>(null);
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
@@ -3154,11 +3240,17 @@ export default function CrmProposalBuilder() {
     </div>
   );
 
-  if (isLoadingUser) {
+  if (isLoadingUser || isLoadingPackages || isLoadingCrawlspaceTiers) {
     return (
       <CrmLayout currentUser={currentUser as CrmUser}>
         <div className="space-y-4">
           <Skeleton className="h-10 w-full" />
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+              <p className="text-muted-foreground">Loading packages...</p>
+            </div>
+          </div>
           <Skeleton className="h-64 w-full" />
         </div>
       </CrmLayout>
@@ -4723,7 +4815,7 @@ export default function CrmProposalBuilder() {
               </div>
               
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {CRAWLSPACE_TIERS.map((tier) => {
+                {crawlspaceTiers.map((tier) => {
                   const sqftNum = parseInt(crawlspaceSqft) || 1000;
                   const pricing = calculateCrawlspacePricing(sqftNum, tier.name);
                   const isSelected = selectedCrawlspaceTier?.name === tier.name;
