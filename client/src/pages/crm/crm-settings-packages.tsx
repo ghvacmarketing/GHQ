@@ -157,10 +157,9 @@ export default function CrmSettingsPackages() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/pricebook/packages"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/pricebook/crawlspace-tiers"] });
       toast({
         title: "Sync Completed",
-        description: `Synced ${data.hvacPackages} packages and ${data.crawlspaceTiers} tiers`,
+        description: `Synced ${data.hvacPackages} HVAC packages from Google Sheet`,
       });
     },
     onError: (error: Error) => {
@@ -476,8 +475,8 @@ export default function CrmSettingsPackages() {
                   <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
                     <p className="font-medium text-amber-800 mb-2">Step 2: Create Google Sheet</p>
                     <ol className="text-sm text-amber-700 list-decimal list-inside space-y-1">
-                      <li>Create a new Google Sheet with two tabs: <strong>HVAC_Packages</strong> and <strong>Crawlspace_Tiers</strong></li>
-                      <li>Import the CSV data into the appropriate tabs</li>
+                      <li>Create a new Google Sheet with a tab named <strong>HVAC_Packages</strong></li>
+                      <li>Import the CSV data (File → Import → Upload)</li>
                       <li>Share the sheet (set to "Anyone with the link can view")</li>
                       <li>Copy the spreadsheet ID from the URL</li>
                     </ol>
@@ -547,8 +546,8 @@ export default function CrmSettingsPackages() {
                   </div>
 
                   <p className="text-sm text-slate-500">
-                    Click "Sync from Sheet" to import the latest package prices and crawlspace
-                    tiers from your configured Google Sheet.
+                    Click "Sync from Sheet" to import the latest HVAC package prices from your
+                    Google Sheet.
                   </p>
                 </>
               )}

@@ -24073,7 +24073,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
-  // GET /api/pricebook/packages/export - Export all packages as CSV for Google Sheets
+  // GET /api/pricebook/packages/export - Export HVAC packages as CSV for Google Sheets
   app.get("/api/pricebook/packages/export", requireCrmSalesOrAbove, async (req, res) => {
     try {
       // Fetch all HVAC packages
@@ -24088,68 +24088,47 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           asc(pricebookPackages.packageLevel)
         );
 
-      // Fetch all crawlspace tiers
-      const tiers = await db
-        .select()
-        .from(crawlspaceTiers)
-        .where(eq(crawlspaceTiers.isActive, true))
-        .orderBy(asc(crawlspaceTiers.name));
-
       // CSV headers for HVAC packages (matching Google Sheets import format)
-      const hvacHeaders = [
+      const headers = [
         "unitType", "tier", "tonnage", "packageLevel", "monthlyPayment", "totalInvestment",
         "outdoorBrand", "outdoorModel", "outdoorName", "coilModel", "coilName",
         "indoorHeatModel", "indoorHeatName", "thermostatModel", "thermostatName",
         "accessoryModels", "outdoorImageUrl", "thermostatImageUrl", "furnaceImageUrl"
       ];
 
-      // Build HVAC CSV rows
-      const hvacRows = hvacPackages.map(pkg => [
-        pkg.unitType,
-        pkg.tier,
-        pkg.tonnage,
-        pkg.packageLevel,
-        (pkg.monthlyPayment / 100).toFixed(2),
-        (pkg.totalInvestment / 100).toFixed(2),
-        pkg.outdoorBrand || "",
-        pkg.outdoorModel || "",
-        pkg.outdoorName || "",
-        pkg.coilModel || "",
-        pkg.coilName || "",
-        pkg.indoorHeatModel || "",
-        pkg.indoorHeatName || "",
-        pkg.thermostatModel || "",
-        pkg.thermostatName || "",
-        pkg.accessoryModels || "",
-        pkg.outdoorImageUrl || "",
-        pkg.thermostatImageUrl || "",
-        pkg.furnaceImageUrl || ""
-      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
+      // Build CSV rows with Google Sheets IMAGE() formula for image columns
+      const rows = hvacPackages.map(pkg => {
+        const outdoorImg = pkg.outdoorImageUrl ? `=IMAGE("${pkg.outdoorImageUrl}")` : "";
+        const thermostatImg = pkg.thermostatImageUrl ? `=IMAGE("${pkg.thermostatImageUrl}")` : "";
+        const furnaceImg = pkg.furnaceImageUrl ? `=IMAGE("${pkg.furnaceImageUrl}")` : "";
 
-      // CSV headers for crawlspace tiers
-      const crawlspaceHeaders = ["name", "milThickness", "rollPrice", "description"];
+        return [
+          pkg.unitType,
+          pkg.tier,
+          pkg.tonnage,
+          pkg.packageLevel,
+          (pkg.monthlyPayment / 100).toFixed(2),
+          (pkg.totalInvestment / 100).toFixed(2),
+          pkg.outdoorBrand || "",
+          pkg.outdoorModel || "",
+          pkg.outdoorName || "",
+          pkg.coilModel || "",
+          pkg.coilName || "",
+          pkg.indoorHeatModel || "",
+          pkg.indoorHeatName || "",
+          pkg.thermostatModel || "",
+          pkg.thermostatName || "",
+          pkg.accessoryModels || "",
+          outdoorImg,
+          thermostatImg,
+          furnaceImg
+        ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(",");
+      });
 
-      // Build crawlspace CSV rows
-      const crawlspaceRows = tiers.map(tier => [
-        tier.name,
-        tier.milThickness,
-        (tier.rollPrice / 100).toFixed(2),
-        tier.description || ""
-      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
-
-      // Combine into single CSV with section markers
-      const csv = [
-        "=== HVAC_Packages (copy to HVAC_Packages tab) ===",
-        hvacHeaders.join(","),
-        ...hvacRows,
-        "",
-        "=== Crawlspace_Tiers (copy to Crawlspace_Tiers tab) ===",
-        crawlspaceHeaders.join(","),
-        ...crawlspaceRows
-      ].join("\n");
+      const csv = [headers.join(","), ...rows].join("\n");
 
       res.setHeader("Content-Type", "text/csv");
-      res.setHeader("Content-Disposition", "attachment; filename=pricebook-packages.csv");
+      res.setHeader("Content-Disposition", "attachment; filename=hvac-packages.csv");
       res.send(csv);
     } catch (error: any) {
       console.error("Error exporting packages:", error);
@@ -24420,7 +24399,6 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       console.log(`Pricebook sheets sync initiated by ${crmUser?.email || 'unknown'}`);
 
       let hvacPackagesCount = 0;
-      let crawlspaceTiersCount = 0;
 
       // Import HVAC packages
       try {
@@ -24463,32 +24441,6 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         console.error("Error syncing HVAC packages:", error);
       }
 
-      // Import crawlspace tiers
-      try {
-        const tiers = await packageSheetsService.importCrawlspaceTiersFromSheet();
-        
-        if (tiers.length > 0) {
-          // Delete all existing tiers and insert fresh data
-          await db.delete(crawlspaceTiers);
-          
-          // Insert all tiers
-          for (const tier of tiers) {
-            await db.insert(crawlspaceTiers).values({
-              name: tier.name,
-              milThickness: tier.milThickness,
-              rollPrice: tier.rollPrice,
-              description: tier.description || null,
-              isActive: true,
-            });
-          }
-          
-          crawlspaceTiersCount = tiers.length;
-          console.log(`Pricebook sync: Imported ${crawlspaceTiersCount} crawlspace tiers`);
-        }
-      } catch (error: any) {
-        console.error("Error syncing crawlspace tiers:", error);
-      }
-
       // Log the sync action
       if (crmUser) {
         await logCrmAudit(
@@ -24496,14 +24448,13 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           "pricebook_sheets_sync",
           "pricebook",
           undefined,
-          { hvacPackagesCount, crawlspaceTiersCount }
+          { hvacPackagesCount }
         );
       }
 
       res.json({
         message: "Pricebook sync completed",
         hvacPackages: hvacPackagesCount,
-        crawlspaceTiers: crawlspaceTiersCount,
       });
     } catch (error: any) {
       console.error("Error during pricebook sheets sync:", error);

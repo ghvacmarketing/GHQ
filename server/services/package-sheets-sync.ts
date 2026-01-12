@@ -59,6 +59,21 @@ export class PackageSheetsService {
     return Math.round(dollars * 100);
   }
 
+  private parseImageUrl(value: string | undefined): string | undefined {
+    if (!value) return undefined;
+    const str = value.toString().trim();
+    if (!str) return undefined;
+    
+    // Check if it's an IMAGE() formula and extract the URL
+    const imageMatch = str.match(/^=IMAGE\s*\(\s*["']([^"']+)["']\s*\)/i);
+    if (imageMatch) {
+      return imageMatch[1];
+    }
+    
+    // Otherwise return as-is (it might be a direct URL)
+    return str;
+  }
+
   async importPackagesFromSheet(): Promise<SheetHvacPackage[]> {
     if (!this.isConfigured()) {
       console.warn('PackageSheetsService: Not configured, skipping import');
@@ -111,9 +126,9 @@ export class PackageSheetsService {
           thermostatModel: (row[13] || '').toString().trim() || undefined,
           thermostatName: (row[14] || '').toString().trim() || undefined,
           accessoryModels: (row[15] || '').toString().trim() || undefined,
-          outdoorImageUrl: (row[16] || '').toString().trim() || undefined,
-          thermostatImageUrl: (row[17] || '').toString().trim() || undefined,
-          furnaceImageUrl: (row[18] || '').toString().trim() || undefined,
+          outdoorImageUrl: this.parseImageUrl(row[16]),
+          thermostatImageUrl: this.parseImageUrl(row[17]),
+          furnaceImageUrl: this.parseImageUrl(row[18]),
         });
       }
       
