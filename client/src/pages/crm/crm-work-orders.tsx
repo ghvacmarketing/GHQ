@@ -1990,78 +1990,71 @@ export default function CrmWorkOrders() {
                   </SelectContent>
                 </Select>
                 {assignedTechId === "unassigned" && (
-                  <p className="text-xs text-slate-500 mt-1">Leave unassigned to add to backlog. Optionally set a date to mark as "Ready to Dispatch".</p>
+                  <p className="text-xs text-slate-500 mt-1">Leave unassigned to add to backlog.</p>
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label>Scheduled Date {assignedTechId !== "unassigned" && <span className="text-red-500">*</span>}{assignedTechId === "unassigned" && <span className="text-slate-400 text-xs ml-1">(optional)</span>}</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                      data-testid="button-scheduled-date"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {scheduledDate ? format(scheduledDate, "MMM d, yyyy") : "Pick a date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={scheduledDate}
-                      onSelect={setScheduledDate}
-                      data-testid="calendar-scheduled-date"
-                    />
-                  </PopoverContent>
-                </Popover>
-                {assignedTechId === "unassigned" && scheduledDate && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs text-slate-500 h-auto p-0"
-                    onClick={() => setScheduledDate(undefined)}
-                  >
-                    Clear date
-                  </Button>
-                )}
-              </div>
+              {assignedTechId !== "unassigned" && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Scheduled Date <span className="text-red-500">*</span></Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                          data-testid="button-scheduled-date"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {scheduledDate ? format(scheduledDate, "MMM d, yyyy") : "Pick a date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={scheduledDate}
+                          onSelect={setScheduledDate}
+                          data-testid="calendar-scheduled-date"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
 
-              {scheduledDate && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>Start Time</Label>
-                    <Select value={startTime} onValueChange={setStartTime}>
-                      <SelectTrigger data-testid="select-start-time">
-                        <SelectValue placeholder="Start" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[200px]">
-                        {timeOptions.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>End Time</Label>
-                    <Select value={endTime} onValueChange={setEndTime}>
-                      <SelectTrigger data-testid="select-end-time">
-                        <SelectValue placeholder="End" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[200px]">
-                        {timeOptions.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                  {scheduledDate && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>Start Time</Label>
+                        <Select value={startTime} onValueChange={setStartTime}>
+                          <SelectTrigger data-testid="select-start-time">
+                            <SelectValue placeholder="Start" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[200px]">
+                            {timeOptions.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>End Time</Label>
+                        <Select value={endTime} onValueChange={setEndTime}>
+                          <SelectTrigger data-testid="select-end-time">
+                            <SelectValue placeholder="End" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[200px]">
+                            {timeOptions.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               <div className="space-y-2">
