@@ -115,7 +115,7 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true, // Auto-sync when returning to tab
       refetchOnMount: false, // Only refetch if data is stale
       staleTime: 10 * 60 * 1000, // 10 minutes - data stays fresh longer for faster feel
       gcTime: 30 * 60 * 1000, // 30 minutes - keep unused data in cache longer

@@ -550,7 +550,8 @@ export default function CrmWorkOrders() {
     },
     enabled: !!currentUser,
     staleTime: 2 * 60 * 1000, // Cache for 2 minutes for better performance
-    refetchInterval: 60000, // Only refresh every 60 seconds instead of 15
+    refetchInterval: 60000, // Refresh every 60 seconds to catch sync updates
+    refetchIntervalInBackground: true, // Keep syncing even when tab is not focused
   });
 
   const filteredWorkOrders = useMemo(() => {
