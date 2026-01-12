@@ -78,22 +78,8 @@ export class PackageSheetsService {
     }
 
     try {
-      // First get the sheet metadata to find the actual sheet name
-      const metadataUrl = `${this.baseUrl}/${this.config.spreadsheetId}?key=${this.config.apiKey}&fields=sheets.properties.title`;
-      console.log('PackageSheetsService: Getting sheet metadata...');
-      const metadataResponse = await fetch(metadataUrl);
-      
-      if (!metadataResponse.ok) {
-        const errorText = await metadataResponse.text();
-        throw new Error(`Google Sheets API metadata error: ${metadataResponse.status} - ${errorText}`);
-      }
-      
-      const metadata = await metadataResponse.json();
-      const firstSheetName = metadata.sheets?.[0]?.properties?.title || 'Sheet1';
-      console.log(`PackageSheetsService: Using sheet name: "${firstSheetName}"`);
-      
-      // Only columns A-P (no image columns)
-      const range = encodeURIComponent(`${firstSheetName}!A2:P1000`);
+      // Only columns A-P (no image columns) - use Sheet1 as default tab name
+      const range = 'Sheet1!A2:P1000';
       const url = `${this.baseUrl}/${this.config.spreadsheetId}/values/${range}?key=${this.config.apiKey}`;
       
       console.log('PackageSheetsService: Fetching HVAC packages from sheet...');
