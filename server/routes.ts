@@ -24076,11 +24076,17 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // GET /api/pricebook/packages/export - Export HVAC packages as CSV for Google Sheets
   app.get("/api/pricebook/packages/export", requireCrmSalesOrAbove, async (req, res) => {
     try {
-      // Fetch all HVAC packages
+      // Fetch HVAC packages - only GP, SHP, SGA, PHP unit types
+      const allowedUnitTypes = ["GP", "SHP", "SGA", "PHP"];
       const hvacPackages = await db
         .select()
         .from(pricebookPackages)
-        .where(eq(pricebookPackages.isActive, true))
+        .where(
+          and(
+            eq(pricebookPackages.isActive, true),
+            inArray(pricebookPackages.unitType, allowedUnitTypes)
+          )
+        )
         .orderBy(
           asc(pricebookPackages.unitType),
           asc(pricebookPackages.tier),
@@ -24088,20 +24094,16 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           asc(pricebookPackages.packageLevel)
         );
 
-      // CSV headers for HVAC packages (matching Google Sheets import format)
+      // CSV headers (no image columns)
       const headers = [
         "unitType", "tier", "tonnage", "packageLevel", "monthlyPayment", "totalInvestment",
         "outdoorBrand", "outdoorModel", "outdoorName", "coilModel", "coilName",
         "indoorHeatModel", "indoorHeatName", "thermostatModel", "thermostatName",
-        "accessoryModels", "outdoorImageUrl", "thermostatImageUrl", "furnaceImageUrl"
+        "accessoryModels"
       ];
 
-      // Build CSV rows with Google Sheets IMAGE() formula for image columns
+      // Build CSV rows (no image columns)
       const rows = hvacPackages.map(pkg => {
-        const outdoorImg = pkg.outdoorImageUrl ? `=IMAGE("${pkg.outdoorImageUrl}")` : "";
-        const thermostatImg = pkg.thermostatImageUrl ? `=IMAGE("${pkg.thermostatImageUrl}")` : "";
-        const furnaceImg = pkg.furnaceImageUrl ? `=IMAGE("${pkg.furnaceImageUrl}")` : "";
-
         return [
           pkg.unitType,
           pkg.tier,
@@ -24118,10 +24120,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           pkg.indoorHeatName || "",
           pkg.thermostatModel || "",
           pkg.thermostatName || "",
-          pkg.accessoryModels || "",
-          outdoorImg,
-          thermostatImg,
-          furnaceImg
+          pkg.accessoryModels || ""
         ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(",");
       });
 
@@ -24408,7 +24407,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           // Delete all existing packages and insert fresh data
           await db.delete(pricebookPackages);
           
-          // Insert all packages
+          // Insert all packages (images are preserved from existing data if available)
           for (const pkg of packages) {
             await db.insert(pricebookPackages).values({
               unitType: pkg.unitType,
@@ -24427,9 +24426,6 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
               thermostatModel: pkg.thermostatModel || null,
               thermostatName: pkg.thermostatName || null,
               accessoryModels: pkg.accessoryModels || null,
-              outdoorImageUrl: pkg.outdoorImageUrl || null,
-              thermostatImageUrl: pkg.thermostatImageUrl || null,
-              furnaceImageUrl: pkg.furnaceImageUrl || null,
               isActive: true,
             });
           }
