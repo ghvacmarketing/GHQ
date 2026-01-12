@@ -78,8 +78,8 @@ export class PackageSheetsService {
     }
 
     try {
-      // Only columns A-P (no image columns)
-      const range = 'HVAC_Packages!A2:P1000';
+      // Only columns A-P (no image columns) - use Sheet1 as default tab name
+      const range = 'Sheet1!A2:P1000';
       const url = `${this.baseUrl}/${this.config.spreadsheetId}/values/${range}?key=${this.config.apiKey}`;
       
       console.log('PackageSheetsService: Fetching HVAC packages from sheet...');
