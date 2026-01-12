@@ -262,26 +262,36 @@ export async function syncPricebookPackages(): Promise<{ updated: number; insert
         .limit(1);
 
       if (existing.length > 0) {
-        // Update existing package with sheet data
-        await db.update(pricebookPackages)
-          .set({
-            monthlyPayment: pkg.monthlyPayment,
-            totalInvestment: pkg.totalInvestment,
-            outdoorBrand: pkg.outdoorBrand || null,
-            outdoorModel: pkg.outdoorModel || null,
-            outdoorName: pkg.outdoorName || null,
-            coilModel: pkg.coilModel || null,
-            coilName: pkg.coilName || null,
-            indoorHeatModel: pkg.indoorHeatModel || null,
-            indoorHeatName: pkg.indoorHeatName || null,
-            thermostatModel: pkg.thermostatModel || null,
-            thermostatName: pkg.thermostatName || null,
-            accessoryModels: pkg.accessoryModels || null,
-            outdoorImageUrl: pkg.outdoorImageUrl || null,
-            thermostatImageUrl: pkg.thermostatImageUrl || null,
-            furnaceImageUrl: pkg.furnaceImageUrl || null,
-          })
-          .where(eq(pricebookPackages.id, existing[0].id));
+        // Update existing package - only update fields that have values from sheet
+        // Preserve CRM-only data (like images) when sheet doesn't have them
+        const updates: Record<string, any> = {};
+        
+        // Always update pricing fields (these are required)
+        if (pkg.monthlyPayment !== undefined) updates.monthlyPayment = pkg.monthlyPayment;
+        if (pkg.totalInvestment !== undefined) updates.totalInvestment = pkg.totalInvestment;
+        
+        // Only update optional fields if they have actual values in the sheet
+        if (pkg.outdoorBrand) updates.outdoorBrand = pkg.outdoorBrand;
+        if (pkg.outdoorModel) updates.outdoorModel = pkg.outdoorModel;
+        if (pkg.outdoorName) updates.outdoorName = pkg.outdoorName;
+        if (pkg.coilModel) updates.coilModel = pkg.coilModel;
+        if (pkg.coilName) updates.coilName = pkg.coilName;
+        if (pkg.indoorHeatModel) updates.indoorHeatModel = pkg.indoorHeatModel;
+        if (pkg.indoorHeatName) updates.indoorHeatName = pkg.indoorHeatName;
+        if (pkg.thermostatModel) updates.thermostatModel = pkg.thermostatModel;
+        if (pkg.thermostatName) updates.thermostatName = pkg.thermostatName;
+        if (pkg.accessoryModels) updates.accessoryModels = pkg.accessoryModels;
+        
+        // Only update image URLs if sheet has them - preserve existing CRM images otherwise
+        if (pkg.outdoorImageUrl) updates.outdoorImageUrl = pkg.outdoorImageUrl;
+        if (pkg.thermostatImageUrl) updates.thermostatImageUrl = pkg.thermostatImageUrl;
+        if (pkg.furnaceImageUrl) updates.furnaceImageUrl = pkg.furnaceImageUrl;
+        
+        if (Object.keys(updates).length > 0) {
+          await db.update(pricebookPackages)
+            .set(updates)
+            .where(eq(pricebookPackages.id, existing[0].id));
+        }
         updatedCount++;
       } else {
         // Insert new package from sheet
