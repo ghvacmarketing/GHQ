@@ -15,7 +15,7 @@ import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
-import { packageSheetsService } from "./services/package-sheets-sync";
+import { packageSheetsService, startPricebookAutoSync } from "./services/package-sheets-sync";
 import { emailService } from "./services/email";
 import { trelloService } from "./services/trello";
 import { voiceService } from "./services/voice";
@@ -24520,6 +24520,10 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
     // Start Bouncie fleet location sync (every 5 minutes for real-time GPS tracking)
     startBouncieBackgroundSync(5);
+
+    // Start pricebook auto-sync (every 1 minute with delta-only updates from pricebook-export sheet)
+    startPricebookAutoSync(1);
+    console.log('Pricebook auto-sync started (every 1 minute)');
 
     // Seed vector store with sales book if empty (async, don't block startup)
     seedVectorStoreWithSalesBook().then(success => {

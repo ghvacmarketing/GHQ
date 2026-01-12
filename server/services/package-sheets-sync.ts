@@ -1,3 +1,7 @@
+import { db } from "../db";
+import { pricebookPackages } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
+
 interface PackageSheetsConfig {
   spreadsheetId: string;
   apiKey: string;
@@ -57,6 +61,15 @@ export class PackageSheetsService {
     const dollars = parseFloat(cleaned);
     if (isNaN(dollars)) return 0;
     return Math.round(dollars * 100);
+  }
+
+  // For pricebook-export sheet where values are already in cents
+  private parseCentsValue(value: string | undefined): number {
+    if (!value) return 0;
+    const cleaned = value.toString().replace(/[$,\s]/g, '');
+    const cents = parseInt(cleaned, 10);
+    if (isNaN(cents)) return 0;
+    return cents;
   }
 
   private parseImageUrl(value: string | undefined): string | undefined {
@@ -131,8 +144,8 @@ export class PackageSheetsService {
           tier,
           tonnage,
           packageLevel,
-          monthlyPayment: this.parseDollarsToCents(row[4]),
-          totalInvestment: this.parseDollarsToCents(row[5]),
+          monthlyPayment: this.parseCentsValue(row[4]),
+          totalInvestment: this.parseCentsValue(row[5]),
           outdoorBrand: (row[6] || '').toString().trim() || undefined,
           outdoorModel: (row[7] || '').toString().trim() || undefined,
           outdoorName: (row[8] || '').toString().trim() || undefined,
@@ -214,3 +227,110 @@ export class PackageSheetsService {
 }
 
 export const packageSheetsService = new PackageSheetsService();
+
+// Auto-sync function for pricebook packages
+let pricebookAutoSyncInterval: NodeJS.Timeout | null = null;
+
+export async function syncPricebookPackages(): Promise<{ updated: number; inserted: number; total: number }> {
+  if (!packageSheetsService.isConfigured()) {
+    console.log('[PricebookSync] Not configured, skipping');
+    return { updated: 0, inserted: 0, total: 0 };
+  }
+
+  try {
+    const packages = await packageSheetsService.importPackagesFromSheet();
+    
+    if (packages.length === 0) {
+      console.log('[PricebookSync] No packages from sheet');
+      return { updated: 0, inserted: 0, total: 0 };
+    }
+
+    let updatedCount = 0;
+    let insertedCount = 0;
+
+    for (const pkg of packages) {
+      // Find existing package by unique key (unitType + tier + tonnage + packageLevel)
+      const existing = await db.select().from(pricebookPackages)
+        .where(
+          and(
+            eq(pricebookPackages.unitType, pkg.unitType),
+            eq(pricebookPackages.tier, pkg.tier),
+            eq(pricebookPackages.tonnage, pkg.tonnage),
+            eq(pricebookPackages.packageLevel, pkg.packageLevel)
+          )
+        )
+        .limit(1);
+
+      if (existing.length > 0) {
+        // Update existing package with sheet data
+        await db.update(pricebookPackages)
+          .set({
+            monthlyPayment: pkg.monthlyPayment,
+            totalInvestment: pkg.totalInvestment,
+            outdoorBrand: pkg.outdoorBrand || null,
+            outdoorModel: pkg.outdoorModel || null,
+            outdoorName: pkg.outdoorName || null,
+            coilModel: pkg.coilModel || null,
+            coilName: pkg.coilName || null,
+            indoorHeatModel: pkg.indoorHeatModel || null,
+            indoorHeatName: pkg.indoorHeatName || null,
+            thermostatModel: pkg.thermostatModel || null,
+            thermostatName: pkg.thermostatName || null,
+            accessoryModels: pkg.accessoryModels || null,
+            outdoorImageUrl: pkg.outdoorImageUrl || null,
+            thermostatImageUrl: pkg.thermostatImageUrl || null,
+            furnaceImageUrl: pkg.furnaceImageUrl || null,
+          })
+          .where(eq(pricebookPackages.id, existing[0].id));
+        updatedCount++;
+      } else {
+        // Insert new package from sheet
+        await db.insert(pricebookPackages).values({
+          unitType: pkg.unitType,
+          tier: pkg.tier,
+          tonnage: pkg.tonnage,
+          packageLevel: pkg.packageLevel,
+          monthlyPayment: pkg.monthlyPayment,
+          totalInvestment: pkg.totalInvestment,
+          outdoorBrand: pkg.outdoorBrand || null,
+          outdoorModel: pkg.outdoorModel || null,
+          outdoorName: pkg.outdoorName || null,
+          coilModel: pkg.coilModel || null,
+          coilName: pkg.coilName || null,
+          indoorHeatModel: pkg.indoorHeatModel || null,
+          indoorHeatName: pkg.indoorHeatName || null,
+          thermostatModel: pkg.thermostatModel || null,
+          thermostatName: pkg.thermostatName || null,
+          accessoryModels: pkg.accessoryModels || null,
+          outdoorImageUrl: pkg.outdoorImageUrl || null,
+          thermostatImageUrl: pkg.thermostatImageUrl || null,
+          furnaceImageUrl: pkg.furnaceImageUrl || null,
+          isActive: true,
+        });
+        insertedCount++;
+      }
+    }
+
+    console.log(`[PricebookSync] Updated ${updatedCount}, inserted ${insertedCount} (${packages.length} total from sheet)`);
+    return { updated: updatedCount, inserted: insertedCount, total: packages.length };
+  } catch (error) {
+    console.error('[PricebookSync] Error:', error);
+    return { updated: 0, inserted: 0, total: 0 };
+  }
+}
+
+export function startPricebookAutoSync(intervalMinutes: number = 1): void {
+  if (pricebookAutoSyncInterval) {
+    clearInterval(pricebookAutoSyncInterval);
+  }
+
+  console.log(`[PricebookSync] Starting auto-sync every ${intervalMinutes} minute(s)`);
+  
+  // Run immediately on startup
+  syncPricebookPackages().catch(err => console.error('[PricebookSync] Initial sync error:', err));
+
+  // Then run on interval
+  pricebookAutoSyncInterval = setInterval(() => {
+    syncPricebookPackages().catch(err => console.error('[PricebookSync] Interval sync error:', err));
+  }, intervalMinutes * 60 * 1000);
+}
