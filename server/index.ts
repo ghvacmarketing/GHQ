@@ -140,6 +140,11 @@ app.use((req, res, next) => {
   next();
 });
 
+// Serve attached_assets at /assets path for equipment images
+import path from "path";
+const assetsPath = path.resolve(import.meta.dirname, "..", "attached_assets");
+app.use("/assets", express.static(assetsPath));
+
 (async () => {
   const server = await registerRoutes(app);
 
