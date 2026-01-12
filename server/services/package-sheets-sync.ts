@@ -74,6 +74,21 @@ export class PackageSheetsService {
     return str;
   }
 
+  private async getFirstSheetName(): Promise<string> {
+    const url = `${this.baseUrl}/${this.config.spreadsheetId}?fields=sheets.properties&key=${this.config.apiKey}`;
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error('Failed to get sheet metadata');
+    }
+    
+    const data = await response.json();
+    if (data.sheets && data.sheets.length > 0) {
+      return data.sheets[0].properties.title;
+    }
+    throw new Error('No sheets found in spreadsheet');
+  }
+
   async importPackagesFromSheet(): Promise<SheetHvacPackage[]> {
     if (!this.isConfigured()) {
       console.warn('PackageSheetsService: Not configured, skipping import');
@@ -81,10 +96,12 @@ export class PackageSheetsService {
     }
 
     try {
-      const range = 'HVAC_Packages!A2:S1000';
+      // Always use the "pricebook-export" sheet tab explicitly
+      const sheetName = 'pricebook-export';
+      const range = `${sheetName}!A2:S1000`;
       const url = `${this.baseUrl}/${this.config.spreadsheetId}/values/${range}?key=${this.config.apiKey}`;
       
-      console.log('PackageSheetsService: Fetching HVAC packages from sheet...');
+      console.log(`PackageSheetsService: Fetching HVAC packages from sheet "${sheetName}"...`);
       const response = await fetch(url);
       
       if (!response.ok) {

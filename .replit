@@ -54,6 +54,7 @@ WEATHER_LON = "-82.0105"
 RESEND_API_KEY = "re_QxaFgdBe_BNHzGnvsQfg2gNqKsLHw8BHB"
 RESEND_INBOUND_ADDRESS = "quotes@bronaekaru.resend.app"
 BOUNCIE_REDIRECT_URI = "https://1571a8b3-4ba1-4e05-8e06-fafee9ee64aa-00-135633vc7z2nc.worf.replit.dev/api/bouncie/callback"
+PRICEBOOK_SHEETS_ID = "1lgIiOZ7JiOkzBdY_qXCK0f1LrFi6Bk3TVwy0078O9Ds"
 
 [userenv.development]
 

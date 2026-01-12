@@ -42,6 +42,7 @@ import {
   TrendingUp,
   TrendingDown,
   History,
+  Info,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
@@ -304,7 +305,7 @@ export default function CrmSettingsPackages() {
                 {estimatedCount !== null && (
                   <div className="p-4 bg-slate-50 rounded-lg">
                     <p className="text-sm text-slate-700">
-                      <AlertCircle className="h-4 w-4 inline mr-2 text-slate-500" />
+                      <Info className="h-4 w-4 inline mr-2 text-slate-500" />
                       This adjustment will affect approximately <strong>{estimatedCount}</strong> packages
                     </p>
                   </div>
