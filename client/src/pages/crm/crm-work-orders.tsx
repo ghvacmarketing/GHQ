@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, Link } from "wouter";
 import { cn } from "@/lib/utils";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -200,7 +200,17 @@ const unassignedCategoryConfig: Record<UnassignedCategory, { label: string; desc
 export default function CrmWorkOrders() {
   usePageTitle("Work Orders");
   const [, navigate] = useLocation();
+  const queryClientInstance = useQueryClient();
   const { toast } = useToast();
+
+  // Prefetch work order detail on hover for instant navigation
+  const prefetchWorkOrder = (workOrderId: string) => {
+    queryClientInstance.prefetchQuery({
+      queryKey: [`/api/crm/work-orders/${workOrderId}`],
+      queryFn: getQueryFn({ on401: "throw" }),
+      staleTime: 2 * 60 * 1000, // Cache prefetched data for 2 minutes
+    });
+  };
 
   const [searchInput, setSearchInput] = useState("");
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
@@ -1150,6 +1160,8 @@ export default function CrmWorkOrders() {
                             <Card
                               key={wo.id}
                               className="bg-white border shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                              onMouseEnter={() => prefetchWorkOrder(wo.id)}
+                              onTouchStart={() => prefetchWorkOrder(wo.id)}
                               onClick={() => handleOpenDetail(wo)}
                               data-testid={`card-work-order-${wo.id}`}
                             >
@@ -1204,6 +1216,8 @@ export default function CrmWorkOrders() {
                 <Card
                   key={wo.id}
                   className="bg-white border shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                  onMouseEnter={() => prefetchWorkOrder(wo.id)}
+                  onTouchStart={() => prefetchWorkOrder(wo.id)}
                   onClick={() => handleOpenDetail(wo)}
                   data-testid={`card-work-order-${wo.id}`}
                 >

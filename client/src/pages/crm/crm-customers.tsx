@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -57,6 +57,7 @@ function useDebounce<T>(value: T, delay: number): T {
 export default function CrmCustomers() {
   usePageTitle("Customers");
   const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
   const [searchInput, setSearchInput] = useState("");
   const [customerType, setCustomerType] = useState("all");
   const [statusTab, setStatusTab] = useState("all");
@@ -64,6 +65,15 @@ export default function CrmCustomers() {
   const [page, setPage] = useState(1);
 
   const debouncedSearch = useDebounce(searchInput, 300);
+
+  // Prefetch customer detail on hover for instant navigation
+  const prefetchCustomer = (customerId: string) => {
+    queryClient.prefetchQuery({
+      queryKey: [`/api/crm/customers/${customerId}`],
+      queryFn: getQueryFn({ on401: "throw" }),
+      staleTime: 2 * 60 * 1000, // Cache prefetched data for 2 minutes
+    });
+  };
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -352,6 +362,8 @@ export default function CrmCustomers() {
                       key={customer.id}
                       className="cursor-pointer hover:bg-slate-50 transition-colors"
                       data-testid={`row-customer-${customer.id}`}
+                      onMouseEnter={() => prefetchCustomer(customer.id)}
+                      onTouchStart={() => prefetchCustomer(customer.id)}
                       onClick={() => {
                         navigate(`/crm/customers/${customer.id}`);
                       }}

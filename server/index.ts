@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import compression from "compression";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { runMigrations } from 'stripe-replit-sync';
@@ -7,6 +8,19 @@ import { WebhookHandlers } from "./webhookHandlers";
 import { startBackgroundSyncScheduler } from "./services/quickbooksService";
 
 const app = express();
+
+// Enable gzip compression for all responses
+app.use(compression({
+  filter: (req, res) => {
+    // Don't compress if client doesn't support it
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    // Use compression for all other requests
+    return compression.filter(req, res);
+  },
+  level: 6, // Compression level (1-9, 6 is balanced)
+}));
 
 // Initialize Stripe schema and sync on startup (runs in background)
 async function initStripe() {
