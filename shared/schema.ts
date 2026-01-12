@@ -2925,5 +2925,84 @@ export const insertAppSettingSchema = createInsertSchema(appSettings);
 export type InsertAppSetting = z.infer<typeof insertAppSettingSchema>;
 export type AppSetting = typeof appSettings.$inferSelect;
 
+// Pricebook Packages - HVAC proposal builder packages
+// Stores package data that was previously in pricebook-packages.json
+export const pricebookPackages = pgTable("pricebook_packages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  unitType: varchar("unit_type", { length: 50 }).notNull(), // PHP, GP, SGA, SHP, Mini-Split, Ducting
+  tier: varchar("tier", { length: 50 }).notNull(), // Packaged, Essential, Premium, Ultimate, Standard
+  tonnage: varchar("tonnage", { length: 20 }).notNull(), // 2, 2.5, 3, 3.5, 4, 5
+  packageLevel: varchar("package_level", { length: 50 }).notNull(), // Best, Better, Good, Budget
+  monthlyPayment: integer("monthly_payment").notNull(), // Monthly payment amount (cents)
+  totalInvestment: integer("total_investment").notNull(), // Total price (cents)
+  outdoorBrand: varchar("outdoor_brand", { length: 100 }),
+  outdoorModel: varchar("outdoor_model", { length: 100 }),
+  outdoorName: text("outdoor_name"),
+  coilModel: varchar("coil_model", { length: 100 }),
+  coilName: text("coil_name"),
+  indoorHeatModel: varchar("indoor_heat_model", { length: 100 }),
+  indoorHeatName: text("indoor_heat_name"),
+  thermostatModel: varchar("thermostat_model", { length: 100 }),
+  thermostatName: text("thermostat_name"),
+  accessoryModels: text("accessory_models"),
+  outdoorImageUrl: text("outdoor_image_url"),
+  thermostatImageUrl: text("thermostat_image_url"),
+  furnaceImageUrl: text("furnace_image_url"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPricebookPackageSchema = createInsertSchema(pricebookPackages).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertPricebookPackage = z.infer<typeof insertPricebookPackageSchema>;
+export type PricebookPackage = typeof pricebookPackages.$inferSelect;
+
+// Crawlspace Tiers - Stores crawlspace encapsulation tier pricing
+export const crawlspaceTiers = pgTable("crawlspace_tiers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 50 }).notNull(), // Essential, Premium, Ultimate
+  milThickness: integer("mil_thickness").notNull(), // 10, 12, 20
+  rollPrice: integer("roll_price").notNull(), // Price in cents per roll
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCrawlspaceTierSchema = createInsertSchema(crawlspaceTiers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCrawlspaceTier = z.infer<typeof insertCrawlspaceTierSchema>;
+export type CrawlspaceTier = typeof crawlspaceTiers.$inferSelect;
+
+// Package Price Adjustments - Audit log for bulk price changes
+export const packagePriceAdjustments = pgTable("package_price_adjustments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  adjustmentType: text("adjustment_type").$type<"hvac" | "crawlspace">().notNull(),
+  // For HVAC: can filter by unitType, tier, or apply to all
+  unitTypeFilter: varchar("unit_type_filter", { length: 50 }), // null = all unit types
+  tierFilter: varchar("tier_filter", { length: 50 }), // null = all tiers
+  percentageChange: integer("percentage_change").notNull(), // +5 = 5% increase, -10 = 10% decrease
+  packagesAffected: integer("packages_affected").notNull(),
+  appliedBy: varchar("applied_by", { length: 100 }),
+  appliedAt: timestamp("applied_at").defaultNow(),
+});
+
+export const insertPackagePriceAdjustmentSchema = createInsertSchema(packagePriceAdjustments).omit({
+  id: true,
+  appliedAt: true,
+});
+
+export type InsertPackagePriceAdjustment = z.infer<typeof insertPackagePriceAdjustmentSchema>;
+export type PackagePriceAdjustment = typeof packagePriceAdjustments.$inferSelect;
+
 // Default financing link for install quotes
 export const DEFAULT_FINANCING_LINK = "https://projects.greensky.com/merchantloanapplication?apptype=short&merchant=81087766&dealerplan=2832&channel=External-Button-03";

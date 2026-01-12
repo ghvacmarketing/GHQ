@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, Users, ClipboardList, ChevronRight, Tags, Clock, CreditCard, Wrench, BookOpen, Upload, Truck } from "lucide-react";
+import { Shield, Users, ClipboardList, ChevronRight, Tags, Clock, CreditCard, Wrench, BookOpen, Upload, Truck, Package } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser } from "@shared/schema";
 
@@ -59,6 +59,12 @@ const settingsCategories: SettingsCategory[] = [
         description: "Configure default deposit percentage for payment links",
         href: "/crm/settings/payments",
         icon: CreditCard,
+      },
+      {
+        title: "Package Pricing",
+        description: "Adjust HVAC and Crawlspace package prices by percentage",
+        href: "/crm/settings/packages",
+        icon: Package,
       },
     ],
   },

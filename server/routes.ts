@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
@@ -24037,6 +24037,274 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error: any) {
       console.error("Error running FieldEdge import:", error);
       res.status(500).json({ message: "Failed to import FieldEdge data", error: error.message });
+    }
+  });
+
+  // ===============================
+  // PRICEBOOK API ENDPOINTS
+  // ===============================
+
+  // GET /api/pricebook/packages - List all active pricebook packages
+  app.get("/api/pricebook/packages", requireCrmAuth, async (req, res) => {
+    try {
+      const packages = await db
+        .select()
+        .from(pricebookPackages)
+        .where(eq(pricebookPackages.isActive, true))
+        .orderBy(
+          asc(pricebookPackages.unitType),
+          asc(pricebookPackages.tier),
+          asc(pricebookPackages.tonnage),
+          asc(pricebookPackages.packageLevel)
+        );
+
+      // Convert cents to dollars for response
+      const packagesWithDollars = packages.map(pkg => ({
+        ...pkg,
+        monthlyPayment: (pkg.monthlyPayment / 100).toFixed(2),
+        totalInvestment: (pkg.totalInvestment / 100).toFixed(2),
+      }));
+
+      res.json(packagesWithDollars);
+    } catch (error: any) {
+      console.error("Error fetching pricebook packages:", error);
+      res.status(500).json({ message: "Failed to fetch packages", error: error.message });
+    }
+  });
+
+  // POST /api/pricebook/packages/import - Import packages from JSON
+  app.post("/api/pricebook/packages/import", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const { packages: packagesToImport } = req.body;
+
+      if (!Array.isArray(packagesToImport)) {
+        return res.status(400).json({ message: "packages must be an array" });
+      }
+
+      let imported = 0;
+      let updated = 0;
+
+      for (const pkg of packagesToImport) {
+        // Convert dollar amounts to cents
+        const monthlyPaymentCents = Math.round(parseFloat(pkg.monthlyPayment || "0") * 100);
+        const totalInvestmentCents = Math.round(parseFloat(pkg.totalInvestment || "0") * 100);
+
+        // Check for existing package by unique key
+        const existing = await db
+          .select()
+          .from(pricebookPackages)
+          .where(
+            and(
+              eq(pricebookPackages.unitType, pkg.unitType),
+              eq(pricebookPackages.tier, pkg.tier),
+              eq(pricebookPackages.tonnage, pkg.tonnage),
+              eq(pricebookPackages.packageLevel, pkg.packageLevel),
+              eq(pricebookPackages.outdoorModel, pkg.outdoorModel || "")
+            )
+          )
+          .limit(1);
+
+        if (existing.length > 0) {
+          // Update existing
+          await db
+            .update(pricebookPackages)
+            .set({
+              monthlyPayment: monthlyPaymentCents,
+              totalInvestment: totalInvestmentCents,
+              outdoorBrand: pkg.outdoorBrand || null,
+              outdoorName: pkg.outdoorName || null,
+              coilModel: pkg.coilModel || null,
+              coilName: pkg.coilName || null,
+              indoorHeatModel: pkg.indoorHeatModel || null,
+              indoorHeatName: pkg.indoorHeatName || null,
+              thermostatModel: pkg.thermostatModel || null,
+              thermostatName: pkg.thermostatName || null,
+              accessoryModels: pkg.accessoryModels || null,
+              outdoorImageUrl: pkg.outdoorImageUrl || null,
+              thermostatImageUrl: pkg.thermostatImageUrl || null,
+              furnaceImageUrl: pkg.furnaceImageUrl || null,
+              isActive: true,
+              updatedAt: new Date(),
+            })
+            .where(eq(pricebookPackages.id, existing[0].id));
+          updated++;
+        } else {
+          // Insert new
+          await db.insert(pricebookPackages).values({
+            unitType: pkg.unitType,
+            tier: pkg.tier,
+            tonnage: pkg.tonnage,
+            packageLevel: pkg.packageLevel,
+            monthlyPayment: monthlyPaymentCents,
+            totalInvestment: totalInvestmentCents,
+            outdoorBrand: pkg.outdoorBrand || null,
+            outdoorModel: pkg.outdoorModel || null,
+            outdoorName: pkg.outdoorName || null,
+            coilModel: pkg.coilModel || null,
+            coilName: pkg.coilName || null,
+            indoorHeatModel: pkg.indoorHeatModel || null,
+            indoorHeatName: pkg.indoorHeatName || null,
+            thermostatModel: pkg.thermostatModel || null,
+            thermostatName: pkg.thermostatName || null,
+            accessoryModels: pkg.accessoryModels || null,
+            outdoorImageUrl: pkg.outdoorImageUrl || null,
+            thermostatImageUrl: pkg.thermostatImageUrl || null,
+            furnaceImageUrl: pkg.furnaceImageUrl || null,
+            isActive: true,
+          });
+          imported++;
+        }
+      }
+
+      res.json({ 
+        message: "Import completed", 
+        imported, 
+        updated, 
+        total: packagesToImport.length 
+      });
+    } catch (error: any) {
+      console.error("Error importing pricebook packages:", error);
+      res.status(500).json({ message: "Failed to import packages", error: error.message });
+    }
+  });
+
+  // POST /api/pricebook/packages/adjust-prices - Apply bulk price adjustment
+  app.post("/api/pricebook/packages/adjust-prices", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const { adjustmentType, percentageChange, unitTypeFilter, tierFilter } = req.body;
+
+      if (!adjustmentType || !["hvac", "crawlspace"].includes(adjustmentType)) {
+        return res.status(400).json({ message: "adjustmentType must be 'hvac' or 'crawlspace'" });
+      }
+
+      if (typeof percentageChange !== "number") {
+        return res.status(400).json({ message: "percentageChange must be a number" });
+      }
+
+      const multiplier = 1 + percentageChange / 100;
+      let packagesAffected = 0;
+      const crmUser = getCurrentCrmUser(req);
+
+      if (adjustmentType === "hvac") {
+        // Build where conditions
+        const conditions = [eq(pricebookPackages.isActive, true)];
+        if (unitTypeFilter) {
+          conditions.push(eq(pricebookPackages.unitType, unitTypeFilter));
+        }
+        if (tierFilter) {
+          conditions.push(eq(pricebookPackages.tier, tierFilter));
+        }
+
+        // Get matching packages
+        const matchingPackages = await db
+          .select()
+          .from(pricebookPackages)
+          .where(and(...conditions));
+
+        // Update each package
+        for (const pkg of matchingPackages) {
+          const newMonthlyPayment = Math.round(pkg.monthlyPayment * multiplier);
+          const newTotalInvestment = Math.round(pkg.totalInvestment * multiplier);
+
+          await db
+            .update(pricebookPackages)
+            .set({
+              monthlyPayment: newMonthlyPayment,
+              totalInvestment: newTotalInvestment,
+              updatedAt: new Date(),
+            })
+            .where(eq(pricebookPackages.id, pkg.id));
+        }
+
+        packagesAffected = matchingPackages.length;
+      } else if (adjustmentType === "crawlspace") {
+        // Get matching crawlspace tiers
+        const conditions = [eq(crawlspaceTiers.isActive, true)];
+        
+        const matchingTiers = await db
+          .select()
+          .from(crawlspaceTiers)
+          .where(and(...conditions));
+
+        // Update each tier
+        for (const tier of matchingTiers) {
+          const newRollPrice = Math.round(tier.rollPrice * multiplier);
+
+          await db
+            .update(crawlspaceTiers)
+            .set({
+              rollPrice: newRollPrice,
+              updatedAt: new Date(),
+            })
+            .where(eq(crawlspaceTiers.id, tier.id));
+        }
+
+        packagesAffected = matchingTiers.length;
+      }
+
+      // Record the adjustment
+      await db.insert(packagePriceAdjustments).values({
+        adjustmentType,
+        unitTypeFilter: unitTypeFilter || null,
+        tierFilter: tierFilter || null,
+        percentageChange: Math.round(percentageChange * 100), // Store as basis points
+        packagesAffected,
+        appliedBy: crmUser?.email || "unknown",
+      });
+
+      res.json({
+        message: "Price adjustment applied",
+        adjustmentType,
+        percentageChange,
+        packagesAffected,
+      });
+    } catch (error: any) {
+      console.error("Error adjusting prices:", error);
+      res.status(500).json({ message: "Failed to adjust prices", error: error.message });
+    }
+  });
+
+  // GET /api/pricebook/crawlspace-tiers - List all active crawlspace tiers
+  app.get("/api/pricebook/crawlspace-tiers", requireCrmAuth, async (req, res) => {
+    try {
+      const tiers = await db
+        .select()
+        .from(crawlspaceTiers)
+        .where(eq(crawlspaceTiers.isActive, true))
+        .orderBy(asc(crawlspaceTiers.milThickness));
+
+      // Convert cents to dollars for response
+      const tiersWithDollars = tiers.map(tier => ({
+        ...tier,
+        rollPrice: (tier.rollPrice / 100).toFixed(2),
+      }));
+
+      res.json(tiersWithDollars);
+    } catch (error: any) {
+      console.error("Error fetching crawlspace tiers:", error);
+      res.status(500).json({ message: "Failed to fetch crawlspace tiers", error: error.message });
+    }
+  });
+
+  // GET /api/pricebook/adjustments - List recent price adjustments (last 20)
+  app.get("/api/pricebook/adjustments", requireCrmAuth, async (req, res) => {
+    try {
+      const adjustments = await db
+        .select()
+        .from(packagePriceAdjustments)
+        .orderBy(desc(packagePriceAdjustments.appliedAt))
+        .limit(20);
+
+      // Convert basis points back to percentage for display
+      const adjustmentsFormatted = adjustments.map(adj => ({
+        ...adj,
+        percentageChange: adj.percentageChange / 100,
+      }));
+
+      res.json(adjustmentsFormatted);
+    } catch (error: any) {
+      console.error("Error fetching price adjustments:", error);
+      res.status(500).json({ message: "Failed to fetch adjustments", error: error.message });
     }
   });
 
