@@ -81,6 +81,14 @@ export default function CrmSettingsPackages() {
     enabled: !!currentUser,
   });
 
+  const { data: sheetsStatus, isLoading: sheetsStatusLoading } = useQuery<{
+    configured: boolean;
+    spreadsheetId?: string;
+  }>({
+    queryKey: ["/api/pricebook/sheets/status"],
+    enabled: !!currentUser,
+  });
+
   useEffect(() => {
     if (!authLoading && !currentUser) {
       navigate("/crm/login");
@@ -131,6 +139,32 @@ export default function CrmSettingsPackages() {
     onError: (error: Error) => {
       toast({
         title: "Failed to apply adjustment",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const syncSheetsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/pricebook/sheets/sync");
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to sync from Google Sheets");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/pricebook/packages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pricebook/crawlspace-tiers"] });
+      toast({
+        title: "Sync Completed",
+        description: `Synced ${data.hvacPackages} packages and ${data.crawlspaceTiers} tiers`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Sync Failed",
         description: error.message,
         variant: "destructive",
       });
@@ -412,39 +446,86 @@ export default function CrmSettingsPackages() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="p-4 bg-slate-50 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-slate-700">Status</p>
-                    <p className="text-sm text-slate-500">Not configured</p>
-                  </div>
-                  <Badge variant="outline" className="text-slate-500">
-                    Coming Soon
-                  </Badge>
+              {sheetsStatusLoading ? (
+                <div className="p-4 bg-slate-50 rounded-lg">
+                  <Skeleton className="h-16 w-full" />
                 </div>
-              </div>
+              ) : !sheetsStatus?.configured ? (
+                <>
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-sm text-amber-800">
+                      <AlertCircle className="h-4 w-4 inline mr-2" />
+                      Google Sheets integration is not configured. Set the{" "}
+                      <code className="bg-amber-100 px-2 py-1 rounded font-mono text-xs">
+                        PRICEBOOK_SHEETS_ID
+                      </code>{" "}
+                      environment variable to enable syncing.
+                    </p>
+                  </div>
+                  <p className="text-sm text-slate-500">
+                    Google Sheets integration allows you to manage package prices in a spreadsheet
+                    and sync them with the system automatically.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="p-4 bg-slate-50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-slate-700">Status</p>
+                        <p className="text-sm text-slate-600">
+                          Configured{" "}
+                          <span className="text-slate-500">
+                            (ID: {sheetsStatus.spreadsheetId?.slice(0, 8)}...)
+                          </span>
+                        </p>
+                      </div>
+                      <Badge className="bg-green-100 text-green-700">Connected</Badge>
+                    </div>
+                  </div>
 
-              <div className="flex items-center gap-3">
-                <Button variant="outline" disabled data-testid="button-sync-sheet">
-                  <FileSpreadsheet className="h-4 w-4 mr-2" />
-                  Sync from Sheet
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled
-                  className="text-slate-500"
-                  data-testid="button-open-sheet"
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Open Google Sheet
-                </Button>
-              </div>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => syncSheetsMutation.mutate()}
+                      disabled={syncSheetsMutation.isPending}
+                      data-testid="button-sync-sheet"
+                    >
+                      {syncSheetsMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Syncing...
+                        </>
+                      ) : (
+                        <>
+                          <FileSpreadsheet className="h-4 w-4 mr-2" />
+                          Sync from Sheet
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        window.open(
+                          `https://docs.google.com/spreadsheets/d/${sheetsStatus.spreadsheetId}`,
+                          "_blank"
+                        )
+                      }
+                      className="text-slate-600 hover:text-slate-900"
+                      data-testid="button-open-sheet"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Open Google Sheet
+                    </Button>
+                  </div>
 
-              <p className="text-sm text-slate-500">
-                Google Sheets integration will allow you to manage package prices in a spreadsheet
-                and sync them with the system automatically.
-              </p>
+                  <p className="text-sm text-slate-500">
+                    Click "Sync from Sheet" to import the latest package prices and crawlspace
+                    tiers from your configured Google Sheet.
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
