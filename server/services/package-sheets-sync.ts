@@ -20,6 +20,9 @@ export interface SheetHvacPackage {
   thermostatModel?: string;
   thermostatName?: string;
   accessoryModels?: string;
+  outdoorImageUrl?: string;
+  thermostatImageUrl?: string;
+  furnaceImageUrl?: string;
 }
 
 export interface SheetCrawlspaceTier {
@@ -78,8 +81,7 @@ export class PackageSheetsService {
     }
 
     try {
-      // Only columns A-P (no image columns) - use Sheet1 as default tab name
-      const range = 'Sheet1!A2:P1000';
+      const range = 'HVAC_Packages!A2:S1000';
       const url = `${this.baseUrl}/${this.config.spreadsheetId}/values/${range}?key=${this.config.apiKey}`;
       
       console.log('PackageSheetsService: Fetching HVAC packages from sheet...');
@@ -96,7 +98,6 @@ export class PackageSheetsService {
       console.log(`PackageSheetsService: Found ${rows.length} rows in HVAC_Packages sheet`);
       
       const packages: SheetHvacPackage[] = [];
-      const allowedUnitTypes = ["GP", "SHP", "SGA", "PHP"];
       
       for (const row of rows) {
         const unitType = (row[0] || '').toString().trim();
@@ -104,11 +105,7 @@ export class PackageSheetsService {
         const tonnage = (row[2] || '').toString().trim();
         const packageLevel = (row[3] || '').toString().trim();
         
-        // Skip if missing required fields or not an allowed unit type
         if (!unitType || !tier || !tonnage || !packageLevel) {
-          continue;
-        }
-        if (!allowedUnitTypes.includes(unitType)) {
           continue;
         }
         
@@ -129,6 +126,9 @@ export class PackageSheetsService {
           thermostatModel: (row[13] || '').toString().trim() || undefined,
           thermostatName: (row[14] || '').toString().trim() || undefined,
           accessoryModels: (row[15] || '').toString().trim() || undefined,
+          outdoorImageUrl: this.parseImageUrl(row[16]),
+          thermostatImageUrl: this.parseImageUrl(row[17]),
+          furnaceImageUrl: this.parseImageUrl(row[18]),
         });
       }
       

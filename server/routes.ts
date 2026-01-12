@@ -24076,17 +24076,11 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // GET /api/pricebook/packages/export - Export HVAC packages as CSV for Google Sheets
   app.get("/api/pricebook/packages/export", requireCrmSalesOrAbove, async (req, res) => {
     try {
-      // Fetch HVAC packages - only GP, SHP, SGA, PHP unit types
-      const allowedUnitTypes = ["GP", "SHP", "SGA", "PHP"];
+      // Fetch all HVAC packages
       const hvacPackages = await db
         .select()
         .from(pricebookPackages)
-        .where(
-          and(
-            eq(pricebookPackages.isActive, true),
-            inArray(pricebookPackages.unitType, allowedUnitTypes)
-          )
-        )
+        .where(eq(pricebookPackages.isActive, true))
         .orderBy(
           asc(pricebookPackages.unitType),
           asc(pricebookPackages.tier),
@@ -24094,16 +24088,20 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           asc(pricebookPackages.packageLevel)
         );
 
-      // CSV headers (no image columns)
+      // CSV headers for HVAC packages (matching Google Sheets import format)
       const headers = [
         "unitType", "tier", "tonnage", "packageLevel", "monthlyPayment", "totalInvestment",
         "outdoorBrand", "outdoorModel", "outdoorName", "coilModel", "coilName",
         "indoorHeatModel", "indoorHeatName", "thermostatModel", "thermostatName",
-        "accessoryModels"
+        "accessoryModels", "outdoorImageUrl", "thermostatImageUrl", "furnaceImageUrl"
       ];
 
-      // Build CSV rows (no image columns)
+      // Build CSV rows with Google Sheets IMAGE() formula for image columns
       const rows = hvacPackages.map(pkg => {
+        const outdoorImg = pkg.outdoorImageUrl ? `=IMAGE("${pkg.outdoorImageUrl}")` : "";
+        const thermostatImg = pkg.thermostatImageUrl ? `=IMAGE("${pkg.thermostatImageUrl}")` : "";
+        const furnaceImg = pkg.furnaceImageUrl ? `=IMAGE("${pkg.furnaceImageUrl}")` : "";
+
         return [
           pkg.unitType,
           pkg.tier,
@@ -24120,7 +24118,10 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           pkg.indoorHeatName || "",
           pkg.thermostatModel || "",
           pkg.thermostatName || "",
-          pkg.accessoryModels || ""
+          pkg.accessoryModels || "",
+          outdoorImg,
+          thermostatImg,
+          furnaceImg
         ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(",");
       });
 
@@ -24399,49 +24400,16 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       let hvacPackagesCount = 0;
 
-      // Import HVAC packages - upsert to preserve images and only update changed data
-      let updatedCount = 0;
-      let insertedCount = 0;
+      // Import HVAC packages
       try {
         const packages = await packageSheetsService.importPackagesFromSheet();
         
-        for (const pkg of packages) {
-          // Look for existing package by unique key
-          const existing = await db
-            .select()
-            .from(pricebookPackages)
-            .where(
-              and(
-                eq(pricebookPackages.unitType, pkg.unitType),
-                eq(pricebookPackages.tier, pkg.tier),
-                eq(pricebookPackages.tonnage, pkg.tonnage),
-                eq(pricebookPackages.packageLevel, pkg.packageLevel)
-              )
-            )
-            .limit(1);
+        if (packages.length > 0) {
+          // Delete all existing packages and insert fresh data
+          await db.delete(pricebookPackages);
           
-          if (existing.length > 0) {
-            // Update existing - preserve image URLs
-            await db
-              .update(pricebookPackages)
-              .set({
-                monthlyPayment: pkg.monthlyPayment,
-                totalInvestment: pkg.totalInvestment,
-                outdoorBrand: pkg.outdoorBrand || existing[0].outdoorBrand,
-                outdoorModel: pkg.outdoorModel || existing[0].outdoorModel,
-                outdoorName: pkg.outdoorName || existing[0].outdoorName,
-                coilModel: pkg.coilModel || existing[0].coilModel,
-                coilName: pkg.coilName || existing[0].coilName,
-                indoorHeatModel: pkg.indoorHeatModel || existing[0].indoorHeatModel,
-                indoorHeatName: pkg.indoorHeatName || existing[0].indoorHeatName,
-                thermostatModel: pkg.thermostatModel || existing[0].thermostatModel,
-                thermostatName: pkg.thermostatName || existing[0].thermostatName,
-                accessoryModels: pkg.accessoryModels || existing[0].accessoryModels,
-              })
-              .where(eq(pricebookPackages.id, existing[0].id));
-            updatedCount++;
-          } else {
-            // Insert new package
+          // Insert all packages
+          for (const pkg of packages) {
             await db.insert(pricebookPackages).values({
               unitType: pkg.unitType,
               tier: pkg.tier,
@@ -24459,14 +24427,16 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
               thermostatModel: pkg.thermostatModel || null,
               thermostatName: pkg.thermostatName || null,
               accessoryModels: pkg.accessoryModels || null,
+              outdoorImageUrl: pkg.outdoorImageUrl || null,
+              thermostatImageUrl: pkg.thermostatImageUrl || null,
+              furnaceImageUrl: pkg.furnaceImageUrl || null,
               isActive: true,
             });
-            insertedCount++;
           }
+          
+          hvacPackagesCount = packages.length;
+          console.log(`Pricebook sync: Imported ${hvacPackagesCount} HVAC packages`);
         }
-        
-        hvacPackagesCount = updatedCount + insertedCount;
-        console.log(`Pricebook sync: Updated ${updatedCount}, Inserted ${insertedCount} HVAC packages`);
       } catch (error: any) {
         console.error("Error syncing HVAC packages:", error);
       }
@@ -24485,8 +24455,6 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       res.json({
         message: "Pricebook sync completed",
         hvacPackages: hvacPackagesCount,
-        updated: updatedCount,
-        inserted: insertedCount,
       });
     } catch (error: any) {
       console.error("Error during pricebook sheets sync:", error);
