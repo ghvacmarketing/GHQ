@@ -13577,7 +13577,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/crm/invoices - List invoices with filters and pagination (OPTIMIZED)
   app.get("/api/crm/invoices", requireCrmAuth, async (req, res) => {
     try {
-      const { customerId, status, workOrderId, projectId, agreementId, page = "1", limit = "25" } = req.query;
+      const { customerId, status, workOrderId, projectId, agreementId, source, page = "1", limit = "25" } = req.query;
       const pageNum = parseInt(page as string, 10) || 1;
       const limitNum = Math.min(50, parseInt(limit as string, 10) || 25);
       const offset = (pageNum - 1) * limitNum;
@@ -13597,6 +13597,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (agreementId) {
         conditions.push(eq(crmInvoices.agreementId, agreementId as string));
+      }
+      // Filter by source: "crm" = created in CRM, "imported" = historical/imported
+      if (source === "crm") {
+        conditions.push(eq(crmInvoices.isHistorical, false));
+      } else if (source === "imported") {
+        conditions.push(eq(crmInvoices.isHistorical, true));
       }
       
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

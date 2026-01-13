@@ -109,6 +109,7 @@ export default function CrmInvoices() {
   const { toast } = useToast();
   const [searchInput, setSearchInput] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState("all"); // "all", "crm", "imported"
   const [page, setPage] = useState(1);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
@@ -140,15 +141,16 @@ export default function CrmInvoices() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusFilter]);
+  }, [debouncedSearch, statusFilter, sourceFilter]);
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
     if (statusFilter !== "all") params.set("status", statusFilter);
+    if (sourceFilter !== "all") params.set("source", sourceFilter);
     params.set("page", page.toString());
     params.set("limit", ITEMS_PER_PAGE.toString());
     return params.toString();
-  }, [statusFilter, page]);
+  }, [statusFilter, sourceFilter, page]);
 
   const { data: invoicesResponse, isLoading: invoicesLoading } = useQuery<{ invoices: InvoiceWithRelations[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>({
     queryKey: ["/api/crm/invoices", queryParams],
@@ -599,15 +601,27 @@ export default function CrmInvoices() {
             </h1>
             <p className="text-sm text-slate-500">Total: {totalInvoices.toLocaleString()}</p>
           </div>
-          <Button 
-            size="sm" 
-            className="bg-[#711419] hover:bg-[#5a1014] text-white" 
-            onClick={() => navigate("/crm/invoices/new")}
-            data-testid="button-create-invoice"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            New Invoice
-          </Button>
+          <div className="flex items-center gap-3">
+            <Select value={sourceFilter} onValueChange={setSourceFilter}>
+              <SelectTrigger className="w-[160px] h-9">
+                <SelectValue placeholder="Source" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Sources</SelectItem>
+                <SelectItem value="crm">CRM Created</SelectItem>
+                <SelectItem value="imported">Imported</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button 
+              size="sm" 
+              className="bg-[#711419] hover:bg-[#5a1014] text-white" 
+              onClick={() => navigate("/crm/invoices/new")}
+              data-testid="button-create-invoice"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New Invoice
+            </Button>
+          </div>
         </div>
 
         {/* Tabs styled like projects page - underline style */}
