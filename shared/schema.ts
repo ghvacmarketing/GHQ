@@ -2615,6 +2615,8 @@ export const smsNotificationTypeEnum = [
   "work_order_on_site",
   "invoice_sms",
   "review_request",
+  "quote_sent",
+  "invoice_sent",
 ] as const;
 export type SmsNotificationType = typeof smsNotificationTypeEnum[number];
 
@@ -2627,6 +2629,7 @@ export const smsNotificationLog = pgTable("sms_notification_log", {
   maintenanceVisitId: varchar("maintenance_visit_id").references(() => maintenanceVisits.id, { onDelete: "cascade" }),
   workOrderId: varchar("work_order_id").references(() => crmWorkOrders.id, { onDelete: "cascade" }),
   invoiceId: varchar("invoice_id").references(() => crmInvoices.id, { onDelete: "cascade" }),
+  quoteId: varchar("quote_id").references(() => crmQuotes.id, { onDelete: "cascade" }),
   // Message tracking
   messageId: varchar("message_id"), // External message ID from Textline
   conversationId: varchar("conversation_id").references(() => crmMessagingConversations.id),

@@ -9,6 +9,8 @@ const DEFAULT_TEMPLATES: Record<string, string> = {
   sms_template_work_order_en_route: "Your GHVAC technician is on the way! They should arrive shortly.",
   sms_template_work_order_on_site: "Your GHVAC technician has arrived and is ready to help!",
   sms_template_invoice: "Your invoice #{invoiceNumber} is ready. Pay online: {paymentLink} - GHVAC",
+  sms_template_quote: "Hi {customerName}! Your quote #{quoteNumber} for {totalAmount} is ready. View it here: {viewLink} - GHVAC",
+  sms_template_invoice_send: "Hi {customerName}! Your invoice #{invoiceNumber} for {amount} is ready. Pay here: {paymentLink} - GHVAC",
 };
 
 const templateCache: Map<string, { value: string; timestamp: number }> = new Map();
@@ -66,6 +68,7 @@ export interface SendAutomatedSmsParams {
   maintenanceVisitId?: string;
   workOrderId?: string;
   invoiceId?: string;
+  quoteId?: string;
 }
 
 export interface SendAutomatedSmsResult {
@@ -84,6 +87,7 @@ export async function sendAutomatedSms(params: SendAutomatedSmsParams): Promise<
     maintenanceVisitId,
     workOrderId,
     invoiceId,
+    quoteId,
   } = params;
 
   try {
@@ -123,6 +127,7 @@ export async function sendAutomatedSms(params: SendAutomatedSmsParams): Promise<
         maintenanceVisitId,
         workOrderId,
         invoiceId,
+        quoteId,
         conversationId: conversation.id,
         phoneNumber,
         messageBody,
@@ -161,6 +166,7 @@ export async function sendAutomatedSms(params: SendAutomatedSmsParams): Promise<
       maintenanceVisitId,
       workOrderId,
       invoiceId,
+      quoteId,
       messageId: sendResult.externalMessageId,
       conversationId: conversation.id,
       phoneNumber,
@@ -184,6 +190,7 @@ export async function sendAutomatedSms(params: SendAutomatedSmsParams): Promise<
         maintenanceVisitId,
         workOrderId,
         invoiceId,
+        quoteId,
         phoneNumber,
         messageBody,
         status: "failed",
