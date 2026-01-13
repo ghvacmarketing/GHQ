@@ -1289,10 +1289,10 @@ export default function CrmProposalBuilder() {
         const price = item.eliteData ? item.eliteData.finalTotal : parseFloat(item.totalInvestment) || 0;
         // Build equipment images JSON for display in public quote view
         const equipmentImages: Record<string, string> = {};
-        if (item.outdoorImageUrl) equipmentImages.outdoor = `/assets/${item.outdoorImageUrl}`;
-        if (item.thermostatImageUrl) equipmentImages.thermostat = `/assets/${item.thermostatImageUrl}`;
-        if (item.coilImageUrl) equipmentImages.coil = `/assets/${item.coilImageUrl}`;
-        if (item.furnaceImageUrl) equipmentImages.furnace = `/assets/${item.furnaceImageUrl}`;
+        if (item.outdoorImageUrl) equipmentImages.outdoor = item.outdoorImageUrl;
+        if (item.thermostatImageUrl) equipmentImages.thermostat = item.thermostatImageUrl;
+        if (item.coilImageUrl) equipmentImages.coil = item.coilImageUrl;
+        if (item.furnaceImageUrl) equipmentImages.furnace = item.furnaceImageUrl;
         
         // For options mode, create unique option tags that include tonnage to distinguish multiple systems
         // e.g., "Best - 2.5 Ton" instead of just "Best" when there are multiple systems
@@ -1321,10 +1321,10 @@ export default function CrmProposalBuilder() {
         const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
         // Build equipment images JSON for custom builds
         const equipmentImages: Record<string, string> = {};
-        if (item.outdoorUnit?.imageUrl) equipmentImages.outdoor = `/assets/${item.outdoorUnit.imageUrl}`;
-        if (item.thermostat?.imageUrl) equipmentImages.thermostat = `/assets/${item.thermostat.imageUrl}`;
-        if (item.coil?.imageUrl) equipmentImages.coil = `/assets/${item.coil.imageUrl}`;
-        if (item.indoorUnit?.imageUrl) equipmentImages.furnace = `/assets/${item.indoorUnit.imageUrl}`;
+        if (item.outdoorUnit?.imageUrl) equipmentImages.outdoor = item.outdoorUnit.imageUrl;
+        if (item.thermostat?.imageUrl) equipmentImages.thermostat = item.thermostat.imageUrl;
+        if (item.coil?.imageUrl) equipmentImages.coil = item.coil.imageUrl;
+        if (item.indoorUnit?.imageUrl) equipmentImages.furnace = item.indoorUnit.imageUrl;
         
         lineItems.push({
           description: `Custom Build - ${item.tonnage} System`,
