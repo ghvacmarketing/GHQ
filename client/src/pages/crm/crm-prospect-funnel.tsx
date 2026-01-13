@@ -695,25 +695,29 @@ export default function CrmProspectFunnel() {
     },
   });
 
-  const deleteProspectMutation = useMutation({
+  const removeFromFunnelMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await apiRequest("DELETE", `/api/crm/customers/${id}`);
+      const res = await apiRequest("PATCH", `/api/crm/customers/${id}`, {
+        salesStage: null,
+        interestLevel: null,
+        customerStatus: "client",
+      });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects/metrics"] });
-      toast({ title: "Prospect deleted successfully" });
+      toast({ title: "Removed from lead funnel" });
       setExpandedProspectId(null);
     },
     onError: (error: Error) => {
-      toast({ title: "Failed to delete prospect", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to remove from funnel", description: error.message, variant: "destructive" });
     },
   });
 
-  const handleDeleteProspect = () => {
+  const handleRemoveFromFunnel = () => {
     if (confirmProspectId) {
-      deleteProspectMutation.mutate(confirmProspectId);
+      removeFromFunnelMutation.mutate(confirmProspectId);
       setDeleteConfirmOpen(false);
       setConfirmProspectId(null);
     }
@@ -998,7 +1002,7 @@ export default function CrmProspectFunnel() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">
-                Prospect Funnel
+                Lead Funnel
               </h1>
               <p className="text-sm text-slate-500">
                 Track prospects through your sales pipeline
@@ -1893,16 +1897,16 @@ export default function CrmProspectFunnel() {
 
                       <div className="pt-4 border-t">
                         <Button 
-                          variant="destructive"
+                          variant="outline"
                           className="w-full"
                           onClick={() => {
                             setConfirmProspectId(expandedProspect.id);
                             setDeleteConfirmOpen(true);
                           }}
-                          data-testid="button-delete-prospect"
+                          data-testid="button-remove-from-funnel"
                         >
                           <X className="h-4 w-4 mr-2" />
-                          Delete Prospect
+                          Remove from Funnel
                         </Button>
                       </div>
                     </TabsContent>
@@ -2096,15 +2100,15 @@ export default function CrmProspectFunnel() {
         <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete Prospect?</AlertDialogTitle>
+              <AlertDialogTitle>Remove from Lead Funnel?</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to permanently delete this prospect? This action cannot be undone.
+                This will remove the customer from the lead funnel. The customer record will remain in the system and can be added back to the funnel later.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => setConfirmProspectId(null)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteProspect} className="bg-red-600 hover:bg-red-700">
-                Delete
+              <AlertDialogAction onClick={handleRemoveFromFunnel}>
+                Remove from Funnel
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

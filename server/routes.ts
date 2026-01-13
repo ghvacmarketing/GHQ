@@ -6356,7 +6356,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (existingCrmCustomer) {
         // Check if converting to prospect and already a prospect
         if (customerStatus === "prospect" && existingCrmCustomer.customerStatus === "prospect") {
-          return res.status(400).json({ message: "This customer is already in the prospect funnel" });
+          return res.status(400).json({ message: "This customer is already in the lead funnel" });
         }
 
         const updateData: any = {};
@@ -6396,7 +6396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (existingLegacy) {
         // Check if converting to prospect and already a prospect
         if (customerStatus === "prospect" && existingLegacy.customerStatus === "prospect") {
-          return res.status(400).json({ message: "This customer is already in the prospect funnel" });
+          return res.status(400).json({ message: "This customer is already in the lead funnel" });
         }
 
         const updateData: any = {};

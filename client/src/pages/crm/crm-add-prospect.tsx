@@ -169,7 +169,7 @@ export default function CrmAddProspect() {
       return;
     }
     if (isAlreadyProspect) {
-      toast({ title: "This customer is already in the prospect funnel", variant: "destructive" });
+      toast({ title: "This customer is already in the lead funnel", variant: "destructive" });
       return;
     }
     if (!potentialValue) {
@@ -353,7 +353,7 @@ export default function CrmAddProspect() {
                     <Alert variant="destructive" className="border-amber-500 bg-amber-50 text-amber-800">
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>
-                        This customer is already in the prospect funnel. You cannot convert them again.
+                        This customer is already in the lead funnel. You cannot convert them again.
                       </AlertDescription>
                     </Alert>
                   )}
