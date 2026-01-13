@@ -18,7 +18,8 @@ import {
   CheckCircle,
   XCircle,
   Mail,
-  Monitor
+  Monitor,
+  MessageSquare
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Sheet,
   SheetContent,
@@ -72,6 +74,9 @@ export default function MobileQuoteDetail() {
   const [showPreview, setShowPreview] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [emailRecipient, setEmailRecipient] = useState("");
+  const [sendViaEmail, setSendViaEmail] = useState(true);
+  const [sendViaSms, setSendViaSms] = useState(false);
+  const [phoneRecipient, setPhoneRecipient] = useState("");
 
   const { data: quote, isLoading, error } = useQuery<QuoteWithLineItems>({
     queryKey: ["/api/crm/quotes", id],
@@ -84,40 +89,61 @@ export default function MobileQuoteDetail() {
   });
 
   const sendQuoteEmailMutation = useMutation({
-    mutationFn: async (recipientEmail: string) => {
-      const response = await apiRequest("POST", `/api/crm/quotes/${id}/send-email`, {
-        recipientEmail,
-      });
+    mutationFn: async (data: { recipientEmail?: string; recipientPhone?: string; sendEmail: boolean; sendSms: boolean }) => {
+      const response = await apiRequest("POST", `/api/crm/quotes/${id}/send-email`, data);
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        throw new Error(error.message || error.error || "Failed to send quote email");
+        throw new Error(error.message || error.error || "Failed to send quote");
       }
       return response.json();
     },
-    onSuccess: () => {
-      toast({ title: "Email Sent", description: "Quote email has been sent successfully." });
+    onSuccess: (_, variables) => {
+      const methods = [];
+      if (variables.sendEmail) methods.push("email");
+      if (variables.sendSms) methods.push("SMS");
+      const methodText = methods.join(" and ");
+      toast({ title: "Quote Sent", description: `Quote has been sent via ${methodText} successfully.` });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       setShowEmailDialog(false);
       setEmailRecipient("");
+      setPhoneRecipient("");
+      setSendViaEmail(true);
+      setSendViaSms(false);
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error.message || "Failed to send quote email", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to send quote", variant: "destructive" });
     },
   });
 
   const openEmailDialog = () => {
     setEmailRecipient(quote?.customerEmail || "");
+    setPhoneRecipient(quote?.customerPhone || (quote as any)?.customer?.phone || "");
+    setSendViaEmail(true);
+    setSendViaSms(false);
     setShowEmailDialog(true);
   };
 
   const handleSendEmail = () => {
-    if (!emailRecipient.trim()) {
+    if (!sendViaEmail && !sendViaSms) {
+      toast({ title: "Error", description: "Please select at least one sending method.", variant: "destructive" });
+      return;
+    }
+    if (sendViaEmail && !emailRecipient.trim()) {
       toast({ title: "Error", description: "Please enter a recipient email address.", variant: "destructive" });
       return;
     }
-    sendQuoteEmailMutation.mutate(emailRecipient.trim());
+    if (sendViaSms && !phoneRecipient.trim()) {
+      toast({ title: "Error", description: "Please enter a recipient phone number.", variant: "destructive" });
+      return;
+    }
+    sendQuoteEmailMutation.mutate({
+      recipientEmail: sendViaEmail ? emailRecipient.trim() : undefined,
+      recipientPhone: sendViaSms ? phoneRecipient.trim() : undefined,
+      sendEmail: sendViaEmail,
+      sendSms: sendViaSms,
+    });
   };
 
   const acceptMutation = useMutation({
@@ -690,35 +716,77 @@ export default function MobileQuoteDetail() {
         </SheetContent>
       </Sheet>
 
-      {/* Send Quote Email Dialog */}
-      <Dialog open={showEmailDialog} onOpenChange={(open) => { if (!open) { setShowEmailDialog(false); setEmailRecipient(""); } }}>
+      {/* Send Quote Dialog */}
+      <Dialog open={showEmailDialog} onOpenChange={(open) => { if (!open) { setShowEmailDialog(false); setEmailRecipient(""); setPhoneRecipient(""); setSendViaEmail(true); setSendViaSms(false); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Send Quote Email</DialogTitle>
+            <DialogTitle>Send Quote</DialogTitle>
             <DialogDescription>
-              Enter the email address where you want to send this quote.
+              Choose how you want to send this quote to the customer.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="email-recipient" className="text-sm font-medium">
-                Recipient Email
-              </Label>
-              <Input
-                id="email-recipient"
-                type="email"
-                placeholder="customer@example.com"
-                value={emailRecipient}
-                onChange={(e) => setEmailRecipient(e.target.value)}
-                className="min-h-[44px] mt-1"
-                data-testid="input-quote-email-recipient"
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="send-via-email"
+                checked={sendViaEmail}
+                onCheckedChange={(checked) => setSendViaEmail(checked === true)}
+                data-testid="checkbox-send-via-email"
               />
+              <Label htmlFor="send-via-email" className="text-sm font-medium flex items-center gap-2 cursor-pointer">
+                <Mail className="h-4 w-4" />
+                Send via Email
+              </Label>
             </div>
+            {sendViaEmail && (
+              <div className="ml-6">
+                <Label htmlFor="email-recipient" className="text-sm font-medium">
+                  Recipient Email
+                </Label>
+                <Input
+                  id="email-recipient"
+                  type="email"
+                  placeholder="customer@example.com"
+                  value={emailRecipient}
+                  onChange={(e) => setEmailRecipient(e.target.value)}
+                  className="min-h-[44px] mt-1"
+                  data-testid="input-quote-email-recipient"
+                />
+              </div>
+            )}
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="send-via-sms"
+                checked={sendViaSms}
+                onCheckedChange={(checked) => setSendViaSms(checked === true)}
+                data-testid="checkbox-send-via-sms"
+              />
+              <Label htmlFor="send-via-sms" className="text-sm font-medium flex items-center gap-2 cursor-pointer">
+                <MessageSquare className="h-4 w-4" />
+                Send via SMS
+              </Label>
+            </div>
+            {sendViaSms && (
+              <div className="ml-6">
+                <Label htmlFor="phone-recipient" className="text-sm font-medium">
+                  Recipient Phone
+                </Label>
+                <Input
+                  id="phone-recipient"
+                  type="tel"
+                  placeholder="(555) 123-4567"
+                  value={phoneRecipient}
+                  onChange={(e) => setPhoneRecipient(e.target.value)}
+                  className="min-h-[44px] mt-1"
+                  data-testid="input-quote-phone-recipient"
+                />
+              </div>
+            )}
           </div>
           <DialogFooter className="flex gap-2">
             <Button 
               variant="outline" 
-              onClick={() => { setShowEmailDialog(false); setEmailRecipient(""); }}
+              onClick={() => { setShowEmailDialog(false); setEmailRecipient(""); setPhoneRecipient(""); setSendViaEmail(true); setSendViaSms(false); }}
               className="min-h-[44px]"
             >
               Cancel
@@ -726,8 +794,8 @@ export default function MobileQuoteDetail() {
             <Button 
               className="bg-blue-600 hover:bg-blue-700 min-h-[44px]"
               onClick={handleSendEmail}
-              disabled={sendQuoteEmailMutation.isPending || !emailRecipient.trim()}
-              data-testid="button-confirm-send-quote-email"
+              disabled={sendQuoteEmailMutation.isPending || (!sendViaEmail && !sendViaSms) || (sendViaEmail && !emailRecipient.trim()) || (sendViaSms && !phoneRecipient.trim())}
+              data-testid="button-confirm-send-quote"
             >
               {sendQuoteEmailMutation.isPending ? (
                 <>
@@ -736,8 +804,8 @@ export default function MobileQuoteDetail() {
                 </>
               ) : (
                 <>
-                  <Mail className="h-4 w-4 mr-2" />
-                  Send Email
+                  <Send className="h-4 w-4 mr-2" />
+                  {sendViaEmail && sendViaSms ? "Send Both" : sendViaSms ? "Send SMS" : "Send Email"}
                 </>
               )}
             </Button>

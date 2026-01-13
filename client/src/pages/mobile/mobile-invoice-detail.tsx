@@ -18,7 +18,8 @@ import {
   Download,
   Eye,
   Ban,
-  Mail
+  Mail,
+  MessageSquare
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import MobileShell from "./mobile-shell";
@@ -95,6 +97,9 @@ export default function MobileInvoiceDetail() {
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [emailRecipient, setEmailRecipient] = useState("");
   const [isGeneratingPaymentLink, setIsGeneratingPaymentLink] = useState(false);
+  const [sendViaEmail, setSendViaEmail] = useState(true);
+  const [sendViaSms, setSendViaSms] = useState(false);
+  const [phoneRecipient, setPhoneRecipient] = useState("");
 
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -117,41 +122,63 @@ export default function MobileInvoiceDetail() {
   });
 
   const sendInvoiceEmailMutation = useMutation({
-    mutationFn: async (recipientEmail: string) => {
-      const response = await apiRequest("POST", `/api/crm/invoices/${id}/send-email`, {
-        recipientEmail,
-      });
+    mutationFn: async (data: { recipientEmail?: string; recipientPhone?: string; sendEmail: boolean; sendSms: boolean }) => {
+      const response = await apiRequest("POST", `/api/crm/invoices/${id}/send-email`, data);
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        throw new Error(error.message || error.error || "Failed to send invoice email");
+        throw new Error(error.message || error.error || "Failed to send invoice");
       }
       return response.json();
     },
-    onSuccess: () => {
-      toast({ title: "Email Sent", description: "Invoice email has been sent successfully." });
+    onSuccess: (_, variables) => {
+      const methods = [];
+      if (variables.sendEmail) methods.push("email");
+      if (variables.sendSms) methods.push("SMS");
+      const methodText = methods.join(" and ");
+      toast({ title: "Invoice Sent", description: `Invoice has been sent via ${methodText} successfully.` });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       setShowEmailDialog(false);
       setEmailRecipient("");
+      setPhoneRecipient("");
+      setSendViaEmail(true);
+      setSendViaSms(false);
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error.message || "Failed to send invoice email", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to send invoice", variant: "destructive" });
     },
   });
 
   const openEmailDialog = () => {
-    const customerEmail = invoice?.customer?.email || invoice?.customerEmail || "";
+    const customerEmail = invoice?.customer?.email || "";
+    const customerPhone = invoice?.customer?.phone || "";
     setEmailRecipient(customerEmail);
+    setPhoneRecipient(customerPhone);
+    setSendViaEmail(true);
+    setSendViaSms(false);
     setShowEmailDialog(true);
   };
 
   const handleSendEmail = () => {
-    if (!emailRecipient.trim()) {
+    if (!sendViaEmail && !sendViaSms) {
+      toast({ title: "Error", description: "Please select at least one delivery method.", variant: "destructive" });
+      return;
+    }
+    if (sendViaEmail && !emailRecipient.trim()) {
       toast({ title: "Error", description: "Please enter a recipient email address.", variant: "destructive" });
       return;
     }
-    sendInvoiceEmailMutation.mutate(emailRecipient.trim());
+    if (sendViaSms && !phoneRecipient.trim()) {
+      toast({ title: "Error", description: "Please enter a recipient phone number.", variant: "destructive" });
+      return;
+    }
+    sendInvoiceEmailMutation.mutate({
+      recipientEmail: sendViaEmail ? emailRecipient.trim() : undefined,
+      recipientPhone: sendViaSms ? phoneRecipient.trim() : undefined,
+      sendEmail: sendViaEmail,
+      sendSms: sendViaSms,
+    });
   };
 
   const recordPaymentMutation = useMutation({
@@ -736,9 +763,9 @@ export default function MobileInvoiceDetail() {
               {sendInvoiceEmailMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : (
-                <Mail className="h-4 w-4 mr-2" />
+                <Send className="h-4 w-4 mr-2" />
               )}
-              Send Email
+              Send Invoice
             </Button>
           )}
 
@@ -996,35 +1023,78 @@ export default function MobileInvoiceDetail() {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Send Invoice Email Dialog */}
-        <Dialog open={showEmailDialog} onOpenChange={(open) => { if (!open) { setShowEmailDialog(false); setEmailRecipient(""); } }}>
+        {/* Send Invoice Dialog */}
+        <Dialog open={showEmailDialog} onOpenChange={(open) => { if (!open) { setShowEmailDialog(false); setEmailRecipient(""); setPhoneRecipient(""); setSendViaEmail(true); setSendViaSms(false); } }}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Send Invoice Email</DialogTitle>
+              <DialogTitle>Send Invoice</DialogTitle>
               <DialogDescription>
-                Enter the email address where you want to send this invoice.
+                Choose how you want to send this invoice to the customer.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div>
-                <Label htmlFor="invoice-email-recipient" className="text-sm font-medium">
-                  Recipient Email
-                </Label>
-                <Input
-                  id="invoice-email-recipient"
-                  type="email"
-                  placeholder="customer@example.com"
-                  value={emailRecipient}
-                  onChange={(e) => setEmailRecipient(e.target.value)}
-                  className="min-h-[44px] mt-1"
-                  data-testid="input-invoice-email-recipient"
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="send-via-email"
+                  checked={sendViaEmail}
+                  onCheckedChange={(checked) => setSendViaEmail(checked === true)}
+                  data-testid="checkbox-send-via-email"
                 />
+                <Label htmlFor="send-via-email" className="text-sm font-medium flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  Send via Email
+                </Label>
               </div>
+              {sendViaEmail && (
+                <div className="ml-6">
+                  <Label htmlFor="invoice-email-recipient" className="text-sm font-medium">
+                    Recipient Email
+                  </Label>
+                  <Input
+                    id="invoice-email-recipient"
+                    type="email"
+                    placeholder="customer@example.com"
+                    value={emailRecipient}
+                    onChange={(e) => setEmailRecipient(e.target.value)}
+                    className="min-h-[44px] mt-1"
+                    data-testid="input-invoice-email-recipient"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="send-via-sms"
+                  checked={sendViaSms}
+                  onCheckedChange={(checked) => setSendViaSms(checked === true)}
+                  data-testid="checkbox-send-via-sms"
+                />
+                <Label htmlFor="send-via-sms" className="text-sm font-medium flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Send via SMS
+                </Label>
+              </div>
+              {sendViaSms && (
+                <div className="ml-6">
+                  <Label htmlFor="invoice-phone-recipient" className="text-sm font-medium">
+                    Recipient Phone
+                  </Label>
+                  <Input
+                    id="invoice-phone-recipient"
+                    type="tel"
+                    placeholder="(555) 123-4567"
+                    value={phoneRecipient}
+                    onChange={(e) => setPhoneRecipient(e.target.value)}
+                    className="min-h-[44px] mt-1"
+                    data-testid="input-invoice-phone-recipient"
+                  />
+                </div>
+              )}
             </div>
             <DialogFooter className="flex gap-2">
               <Button 
                 variant="outline" 
-                onClick={() => { setShowEmailDialog(false); setEmailRecipient(""); }}
+                onClick={() => { setShowEmailDialog(false); setEmailRecipient(""); setPhoneRecipient(""); setSendViaEmail(true); setSendViaSms(false); }}
                 className="min-h-[44px]"
               >
                 Cancel
@@ -1032,8 +1102,8 @@ export default function MobileInvoiceDetail() {
               <Button 
                 className="bg-blue-600 hover:bg-blue-700 min-h-[44px]"
                 onClick={handleSendEmail}
-                disabled={sendInvoiceEmailMutation.isPending || !emailRecipient.trim()}
-                data-testid="button-confirm-send-invoice-email"
+                disabled={sendInvoiceEmailMutation.isPending || (!sendViaEmail && !sendViaSms) || (sendViaEmail && !emailRecipient.trim()) || (sendViaSms && !phoneRecipient.trim())}
+                data-testid="button-confirm-send-invoice"
               >
                 {sendInvoiceEmailMutation.isPending ? (
                   <>
@@ -1042,8 +1112,8 @@ export default function MobileInvoiceDetail() {
                   </>
                 ) : (
                   <>
-                    <Mail className="h-4 w-4 mr-2" />
-                    Send Email
+                    <Send className="h-4 w-4 mr-2" />
+                    {sendViaEmail && sendViaSms ? "Send Both" : sendViaSms ? "Send SMS" : "Send Email"}
                   </>
                 )}
               </Button>
