@@ -74,6 +74,15 @@ export class PackageSheetsService {
     return cents;
   }
 
+  // Monthly payment in sheet is stored in DOLLARS, convert to cents for storage
+  private parseMonthlyPaymentDollars(value: string | undefined): number {
+    if (!value) return 0;
+    const cleaned = value.toString().replace(/[$,\s]/g, '');
+    const dollars = parseFloat(cleaned);
+    if (isNaN(dollars)) return 0;
+    return Math.round(dollars * 100); // Convert dollars to cents
+  }
+
   private parseImageUrl(value: string | undefined): string | undefined {
     if (!value) return undefined;
     const str = value.toString().trim();
@@ -146,8 +155,8 @@ export class PackageSheetsService {
           tier,
           tonnage,
           packageLevel,
-          monthlyPayment: this.parseCentsValue(row[4]),
-          totalInvestment: this.parseCentsValue(row[5]),
+          monthlyPayment: this.parseMonthlyPaymentDollars(row[4]), // Sheet stores monthly in dollars
+          totalInvestment: this.parseCentsValue(row[5]), // Sheet stores total in cents
           outdoorBrand: (row[6] || '').toString().trim() || undefined,
           outdoorModel: (row[7] || '').toString().trim() || undefined,
           outdoorName: (row[8] || '').toString().trim() || undefined,
