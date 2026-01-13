@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -63,6 +63,7 @@ export default function CrmAddProspect() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [potentialValue, setPotentialValue] = useState("");
   const [assignedSalesRepId, setAssignedSalesRepId] = useState("");
   const [interestLevel, setInterestLevel] = useState<InterestLevel | "">("");
@@ -78,9 +79,38 @@ export default function CrmAddProspect() {
     }
   }, [authLoading, currentUser, navigate]);
 
+  // Debounce search to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Server-side search for customers - fetches from all 11k+ customers
   const { data: customersData, isLoading: customersLoading } = useQuery<{ customers: CrmCustomer[] }>({
-    queryKey: ["/api/crm/customers"],
+    queryKey: ["/api/crm/customers", { search: debouncedSearch, limit: "100" }],
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: "100" });
+      if (debouncedSearch.trim()) {
+        params.set("search", debouncedSearch.trim());
+      }
+      const res = await fetch(`/api/crm/customers?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch customers");
+      return res.json();
+    },
     enabled: !!currentUser && mode === "existing",
+  });
+
+  // Fetch selected customer separately if not in search results
+  const { data: selectedCustomerData } = useQuery<CrmCustomer>({
+    queryKey: ["/api/crm/customers", selectedCustomerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${selectedCustomerId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch customer");
+      return res.json();
+    },
+    enabled: !!currentUser && !!selectedCustomerId,
   });
 
   // Fetch CRM users for sales rep dropdown (sales and owner roles can sell)
@@ -98,23 +128,14 @@ export default function CrmAddProspect() {
 
   const customers = customersData?.customers || [];
 
+  // Use selectedCustomerData if available, otherwise find from search results
   const selectedCustomer = useMemo(() => {
+    if (selectedCustomerData) return selectedCustomerData;
     return customers.find((c) => c.id === selectedCustomerId);
-  }, [customers, selectedCustomerId]);
+  }, [customers, selectedCustomerId, selectedCustomerData]);
 
-  const filteredCustomers = useMemo(() => {
-    let result = customers;
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (c) =>
-          c.name?.toLowerCase().includes(query) ||
-          c.phone?.toLowerCase().includes(query) ||
-          c.email?.toLowerCase().includes(query)
-      );
-    }
-    return result;
-  }, [customers, searchQuery]);
+  // No client-side filtering needed - API handles search
+  const filteredCustomers = customers;
 
   // Check if customer is already in the sales funnel (has a salesStage)
   const isAlreadyProspect = !!selectedCustomer?.salesStage;
@@ -276,10 +297,15 @@ export default function CrmAddProspect() {
                       />
                       <CommandList className="max-h-[300px]">
                         <CommandEmpty>
-                          {customersLoading ? "Loading..." : searchQuery ? "No customers found matching your search." : "Start typing to search customers..."}
+                          {customersLoading ? (
+                            <div className="flex items-center gap-2 justify-center py-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Searching...
+                            </div>
+                          ) : searchQuery ? "No customers found matching your search." : "Type to search all customers..."}
                         </CommandEmpty>
                         <CommandGroup>
-                          {filteredCustomers.slice(0, 100).map((customer) => {
+                          {filteredCustomers.map((customer) => {
                             const isProspect = !!customer.salesStage;
                             return (
                               <CommandItem
