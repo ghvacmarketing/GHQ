@@ -1560,6 +1560,10 @@ function UnassignedQueueSection({
   onQuickNote,
   selectedDate,
 }: UnassignedQueueSectionProps) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: "unassigned-queue",
+  });
+  
   const filteredWorkOrders = useMemo(() => {
     return workOrders;
   }, [workOrders]);
@@ -1599,16 +1603,23 @@ function UnassignedQueueSection({
   ];
 
   return (
-    <div className="space-y-3" data-testid="unassigned-queue-section">
+    <div 
+      ref={setNodeRef}
+      className={`space-y-3 p-2 rounded-lg transition-colors ${isOver ? 'bg-amber-50 ring-2 ring-amber-400 ring-dashed' : ''}`}
+      data-testid="unassigned-queue-section"
+    >
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-800">Unassigned Queue ({workOrders.length})</h2>
+        <h2 className="text-lg font-semibold text-slate-800">
+          Unassigned Queue ({workOrders.length})
+          {isOver && <span className="ml-2 text-sm text-amber-600 font-normal">Drop here to unassign</span>}
+        </h2>
       </div>
       
       {filteredWorkOrders.length === 0 ? (
-        <Card className="bg-slate-50 border-dashed">
+        <Card className={`border-dashed ${isOver ? 'bg-amber-50 border-amber-300' : 'bg-slate-50'}`}>
           <CardContent className="py-8 text-center text-slate-500">
             <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">No unassigned work orders match your filters</p>
+            <p className="text-sm">{isOver ? 'Drop here to unassign this work order' : 'No unassigned work orders match your filters'}</p>
           </CardContent>
         </Card>
       ) : (
