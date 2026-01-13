@@ -45,7 +45,6 @@ integrations = ["javascript_mem_db:1.0.0", "javascript_openai:1.0.0", "javascrip
 [userenv]
 
 [userenv.shared]
-FIELDEDGE_CUSTOMER_SHEET_ID = "1lgIiOZ7JiOkzBdY_qXCK0f1LrFi6Bk3TVwy0078O9Ds"
 TRELLO_LIST_UNRESOLVED = "67769950d438e075bef2e14b"
 TRELLO_LIST_RESOLVED = "685c6b3a6a0a06c495b7602c"
 TRELLO_LIST_NEW = "685d91eba2dad71b518912b0"
@@ -55,6 +54,7 @@ RESEND_API_KEY = "re_QxaFgdBe_BNHzGnvsQfg2gNqKsLHw8BHB"
 RESEND_INBOUND_ADDRESS = "quotes@bronaekaru.resend.app"
 BOUNCIE_REDIRECT_URI = "https://1571a8b3-4ba1-4e05-8e06-fafee9ee64aa-00-135633vc7z2nc.worf.replit.dev/api/bouncie/callback"
 PRICEBOOK_SHEETS_ID = "1lgIiOZ7JiOkzBdY_qXCK0f1LrFi6Bk3TVwy0078O9Ds"
+FIELDEDGE_CUSTOMER_SHEET_ID = "1lgIiOZ7JiOkzBdY_qXCK0f1LrFi6Bk3TVwy0078O9Ds"
 
 [userenv.development]
 
