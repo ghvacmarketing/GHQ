@@ -43,6 +43,8 @@ import {
   TrendingDown,
   History,
   Info,
+  RefreshCw,
+  FileSpreadsheet,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
@@ -76,6 +78,11 @@ export default function CrmSettingsPackages() {
 
   const { data: packages } = useQuery<any[]>({
     queryKey: ["/api/pricebook/packages"],
+    enabled: !!currentUser,
+  });
+
+  const { data: sheetsStatus } = useQuery<{ configured: boolean; spreadsheetId?: string }>({
+    queryKey: ["/api/pricebook/sheets/status"],
     enabled: !!currentUser,
   });
 
@@ -129,6 +136,31 @@ export default function CrmSettingsPackages() {
     onError: (error: Error) => {
       toast({
         title: "Failed to apply adjustment",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const syncSheetsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/pricebook/sheets/sync", {});
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to sync");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/pricebook/packages"] });
+      toast({
+        title: "Google Sheets Sync Complete",
+        description: `Updated ${data.updated} packages, inserted ${data.inserted} new packages. Images preserved.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Sync Failed",
         description: error.message,
         variant: "destructive",
       });
@@ -218,6 +250,44 @@ export default function CrmSettingsPackages() {
         </div>
 
         <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileSpreadsheet className="h-5 w-5" />
+                Google Sheets Sync
+              </CardTitle>
+              <CardDescription>
+                Sync pricing and equipment data from Google Sheets. Images are preserved and never overwritten.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">
+                    {sheetsStatus?.configured ? (
+                      <span className="text-green-600">Sheet connected</span>
+                    ) : (
+                      <span className="text-amber-600">Sheet not configured</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Syncs: prices, models, names • Preserves: all images
+                  </p>
+                </div>
+                <Button
+                  onClick={() => syncSheetsMutation.mutate()}
+                  disabled={!sheetsStatus?.configured || syncSheetsMutation.isPending}
+                >
+                  {syncSheetsMutation.isPending ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Syncing...</>
+                  ) : (
+                    <><RefreshCw className="h-4 w-4 mr-2" /> Sync from Sheet</>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

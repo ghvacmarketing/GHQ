@@ -233,9 +233,112 @@ export const packageSheetsService = new PackageSheetsService();
 // Auto-sync function for pricebook packages
 let pricebookAutoSyncInterval: NodeJS.Timeout | null = null;
 
-export async function syncPricebookPackages(): Promise<{ updated: number; inserted: number; total: number }> {
-  // COMPLETELY DISABLED - Return immediately without any processing
-  return { updated: 0, inserted: 0, total: 0 };
+// Sync pricebook packages from Google Sheet - PRESERVES IMAGE URLs
+export async function syncPricebookPackages(): Promise<{ updated: number; inserted: number; total: number; errors: string[] }> {
+  if (!packageSheetsService.isConfigured()) {
+    console.log('[PricebookSync] Not configured, skipping');
+    return { updated: 0, inserted: 0, total: 0, errors: ['Not configured - missing PRICEBOOK_SHEETS_ID or GOOGLE_SHEETS_API_KEY'] };
+  }
+
+  const errors: string[] = [];
+
+  try {
+    const packages = await packageSheetsService.importPackagesFromSheet();
+    
+    if (packages.length === 0) {
+      console.log('[PricebookSync] No packages from sheet');
+      return { updated: 0, inserted: 0, total: 0, errors: ['No packages found in sheet'] };
+    }
+
+    let updatedCount = 0;
+    let insertedCount = 0;
+
+    for (const pkg of packages) {
+      try {
+        // Find existing package by unique key (unitType + tier + tonnage + packageLevel)
+        const existing = await db.select().from(pricebookPackages)
+          .where(
+            and(
+              eq(pricebookPackages.unitType, pkg.unitType),
+              eq(pricebookPackages.tier, pkg.tier),
+              eq(pricebookPackages.tonnage, pkg.tonnage),
+              eq(pricebookPackages.packageLevel, pkg.packageLevel)
+            )
+          )
+          .limit(1);
+
+        if (existing.length > 0) {
+          // Update existing package - ONLY update data fields, NEVER touch image URLs
+          const updates: Record<string, any> = {};
+          
+          // Always update pricing fields (these are required)
+          if (pkg.monthlyPayment !== undefined) updates.monthlyPayment = pkg.monthlyPayment;
+          if (pkg.totalInvestment !== undefined) updates.totalInvestment = pkg.totalInvestment;
+          
+          // Update equipment fields if they have actual values in the sheet
+          if (pkg.outdoorBrand) updates.outdoorBrand = pkg.outdoorBrand;
+          if (pkg.outdoorModel) updates.outdoorModel = pkg.outdoorModel;
+          if (pkg.outdoorName) updates.outdoorName = pkg.outdoorName;
+          if (pkg.coilModel) updates.coilModel = pkg.coilModel;
+          if (pkg.coilName) updates.coilName = pkg.coilName;
+          if (pkg.indoorHeatModel) updates.indoorHeatModel = pkg.indoorHeatModel;
+          if (pkg.indoorHeatName) updates.indoorHeatName = pkg.indoorHeatName;
+          if (pkg.thermostatModel) updates.thermostatModel = pkg.thermostatModel;
+          if (pkg.thermostatName) updates.thermostatName = pkg.thermostatName;
+          if (pkg.accessoryModels) updates.accessoryModels = pkg.accessoryModels;
+          
+          // IMPORTANT: NEVER update image URLs - they are managed separately in the CRM
+          // outdoorImageUrl, thermostatImageUrl, furnaceImageUrl, coilImageUrl are EXCLUDED
+          
+          // Filter out any undefined values
+          const cleanUpdates = Object.fromEntries(
+            Object.entries(updates).filter(([_, value]) => value !== undefined)
+          );
+          
+          if (Object.keys(cleanUpdates).length > 0) {
+            await db.update(pricebookPackages)
+              .set(cleanUpdates)
+              .where(eq(pricebookPackages.id, existing[0].id));
+          }
+          updatedCount++;
+        } else {
+          // Insert new package from sheet - new packages get NO images (can be set later in CRM)
+          await db.insert(pricebookPackages).values({
+            unitType: pkg.unitType,
+            tier: pkg.tier,
+            tonnage: pkg.tonnage,
+            packageLevel: pkg.packageLevel,
+            monthlyPayment: pkg.monthlyPayment,
+            totalInvestment: pkg.totalInvestment,
+            outdoorBrand: pkg.outdoorBrand || null,
+            outdoorModel: pkg.outdoorModel || null,
+            outdoorName: pkg.outdoorName || null,
+            coilModel: pkg.coilModel || null,
+            coilName: pkg.coilName || null,
+            indoorHeatModel: pkg.indoorHeatModel || null,
+            indoorHeatName: pkg.indoorHeatName || null,
+            thermostatModel: pkg.thermostatModel || null,
+            thermostatName: pkg.thermostatName || null,
+            accessoryModels: pkg.accessoryModels || null,
+            // New packages have no images - they can be added later via CRM
+            outdoorImageUrl: null,
+            thermostatImageUrl: null,
+            furnaceImageUrl: null,
+            isActive: true,
+          });
+          insertedCount++;
+        }
+      } catch (pkgError: any) {
+        errors.push(`Error processing ${pkg.unitType}/${pkg.tonnage}/${pkg.packageLevel}: ${pkgError.message}`);
+      }
+    }
+
+    console.log(`[PricebookSync] Updated ${updatedCount}, inserted ${insertedCount} (${packages.length} total from sheet). Images PRESERVED.`);
+    return { updated: updatedCount, inserted: insertedCount, total: packages.length, errors };
+  } catch (error: any) {
+    console.error('[PricebookSync] Error:', error);
+    return { updated: 0, inserted: 0, total: 0, errors: [error.message] };
+  }
 }
 
 // Old sync function code - completely disabled to prevent image clearing

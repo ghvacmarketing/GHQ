@@ -24418,10 +24418,14 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       }
 
       res.json({
-        message: "Pricebook sync completed",
+        message: result.errors.length > 0 
+          ? `Pricebook sync completed with ${result.errors.length} warnings` 
+          : "Pricebook sync completed - images preserved",
         hvacPackages: result.total,
         updated: result.updated,
         inserted: result.inserted,
+        errors: result.errors,
+        imagesPreserved: true,
       });
     } catch (error: any) {
       console.error("Error during pricebook sheets sync:", error);
