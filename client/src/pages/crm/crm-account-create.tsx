@@ -1116,7 +1116,7 @@ export default function CrmAccountCreate() {
                 <Collapsible defaultOpen>
                   <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900 py-2">
                     <ChevronRight className="h-4 w-4 transition-transform duration-200 [[data-state=open]>&]:rotate-90" />
-                    Prospect & Sales Funnel
+                    Lead & Sales Funnel
                   </CollapsibleTrigger>
                   <CollapsibleContent className="pt-4 space-y-4">
                     <div className="flex items-center justify-between">
@@ -1191,7 +1191,7 @@ export default function CrmAccountCreate() {
                             onChange={(e) => updateField("potentialValue", e.target.value)}
                             data-testid="input-potential-value"
                           />
-                          <p className="text-xs text-slate-500">Estimated value of this prospect</p>
+                          <p className="text-xs text-slate-500">Estimated value of this lead</p>
                         </div>
 
                         <Separator />
@@ -1199,7 +1199,7 @@ export default function CrmAccountCreate() {
                         <div className="flex items-center justify-between">
                           <div>
                             <Label htmlFor="scheduleFollowUp" className="text-sm font-medium">Schedule Initial Follow-up</Label>
-                            <p className="text-xs text-slate-500 mt-1">Set a reminder to follow up with this prospect</p>
+                            <p className="text-xs text-slate-500 mt-1">Set a reminder to follow up with this lead</p>
                           </div>
                           <Switch
                             id="scheduleFollowUp"

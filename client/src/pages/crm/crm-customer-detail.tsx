@@ -3792,7 +3792,7 @@ export default function CrmCustomerDetail() {
     if (customer) {
       setEditName(customer.name || "");
       setEditCustomerType(customer.customerType || "Residential");
-      setEditCustomerStatus(customer.customerStatus || "Prospect");
+      setEditCustomerStatus(customer.customerStatus || "Lead");
       setEditPhone(customer.phone || "");
       setEditEmail(customer.email || "");
       setEditFullAddress(customer.fullAddress || "");
@@ -5025,7 +5025,7 @@ export default function CrmCustomerDetail() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Customer">Customer</SelectItem>
-                      <SelectItem value="Prospect">Prospect</SelectItem>
+                      <SelectItem value="Lead">Lead</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

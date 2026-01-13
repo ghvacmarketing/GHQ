@@ -56,7 +56,7 @@ const INTEREST_LEVELS: { value: InterestLevel; label: string }[] = [
 ];
 
 export default function CrmAddProspect() {
-  usePageTitle("Add Prospect");
+  usePageTitle("Add Lead");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [mode, setMode] = useState<ProspectMode>("choose");
@@ -113,18 +113,21 @@ export default function CrmAddProspect() {
     enabled: !!currentUser && !!selectedCustomerId,
   });
 
-  // Fetch CRM users for sales rep dropdown (sales and owner roles can sell)
-  const { data: crmUsers } = useQuery<CrmUser[]>({
-    queryKey: ["/api/crm/users"],
+  // Fetch CRM users for sales rep dropdown (sales role only)
+  const { data: salesUsers } = useQuery<CrmUser[]>({
+    queryKey: ["/api/crm/users/by-role", "sales"],
+    queryFn: async () => {
+      const response = await fetch(`/api/crm/users/by-role?exactRole=sales`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch sales users");
+      return response.json();
+    },
     enabled: !!currentUser,
   });
 
   const salesReps = useMemo(() => {
-    if (!crmUsers) return [];
-    return crmUsers
-      .filter(u => u.isActive && (u.role === "sales" || u.role === "owner"))
-      .map(u => ({ value: u.id, label: u.name }));
-  }, [crmUsers]);
+    if (!salesUsers) return [];
+    return salesUsers.map(u => ({ value: u.id, label: u.name }));
+  }, [salesUsers]);
 
   const customers = customersData?.customers || [];
 
@@ -155,7 +158,7 @@ export default function CrmAddProspect() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects/metrics"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
-      toast({ title: "Customer converted to prospect successfully" });
+      toast({ title: "Customer converted to lead successfully" });
       navigate("/crm/prospect-funnel");
     },
     onError: (error: Error) => {
@@ -212,9 +215,9 @@ export default function CrmAddProspect() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">Add Prospect</h1>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">Add Lead</h1>
             <p className="text-muted-foreground">
-              {mode === "choose" ? "Choose how to add a new prospect" : "Convert existing customer to prospect"}
+              {mode === "choose" ? "Choose how to add a new lead" : "Convert existing customer to lead"}
             </p>
           </div>
         </div>
@@ -234,7 +237,7 @@ export default function CrmAddProspect() {
                   <div>
                     <CardTitle className="text-lg mb-2">Create New Customer</CardTitle>
                     <CardDescription>
-                      Add a brand new customer and set them up as a prospect
+                      Add a brand new customer and set them up as a lead
                     </CardDescription>
                   </div>
                 </div>
@@ -254,7 +257,7 @@ export default function CrmAddProspect() {
                   <div>
                     <CardTitle className="text-lg mb-2">Select Existing Customer</CardTitle>
                     <CardDescription>
-                      Convert an existing customer into a sales prospect
+                      Convert an existing customer into a sales lead
                     </CardDescription>
                   </div>
                 </div>
@@ -266,9 +269,9 @@ export default function CrmAddProspect() {
         {mode === "existing" && (
           <Card>
             <CardHeader>
-              <CardTitle>Convert Customer to Prospect</CardTitle>
+              <CardTitle>Convert Customer to Lead</CardTitle>
               <CardDescription>
-                Select an existing customer and enter prospect details
+                Select an existing customer and enter lead details
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -329,7 +332,7 @@ export default function CrmAddProspect() {
                                     <span className="font-medium">{customer.name}</span>
                                     {isProspect && (
                                       <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
-                                        Already Prospect
+                                        Already a Lead
                                       </span>
                                     )}
                                   </div>
@@ -413,7 +416,7 @@ export default function CrmAddProspect() {
 
                   <div className="border-t pt-6 space-y-4">
                     <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
-                      Prospect Details
+                      Lead Details
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
@@ -498,7 +501,7 @@ export default function CrmAddProspect() {
                       {convertToProspectMutation.isPending && (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       )}
-                      {isAlreadyProspect ? "Already a Prospect" : "Convert to Prospect"}
+                      {isAlreadyProspect ? "Already a Lead" : "Convert to Lead"}
                     </Button>
                   </div>
                 </>

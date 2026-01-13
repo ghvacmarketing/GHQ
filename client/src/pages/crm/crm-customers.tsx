@@ -206,7 +206,7 @@ export default function CrmCustomers() {
   const formatCustomerStatus = (status: string | null) => {
     if (!status) return "Unknown";
     const normalizedStatus = status.toLowerCase();
-    if (normalizedStatus === "prospect") return "Prospect";
+    if (normalizedStatus === "prospect") return "Lead";
     if (normalizedStatus === "customer") return "Customer";
     return status;
   };
@@ -310,7 +310,7 @@ export default function CrmCustomers() {
             }`}
             data-testid="tab-status-prospects"
           >
-            Prospects ({statsData?.prospects?.toLocaleString() || 0})
+            Leads ({statsData?.prospects?.toLocaleString() || 0})
           </button>
           <button
             onClick={() => { setStatusTab("customers"); setCustomerType("all"); setHasAgreement(false); setSourceFilter("all"); }}

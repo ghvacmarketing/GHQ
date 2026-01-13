@@ -198,7 +198,7 @@ export default function MobileCustomerDetail() {
   };
 
   const customerStatusConfig = {
-    prospect: { label: "Prospect", className: "bg-yellow-100 text-yellow-700 border-yellow-300" },
+    prospect: { label: "Lead", className: "bg-yellow-100 text-yellow-700 border-yellow-300" },
     client: { label: "Client", className: "bg-green-100 text-green-700 border-green-300" },
   };
 

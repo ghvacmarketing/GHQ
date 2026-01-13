@@ -527,7 +527,7 @@ function ProspectKanbanColumn({ stage, prospects, onCardClick }: ProspectKanbanC
             <SortableContext items={prospects.map(p => p.id)} strategy={verticalListSortingStrategy}>
               {prospects.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground text-sm">
-                  No prospects
+                  No leads
                 </div>
               ) : (
                 prospects.map((prospect) => (
@@ -1444,10 +1444,10 @@ export default function CrmProspectFunnel() {
                           <TableCell colSpan={5} className="text-center py-12">
                             <Users className="h-12 w-12 text-slate-300 mx-auto mb-3" />
                             <p className="text-slate-500 font-medium">
-                              {searchTerm ? "No prospects found matching your search" : "No prospects found"}
+                              {searchTerm ? "No leads found matching your search" : "No leads found"}
                             </p>
                             <p className="text-slate-400 text-sm mt-1">
-                              {searchTerm ? "Try adjusting your search" : "Add a new prospect to get started"}
+                              {searchTerm ? "Try adjusting your search" : "Add a new lead to get started"}
                             </p>
                           </TableCell>
                         </TableRow>
