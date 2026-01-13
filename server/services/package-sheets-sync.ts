@@ -74,13 +74,22 @@ export class PackageSheetsService {
     return cents;
   }
 
-  // Monthly payment in sheet is stored in DOLLARS, convert to cents for storage
-  private parseMonthlyPaymentDollars(value: string | undefined): number {
+  // Monthly payment in sheet has MIXED formats:
+  // - Values >= 1000 are already in cents (e.g., 16700 = $167.00)
+  // - Values < 1000 are in dollars (e.g., 100 = $100.00, need to convert to 10000 cents)
+  private parseMonthlyPaymentMixed(value: string | undefined): number {
     if (!value) return 0;
     const cleaned = value.toString().replace(/[$,\s]/g, '');
-    const dollars = parseFloat(cleaned);
-    if (isNaN(dollars)) return 0;
-    return Math.round(dollars * 100); // Convert dollars to cents
+    const numValue = parseFloat(cleaned);
+    if (isNaN(numValue)) return 0;
+    
+    // If value is >= 1000, it's already in cents
+    // If value is < 1000, it's in dollars and needs conversion
+    if (numValue >= 1000) {
+      return Math.round(numValue); // Already cents
+    } else {
+      return Math.round(numValue * 100); // Convert dollars to cents
+    }
   }
 
   private parseImageUrl(value: string | undefined): string | undefined {
@@ -155,7 +164,7 @@ export class PackageSheetsService {
           tier,
           tonnage,
           packageLevel,
-          monthlyPayment: this.parseMonthlyPaymentDollars(row[4]), // Sheet stores monthly in dollars
+          monthlyPayment: this.parseMonthlyPaymentMixed(row[4]), // Sheet has mixed formats
           totalInvestment: this.parseCentsValue(row[5]), // Sheet stores total in cents
           outdoorBrand: (row[6] || '').toString().trim() || undefined,
           outdoorModel: (row[7] || '').toString().trim() || undefined,
