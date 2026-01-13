@@ -3027,6 +3027,32 @@ export default function CrmDispatch() {
     
     if (!wo) return;
     
+    // Handle dropping on the unassigned queue - clear assignment
+    if (overId === 'unassigned-queue') {
+      // Only allow dropping from schedule, not from queue itself
+      if (!isFromSchedule) return;
+      
+      // Clear the technician assignment
+      setLocalWorkOrders(prev => prev.map(w => 
+        w.id === workOrderId 
+          ? { ...w, assignedTechId: null, techName: null } 
+          : w
+      ));
+
+      updateWorkOrderMutation.mutate({
+        workOrderId,
+        updates: {
+          assignedTechId: null,
+        },
+      });
+
+      toast({
+        title: "Work order unassigned",
+        description: `Moved back to unassigned queue`,
+      });
+      return;
+    }
+    
     if (overId.startsWith('technician-')) {
       const newTechId = overId.replace('technician-', '');
       
