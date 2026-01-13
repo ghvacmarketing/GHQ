@@ -1,3 +1,5 @@
+console.log('[PACKAGE_SHEETS_SYNC] Module loaded from:', import.meta.url, '- THIS CONFIRMS NEW CODE IS RUNNING');
+
 import { db } from "../db";
 import { pricebookPackages } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
@@ -287,10 +289,31 @@ export async function syncPricebookPackages(): Promise<{ updated: number; insert
         if (pkg.thermostatImageUrl) updates.thermostatImageUrl = pkg.thermostatImageUrl;
         if (pkg.furnaceImageUrl) updates.furnaceImageUrl = pkg.furnaceImageUrl;
         
-        if (Object.keys(updates).length > 0) {
+        // Filter out any undefined values to prevent Drizzle from setting them to null
+        const cleanUpdates = Object.fromEntries(
+          Object.entries(updates).filter(([_, value]) => value !== undefined)
+        );
+        
+        if (Object.keys(cleanUpdates).length > 0) {
+          // DEBUG: Log what's being updated for first GP package
+          if (pkg.unitType === 'GP' && pkg.tonnage === '2' && pkg.packageLevel === 'Best') {
+            console.log('[PricebookSync] DEBUG GP/2/Best: existing.outdoorImageUrl =', existing[0].outdoorImageUrl);
+            console.log('[PricebookSync] DEBUG GP/2/Best: cleanUpdates has outdoorImageUrl?', 'outdoorImageUrl' in cleanUpdates);
+            console.log('[PricebookSync] DEBUG GP/2/Best: cleanUpdates keys =', Object.keys(cleanUpdates).join(', '));
+          }
+          
           await db.update(pricebookPackages)
-            .set(updates)
+            .set(cleanUpdates)
             .where(eq(pricebookPackages.id, existing[0].id));
+            
+          // DEBUG: Verify the update preserved the image
+          if (pkg.unitType === 'GP' && pkg.tonnage === '2' && pkg.packageLevel === 'Best') {
+            const afterUpdate = await db.select({ outdoorImageUrl: pricebookPackages.outdoorImageUrl })
+              .from(pricebookPackages)
+              .where(eq(pricebookPackages.id, existing[0].id))
+              .limit(1);
+            console.log('[PricebookSync] DEBUG GP/2/Best: AFTER UPDATE outdoorImageUrl =', afterUpdate[0]?.outdoorImageUrl);
+          }
         }
         updatedCount++;
       } else {

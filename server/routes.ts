@@ -24163,27 +24163,29 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           .limit(1);
 
         if (existing.length > 0) {
-          // Update existing
+          // Update existing - preserve CRM-only fields (like images) if not provided in import
+          const updates: Record<string, any> = {
+            monthlyPayment: monthlyPaymentCents,
+            totalInvestment: totalInvestmentCents,
+            isActive: true,
+            updatedAt: new Date(),
+          };
+          if (pkg.outdoorBrand) updates.outdoorBrand = pkg.outdoorBrand;
+          if (pkg.outdoorName) updates.outdoorName = pkg.outdoorName;
+          if (pkg.coilModel) updates.coilModel = pkg.coilModel;
+          if (pkg.coilName) updates.coilName = pkg.coilName;
+          if (pkg.indoorHeatModel) updates.indoorHeatModel = pkg.indoorHeatModel;
+          if (pkg.indoorHeatName) updates.indoorHeatName = pkg.indoorHeatName;
+          if (pkg.thermostatModel) updates.thermostatModel = pkg.thermostatModel;
+          if (pkg.thermostatName) updates.thermostatName = pkg.thermostatName;
+          if (pkg.accessoryModels) updates.accessoryModels = pkg.accessoryModels;
+          if (pkg.outdoorImageUrl) updates.outdoorImageUrl = pkg.outdoorImageUrl;
+          if (pkg.thermostatImageUrl) updates.thermostatImageUrl = pkg.thermostatImageUrl;
+          if (pkg.furnaceImageUrl) updates.furnaceImageUrl = pkg.furnaceImageUrl;
+          
           await db
             .update(pricebookPackages)
-            .set({
-              monthlyPayment: monthlyPaymentCents,
-              totalInvestment: totalInvestmentCents,
-              outdoorBrand: pkg.outdoorBrand || null,
-              outdoorName: pkg.outdoorName || null,
-              coilModel: pkg.coilModel || null,
-              coilName: pkg.coilName || null,
-              indoorHeatModel: pkg.indoorHeatModel || null,
-              indoorHeatName: pkg.indoorHeatName || null,
-              thermostatModel: pkg.thermostatModel || null,
-              thermostatName: pkg.thermostatName || null,
-              accessoryModels: pkg.accessoryModels || null,
-              outdoorImageUrl: pkg.outdoorImageUrl || null,
-              thermostatImageUrl: pkg.thermostatImageUrl || null,
-              furnaceImageUrl: pkg.furnaceImageUrl || null,
-              isActive: true,
-              updatedAt: new Date(),
-            })
+            .set(updates)
             .where(eq(pricebookPackages.id, existing[0].id));
           updated++;
         } else {
@@ -24445,8 +24447,10 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     startBouncieBackgroundSync(5);
 
     // Start pricebook auto-sync (every 1 minute with delta-only updates from pricebook-export sheet)
-    startPricebookAutoSync(1);
-    console.log('Pricebook auto-sync started (every 1 minute)');
+    // TEMPORARILY DISABLED for debugging
+    // startPricebookAutoSync(1);
+    // console.log('Pricebook auto-sync started (every 1 minute)');
+    console.log('Pricebook auto-sync DISABLED for debugging');
 
     // Seed vector store with sales book if empty (async, don't block startup)
     seedVectorStoreWithSalesBook().then(success => {

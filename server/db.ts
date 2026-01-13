@@ -12,4 +12,15 @@ if (!process.env.DATABASE_URL) {
 }
 
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle({ client: pool, schema });
+export const db = drizzle({ 
+  client: pool, 
+  schema,
+  logger: {
+    logQuery(query, params) {
+      // Log ALL SQL touching pricebook_packages for comprehensive debugging
+      if (query.includes('pricebook_packages')) {
+        console.log('[Drizzle SQL]', query, params);
+      }
+    }
+  }
+});
