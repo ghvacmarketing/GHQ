@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -124,6 +125,9 @@ export default function CrmInvoiceDetail() {
   const [showSendEmailDialog, setShowSendEmailDialog] = useState(false);
   const [sendEmailRecipient, setSendEmailRecipient] = useState("");
   const [sendEmailMessage, setSendEmailMessage] = useState("");
+  const [sendViaEmail, setSendViaEmail] = useState(true);
+  const [sendViaSms, setSendViaSms] = useState(false);
+  const [sendPhoneRecipient, setSendPhoneRecipient] = useState("");
   const [expandedEmailIds, setExpandedEmailIds] = useState<Set<string>>(new Set());
   const [editingLineItemId, setEditingLineItemId] = useState<string | null>(null);
   const [editingLineItemData, setEditingLineItemData] = useState<{ description: string; quantity: string; unitPrice: string }>({ description: "", quantity: "", unitPrice: "" });
@@ -271,12 +275,15 @@ export default function CrmInvoiceDetail() {
   const sendEmailMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/crm/invoices/${invoiceId}/send-email`, {
-        recipientEmail: sendEmailRecipient || undefined,
+        recipientEmail: sendViaEmail ? sendEmailRecipient : undefined,
+        recipientPhone: sendViaSms ? sendPhoneRecipient : undefined,
         personalMessage: sendEmailMessage || undefined,
+        sendEmail: sendViaEmail,
+        sendSms: sendViaSms,
       });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.message || "Failed to send email");
+        throw new Error(data.message || "Failed to send invoice");
       }
       const result = await res.json();
       return result as { success: boolean; successCount: number; totalCount: number };
@@ -289,13 +296,20 @@ export default function CrmInvoiceDetail() {
       setShowSendEmailDialog(false);
       setSendEmailRecipient("");
       setSendEmailMessage("");
+      setSendPhoneRecipient("");
+      setSendViaEmail(true);
+      setSendViaSms(false);
+      const methods: string[] = [];
+      if (sendViaEmail) methods.push("email");
+      if (sendViaSms) methods.push("SMS");
+      const methodStr = methods.join(" and ");
       const description = data.totalCount > 1 
-        ? `Invoice sent to ${data.successCount} of ${data.totalCount} recipients.`
-        : "The invoice has been emailed to the customer.";
+        ? `Invoice sent via ${methodStr} to ${data.successCount} of ${data.totalCount} recipients.`
+        : `The invoice has been sent via ${methodStr}.`;
       toast({ title: "Invoice sent!", description });
     },
     onError: (error: Error) => {
-      toast({ title: "Failed to send email", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to send invoice", description: error.message, variant: "destructive" });
     },
   });
 
@@ -709,12 +723,13 @@ export default function CrmInvoiceDetail() {
                   size="sm"
                   onClick={() => {
                     setSendEmailRecipient(invoice.customer?.email || "");
+                    setSendPhoneRecipient(invoice.customer?.phone || "");
                     setShowSendEmailDialog(true);
                   }}
                   data-testid="button-send-email"
                 >
                   <Mail className="h-4 w-4 mr-2" />
-                  Send Email
+                  Send Invoice
                 </Button>
               )}
               
@@ -1183,35 +1198,73 @@ export default function CrmInvoiceDetail() {
         </Card>
       </div>
 
-      {/* Send Email Dialog */}
+      {/* Send Invoice Dialog */}
       <Dialog open={showSendEmailDialog} onOpenChange={setShowSendEmailDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Send Invoice Email</DialogTitle>
+            <DialogTitle>Send Invoice</DialogTitle>
             <DialogDescription>
-              Send invoice {invoice.invoiceNumber} to the customer via email.
+              Send invoice {invoice.invoiceNumber} to the customer.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="recipientEmail">Recipient Email(s)</Label>
-              <Input
-                id="recipientEmail"
-                type="text"
-                value={sendEmailRecipient}
-                onChange={(e) => setSendEmailRecipient(e.target.value)}
-                placeholder="email1@example.com, email2@example.com"
-                data-testid="input-recipient-email"
-              />
-              <p className="text-xs text-slate-500">Separate multiple emails with commas</p>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="send-email-inv" 
+                  checked={sendViaEmail} 
+                  onCheckedChange={(c) => setSendViaEmail(!!c)} 
+                  data-testid="checkbox-send-via-email"
+                />
+                <Label htmlFor="send-email-inv" className="cursor-pointer">Email</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="send-sms-inv" 
+                  checked={sendViaSms} 
+                  onCheckedChange={(c) => setSendViaSms(!!c)} 
+                  data-testid="checkbox-send-via-sms"
+                />
+                <Label htmlFor="send-sms-inv" className="cursor-pointer">Text Message (SMS)</Label>
+              </div>
             </div>
+
+            {sendViaEmail && (
+              <div className="space-y-2">
+                <Label htmlFor="recipientEmail">Recipient Email(s)</Label>
+                <Input
+                  id="recipientEmail"
+                  type="text"
+                  value={sendEmailRecipient}
+                  onChange={(e) => setSendEmailRecipient(e.target.value)}
+                  placeholder="email1@example.com, email2@example.com"
+                  data-testid="input-recipient-email"
+                />
+                <p className="text-xs text-slate-500">Separate multiple emails with commas</p>
+              </div>
+            )}
+
+            {sendViaSms && (
+              <div className="space-y-2">
+                <Label htmlFor="recipientPhone">Recipient Phone</Label>
+                <Input
+                  id="recipientPhone"
+                  type="tel"
+                  value={sendPhoneRecipient}
+                  onChange={(e) => setSendPhoneRecipient(e.target.value)}
+                  placeholder="(555) 123-4567"
+                  data-testid="input-recipient-phone"
+                />
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="personalMessage">Personal Message (optional)</Label>
               <Textarea
                 id="personalMessage"
                 value={sendEmailMessage}
                 onChange={(e) => setSendEmailMessage(e.target.value)}
-                placeholder="Add a personal message to include in the email..."
+                placeholder="Add a personal message to include..."
                 rows={4}
                 data-testid="textarea-personal-message"
               />
@@ -1223,15 +1276,15 @@ export default function CrmInvoiceDetail() {
             </Button>
             <Button
               onClick={() => sendEmailMutation.mutate()}
-              disabled={sendEmailMutation.isPending || !sendEmailRecipient}
+              disabled={sendEmailMutation.isPending || (!sendViaEmail && !sendViaSms) || (sendViaEmail && !sendEmailRecipient) || (sendViaSms && !sendPhoneRecipient)}
               data-testid="button-submit-send-email"
             >
               {sendEmailMutation.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
-                <Mail className="h-4 w-4 mr-2" />
+                <Send className="h-4 w-4 mr-2" />
               )}
-              Send Email
+              {sendViaEmail && sendViaSms ? "Send Email & SMS" : sendViaSms ? "Send SMS" : "Send Email"}
             </Button>
           </DialogFooter>
         </DialogContent>

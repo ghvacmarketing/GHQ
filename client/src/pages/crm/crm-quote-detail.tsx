@@ -191,6 +191,9 @@ export default function CrmQuoteDetail() {
   const [showSendQuoteDialog, setShowSendQuoteDialog] = useState(false);
   const [sendEmailRecipient, setSendEmailRecipient] = useState("");
   const [sendEmailMessage, setSendEmailMessage] = useState("");
+  const [sendViaEmail, setSendViaEmail] = useState(true);
+  const [sendViaSms, setSendViaSms] = useState(false);
+  const [sendPhoneRecipient, setSendPhoneRecipient] = useState("");
   const [expandedEmailIds, setExpandedEmailIds] = useState<Set<string>>(new Set());
   const [showMarkAsSentDialog, setShowMarkAsSentDialog] = useState(false);
   const [markSentNote, setMarkSentNote] = useState("");
@@ -309,7 +312,7 @@ export default function CrmQuoteDetail() {
   });
 
   const sendEmailMutation = useMutation({
-    mutationFn: async (data: { recipientEmail: string; personalMessage?: string }) => {
+    mutationFn: async (data: { recipientEmail?: string; recipientPhone?: string; personalMessage?: string; sendEmail: boolean; sendSms: boolean }) => {
       const res = await fetch(`/api/crm/quotes/${quoteId}/send-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -318,9 +321,9 @@ export default function CrmQuoteDetail() {
       });
       const result = await res.json();
       if (!res.ok || !result.success) {
-        throw new Error(result.error || result.message || "Failed to send email");
+        throw new Error(result.error || result.message || "Failed to send quote");
       }
-      return result as { success: boolean; successCount: number; totalCount: number };
+      return result as { success: boolean; successCount: number; totalCount: number; emailSent?: boolean; smsSent?: boolean };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
@@ -330,13 +333,23 @@ export default function CrmQuoteDetail() {
       setShowSendQuoteDialog(false);
       setSendEmailRecipient("");
       setSendEmailMessage("");
-      const description = data.totalCount > 1 
-        ? `Quote sent to ${data.successCount} of ${data.totalCount} recipients.`
-        : "The quote has been emailed to the customer.";
+      setSendPhoneRecipient("");
+      setSendViaEmail(true);
+      setSendViaSms(false);
+      let description = "";
+      if (data.emailSent && data.smsSent) {
+        description = "The quote has been sent via email and SMS.";
+      } else if (data.smsSent) {
+        description = "The quote has been sent via SMS.";
+      } else if (data.totalCount > 1) {
+        description = `Quote sent to ${data.successCount} of ${data.totalCount} recipients.`;
+      } else {
+        description = "The quote has been emailed to the customer.";
+      }
       toast({ title: "Quote sent!", description });
     },
     onError: (error: Error) => {
-      toast({ title: "Failed to send email", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to send quote", description: error.message, variant: "destructive" });
     },
   });
 
@@ -1089,18 +1102,32 @@ export default function CrmQuoteDetail() {
 
   const handleOpenSendDialog = () => {
     setSendEmailRecipient(quote?.customerEmail || quote?.customer?.email || "");
+    setSendPhoneRecipient(quote?.customerPhone || quote?.customer?.phone || "");
     setSendEmailMessage("");
+    setSendViaEmail(true);
+    setSendViaSms(false);
     setShowSendQuoteDialog(true);
   };
 
   const handleSendEmail = () => {
-    if (!sendEmailRecipient.trim()) {
-      toast({ title: "Email required", description: "Please enter a recipient email address.", variant: "destructive" });
+    if (sendViaEmail && !sendEmailRecipient.trim()) {
+      toast({ title: "Email required", description: "Please enter an email address.", variant: "destructive" });
+      return;
+    }
+    if (sendViaSms && !sendPhoneRecipient.trim()) {
+      toast({ title: "Phone required", description: "Please enter a phone number for SMS.", variant: "destructive" });
+      return;
+    }
+    if (!sendViaEmail && !sendViaSms) {
+      toast({ title: "Select method", description: "Please select at least one sending method.", variant: "destructive" });
       return;
     }
     sendEmailMutation.mutate({
-      recipientEmail: sendEmailRecipient.trim(),
+      recipientEmail: sendViaEmail ? sendEmailRecipient.trim() : undefined,
+      recipientPhone: sendViaSms ? sendPhoneRecipient.trim() : undefined,
       personalMessage: sendEmailMessage.trim() || undefined,
+      sendEmail: sendViaEmail,
+      sendSms: sendViaSms,
     });
   };
 
@@ -2917,31 +2944,64 @@ export default function CrmQuoteDetail() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Mail className="h-5 w-5" />
-              Send Quote via Email
+              <Send className="h-5 w-5" />
+              Send Quote
             </DialogTitle>
             <DialogDescription>
-              Send this quote to the customer via email. They will receive a link to view it.
+              Send this quote to the customer. Select one or both methods.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="recipient-email">Recipient Email(s)</Label>
-              <Input
-                id="recipient-email"
-                type="text"
-                placeholder="email1@example.com, email2@example.com"
-                value={sendEmailRecipient}
-                onChange={(e) => setSendEmailRecipient(e.target.value)}
-                data-testid="input-recipient-email"
-              />
-              <p className="text-xs text-slate-500">Separate multiple emails with commas</p>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="send-email" 
+                  checked={sendViaEmail} 
+                  onCheckedChange={(c) => setSendViaEmail(!!c)} 
+                />
+                <Label htmlFor="send-email" className="cursor-pointer">Email</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="send-sms" 
+                  checked={sendViaSms} 
+                  onCheckedChange={(c) => setSendViaSms(!!c)} 
+                />
+                <Label htmlFor="send-sms" className="cursor-pointer">Text Message (SMS)</Label>
+              </div>
             </div>
+            {sendViaEmail && (
+              <div className="space-y-2">
+                <Label htmlFor="recipient-email">Recipient Email(s)</Label>
+                <Input
+                  id="recipient-email"
+                  type="text"
+                  placeholder="email1@example.com, email2@example.com"
+                  value={sendEmailRecipient}
+                  onChange={(e) => setSendEmailRecipient(e.target.value)}
+                  data-testid="input-recipient-email"
+                />
+                <p className="text-xs text-slate-500">Separate multiple emails with commas</p>
+              </div>
+            )}
+            {sendViaSms && (
+              <div className="space-y-2">
+                <Label htmlFor="recipient-phone">Recipient Phone</Label>
+                <Input
+                  id="recipient-phone"
+                  type="tel"
+                  placeholder="(555) 123-4567"
+                  value={sendPhoneRecipient}
+                  onChange={(e) => setSendPhoneRecipient(e.target.value)}
+                  data-testid="input-recipient-phone"
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="personal-message">Personal Message (optional)</Label>
               <Textarea
                 id="personal-message"
-                placeholder="Add a personal note to the email..."
+                placeholder="Add a personal note..."
                 value={sendEmailMessage}
                 onChange={(e) => setSendEmailMessage(e.target.value)}
                 rows={3}
@@ -2959,7 +3019,7 @@ export default function CrmQuoteDetail() {
             </Button>
             <Button
               onClick={handleSendEmail}
-              disabled={sendEmailMutation.isPending}
+              disabled={sendEmailMutation.isPending || (!sendViaEmail && !sendViaSms)}
               className="bg-[#711419] hover:bg-[#711419]/90"
               data-testid="button-confirm-send"
             >
@@ -2968,7 +3028,7 @@ export default function CrmQuoteDetail() {
               ) : (
                 <Send className="h-4 w-4 mr-2" />
               )}
-              Send Quote
+              {sendViaEmail && sendViaSms ? "Send Email & SMS" : sendViaEmail ? "Send Email" : sendViaSms ? "Send SMS" : "Send Quote"}
             </Button>
           </DialogFooter>
         </DialogContent>
