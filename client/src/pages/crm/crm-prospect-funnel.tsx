@@ -1005,7 +1005,7 @@ export default function CrmProspectFunnel() {
                 Lead Funnel
               </h1>
               <p className="text-sm text-slate-500">
-                Track prospects through your sales pipeline
+                Track leads through your sales pipeline
               </p>
             </div>
             <Button
@@ -1015,7 +1015,7 @@ export default function CrmProspectFunnel() {
               data-testid="button-add-prospect"
             >
               <Plus className="h-4 w-4 mr-1" />
-              Add New Prospect
+              Add New Lead
             </Button>
           </div>
           
