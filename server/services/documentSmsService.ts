@@ -1,14 +1,30 @@
-import { sendAutomatedSms, getSmsTemplate } from "./smsNotificationService";
-import type { SmsNotificationType } from "@shared/schema";
+import { getMessagingAdapter } from "./messaging/adapters";
+import { storage } from "../storage";
+import type { SmsNotificationType, InsertCrmMessagingMessage } from "@shared/schema";
 
 const DEFAULT_TEMPLATES: Record<string, string> = {
   sms_template_quote: "Hi {customerName}! Your quote #{quoteNumber} for {totalAmount} is ready. View it here: {viewLink} - GHVAC",
   sms_template_invoice_send: "Hi {customerName}! Your invoice #{invoiceNumber} for {amount} is ready. Pay here: {paymentLink} - GHVAC",
 };
 
+const templateCache: Map<string, { value: string; timestamp: number }> = new Map();
+const CACHE_TTL_MS = 60000;
+
 async function getDocumentSmsTemplate(templateKey: string): Promise<string> {
-  const template = await getSmsTemplate(templateKey);
-  return template || DEFAULT_TEMPLATES[templateKey] || "";
+  const cached = templateCache.get(templateKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.value;
+  }
+
+  try {
+    const setting = await storage.getSetting(templateKey);
+    const value = setting?.value || DEFAULT_TEMPLATES[templateKey] || "";
+    templateCache.set(templateKey, { value, timestamp: Date.now() });
+    return value;
+  } catch (error) {
+    console.error(`[DocumentSmsService] Error fetching template ${templateKey}:`, error);
+    return DEFAULT_TEMPLATES[templateKey] || "";
+  }
 }
 
 function formatCurrency(amount: string | number): string {
@@ -57,21 +73,83 @@ export async function sendQuoteSms(params: SendQuoteSmsParams): Promise<SendQuot
       .replace("{totalAmount}", formatCurrency(totalAmount))
       .replace("{viewLink}", viewLink);
 
-    const result = await sendAutomatedSms({
-      customerId,
-      phoneNumber,
-      messageBody,
-      notificationType: "quote_sent" as SmsNotificationType,
-      quoteId,
-    });
-
-    if (result.success) {
-      console.log(`[DocumentSmsService] Quote SMS sent successfully for quote ${quoteNumber}`);
-    } else {
-      console.error(`[DocumentSmsService] Failed to send quote SMS for quote ${quoteNumber}:`, result.errorMessage);
+    const adapter = getMessagingAdapter();
+    
+    let conversation = await storage.getMessagingConversationByPhone(phoneNumber);
+    
+    if (!conversation) {
+      conversation = await storage.createMessagingConversation({
+        customerId,
+        phoneNumber,
+        subject: "Quote Notification",
+        externalSource: "textline",
+        status: "open",
+      });
     }
 
-    return result;
+    const sendResult = await adapter.sendMessage({
+      conversationId: conversation.id,
+      body: messageBody,
+      channel: "sms",
+      recipientPhone: phoneNumber,
+    });
+
+    if (!sendResult.success) {
+      await storage.createSmsNotificationLog({
+        customerId,
+        notificationType: "quote_sent" as SmsNotificationType,
+        quoteId,
+        conversationId: conversation.id,
+        phoneNumber,
+        messageBody,
+        status: "failed",
+        errorMessage: sendResult.errorMessage,
+        sentAt: new Date(),
+      });
+
+      console.error(`[DocumentSmsService] Failed to send quote SMS for quote ${quoteNumber}:`, sendResult.errorMessage);
+      return {
+        success: false,
+        errorMessage: sendResult.errorMessage,
+      };
+    }
+
+    if (sendResult.externalConversationId && sendResult.externalConversationId !== conversation.externalConversationId) {
+      await storage.updateMessagingConversation(conversation.id, {
+        externalConversationId: sendResult.externalConversationId,
+      });
+    }
+
+    const messageData: InsertCrmMessagingMessage = {
+      conversationId: conversation.id,
+      direction: "outbound",
+      channel: "sms",
+      body: messageBody,
+      sentAt: new Date(),
+      externalMessageId: sendResult.externalMessageId,
+      status: "sent",
+    };
+    
+    const savedMessage = await storage.createMessage(messageData);
+
+    await storage.createSmsNotificationLog({
+      customerId,
+      notificationType: "quote_sent" as SmsNotificationType,
+      quoteId,
+      messageId: sendResult.externalMessageId,
+      conversationId: conversation.id,
+      phoneNumber,
+      messageBody,
+      status: "sent",
+      sentAt: new Date(),
+    });
+
+    console.log(`[DocumentSmsService] Quote SMS sent successfully for quote ${quoteNumber}`);
+    return {
+      success: true,
+      messageId: savedMessage.id,
+      conversationId: conversation.id,
+    };
   } catch (error: any) {
     console.error("[DocumentSmsService] Error sending quote SMS:", error);
     return {
@@ -121,21 +199,83 @@ export async function sendInvoiceSms(params: SendInvoiceSmsParams): Promise<Send
       .replace("{amount}", formatCurrency(amount))
       .replace("{paymentLink}", paymentLink);
 
-    const result = await sendAutomatedSms({
-      customerId,
-      phoneNumber,
-      messageBody,
-      notificationType: "invoice_sent" as SmsNotificationType,
-      invoiceId,
-    });
-
-    if (result.success) {
-      console.log(`[DocumentSmsService] Invoice SMS sent successfully for invoice ${invoiceNumber}`);
-    } else {
-      console.error(`[DocumentSmsService] Failed to send invoice SMS for invoice ${invoiceNumber}:`, result.errorMessage);
+    const adapter = getMessagingAdapter();
+    
+    let conversation = await storage.getMessagingConversationByPhone(phoneNumber);
+    
+    if (!conversation) {
+      conversation = await storage.createMessagingConversation({
+        customerId,
+        phoneNumber,
+        subject: "Invoice Notification",
+        externalSource: "textline",
+        status: "open",
+      });
     }
 
-    return result;
+    const sendResult = await adapter.sendMessage({
+      conversationId: conversation.id,
+      body: messageBody,
+      channel: "sms",
+      recipientPhone: phoneNumber,
+    });
+
+    if (!sendResult.success) {
+      await storage.createSmsNotificationLog({
+        customerId,
+        notificationType: "invoice_sent" as SmsNotificationType,
+        invoiceId,
+        conversationId: conversation.id,
+        phoneNumber,
+        messageBody,
+        status: "failed",
+        errorMessage: sendResult.errorMessage,
+        sentAt: new Date(),
+      });
+
+      console.error(`[DocumentSmsService] Failed to send invoice SMS for invoice ${invoiceNumber}:`, sendResult.errorMessage);
+      return {
+        success: false,
+        errorMessage: sendResult.errorMessage,
+      };
+    }
+
+    if (sendResult.externalConversationId && sendResult.externalConversationId !== conversation.externalConversationId) {
+      await storage.updateMessagingConversation(conversation.id, {
+        externalConversationId: sendResult.externalConversationId,
+      });
+    }
+
+    const messageData: InsertCrmMessagingMessage = {
+      conversationId: conversation.id,
+      direction: "outbound",
+      channel: "sms",
+      body: messageBody,
+      sentAt: new Date(),
+      externalMessageId: sendResult.externalMessageId,
+      status: "sent",
+    };
+    
+    const savedMessage = await storage.createMessage(messageData);
+
+    await storage.createSmsNotificationLog({
+      customerId,
+      notificationType: "invoice_sent" as SmsNotificationType,
+      invoiceId,
+      messageId: sendResult.externalMessageId,
+      conversationId: conversation.id,
+      phoneNumber,
+      messageBody,
+      status: "sent",
+      sentAt: new Date(),
+    });
+
+    console.log(`[DocumentSmsService] Invoice SMS sent successfully for invoice ${invoiceNumber}`);
+    return {
+      success: true,
+      messageId: savedMessage.id,
+      conversationId: conversation.id,
+    };
   } catch (error: any) {
     console.error("[DocumentSmsService] Error sending invoice SMS:", error);
     return {
