@@ -234,6 +234,12 @@ export const packageSheetsService = new PackageSheetsService();
 let pricebookAutoSyncInterval: NodeJS.Timeout | null = null;
 
 export async function syncPricebookPackages(): Promise<{ updated: number; inserted: number; total: number }> {
+  // COMPLETELY DISABLED - Return immediately without any processing
+  return { updated: 0, inserted: 0, total: 0 };
+}
+
+// Old sync function code - completely disabled to prevent image clearing
+async function _OLD_syncPricebookPackages_DISABLED(): Promise<{ updated: number; inserted: number; total: number }> {
   if (!packageSheetsService.isConfigured()) {
     console.log('[PricebookSync] Not configured, skipping');
     return { updated: 0, inserted: 0, total: 0 };

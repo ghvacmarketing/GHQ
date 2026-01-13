@@ -24132,6 +24132,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
   // POST /api/pricebook/packages/import - Import packages from JSON
   app.post("/api/pricebook/packages/import", requireCrmSalesOrAbove, async (req, res) => {
+    console.log('[IMPORT_DEBUG] /api/pricebook/packages/import called at:', new Date().toISOString());
+    console.log('[IMPORT_DEBUG] Request origin:', req.headers.origin || req.headers.referer || 'no-origin');
+    console.log('[IMPORT_DEBUG] Auth header:', req.headers.authorization ? 'Bearer ***' : 'no-auth');
     try {
       const { packages: packagesToImport } = req.body;
 
@@ -24182,6 +24185,12 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           if (pkg.outdoorImageUrl) updates.outdoorImageUrl = pkg.outdoorImageUrl;
           if (pkg.thermostatImageUrl) updates.thermostatImageUrl = pkg.thermostatImageUrl;
           if (pkg.furnaceImageUrl) updates.furnaceImageUrl = pkg.furnaceImageUrl;
+          
+          // Log if this update will change images (existing has them, but we're not setting any)
+          if (existing[0].outdoorImageUrl && !updates.outdoorImageUrl) {
+            console.log('[IMPORT_DEBUG] UPDATE will NOT overwrite existing outdoor image for:', 
+              pkg.unitType, pkg.tier, pkg.tonnage, pkg.packageLevel);
+          }
           
           await db
             .update(pricebookPackages)
