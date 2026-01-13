@@ -174,7 +174,7 @@ const queueStageColors: Record<DispatchQueueStage, { bg: string; border: string;
 import {
   DndContext,
   DragOverlay,
-  closestCenter,
+  pointerWithin,
   DragEndEvent,
   DragStartEvent,
   useSensor,
@@ -3032,6 +3032,9 @@ export default function CrmDispatch() {
       // Only allow dropping from schedule, not from queue itself
       if (!isFromSchedule) return;
       
+      // Only process if the work order is currently assigned
+      if (!wo.assignedTechId) return;
+      
       // Clear the technician assignment
       setLocalWorkOrders(prev => prev.map(w => 
         w.id === workOrderId 
@@ -3589,7 +3592,7 @@ export default function CrmDispatch() {
         {/* Main Content Area - Scrollable Schedule + Fixed Queue */}
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCenter}
+          collisionDetection={pointerWithin}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           modifiers={combinedModifiers}
