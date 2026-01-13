@@ -11464,25 +11464,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/crm/dispatch/work-orders", requireCrmAuth, async (req, res) => {
     try {
       const dateParam = req.query.date as string;
+      const startDateParam = req.query.startDate as string;
+      const endDateParam = req.query.endDate as string;
       const statusParam = req.query.status as string;
       
-      // Parse date - expecting YYYY-MM-DD format in local timezone (America/New_York)
-      let targetDateStr: string;
-      if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
-        targetDateStr = dateParam;
+      // Support date range queries (for week view) or single date (for day view)
+      let startDateStr: string;
+      let endDateStr: string;
+      
+      if (startDateParam && endDateParam && /^\d{4}-\d{2}-\d{2}$/.test(startDateParam) && /^\d{4}-\d{2}-\d{2}$/.test(endDateParam)) {
+        // Use date range for week view
+        startDateStr = startDateParam;
+        endDateStr = endDateParam;
+      } else if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+        // Single date for backward compatibility
+        startDateStr = dateParam;
+        endDateStr = dateParam;
       } else {
         // Default to today in EST
         const now = new Date();
         const estNow = new Date(now.toLocaleString("en-US", { timeZone: APP_TIMEZONE }));
-        targetDateStr = estNow.toISOString().split("T")[0];
+        startDateStr = estNow.toISOString().split("T")[0];
+        endDateStr = startDateStr;
       }
 
       // Convert local timezone (EST) date boundaries to UTC for database queries
       // Start of day in EST (e.g., Jan 1 00:00 EST = Jan 1 05:00 UTC)
-      const startOfDayLocal = new Date(`${targetDateStr}T00:00:00`);
+      const startOfDayLocal = new Date(`${startDateStr}T00:00:00`);
       const startOfDay = fromZonedTime(startOfDayLocal, APP_TIMEZONE);
-      // End of day in EST (e.g., Jan 1 23:59 EST = Jan 2 04:59 UTC)
-      const endOfDayLocal = new Date(`${targetDateStr}T23:59:59.999`);
+      // End of day in EST (e.g., Jan 7 23:59 EST = Jan 8 04:59 UTC)
+      const endOfDayLocal = new Date(`${endDateStr}T23:59:59.999`);
       const endOfDay = fromZonedTime(endOfDayLocal, APP_TIMEZONE);
 
       let workOrders = await storage.getWorkOrdersByDateRange(startOfDay, endOfDay);

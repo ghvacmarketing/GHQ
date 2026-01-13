@@ -2059,6 +2059,19 @@ export default function CrmDispatch() {
   
   const weekDates = useMemo(() => getWeekDates(selectedDate), [selectedDate]);
   
+  // Calculate date range for API query based on view mode
+  const dateRangeParams = useMemo((): { startDate: string; endDate: string } | { date: string } => {
+    if (viewMode === "week") {
+      const dates = getWeekDates(selectedDate);
+      return {
+        startDate: format(dates[0], "yyyy-MM-dd"),
+        endDate: format(dates[6], "yyyy-MM-dd")
+      };
+    }
+    // Day view - use single date
+    return { date: format(selectedDate, "yyyy-MM-dd") };
+  }, [selectedDate, viewMode]);
+  
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
@@ -2245,9 +2258,16 @@ export default function CrmDispatch() {
   };
 
   const { data: workOrdersData, isLoading: workOrdersLoading } = useQuery<any[]>({
-    queryKey: ["/api/crm/dispatch/work-orders", dateString],
+    queryKey: ["/api/crm/dispatch/work-orders", dateRangeParams],
     queryFn: async () => {
-      const res = await fetch(`/api/crm/dispatch/work-orders?date=${dateString}`, { credentials: "include" });
+      const params = new URLSearchParams();
+      if ('startDate' in dateRangeParams) {
+        params.set('startDate', dateRangeParams.startDate);
+        params.set('endDate', dateRangeParams.endDate);
+      } else {
+        params.set('date', dateRangeParams.date);
+      }
+      const res = await fetch(`/api/crm/dispatch/work-orders?${params.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch dispatch data");
       return res.json();
     },
@@ -2302,7 +2322,7 @@ export default function CrmDispatch() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch/work-orders", dateString] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch/work-orders", dateRangeParams] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders/list"] });
       queryClient.invalidateQueries({ 
         predicate: (query) => {
@@ -2600,7 +2620,7 @@ export default function CrmDispatch() {
       };
       setLocalWorkOrders(prev => [...prev, enrichedWorkOrder]);
       
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch/work-orders", dateString] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch/work-orders", dateRangeParams] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders/list"] });
       toast({ title: "Work order created", description: "New work order has been scheduled." });
       setCreateDialogOpen(false);
