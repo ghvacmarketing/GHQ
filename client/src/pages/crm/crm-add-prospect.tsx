@@ -266,26 +266,25 @@ export default function CrmAddProspect() {
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-full p-0" align="start">
-                    <Command>
+                  <PopoverContent className="w-[400px] p-0" align="start">
+                    <Command shouldFilter={false}>
                       <CommandInput
-                        placeholder="Search customers..."
+                        placeholder="Search by name, phone, or email..."
                         value={searchQuery}
                         onValueChange={setSearchQuery}
                         data-testid="input-customer-search"
                       />
-                      <CommandList>
+                      <CommandList className="max-h-[300px]">
                         <CommandEmpty>
-                          {customersLoading ? "Loading..." : "No customers found."}
+                          {customersLoading ? "Loading..." : searchQuery ? "No customers found matching your search." : "Start typing to search customers..."}
                         </CommandEmpty>
                         <CommandGroup>
-                          {filteredCustomers.slice(0, 50).map((customer) => {
-                            // Check if customer is already in the sales funnel
+                          {filteredCustomers.slice(0, 100).map((customer) => {
                             const isProspect = !!customer.salesStage;
                             return (
                               <CommandItem
                                 key={customer.id}
-                                value={customer.id}
+                                value={`${customer.name} ${customer.phone || ''} ${customer.email || ''}`}
                                 onSelect={() => {
                                   setSelectedCustomerId(customer.id);
                                   setCustomerSearchOpen(false);
