@@ -3141,7 +3141,7 @@ export default function CrmProposalBuilder() {
           {comp.imageUrl && (
             <div className="flex-shrink-0">
               <img 
-                src={`/assets/${comp.imageUrl}`}
+                src={comp.imageUrl}
                 alt={comp.model}
                 className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-md bg-gray-50"
                 loading="lazy"
@@ -3866,7 +3866,7 @@ export default function CrmProposalBuilder() {
                                 {pkg.outdoorImageUrl && (
                                   <div className="text-center">
                                     <img 
-                                      src={`/assets/${pkg.outdoorImageUrl}`}
+                                      src={pkg.outdoorImageUrl}
                                       alt={isMiniSplit ? "Outdoor Condenser" : "Duct System"}
                                       className="w-16 h-16 object-contain rounded-lg bg-white border shadow-sm"
                                       loading="lazy"
@@ -3877,7 +3877,7 @@ export default function CrmProposalBuilder() {
                                 {isMiniSplit && pkg.furnaceImageUrl && (
                                   <div className="text-center">
                                     <img 
-                                      src={`/assets/${pkg.furnaceImageUrl}`}
+                                      src={pkg.furnaceImageUrl}
                                       alt="Indoor Wall Unit"
                                       className="w-16 h-16 object-contain rounded-lg bg-white border shadow-sm"
                                       loading="lazy"
@@ -3990,7 +3990,7 @@ export default function CrmProposalBuilder() {
                                 <div className="flex gap-3">
                                   {pkg.outdoorImageUrl && (
                                     <img 
-                                      src={`/assets/${pkg.outdoorImageUrl}`}
+                                      src={pkg.outdoorImageUrl}
                                       alt={pkg.outdoorModel}
                                       className="w-16 h-16 object-contain rounded bg-slate-100 flex-shrink-0"
                                       loading="lazy"
@@ -4009,7 +4009,7 @@ export default function CrmProposalBuilder() {
                                   <div className="flex gap-3">
                                     {pkg.coilImageUrl && (
                                       <img 
-                                        src={`/assets/${pkg.coilImageUrl}`}
+                                        src={pkg.coilImageUrl}
                                         alt={pkg.coilModel}
                                         className="w-16 h-16 object-contain rounded bg-slate-100 flex-shrink-0"
                                         loading="lazy"
@@ -4029,7 +4029,7 @@ export default function CrmProposalBuilder() {
                                   <div className="flex gap-3">
                                     {pkg.furnaceImageUrl && (
                                       <img 
-                                        src={`/assets/${pkg.furnaceImageUrl}`}
+                                        src={pkg.furnaceImageUrl}
                                         alt={pkg.indoorHeatModel}
                                         className="w-16 h-16 object-contain rounded bg-slate-100 flex-shrink-0"
                                         loading="lazy"
@@ -4051,7 +4051,7 @@ export default function CrmProposalBuilder() {
                                   <div className="flex gap-3">
                                     {pkg.thermostatImageUrl && (
                                       <img 
-                                        src={`/assets/${pkg.thermostatImageUrl}`}
+                                        src={pkg.thermostatImageUrl}
                                         alt={pkg.thermostatModel}
                                         className="w-16 h-16 object-contain rounded bg-slate-100 flex-shrink-0"
                                         loading="lazy"
@@ -4539,7 +4539,7 @@ export default function CrmProposalBuilder() {
                                   {pkg.outdoorImageUrl && (
                                     <div className="text-center">
                                       <img 
-                                        src={`/assets/${pkg.outdoorImageUrl}`}
+                                        src={pkg.outdoorImageUrl}
                                         alt={isMiniSplit ? "Outdoor Condenser" : "Duct System"}
                                         className="w-16 h-16 object-contain rounded-lg bg-white border shadow-sm"
                                         loading="lazy"
@@ -4550,7 +4550,7 @@ export default function CrmProposalBuilder() {
                                   {isMiniSplit && pkg.furnaceImageUrl && (
                                     <div className="text-center">
                                       <img 
-                                        src={`/assets/${pkg.furnaceImageUrl}`}
+                                        src={pkg.furnaceImageUrl}
                                         alt="Indoor Wall Unit"
                                         className="w-16 h-16 object-contain rounded-lg bg-white border shadow-sm"
                                         loading="lazy"
@@ -5351,7 +5351,7 @@ export default function CrmProposalBuilder() {
                             {components.map((comp, i) => (
                               <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center border border-gray-100 dark:border-gray-700">
                                 {comp.image ? (
-                                  <img src={`/assets/${comp.image}`} alt={comp.label} className="w-12 h-12 mx-auto object-contain mb-1" loading="lazy" />
+                                  <img src={comp.image} alt={comp.label} className="w-12 h-12 mx-auto object-contain mb-1" loading="lazy" />
                                 ) : (
                                   <div className="w-12 h-12 mx-auto bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center mb-1">
                                     <Package className="h-6 w-6 text-gray-400" />
@@ -5472,7 +5472,7 @@ export default function CrmProposalBuilder() {
                             {components.map((comp, i) => (
                               <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center border border-gray-100 dark:border-gray-700">
                                 {comp.image ? (
-                                  <img src={`/assets/${comp.image}`} alt={comp.label} className="w-12 h-12 mx-auto object-contain mb-1" loading="lazy" />
+                                  <img src={comp.image} alt={comp.label} className="w-12 h-12 mx-auto object-contain mb-1" loading="lazy" />
                                 ) : (
                                   <div className="w-12 h-12 mx-auto bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center mb-1">
                                     <Package className="h-6 w-6 text-gray-400" />

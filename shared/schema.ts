@@ -2946,6 +2946,7 @@ export const pricebookPackages = pgTable("pricebook_packages", {
   thermostatName: text("thermostat_name"),
   accessoryModels: text("accessory_models"),
   outdoorImageUrl: text("outdoor_image_url"),
+  coilImageUrl: text("coil_image_url"),
   thermostatImageUrl: text("thermostat_image_url"),
   furnaceImageUrl: text("furnace_image_url"),
   isActive: boolean("is_active").default(true),
