@@ -698,7 +698,7 @@ const timelineTypeConfig: Record<TimelineEntry['type'], { icon: any; bgColor: st
   payment: { icon: DollarSign, bgColor: "bg-emerald-100", textColor: "text-emerald-700", borderColor: "border-emerald-200", label: "Payment" },
 };
 
-function HistoryTabContent({ customerId }: { customerId: string }) {
+function TimelineTabContent({ customerId }: { customerId: string }) {
   const [, navigate] = useLocation();
   const allTypes: TimelineEntry['type'][] = ['work_order', 'project', 'agreement', 'quote', 'invoice', 'note', 'payment'];
   const [activeFilters, setActiveFilters] = useState<Set<TimelineEntry['type']>>(() => new Set(allTypes));
@@ -728,11 +728,11 @@ function HistoryTabContent({ customerId }: { customerId: string }) {
 
   if (isLoading) {
     return (
-      <Card data-testid="card-history-loading">
+      <Card data-testid="card-timeline-loading">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <History className="h-5 w-5 text-[#711419]" />
-            Customer History
+            Customer Timeline
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -758,17 +758,17 @@ function HistoryTabContent({ customerId }: { customerId: string }) {
 
   if (isError) {
     return (
-      <Card data-testid="card-history-error">
+      <Card data-testid="card-timeline-error">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <History className="h-5 w-5 text-[#711419]" />
-            Customer History
+            Customer Timeline
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
             <AlertTriangle className="h-12 w-12 text-red-400 mx-auto mb-3" />
-            <p className="text-red-500 mb-2">Failed to load history</p>
+            <p className="text-red-500 mb-2">Failed to load timeline</p>
             <p className="text-sm text-slate-400">
               {(error as Error)?.message || 'An error occurred while loading the timeline.'}
             </p>
@@ -780,19 +780,19 @@ function HistoryTabContent({ customerId }: { customerId: string }) {
 
   if (!timeline || timeline.length === 0) {
     return (
-      <Card data-testid="card-history-empty">
+      <Card data-testid="card-timeline-empty">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <History className="h-5 w-5 text-[#711419]" />
-            Customer History
+            Customer Timeline
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
             <History className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500 mb-2">No history yet</p>
+            <p className="text-slate-500 mb-2">No timeline yet</p>
             <p className="text-sm text-slate-400">
-              Activity history will appear here as you work with this customer.
+              Activity timeline will appear here as you work with this customer.
             </p>
           </div>
         </CardContent>
@@ -801,15 +801,15 @@ function HistoryTabContent({ customerId }: { customerId: string }) {
   }
 
   return (
-    <Card data-testid="card-history">
+    <Card data-testid="card-timeline">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <History className="h-5 w-5 text-[#711419]" />
-          Customer History
+          Customer Timeline
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-wrap gap-2 mb-6" data-testid="history-filter-bar">
+        <div className="flex flex-wrap gap-2 mb-6" data-testid="timeline-filter-bar">
           {(Object.keys(timelineTypeConfig) as TimelineEntry['type'][]).map((type) => {
             const config = timelineTypeConfig[type];
             const isActive = activeFilters.has(type);
@@ -834,15 +834,15 @@ function HistoryTabContent({ customerId }: { customerId: string }) {
         </div>
 
         {filteredTimeline.length === 0 ? (
-          <div className="text-center py-8" data-testid="history-filtered-empty">
+          <div className="text-center py-8" data-testid="timeline-filtered-empty">
             <History className="h-12 w-12 text-slate-300 mx-auto mb-3" />
             <p className="text-slate-500 mb-2">No matching entries</p>
             <p className="text-sm text-slate-400">
-              Adjust your filters to see more history.
+              Adjust your filters to see more timeline.
             </p>
           </div>
         ) : (
-          <div className="relative" data-testid="history-timeline">
+          <div className="relative" data-testid="timeline-timeline">
             <div className="absolute left-[90px] top-0 bottom-0 w-px bg-slate-200" />
             <div className="space-y-4">
               {filteredTimeline.map((entry) => {
@@ -1490,12 +1490,12 @@ function CustomerTabbedView({
           Agreements
         </TabsTrigger>
         <TabsTrigger 
-          value="history" 
+          value="timeline" 
           className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
-          data-testid="tab-history"
+          data-testid="tab-timeline"
         >
           <History className="h-4 w-4 mr-2" />
-          History
+          Timeline
         </TabsTrigger>
         <TabsTrigger 
           value="settings" 
@@ -2265,9 +2265,9 @@ function CustomerTabbedView({
         <AgreementsTabContent customerId={customer.id} />
       </TabsContent>
 
-      {/* History Tab */}
-      <TabsContent value="history" className="space-y-6" data-testid="tab-content-history">
-        <HistoryTabContent customerId={customer.id} />
+      {/* Timeline Tab */}
+      <TabsContent value="timeline" className="space-y-6" data-testid="tab-content-timeline">
+        <TimelineTabContent customerId={customer.id} />
       </TabsContent>
 
       {/* Settings Tab - Placeholder */}
