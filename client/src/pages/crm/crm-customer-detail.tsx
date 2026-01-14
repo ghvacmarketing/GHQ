@@ -1343,6 +1343,8 @@ interface CustomerTabbedViewProps {
   onViewWorkOrder: (id: string) => void;
   onViewProject: (id: string) => void;
   onViewInvoice: (id: string) => void;
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
 }
 
 function CustomerTabbedView({
@@ -1376,9 +1378,49 @@ function CustomerTabbedView({
   onViewWorkOrder,
   onViewProject,
   onViewInvoice,
+  activeTab,
+  setActiveTab,
 }: CustomerTabbedViewProps) {
   const completedJobs = jobs?.filter(j => ["completed", "invoiced", "paid"].includes(j.status)) || [];
   const customerType = (customer.customerType || "residential").toLowerCase();
+  
+  const { data: overviewTimeline, isLoading: timelineLoading } = useQuery<TimelineEntry[]>({
+    queryKey: ['/api/crm/customers', customer.id, 'timeline'],
+    queryFn: async () => {
+      const response = await fetch(`/api/crm/customers/${customer.id}/timeline`, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch timeline');
+      return response.json();
+    },
+  });
+
+  const combinedTimelineEntries = (() => {
+    const entries: Array<{ id: string; type: string; title: string; description: string; timestamp: Date; userName?: string }> = [];
+    
+    overviewTimeline?.forEach(entry => {
+      entries.push({
+        id: entry.id,
+        type: entry.type,
+        title: entry.title,
+        description: entry.description,
+        timestamp: new Date(entry.timestamp),
+      });
+    });
+    
+    notes?.forEach(note => {
+      entries.push({
+        id: note.id,
+        type: 'note',
+        title: 'Note',
+        description: note.body,
+        timestamp: new Date(note.createdAt || Date.now()),
+        userName: note.userName || undefined,
+      });
+    });
+    
+    return entries
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+      .slice(0, 5);
+  })();
   const isPropertyManager = customerType === "property_manager" || customerType === "property manager";
   const isCommercial = customerType === "commercial";
   
@@ -1423,7 +1465,7 @@ function CustomerTabbedView({
   };
 
   return (
-    <Tabs defaultValue="overview" className="w-full" data-testid="customer-tabs">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" data-testid="customer-tabs">
       <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap" data-testid="tabs-list">
         <TabsTrigger 
           value="overview" 
@@ -1719,6 +1761,111 @@ function CustomerTabbedView({
             </CardContent>
           </Card>
         )}
+
+        {/* Customer Timeline Section */}
+        <Card data-testid="card-customer-timeline-overview">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <History className="h-5 w-5 text-[#711419]" />
+              Customer Timeline
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <Textarea
+                  placeholder="Add a comment about this customer..."
+                  value={noteBody}
+                  onChange={(e) => setNoteBody(e.target.value)}
+                  rows={2}
+                  className="flex-1"
+                  data-testid="textarea-timeline-comment"
+                />
+                <Button
+                  onClick={handleAddNote}
+                  disabled={!noteBody.trim() || addNotePending}
+                  className="self-end bg-[#711419] hover:bg-[#5a1014] text-white"
+                  data-testid="button-add-timeline-comment"
+                >
+                  {addNotePending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-1" />
+                      Post
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {timelineLoading || notesLoading ? (
+                <div className="space-y-3 py-4">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              ) : combinedTimelineEntries.length === 0 ? (
+                <div className="text-center py-6">
+                  <History className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                  <p className="text-sm text-slate-500">No activity yet</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Comments and activity will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {combinedTimelineEntries.map((entry) => {
+                    const config = entry.type === 'note' 
+                      ? { icon: MessageSquare, bgColor: "bg-gray-100", textColor: "text-gray-700" }
+                      : timelineTypeConfig[entry.type as TimelineEntry['type']] || { icon: Circle, bgColor: "bg-slate-100", textColor: "text-slate-700" };
+                    const IconComponent = config.icon;
+                    
+                    return (
+                      <div 
+                        key={entry.id} 
+                        className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100"
+                        data-testid={`timeline-entry-overview-${entry.id}`}
+                      >
+                        <div className={cn(
+                          "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
+                          config.bgColor
+                        )}>
+                          <IconComponent className={cn("h-4 w-4", config.textColor)} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="font-medium text-sm text-slate-700 truncate">
+                              {entry.type === 'note' ? (entry.userName || 'Unknown User') : entry.title}
+                            </span>
+                            <span className="text-xs text-slate-400 flex-shrink-0">
+                              {format(entry.timestamp, "MMM d, yyyy 'at' h:mm a")}
+                            </span>
+                          </div>
+                          <p className="text-sm text-slate-600 line-clamp-2">
+                            {entry.description}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="pt-2 border-t">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-[#711419] hover:text-[#711419] hover:bg-[#711419]/10"
+                  onClick={() => setActiveTab("timeline")}
+                  data-testid="button-view-all-timeline"
+                >
+                  View All Timeline
+                  <History className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </TabsContent>
 
       {/* Locations Tab */}
@@ -2299,6 +2446,7 @@ export default function CrmCustomerDetail() {
   const [, navigate] = useLocation();
   const params = useParams<{ id: string }>();
   const customerId = params.id;
+  const [activeTab, setActiveTab] = useState("overview");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [scheduleVisitDialogOpen, setScheduleVisitDialogOpen] = useState(false);
   const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
@@ -5466,6 +5614,8 @@ export default function CrmCustomerDetail() {
           onViewWorkOrder={(id) => navigate(`/crm/work-orders/${id}`)}
           onViewProject={(id) => navigate(`/crm/projects/${id}`)}
           onViewInvoice={(id) => navigate(`/crm/invoices/${id}`)}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
         />
 
         {/* Quote Detail Dialog */}
