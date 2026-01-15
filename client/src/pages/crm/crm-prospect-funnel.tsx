@@ -97,6 +97,8 @@ import {
   LayoutGrid,
   Trophy,
   Pencil,
+  History,
+  Send,
 } from "lucide-react";
 import { format, isToday, isPast, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, getDay } from "date-fns";
 import type { CrmUser, CrmCustomer, CrmFollowUp, SalesStage, InterestLevel, FollowUpType } from "@shared/schema";
@@ -589,6 +591,9 @@ export default function CrmProspectFunnel() {
   const [editFollowUpDueDate, setEditFollowUpDueDate] = useState("");
   const [editFollowUpNotes, setEditFollowUpNotes] = useState("");
 
+  const [leadNoteBody, setLeadNoteBody] = useState("");
+  const [showAllNotes, setShowAllNotes] = useState(false);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 8 },
@@ -648,6 +653,24 @@ export default function CrmProspectFunnel() {
     queryKey: ["/api/crm/users"],
     queryFn: getQueryFn({ on401: "returnNull" }),
     enabled: !!currentUser,
+  });
+
+  type LeadNote = {
+    id: string;
+    customerId: string;
+    userId: string;
+    body: string;
+    createdAt: string;
+    userName: string;
+  };
+
+  const { data: leadNotes = [], isLoading: leadNotesLoading } = useQuery<LeadNote[]>({
+    queryKey: ["/api/crm/customers", expandedProspectId, "notes"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${expandedProspectId}/notes`);
+      return res.json();
+    },
+    enabled: !!currentUser && !!expandedProspectId,
   });
 
   const salesUsers = useMemo(() => {
@@ -760,6 +783,21 @@ export default function CrmProspectFunnel() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to remove from funnel", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const createLeadNoteMutation = useMutation({
+    mutationFn: async ({ customerId, body }: { customerId: string; body: string }) => {
+      const res = await apiRequest("POST", `/api/crm/customers/${customerId}/notes`, { body });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", expandedProspectId, "notes"] });
+      setLeadNoteBody("");
+      toast({ title: "Comment posted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to post comment", description: error.message, variant: "destructive" });
     },
   });
 
@@ -2058,6 +2096,88 @@ export default function CrmProspectFunnel() {
                           <p className="text-sm text-muted-foreground whitespace-pre-wrap">{expandedProspect.notes}</p>
                         </div>
                       )}
+
+                      <Card className="mt-4">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <History className="h-4 w-4" />
+                            Timeline / Comments
+                          </CardTitle>
+                        </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="flex gap-2">
+                              <Textarea
+                                placeholder="Add a comment..."
+                                value={leadNoteBody}
+                                onChange={(e) => setLeadNoteBody(e.target.value)}
+                                className="min-h-[60px] resize-none flex-1"
+                              />
+                              <Button
+                                size="sm"
+                                className="self-end"
+                                onClick={() => {
+                                  if (expandedProspect && leadNoteBody.trim()) {
+                                    createLeadNoteMutation.mutate({
+                                      customerId: expandedProspect.id,
+                                      body: leadNoteBody.trim(),
+                                    });
+                                  }
+                                }}
+                                disabled={!leadNoteBody.trim() || createLeadNoteMutation.isPending}
+                              >
+                                <Send className="h-4 w-4" />
+                              </Button>
+                            </div>
+
+                            {leadNotesLoading ? (
+                              <div className="space-y-2">
+                                <Skeleton className="h-16 w-full" />
+                                <Skeleton className="h-16 w-full" />
+                              </div>
+                            ) : leadNotes.length === 0 ? (
+                              <p className="text-center text-muted-foreground text-sm py-4">
+                                No comments yet
+                              </p>
+                            ) : (
+                              <>
+                                <div className="space-y-2">
+                                  {[...leadNotes]
+                                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                                    .slice(0, showAllNotes ? leadNotes.length : 5)
+                                    .map((note) => (
+                                      <div
+                                        key={note.id}
+                                        className="flex gap-3 p-3 rounded-lg border bg-gray-50"
+                                      >
+                                        <MessageSquare className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-baseline gap-2 flex-wrap">
+                                            <span className="font-semibold text-sm">{note.userName}</span>
+                                            <span className="text-xs text-muted-foreground">
+                                              {format(parseISO(note.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                                            </span>
+                                          </div>
+                                          <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
+                                            {note.body}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    ))}
+                                </div>
+                                {leadNotes.length > 5 && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full"
+                                    onClick={() => setShowAllNotes(!showAllNotes)}
+                                  >
+                                    {showAllNotes ? "Show less" : `Show ${leadNotes.length - 5} more comments`}
+                                  </Button>
+                                )}
+                              </>
+                            )}
+                          </CardContent>
+                        </Card>
 
                       {!isEditing && (
                         <>
