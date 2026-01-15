@@ -10,6 +10,18 @@ import redlogo from "@assets/redlogo.webp";
 const STORAGE_KEY = 'ghvac-global-auth';
 const EXPIRY_DAYS = 90;
 
+// Public routes that bypass password protection - clients need to access these
+const PUBLIC_ROUTES = [
+  /^\/quote\/[^/]+$/,       // /quote/:token - public quote viewing
+  /^\/portal(\/|$)/,        // /portal/* - customer portal (has its own auth)
+  /^\/book-online/,         // /book-online - public booking page
+  /^\/auth-verify/,         // /auth-verify - SMS magic link verification
+];
+
+function isPublicRoute(pathname: string): boolean {
+  return PUBLIC_ROUTES.some(pattern => pattern.test(pathname));
+}
+
 interface StoredAuth {
   authenticated: boolean;
   expiry: number;
@@ -23,9 +35,19 @@ export default function GlobalPasswordGate({ children }: { children: React.React
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  // Check if current route is a public route that should bypass password protection
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+  const isOnPublicRoute = isPublicRoute(currentPath);
+
   useEffect(() => {
+    // Skip auth check for public routes - clients should access them without password
+    if (isOnPublicRoute) {
+      setIsAuthenticated(true);
+      setAuthRequired(false);
+      return;
+    }
     checkAuthStatus();
-  }, []);
+  }, [isOnPublicRoute]);
 
   const checkAuthStatus = async () => {
     // Check if auth is required
@@ -103,6 +125,11 @@ export default function GlobalPasswordGate({ children }: { children: React.React
       setIsLoading(false);
     }
   };
+
+  // Public routes bypass password protection immediately
+  if (isOnPublicRoute) {
+    return <>{children}</>;
+  }
 
   // Still checking auth status
   if (isAuthenticated === null || authRequired === null) {
