@@ -699,19 +699,32 @@ export default function CrmProspectFunnel() {
   });
 
   const createFollowUpMutation = useMutation({
-    mutationFn: async (data: { customerId: string; followUpType: FollowUpType; dueAt: string; notes?: string }) => {
-      const res = await apiRequest("POST", "/api/crm/follow-ups", data);
-      return res.json();
+    mutationFn: async (data: { customerId: string; followUpType: FollowUpType; dueAt: string; notes?: string; openInEditMode?: boolean }) => {
+      const res = await apiRequest("POST", "/api/crm/follow-ups", {
+        customerId: data.customerId,
+        followUpType: data.followUpType,
+        dueAt: data.dueAt,
+        notes: data.notes,
+      });
+      return { followUp: await res.json(), openInEditMode: data.openInEditMode };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/follow-ups"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
-      setFollowUpDialogOpen(false);
-      setSelectedProspectId(null);
-      setFollowUpType("call");
-      setFollowUpDueDate("");
-      setFollowUpNotes("");
-      toast({ title: "Follow-up scheduled" });
+      if (result.openInEditMode && result.followUp?.id) {
+        setEditingFollowUpId(result.followUp.id);
+        setEditFollowUpType(result.followUp.followUpType || "call");
+        setEditFollowUpDueDate(format(new Date(result.followUp.dueAt), "yyyy-MM-dd'T'HH:mm"));
+        setEditFollowUpNotes(result.followUp.notes || "");
+        toast({ title: "Follow-up created - edit below" });
+      } else {
+        setFollowUpDialogOpen(false);
+        setSelectedProspectId(null);
+        setFollowUpType("call");
+        setFollowUpDueDate("");
+        setFollowUpNotes("");
+        toast({ title: "Follow-up scheduled" });
+      }
     },
     onError: (error: Error) => {
       toast({ title: "Failed to schedule follow-up", description: error.message, variant: "destructive" });
@@ -942,8 +955,16 @@ export default function CrmProspectFunnel() {
   };
 
   const handleAddFollowUp = (prospectId: string) => {
-    setSelectedProspectId(prospectId);
-    setFollowUpDialogOpen(true);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(10, 0, 0, 0);
+    
+    createFollowUpMutation.mutate({
+      customerId: prospectId,
+      followUpType: "call",
+      dueAt: tomorrow.toISOString(),
+      openInEditMode: true,
+    });
   };
 
   const handleSubmitFollowUp = () => {
