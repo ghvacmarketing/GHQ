@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Sparkles, Download, Save, X, MapPin, Cog, Shield, Plus, FileEdit, Pencil } from "lucide-react";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, Table, TableRow, TableCell, WidthType } from "docx";
@@ -790,6 +790,7 @@ function loadCustomerFromStorage(): { name: string; address: string; notes: stri
 export default function CrmProposalBuilder() {
   usePageTitle("Proposal Builder");
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   
   const { data: currentUser, isLoading: isLoadingUser } = useQuery<CrmUser>({
     queryKey: ["/api/crm/auth/me"],
@@ -1235,6 +1236,10 @@ export default function CrmProposalBuilder() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
+      setQuoteDialogOpen(false);
+      if (data.quote?.id) {
+        setLocation(`/crm/quotes/${data.quote.id}`);
+      }
     },
     onError: (error) => {
       toast({
