@@ -15706,8 +15706,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Validate scope
       const scope = quoteData.scope;
-      if (!scope || !['work_order', 'project'].includes(scope)) {
-        return res.status(400).json({ message: "scope must be 'work_order' or 'project'" });
+      if (!scope || !['work_order', 'project', 'standalone'].includes(scope)) {
+        return res.status(400).json({ message: "scope must be 'work_order', 'project', or 'standalone'" });
       }
       
       // Validate scope + workOrderId/projectId relationship
@@ -15732,6 +15732,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const [proj] = await db.select().from(crmProjects).where(eq(crmProjects.id, quoteData.projectId));
         if (!proj) {
           return res.status(400).json({ message: "Project not found" });
+        }
+      } else if (scope === 'standalone') {
+        // Standalone quotes require customerId
+        if (!quoteData.customerId) {
+          return res.status(400).json({ message: "customerId is required when scope is 'standalone'" });
+        }
+        quoteData.workOrderId = null;
+        quoteData.projectId = null;
+        
+        // Verify customer exists
+        const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, quoteData.customerId));
+        if (!customer) {
+          return res.status(400).json({ message: "Customer not found" });
         }
       }
 
