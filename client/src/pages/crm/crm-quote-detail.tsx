@@ -745,13 +745,14 @@ export default function CrmQuoteDetail() {
 
   const addFromCatalogMutation = useMutation({
     mutationFn: async (item: CrmItem) => {
+      const price = parseFloat(item.rate || "0");
       const res = await apiRequest("POST", `/api/crm/quotes/${quoteId}/line-items`, {
         description: item.name,
-        quantity: 1,
-        unitPrice: parseFloat(item.rate || "0"),
-        lineTotal: parseFloat(item.rate || "0"),
-        itemCategory: item.category || "install",
-        crmItemId: item.id,
+        quantity: "1",
+        unitPrice: price.toString(),
+        lineTotal: price.toString(),
+        lineType: item.category || "install",
+        itemId: item.id,
       });
       return res.json();
     },
@@ -794,11 +795,14 @@ export default function CrmQuoteDetail() {
 
   const addDiscountMutation = useMutation({
     mutationFn: async (data: { description: string; amount: number }) => {
+      const discountValue = -Math.abs(data.amount);
       const res = await apiRequest("POST", `/api/crm/quotes/${quoteId}/line-items`, {
         description: data.description,
-        quantity: 1,
-        unitPrice: -Math.abs(data.amount),
-        lineTotal: -Math.abs(data.amount),
+        quantity: "1",
+        unitPrice: discountValue.toString(),
+        lineTotal: discountValue.toString(),
+        lineType: "discount",
+        isDiscountLine: true,
       });
       return res.json();
     },
