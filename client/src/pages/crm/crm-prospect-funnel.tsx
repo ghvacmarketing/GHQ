@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -99,9 +99,11 @@ import {
   Pencil,
   History,
   Send,
+  FileText,
+  ExternalLink,
 } from "lucide-react";
 import { format, isToday, isPast, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, getDay } from "date-fns";
-import type { CrmUser, CrmCustomer, CrmFollowUp, SalesStage, InterestLevel, FollowUpType } from "@shared/schema";
+import type { CrmUser, CrmCustomer, CrmFollowUp, SalesStage, InterestLevel, FollowUpType, CrmQuote } from "@shared/schema";
 
 type ProspectMetrics = {
   activeProspects: number;
@@ -672,6 +674,18 @@ export default function CrmProspectFunnel() {
       return res.json();
     },
     enabled: !!currentUser && !!expandedProspectId,
+  });
+
+  const { data: leadQuotes = [] } = useQuery<CrmQuote[]>({
+    queryKey: ['/api/crm/quotes', 'customer', expandedProspectId],
+    queryFn: async () => {
+      if (!expandedProspectId) return [];
+      const res = await fetch(`/api/crm/quotes?customerId=${expandedProspectId}`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.quotes || [];
+    },
+    enabled: !!expandedProspectId,
   });
 
   const salesUsers = useMemo(() => {
@@ -1928,7 +1942,12 @@ export default function CrmProspectFunnel() {
                 <SheetHeader className="px-4 py-3 border-b flex-shrink-0 pr-12">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <SheetTitle className="text-lg truncate">{expandedProspect.name}</SheetTitle>
+                      <SheetTitle className="text-lg truncate">
+                        <Link href={`/crm/customers/${expandedProspect.id}`} className="hover:text-[#711419] hover:underline">
+                          {expandedProspect.name}
+                          <ExternalLink className="h-3 w-3 inline ml-1 opacity-50" />
+                        </Link>
+                      </SheetTitle>
                       <SheetDescription className="text-xs">
                         {expandedProspect.phone && <span className="mr-3">{expandedProspect.phone}</span>}
                         {expandedProspect.email && <span className="truncate">{expandedProspect.email}</span>}
@@ -2006,6 +2025,10 @@ export default function CrmProspectFunnel() {
                       <TabsTrigger value="notes" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
                         <StickyNote className="h-3 w-3 mr-1" />
                         Notes
+                      </TabsTrigger>
+                      <TabsTrigger value="quotes" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
+                        <FileText className="h-3 w-3 mr-1" />
+                        Quotes ({leadQuotes.length})
                       </TabsTrigger>
                     </TabsList>
 
@@ -2527,6 +2550,47 @@ export default function CrmProspectFunnel() {
                           </Card>
                         )}
                       </div>
+                    </TabsContent>
+
+                    <TabsContent value="quotes" className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h4 className="text-sm font-medium">Quotes</h4>
+                        <Link href={`/crm/quotes/new?customerId=${expandedProspect.id}&scope=standalone`}>
+                          <Button size="sm" className="h-8 text-xs">
+                            <Plus className="h-3 w-3 mr-1" />
+                            Create Quote
+                          </Button>
+                        </Link>
+                      </div>
+                      
+                      {leadQuotes.length === 0 ? (
+                        <div className="text-center py-8 text-sm text-gray-500">
+                          <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                          <p>No quotes yet</p>
+                          <p className="text-xs mt-1">Create a quote to send to this lead</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {leadQuotes.map((quote) => (
+                            <Link key={quote.id} href={`/crm/quotes/${quote.id}`}>
+                              <div className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <p className="font-medium text-sm">{quote.title || `Quote #${quote.quoteNumber}`}</p>
+                                    <p className="text-xs text-gray-500">{quote.createdAt ? format(new Date(quote.createdAt), "MMM d, yyyy") : ""}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="font-medium text-sm">${Number(quote.total || 0).toLocaleString()}</p>
+                                    <Badge variant={quote.status === 'accepted' ? 'default' : quote.status === 'sent' ? 'secondary' : 'outline'} className="text-xs">
+                                      {quote.status}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
                     </TabsContent>
                   </Tabs>
                 </ScrollArea>
