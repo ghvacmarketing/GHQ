@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -583,6 +584,11 @@ export default function CrmProspectFunnel() {
   const [editCompanyName, setEditCompanyName] = useState("");
   const [editNotes, setEditNotes] = useState("");
 
+  const [editingFollowUpId, setEditingFollowUpId] = useState<string | null>(null);
+  const [editFollowUpType, setEditFollowUpType] = useState<FollowUpType>("call");
+  const [editFollowUpDueDate, setEditFollowUpDueDate] = useState("");
+  const [editFollowUpNotes, setEditFollowUpNotes] = useState("");
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 8 },
@@ -686,6 +692,40 @@ export default function CrmProspectFunnel() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to schedule follow-up", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const completeFollowUpMutation = useMutation({
+    mutationFn: async ({ id, completedAt }: { id: string; completedAt: string | null }) => {
+      const res = await apiRequest("PATCH", `/api/crm/follow-ups/${id}`, { completedAt });
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/follow-ups"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
+      toast({ title: variables.completedAt ? "Follow-up completed" : "Follow-up marked incomplete" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update follow-up", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateFollowUpMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { followUpType?: FollowUpType; dueAt?: string; notes?: string } }) => {
+      const res = await apiRequest("PATCH", `/api/crm/follow-ups/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/follow-ups"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
+      setEditingFollowUpId(null);
+      setEditFollowUpType("call");
+      setEditFollowUpDueDate("");
+      setEditFollowUpNotes("");
+      toast({ title: "Follow-up updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update follow-up", description: error.message, variant: "destructive" });
     },
   });
 
@@ -1718,7 +1758,16 @@ export default function CrmProspectFunnel() {
                       <div className="space-y-1">
                         {dayFollowUps.slice(0, 3).map((followUp) => {
                           const followUpDate = typeof followUp.dueAt === "string" ? parseISO(followUp.dueAt) : followUp.dueAt;
-                          const isOverdue = isPast(followUpDate) && !isToday(followUpDate) && !followUp.completedAt;
+                          const isCompleted = !!followUp.completedAt;
+                          const isOverdue = isPast(followUpDate) && !isToday(followUpDate) && !isCompleted;
+                          
+                          const calendarItemStyle = isCompleted
+                            ? "bg-gray-100 text-gray-400 border border-gray-200"
+                            : isOverdue
+                            ? "bg-red-100 text-red-700"
+                            : isTodayDate
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-gray-100 text-gray-700";
                           
                           return (
                             <button
@@ -1729,18 +1778,12 @@ export default function CrmProspectFunnel() {
                                   setActiveTab("followups");
                                 }
                               }}
-                              className={`w-full text-left text-xs p-1 rounded truncate cursor-pointer hover:opacity-80 ${
-                                isOverdue
-                                  ? "bg-red-100 text-red-700"
-                                  : isTodayDate
-                                  ? "bg-amber-100 text-amber-700"
-                                  : "bg-gray-100 text-gray-700"
-                              }`}
+                              className={`w-full text-left text-xs p-1 rounded truncate cursor-pointer hover:opacity-80 ${calendarItemStyle}`}
                               data-testid={`calendar-followup-${followUp.id}`}
                             >
                               <div className="flex items-center gap-1">
                                 <FollowUpTypeIcon type={followUp.followUpType as FollowUpType} />
-                                <span className="truncate">{followUp.prospect?.name || "Unknown"}</span>
+                                <span className={`truncate ${isCompleted ? 'line-through' : ''}`}>{followUp.prospect?.name || "Unknown"}</span>
                               </div>
                               {followUp.notes && (
                                 <div className="truncate text-[10px] opacity-75">{followUp.notes}</div>
@@ -2090,54 +2133,165 @@ export default function CrmProspectFunnel() {
                         <div className="space-y-3">
                           {getProspectFollowUps(expandedProspect.id).map((followUp) => {
                             const dueDate = new Date(followUp.dueAt);
-                            const isOverdue = isPast(dueDate) && !isToday(dueDate) && !followUp.completedAt;
-                            const isDueToday = isToday(dueDate) && !followUp.completedAt;
+                            const isCompleted = !!followUp.completedAt;
+                            const isOverdue = isPast(dueDate) && !isToday(dueDate) && !isCompleted;
+                            const isDueToday = isToday(dueDate) && !isCompleted;
+                            const isEditingThis = editingFollowUpId === followUp.id;
+                            
+                            const cardStyle = isCompleted
+                              ? 'border-gray-200 bg-gray-50'
+                              : isOverdue
+                              ? 'border-red-300 bg-red-50'
+                              : isDueToday
+                              ? 'border-amber-300 bg-amber-50'
+                              : '';
+                            
+                            const iconBgStyle = isCompleted
+                              ? 'bg-gray-100'
+                              : isOverdue
+                              ? 'bg-red-100'
+                              : isDueToday
+                              ? 'bg-amber-100'
+                              : 'bg-gray-100';
                             
                             return (
                               <Card 
                                 key={followUp.id} 
-                                className={`p-3 ${isOverdue ? 'border-red-300 bg-red-50' : isDueToday ? 'border-amber-300 bg-amber-50' : ''}`}
+                                className={`p-3 ${cardStyle}`}
                                 data-testid={`card-followup-${followUp.id}`}
                               >
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="flex items-center gap-2">
-                                    <div className={`p-1.5 rounded ${isOverdue ? 'bg-red-100' : isDueToday ? 'bg-amber-100' : 'bg-gray-100'}`}>
-                                      <FollowUpTypeIcon type={followUp.followUpType as FollowUpType} />
+                                {isEditingThis ? (
+                                  <div className="space-y-3">
+                                    <div className="space-y-2">
+                                      <Label className="text-xs">Type</Label>
+                                      <Select value={editFollowUpType} onValueChange={(v) => setEditFollowUpType(v as FollowUpType)}>
+                                        <SelectTrigger className="h-8 text-sm">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="call">Call</SelectItem>
+                                          <SelectItem value="email">Email</SelectItem>
+                                          <SelectItem value="visit">Visit</SelectItem>
+                                          <SelectItem value="text">Text</SelectItem>
+                                        </SelectContent>
+                                      </Select>
                                     </div>
-                                    <div>
-                                      <div className="font-medium text-sm capitalize">{followUp.followUpType}</div>
-                                      <div className="text-xs text-muted-foreground">
-                                        Due: {format(dueDate, "MMM d, yyyy h:mm a")}
+                                    <div className="space-y-2">
+                                      <Label className="text-xs">Due Date</Label>
+                                      <Input
+                                        type="datetime-local"
+                                        value={editFollowUpDueDate}
+                                        onChange={(e) => setEditFollowUpDueDate(e.target.value)}
+                                        className="h-8 text-sm"
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label className="text-xs">Notes</Label>
+                                      <Textarea
+                                        value={editFollowUpNotes}
+                                        onChange={(e) => setEditFollowUpNotes(e.target.value)}
+                                        placeholder="Add notes..."
+                                        className="text-sm min-h-[60px]"
+                                      />
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        onClick={() => {
+                                          updateFollowUpMutation.mutate({
+                                            id: followUp.id,
+                                            data: {
+                                              followUpType: editFollowUpType,
+                                              dueAt: new Date(editFollowUpDueDate).toISOString(),
+                                              notes: editFollowUpNotes || undefined,
+                                            },
+                                          });
+                                        }}
+                                        disabled={!editFollowUpDueDate || updateFollowUpMutation.isPending}
+                                      >
+                                        {updateFollowUpMutation.isPending ? "Saving..." : "Save"}
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setEditingFollowUpId(null);
+                                          setEditFollowUpType("call");
+                                          setEditFollowUpDueDate("");
+                                          setEditFollowUpNotes("");
+                                        }}
+                                      >
+                                        Cancel
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex items-center gap-2">
+                                        <Checkbox
+                                          checked={isCompleted}
+                                          onCheckedChange={(checked) => {
+                                            completeFollowUpMutation.mutate({
+                                              id: followUp.id,
+                                              completedAt: checked ? new Date().toISOString() : null,
+                                            });
+                                          }}
+                                          disabled={completeFollowUpMutation.isPending}
+                                          className="flex-shrink-0"
+                                        />
+                                        <div className={`p-1.5 rounded ${iconBgStyle}`}>
+                                          <FollowUpTypeIcon type={followUp.followUpType as FollowUpType} />
+                                        </div>
+                                        <div className={isCompleted ? 'text-gray-500' : ''}>
+                                          <div className={`font-medium text-sm capitalize ${isCompleted ? 'line-through' : ''}`}>{followUp.followUpType}</div>
+                                          <div className="text-xs text-muted-foreground">
+                                            Due: {format(dueDate, "MMM d, yyyy h:mm a")}
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        {followUp.completedAt ? (
+                                          <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
+                                            Completed
+                                          </Badge>
+                                        ) : isOverdue ? (
+                                          <Badge variant="destructive" className="text-xs">
+                                            Overdue
+                                          </Badge>
+                                        ) : isDueToday ? (
+                                          <Badge className="text-xs bg-amber-500">
+                                            Due Today
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="outline" className="text-xs">
+                                            Scheduled
+                                          </Badge>
+                                        )}
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-7 w-7 p-0"
+                                          onClick={() => {
+                                            setEditingFollowUpId(followUp.id);
+                                            setEditFollowUpType(followUp.followUpType as FollowUpType);
+                                            setEditFollowUpDueDate(format(dueDate, "yyyy-MM-dd'T'HH:mm"));
+                                            setEditFollowUpNotes(followUp.notes || "");
+                                          }}
+                                        >
+                                          <Pencil className="h-3.5 w-3.5" />
+                                        </Button>
                                       </div>
                                     </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    {followUp.completedAt ? (
-                                      <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
-                                        Completed
-                                      </Badge>
-                                    ) : isOverdue ? (
-                                      <Badge variant="destructive" className="text-xs">
-                                        Overdue
-                                      </Badge>
-                                    ) : isDueToday ? (
-                                      <Badge className="text-xs bg-amber-500">
-                                        Due Today
-                                      </Badge>
-                                    ) : (
-                                      <Badge variant="outline" className="text-xs">
-                                        Scheduled
-                                      </Badge>
+                                    {followUp.notes && (
+                                      <p className={`text-xs mt-2 pl-12 ${isCompleted ? 'text-gray-400' : 'text-muted-foreground'}`}>{followUp.notes}</p>
                                     )}
-                                  </div>
-                                </div>
-                                {followUp.notes && (
-                                  <p className="text-xs text-muted-foreground mt-2 pl-9">{followUp.notes}</p>
-                                )}
-                                {followUp.outcome && (
-                                  <div className="mt-2 pl-9">
-                                    <Badge variant="outline" className="text-xs">{followUp.outcome.replace(/_/g, " ")}</Badge>
-                                  </div>
+                                    {followUp.outcome && (
+                                      <div className="mt-2 pl-12">
+                                        <Badge variant="outline" className="text-xs">{followUp.outcome.replace(/_/g, " ")}</Badge>
+                                      </div>
+                                    )}
+                                  </>
                                 )}
                               </Card>
                             );
