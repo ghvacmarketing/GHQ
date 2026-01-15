@@ -95,6 +95,7 @@ import {
   GripVertical,
   LayoutGrid,
   Trophy,
+  Pencil,
 } from "lucide-react";
 import { format, isToday, isPast, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, getDay } from "date-fns";
 import type { CrmUser, CrmCustomer, CrmFollowUp, SalesStage, InterestLevel, FollowUpType } from "@shared/schema";
@@ -574,6 +575,13 @@ export default function CrmProspectFunnel() {
   
   const [activeProspectId, setActiveProspectId] = useState<string | null>(null);
   const [isDraggingCard, setIsDraggingCard] = useState(false);
+  
+  const [isEditing, setIsEditing] = useState(false);
+  const [editPhone, setEditPhone] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editCompanyName, setEditCompanyName] = useState("");
+  const [editNotes, setEditNotes] = useState("");
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -714,6 +722,55 @@ export default function CrmProspectFunnel() {
       toast({ title: "Failed to remove from funnel", description: error.message, variant: "destructive" });
     },
   });
+
+  const updateLeadMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { phone?: string; email?: string; fullAddress?: string; companyName?: string; notes?: string } }) => {
+      const res = await apiRequest("PATCH", `/api/crm/customers/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
+      toast({ title: "Lead updated successfully" });
+      setIsEditing(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update lead", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleEditLead = () => {
+    if (!expandedProspect) return;
+    setEditPhone(expandedProspect.phone || "");
+    setEditEmail(expandedProspect.email || "");
+    setEditAddress(expandedProspect.fullAddress || "");
+    setEditCompanyName(expandedProspect.companyName || "");
+    setEditNotes(expandedProspect.notes || "");
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditPhone("");
+    setEditEmail("");
+    setEditAddress("");
+    setEditCompanyName("");
+    setEditNotes("");
+  };
+
+  const handleSaveLead = () => {
+    if (!expandedProspect) return;
+    updateLeadMutation.mutate({
+      id: expandedProspect.id,
+      data: {
+        phone: editPhone,
+        email: editEmail,
+        fullAddress: editAddress,
+        companyName: editCompanyName,
+        notes: editNotes,
+      },
+    });
+  };
 
   const handleRemoveFromFunnel = () => {
     if (confirmProspectId) {
@@ -1753,7 +1810,12 @@ export default function CrmProspectFunnel() {
           </Tabs>
         </div>
 
-        <Sheet open={!!expandedProspectId} onOpenChange={(open) => !open && setExpandedProspectId(null)}>
+        <Sheet open={!!expandedProspectId} onOpenChange={(open) => {
+          if (!open) {
+            setExpandedProspectId(null);
+            setIsEditing(false);
+          }
+        }}>
           <SheetContent side="bottom" className="h-[95vh] p-0 flex flex-col">
             {expandedProspect && (
               <>
@@ -1823,92 +1885,190 @@ export default function CrmProspectFunnel() {
                       </div>
 
                       <div className="space-y-2">
-                        <h4 className="text-sm font-medium">Contact Information</h4>
-                        <div className="grid gap-2 text-sm">
-                          {expandedProspect.phone && (
-                            <a href={`tel:${expandedProspect.phone}`} className="flex items-center gap-2 hover:underline">
-                              <Phone className="h-4 w-4 text-muted-foreground" />
-                              {expandedProspect.phone}
-                            </a>
-                          )}
-                          {expandedProspect.email && (
-                            <a href={`mailto:${expandedProspect.email}`} className="flex items-center gap-2 hover:underline">
-                              <Mail className="h-4 w-4 text-muted-foreground" />
-                              {expandedProspect.email}
-                            </a>
-                          )}
-                          {expandedProspect.fullAddress && (
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                              <span>{expandedProspect.fullAddress}</span>
-                            </div>
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-medium">Contact Information</h4>
+                          {!isEditing && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleEditLead}
+                              className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                              data-testid="button-edit-lead"
+                            >
+                              <Pencil className="h-4 w-4 mr-1" />
+                              Edit
+                            </Button>
                           )}
                         </div>
+                        
+                        {isEditing ? (
+                          <div className="grid gap-3">
+                            <div className="space-y-1.5">
+                              <Label htmlFor="edit-phone" className="text-xs text-muted-foreground">Phone</Label>
+                              <Input
+                                id="edit-phone"
+                                value={editPhone}
+                                onChange={(e) => setEditPhone(e.target.value)}
+                                placeholder="Enter phone number"
+                                className="h-9"
+                                data-testid="input-edit-phone"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="edit-email" className="text-xs text-muted-foreground">Email</Label>
+                              <Input
+                                id="edit-email"
+                                type="email"
+                                value={editEmail}
+                                onChange={(e) => setEditEmail(e.target.value)}
+                                placeholder="Enter email address"
+                                className="h-9"
+                                data-testid="input-edit-email"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="edit-address" className="text-xs text-muted-foreground">Address</Label>
+                              <Input
+                                id="edit-address"
+                                value={editAddress}
+                                onChange={(e) => setEditAddress(e.target.value)}
+                                placeholder="Enter address"
+                                className="h-9"
+                                data-testid="input-edit-address"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="edit-company" className="text-xs text-muted-foreground">Company</Label>
+                              <Input
+                                id="edit-company"
+                                value={editCompanyName}
+                                onChange={(e) => setEditCompanyName(e.target.value)}
+                                placeholder="Enter company name"
+                                className="h-9"
+                                data-testid="input-edit-company"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="edit-notes" className="text-xs text-muted-foreground">Notes</Label>
+                              <Textarea
+                                id="edit-notes"
+                                value={editNotes}
+                                onChange={(e) => setEditNotes(e.target.value)}
+                                placeholder="Enter notes"
+                                className="min-h-[80px] resize-none"
+                                data-testid="input-edit-notes"
+                              />
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                              <Button
+                                variant="outline"
+                                className="flex-1"
+                                onClick={handleCancelEdit}
+                                data-testid="button-cancel-edit"
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                className="flex-1 bg-[#711419] hover:bg-[#5a1014]"
+                                onClick={handleSaveLead}
+                                disabled={updateLeadMutation.isPending}
+                                data-testid="button-save-lead"
+                              >
+                                {updateLeadMutation.isPending ? "Saving..." : "Save"}
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid gap-2 text-sm">
+                            {expandedProspect.phone && (
+                              <a href={`tel:${expandedProspect.phone}`} className="flex items-center gap-2 hover:underline">
+                                <Phone className="h-4 w-4 text-muted-foreground" />
+                                {expandedProspect.phone}
+                              </a>
+                            )}
+                            {expandedProspect.email && (
+                              <a href={`mailto:${expandedProspect.email}`} className="flex items-center gap-2 hover:underline">
+                                <Mail className="h-4 w-4 text-muted-foreground" />
+                                {expandedProspect.email}
+                              </a>
+                            )}
+                            {expandedProspect.fullAddress && (
+                              <div className="flex items-center gap-2">
+                                <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                <span>{expandedProspect.fullAddress}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
-                      {expandedProspect.companyName && (
+                      {!isEditing && expandedProspect.companyName && (
                         <div className="space-y-2">
                           <h4 className="text-sm font-medium">Company</h4>
                           <p className="text-sm text-muted-foreground">{expandedProspect.companyName}</p>
                         </div>
                       )}
 
-                      {expandedProspect.notes && (
+                      {!isEditing && expandedProspect.notes && (
                         <div className="space-y-2">
                           <h4 className="text-sm font-medium">Notes</h4>
                           <p className="text-sm text-muted-foreground whitespace-pre-wrap">{expandedProspect.notes}</p>
                         </div>
                       )}
 
-                      <div className="pt-4 border-t flex gap-2">
-                        {expandedProspect.salesStage !== "won" && expandedProspect.salesStage !== "lost" && (
-                          <>
-                            <Button 
-                              className="flex-1" 
-                              variant="outline"
-                              onClick={() => {
-                                setConfirmProspectId(expandedProspect.id);
-                                setWonConfirmOpen(true);
-                              }}
+                      {!isEditing && (
+                        <>
+                          <div className="pt-4 border-t flex gap-2">
+                            {expandedProspect.salesStage !== "won" && expandedProspect.salesStage !== "lost" && (
+                              <>
+                                <Button 
+                                  className="flex-1" 
+                                  variant="outline"
+                                  onClick={() => {
+                                    setConfirmProspectId(expandedProspect.id);
+                                    setWonConfirmOpen(true);
+                                  }}
+                                >
+                                  <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
+                                  Mark Won
+                                </Button>
+                                <Button 
+                                  className="flex-1" 
+                                  variant="outline"
+                                  onClick={() => {
+                                    setConfirmProspectId(expandedProspect.id);
+                                    setLostConfirmOpen(true);
+                                  }}
+                                >
+                                  <X className="h-4 w-4 mr-2 text-red-600" />
+                                  Mark Lost
+                                </Button>
+                              </>
+                            )}
+                            <Button
+                              className="flex-1"
+                              onClick={() => navigate(`/crm/customers/${expandedProspect.id}`)}
                             >
-                              <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
-                              Mark Won
+                              View Full Profile
                             </Button>
-                            <Button 
-                              className="flex-1" 
-                              variant="outline"
-                              onClick={() => {
-                                setConfirmProspectId(expandedProspect.id);
-                                setLostConfirmOpen(true);
-                              }}
-                            >
-                              <X className="h-4 w-4 mr-2 text-red-600" />
-                              Mark Lost
-                            </Button>
-                          </>
-                        )}
-                        <Button
-                          className="flex-1"
-                          onClick={() => navigate(`/crm/customers/${expandedProspect.id}`)}
-                        >
-                          View Full Profile
-                        </Button>
-                      </div>
+                          </div>
 
-                      <div className="pt-4 border-t">
-                        <Button 
-                          variant="outline"
-                          className="w-full"
-                          onClick={() => {
-                            setConfirmProspectId(expandedProspect.id);
-                            setDeleteConfirmOpen(true);
-                          }}
-                          data-testid="button-remove-from-funnel"
-                        >
-                          <X className="h-4 w-4 mr-2" />
-                          Remove from Funnel
-                        </Button>
-                      </div>
+                          <div className="pt-4 border-t">
+                            <Button 
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => {
+                                setConfirmProspectId(expandedProspect.id);
+                                setDeleteConfirmOpen(true);
+                              }}
+                              data-testid="button-remove-from-funnel"
+                            >
+                              <X className="h-4 w-4 mr-2" />
+                              Remove from Funnel
+                            </Button>
+                          </div>
+                        </>
+                      )}
                     </TabsContent>
 
                     <TabsContent value="followups" className="space-y-4">
