@@ -34,6 +34,7 @@ import {
   useSensors,
   closestCorners,
   useDroppable,
+  useDraggable,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -406,6 +407,93 @@ function HorizontalScrollContainer({ children, className, isDraggingCard }: Hori
   );
 }
 
+interface DraggableFollowUpProps {
+  followUp: {
+    id: string;
+    followUpType: string | null;
+    dueAt: string | Date;
+    notes: string | null;
+    completedAt: string | Date | null;
+    prospect?: CrmCustomer;
+  };
+  onClick: () => void;
+  calendarItemStyle: string;
+  isCompleted: boolean;
+}
+
+function DraggableFollowUp({ followUp, onClick, calendarItemStyle, isCompleted }: DraggableFollowUpProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: followUp.id,
+  });
+
+  const style = transform
+    ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        zIndex: isDragging ? 1000 : undefined,
+        opacity: isDragging ? 0.8 : 1,
+      }
+    : undefined;
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (isDragging) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    onClick();
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      onClick={handleClick}
+      style={style}
+      className={`w-full text-left text-xs p-1 rounded truncate cursor-grab active:cursor-grabbing hover:opacity-80 touch-manipulation ${calendarItemStyle}`}
+      data-testid={`calendar-followup-${followUp.id}`}
+    >
+      <div className="flex items-center gap-1">
+        <FollowUpTypeIcon type={followUp.followUpType as FollowUpType} />
+        <span className={`truncate ${isCompleted ? 'line-through' : ''}`}>{followUp.prospect?.name || "Unknown"}</span>
+      </div>
+      {followUp.notes && (
+        <div className="truncate text-[10px] opacity-75">{followUp.notes}</div>
+      )}
+    </div>
+  );
+}
+
+interface DroppableCalendarDayProps {
+  day: Date;
+  calendarMonth: Date;
+  children: ReactNode;
+}
+
+function DroppableCalendarDay({ day, calendarMonth, children }: DroppableCalendarDayProps) {
+  const dateStr = format(day, "yyyy-MM-dd");
+  const { setNodeRef, isOver } = useDroppable({
+    id: `calendar-day-${dateStr}`,
+  });
+
+  const isCurrentMonth = isSameMonth(day, calendarMonth);
+  const isTodayDate = isToday(day);
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`min-h-[100px] bg-white p-1 transition-colors ${
+        !isCurrentMonth ? "bg-gray-50 text-gray-400" : ""
+      } ${isTodayDate ? "ring-2 ring-amber-400 ring-inset" : ""} ${
+        isOver ? "bg-blue-50 ring-2 ring-blue-400 ring-inset" : ""
+      }`}
+      data-testid={`calendar-day-${dateStr}`}
+    >
+      {children}
+    </div>
+  );
+}
+
 interface ProspectCardProps {
   prospect: CrmCustomer;
   onClick: () => void;
@@ -580,6 +668,7 @@ export default function CrmProspectFunnel() {
   
   const [activeProspectId, setActiveProspectId] = useState<string | null>(null);
   const [isDraggingCard, setIsDraggingCard] = useState(false);
+  const [activeCalendarFollowUpId, setActiveCalendarFollowUpId] = useState<string | null>(null);
   
   const [isEditing, setIsEditing] = useState(false);
   const [editPhone, setEditPhone] = useState("");
@@ -1072,6 +1161,41 @@ export default function CrmProspectFunnel() {
         }
       }
     }
+  };
+
+  const handleCalendarDragStart = (event: DragStartEvent) => {
+    setActiveCalendarFollowUpId(event.active.id as string);
+  };
+
+  const handleCalendarDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveCalendarFollowUpId(null);
+
+    if (!over) return;
+
+    const followUpId = active.id as string;
+    const targetDateStr = over.id as string;
+
+    if (!targetDateStr.startsWith("calendar-day-")) return;
+
+    const targetDate = parseISO(targetDateStr.replace("calendar-day-", ""));
+    const followUp = followUps.find((f) => f.id === followUpId);
+
+    if (!followUp) return;
+
+    const originalDate = typeof followUp.dueAt === "string" ? parseISO(followUp.dueAt) : followUp.dueAt;
+
+    if (isSameDay(originalDate, targetDate)) return;
+
+    const hours = originalDate.getHours();
+    const minutes = originalDate.getMinutes();
+    const newDate = new Date(targetDate);
+    newDate.setHours(hours, minutes, 0, 0);
+
+    updateFollowUpMutation.mutate({
+      id: followUpId,
+      data: { dueAt: newDate.toISOString() },
+    });
   };
 
   const filteredProspectIds = useMemo(() => {
@@ -1784,101 +1908,118 @@ export default function CrmProspectFunnel() {
 
             <TabsContent value="calendar" className="space-y-4 mt-4">
               <SearchFiltersComponent />
-              <div className="space-y-4" data-testid="calendar-view">
-              <div className="flex items-center justify-between">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}
-                  data-testid="button-prev-month"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <h3 className="text-lg font-semibold" data-testid="text-calendar-month">
-                  {format(calendarMonth, "MMMM yyyy")}
-                </h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}
-                  data-testid="button-next-month"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-              
-              <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-lg overflow-hidden">
-                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                  <div key={day} className="bg-gray-100 text-center py-2 text-xs font-medium text-gray-600">
-                    {day}
-                  </div>
-                ))}
-                {calendarDays.map((day, idx) => {
-                  const dayFollowUps = getFollowUpsForDate(day);
-                  const isCurrentMonth = isSameMonth(day, calendarMonth);
-                  const isTodayDate = isToday(day);
-                  const isPastDate = isPast(day) && !isTodayDate;
-                  
-                  return (
-                    <div
-                      key={idx}
-                      className={`min-h-[100px] bg-white p-1 ${
-                        !isCurrentMonth ? "bg-gray-50 text-gray-400" : ""
-                      } ${isTodayDate ? "ring-2 ring-amber-400 ring-inset" : ""}`}
-                      data-testid={`calendar-day-${format(day, "yyyy-MM-dd")}`}
+              <DndContext
+                sensors={sensors}
+                onDragStart={handleCalendarDragStart}
+                onDragEnd={handleCalendarDragEnd}
+              >
+                <div className="space-y-4" data-testid="calendar-view">
+                  <div className="flex items-center justify-between">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}
+                      data-testid="button-prev-month"
                     >
-                      <div className={`text-xs font-medium mb-1 ${
-                        isTodayDate ? "text-amber-600" : isPastDate ? "text-gray-400" : "text-gray-700"
-                      }`}>
-                        {format(day, "d")}
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <h3 className="text-lg font-semibold" data-testid="text-calendar-month">
+                      {format(calendarMonth, "MMMM yyyy")}
+                    </h3>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}
+                      data-testid="button-next-month"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-lg overflow-hidden">
+                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                      <div key={day} className="bg-gray-100 text-center py-2 text-xs font-medium text-gray-600">
+                        {day}
                       </div>
-                      <div className="space-y-1">
-                        {dayFollowUps.slice(0, 3).map((followUp) => {
-                          const followUpDate = typeof followUp.dueAt === "string" ? parseISO(followUp.dueAt) : followUp.dueAt;
-                          const isCompleted = !!followUp.completedAt;
-                          const isOverdue = isPast(followUpDate) && !isToday(followUpDate) && !isCompleted;
-                          
-                          const calendarItemStyle = isCompleted
-                            ? "bg-gray-100 text-gray-400 border border-gray-200"
-                            : isOverdue
-                            ? "bg-red-100 text-red-700"
-                            : isTodayDate
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-gray-100 text-gray-700";
-                          
-                          return (
-                            <button
-                              key={followUp.id}
-                              onClick={() => {
-                                if (followUp.prospect) {
-                                  setExpandedProspectId(followUp.prospect.id);
-                                  setActiveTab("followups");
-                                }
-                              }}
-                              className={`w-full text-left text-xs p-1 rounded truncate cursor-pointer hover:opacity-80 ${calendarItemStyle}`}
-                              data-testid={`calendar-followup-${followUp.id}`}
-                            >
-                              <div className="flex items-center gap-1">
-                                <FollowUpTypeIcon type={followUp.followUpType as FollowUpType} />
-                                <span className={`truncate ${isCompleted ? 'line-through' : ''}`}>{followUp.prospect?.name || "Unknown"}</span>
-                              </div>
-                              {followUp.notes && (
-                                <div className="truncate text-[10px] opacity-75">{followUp.notes}</div>
-                              )}
-                            </button>
-                          );
-                        })}
-                        {dayFollowUps.length > 3 && (
-                          <div className="text-[10px] text-muted-foreground text-center">
-                            +{dayFollowUps.length - 3} more
+                    ))}
+                    {calendarDays.map((day, idx) => {
+                      const dayFollowUps = getFollowUpsForDate(day);
+                      const isTodayDate = isToday(day);
+                      const isPastDate = isPast(day) && !isTodayDate;
+                      
+                      return (
+                        <DroppableCalendarDay key={idx} day={day} calendarMonth={calendarMonth}>
+                          <div className={`text-xs font-medium mb-1 ${
+                            isTodayDate ? "text-amber-600" : isPastDate ? "text-gray-400" : "text-gray-700"
+                          }`}>
+                            {format(day, "d")}
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+                          <div className="space-y-1">
+                            {dayFollowUps.slice(0, 3).map((followUp) => {
+                              const followUpDate = typeof followUp.dueAt === "string" ? parseISO(followUp.dueAt) : followUp.dueAt;
+                              const isCompleted = !!followUp.completedAt;
+                              const isOverdue = isPast(followUpDate) && !isToday(followUpDate) && !isCompleted;
+                              
+                              const calendarItemStyle = isCompleted
+                                ? "bg-gray-100 text-gray-400 border border-gray-200"
+                                : isOverdue
+                                ? "bg-red-100 text-red-700"
+                                : isTodayDate
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-gray-100 text-gray-700";
+                              
+                              return (
+                                <DraggableFollowUp
+                                  key={followUp.id}
+                                  followUp={followUp}
+                                  onClick={() => {
+                                    if (followUp.prospect) {
+                                      setExpandedProspectId(followUp.prospect.id);
+                                      setActiveTab("followups");
+                                    }
+                                  }}
+                                  calendarItemStyle={calendarItemStyle}
+                                  isCompleted={isCompleted}
+                                />
+                              );
+                            })}
+                            {dayFollowUps.length > 3 && (
+                              <div className="text-[10px] text-muted-foreground text-center">
+                                +{dayFollowUps.length - 3} more
+                              </div>
+                            )}
+                          </div>
+                        </DroppableCalendarDay>
+                      );
+                    })}
+                  </div>
+                </div>
+                <DragOverlay>
+                  {activeCalendarFollowUpId ? (
+                    (() => {
+                      const followUp = followUps.find((f) => f.id === activeCalendarFollowUpId);
+                      if (!followUp) return null;
+                      const prospect = filteredProspects.find((p) => p.id === followUp.customerId);
+                      const followUpDate = typeof followUp.dueAt === "string" ? parseISO(followUp.dueAt) : followUp.dueAt;
+                      const isCompleted = !!followUp.completedAt;
+                      const isOverdue = isPast(followUpDate) && !isToday(followUpDate) && !isCompleted;
+                      const calendarItemStyle = isCompleted
+                        ? "bg-gray-100 text-gray-400 border border-gray-200"
+                        : isOverdue
+                        ? "bg-red-100 text-red-700"
+                        : "bg-amber-100 text-amber-700";
+                      return (
+                        <div className={`text-xs p-1 rounded truncate shadow-lg ${calendarItemStyle}`}>
+                          <div className="flex items-center gap-1">
+                            <FollowUpTypeIcon type={followUp.followUpType as FollowUpType} />
+                            <span>{prospect?.name || "Unknown"}</span>
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
             </TabsContent>
 
             <TabsContent value="kanban" className="mt-4 -mx-4 px-0" style={{ overflow: 'visible' }}>
