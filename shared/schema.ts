@@ -1377,6 +1377,8 @@ export const crmInvoices = pgTable("crm_invoices", {
   isHistorical: boolean("is_historical").default(false),
   fieldEdgeInvoiceNumber: text("field_edge_invoice_number"),
   fieldEdgeWoNumber: text("field_edge_wo_number"),
+  // Short public view token for client-facing links
+  viewToken: text("view_token"),
 }, (table) => ({
   statusIdx: index("crm_invoices_status_idx").on(table.status),
 }));

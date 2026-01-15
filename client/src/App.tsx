@@ -97,6 +97,7 @@ const PortalServiceHistory = lazy(() => import("@/pages/portal/portal-service-hi
 
 // Lazy-load Public pages (no auth required)
 const PublicQuoteView = lazy(() => import("@/pages/public/quote-view"));
+const PublicInvoiceView = lazy(() => import("@/pages/public/invoice-view"));
 
 // Global Error Boundary to prevent blank screens
 class ErrorBoundary extends Component<
@@ -306,6 +307,8 @@ function Router() {
       <Route path="/portal/agreements">{() => <PortalWrapper><PortalAgreements /></PortalWrapper>}</Route>
       <Route path="/portal/service-history">{() => <PortalWrapper><PortalServiceHistory /></PortalWrapper>}</Route>
       <Route path="/quote/:token">{() => <Suspense fallback={<GlobalLoader />}><PublicQuoteView /></Suspense>}</Route>
+      <Route path="/q/:token">{() => <Suspense fallback={<GlobalLoader />}><PublicQuoteView /></Suspense>}</Route>
+      <Route path="/i/:token">{() => <Suspense fallback={<GlobalLoader />}><PublicInvoiceView /></Suspense>}</Route>
       <Route component={NotFound} />
     </Switch>
   );

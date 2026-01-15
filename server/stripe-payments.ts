@@ -120,7 +120,7 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
       after_completion: {
         type: 'redirect',
         redirect: {
-          url: `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}/quote/${quote.viewToken}?payment=success`,
+          url: `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}/q/${quote.viewToken}?payment=success`,
         },
       },
     });
@@ -170,6 +170,16 @@ router.post("/api/stripe/invoice/:invoiceId/payment-link", async (req, res) => {
 
     const stripe = await getUncachableStripeClient();
 
+    // Ensure invoice has a viewToken for short URLs
+    let viewToken = invoice.viewToken;
+    if (!viewToken) {
+      const { nanoid } = await import("nanoid");
+      viewToken = nanoid(8);
+      await db.update(crmInvoices)
+        .set({ viewToken, updatedAt: new Date() })
+        .where(eq(crmInvoices.id, invoice.id));
+    }
+
     // Create a Payment Link for the full balance
     const paymentLink = await stripe.paymentLinks.create({
       line_items: [
@@ -193,7 +203,7 @@ router.post("/api/stripe/invoice/:invoiceId/payment-link", async (req, res) => {
       after_completion: {
         type: 'redirect',
         redirect: {
-          url: `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}/portal/invoice/${invoice.id}?payment=success`,
+          url: `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}/i/${viewToken}?payment=success`,
         },
       },
     });

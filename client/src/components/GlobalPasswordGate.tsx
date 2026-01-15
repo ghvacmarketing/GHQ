@@ -12,7 +12,9 @@ const EXPIRY_DAYS = 90;
 
 // Public routes that bypass password protection - clients need to access these
 const PUBLIC_ROUTES = [
-  /^\/quote\/[^/]+$/,       // /quote/:token - public quote viewing
+  /^\/quote\/[^/]+$/,       // /quote/:token - public quote viewing (legacy long URL)
+  /^\/q\/[^/]+$/,           // /q/:token - short public quote viewing
+  /^\/i\/[^/]+$/,           // /i/:token - short public invoice viewing
   /^\/portal(\/|$)/,        // /portal/* - customer portal (has its own auth)
   /^\/book-online/,         // /book-online - public booking page
   /^\/auth-verify/,         // /auth-verify - SMS magic link verification

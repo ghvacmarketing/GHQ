@@ -14980,10 +14980,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const subject = `Your Invoice from Giesbrecht HVAC - ${invoice.invoiceNumber}`;
       const replyToEmail = user.email;
       
-      // Build payment link URL for SMS
+      // Generate viewToken if one doesn't exist (8 chars for shorter client-facing URLs)
+      let currentInvoice = invoice;
+      if (!currentInvoice.viewToken) {
+        const { nanoid } = await import("nanoid");
+        const viewToken = nanoid(8);
+        [currentInvoice] = await db.update(crmInvoices)
+          .set({ viewToken, updatedAt: new Date() })
+          .where(eq(crmInvoices.id, currentInvoice.id))
+          .returning();
+      }
+      
+      // Build payment link URL for SMS (short /i/ route)
       const host = req.get('host') || process.env.REPLIT_DOMAINS?.split(',')[0] || 'app.ghvacinc.com';
       const protocol = req.protocol || 'https';
-      const paymentLink = `${protocol}://${host}/portal/invoice/${invoice.id}`;
+      const paymentLink = `${protocol}://${host}/i/${currentInvoice.viewToken}`;
 
       // Track results
       const emailResults: { email: string; success: boolean; error?: string; messageId?: string }[] = [];
@@ -17140,19 +17151,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Generate viewToken if one doesn't exist
+      // Generate viewToken if one doesn't exist (8 chars for shorter client-facing URLs)
       if (!quote.viewToken) {
         const { nanoid } = await import("nanoid");
-        const viewToken = nanoid(32);
+        const viewToken = nanoid(8);
         [quote] = await db.update(crmQuotes)
           .set({ viewToken, updatedAt: new Date() })
           .where(eq(crmQuotes.id, quote.id))
           .returning();
       }
 
-      // Build the public quote view URL
+      // Build the public quote view URL (short /q/ route)
       const baseUrl = `https://${req.get("host")}`;
-      const quoteViewUrl = `${baseUrl}/quote/${quote.viewToken}`;
+      const quoteViewUrl = `${baseUrl}/q/${quote.viewToken}`;
 
       const lineItems = await db.select().from(crmQuoteLineItems)
         .where(eq(crmQuoteLineItems.quoteId, quote.id))
@@ -19553,8 +19564,97 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   });
 
   // ============================================
-  // PUBLIC QUOTE VIEW & E-SIGNATURE ROUTES
+  // PUBLIC QUOTE & INVOICE VIEW ROUTES
   // ============================================
+
+  // GET /api/public/invoices/:token - Fetch invoice by viewToken (public, no auth)
+  app.get("/api/public/invoices/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+
+      if (!token || typeof token !== "string") {
+        return res.status(400).json({ message: "Invalid token" });
+      }
+
+      const [invoice] = await db.select().from(crmInvoices).where(eq(crmInvoices.viewToken, token)).limit(1);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found or link is invalid" });
+      }
+
+      // Track invoice views - update viewedAt (first view) and increment viewCount (every view)
+      const now = new Date();
+      const currentViewCount = invoice.viewCount || 0;
+      
+      await db.update(crmInvoices)
+        .set({ 
+          viewedAt: invoice.viewedAt || now,
+          viewCount: currentViewCount + 1,
+          updatedAt: now 
+        })
+        .where(eq(crmInvoices.id, invoice.id));
+      
+      console.log(`[InvoiceView] Invoice ${invoice.invoiceNumber} viewed (view #${currentViewCount + 1})`);
+
+      // Get line items
+      const lineItems = await db.select().from(crmInvoiceLineItems)
+        .where(eq(crmInvoiceLineItems.invoiceId, invoice.id))
+        .orderBy(crmInvoiceLineItems.sortOrder);
+
+      // Get customer name
+      let customerName = "Customer";
+      if (invoice.customerId) {
+        const [customer] = await db.select().from(crmCustomers)
+          .where(eq(crmCustomers.id, invoice.customerId)).limit(1);
+        if (customer) {
+          customerName = customer.name || "Customer";
+        }
+      }
+
+      // Get property address
+      let serviceAddress = "";
+      if (invoice.propertyId) {
+        const [property] = await db.select().from(crmProperties)
+          .where(eq(crmProperties.id, invoice.propertyId)).limit(1);
+        if (property) {
+          serviceAddress = property.address || "";
+        }
+      }
+
+      // Return only public-safe fields
+      const publicInvoice = {
+        id: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        customerName,
+        serviceAddress,
+        status: invoice.status,
+        subtotal: invoice.subtotal,
+        laborTotal: invoice.laborTotal,
+        total: invoice.total,
+        amountPaid: invoice.amountPaid,
+        balanceDue: invoice.balanceDue,
+        dueDate: invoice.dueDate,
+        paidAt: invoice.paidAt,
+        notes: invoice.notes,
+        createdAt: invoice.createdAt,
+      };
+
+      const publicLineItems = lineItems.map((item) => ({
+        id: item.id,
+        lineType: item.lineType,
+        description: item.description,
+        partNumber: item.partNumber,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        lineTotal: item.lineTotal,
+        sortOrder: item.sortOrder,
+      }));
+
+      return res.json({ invoice: publicInvoice, lineItems: publicLineItems });
+    } catch (error) {
+      console.error("Error fetching public invoice:", error);
+      return res.status(500).json({ message: "Failed to load invoice" });
+    }
+  });
 
   // GET /api/public/quotes/:token - Fetch quote by viewToken (public, no auth)
   app.get("/api/public/quotes/:token", async (req, res) => {

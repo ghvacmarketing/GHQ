@@ -73,6 +73,19 @@ export interface CrmInvoiceEmailResult {
   paymentLinkUrl?: string;
 }
 
+// Ensure invoice has a viewToken for short URLs
+async function ensureViewToken(invoice: CrmInvoice): Promise<string> {
+  if (invoice.viewToken) {
+    return invoice.viewToken;
+  }
+  const { nanoid } = await import("nanoid");
+  const viewToken = nanoid(8);
+  await db.update(crmInvoices)
+    .set({ viewToken, updatedAt: new Date() })
+    .where(eq(crmInvoices.id, invoice.id));
+  return viewToken;
+}
+
 // Generate a Stripe payment link for an invoice and store its ID for later deactivation
 async function generatePaymentLink(invoice: CrmInvoice): Promise<string | null> {
   try {
@@ -80,6 +93,9 @@ async function generatePaymentLink(invoice: CrmInvoice): Promise<string | null> 
     if (balanceDue <= 0) {
       return null; // No balance due, no payment link needed
     }
+
+    // Ensure we have a viewToken for short URLs
+    const viewToken = await ensureViewToken(invoice);
 
     const stripe = await getUncachableStripeClient();
     
@@ -105,7 +121,7 @@ async function generatePaymentLink(invoice: CrmInvoice): Promise<string | null> 
       after_completion: {
         type: 'redirect',
         redirect: {
-          url: `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}/portal/invoice/${invoice.id}?payment=success`,
+          url: `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}/i/${viewToken}?payment=success`,
         },
       },
     });
