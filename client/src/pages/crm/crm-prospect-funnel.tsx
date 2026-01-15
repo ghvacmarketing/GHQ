@@ -1897,7 +1897,7 @@ export default function CrmProspectFunnel() {
             setIsEditing(false);
           }
         }}>
-          <SheetContent side="right" className="w-[90vw] sm:w-[440px] sm:max-w-[440px] p-0 flex flex-col overflow-y-auto">
+          <SheetContent side="right" className="w-[90vw] sm:w-[530px] sm:max-w-[530px] p-0 flex flex-col overflow-y-auto">
             {expandedProspect && (
               <>
                 <SheetHeader className="px-4 py-3 border-b flex-shrink-0 pr-12">
