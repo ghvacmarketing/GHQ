@@ -687,6 +687,24 @@ export default function CrmQuoteDetail() {
     },
   });
 
+  const deleteLineItemMutation = useMutation({
+    mutationFn: async (lineItemId: string) => {
+      const res = await apiRequest("DELETE", `/api/crm/quotes/${quoteId}/line-items/${lineItemId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      toast({ title: "Line item deleted" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete line item",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleStartEditLineItem = (item: CrmQuoteLineItem) => {
     setEditingLineItemId(item.id);
     setEditingLineItemData({
@@ -2370,16 +2388,28 @@ export default function CrmQuoteDetail() {
                           <TableCell className="text-right">{formatCurrency(item.lineTotal)}</TableCell>
                           {canEditLineItems && (
                             <TableCell>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-8 w-8 p-0"
-                                onClick={() => handleStartEditLineItem(item)}
-                                disabled={editingLineItemId !== null}
-                                data-testid={`button-edit-line-item-${item.id}`}
-                              >
-                                <Pencil className="h-4 w-4 text-slate-500 hover:text-[#711419]" />
-                              </Button>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => handleStartEditLineItem(item)}
+                                  disabled={editingLineItemId !== null}
+                                  data-testid={`button-edit-line-item-${item.id}`}
+                                >
+                                  <Pencil className="h-4 w-4 text-slate-500 hover:text-[#711419]" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => deleteLineItemMutation.mutate(item.id)}
+                                  disabled={editingLineItemId !== null || deleteLineItemMutation.isPending}
+                                  data-testid={`button-delete-line-item-${item.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-slate-500 hover:text-red-600" />
+                                </Button>
+                              </div>
                             </TableCell>
                           )}
                         </>
