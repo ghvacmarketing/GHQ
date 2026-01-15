@@ -166,16 +166,16 @@ const STAGE_LABELS: Record<SalesStage, string> = {
   lost: "Lost",
 };
 
+const temperatureConfig: Record<InterestLevel, { icon: React.ComponentType<{ className?: string }>; className: string }> = {
+  hot: { icon: Flame, className: "bg-red-100 text-red-700 border-red-200" },
+  warm: { icon: Thermometer, className: "bg-amber-100 text-amber-700 border-amber-200" },
+  cold: { icon: Snowflake, className: "bg-slate-100 text-slate-600 border-slate-200" },
+};
+
 function InterestBadge({ level }: { level: InterestLevel | null | undefined }) {
   if (!level) return null;
   
-  const config = {
-    hot: { icon: Flame, className: "bg-red-100 text-red-700 border-red-200" },
-    warm: { icon: Thermometer, className: "bg-amber-100 text-amber-700 border-amber-200" },
-    cold: { icon: Snowflake, className: "bg-slate-100 text-slate-600 border-slate-200" },
-  };
-  
-  const { icon: Icon, className } = config[level];
+  const { icon: Icon, className } = temperatureConfig[level];
   
   return (
     <Badge variant="outline" className={`text-xs ${className}`}>
@@ -1935,7 +1935,46 @@ export default function CrmProspectFunnel() {
                       </SheetDescription>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <InterestBadge level={expandedProspect.interestLevel as InterestLevel} />
+                      <Select
+                        value={expandedProspect.interestLevel || ""}
+                        onValueChange={(value) => updateLeadMutation.mutate({ id: expandedProspect.id, data: { interestLevel: value || null } })}
+                      >
+                        <SelectTrigger className="h-8 w-[90px] text-xs border-0 bg-transparent p-0 gap-1">
+                          <SelectValue placeholder="Set temp">
+                            {expandedProspect.interestLevel ? (() => {
+                              const level = expandedProspect.interestLevel as InterestLevel;
+                              const config = temperatureConfig[level];
+                              const Icon = config.icon;
+                              return (
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${config.className}`}>
+                                  <Icon className="h-3 w-3" />
+                                  {level.charAt(0).toUpperCase() + level.slice(1)}
+                                </span>
+                              );
+                            })() : null}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="hot">
+                            <div className="flex items-center gap-2">
+                              <Flame className="h-4 w-4 text-red-600" />
+                              Hot
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="warm">
+                            <div className="flex items-center gap-2">
+                              <Thermometer className="h-4 w-4 text-amber-600" />
+                              Warm
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="cold">
+                            <div className="flex items-center gap-2">
+                              <Snowflake className="h-4 w-4 text-slate-500" />
+                              Cold
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                       <Select
                         value={expandedProspect.salesStage || "new"}
                         onValueChange={(value) => updateStageMutation.mutate({ id: expandedProspect.id, salesStage: value as SalesStage })}
