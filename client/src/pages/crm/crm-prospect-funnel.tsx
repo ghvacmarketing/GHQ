@@ -585,6 +585,7 @@ export default function CrmProspectFunnel() {
   const [editAddress, setEditAddress] = useState("");
   const [editCompanyName, setEditCompanyName] = useState("");
   const [editNotes, setEditNotes] = useState("");
+  const [editInterestLevel, setEditInterestLevel] = useState<InterestLevel | "">("");
 
   const [editingFollowUpId, setEditingFollowUpId] = useState<string | null>(null);
   const [editFollowUpType, setEditFollowUpType] = useState<FollowUpType>("call");
@@ -815,7 +816,7 @@ export default function CrmProspectFunnel() {
   });
 
   const updateLeadMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { phone?: string; email?: string; fullAddress?: string; companyName?: string; notes?: string } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: { phone?: string; email?: string; fullAddress?: string; companyName?: string; notes?: string; interestLevel?: string | null } }) => {
       const res = await apiRequest("PATCH", `/api/crm/customers/${id}`, data);
       return res.json();
     },
@@ -837,6 +838,7 @@ export default function CrmProspectFunnel() {
     setEditAddress(expandedProspect.fullAddress || "");
     setEditCompanyName(expandedProspect.companyName || "");
     setEditNotes(expandedProspect.notes || "");
+    setEditInterestLevel((expandedProspect.interestLevel as InterestLevel) || "");
     setIsEditing(true);
   };
 
@@ -847,6 +849,7 @@ export default function CrmProspectFunnel() {
     setEditAddress("");
     setEditCompanyName("");
     setEditNotes("");
+    setEditInterestLevel("");
   };
 
   const handleSaveLead = () => {
@@ -859,6 +862,7 @@ export default function CrmProspectFunnel() {
         fullAddress: editAddress,
         companyName: editCompanyName,
         notes: editNotes,
+        interestLevel: editInterestLevel || null,
       },
     });
   };
@@ -2049,6 +2053,34 @@ export default function CrmProspectFunnel() {
                                 className="h-9"
                                 data-testid="input-edit-company"
                               />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="edit-temperature" className="text-xs text-muted-foreground">Temperature</Label>
+                              <Select value={editInterestLevel} onValueChange={(v) => setEditInterestLevel(v as InterestLevel)}>
+                                <SelectTrigger className="h-9" data-testid="select-edit-temperature">
+                                  <SelectValue placeholder="Select temperature" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="hot">
+                                    <div className="flex items-center gap-2">
+                                      <Flame className="h-4 w-4 text-red-600" />
+                                      Hot
+                                    </div>
+                                  </SelectItem>
+                                  <SelectItem value="warm">
+                                    <div className="flex items-center gap-2">
+                                      <Thermometer className="h-4 w-4 text-amber-600" />
+                                      Warm
+                                    </div>
+                                  </SelectItem>
+                                  <SelectItem value="cold">
+                                    <div className="flex items-center gap-2">
+                                      <Snowflake className="h-4 w-4 text-slate-500" />
+                                      Cold
+                                    </div>
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
                             </div>
                             <div className="space-y-1.5">
                               <Label htmlFor="edit-notes" className="text-xs text-muted-foreground">Notes</Label>
