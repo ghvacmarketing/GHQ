@@ -15500,7 +15500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/crm/quotes - List quotes with filters and pagination (OPTIMIZED)
   app.get("/api/crm/quotes", requireCrmAuth, async (req, res) => {
     try {
-      const { scope, status, customerId, projectId, workOrderId, quoteType, page = "1", limit = "25" } = req.query;
+      const { scope, status, customerId, projectId, workOrderId, quoteType, sourceType, page = "1", limit = "25" } = req.query;
       const pageNum = parseInt(page as string, 10) || 1;
       const limitNum = Math.min(50, parseInt(limit as string, 10) || 25);
       const offset = (pageNum - 1) * limitNum;
@@ -15523,6 +15523,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (quoteType) {
         conditions.push(eq(crmQuotes.quoteType, quoteType as string));
+      }
+      if (sourceType) {
+        conditions.push(eq(crmQuotes.sourceType, sourceType as string));
       }
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -16217,7 +16220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const { customerId, title, description, notes, lineItems, workOrderId, propertyId, projectId, assignedToId } = req.body;
+      const { customerId, title, description, notes, lineItems, workOrderId, propertyId, projectId, assignedToId, sourceType } = req.body;
 
       if (!customerId) {
         return res.status(400).json({ message: "Customer is required" });
@@ -16265,6 +16268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdBy: user.id,
         quoteType: "quick",
         assignedToId: assignedToId || null,
+        sourceType: sourceType || null,
       }).returning();
 
       // Create line items

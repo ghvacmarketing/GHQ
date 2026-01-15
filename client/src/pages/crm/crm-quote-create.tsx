@@ -129,6 +129,7 @@ export default function CrmQuoteCreate() {
   const customerIdFromUrl = urlParams.get("customerId");
   const propertyIdFromUrl = urlParams.get("propertyId");
   const projectIdFromUrl = urlParams.get("projectId");
+  const sourceTypeFromUrl = urlParams.get("sourceType");
 
   const [discountModalOpen, setDiscountModalOpen] = useState(false);
   const [discountKind, setDiscountKind] = useState<"promotion" | "maintenance">("promotion");
@@ -510,6 +511,7 @@ export default function CrmQuoteCreate() {
         propertyId: propertyIdFromUrl || undefined,
         projectId: projectIdFromUrl || undefined,
         assignedToId: formData.assignedToId || undefined,
+        sourceType: sourceTypeFromUrl || undefined,
         lineItems: validLineItems.map(item => ({
           description: item.description,
           quantity: item.quantity,

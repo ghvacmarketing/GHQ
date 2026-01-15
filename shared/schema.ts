@@ -1197,6 +1197,10 @@ export type CrmQuoteType = typeof crmQuoteTypeEnum[number];
 export const quoteCategoryEnum = ["install", "service"] as const;
 export type QuoteCategory = typeof quoteCategoryEnum[number];
 
+// Quote Source Type - tracks where the quote was created from
+export const quoteSourceTypeEnum = ["lead", "customer", "work_order", "project"] as const;
+export type QuoteSourceType = typeof quoteSourceTypeEnum[number];
+
 // CRM Quotes (proposals attached to either a Work Order or Project)
 export const crmQuotes = pgTable("crm_quotes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1233,6 +1237,7 @@ export const crmQuotes = pgTable("crm_quotes", {
   workOrderId: varchar("work_order_id"),
   projectId: varchar("project_id"),
   scope: text("scope").$type<CrmQuoteScope>(),
+  sourceType: text("source_type").$type<QuoteSourceType>(),
   acceptedBy: text("accepted_by"),
   declineReason: text("decline_reason"),
   notes: text("notes"),

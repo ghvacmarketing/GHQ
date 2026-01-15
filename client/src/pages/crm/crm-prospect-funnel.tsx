@@ -677,10 +677,10 @@ export default function CrmProspectFunnel() {
   });
 
   const { data: leadQuotes = [] } = useQuery<CrmQuote[]>({
-    queryKey: ['/api/crm/quotes', 'customer', expandedProspectId],
+    queryKey: ['/api/crm/quotes', 'lead', expandedProspectId],
     queryFn: async () => {
       if (!expandedProspectId) return [];
-      const res = await fetch(`/api/crm/quotes?customerId=${expandedProspectId}`);
+      const res = await fetch(`/api/crm/quotes?customerId=${expandedProspectId}&sourceType=lead`);
       if (!res.ok) return [];
       const data = await res.json();
       return data.quotes || [];
@@ -2555,7 +2555,7 @@ export default function CrmProspectFunnel() {
                     <TabsContent value="quotes" className="space-y-4">
                       <div className="flex justify-between items-center">
                         <h4 className="text-sm font-medium">Quotes</h4>
-                        <Link href={`/crm/quotes/new?customerId=${expandedProspect.id}&scope=standalone`}>
+                        <Link href={`/crm/quotes/new?customerId=${expandedProspect.id}&sourceType=lead`}>
                           <Button size="sm" className="h-8 text-xs">
                             <Plus className="h-3 w-3 mr-1" />
                             Create Quote
