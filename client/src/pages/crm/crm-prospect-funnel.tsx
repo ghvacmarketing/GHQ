@@ -102,6 +102,7 @@ import {
   Send,
   FileText,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 import { format, isToday, isPast, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, getDay } from "date-fns";
 import type { CrmUser, CrmCustomer, CrmFollowUp, SalesStage, InterestLevel, FollowUpType, CrmQuote } from "@shared/schema";
@@ -661,6 +662,8 @@ export default function CrmProspectFunnel() {
   const [wonConfirmOpen, setWonConfirmOpen] = useState(false);
   const [lostConfirmOpen, setLostConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteFollowUpConfirmOpen, setDeleteFollowUpConfirmOpen] = useState(false);
+  const [deleteFollowUpId, setDeleteFollowUpId] = useState<string | null>(null);
   const [confirmProspectId, setConfirmProspectId] = useState<string | null>(null);
   
   const [mainViewTab, setMainViewTab] = useState<string>("overview");
@@ -866,6 +869,23 @@ export default function CrmProspectFunnel() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to update follow-up", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteFollowUpMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/crm/follow-ups/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/follow-ups"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
+      setDeleteFollowUpConfirmOpen(false);
+      setDeleteFollowUpId(null);
+      toast({ title: "Follow-up deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete follow-up", description: error.message, variant: "destructive" });
     },
   });
 
@@ -2657,6 +2677,17 @@ export default function CrmProspectFunnel() {
                                         >
                                           <Pencil className="h-3.5 w-3.5" />
                                         </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                          onClick={() => {
+                                            setDeleteFollowUpId(followUp.id);
+                                            setDeleteFollowUpConfirmOpen(true);
+                                          }}
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
                                       </div>
                                     </div>
                                     {followUp.notes && (
@@ -2840,6 +2871,30 @@ export default function CrmProspectFunnel() {
               <AlertDialogCancel onClick={() => setConfirmProspectId(null)}>Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={handleRemoveFromFunnel}>
                 Remove from Funnel
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={deleteFollowUpConfirmOpen} onOpenChange={setDeleteFollowUpConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Follow-up?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this follow-up? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setDeleteFollowUpId(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => {
+                  if (deleteFollowUpId) {
+                    deleteFollowUpMutation.mutate(deleteFollowUpId);
+                  }
+                }}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {deleteFollowUpMutation.isPending ? "Deleting..." : "Delete"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
