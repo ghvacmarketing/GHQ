@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import RichTextEditor from "@/components/rich-text-editor";
 import {
   Dialog,
@@ -880,11 +881,13 @@ export default function CrmQuoteCreate() {
                       </div>
                       <div className="flex-1 space-y-2">
                         <Label htmlFor={`item-desc-${item.id}`}>Description</Label>
-                        <Input
+                        <Textarea
                           id={`item-desc-${item.id}`}
-                          placeholder="Service or product description"
+                          placeholder="Service or product description - use bullet points, formatting as needed"
                           value={item.description}
                           onChange={(e) => updateLineItem(item.id, "description", e.target.value)}
+                          rows={3}
+                          className="resize-y min-h-[80px]"
                           data-testid={`input-line-item-description-${index}`}
                         />
                       </div>
