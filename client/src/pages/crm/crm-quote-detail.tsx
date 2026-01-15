@@ -90,6 +90,7 @@ import { format } from "date-fns";
 import type { CrmUser, CrmQuote, CrmQuoteLineItem, QuoteEmailLog } from "@shared/schema";
 import { PaymentLinkButton } from "@/components/stripe-payment-link-button";
 import { Checkbox } from "@/components/ui/checkbox";
+import RichTextEditor, { RichTextDisplay } from "@/components/rich-text-editor";
 import ghvacLogo from "@assets/ghvac-logo.png";
 import {
   BRAND_COLOR,
@@ -2548,12 +2549,11 @@ export default function CrmQuoteDetail() {
             <CardContent>
               {isEditingDescription ? (
                 <div className="space-y-3">
-                  <Textarea
-                    value={editedDescription}
-                    onChange={(e) => setEditedDescription(e.target.value)}
+                  <RichTextEditor
+                    content={editedDescription}
+                    onChange={(content) => setEditedDescription(content)}
                     placeholder="Add a description for this custom install quote..."
-                    className="min-h-[100px]"
-                    data-testid="textarea-quote-description"
+                    minHeight="min-h-[150px]"
                   />
                   <div className="flex gap-2">
                     <Button
@@ -2575,7 +2575,7 @@ export default function CrmQuoteDetail() {
                   </div>
                 </div>
               ) : quote.description ? (
-                <p className="text-sm text-slate-600 whitespace-pre-wrap">{quote.description}</p>
+                <RichTextDisplay content={quote.description} className="text-sm text-slate-600" />
               ) : (
                 <p className="text-sm text-slate-400 italic">No description added. Click Edit to add one.</p>
               )}

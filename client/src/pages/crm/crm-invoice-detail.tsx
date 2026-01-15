@@ -84,6 +84,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { CrmUser, CrmCustomer, CrmJob, CrmInvoice, CrmInvoiceLineItem, CrmInvoiceStatus, CrmPayment, InvoiceEmailLog } from "@shared/schema";
 import { PaymentLinkButton } from "@/components/stripe-payment-link-button";
+import { RichTextDisplay } from "@/components/rich-text-editor";
 
 type InvoiceDetailWithItems = CrmInvoice & {
   customer: CrmCustomer | null;
@@ -1005,7 +1006,7 @@ export default function CrmInvoiceDetail() {
               <CardTitle className="text-base">Notes</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-slate-700 whitespace-pre-wrap" data-testid="text-notes">{invoice.notes}</p>
+              <RichTextDisplay content={invoice.notes} className="text-slate-700" />
             </CardContent>
           </Card>
         )}
