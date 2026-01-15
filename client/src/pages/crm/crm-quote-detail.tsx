@@ -66,6 +66,9 @@ import {
   Pencil,
   FolderKanban,
   Eye,
+  Package,
+  Search,
+  Tag,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -83,11 +86,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { cn } from "@/lib/utils";
 import { jsPDF } from "jspdf";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import type { CrmUser, CrmQuote, CrmQuoteLineItem, QuoteEmailLog } from "@shared/schema";
+import type { CrmUser, CrmQuote, CrmQuoteLineItem, QuoteEmailLog, CrmItem } from "@shared/schema";
 import { PaymentLinkButton } from "@/components/stripe-payment-link-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import RichTextEditor, { RichTextDisplay } from "@/components/rich-text-editor";
@@ -220,6 +225,17 @@ export default function CrmQuoteDetail() {
   const [showAddLineItemDialog, setShowAddLineItemDialog] = useState(false);
   const [newLineItemData, setNewLineItemData] = useState<{ description: string; quantity: string; unitPrice: string }>({ description: "", quantity: "1", unitPrice: "" });
 
+  // Items catalog state
+  const [showItemsCatalogDialog, setShowItemsCatalogDialog] = useState(false);
+  const [itemSearch, setItemSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "install" | "service" | "maintenance" | "discount">("all");
+
+  // Discount modal state
+  const [showDiscountDialog, setShowDiscountDialog] = useState(false);
+  const [discountKind, setDiscountKind] = useState<"promotion" | "maintenance">("promotion");
+  const [discountMode, setDiscountMode] = useState<"amount" | "percentage">("amount");
+  const [discountValue, setDiscountValue] = useState("");
+
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
   const [followUpContext, setFollowUpContext] = useState<{
     customerId: string;
@@ -268,6 +284,27 @@ export default function CrmQuoteDetail() {
     },
     enabled: !!quoteId && !!currentUser,
   });
+
+  // CRM Items search query for catalog
+  const { data: itemSearchResults, isLoading: isSearchingItems } = useQuery<CrmItem[]>({
+    queryKey: ["/api/crm/items", "search", itemSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (itemSearch.trim()) {
+        params.set("search", itemSearch.trim());
+      }
+      const response = await fetch(`/api/crm/items?${params.toString()}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to search items");
+      const data = await response.json();
+      return data.items || data || [];
+    },
+    enabled: showItemsCatalogDialog,
+  });
+
+  const filteredItems = itemSearchResults?.filter(item => {
+    if (categoryFilter === "all") return true;
+    return item.category === categoryFilter;
+  }) || [];
 
   // Determine which users to show based on quote type
   // Quick/custom_service quotes (service) need exactly admin role
@@ -705,6 +742,109 @@ export default function CrmQuoteDetail() {
       });
     },
   });
+
+  const addFromCatalogMutation = useMutation({
+    mutationFn: async (item: CrmItem) => {
+      const res = await apiRequest("POST", `/api/crm/quotes/${quoteId}/line-items`, {
+        description: item.name,
+        quantity: 1,
+        unitPrice: parseFloat(item.rate || "0"),
+        lineTotal: parseFloat(item.rate || "0"),
+        itemCategory: item.category || "install",
+        crmItemId: item.id,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      setShowItemsCatalogDialog(false);
+      setItemSearch("");
+      setCategoryFilter("all");
+      toast({ title: "Item added from catalog" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to add item", variant: "destructive" });
+    },
+  });
+
+  const calculateQuoteSubtotal = () => {
+    return quote?.lineItems
+      ?.filter(item => !item.description?.startsWith("Discount:") && parseFloat(String(item.unitPrice)) > 0)
+      .reduce((sum, item) => sum + parseFloat(String(item.lineTotal || 0)), 0) || 0;
+  };
+
+  const hasExistingDiscount = (kind: "promotion" | "maintenance") => {
+    return quote?.lineItems?.some(item => 
+      item.description?.includes(kind === "promotion" ? "Promotional" : "Maintenance") && 
+      parseFloat(String(item.unitPrice)) < 0
+    ) || false;
+  };
+
+  const calculateEligibleSubtotal = (kind: "promotion" | "maintenance") => {
+    return quote?.lineItems
+      ?.filter(item => {
+        const price = parseFloat(String(item.unitPrice)) || 0;
+        if (item.description?.startsWith("Discount:") || price <= 0) return false;
+        if (kind === "maintenance") return true;
+        const category = item.lineType || "install";
+        return category === "install" || category === "service";
+      })
+      .reduce((sum, item) => sum + parseFloat(String(item.lineTotal || 0)), 0) || 0;
+  };
+
+  const addDiscountMutation = useMutation({
+    mutationFn: async (data: { description: string; amount: number }) => {
+      const res = await apiRequest("POST", `/api/crm/quotes/${quoteId}/line-items`, {
+        description: data.description,
+        quantity: 1,
+        unitPrice: -Math.abs(data.amount),
+        lineTotal: -Math.abs(data.amount),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      setShowDiscountDialog(false);
+      setDiscountKind("promotion");
+      setDiscountMode("amount");
+      setDiscountValue("");
+      toast({ title: "Discount added" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to add discount", variant: "destructive" });
+    },
+  });
+
+  const handleApplyDiscount = () => {
+    if (hasExistingDiscount(discountKind)) {
+      toast({ title: "Discount already exists", description: "Remove the existing discount first.", variant: "destructive" });
+      return;
+    }
+
+    let discountAmount: number;
+    let description: string;
+
+    if (discountKind === "maintenance") {
+      discountAmount = calculateQuoteSubtotal() * 0.15;
+      description = "Discount: Maintenance Agreement (15%)";
+    } else {
+      if (discountMode === "amount") {
+        discountAmount = parseFloat(discountValue) || 0;
+      } else {
+        discountAmount = calculateEligibleSubtotal("promotion") * (parseFloat(discountValue) || 0) / 100;
+      }
+      description = discountMode === "percentage" 
+        ? `Discount: Promotional (${discountValue}%)`
+        : `Discount: Promotional`;
+    }
+
+    if (discountAmount <= 0) {
+      toast({ title: "Invalid discount", description: "Please enter a valid discount amount.", variant: "destructive" });
+      return;
+    }
+
+    addDiscountMutation.mutate({ description, amount: discountAmount });
+  };
 
   const handleStartEditLineItem = (item: CrmQuoteLineItem) => {
     setEditingLineItemId(item.id);
@@ -2288,15 +2428,42 @@ export default function CrmQuoteDetail() {
               Line Items
             </CardTitle>
             {canEditLineItems && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowAddLineItemDialog(true)}
-                data-testid="button-add-line-item"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Line Item
-              </Button>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowItemsCatalogDialog(true)}
+                  className="border-blue-400 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                  data-testid="button-add-from-catalog"
+                >
+                  <Package className="h-4 w-4 mr-1" />
+                  Add from Items Catalog
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setDiscountKind("promotion");
+                    setDiscountMode("amount");
+                    setDiscountValue("");
+                    setShowDiscountDialog(true);
+                  }}
+                  className="border-[#d3b07d] text-[#b8944d] hover:bg-[#faf6ef] hover:text-[#9a7d3f]"
+                  data-testid="button-add-discount"
+                >
+                  <Tag className="h-4 w-4 mr-1" />
+                  Add Discount
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowAddLineItemDialog(true)}
+                  data-testid="button-add-line-item"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Line Item
+                </Button>
+              </div>
             )}
           </CardHeader>
           <CardContent>
@@ -2520,6 +2687,231 @@ export default function CrmQuoteDetail() {
                   </>
                 ) : (
                   "Add Line Item"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Items Catalog Dialog */}
+        <Dialog open={showItemsCatalogDialog} onOpenChange={(open) => {
+          setShowItemsCatalogDialog(open);
+          if (!open) {
+            setItemSearch("");
+            setCategoryFilter("all");
+          }
+        }}>
+          <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Items Catalog
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+              <div className="flex gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search by name or part number..."
+                    value={itemSearch}
+                    onChange={(e) => setItemSearch(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <Select value={categoryFilter} onValueChange={(value) => setCategoryFilter(value as any)}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    <SelectItem value="install">Install</SelectItem>
+                    <SelectItem value="service">Service</SelectItem>
+                    <SelectItem value="maintenance">Maintenance</SelectItem>
+                    <SelectItem value="discount">Discount</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="border rounded-lg overflow-hidden flex-1 overflow-y-auto min-h-[300px] max-h-[400px]">
+                {isSearchingItems ? (
+                  <div className="p-8 text-center text-slate-500">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                    Loading items...
+                  </div>
+                ) : filteredItems.length > 0 ? (
+                  <div className="divide-y">
+                    {filteredItems.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => addFromCatalogMutation.mutate(item)}
+                        disabled={addFromCatalogMutation.isPending}
+                        className="w-full p-4 text-left hover:bg-slate-50 transition-colors disabled:opacity-50"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-slate-900 truncate">{item.name}</p>
+                            <div className="flex items-center gap-2 mt-1 text-sm text-slate-500">
+                              {item.partNumber && (
+                                <span className="bg-slate-100 px-2 py-0.5 rounded text-xs font-mono">
+                                  {item.partNumber}
+                                </span>
+                              )}
+                              <span className={cn(
+                                "px-2 py-0.5 rounded text-xs capitalize",
+                                item.category === "install" && "bg-blue-100 text-blue-700",
+                                item.category === "service" && "bg-green-100 text-green-700",
+                                item.category === "maintenance" && "bg-amber-100 text-amber-700",
+                                item.category === "discount" && "bg-purple-100 text-purple-700"
+                              )}>
+                                {item.category || "install"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-semibold text-slate-900">
+                              ${parseFloat(item.rate || "0").toFixed(2)}
+                            </p>
+                            <p className="text-xs text-slate-400">{item.unit || "each"}</p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 text-center text-slate-500">
+                    No items found. Try a different search.
+                  </div>
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Discount Dialog */}
+        <Dialog open={showDiscountDialog} onOpenChange={setShowDiscountDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add Discount</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6 py-4">
+              <div className="space-y-3">
+                <Label>Discount Type</Label>
+                <RadioGroup
+                  value={discountKind}
+                  onValueChange={(value) => setDiscountKind(value as "promotion" | "maintenance")}
+                  className="flex flex-col gap-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem 
+                      value="promotion" 
+                      id="detail-discount-promotion" 
+                      disabled={hasExistingDiscount("promotion")}
+                    />
+                    <Label 
+                      htmlFor="detail-discount-promotion" 
+                      className={cn(hasExistingDiscount("promotion") && "text-slate-400")}
+                    >
+                      Promotion Discount
+                      {hasExistingDiscount("promotion") && <span className="text-xs ml-2">(Already applied)</span>}
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem 
+                      value="maintenance" 
+                      id="detail-discount-maintenance"
+                      disabled={hasExistingDiscount("maintenance")}
+                    />
+                    <Label 
+                      htmlFor="detail-discount-maintenance"
+                      className={cn(hasExistingDiscount("maintenance") && "text-slate-400")}
+                    >
+                      Maintenance Discount
+                      {hasExistingDiscount("maintenance") && <span className="text-xs ml-2">(Already applied)</span>}
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {discountKind === "maintenance" ? (
+                <div className="p-4 bg-slate-50 rounded-lg border">
+                  <p className="text-sm font-medium text-slate-700">Fixed 15% Discount</p>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Maintenance discount is always 15% of the total quote amount.
+                  </p>
+                  <p className="text-sm font-medium text-slate-800 mt-2">
+                    ≈ ${(calculateQuoteSubtotal() * 0.15).toFixed(2)} off ${calculateQuoteSubtotal().toFixed(2)} total
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    <Label>Discount Mode</Label>
+                    <RadioGroup
+                      value={discountMode}
+                      onValueChange={(value) => setDiscountMode(value as "amount" | "percentage")}
+                      className="flex gap-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="amount" id="detail-mode-amount" />
+                        <Label htmlFor="detail-mode-amount">$ Amount</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="percentage" id="detail-mode-percentage" />
+                        <Label htmlFor="detail-mode-percentage">% Percentage</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="detail-discount-value">
+                      {discountMode === "amount" ? "Discount Amount ($)" : "Discount Percentage (%)"}
+                    </Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+                        {discountMode === "amount" ? "$" : "%"}
+                      </span>
+                      <Input
+                        id="detail-discount-value"
+                        type="number"
+                        min="0"
+                        step={discountMode === "amount" ? "0.01" : "1"}
+                        value={discountValue}
+                        onChange={(e) => setDiscountValue(e.target.value)}
+                        placeholder={discountMode === "amount" ? "0.00" : "0"}
+                        className="pl-8"
+                      />
+                    </div>
+                    {discountMode === "percentage" && discountValue && (
+                      <p className="text-sm text-slate-500">
+                        ≈ ${(calculateEligibleSubtotal("promotion") * (parseFloat(discountValue) || 0) / 100).toFixed(2)} off ${calculateEligibleSubtotal("promotion").toFixed(2)} eligible subtotal
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowDiscountDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleApplyDiscount}
+                disabled={addDiscountMutation.isPending}
+                className="bg-[#d3b07d] hover:bg-[#b8944d] text-white"
+              >
+                {addDiscountMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Applying...
+                  </>
+                ) : (
+                  "Apply Discount"
                 )}
               </Button>
             </DialogFooter>
