@@ -7,8 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import RichTextEditor from "@/components/rich-text-editor";
 import {
   Dialog,
   DialogContent,
@@ -813,13 +813,11 @@ export default function CrmQuoteCreate() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
+                  <RichTextEditor
+                    content={formData.description}
+                    onChange={(content) => updateField("description", content)}
                     placeholder="Brief description of the quote..."
-                    value={formData.description}
-                    onChange={(e) => updateField("description", e.target.value)}
-                    rows={3}
-                    data-testid="input-quote-description"
+                    minHeight="min-h-[150px]"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1109,13 +1107,11 @@ export default function CrmQuoteCreate() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="notes">Additional Notes</Label>
-                    <Textarea
-                      id="notes"
+                    <RichTextEditor
+                      content={formData.notes || ""}
+                      onChange={(content) => updateField("notes", content)}
                       placeholder="Any additional notes for this quote..."
-                      value={formData.notes}
-                      onChange={(e) => updateField("notes", e.target.value)}
-                      rows={3}
-                      data-testid="input-notes"
+                      minHeight="min-h-[150px]"
                     />
                   </div>
                 </div>

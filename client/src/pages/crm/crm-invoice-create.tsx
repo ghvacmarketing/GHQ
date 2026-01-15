@@ -54,6 +54,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import RichTextEditor from "@/components/rich-text-editor";
 import type { CrmUser, CrmWorkOrder, CrmQuote, CrmQuoteLineItem, CrmItem, CrmCustomer, CrmProperty, QuickbooksAccount } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -1301,14 +1302,14 @@ export default function CrmInvoiceCreate() {
                     <div className="space-y-4">
                       <div>
                         <Label htmlFor="notes">Invoice Notes (Optional)</Label>
-                        <Textarea
-                          id="notes"
-                          value={formData.notes}
-                          onChange={(e) => updateField("notes", e.target.value)}
-                          placeholder="Add any notes for this invoice..."
-                          className="mt-1"
-                          data-testid="input-notes"
-                        />
+                        <div className="mt-1">
+                          <RichTextEditor
+                            content={formData.notes || ""}
+                            onChange={(content) => updateField("notes", content)}
+                            placeholder="Add any notes for this invoice..."
+                            minHeight="min-h-[150px]"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
