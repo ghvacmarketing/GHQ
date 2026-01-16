@@ -30,7 +30,7 @@ import {
   TouchSensor,
   useSensor,
   useSensors,
-  pointerWithin,
+  closestCenter,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -1384,7 +1384,7 @@ export default function CrmProjects() {
           </TabsContent>
 
           <TabsContent value="calendar" className="mt-4">
-            <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleCalendarDragStart} onDragEnd={handleCalendarDragEnd}>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleCalendarDragStart} onDragEnd={handleCalendarDragEnd}>
               <div className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
                   <Button variant="outline" size="sm" onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}>
