@@ -86,12 +86,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import RichTextEditor, { RichTextDisplay } from "@/components/rich-text-editor";
 import { format } from "date-fns";
 import type { 
   CrmUser, CrmProject, CrmWorkOrder, CrmInvoice, CrmQuote, CrmCustomer, CrmProperty,
   ActivityAttachment, NoteMetadata, PhotoMetadata, FileMetadata, FinancialMetadata, 
   ApprovalMetadata, FinancialSubtype, ApprovalStatus,
-  WorkOrderVisitType, WorkSubtype, ChecklistQuestion
+  WorkOrderVisitType, WorkSubtype, ChecklistQuestion,
+  ProjectEquipmentItem
 } from "@shared/schema";
 import { 
   projectActivityTypeEnum, financialSubtypeEnum, approvalStatusEnum,
@@ -281,6 +283,15 @@ export default function CrmProjectDetail() {
   const [editStatus, setEditStatus] = useState("");
   const [editProjectType, setEditProjectType] = useState("");
   const [editPriority, setEditPriority] = useState("");
+
+  // Scope of Work and Equipment sections state
+  const [isEditingScopeSection, setIsEditingScopeSection] = useState(false);
+  const [editScopeOfWork, setEditScopeOfWork] = useState("");
+  const [editChallengePoints, setEditChallengePoints] = useState("");
+  const [equipmentItems, setEquipmentItems] = useState<ProjectEquipmentItem[]>([]);
+  const [editingEquipmentId, setEditingEquipmentId] = useState<string | null>(null);
+  const [newEquipmentItem, setNewEquipmentItem] = useState<Partial<ProjectEquipmentItem>>({ name: "", quantity: 1, modelNumber: "", notes: "" });
+  const [equipmentHasChanges, setEquipmentHasChanges] = useState(false);
 
   // Inline timeline state for Overview tab
   const [overviewComment, setOverviewComment] = useState("");
@@ -745,6 +756,68 @@ export default function CrmProjectDetail() {
       toast({ title: "Failed to update project", variant: "destructive" });
     },
   });
+
+  const updateScopeMutation = useMutation({
+    mutationFn: async (data: { scopeOfWork?: string; challengePoints?: string }) => {
+      const res = await apiRequest("PATCH", `/api/crm/projects/${projectId}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Scope of work updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId] });
+      setIsEditingScopeSection(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to update scope", variant: "destructive" });
+    },
+  });
+
+  const updateEquipmentMutation = useMutation({
+    mutationFn: async (data: { equipmentMaterials: ProjectEquipmentItem[] }) => {
+      const res = await apiRequest("PATCH", `/api/crm/projects/${projectId}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Equipment materials updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId] });
+      setEquipmentHasChanges(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to update equipment", variant: "destructive" });
+    },
+  });
+
+  useEffect(() => {
+    if (project) {
+      setEquipmentItems(project.equipmentMaterials || []);
+      setEditScopeOfWork(project.scopeOfWork || "");
+      setEditChallengePoints(project.challengePoints || "");
+    }
+  }, [project]);
+
+  const handleAddEquipmentItem = () => {
+    if (!newEquipmentItem.name?.trim()) return;
+    const item: ProjectEquipmentItem = {
+      id: crypto.randomUUID(),
+      name: newEquipmentItem.name.trim(),
+      quantity: newEquipmentItem.quantity || 1,
+      modelNumber: newEquipmentItem.modelNumber?.trim() || undefined,
+      notes: newEquipmentItem.notes?.trim() || undefined,
+    };
+    setEquipmentItems([...equipmentItems, item]);
+    setNewEquipmentItem({ name: "", quantity: 1, modelNumber: "", notes: "" });
+    setEquipmentHasChanges(true);
+  };
+
+  const handleUpdateEquipmentItem = (id: string, updates: Partial<ProjectEquipmentItem>) => {
+    setEquipmentItems(equipmentItems.map(item => item.id === id ? { ...item, ...updates } : item));
+    setEquipmentHasChanges(true);
+  };
+
+  const handleDeleteEquipmentItem = (id: string) => {
+    setEquipmentItems(equipmentItems.filter(item => item.id !== id));
+    setEquipmentHasChanges(true);
+  };
 
   const totalQuoted = (quotes || [])
     .filter((q) => q.status === "accepted")
@@ -1279,6 +1352,273 @@ export default function CrmProjectDetail() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Project Scope of Work Section */}
+            <Card data-testid="card-project-scope">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-[#711419]" />
+                  Project Scope of Work
+                </CardTitle>
+                {!isEditingScopeSection && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditingScopeSection(true)}
+                    data-testid="button-edit-scope"
+                  >
+                    <Pencil className="h-4 w-4 mr-1" />
+                    Edit
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {isEditingScopeSection ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Scope of Work</Label>
+                      <RichTextEditor
+                        content={editScopeOfWork}
+                        onChange={setEditScopeOfWork}
+                        placeholder="Describe the scope of work for this project..."
+                        minHeight="min-h-[150px]"
+                        editable={true}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Project Challenge Points</Label>
+                      <Textarea
+                        value={editChallengePoints}
+                        onChange={(e) => setEditChallengePoints(e.target.value)}
+                        placeholder="List any challenges or special considerations..."
+                        rows={4}
+                        data-testid="textarea-challenge-points"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => updateScopeMutation.mutate({ scopeOfWork: editScopeOfWork, challengePoints: editChallengePoints })}
+                        disabled={updateScopeMutation.isPending}
+                        className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                        data-testid="button-save-scope"
+                      >
+                        {updateScopeMutation.isPending ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          "Save"
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsEditingScopeSection(false);
+                          setEditScopeOfWork(project?.scopeOfWork || "");
+                          setEditChallengePoints(project?.challengePoints || "");
+                        }}
+                        data-testid="button-cancel-scope"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-muted-foreground">Scope of Work</Label>
+                      {project?.scopeOfWork ? (
+                        <RichTextDisplay content={project.scopeOfWork} className="p-3 bg-slate-50 rounded-lg border" />
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic p-3 bg-slate-50 rounded-lg border">No scope of work defined</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm text-muted-foreground">Project Challenge Points</Label>
+                      {project?.challengePoints ? (
+                        <p className="text-sm p-3 bg-slate-50 rounded-lg border whitespace-pre-wrap">{project.challengePoints}</p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic p-3 bg-slate-50 rounded-lg border">No challenge points noted</p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Equipment Details and Materials Section */}
+            <Card data-testid="card-equipment-materials">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Wrench className="h-5 w-5 text-[#711419]" />
+                  Equipment & Materials
+                </CardTitle>
+                {equipmentHasChanges && (
+                  <Button
+                    onClick={() => updateEquipmentMutation.mutate({ equipmentMaterials: equipmentItems })}
+                    disabled={updateEquipmentMutation.isPending}
+                    className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                    data-testid="button-save-equipment"
+                  >
+                    {updateEquipmentMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save Changes"
+                    )}
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {/* Equipment table header */}
+                  <div className="grid grid-cols-12 gap-2 text-sm font-medium text-muted-foreground border-b pb-2">
+                    <div className="col-span-4">Name</div>
+                    <div className="col-span-1">Qty</div>
+                    <div className="col-span-3">Model Number</div>
+                    <div className="col-span-3">Notes</div>
+                    <div className="col-span-1">Actions</div>
+                  </div>
+                  
+                  {/* Equipment items list */}
+                  {equipmentItems.length === 0 && (
+                    <p className="text-sm text-muted-foreground italic py-4 text-center">No equipment or materials added yet</p>
+                  )}
+                  
+                  {equipmentItems.map((item) => (
+                    <div key={item.id} className="grid grid-cols-12 gap-2 items-center py-2 border-b border-slate-100">
+                      {editingEquipmentId === item.id ? (
+                        <>
+                          <div className="col-span-4">
+                            <Input
+                              value={item.name}
+                              onChange={(e) => handleUpdateEquipmentItem(item.id, { name: e.target.value })}
+                              placeholder="Item name"
+                              data-testid={`input-equipment-name-${item.id}`}
+                            />
+                          </div>
+                          <div className="col-span-1">
+                            <Input
+                              type="number"
+                              min={1}
+                              value={item.quantity}
+                              onChange={(e) => handleUpdateEquipmentItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
+                              data-testid={`input-equipment-qty-${item.id}`}
+                            />
+                          </div>
+                          <div className="col-span-3">
+                            <Input
+                              value={item.modelNumber || ""}
+                              onChange={(e) => handleUpdateEquipmentItem(item.id, { modelNumber: e.target.value })}
+                              placeholder="Model #"
+                              data-testid={`input-equipment-model-${item.id}`}
+                            />
+                          </div>
+                          <div className="col-span-3">
+                            <Input
+                              value={item.notes || ""}
+                              onChange={(e) => handleUpdateEquipmentItem(item.id, { notes: e.target.value })}
+                              placeholder="Notes"
+                              data-testid={`input-equipment-notes-${item.id}`}
+                            />
+                          </div>
+                          <div className="col-span-1 flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditingEquipmentId(null)}
+                              className="h-8 w-8 p-0"
+                              data-testid={`button-done-equipment-${item.id}`}
+                            >
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="col-span-4 text-sm">{item.name}</div>
+                          <div className="col-span-1 text-sm">{item.quantity}</div>
+                          <div className="col-span-3 text-sm text-muted-foreground">{item.modelNumber || "—"}</div>
+                          <div className="col-span-3 text-sm text-muted-foreground">{item.notes || "—"}</div>
+                          <div className="col-span-1 flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditingEquipmentId(item.id)}
+                              className="h-8 w-8 p-0"
+                              data-testid={`button-edit-equipment-${item.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteEquipmentItem(item.id)}
+                              className="h-8 w-8 p-0 hover:text-destructive"
+                              data-testid={`button-delete-equipment-${item.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                  
+                  {/* Add new item row */}
+                  <div className="grid grid-cols-12 gap-2 items-center pt-3 border-t mt-2">
+                    <div className="col-span-4">
+                      <Input
+                        value={newEquipmentItem.name || ""}
+                        onChange={(e) => setNewEquipmentItem({ ...newEquipmentItem, name: e.target.value })}
+                        placeholder="New item name"
+                        data-testid="input-new-equipment-name"
+                      />
+                    </div>
+                    <div className="col-span-1">
+                      <Input
+                        type="number"
+                        min={1}
+                        value={newEquipmentItem.quantity || 1}
+                        onChange={(e) => setNewEquipmentItem({ ...newEquipmentItem, quantity: parseInt(e.target.value) || 1 })}
+                        data-testid="input-new-equipment-qty"
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <Input
+                        value={newEquipmentItem.modelNumber || ""}
+                        onChange={(e) => setNewEquipmentItem({ ...newEquipmentItem, modelNumber: e.target.value })}
+                        placeholder="Model # (optional)"
+                        data-testid="input-new-equipment-model"
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <Input
+                        value={newEquipmentItem.notes || ""}
+                        onChange={(e) => setNewEquipmentItem({ ...newEquipmentItem, notes: e.target.value })}
+                        placeholder="Notes (optional)"
+                        data-testid="input-new-equipment-notes"
+                      />
+                    </div>
+                    <div className="col-span-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAddEquipmentItem}
+                        disabled={!newEquipmentItem.name?.trim()}
+                        className="h-8 w-8 p-0"
+                        data-testid="button-add-equipment"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Project Timeline Section */}
             <Card data-testid="card-project-timeline-overview">
@@ -2386,7 +2726,7 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowAddDialog(false); setUpdateText(""); setUploadedFiles([]); }}>
+            <Button variant="outline" onClick={() => { setShowAddDialog(false); setUpdateText(""); clearUploadedFiles(); }}>
               Cancel
             </Button>
             <Button 
