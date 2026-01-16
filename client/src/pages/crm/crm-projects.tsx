@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import {
   Dialog,
   DialogContent,
@@ -177,6 +178,82 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
+// Droppable day cell component for calendar drag and drop
+function DroppableDay({ day, isCurrentMonth, children }: { day: Date; isCurrentMonth: boolean; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: day.toISOString(),
+  });
+  
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "min-h-[100px] border-b border-r relative transition-colors",
+        !isCurrentMonth && "bg-muted/50 text-muted-foreground",
+        isOver && "bg-blue-50 ring-2 ring-blue-400 ring-inset"
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Draggable project item component for calendar
+function DraggableProject({ 
+  project, 
+  lane, 
+  colors, 
+  isSingleDay, 
+  showRoundedLeft, 
+  showRoundedRight, 
+  onClick 
+}: { 
+  project: ProjectWithDetails; 
+  lane: number; 
+  colors: { bg: string; text: string }; 
+  isSingleDay: boolean; 
+  showRoundedLeft: boolean; 
+  showRoundedRight: boolean;
+  onClick: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: project.id,
+  });
+  
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    top: `${lane * 22}px`,
+  } : {
+    top: `${lane * 22}px`,
+  };
+  
+  return (
+    <button
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      onClick={(e) => {
+        if (!isDragging) {
+          onClick();
+        }
+      }}
+      className={cn(
+        "absolute left-0 right-0 text-left text-xs py-1 px-1.5 truncate h-5 cursor-grab active:cursor-grabbing",
+        colors.bg, colors.text,
+        isDragging && "opacity-50 z-50",
+        isSingleDay && "rounded mx-0.5",
+        !isSingleDay && showRoundedLeft && !showRoundedRight && "rounded-l ml-0.5",
+        !isSingleDay && !showRoundedLeft && showRoundedRight && "rounded-r mr-0.5",
+        !isSingleDay && showRoundedLeft && showRoundedRight && "rounded mx-0.5"
+      )}
+      style={style}
+      title={`${project.customerName || "Customer"} - ${project.title} (drag to reschedule)`}
+    >
+      {project.customerName || project.title}
+    </button>
+  );
+}
+
 export default function CrmProjects() {
   usePageTitle("Projects");
   const [, navigate] = useLocation();
@@ -211,6 +288,16 @@ export default function CrmProjects() {
   const [priority, setPriority] = useState<string>("normal");
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  
+  // Drag and drop state for calendar
+  const [activeDragProject, setActiveDragProject] = useState<ProjectWithDetails | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   const debouncedSearch = useDebounce(searchInput, 300);
   const debouncedCustomerSearch = useDebounce(customerSearch, 300);
@@ -348,6 +435,67 @@ export default function CrmProjects() {
       });
     },
   });
+
+  // Mutation for updating project dates via drag and drop
+  const updateProjectDatesMutation = useMutation({
+    mutationFn: async (data: { projectId: string; startDate: string; endDate: string }) => {
+      return apiRequest("PATCH", `/api/crm/projects/${data.projectId}`, {
+        startDate: data.startDate,
+        endDate: data.endDate,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Project rescheduled" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects/calendar"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to reschedule project",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const projectId = event.active.id as string;
+    const allProjects = calendarProjectsData?.projects || [];
+    const project = allProjects.find(p => p.id === projectId);
+    setActiveDragProject(project || null);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveDragProject(null);
+    
+    if (!over || !active) return;
+    
+    const projectId = active.id as string;
+    const newDateStr = over.id as string;
+    
+    const allProjects = calendarProjectsData?.projects || [];
+    const project = allProjects.find(p => p.id === projectId);
+    if (!project || !project.startDate) return;
+    
+    const oldStartDate = startOfDay(new Date(project.startDate));
+    const newDate = startOfDay(new Date(newDateStr));
+    
+    // Calculate the difference in days
+    const daysDiff = Math.round((newDate.getTime() - oldStartDate.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysDiff === 0) return;
+    
+    // Calculate new dates
+    const newStartDate = addDays(oldStartDate, daysDiff);
+    const oldEndDate = project.endDate ? startOfDay(new Date(project.endDate)) : oldStartDate;
+    const newEndDate = addDays(oldEndDate, daysDiff);
+    
+    updateProjectDatesMutation.mutate({
+      projectId,
+      startDate: format(newStartDate, "yyyy-MM-dd"),
+      endDate: format(newEndDate, "yyyy-MM-dd"),
+    });
+  };
 
   const resetCreateForm = () => {
     setCustomerSearch("");
@@ -852,6 +1000,7 @@ export default function CrmProjects() {
         </TabsContent>
 
         <TabsContent value="calendar">
+          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div className="space-y-4">
             {/* Calendar Header */}
             <div className="flex items-center justify-between mb-4">
@@ -966,13 +1115,7 @@ export default function CrmProjects() {
                     const maxLane = Math.max(0, ...sortedDayProjects.map(p => projectLanes.get(p.id) || 0));
                     
                     return (
-                      <div
-                        key={day.toISOString()}
-                        className={cn(
-                          "min-h-[100px] border-b border-r relative",
-                          !isCurrentMonth && "bg-muted/50 text-muted-foreground"
-                        )}
-                      >
+                      <DroppableDay key={day.toISOString()} day={day} isCurrentMonth={isCurrentMonth}>
                         <div className="text-xs font-medium p-1">{format(day, "d")}</div>
                         <div className="relative" style={{ height: `${Math.min(maxLane + 1, 3) * 24 + 4}px` }}>
                           {sortedDayProjects.slice(0, 3).map(project => {
@@ -990,13 +1133,29 @@ export default function CrmProjects() {
                             const showRoundedLeft = isFirst || isStartOfWeek;
                             const showRoundedRight = isLast || isEndOfWeek;
                             
+                            // Only make the first day of the project draggable
+                            if (isFirst) {
+                              return (
+                                <DraggableProject
+                                  key={project.id}
+                                  project={project}
+                                  lane={lane}
+                                  colors={colors}
+                                  isSingleDay={isSingleDay}
+                                  showRoundedLeft={showRoundedLeft}
+                                  showRoundedRight={showRoundedRight}
+                                  onClick={() => navigate(`/crm/projects/${project.id}`)}
+                                />
+                              );
+                            }
+                            
                             return (
-                              <button
+                              <div
                                 key={project.id}
-                                onClick={() => navigate(`/crm/projects/${project.id}`)}
                                 className={cn(
-                                  "absolute left-0 right-0 text-left text-xs py-1 px-1.5 truncate h-5",
+                                  "absolute left-0 right-0 text-left text-xs py-1 px-1.5 truncate h-5 cursor-default",
                                   colors.bg, colors.text,
+                                  activeDragProject?.id === project.id && "opacity-30",
                                   isSingleDay && "rounded mx-0.5",
                                   !isSingleDay && showRoundedLeft && !showRoundedRight && "rounded-l ml-0.5",
                                   !isSingleDay && !showRoundedLeft && showRoundedRight && "rounded-r mr-0.5",
@@ -1004,23 +1163,35 @@ export default function CrmProjects() {
                                 )}
                                 style={{ top: `${lane * 22}px` }}
                                 title={`${project.customerName || "Customer"} - ${project.title}`}
-                              >
-                                {(isFirst || isStartOfWeek) ? (project.customerName || project.title) : ""}
-                              </button>
+                              />
                             );
                           })}
                         </div>
                         {dayProjects.length > 3 && (
                           <div className="text-xs text-muted-foreground px-1 absolute bottom-0.5">+{dayProjects.length - 3} more</div>
                         )}
-                      </div>
+                      </DroppableDay>
                     );
                   });
                 })()}
               </div>
             </div>
             )}
+
+            {/* Drag Overlay */}
+            <DragOverlay>
+              {activeDragProject && (
+                <div className={cn(
+                  "text-xs py-1 px-2 rounded shadow-lg opacity-90",
+                  statusColors[activeDragProject.status]?.bg || "bg-slate-100",
+                  statusColors[activeDragProject.status]?.text || "text-slate-700"
+                )}>
+                  {activeDragProject.customerName || activeDragProject.title}
+                </div>
+              )}
+            </DragOverlay>
           </div>
+          </DndContext>
         </TabsContent>
       </Tabs>
 
