@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback, type ReactNode } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -10,8 +10,33 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  useDraggable,
+  useDroppable,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   Dialog,
   DialogContent,
@@ -56,10 +81,12 @@ import {
   LayoutGrid,
   CalendarDays,
   Activity,
+  List,
+  GripVertical,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, isWithinInterval, addDays, isBefore, isAfter, startOfDay } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, addDays, isBefore, isAfter, startOfDay } from "date-fns";
 import type { CrmUser, CrmProject, CrmProperty } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
@@ -122,6 +149,7 @@ const filterTabConfig: Record<FilterTab, { label: string }> = {
 const statusColors: Record<string, { bg: string; text: string; border: string }> = {
   lead: { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-200" },
   proposal_sent: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
+  approved: { bg: "bg-green-100", text: "text-green-700", border: "border-green-200" },
   equipment_ordered: { bg: "bg-yellow-100", text: "text-yellow-700", border: "border-yellow-200" },
   equipment_arrived: { bg: "bg-lime-100", text: "text-lime-700", border: "border-lime-200" },
   in_progress: { bg: "bg-amber-100", text: "text-amber-700", border: "border-amber-200" },
@@ -134,6 +162,7 @@ const statusColors: Record<string, { bg: string; text: string; border: string }>
 const statusLabels: Record<string, string> = {
   lead: "New",
   proposal_sent: "Proposal Sent",
+  approved: "Approved",
   equipment_ordered: "Equipment Ordered",
   equipment_arrived: "Equipment Arrived",
   in_progress: "In Progress",
@@ -169,6 +198,24 @@ const priorityColors: Record<string, { bg: string; text: string; border: string 
 const PROJECT_TYPES = ["INSTALL", "DUCT", "COMMERCIAL", "CRAWLSPACE", "MAJOR_REPAIR"] as const;
 const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 
+type ProjectStatus = "lead" | "proposal_sent" | "approved" | "in_progress" | "completed";
+const KANBAN_STAGES: ProjectStatus[] = ["lead", "proposal_sent", "approved", "in_progress", "completed"];
+const COLUMN_PREFIX = "column-";
+
+function getColumnId(stage: ProjectStatus): string {
+  return `${COLUMN_PREFIX}${stage}`;
+}
+
+function getStageFromColumnId(columnId: string): ProjectStatus | null {
+  if (columnId.startsWith(COLUMN_PREFIX)) {
+    const stage = columnId.slice(COLUMN_PREFIX.length) as ProjectStatus;
+    if (KANBAN_STAGES.includes(stage)) {
+      return stage;
+    }
+  }
+  return null;
+}
+
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
   useEffect(() => {
@@ -178,7 +225,249 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-// Droppable day cell component for calendar drag and drop
+interface HorizontalScrollContainerProps {
+  children: ReactNode;
+  className?: string;
+  isDraggingCard?: boolean;
+}
+
+function HorizontalScrollContainer({ children, className, isDraggingCard }: HorizontalScrollContainerProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [showLeftFade, setShowLeftFade] = useState(false);
+  const [showRightFade, setShowRightFade] = useState(true);
+
+  const updateFades = useCallback(() => {
+    if (!containerRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = containerRef.current;
+    setShowLeftFade(scrollLeft > 10);
+    setShowRightFade(scrollLeft < scrollWidth - clientWidth - 10);
+  }, []);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    updateFades();
+    container.addEventListener('scroll', updateFades);
+    window.addEventListener('resize', updateFades);
+    return () => {
+      container.removeEventListener('scroll', updateFades);
+      window.removeEventListener('resize', updateFades);
+    };
+  }, [updateFades]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (isDraggingCard) return;
+    if ((e.target as HTMLElement).closest('[data-no-drag]')) return;
+    const container = containerRef.current;
+    if (!container) return;
+    setIsDragging(true);
+    setStartX(e.pageX - container.offsetLeft);
+    setScrollLeft(container.scrollLeft);
+    container.style.cursor = 'grabbing';
+    container.style.userSelect = 'none';
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || isDraggingCard) return;
+    e.preventDefault();
+    const container = containerRef.current;
+    if (!container) return;
+    const x = e.pageX - container.offsetLeft;
+    const walk = (x - startX) * 1.5;
+    container.scrollLeft = scrollLeft - walk;
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    const container = containerRef.current;
+    if (container) {
+      container.style.cursor = 'grab';
+      container.style.userSelect = '';
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (isDragging) {
+      handleMouseUp();
+    }
+  };
+
+  return (
+    <div className="relative" style={{ overflow: 'visible' }}>
+      {showLeftFade && (
+        <div className="absolute left-0 top-0 bottom-4 w-8 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+      )}
+      <div
+        ref={containerRef}
+        className={cn(
+          "flex flex-row gap-4 pb-4",
+          !isDraggingCard && "cursor-grab",
+          isDragging && "cursor-grabbing",
+          className
+        )}
+        style={{ 
+          scrollbarWidth: 'thin',
+          overflowX: 'auto',
+          overflowY: 'hidden',
+        }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+      >
+        <div className="w-2 flex-shrink-0" aria-hidden="true" />
+        {children}
+        <div className="w-2 flex-shrink-0" aria-hidden="true" />
+      </div>
+      {showRightFade && (
+        <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
+      )}
+    </div>
+  );
+}
+
+interface ProjectCardProps {
+  project: ProjectWithDetails;
+  onClick: () => void;
+  isDragging?: boolean;
+}
+
+function ProjectCard({ project, onClick, isDragging: isDraggingProp }: ProjectCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ 
+    id: project.id,
+    data: {
+      type: "card",
+      project,
+      stage: project.status || "lead",
+    }
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging || isDraggingProp ? 0.5 : 1,
+  };
+
+  const statusStyle = statusColors[project.status] || statusColors.lead;
+  const priorityStyle = priorityColors[project.priority || "normal"];
+  const showPriority = project.priority === "high" || project.priority === "urgent";
+
+  return (
+    <Card
+      ref={setNodeRef}
+      style={style}
+      className="mb-2 cursor-pointer hover:shadow-md transition-shadow bg-white touch-manipulation"
+      onClick={onClick}
+      data-no-drag
+    >
+      <CardContent className="p-3">
+        <div className="flex items-start gap-2">
+          <div
+            {...attributes}
+            {...listeners}
+            className="flex-shrink-0 cursor-grab active:cursor-grabbing p-1 min-h-[44px] min-w-[44px] flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="font-semibold text-sm truncate">
+              {project.customerName || "No customer"}
+            </h4>
+            <p className="text-xs text-muted-foreground truncate mt-0.5">
+              {project.title}
+            </p>
+            {project.startDate && project.endDate && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                <Calendar className="h-3 w-3 flex-shrink-0" />
+                <span>{format(new Date(project.startDate), "MMM d")} - {format(new Date(project.endDate), "MMM d")}</span>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-1 mt-2">
+              <Badge className={cn("text-xs border", statusStyle.bg, statusStyle.text, statusStyle.border)}>
+                {statusLabels[project.status] || project.status}
+              </Badge>
+              {showPriority && (
+                <Badge className={cn("text-xs border", priorityStyle.bg, priorityStyle.text, priorityStyle.border)}>
+                  {project.priority}
+                </Badge>
+              )}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface ProjectKanbanColumnProps {
+  stage: ProjectStatus;
+  projects: ProjectWithDetails[];
+  onCardClick: (project: ProjectWithDetails) => void;
+}
+
+function ProjectKanbanColumn({ stage, projects, onCardClick }: ProjectKanbanColumnProps) {
+  const columnId = getColumnId(stage);
+  
+  const { setNodeRef, isOver } = useDroppable({
+    id: columnId,
+    data: {
+      type: "column",
+      stage,
+    }
+  });
+
+  return (
+    <div className="flex-1 min-w-[280px] max-w-[320px] h-full flex flex-col">
+      <Card className={`h-full bg-gray-50 transition-colors flex flex-col ${isOver ? 'ring-2 ring-primary ring-opacity-50' : ''}`}>
+        <CardHeader className="pb-2 pt-3 px-3 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold truncate">
+              {statusLabels[stage]}
+            </CardTitle>
+            <Badge variant="outline" className="ml-2 flex-shrink-0">
+              {projects.length}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="px-3 pb-3 pt-0 flex-1 overflow-hidden">
+          <div
+            ref={setNodeRef}
+            className="h-full overflow-y-auto"
+            style={{ scrollbarWidth: 'thin', maxHeight: 'calc(100vh - 350px)' }}
+          >
+            <SortableContext items={projects.map(p => p.id)} strategy={verticalListSortingStrategy}>
+              {projects.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No projects
+                </div>
+              ) : (
+                projects.map((project) => (
+                  <ProjectCard
+                    key={project.id}
+                    project={project}
+                    onClick={() => onCardClick(project)}
+                  />
+                ))
+              )}
+            </SortableContext>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function DroppableDay({ day, isCurrentMonth, children }: { day: Date; isCurrentMonth: boolean; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({
     id: day.toISOString(),
@@ -198,7 +487,6 @@ function DroppableDay({ day, isCurrentMonth, children }: { day: Date; isCurrentM
   );
 }
 
-// Draggable project item component for calendar
 function DraggableProject({ 
   project, 
   lane, 
@@ -261,18 +549,17 @@ export default function CrmProjects() {
   const [searchInput, setSearchInput] = useState("");
   const [activeFilterTab, setActiveFilterTab] = useState<FilterTab>("all");
   
-  // Read initial tab from URL query param
-  const getInitialTab = (): "overview" | "pipeline" | "calendar" => {
+  const getInitialTab = (): "overview" | "list" | "calendar" | "kanban" => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get("tab");
-      if (tab === "calendar" || tab === "overview" || tab === "pipeline") {
+      if (tab === "calendar" || tab === "overview" || tab === "list" || tab === "kanban") {
         return tab;
       }
     }
     return "overview";
   };
-  const [activeTab, setActiveTab] = useState<"overview" | "pipeline" | "calendar">(getInitialTab);
+  const [mainViewTab, setMainViewTab] = useState<"overview" | "list" | "calendar" | "kanban">(getInitialTab);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [page, setPage] = useState(1);
   
@@ -289,13 +576,18 @@ export default function CrmProjects() {
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   
-  // Drag and drop state for calendar
   const [activeDragProject, setActiveDragProject] = useState<ProjectWithDetails | null>(null);
+  const [isDraggingCard, setIsDraggingCard] = useState(false);
+  const [activeKanbanProjectId, setActiveKanbanProjectId] = useState<string | null>(null);
+  
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8,
       },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 200, tolerance: 8 },
     })
   );
 
@@ -342,6 +634,18 @@ export default function CrmProjects() {
     enabled: !!currentUser,
   });
 
+  const { data: allProjectsData, isLoading: allProjectsLoading } = useQuery<ProjectsResponse>({
+    queryKey: ["/api/crm/projects/all"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/projects?limit=1000`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch all projects");
+      return res.json();
+    },
+    enabled: !!currentUser && mainViewTab === "kanban",
+  });
+
   const { data: statsData, isLoading: statsLoading } = useQuery<{
     activeProjects: number;
     pendingActions: number;
@@ -352,15 +656,12 @@ export default function CrmProjects() {
     queryKey: ["/api/crm/projects/stats"],
   });
 
-  // Separate query for calendar view - fetches all scheduled projects without pagination
   const calendarQueryParams = useMemo(() => {
-    const monthStart = startOfMonth(calendarMonth);
-    const monthEnd = endOfMonth(calendarMonth);
     const params = new URLSearchParams();
     params.set("hasSchedule", "true");
-    params.set("limit", "1000"); // Get all scheduled projects
+    params.set("limit", "1000");
     return params.toString();
-  }, [calendarMonth]);
+  }, []);
 
   const { data: calendarProjectsData, isLoading: calendarLoading } = useQuery<ProjectsResponse>({
     queryKey: ["/api/crm/projects/calendar", calendarQueryParams],
@@ -371,7 +672,7 @@ export default function CrmProjects() {
       if (!res.ok) throw new Error("Failed to fetch calendar projects");
       return res.json();
     },
-    enabled: !!currentUser && activeTab === "calendar",
+    enabled: !!currentUser && mainViewTab === "calendar",
   });
 
   const { data: customersData, isLoading: customersLoading } = useQuery<CustomersResponse>({
@@ -389,7 +690,6 @@ export default function CrmProjects() {
     enabled: !!currentUser && createDialogOpen,
   });
 
-  // Fetch sites for the selected customer
   const { data: sitesData, isLoading: sitesLoading } = useQuery<CrmProperty[]>({
     queryKey: ["/api/crm/properties", selectedCustomer?.id],
     queryFn: async () => {
@@ -436,7 +736,6 @@ export default function CrmProjects() {
     },
   });
 
-  // Mutation for updating project dates via drag and drop
   const updateProjectDatesMutation = useMutation({
     mutationFn: async (data: { projectId: string; startDate: string; endDate: string }) => {
       return apiRequest("PATCH", `/api/crm/projects/${data.projectId}`, {
@@ -447,7 +746,6 @@ export default function CrmProjects() {
     onSuccess: () => {
       toast({ title: "Project rescheduled" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/projects"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects/calendar"] });
     },
     onError: (error: Error) => {
       toast({
@@ -458,14 +756,33 @@ export default function CrmProjects() {
     },
   });
 
-  const handleDragStart = (event: DragStartEvent) => {
+  const updateProjectStatusMutation = useMutation({
+    mutationFn: async (data: { projectId: string; status: string }) => {
+      return apiRequest("PATCH", `/api/crm/projects/${data.projectId}`, {
+        status: data.status,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Project status updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update project status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCalendarDragStart = (event: DragStartEvent) => {
     const projectId = event.active.id as string;
     const allProjects = calendarProjectsData?.projects || [];
     const project = allProjects.find(p => p.id === projectId);
     setActiveDragProject(project || null);
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleCalendarDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveDragProject(null);
     
@@ -481,11 +798,9 @@ export default function CrmProjects() {
     const oldStartDate = startOfDay(new Date(project.startDate));
     const newDate = startOfDay(new Date(newDateStr));
     
-    // Calculate the difference in days
     const daysDiff = Math.round((newDate.getTime() - oldStartDate.getTime()) / (1000 * 60 * 60 * 24));
     if (daysDiff === 0) return;
     
-    // Calculate new dates
     const newStartDate = addDays(oldStartDate, daysDiff);
     const oldEndDate = project.endDate ? startOfDay(new Date(project.endDate)) : oldStartDate;
     const newEndDate = addDays(oldEndDate, daysDiff);
@@ -496,6 +811,60 @@ export default function CrmProjects() {
       endDate: format(newEndDate, "yyyy-MM-dd"),
     });
   };
+
+  const handleKanbanDragStart = (event: DragStartEvent) => {
+    setActiveKanbanProjectId(event.active.id as string);
+    setIsDraggingCard(true);
+  };
+
+  const handleKanbanDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveKanbanProjectId(null);
+    setIsDraggingCard(false);
+
+    if (!over) return;
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    let newStage: ProjectStatus | null = null;
+
+    if (over.data.current?.type === "column") {
+      newStage = over.data.current.stage as ProjectStatus;
+    } else if (over.data.current?.type === "card") {
+      newStage = over.data.current.stage as ProjectStatus;
+    } else {
+      newStage = getStageFromColumnId(overId);
+    }
+
+    if (newStage) {
+      const allProjects = allProjectsData?.projects || [];
+      const project = allProjects.find((p) => p.id === activeId);
+      if (project && project.status !== newStage) {
+        updateProjectStatusMutation.mutate({ projectId: activeId, status: newStage });
+      }
+    }
+  };
+
+  const projectsByStage = useMemo(() => {
+    const grouped: Record<ProjectStatus, ProjectWithDetails[]> = {
+      lead: [],
+      proposal_sent: [],
+      approved: [],
+      in_progress: [],
+      completed: [],
+    };
+    const allProjects = allProjectsData?.projects || [];
+    allProjects.forEach((p) => {
+      const stage = (p.status || "lead") as ProjectStatus;
+      if (grouped[stage]) {
+        grouped[stage].push(p);
+      } else if (stage === "equipment_ordered" || stage === "equipment_arrived") {
+        grouped["approved"].push(p);
+      }
+    });
+    return grouped;
+  }, [allProjectsData?.projects]);
 
   const resetCreateForm = () => {
     setCustomerSearch("");
@@ -520,7 +889,6 @@ export default function CrmProjects() {
       return;
     }
 
-    // Date range is required so projects appear on calendar
     if (!startDate || !endDate) {
       toast({
         title: "Schedule required",
@@ -530,7 +898,6 @@ export default function CrmProjects() {
       return;
     }
 
-    // If customer has sites, require site selection
     if (sites.length > 0 && !selectedSite) {
       toast({
         title: "Location required",
@@ -594,606 +961,645 @@ export default function CrmProjects() {
   const total = projectsData?.pagination?.total || 0;
   const totalPages = projectsData?.pagination?.totalPages || Math.ceil(total / ITEMS_PER_PAGE);
 
+  const activeKanbanProject = activeKanbanProjectId 
+    ? (allProjectsData?.projects || []).find(p => p.id === activeKanbanProjectId)
+    : null;
+
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <FolderKanban className="h-8 w-8 text-primary" />
-          <h1 className="text-2xl font-bold">Projects</h1>
+      <div className="space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <FolderKanban className="h-8 w-8 text-primary" />
+            <div>
+              <h1 className="text-2xl font-bold">Projects</h1>
+              <p className="text-sm text-slate-500">Manage your project pipeline</p>
+            </div>
+          </div>
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> New Project
+          </Button>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> New Project
-        </Button>
-      </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-        <TabsList className="grid w-full max-w-md grid-cols-3 mb-6">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
+        <div className="flex overflow-x-auto border-b border-slate-200">
+          <button
+            onClick={() => setMainViewTab("overview")}
+            className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-2 ${
+              mainViewTab === "overview"
+                ? "border-[#711419] text-[#711419]"
+                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+            }`}
+          >
             <BarChart3 className="h-4 w-4" />
             Overview
-          </TabsTrigger>
-          <TabsTrigger value="calendar" className="flex items-center gap-2">
+          </button>
+          <button
+            onClick={() => setMainViewTab("list")}
+            className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-2 ${
+              mainViewTab === "list"
+                ? "border-[#711419] text-[#711419]"
+                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+            }`}
+          >
+            <List className="h-4 w-4" />
+            List
+          </button>
+          <button
+            onClick={() => setMainViewTab("calendar")}
+            className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-2 ${
+              mainViewTab === "calendar"
+                ? "border-[#711419] text-[#711419]"
+                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+            }`}
+          >
             <CalendarDays className="h-4 w-4" />
             Calendar
-          </TabsTrigger>
-          <TabsTrigger value="pipeline" className="flex items-center gap-2">
+          </button>
+          <button
+            onClick={() => setMainViewTab("kanban")}
+            className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-2 ${
+              mainViewTab === "kanban"
+                ? "border-[#711419] text-[#711419]"
+                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+            }`}
+          >
             <LayoutGrid className="h-4 w-4" />
-            Pipeline
-          </TabsTrigger>
-        </TabsList>
+            Kanban
+          </button>
+        </div>
 
-        <TabsContent value="overview">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Projects</CardTitle>
-                <FolderKanban className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{statsLoading ? <Skeleton className="h-8 w-16" /> : statsData?.activeProjects ?? 0}</div>
-                <p className="text-xs text-muted-foreground">Projects in progress</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Pending Actions</CardTitle>
-                <ClipboardList className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{statsLoading ? <Skeleton className="h-8 w-16" /> : statsData?.pendingActions ?? 0}</div>
-                <p className="text-xs text-muted-foreground">Need attention</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Pipeline Value</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {statsLoading ? <Skeleton className="h-8 w-20" /> : `$${(statsData?.pipelineValue ?? 0).toLocaleString()}`}
-                </div>
-                <p className="text-xs text-muted-foreground">Active project value</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
-                <Activity className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{statsLoading ? <Skeleton className="h-8 w-16" /> : `${statsData?.completionRate ?? 0}%`}</div>
-                <p className="text-xs text-muted-foreground">Projects completed</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle className="text-lg">Project Status Funnel</CardTitle>
-              <CardDescription>Click a status to filter the pipeline view</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-                {Object.entries(statusLabels).filter(([key]) => key !== "archived" && key !== "proposal_sent").map(([status, label]) => {
-                  const count = statsData?.statusFunnel?.[status] ?? 0;
-                  const colors = statusColors[status] || statusColors.lead;
-                  return (
-                    <button
-                      key={status}
-                      onClick={() => {
-                        setActiveFilterTab(status as FilterTab);
-                        setActiveTab("pipeline");
-                      }}
-                      className={cn(
-                        "p-4 rounded-lg border-2 transition-all hover:scale-105",
-                        colors.bg, colors.border
-                      )}
-                    >
-                      <div className={cn("text-2xl font-bold", colors.text)}>{count}</div>
-                      <div className="text-xs text-muted-foreground mt-1">{label}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Scheduled Projects */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Scheduled Projects</CardTitle>
-              <CardDescription>Projects with scheduled dates in the next 14 days</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {projectsLoading ? (
-                <div className="space-y-3">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <Skeleton key={i} className="h-16 w-full" />
-                  ))}
-                </div>
-              ) : (() => {
-                const today = startOfDay(new Date());
-                const twoWeeksOut = addDays(today, 14);
-                
-                // Get unique projects with dates in the next 14 days
-                const upcomingProjects = projects.filter(project => {
-                  if (!project.startDate && !project.endDate) return false;
-                  const startDate = project.startDate ? startOfDay(new Date(project.startDate)) : null;
-                  const endDate = project.endDate ? startOfDay(new Date(project.endDate)) : null;
-                  
-                  // Include if start or end date is within 14 days
-                  const startInRange = startDate && !isBefore(startDate, today) && !isAfter(startDate, twoWeeksOut);
-                  const endInRange = endDate && !isBefore(endDate, today) && !isAfter(endDate, twoWeeksOut);
-                  // Also include if project spans today (started before, ends after)
-                  const spansToday = startDate && endDate && isBefore(startDate, today) && isAfter(endDate, today);
-                  
-                  return startInRange || endInRange || spansToday;
-                });
-
-                // Sort by earliest date (start date first, then end date)
-                upcomingProjects.sort((a, b) => {
-                  const aDate = a.startDate ? new Date(a.startDate) : (a.endDate ? new Date(a.endDate) : new Date());
-                  const bDate = b.startDate ? new Date(b.startDate) : (b.endDate ? new Date(b.endDate) : new Date());
-                  return aDate.getTime() - bDate.getTime();
-                });
-                
-                if (upcomingProjects.length === 0) {
-                  return (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Calendar className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                      <p>No scheduled projects in the next 14 days</p>
-                      <p className="text-sm mt-1">Set start/end dates on projects to see them here</p>
-                    </div>
-                  );
-                }
-                
-                return (
-                  <div className="space-y-3">
-                    {upcomingProjects.slice(0, 10).map((project) => {
-                      const statusStyle = statusColors[project.status] || statusColors.lead;
-                      const startDate = project.startDate ? startOfDay(new Date(project.startDate)) : null;
-                      const endDate = project.endDate ? startOfDay(new Date(project.endDate)) : null;
-                      
-                      const startDaysAway = startDate ? Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
-                      const endDaysAway = endDate ? Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
-                      
-                      const formatDaysAway = (days: number) => {
-                        if (days < 0) return `${Math.abs(days)}d ago`;
-                        if (days === 0) return "Today";
-                        if (days === 1) return "Tomorrow";
-                        return `In ${days}d`;
-                      };
-                      
-                      return (
-                        <button
-                          key={project.id}
-                          onClick={() => navigate(`/crm/projects/${project.id}`)}
-                          className="w-full text-left p-4 rounded-lg border hover:bg-muted/50 transition-colors flex items-center justify-between gap-4"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium truncate">{project.title}</span>
-                              <Badge className={cn("text-xs", statusStyle.bg, statusStyle.text, statusStyle.border)}>
-                                {statusLabels[project.status] || project.status}
-                              </Badge>
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {project.customerName || "No customer"}
-                            </div>
-                          </div>
-                          <div className="text-right flex-shrink-0 space-y-0.5">
-                            {startDate && (
-                              <div className="text-sm">
-                                <span className="text-blue-600 font-medium">{format(startDate, "MMM d")}</span>
-                                <span className="text-xs text-muted-foreground ml-1">({formatDaysAway(startDaysAway!)})</span>
-                              </div>
-                            )}
-                            {endDate && startDate && endDate.getTime() !== startDate.getTime() && (
-                              <div className="text-sm">
-                                <span className="text-orange-600 font-medium">{format(endDate, "MMM d")}</span>
-                                <span className="text-xs text-muted-foreground ml-1">({formatDaysAway(endDaysAway!)})</span>
-                              </div>
-                            )}
-                            {endDate && !startDate && (
-                              <div className="text-sm">
-                                <span className="text-orange-600 font-medium">{format(endDate, "MMM d")}</span>
-                                <span className="text-xs text-muted-foreground ml-1">({formatDaysAway(endDaysAway!)})</span>
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                    {upcomingProjects.length > 10 && (
-                      <p className="text-sm text-center text-muted-foreground pt-2">
-                        +{upcomingProjects.length - 10} more projects
-                      </p>
-                    )}
-                  </div>
-                );
-              })()}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="pipeline">
-          <div className="space-y-4">
-            {/* Search bar at top - DoorLoop style */}
-            <div className="flex justify-center mb-2">
-              <div className="relative w-full max-w-xl">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="Search projects..."
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
-                  data-testid="input-search-projects"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500">Total: {total}</p>
-              </div>
-            </div>
-
-            {/* Status filter tabs - underline style */}
-            <div className="flex overflow-x-auto border-b border-slate-200">
-              {(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveFilterTab(tab)}
-                  className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-                    activeFilterTab === tab
-                      ? "border-[#711419] text-[#711419]"
-                      : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-                  }`}
-                  data-testid={`tab-status-${tab}`}
-                >
-                  {filterTabConfig[tab].label}
-                </button>
-              ))}
-            </div>
-
-            {projectsLoading ? (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <Skeleton key={i} className="h-48 rounded-xl" />
-                ))}
-              </div>
-            ) : projects.length === 0 ? (
-              <Card className="bg-white border shadow-sm">
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <FolderKanban className="h-12 w-12 text-slate-300 mb-4" />
-                  <p className="text-slate-500 text-center">No projects found</p>
-                  <p className="text-slate-400 text-sm text-center mt-1">
-                    Create a new project to get started
-                  </p>
+        <Tabs value={mainViewTab} onValueChange={(v) => setMainViewTab(v as any)} className="w-full">
+          <TabsContent value="overview" className="mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Active Projects</CardTitle>
+                  <FolderKanban className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{statsLoading ? <Skeleton className="h-8 w-16" /> : statsData?.activeProjects ?? 0}</div>
+                  <p className="text-xs text-muted-foreground">Projects in progress</p>
                 </CardContent>
               </Card>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {projects.map((project) => {
-                  const status = project.status || "lead";
-                  const statusStyle = statusColors[status] || statusColors.lead;
-                  const typeStyle = projectTypeColors[project.projectType] || projectTypeColors.INSTALL;
 
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Pending Actions</CardTitle>
+                  <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{statsLoading ? <Skeleton className="h-8 w-16" /> : statsData?.pendingActions ?? 0}</div>
+                  <p className="text-xs text-muted-foreground">Need attention</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Pipeline Value</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {statsLoading ? <Skeleton className="h-8 w-20" /> : `$${(statsData?.pipelineValue ?? 0).toLocaleString()}`}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Active project value</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{statsLoading ? <Skeleton className="h-8 w-16" /> : `${statsData?.completionRate ?? 0}%`}</div>
+                  <p className="text-xs text-muted-foreground">Projects completed</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle className="text-lg">Project Status Funnel</CardTitle>
+                <CardDescription>Click a status to filter the list view</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+                  {Object.entries(statusLabels).filter(([key]) => key !== "archived" && key !== "proposal_sent" && key !== "approved").map(([status, label]) => {
+                    const count = statsData?.statusFunnel?.[status] ?? 0;
+                    const colors = statusColors[status] || statusColors.lead;
+                    return (
+                      <button
+                        key={status}
+                        onClick={() => {
+                          setActiveFilterTab(status as FilterTab);
+                          setMainViewTab("list");
+                        }}
+                        className={cn(
+                          "p-4 rounded-lg border-2 transition-all hover:scale-105",
+                          colors.bg, colors.border
+                        )}
+                      >
+                        <div className={cn("text-2xl font-bold", colors.text)}>{count}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{label}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Scheduled Projects</CardTitle>
+                <CardDescription>Projects with scheduled dates in the next 14 days</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {projectsLoading ? (
+                  <div className="space-y-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <Skeleton key={i} className="h-16 w-full" />
+                    ))}
+                  </div>
+                ) : (() => {
+                  const today = startOfDay(new Date());
+                  const twoWeeksOut = addDays(today, 14);
+                  
+                  const upcomingProjects = projects.filter(project => {
+                    if (!project.startDate && !project.endDate) return false;
+                    const projectStartDate = project.startDate ? startOfDay(new Date(project.startDate)) : null;
+                    const projectEndDate = project.endDate ? startOfDay(new Date(project.endDate)) : null;
+                    
+                    const startInRange = projectStartDate && !isBefore(projectStartDate, today) && !isAfter(projectStartDate, twoWeeksOut);
+                    const endInRange = projectEndDate && !isBefore(projectEndDate, today) && !isAfter(projectEndDate, twoWeeksOut);
+                    const spansToday = projectStartDate && projectEndDate && isBefore(projectStartDate, today) && isAfter(projectEndDate, today);
+                    
+                    return startInRange || endInRange || spansToday;
+                  });
+
+                  upcomingProjects.sort((a, b) => {
+                    const aDate = a.startDate ? new Date(a.startDate) : (a.endDate ? new Date(a.endDate) : new Date());
+                    const bDate = b.startDate ? new Date(b.startDate) : (b.endDate ? new Date(b.endDate) : new Date());
+                    return aDate.getTime() - bDate.getTime();
+                  });
+                  
+                  if (upcomingProjects.length === 0) {
+                    return (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Calendar className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                        <p>No scheduled projects in the next 14 days</p>
+                        <p className="text-sm mt-1">Set start/end dates on projects to see them here</p>
+                      </div>
+                    );
+                  }
+                  
                   return (
-                    <Card
-                      key={project.id}
-                      className="bg-white border shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                      onClick={() => navigate(`/crm/projects/${project.id}`)}
-                      data-testid={`card-project-${project.id}`}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between mb-3">
-                          <h3 className="font-semibold text-slate-900 line-clamp-2 flex-1 mr-2">
-                            {project.title}
-                          </h3>
-                          <Badge
-                            className={cn(
-                              "text-xs border flex-shrink-0",
-                              statusStyle.bg,
-                              statusStyle.text,
-                              statusStyle.border
-                            )}
+                    <div className="space-y-3">
+                      {upcomingProjects.slice(0, 10).map((project) => {
+                        const statusStyle = statusColors[project.status] || statusColors.lead;
+                        const projectStartDate = project.startDate ? startOfDay(new Date(project.startDate)) : null;
+                        const projectEndDate = project.endDate ? startOfDay(new Date(project.endDate)) : null;
+                        
+                        const startDaysAway = projectStartDate ? Math.ceil((projectStartDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
+                        const endDaysAway = projectEndDate ? Math.ceil((projectEndDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
+                        
+                        const formatDaysAway = (days: number) => {
+                          if (days < 0) return `${Math.abs(days)}d ago`;
+                          if (days === 0) return "Today";
+                          if (days === 1) return "Tomorrow";
+                          return `In ${days}d`;
+                        };
+                        
+                        return (
+                          <button
+                            key={project.id}
+                            onClick={() => navigate(`/crm/projects/${project.id}`)}
+                            className="w-full text-left p-4 rounded-lg border hover:bg-muted/50 transition-colors flex items-center justify-between gap-4"
                           >
-                            {statusLabels[status] || status}
-                          </Badge>
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-sm text-slate-600">
-                            <span className="font-medium">Customer:</span>
-                            <span className="truncate">{project.customerName || "—"}</span>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              className={cn(
-                                "text-xs border",
-                                typeStyle.bg,
-                                typeStyle.text,
-                                typeStyle.border
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-medium truncate">{project.title}</span>
+                                <Badge className={cn("text-xs", statusStyle.bg, statusStyle.text, statusStyle.border)}>
+                                  {statusLabels[project.status] || project.status}
+                                </Badge>
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {project.customerName || "No customer"}
+                              </div>
+                            </div>
+                            <div className="text-right flex-shrink-0 space-y-0.5">
+                              {projectStartDate && (
+                                <div className="text-sm">
+                                  <span className="text-blue-600 font-medium">{format(projectStartDate, "MMM d")}</span>
+                                  <span className="text-xs text-muted-foreground ml-1">({formatDaysAway(startDaysAway!)})</span>
+                                </div>
                               )}
-                            >
-                              {projectTypeLabels[project.projectType] || project.projectType}
-                            </Badge>
-                            {project.priority && project.priority !== "normal" && (
-                              <Badge
-                                className={cn(
-                                  "text-xs border",
-                                  priorityColors[project.priority]?.bg || "bg-slate-100",
-                                  priorityColors[project.priority]?.text || "text-slate-600",
-                                  priorityColors[project.priority]?.border || "border-slate-200"
-                                )}
-                              >
-                                {project.priority}
-                              </Badge>
-                            )}
-                          </div>
+                              {projectEndDate && projectStartDate && projectEndDate.getTime() !== projectStartDate.getTime() && (
+                                <div className="text-sm">
+                                  <span className="text-orange-600 font-medium">{format(projectEndDate, "MMM d")}</span>
+                                  <span className="text-xs text-muted-foreground ml-1">({formatDaysAway(endDaysAway!)})</span>
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                      {upcomingProjects.length > 10 && (
+                        <p className="text-sm text-center text-muted-foreground pt-2">
+                          +{upcomingProjects.length - 10} more projects
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-                          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                            <div className="flex items-center gap-1 text-sm">
-                              <DollarSign className="h-4 w-4 text-green-600" />
+          <TabsContent value="list" className="mt-4">
+            <div className="space-y-4">
+              <div className="flex justify-center mb-2">
+                <div className="relative w-full max-w-xl">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search projects..."
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-500">Total: {total}</p>
+              </div>
+
+              <div className="flex overflow-x-auto border-b border-slate-200">
+                {(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveFilterTab(tab)}
+                    className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                      activeFilterTab === tab
+                        ? "border-[#711419] text-[#711419]"
+                        : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+                    }`}
+                  >
+                    {filterTabConfig[tab].label}
+                  </button>
+                ))}
+              </div>
+
+              {projectsLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="h-14 rounded-lg" />
+                  ))}
+                </div>
+              ) : projects.length === 0 ? (
+                <Card className="bg-white border shadow-sm">
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <FolderKanban className="h-12 w-12 text-slate-300 mb-4" />
+                    <p className="text-slate-500 text-center">No projects found</p>
+                    <p className="text-slate-400 text-sm text-center mt-1">
+                      Create a new project to get started
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-50">
+                        <TableHead className="font-semibold">Customer</TableHead>
+                        <TableHead className="font-semibold">Title</TableHead>
+                        <TableHead className="font-semibold">Status</TableHead>
+                        <TableHead className="font-semibold">Priority</TableHead>
+                        <TableHead className="font-semibold">Dates</TableHead>
+                        <TableHead className="font-semibold text-right">Value</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {projects.map((project) => {
+                        const status = project.status || "lead";
+                        const statusStyle = statusColors[status] || statusColors.lead;
+                        const priorityStyle = priorityColors[project.priority || "normal"];
+
+                        return (
+                          <TableRow
+                            key={project.id}
+                            className="cursor-pointer hover:bg-slate-50"
+                            onClick={() => navigate(`/crm/projects/${project.id}`)}
+                          >
+                            <TableCell className="font-medium">
+                              {project.customerName || "—"}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <span className="truncate max-w-[200px]">{project.title}</span>
+                                {project.projectType && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {projectTypeLabels[project.projectType] || project.projectType}
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={cn("text-xs border", statusStyle.bg, statusStyle.text, statusStyle.border)}>
+                                {statusLabels[status] || status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={cn("text-xs border", priorityStyle.bg, priorityStyle.text, priorityStyle.border)}>
+                                {project.priority || "normal"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {project.startDate ? (
+                                <span className="text-sm">
+                                  {format(new Date(project.startDate), "MMM d")}
+                                  {project.endDate && project.endDate !== project.startDate && (
+                                    <> - {format(new Date(project.endDate), "MMM d")}</>
+                                  )}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
                               <span className="font-medium text-green-700">
                                 {formatCurrency(project.expectedValue)}
                               </span>
-                            </div>
-                            {project.workOrderCount > 0 && (
-                              <div className="flex items-center gap-1 text-sm text-slate-500">
-                                <ClipboardList className="h-4 w-4" />
-                                <span>{project.workOrderCount} WO{project.workOrderCount !== 1 ? "s" : ""}</span>
-                              </div>
-                            )}
-                          </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
 
-                          <div className="flex items-center gap-1 text-xs text-slate-400">
-                            <Calendar className="h-3 w-3" />
-                            <span>Created {formatDate(project.createdAt)}</span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <p className="text-sm text-slate-500">
+                    Showing {(page - 1) * ITEMS_PER_PAGE + 1} to{" "}
+                    {Math.min(page * ITEMS_PER_PAGE, total)} of {total}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page <= 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm text-slate-600">
+                      Page {page} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page >= totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </TabsContent>
 
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between pt-4 border-t">
-                <p className="text-sm text-slate-500">
-                  Showing {(page - 1) * ITEMS_PER_PAGE + 1} to{" "}
-                  {Math.min(page * ITEMS_PER_PAGE, total)} of {total}
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page <= 1}
-                    data-testid="button-prev-page"
-                  >
+          <TabsContent value="calendar" className="mt-4">
+            <DndContext sensors={sensors} onDragStart={handleCalendarDragStart} onDragEnd={handleCalendarDragEnd}>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between mb-4">
+                  <Button variant="outline" size="sm" onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}>
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  <span className="text-sm text-slate-600">
-                    Page {page} of {totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page >= totalPages}
-                    data-testid="button-next-page"
-                  >
+                  <h2 className="text-lg font-semibold">{format(calendarMonth, "MMMM yyyy")}</h2>
+                  <Button variant="outline" size="sm" onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}>
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
-              </div>
-            )}
-          </div>
-        </TabsContent>
 
-        <TabsContent value="calendar">
-          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="space-y-4">
-            {/* Calendar Header */}
-            <div className="flex items-center justify-between mb-4">
-              <Button variant="outline" size="sm" onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <h2 className="text-lg font-semibold">{format(calendarMonth, "MMMM yyyy")}</h2>
-              <Button variant="outline" size="sm" onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* Status Legend */}
-            <div className="flex flex-wrap gap-2 mb-4">
-              {Object.entries(statusColors).filter(([key]) => !["archived", "proposal_sent"].includes(key)).map(([status, colors]) => (
-                <div key={status} className="flex items-center gap-1.5 text-xs">
-                  <div className={cn("w-3 h-3 rounded", colors.bg, colors.border, "border")} />
-                  <span>{statusLabels[status]}</span>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {Object.entries(statusColors).filter(([key]) => !["archived", "proposal_sent"].includes(key)).map(([status, colors]) => (
+                    <div key={status} className="flex items-center gap-1.5 text-xs">
+                      <div className={cn("w-3 h-3 rounded", colors.bg, colors.border, "border")} />
+                      <span>{statusLabels[status]}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            {/* Calendar Grid */}
-            {calendarLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-              </div>
-            ) : (
-            <div className="border rounded-lg overflow-hidden">
-              {/* Weekday headers */}
-              <div className="grid grid-cols-7 bg-muted">
-                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
-                  <div key={day} className="p-2 text-center text-sm font-medium border-b">{day}</div>
-                ))}
-              </div>
-              
-              {/* Calendar days */}
-              <div className="grid grid-cols-7">
-                {(() => {
-                  const monthStart = startOfMonth(calendarMonth);
-                  const monthEnd = endOfMonth(calendarMonth);
-                  const calendarStart = startOfWeek(monthStart);
-                  const calendarEnd = endOfWeek(monthEnd);
-                  const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
-                  
-                  // Assign lanes to projects for consistent vertical positioning
-                  const projectLanes = new Map<string, number>();
-                  const allProjects = calendarProjectsData?.projects || [];
-                  
-                  // Sort projects by start date, then by duration (longer first)
-                  const sortedProjects = [...allProjects]
-                    .filter(p => p.startDate)
-                    .sort((a, b) => {
-                      const aStart = new Date(a.startDate!).getTime();
-                      const bStart = new Date(b.startDate!).getTime();
-                      if (aStart !== bStart) return aStart - bStart;
-                      const aEnd = a.endDate ? new Date(a.endDate).getTime() : aStart;
-                      const bEnd = b.endDate ? new Date(b.endDate).getTime() : bStart;
-                      return (bEnd - bStart) - (aEnd - aStart);
-                    });
-                  
-                  // Assign each project to a lane
-                  sortedProjects.forEach(project => {
-                    const projectStart = startOfDay(new Date(project.startDate!));
-                    const projectEnd = project.endDate ? startOfDay(new Date(project.endDate)) : projectStart;
+                {calendarLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                  </div>
+                ) : (
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="grid grid-cols-7 bg-muted">
+                      {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
+                        <div key={day} className="p-2 text-center text-sm font-medium border-b">{day}</div>
+                      ))}
+                    </div>
                     
-                    // Find first available lane
-                    let lane = 0;
-                    while (true) {
-                      let laneAvailable = true;
-                      const entries = Array.from(projectLanes.entries());
-                      for (let i = 0; i < entries.length; i++) {
-                        const [otherId, otherLane] = entries[i];
-                        if (otherLane !== lane) continue;
-                        const other = sortedProjects.find(p => p.id === otherId);
-                        if (!other) continue;
-                        const otherStart = startOfDay(new Date(other.startDate!));
-                        const otherEnd = other.endDate ? startOfDay(new Date(other.endDate)) : otherStart;
-                        // Check if ranges overlap
-                        if (!(isAfter(projectStart, otherEnd) || isBefore(projectEnd, otherStart))) {
-                          laneAvailable = false;
-                          break;
-                        }
-                      }
-                      if (laneAvailable) break;
-                      lane++;
-                    }
-                    projectLanes.set(project.id, lane);
-                  });
-                  
-                  return days.map((day, dayIndex) => {
-                    const isCurrentMonth = isSameMonth(day, calendarMonth);
-                    const dayStart = startOfDay(day);
-                    const isStartOfWeek = dayIndex % 7 === 0;
-                    const isEndOfWeek = dayIndex % 7 === 6;
-                    
-                    const dayProjects = allProjects.filter(project => {
-                      if (!project.startDate) return false;
-                      const projectStart = startOfDay(new Date(project.startDate));
-                      const projectEnd = project.endDate ? startOfDay(new Date(project.endDate)) : projectStart;
-                      return isSameDay(dayStart, projectStart) ||
-                             isSameDay(dayStart, projectEnd) ||
-                             (isAfter(dayStart, projectStart) && isBefore(dayStart, projectEnd));
-                    });
-                    
-                    // Sort by lane for consistent rendering
-                    const sortedDayProjects = [...dayProjects].sort((a, b) => 
-                      (projectLanes.get(a.id) || 0) - (projectLanes.get(b.id) || 0)
-                    );
-                    
-                    // Get max lane for this day to create proper spacing
-                    const maxLane = Math.max(0, ...sortedDayProjects.map(p => projectLanes.get(p.id) || 0));
-                    
-                    return (
-                      <DroppableDay key={day.toISOString()} day={day} isCurrentMonth={isCurrentMonth}>
-                        <div className="text-xs font-medium p-1">{format(day, "d")}</div>
-                        <div className="relative" style={{ height: `${Math.min(maxLane + 1, 3) * 24 + 4}px` }}>
-                          {sortedDayProjects.slice(0, 3).map(project => {
-                            const lane = projectLanes.get(project.id) || 0;
-                            if (lane > 2) return null; // Only show first 3 lanes
-                            
-                            const colors = statusColors[project.status] || statusColors.lead;
-                            const projectStart = startOfDay(new Date(project.startDate!));
-                            const projectEnd = project.endDate ? startOfDay(new Date(project.endDate)) : projectStart;
-                            
-                            const isFirst = isSameDay(dayStart, projectStart);
-                            const isLast = isSameDay(dayStart, projectEnd);
-                            const isSingleDay = isFirst && isLast;
-                            
-                            const showRoundedLeft = isFirst || isStartOfWeek;
-                            const showRoundedRight = isLast || isEndOfWeek;
-                            
-                            // Only make the first day of the project draggable
-                            if (isFirst) {
-                              return (
-                                <DraggableProject
-                                  key={project.id}
-                                  project={project}
-                                  lane={lane}
-                                  colors={colors}
-                                  isSingleDay={isSingleDay}
-                                  showRoundedLeft={showRoundedLeft}
-                                  showRoundedRight={showRoundedRight}
-                                  onClick={() => navigate(`/crm/projects/${project.id}`)}
-                                />
-                              );
+                    <div className="grid grid-cols-7">
+                      {(() => {
+                        const monthStart = startOfMonth(calendarMonth);
+                        const monthEnd = endOfMonth(calendarMonth);
+                        const calendarStart = startOfWeek(monthStart);
+                        const calendarEnd = endOfWeek(monthEnd);
+                        const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+                        
+                        const projectLanes = new Map<string, number>();
+                        const allProjects = calendarProjectsData?.projects || [];
+                        
+                        const sortedProjects = [...allProjects]
+                          .filter(p => p.startDate)
+                          .sort((a, b) => {
+                            const aStart = new Date(a.startDate!).getTime();
+                            const bStart = new Date(b.startDate!).getTime();
+                            if (aStart !== bStart) return aStart - bStart;
+                            const aEnd = a.endDate ? new Date(a.endDate).getTime() : aStart;
+                            const bEnd = b.endDate ? new Date(b.endDate).getTime() : bStart;
+                            return (bEnd - bStart) - (aEnd - aStart);
+                          });
+                        
+                        sortedProjects.forEach(project => {
+                          const projectStart = startOfDay(new Date(project.startDate!));
+                          const projectEnd = project.endDate ? startOfDay(new Date(project.endDate)) : projectStart;
+                          
+                          let lane = 0;
+                          while (true) {
+                            let laneAvailable = true;
+                            const entries = Array.from(projectLanes.entries());
+                            for (let i = 0; i < entries.length; i++) {
+                              const [otherId, otherLane] = entries[i];
+                              if (otherLane !== lane) continue;
+                              const other = sortedProjects.find(p => p.id === otherId);
+                              if (!other) continue;
+                              const otherStart = startOfDay(new Date(other.startDate!));
+                              const otherEnd = other.endDate ? startOfDay(new Date(other.endDate)) : otherStart;
+                              if (!(isAfter(projectStart, otherEnd) || isBefore(projectEnd, otherStart))) {
+                                laneAvailable = false;
+                                break;
+                              }
                             }
-                            
-                            return (
-                              <div
-                                key={project.id}
-                                className={cn(
-                                  "absolute left-0 right-0 text-left text-xs py-1 px-1.5 truncate h-5 cursor-default",
-                                  colors.bg, colors.text,
-                                  activeDragProject?.id === project.id && "opacity-30",
-                                  isSingleDay && "rounded mx-0.5",
-                                  !isSingleDay && showRoundedLeft && !showRoundedRight && "rounded-l ml-0.5",
-                                  !isSingleDay && !showRoundedLeft && showRoundedRight && "rounded-r mr-0.5",
-                                  !isSingleDay && showRoundedLeft && showRoundedRight && "rounded mx-0.5"
-                                )}
-                                style={{ top: `${lane * 22}px` }}
-                                title={`${project.customerName || "Customer"} - ${project.title}`}
-                              />
-                            );
-                          })}
-                        </div>
-                        {dayProjects.length > 3 && (
-                          <div className="text-xs text-muted-foreground px-1 absolute bottom-0.5">+{dayProjects.length - 3} more</div>
-                        )}
-                      </DroppableDay>
-                    );
-                  });
-                })()}
-              </div>
-            </div>
-            )}
+                            if (laneAvailable) break;
+                            lane++;
+                          }
+                          projectLanes.set(project.id, lane);
+                        });
+                        
+                        return days.map((day, dayIndex) => {
+                          const isCurrentMonth = isSameMonth(day, calendarMonth);
+                          const dayStart = startOfDay(day);
+                          const isStartOfWeekDay = dayIndex % 7 === 0;
+                          const isEndOfWeekDay = dayIndex % 7 === 6;
+                          
+                          const dayProjects = allProjects.filter(project => {
+                            if (!project.startDate) return false;
+                            const projectStart = startOfDay(new Date(project.startDate));
+                            const projectEnd = project.endDate ? startOfDay(new Date(project.endDate)) : projectStart;
+                            return isSameDay(dayStart, projectStart) ||
+                                   isSameDay(dayStart, projectEnd) ||
+                                   (isAfter(dayStart, projectStart) && isBefore(dayStart, projectEnd));
+                          });
+                          
+                          const sortedDayProjects = [...dayProjects].sort((a, b) => 
+                            (projectLanes.get(a.id) || 0) - (projectLanes.get(b.id) || 0)
+                          );
+                          
+                          const maxLane = Math.max(0, ...sortedDayProjects.map(p => projectLanes.get(p.id) || 0));
+                          
+                          return (
+                            <DroppableDay key={day.toISOString()} day={day} isCurrentMonth={isCurrentMonth}>
+                              <div className="text-xs font-medium p-1">{format(day, "d")}</div>
+                              <div className="relative" style={{ height: `${Math.min(maxLane + 1, 3) * 24 + 4}px` }}>
+                                {sortedDayProjects.slice(0, 3).map(project => {
+                                  const lane = projectLanes.get(project.id) || 0;
+                                  if (lane > 2) return null;
+                                  
+                                  const colors = statusColors[project.status] || statusColors.lead;
+                                  const projectStart = startOfDay(new Date(project.startDate!));
+                                  const projectEnd = project.endDate ? startOfDay(new Date(project.endDate)) : projectStart;
+                                  
+                                  const isFirst = isSameDay(dayStart, projectStart);
+                                  const isLast = isSameDay(dayStart, projectEnd);
+                                  const isSingleDayProject = isFirst && isLast;
+                                  
+                                  const showRoundedLeft = isFirst || isStartOfWeekDay;
+                                  const showRoundedRight = isLast || isEndOfWeekDay;
+                                  
+                                  if (isFirst) {
+                                    return (
+                                      <DraggableProject
+                                        key={project.id}
+                                        project={project}
+                                        lane={lane}
+                                        colors={colors}
+                                        isSingleDay={isSingleDayProject}
+                                        showRoundedLeft={showRoundedLeft}
+                                        showRoundedRight={showRoundedRight}
+                                        onClick={() => navigate(`/crm/projects/${project.id}`)}
+                                      />
+                                    );
+                                  }
+                                  
+                                  return (
+                                    <div
+                                      key={project.id}
+                                      className={cn(
+                                        "absolute left-0 right-0 text-left text-xs py-1 px-1.5 truncate h-5 cursor-default",
+                                        colors.bg, colors.text,
+                                        activeDragProject?.id === project.id && "opacity-30",
+                                        isSingleDayProject && "rounded mx-0.5",
+                                        !isSingleDayProject && showRoundedLeft && !showRoundedRight && "rounded-l ml-0.5",
+                                        !isSingleDayProject && !showRoundedLeft && showRoundedRight && "rounded-r mr-0.5",
+                                        !isSingleDayProject && showRoundedLeft && showRoundedRight && "rounded mx-0.5"
+                                      )}
+                                      style={{ top: `${lane * 22}px` }}
+                                      title={`${project.customerName || "Customer"} - ${project.title}`}
+                                    />
+                                  );
+                                })}
+                              </div>
+                              {dayProjects.length > 3 && (
+                                <div className="text-xs text-muted-foreground px-1 absolute bottom-0.5">+{dayProjects.length - 3} more</div>
+                              )}
+                            </DroppableDay>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </div>
+                )}
 
-            {/* Drag Overlay */}
-            <DragOverlay>
-              {activeDragProject && (
-                <div className={cn(
-                  "text-xs py-1 px-2 rounded shadow-lg opacity-90",
-                  statusColors[activeDragProject.status]?.bg || "bg-slate-100",
-                  statusColors[activeDragProject.status]?.text || "text-slate-700"
-                )}>
-                  {activeDragProject.customerName || activeDragProject.title}
+                <DragOverlay>
+                  {activeDragProject && (
+                    <div className={cn(
+                      "text-xs py-1 px-2 rounded shadow-lg opacity-90",
+                      statusColors[activeDragProject.status]?.bg || "bg-slate-100",
+                      statusColors[activeDragProject.status]?.text || "text-slate-700"
+                    )}>
+                      {activeDragProject.customerName || activeDragProject.title}
+                    </div>
+                  )}
+                </DragOverlay>
+              </div>
+            </DndContext>
+          </TabsContent>
+
+          <TabsContent value="kanban" className="mt-4">
+            <DndContext 
+              sensors={sensors} 
+              onDragStart={handleKanbanDragStart} 
+              onDragEnd={handleKanbanDragEnd}
+            >
+              {allProjectsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
                 </div>
+              ) : (
+                <HorizontalScrollContainer isDraggingCard={isDraggingCard}>
+                  {KANBAN_STAGES.map((stage) => (
+                    <ProjectKanbanColumn
+                      key={stage}
+                      stage={stage}
+                      projects={projectsByStage[stage] || []}
+                      onCardClick={(project) => navigate(`/crm/projects/${project.id}`)}
+                    />
+                  ))}
+                </HorizontalScrollContainer>
               )}
-            </DragOverlay>
-          </div>
-          </DndContext>
-        </TabsContent>
-      </Tabs>
+
+              <DragOverlay>
+                {activeKanbanProject && (
+                  <Card className="w-[280px] shadow-lg opacity-90">
+                    <CardContent className="p-3">
+                      <div className="flex items-start gap-2">
+                        <div className="flex-shrink-0 p-1">
+                          <GripVertical className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-sm truncate">
+                            {activeKanbanProject.customerName || "No customer"}
+                          </h4>
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">
+                            {activeKanbanProject.title}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </DragOverlay>
+            </DndContext>
+          </TabsContent>
+        </Tabs>
+      </div>
 
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent className="max-w-lg">
@@ -1210,7 +1616,6 @@ export default function CrmProjects() {
                     role="combobox"
                     aria-expanded={customerSearchOpen}
                     className="w-full justify-between"
-                    data-testid="button-select-customer"
                   >
                     {selectedCustomer ? selectedCustomer.name : "Select customer..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -1222,7 +1627,6 @@ export default function CrmProjects() {
                       placeholder="Search customers..."
                       value={customerSearch}
                       onValueChange={setCustomerSearch}
-                      data-testid="input-customer-search"
                     />
                     <CommandList>
                       {customersLoading ? (
@@ -1239,10 +1643,9 @@ export default function CrmProjects() {
                                 value={customer.name}
                                 onSelect={() => {
                                   setSelectedCustomer(customer);
-                                  setSelectedSite(null); // Reset site when customer changes
+                                  setSelectedSite(null);
                                   setCustomerSearchOpen(false);
                                 }}
-                                data-testid={`customer-option-${customer.id}`}
                               >
                                 <Check
                                   className={cn(
@@ -1271,7 +1674,6 @@ export default function CrmProjects() {
               </Popover>
             </div>
 
-            {/* Location selection - shown only when customer is selected */}
             {selectedCustomer && (
               <div className="space-y-2">
                 <Label htmlFor="location">
@@ -1290,7 +1692,7 @@ export default function CrmProjects() {
                       setSelectedSite(site || null);
                     }}
                   >
-                    <SelectTrigger data-testid="select-location">
+                    <SelectTrigger>
                       <SelectValue placeholder="Select a location">
                         {selectedSite 
                           ? `${selectedSite.address1}${selectedSite.city ? `, ${selectedSite.city}` : ""}`
@@ -1319,14 +1721,13 @@ export default function CrmProjects() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Project title"
-                data-testid="input-project-title"
               />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="projectType">Project Type *</Label>
               <Select value={projectType} onValueChange={setProjectType}>
-                <SelectTrigger data-testid="select-project-type">
+                <SelectTrigger>
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1350,7 +1751,6 @@ export default function CrmProjects() {
                         "w-full justify-start text-left font-normal",
                         !startDate && "text-muted-foreground"
                       )}
-                      data-testid="button-start-date"
                     >
                       <CalendarDays className="mr-2 h-4 w-4" />
                       {startDate ? format(startDate, "MMM d, yyyy") : "Select start"}
@@ -1381,7 +1781,6 @@ export default function CrmProjects() {
                         "w-full justify-start text-left font-normal",
                         !endDate && "text-muted-foreground"
                       )}
-                      data-testid="button-end-date"
                     >
                       <CalendarDays className="mr-2 h-4 w-4" />
                       {endDate ? format(endDate, "MMM d, yyyy") : "Select end"}
@@ -1411,7 +1810,6 @@ export default function CrmProjects() {
                   onChange={(e) => setExpectedValue(e.target.value)}
                   placeholder="0.00"
                   className="pl-9"
-                  data-testid="input-expected-value"
                 />
               </div>
             </div>
@@ -1419,7 +1817,7 @@ export default function CrmProjects() {
             <div className="space-y-2">
               <Label htmlFor="priority">Priority</Label>
               <Select value={priority} onValueChange={setPriority}>
-                <SelectTrigger data-testid="select-priority">
+                <SelectTrigger>
                   <SelectValue placeholder="Select priority" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1440,7 +1838,6 @@ export default function CrmProjects() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Project description (optional)"
                 rows={3}
-                data-testid="textarea-description"
               />
             </div>
           </div>
@@ -1451,14 +1848,12 @@ export default function CrmProjects() {
                 resetCreateForm();
                 setCreateDialogOpen(false);
               }}
-              data-testid="button-cancel-create"
             >
               Cancel
             </Button>
             <Button
               onClick={handleCreateProject}
               disabled={createProjectMutation.isPending || !selectedCustomer || !title || !projectType || !startDate || !endDate || (sites.length > 0 && !selectedSite)}
-              data-testid="button-submit-create"
             >
               {createProjectMutation.isPending ? (
                 <>
