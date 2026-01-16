@@ -30,6 +30,7 @@ import {
   TouchSensor,
   useSensor,
   useSensors,
+  pointerWithin,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -1383,7 +1384,7 @@ export default function CrmProjects() {
           </TabsContent>
 
           <TabsContent value="calendar" className="mt-4">
-            <DndContext sensors={sensors} onDragStart={handleCalendarDragStart} onDragEnd={handleCalendarDragEnd}>
+            <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleCalendarDragStart} onDragEnd={handleCalendarDragEnd}>
               <div className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
                   <Button variant="outline" size="sm" onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}>
@@ -1519,12 +1520,11 @@ export default function CrmProjects() {
                                     );
                                   }
                                   
-                                  const expectedValueDisplay = formatCurrency(project.expectedValue);
                                   return (
                                     <div
                                       key={project.id}
                                       className={cn(
-                                        "absolute left-0 right-0 text-left text-[10px] leading-tight py-1 px-1.5 h-10 cursor-default overflow-hidden",
+                                        "absolute left-0 right-0 h-10 cursor-default",
                                         colors.bg, colors.text,
                                         activeDragProject?.id === project.id && "opacity-30",
                                         isSingleDayProject && "rounded mx-0.5",
@@ -1533,12 +1533,8 @@ export default function CrmProjects() {
                                         !isSingleDayProject && showRoundedLeft && showRoundedRight && "rounded mx-0.5"
                                       )}
                                       style={{ top: `${lane * 44}px` }}
-                                      title={`${project.customerName || "Customer"} - ${project.title}${expectedValueDisplay ? ` - ${expectedValueDisplay}` : ""}`}
-                                    >
-                                      <div className="font-medium truncate">{project.customerName || "Customer"}</div>
-                                      <div className="truncate opacity-90">{project.title}</div>
-                                      {expectedValueDisplay && <div className="truncate font-medium">{expectedValueDisplay}</div>}
-                                    </div>
+                                      title={`${project.customerName || "Customer"} - ${project.title}`}
+                                    />
                                   );
                                 })}
                               </div>
