@@ -293,6 +293,17 @@ export default function CrmProjectDetail() {
   const [newEquipmentItem, setNewEquipmentItem] = useState<Partial<ProjectEquipmentItem>>({ name: "", quantity: 1, modelNumber: "", notes: "" });
   const [equipmentHasChanges, setEquipmentHasChanges] = useState(false);
 
+  // Equipment file attachment state
+  const {
+    files: equipmentFiles,
+    isDragging: isDraggingEquipment,
+    dropZoneProps: equipmentDropZoneProps,
+    handleFileSelect: handleEquipmentFileSelect,
+    removeFile: removeEquipmentFile,
+    clearFiles: clearEquipmentFiles,
+  } = useFileDrop();
+  const [isUploadingEquipmentFiles, setIsUploadingEquipmentFiles] = useState(false);
+
   // Inline timeline state for Overview tab
   const [overviewComment, setOverviewComment] = useState("");
   const [isSubmittingOverviewComment, setIsSubmittingOverviewComment] = useState(false);
@@ -819,6 +830,40 @@ export default function CrmProjectDetail() {
     setEquipmentHasChanges(true);
   };
 
+  const uploadEquipmentFilesHandler = async () => {
+    if (equipmentFiles.length === 0) return;
+    setIsUploadingEquipmentFiles(true);
+    try {
+      const formData = new FormData();
+      equipmentFiles.forEach((f) => formData.append('files', f.file));
+      const uploadRes = await fetch('/api/activities/upload', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      if (!uploadRes.ok) throw new Error("Upload failed");
+      const attachments = await uploadRes.json();
+      
+      await apiRequest("POST", `/api/crm/projects/${projectId}/activities`, {
+        activityType: "note",
+        title: `Equipment/Materials files (${equipmentFiles.length})`,
+        metadata: {
+          content: "Equipment and materials documentation",
+          attachments,
+          source: "equipment"
+        },
+      });
+      
+      toast({ title: "Files uploaded successfully" });
+      clearEquipmentFiles();
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "activities"] });
+    } catch (error) {
+      toast({ title: "Failed to upload files", variant: "destructive" });
+    } finally {
+      setIsUploadingEquipmentFiles(false);
+    }
+  };
+
   const totalQuoted = (quotes || [])
     .filter((q) => q.status === "accepted")
     .reduce((sum, q) => sum + parseFloat(q.total?.toString() || "0"), 0);
@@ -1207,46 +1252,14 @@ export default function CrmProjectDetail() {
               </Card>
             )}
             <Card className="border shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg font-semibold">Project Details</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {project.description && (
-                  <div className="mb-4">
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Description</p>
-                    <p className="text-sm text-slate-700">{project.description}</p>
-                  </div>
-                )}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Proposal Sent</p>
-                    <p className="text-sm text-slate-700">{formatDate(project.proposalSentAt)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Approved</p>
-                    <p className="text-sm text-slate-700">{formatDate(project.approvedAt)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Completed</p>
-                    <p className="text-sm text-slate-700">{formatDate(project.completedAt)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Closed</p>
-                    <p className="text-sm text-slate-700">{formatDate(project.closedAt)}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border shadow-sm">
               <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                <CardTitle className="text-lg font-semibold">Project Schedule & Equipment</CardTitle>
+                <CardTitle className="text-lg font-semibold">Project Schedule</CardTitle>
                 <Button variant="outline" size="sm" onClick={() => setShowEditScheduleDialog(true)}>
                   Edit
                 </Button>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Start Date</p>
                     <p className="text-sm text-slate-700">{formatDate(project.startDate)}</p>
@@ -1254,10 +1267,6 @@ export default function CrmProjectDetail() {
                   <div>
                     <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">End Date</p>
                     <p className="text-sm text-slate-700">{formatDate(project.endDate)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Equipment Status</p>
-                    <p className="text-sm text-slate-700">{project.equipmentInfo || "Not specified"}</p>
                   </div>
                 </div>
               </CardContent>
@@ -1615,6 +1624,80 @@ export default function CrmProjectDetail() {
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
+                  </div>
+
+                  {/* File Attachment Section */}
+                  <div className="mt-6 pt-4 border-t">
+                    <Label className="text-sm font-medium mb-2 block">Attach Materials List or Documentation</Label>
+                    <div
+                      {...equipmentDropZoneProps}
+                      className={cn(
+                        "border-2 border-dashed rounded-lg p-4 text-center transition-colors",
+                        isDraggingEquipment
+                          ? "border-[#711419] bg-[#711419]/5"
+                          : "border-slate-200 hover:border-slate-300"
+                      )}
+                      data-testid="equipment-file-dropzone"
+                    >
+                      <input
+                        type="file"
+                        multiple
+                        onChange={handleEquipmentFileSelect}
+                        className="hidden"
+                        id="equipment-file-upload"
+                      />
+                      <label htmlFor="equipment-file-upload" className="cursor-pointer">
+                        <Upload className={cn(
+                          "w-6 h-6 mx-auto mb-2",
+                          isDraggingEquipment ? "text-[#711419]" : "text-muted-foreground"
+                        )} />
+                        <p className={cn(
+                          "text-sm",
+                          isDraggingEquipment ? "text-[#711419] font-medium" : "text-muted-foreground"
+                        )}>
+                          {isDraggingEquipment ? "Drop files here" : "Drag & drop files or click to upload"}
+                        </p>
+                      </label>
+                    </div>
+
+                    {/* File queue display */}
+                    {equipmentFiles.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {equipmentFiles.map((f, idx) => (
+                          <div key={idx} className="flex items-center justify-between p-2 border rounded bg-slate-50">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {f.preview ? (
+                                <img src={f.preview} alt="" className="w-8 h-8 object-cover rounded" />
+                              ) : (
+                                <File className="w-4 h-4 text-muted-foreground" />
+                              )}
+                              <span className="text-sm truncate">{f.file.name}</span>
+                            </div>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => removeEquipmentFile(idx)}>
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button
+                          onClick={uploadEquipmentFilesHandler}
+                          disabled={isUploadingEquipmentFiles}
+                          className="w-full bg-[#711419] hover:bg-[#5a1014] text-white"
+                          data-testid="button-upload-equipment-files"
+                        >
+                          {isUploadingEquipmentFiles ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="h-4 w-4 mr-2" />
+                              Upload {equipmentFiles.length} File{equipmentFiles.length > 1 ? "s" : ""}
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
