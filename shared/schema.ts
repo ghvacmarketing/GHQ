@@ -1029,6 +1029,15 @@ export const crmJobs = pgTable("crm_jobs", {
 }));
 
 // CRM Projects (big-ticket scope containers - $5k+ jobs)
+// Equipment/Materials item type for projects
+export type ProjectEquipmentItem = {
+  id: string;
+  name: string;
+  quantity: number;
+  modelNumber?: string;
+  notes?: string;
+};
+
 export const crmProjects = pgTable("crm_projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   customerId: varchar("customer_id"),
@@ -1043,6 +1052,9 @@ export const crmProjects = pgTable("crm_projects", {
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
   equipmentInfo: text("equipment_info"),
+  scopeOfWork: text("scope_of_work"),
+  challengePoints: text("challenge_points"),
+  equipmentMaterials: json("equipment_materials").$type<ProjectEquipmentItem[]>().default([]),
   proposalSentAt: timestamp("proposal_sent_at"),
   approvedAt: timestamp("approved_at"),
   completedAt: timestamp("completed_at"),
