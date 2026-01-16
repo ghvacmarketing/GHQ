@@ -35,6 +35,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import RichTextEditor from "@/components/rich-text-editor";
 import {
   Search,
   Package,
@@ -538,8 +539,8 @@ export default function CrmItems() {
                         </TableCell>
                         {activeCategory === "discount" ? (
                           <>
-                            <TableCell className="text-slate-600 max-w-xs truncate">
-                              {item.description || "—"}
+                            <TableCell className="text-slate-600 max-w-xs">
+                              <div className="prose prose-sm max-w-none line-clamp-2" dangerouslySetInnerHTML={{ __html: item.description || "—" }} />
                             </TableCell>
                             <TableCell>
                               <Badge
@@ -668,13 +669,11 @@ export default function CrmItems() {
                 </div>
                 <div>
                   <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={createForm.description}
-                    onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
-                    placeholder="Item description"
-                    rows={2}
-                    data-testid="input-create-description"
+                  <RichTextEditor
+                    content={createForm.description}
+                    onChange={(content) => setCreateForm({ ...createForm, description: content })}
+                    placeholder="Item description..."
+                    minHeight="min-h-[100px]"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">

@@ -84,7 +84,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { CrmUser, CrmCustomer, CrmJob, CrmInvoice, CrmInvoiceLineItem, CrmInvoiceStatus, CrmPayment, InvoiceEmailLog } from "@shared/schema";
 import { PaymentLinkButton } from "@/components/stripe-payment-link-button";
-import { RichTextDisplay } from "@/components/rich-text-editor";
+import RichTextEditor, { RichTextDisplay } from "@/components/rich-text-editor";
 
 type InvoiceDetailWithItems = CrmInvoice & {
   customer: CrmCustomer | null;
@@ -866,11 +866,12 @@ export default function CrmInvoiceDetail() {
                       {editingLineItemId === item.id ? (
                         <>
                           <TableCell>
-                            <Input
+                            <Textarea
                               value={editingLineItemData.description}
                               onChange={(e) => setEditingLineItemData(prev => ({ ...prev, description: e.target.value }))}
                               placeholder="Description"
-                              className="w-full"
+                              className="w-full min-h-[80px]"
+                              rows={3}
                               data-testid={`input-edit-description-${index}`}
                             />
                           </TableCell>
@@ -930,7 +931,7 @@ export default function CrmInvoiceDetail() {
                         </>
                       ) : (
                         <>
-                          <TableCell className="font-medium">{item.description || "—"}</TableCell>
+                          <TableCell className="font-medium"><div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: item.description || "—" }} /></TableCell>
                           <TableCell className="text-center">{item.quantity || 1}</TableCell>
                           <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
                           <TableCell className="text-right">{formatCurrency(item.lineTotal)}</TableCell>
@@ -1411,13 +1412,11 @@ export default function CrmInvoiceDetail() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="newDescription">Description</Label>
-              <Textarea
-                id="newDescription"
-                value={newLineItemData.description}
-                onChange={(e) => setNewLineItemData(prev => ({ ...prev, description: e.target.value }))}
+              <RichTextEditor
+                content={newLineItemData.description}
+                onChange={(content) => setNewLineItemData(prev => ({ ...prev, description: content }))}
                 placeholder="Enter item description..."
-                rows={3}
-                data-testid="input-new-line-item-description"
+                minHeight="min-h-[120px]"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">

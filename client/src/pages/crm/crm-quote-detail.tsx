@@ -2509,11 +2509,12 @@ export default function CrmQuoteDetail() {
                       {editingLineItemId === item.id ? (
                         <>
                           <TableCell>
-                            <Input
+                            <Textarea
                               value={editingLineItemData.description}
                               onChange={(e) => setEditingLineItemData(prev => ({ ...prev, description: e.target.value }))}
                               placeholder="Description"
-                              className="w-full"
+                              className="w-full min-h-[80px]"
+                              rows={3}
                               data-testid={`input-line-item-description-${item.id}`}
                             />
                           </TableCell>
@@ -2575,7 +2576,7 @@ export default function CrmQuoteDetail() {
                         </>
                       ) : (
                         <>
-                          <TableCell>{item.description}</TableCell>
+                          <TableCell><div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: item.description || "—" }} /></TableCell>
                           <TableCell className="text-right">{item.quantity}</TableCell>
                           <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
                           <TableCell className="text-right">{formatCurrency(item.lineTotal)}</TableCell>
@@ -2620,11 +2621,12 @@ export default function CrmQuoteDetail() {
                 {isAddingNewLineItem && canEditLineItems && (
                   <TableRow className="bg-blue-50/50">
                     <TableCell>
-                      <Input
+                      <Textarea
                         value={newLineItemData.description}
                         onChange={(e) => setNewLineItemData(prev => ({ ...prev, description: e.target.value }))}
                         placeholder="Enter description"
-                        className="w-full"
+                        className="w-full min-h-[80px]"
+                        rows={3}
                         autoFocus
                         data-testid="input-new-line-item-description"
                       />
@@ -4044,7 +4046,7 @@ export default function CrmQuoteDetail() {
                             {quote.lineItems && quote.lineItems.length > 0 ? (
                               quote.lineItems.map((item) => (
                                 <TableRow key={item.id}>
-                                  <TableCell>{item.description}</TableCell>
+                                  <TableCell><div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: item.description || "—" }} /></TableCell>
                                   <TableCell className="text-right">{item.quantity}</TableCell>
                                   <TableCell className="text-right">{formatPresentationCurrency(item.unitPrice)}</TableCell>
                                   <TableCell className="text-right">{formatPresentationCurrency(item.lineTotal)}</TableCell>
