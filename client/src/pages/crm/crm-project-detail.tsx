@@ -30,6 +30,7 @@ import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
+import { useFileDrop } from "@/hooks/use-file-drop";
 import { cn } from "@/lib/utils";
 import { createLocalDateTime } from "@/lib/timezone";
 import {
@@ -281,6 +282,18 @@ export default function CrmProjectDetail() {
   const [editProjectType, setEditProjectType] = useState("");
   const [editPriority, setEditPriority] = useState("");
 
+  // Inline timeline state for Overview tab
+  const [overviewComment, setOverviewComment] = useState("");
+  const [isSubmittingOverviewComment, setIsSubmittingOverviewComment] = useState(false);
+  const {
+    files: overviewFiles,
+    isDragging: isDraggingOverview,
+    dropZoneProps: overviewDropZoneProps,
+    handleFileSelect: handleOverviewFileSelect,
+    removeFile: removeOverviewFile,
+    clearFiles: clearOverviewFiles,
+  } = useFileDrop();
+
   const timeOptions = (() => {
     const options: { value: string; label: string }[] = [];
     for (let hour = 8; hour <= 20; hour++) {
@@ -341,6 +354,77 @@ export default function CrmProjectDetail() {
     },
     enabled: !!currentUser && !!projectId,
   });
+
+  // Query for activities in overview tab
+  const { data: overviewActivitiesData, isLoading: overviewActivitiesLoading, refetch: refetchOverviewActivities } = useQuery<ProjectActivityWithMeta[]>({
+    queryKey: ["/api/crm/projects", projectId, "activities"],
+    queryFn: async () => {
+      const response = await fetch(`/api/crm/projects/${projectId}/activities`, { credentials: 'include' });
+      return response.json();
+    },
+    enabled: !!currentUser && !!projectId,
+  });
+  const overviewActivities = Array.isArray(overviewActivitiesData) ? overviewActivitiesData.slice(0, 5) : [];
+
+  // File upload helper for overview
+  const uploadOverviewFiles = async (files: { file: File }[]): Promise<ActivityAttachment[]> => {
+    if (files.length === 0) return [];
+    const formData = new FormData();
+    files.forEach((f) => formData.append('files', f.file));
+    const response = await fetch('/api/activities/upload', {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+    if (!response.ok) throw new Error('Failed to upload files');
+    return response.json();
+  };
+
+  // Mutation to create activity from overview
+  const createOverviewActivityMutation = useMutation({
+    mutationFn: async (data: { activityType: string; title: string; metadata?: Record<string, any> }) => {
+      const response = await apiRequest("POST", `/api/crm/projects/${projectId}/activities`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Comment added" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "activities"], exact: false });
+      setOverviewComment("");
+      clearOverviewFiles();
+      refetchOverviewActivities();
+    },
+    onError: () => {
+      toast({ title: "Failed to add comment", variant: "destructive" });
+    },
+  });
+
+
+  const handleSubmitOverviewComment = async () => {
+    if (!overviewComment.trim() && overviewFiles.length === 0) {
+      toast({ title: "Please enter a comment or attach files", variant: "destructive" });
+      return;
+    }
+    setIsSubmittingOverviewComment(true);
+    try {
+      let attachments: ActivityAttachment[] = [];
+      if (overviewFiles.length > 0) {
+        attachments = await uploadOverviewFiles(overviewFiles);
+      }
+      const title = overviewComment.substring(0, 50) + (overviewComment.length > 50 ? "..." : "") || "File attachment";
+      await createOverviewActivityMutation.mutateAsync({
+        activityType: "note",
+        title,
+        metadata: { 
+          content: overviewComment,
+          attachments: attachments.length > 0 ? attachments : undefined,
+        },
+      });
+    } catch (error) {
+      toast({ title: "Failed to add comment", variant: "destructive" });
+    } finally {
+      setIsSubmittingOverviewComment(false);
+    }
+  };
 
   const { data: technicians = [] } = useQuery<{ id: string; name: string; email: string; role: string }[]>({
     queryKey: ["/api/crm/technicians"],
@@ -1195,6 +1279,196 @@ export default function CrmProjectDetail() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Project Timeline Section */}
+            <Card data-testid="card-project-timeline-overview">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <History className="h-5 w-5 text-[#711419]" />
+                  Project Timeline
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Comment input with drag-and-drop file upload */}
+                  <div className="space-y-3">
+                    <Textarea
+                      placeholder="Add a comment about this project..."
+                      value={overviewComment}
+                      onChange={(e) => setOverviewComment(e.target.value)}
+                      rows={2}
+                      className="w-full"
+                      data-testid="textarea-project-timeline-comment"
+                    />
+                    
+                    {/* Drag-and-drop file upload area */}
+                    <div
+                      {...overviewDropZoneProps}
+                      className={cn(
+                        "border-2 border-dashed rounded-lg p-4 text-center transition-colors",
+                        isDraggingOverview
+                          ? "border-[#711419] bg-[#711419]/5"
+                          : "border-slate-200 hover:border-slate-300"
+                      )}
+                      data-testid="overview-file-dropzone"
+                    >
+                      <input
+                        type="file"
+                        multiple
+                        onChange={handleOverviewFileSelect}
+                        className="hidden"
+                        id="overview-file-upload"
+                      />
+                      <label htmlFor="overview-file-upload" className="cursor-pointer">
+                        <Upload className={cn(
+                          "w-6 h-6 mx-auto mb-2",
+                          isDraggingOverview ? "text-[#711419]" : "text-muted-foreground"
+                        )} />
+                        <p className={cn(
+                          "text-sm",
+                          isDraggingOverview ? "text-[#711419] font-medium" : "text-muted-foreground"
+                        )}>
+                          {isDraggingOverview ? "Drop files here" : "Drag & drop files or click to upload"}
+                        </p>
+                      </label>
+                    </div>
+
+                    {/* File queue with thumbnails */}
+                    {overviewFiles.length > 0 && (
+                      <div className="flex flex-wrap gap-2" data-testid="overview-file-queue">
+                        {overviewFiles.map((f, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center gap-2 p-2 border rounded-lg bg-slate-50"
+                          >
+                            {f.preview ? (
+                              <img src={f.preview} alt="" className="w-10 h-10 object-cover rounded" />
+                            ) : (
+                              <div className="w-10 h-10 bg-slate-200 rounded flex items-center justify-center">
+                                <File className="w-5 h-5 text-slate-500" />
+                              </div>
+                            )}
+                            <span className="text-xs truncate max-w-[100px]">{f.file.name}</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                              onClick={() => removeOverviewFile(idx)}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Save button */}
+                    <Button
+                      onClick={handleSubmitOverviewComment}
+                      disabled={(!overviewComment.trim() && overviewFiles.length === 0) || isSubmittingOverviewComment}
+                      className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                      data-testid="button-save-project-timeline-comment"
+                    >
+                      {isSubmittingOverviewComment ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4 mr-1" />
+                          Save
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* Recent activity entries */}
+                  {overviewActivitiesLoading ? (
+                    <div className="space-y-3 py-4">
+                      <Skeleton className="h-16 w-full" />
+                      <Skeleton className="h-16 w-full" />
+                      <Skeleton className="h-16 w-full" />
+                    </div>
+                  ) : overviewActivities.length === 0 ? (
+                    <div className="text-center py-6">
+                      <History className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                      <p className="text-sm text-slate-500">No activity yet</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Comments and activity will appear here.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {overviewActivities.map((activity) => {
+                        const metadata = activity.metadata || {};
+                        const content = metadata.content || activity.title || "";
+                        const attachments = metadata.attachments || metadata.photos || metadata.files || [];
+                        let timestamp = activity.createdAt || "";
+                        if (timestamp && !timestamp.endsWith('Z') && !timestamp.includes('+')) {
+                          timestamp = timestamp + 'Z';
+                        }
+                        
+                        return (
+                          <div 
+                            key={activity.id} 
+                            className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100"
+                            data-testid={`timeline-entry-overview-${activity.id}`}
+                          >
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-gray-100">
+                              <MessageSquare className="h-4 w-4 text-gray-700" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2 mb-1">
+                                <span className="font-medium text-sm text-slate-700 truncate">
+                                  {activity.userName || 'Unknown User'}
+                                </span>
+                                <span className="text-xs text-slate-400 flex-shrink-0">
+                                  {timestamp ? format(new Date(timestamp), "MMM d, yyyy 'at' h:mm a") : ""}
+                                </span>
+                              </div>
+                              <p className="text-sm text-slate-600 line-clamp-2 whitespace-pre-wrap">
+                                {content}
+                              </p>
+                              {attachments.length > 0 && (
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                  {attachments.map((att: ActivityAttachment, idx: number) => (
+                                    <a
+                                      key={idx}
+                                      href={att.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-1 text-xs text-blue-600 hover:underline bg-blue-50 px-2 py-1 rounded"
+                                    >
+                                      <File className="w-3 h-3" />
+                                      {att.filename || att.originalName || "Attachment"}
+                                    </a>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* View All Timeline button */}
+                  <div className="pt-2 border-t">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-[#711419] hover:text-[#711419] hover:bg-[#711419]/10"
+                      onClick={() => setActiveTab("timeline")}
+                      data-testid="button-view-all-timeline"
+                    >
+                      View All Timeline
+                      <History className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="work-orders" className="mt-4">
@@ -1825,8 +2099,15 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
   const { toast } = useToast();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [updateText, setUpdateText] = useState("");
-  const [uploadedFiles, setUploadedFiles] = useState<{ file: File; preview?: string }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const {
+    files: uploadedFiles,
+    isDragging: isDraggingDialog,
+    dropZoneProps: dialogDropZoneProps,
+    handleFileSelect,
+    removeFile,
+    clearFiles: clearUploadedFiles,
+  } = useFileDrop();
 
   const { data: activitiesData, isLoading, refetch } = useQuery<ProjectActivityWithMeta[]>({
     queryKey: ["/api/crm/projects", projectId, "activities"],
@@ -1860,7 +2141,7 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "activities"], exact: false });
       setShowAddDialog(false);
       setUpdateText("");
-      setUploadedFiles([]);
+      clearUploadedFiles();
       refetch();
     },
     onError: () => {
@@ -1906,25 +2187,6 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-    const newFiles = Array.from(files).map(file => ({
-      file,
-      preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
-    }));
-    setUploadedFiles(prev => [...prev, ...newFiles]);
-  };
-
-  const removeFile = (index: number) => {
-    setUploadedFiles(prev => {
-      const updated = [...prev];
-      if (updated[index].preview) URL.revokeObjectURL(updated[index].preview!);
-      updated.splice(index, 1);
-      return updated;
-    });
   };
 
   const groupedByDay = activities.reduce((acc, activity) => {
@@ -2072,7 +2334,16 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
             </div>
             <div className="space-y-2">
               <Label>Attachment (optional)</Label>
-              <div className="border-2 border-dashed rounded-lg p-4 text-center">
+              <div 
+                {...dialogDropZoneProps}
+                className={cn(
+                  "border-2 border-dashed rounded-lg p-4 text-center transition-colors",
+                  isDraggingDialog
+                    ? "border-[#711419] bg-[#711419]/5"
+                    : "border-slate-200 hover:border-slate-300"
+                )}
+                data-testid="dialog-file-dropzone"
+              >
                 <input
                   type="file"
                   multiple
@@ -2081,8 +2352,16 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
                   id="update-file-upload"
                 />
                 <label htmlFor="update-file-upload" className="cursor-pointer">
-                  <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Click to upload files or photos</p>
+                  <Upload className={cn(
+                    "w-8 h-8 mx-auto mb-2",
+                    isDraggingDialog ? "text-[#711419]" : "text-muted-foreground"
+                  )} />
+                  <p className={cn(
+                    "text-sm",
+                    isDraggingDialog ? "text-[#711419] font-medium" : "text-muted-foreground"
+                  )}>
+                    {isDraggingDialog ? "Drop files here" : "Drag & drop files or click to upload"}
+                  </p>
                 </label>
               </div>
               {uploadedFiles.length > 0 && (
