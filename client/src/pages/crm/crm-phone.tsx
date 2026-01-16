@@ -371,7 +371,7 @@ function KanbanColumn({ status, voicemails, onCardClick }: KanbanColumnProps) {
 
 const callLogFormSchema = z.object({
   clientName: z.string().min(1, "Client name is required"),
-  description: z.string().min(1, "Description is required"),
+  description: z.string().min(1, "Phone call summary is required"),
   phone: z.string().optional(),
   tag: z.string().optional(),
   billable: z.boolean().optional(),
@@ -505,12 +505,19 @@ function CallLogEntry({ log, isHighlighted, entryRef, onEdit, onDelete }: CallLo
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{log.description}</p>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="text-[10px] text-muted-foreground/60 cursor-default">{relativeTime}</span>
-            </TooltipTrigger>
-            <TooltipContent>{exactTime}</TooltipContent>
-          </Tooltip>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-[10px] text-muted-foreground/60 cursor-default">{relativeTime}</span>
+              </TooltipTrigger>
+              <TooltipContent>{exactTime}</TooltipContent>
+            </Tooltip>
+            {log.createdByName && (
+              <span className="text-[10px] text-muted-foreground/60">
+                • by {log.createdByName}
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
@@ -741,7 +748,7 @@ function CallLogForm({ date, editingLog, onCancel, onSuccess }: CallLogFormProps
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Description *</FormLabel>
+              <FormLabel>Phone Call Summary *</FormLabel>
               <FormControl>
                 <Textarea placeholder="What was the call about?" className="min-h-[60px]" {...field} data-testid="crm-phone-input-description" />
               </FormControl>
