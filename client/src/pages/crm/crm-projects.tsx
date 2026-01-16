@@ -758,6 +758,7 @@ export default function CrmProjects() {
     onSuccess: () => {
       toast({ title: "Project rescheduled" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/projects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects/calendar"] });
     },
     onError: (error: Error) => {
       toast({
