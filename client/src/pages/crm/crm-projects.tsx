@@ -477,7 +477,7 @@ function DroppableDay({ day, isCurrentMonth, children }: { day: Date; isCurrentM
     <div
       ref={setNodeRef}
       className={cn(
-        "min-h-[100px] border-b border-r relative transition-colors",
+        "min-h-[120px] border-b border-r relative transition-colors",
         !isCurrentMonth && "bg-muted/50 text-muted-foreground",
         isOver && "bg-blue-50 ring-2 ring-blue-400 ring-inset"
       )}
@@ -485,6 +485,13 @@ function DroppableDay({ day, isCurrentMonth, children }: { day: Date; isCurrentM
       {children}
     </div>
   );
+}
+
+function formatCurrency(value: number | string | null | undefined): string {
+  if (value === null || value === undefined || value === "") return "";
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  if (isNaN(num)) return "";
+  return `$${num.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
 function DraggableProject({ 
@@ -510,10 +517,12 @@ function DraggableProject({
   
   const style = transform ? {
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-    top: `${lane * 22}px`,
+    top: `${lane * 44}px`,
   } : {
-    top: `${lane * 22}px`,
+    top: `${lane * 44}px`,
   };
+
+  const expectedValueFormatted = formatCurrency(project.expectedValue);
   
   return (
     <button
@@ -526,7 +535,7 @@ function DraggableProject({
         }
       }}
       className={cn(
-        "absolute left-0 right-0 text-left text-xs py-1 px-1.5 truncate h-5 cursor-grab active:cursor-grabbing",
+        "absolute left-0 right-0 text-left text-[10px] leading-tight py-1 px-1.5 h-10 cursor-grab active:cursor-grabbing overflow-hidden",
         colors.bg, colors.text,
         isDragging && "opacity-50 z-50",
         isSingleDay && "rounded mx-0.5",
@@ -535,9 +544,11 @@ function DraggableProject({
         !isSingleDay && showRoundedLeft && showRoundedRight && "rounded mx-0.5"
       )}
       style={style}
-      title={`${project.customerName || "Customer"} - ${project.title} (drag to reschedule)`}
+      title={`${project.customerName || "Customer"} - ${project.title}${expectedValueFormatted ? ` - ${expectedValueFormatted}` : ""} (drag to reschedule)`}
     >
-      {project.customerName || project.title}
+      <div className="font-medium truncate">{project.customerName || "Customer"}</div>
+      <div className="truncate opacity-90">{project.title}</div>
+      {expectedValueFormatted && <div className="truncate font-medium">{expectedValueFormatted}</div>}
     </button>
   );
 }
@@ -1477,7 +1488,7 @@ export default function CrmProjects() {
                           return (
                             <DroppableDay key={day.toISOString()} day={day} isCurrentMonth={isCurrentMonth}>
                               <div className="text-xs font-medium p-1">{format(day, "d")}</div>
-                              <div className="relative" style={{ height: `${Math.min(maxLane + 1, 3) * 24 + 4}px` }}>
+                              <div className="relative" style={{ height: `${Math.min(maxLane + 1, 3) * 46 + 4}px` }}>
                                 {sortedDayProjects.slice(0, 3).map(project => {
                                   const lane = projectLanes.get(project.id) || 0;
                                   if (lane > 2) return null;
@@ -1508,11 +1519,12 @@ export default function CrmProjects() {
                                     );
                                   }
                                   
+                                  const expectedValueDisplay = formatCurrency(project.expectedValue);
                                   return (
                                     <div
                                       key={project.id}
                                       className={cn(
-                                        "absolute left-0 right-0 text-left text-xs py-1 px-1.5 truncate h-5 cursor-default",
+                                        "absolute left-0 right-0 text-left text-[10px] leading-tight py-1 px-1.5 h-10 cursor-default overflow-hidden",
                                         colors.bg, colors.text,
                                         activeDragProject?.id === project.id && "opacity-30",
                                         isSingleDayProject && "rounded mx-0.5",
@@ -1520,9 +1532,13 @@ export default function CrmProjects() {
                                         !isSingleDayProject && !showRoundedLeft && showRoundedRight && "rounded-r mr-0.5",
                                         !isSingleDayProject && showRoundedLeft && showRoundedRight && "rounded mx-0.5"
                                       )}
-                                      style={{ top: `${lane * 22}px` }}
-                                      title={`${project.customerName || "Customer"} - ${project.title}`}
-                                    />
+                                      style={{ top: `${lane * 44}px` }}
+                                      title={`${project.customerName || "Customer"} - ${project.title}${expectedValueDisplay ? ` - ${expectedValueDisplay}` : ""}`}
+                                    >
+                                      <div className="font-medium truncate">{project.customerName || "Customer"}</div>
+                                      <div className="truncate opacity-90">{project.title}</div>
+                                      {expectedValueDisplay && <div className="truncate font-medium">{expectedValueDisplay}</div>}
+                                    </div>
                                   );
                                 })}
                               </div>
@@ -1540,11 +1556,15 @@ export default function CrmProjects() {
                 <DragOverlay>
                   {activeDragProject && (
                     <div className={cn(
-                      "text-xs py-1 px-2 rounded shadow-lg opacity-90",
+                      "text-[10px] leading-tight py-1 px-2 rounded shadow-lg opacity-90",
                       statusColors[activeDragProject.status]?.bg || "bg-slate-100",
                       statusColors[activeDragProject.status]?.text || "text-slate-700"
                     )}>
-                      {activeDragProject.customerName || activeDragProject.title}
+                      <div className="font-medium">{activeDragProject.customerName || "Customer"}</div>
+                      <div className="opacity-90">{activeDragProject.title}</div>
+                      {activeDragProject.expectedValue && (
+                        <div className="font-medium">{formatCurrency(activeDragProject.expectedValue)}</div>
+                      )}
                     </div>
                   )}
                 </DragOverlay>
