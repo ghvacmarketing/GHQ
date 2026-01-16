@@ -12,7 +12,7 @@ import {
 
 const APP_TIMEZONE = "America/New_York";
 
-const DEFAULT_REVIEW_TEMPLATE = "Thanks for choosing GHVAC! We'd love your feedback - please leave us a Google review: {reviewLink} - GHVAC";
+const DEFAULT_REVIEW_TEMPLATE = "Thanks for choosing GHVAC! We'd love your feedback - please leave us a Google review: {reviewLink}\n\n- GHVAC";
 
 const REVIEW_COOLDOWN_MONTHS = 6;
 const REVIEW_DELAY_HOURS = 0; // Send immediately after work order completion

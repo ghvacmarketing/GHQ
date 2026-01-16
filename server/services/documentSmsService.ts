@@ -3,8 +3,8 @@ import { storage } from "../storage";
 import type { SmsNotificationType, InsertCrmMessagingMessage } from "@shared/schema";
 
 const DEFAULT_TEMPLATES: Record<string, string> = {
-  sms_template_quote: "Hi {customerName}! Your quote #{quoteNumber} for {totalAmount} is ready. View it here: {viewLink} - GHVAC",
-  sms_template_invoice_send: "Hi {customerName}! Your invoice #{invoiceNumber} for {amount} is ready. Pay here: {paymentLink} - GHVAC",
+  sms_template_quote: "Hi {customerName}! Your quote #{quoteNumber} for {totalAmount} is ready. View it here: {viewLink}\n\n- GHVAC",
+  sms_template_invoice_send: "Hi {customerName}! Your invoice #{invoiceNumber} for {amount} is ready. Pay here: {paymentLink}\n\n- GHVAC",
 };
 
 const templateCache: Map<string, { value: string; timestamp: number }> = new Map();

@@ -4,13 +4,13 @@ import type { SmsNotificationType, InsertCrmMessagingMessage } from "@shared/sch
 
 // Default SMS templates - used as fallback when database values are not set
 const DEFAULT_TEMPLATES: Record<string, string> = {
-  sms_template_maintenance_10_day: "Hi! Your scheduled maintenance visit is coming up in 10 days. Please call us to confirm your appointment. - GHVAC",
-  sms_template_maintenance_5_day: "Reminder: Your maintenance visit is in 5 days. Please call to schedule if you haven't already. - GHVAC",
+  sms_template_maintenance_10_day: "Hi! Your scheduled maintenance visit is coming up in 10 days. Please call us to confirm your appointment.\n\n- GHVAC",
+  sms_template_maintenance_5_day: "Reminder: Your maintenance visit is in 5 days. Please call to schedule if you haven't already.\n\n- GHVAC",
   sms_template_work_order_en_route: "Your GHVAC technician is on the way! They should arrive shortly.",
   sms_template_work_order_on_site: "Your GHVAC technician has arrived and is ready to help!",
-  sms_template_invoice: "Your invoice #{invoiceNumber} is ready. Pay online: {paymentLink} - GHVAC",
-  sms_template_quote: "Hi {customerName}! Your quote #{quoteNumber} for {totalAmount} is ready. View it here: {viewLink} - GHVAC",
-  sms_template_invoice_send: "Hi {customerName}! Your invoice #{invoiceNumber} for {amount} is ready. Pay here: {paymentLink} - GHVAC",
+  sms_template_invoice: "Your invoice #{invoiceNumber} is ready. Pay online: {paymentLink}\n\n- GHVAC",
+  sms_template_quote: "Hi {customerName}! Your quote #{quoteNumber} for {totalAmount} is ready. View it here: {viewLink}\n\n- GHVAC",
+  sms_template_invoice_send: "Hi {customerName}! Your invoice #{invoiceNumber} for {amount} is ready. Pay here: {paymentLink}\n\n- GHVAC",
 };
 
 const templateCache: Map<string, { value: string; timestamp: number }> = new Map();

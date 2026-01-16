@@ -20197,11 +20197,11 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
   // SMS Templates configuration
   const SMS_TEMPLATE_CONFIG = [
-    { key: "sms_template_maintenance_10_day", description: "Maintenance 10-Day Reminder", defaultValue: "Hi! Your scheduled maintenance visit is coming up in 10 days. Please call us to confirm your appointment. - GHVAC" },
-    { key: "sms_template_maintenance_5_day", description: "Maintenance 5-Day Reminder", defaultValue: "Reminder: Your maintenance visit is in 5 days. Please call to schedule if you haven't already. - GHVAC" },
+    { key: "sms_template_maintenance_10_day", description: "Maintenance 10-Day Reminder", defaultValue: "Hi! Your scheduled maintenance visit is coming up in 10 days. Please call us to confirm your appointment.\n\n- GHVAC" },
+    { key: "sms_template_maintenance_5_day", description: "Maintenance 5-Day Reminder", defaultValue: "Reminder: Your maintenance visit is in 5 days. Please call to schedule if you haven't already.\n\n- GHVAC" },
     { key: "sms_template_work_order_en_route", description: "Technician En Route", defaultValue: "Your GHVAC technician is on the way! They should arrive shortly." },
     { key: "sms_template_work_order_on_site", description: "Technician On Site", defaultValue: "Your GHVAC technician has arrived and is ready to help!" },
-    { key: "sms_template_invoice", description: "Invoice Payment (uses {invoiceNumber} and {paymentLink} placeholders)", defaultValue: "Your invoice #{invoiceNumber} is ready. Pay online: {paymentLink} - GHVAC" },
+    { key: "sms_template_invoice", description: "Invoice Payment (uses {invoiceNumber} and {paymentLink} placeholders)", defaultValue: "Your invoice #{invoiceNumber} is ready. Pay online: {paymentLink}\n\n- GHVAC" },
   ];
 
   // GET /api/admin/settings/sms-templates - Get all SMS templates
