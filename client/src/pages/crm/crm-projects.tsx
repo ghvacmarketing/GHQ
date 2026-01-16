@@ -193,7 +193,7 @@ export default function CrmProjects() {
         return tab;
       }
     }
-    return "pipeline";
+    return "overview";
   };
   const [activeTab, setActiveTab] = useState<"overview" | "pipeline" | "calendar">(getInitialTab);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
@@ -464,13 +464,13 @@ export default function CrmProjects() {
             <BarChart3 className="h-4 w-4" />
             Overview
           </TabsTrigger>
-          <TabsTrigger value="pipeline" className="flex items-center gap-2">
-            <LayoutGrid className="h-4 w-4" />
-            Pipeline
-          </TabsTrigger>
           <TabsTrigger value="calendar" className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4" />
             Calendar
+          </TabsTrigger>
+          <TabsTrigger value="pipeline" className="flex items-center gap-2">
+            <LayoutGrid className="h-4 w-4" />
+            Pipeline
           </TabsTrigger>
         </TabsList>
 
