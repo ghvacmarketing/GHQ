@@ -644,7 +644,7 @@ export default function CrmProjects() {
       return res.json();
     },
     enabled: !!currentUser,
-    staleTime: 10 * 60 * 1000, // 10 min - show cached data instantly, refresh in background when stale
+    staleTime: 2 * 60 * 1000,
   });
 
   const { data: allProjectsData, isLoading: allProjectsLoading } = useQuery<ProjectsResponse>({
@@ -667,7 +667,6 @@ export default function CrmProjects() {
     statusFunnel: Record<string, number>;
   }>({
     queryKey: ["/api/crm/projects/stats"],
-    staleTime: 10 * 60 * 1000, // 10 min - show cached data instantly
   });
 
   const calendarQueryParams = useMemo(() => {
@@ -1130,7 +1129,7 @@ export default function CrmProjects() {
                 <CardDescription>Projects with scheduled dates in the next 14 days</CardDescription>
               </CardHeader>
               <CardContent>
-                {projectsLoading && !projectsData ? (
+                {projectsLoading ? (
                   <div className="space-y-3">
                     {Array.from({ length: 3 }).map((_, i) => (
                       <Skeleton key={i} className="h-16 w-full" />
@@ -1265,7 +1264,7 @@ export default function CrmProjects() {
                 ))}
               </div>
 
-              {projectsLoading && !projectsData ? (
+              {projectsLoading ? (
                 <div className="space-y-2">
                   {Array.from({ length: 6 }).map((_, i) => (
                     <Skeleton key={i} className="h-14 rounded-lg" />

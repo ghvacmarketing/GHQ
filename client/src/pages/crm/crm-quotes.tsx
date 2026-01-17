@@ -205,7 +205,7 @@ export default function CrmQuotes() {
       return res.json();
     },
     enabled: !!currentUser,
-    staleTime: 10 * 60 * 1000, // 10 min - show cached data instantly, refresh in background when stale
+    staleTime: 2 * 60 * 1000,
   });
 
   // Customer search query
@@ -696,7 +696,7 @@ export default function CrmQuotes() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {quotesLoading && !quotesData ? (
+                {quotesLoading ? (
                   Array.from({ length: 10 }).map((_, i) => (
                     <TableRow key={i}>
                       <TableCell><Skeleton className="h-5 w-24" /></TableCell>

@@ -94,7 +94,7 @@ async function prefetchEndpoint(queryKey: unknown[], url: string, index: number)
         });
         return data;
       },
-      staleTime: 10 * 60 * 1000, // 10 min - matches page queries for instant cache hits
+      staleTime: 5 * 60 * 1000,
     });
     
     const duration = performance.now() - startTime;
