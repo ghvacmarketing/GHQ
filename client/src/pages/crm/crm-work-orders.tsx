@@ -4,6 +4,14 @@ import { useLocation, Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
+
+// Debug logging for cache hits
+const DEBUG_CACHE = true;
+const logCache = (...args: unknown[]) => {
+  if (DEBUG_CACHE) {
+    console.log(`[WORKORDERS-PAGE ${new Date().toISOString().split('T')[1].slice(0, 12)}]`, ...args);
+  }
+};
 import { DndContext, DragOverlay, useDraggable, useDroppable, closestCenter, DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -646,12 +654,39 @@ export default function CrmWorkOrders() {
     return params.toString();
   }, [activeTab, techFilter]);
 
+  // Debug: Check cache before query runs
+  useEffect(() => {
+    const myQueryKey = ["/api/crm/work-orders/list", queryParams];
+    const cachedData = queryClient.getQueryData(myQueryKey);
+    logCache('========================================');
+    logCache('PAGE MOUNTING / QUERY PARAMS CHANGED');
+    logCache('My queryKey:', JSON.stringify(myQueryKey));
+    logCache('queryParams string:', queryParams);
+    logCache('Cache data exists:', !!cachedData);
+    if (cachedData) {
+      logCache('CACHE HIT - should render instantly!');
+    } else {
+      logCache('CACHE MISS - will fetch from network');
+      const allQueries = queryClient.getQueryCache().getAll();
+      const woQueries = allQueries.filter(q => 
+        JSON.stringify(q.queryKey).includes('work-orders')
+      );
+      logCache('Existing work-orders-related cache keys:', 
+        woQueries.map(q => JSON.stringify(q.queryKey))
+      );
+    }
+    logCache('========================================');
+  }, [queryParams]);
+
   const { data: workOrdersData, isLoading: workOrdersLoading, refetch } = useQuery<EnrichedWorkOrder[]>({
     queryKey: ["/api/crm/work-orders/list", queryParams],
     queryFn: async () => {
+      logCache('queryFn EXECUTING - fetching from network!');
       const res = await fetch(`/api/crm/work-orders/list?${queryParams}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch work orders");
-      return res.json();
+      const data = await res.json();
+      logCache('queryFn COMPLETE - got data');
+      return data;
     },
     enabled: !!currentUser,
     staleTime: 2 * 60 * 1000, // Cache for 2 minutes for better performance

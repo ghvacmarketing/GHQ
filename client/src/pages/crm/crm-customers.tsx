@@ -2,7 +2,15 @@ import { useEffect, useState, useMemo } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, Link } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getQueryFn } from "@/lib/queryClient";
+import { getQueryFn, queryClient as globalQueryClient } from "@/lib/queryClient";
+
+// Debug logging for cache hits
+const DEBUG_CACHE = true;
+const logCache = (...args: unknown[]) => {
+  if (DEBUG_CACHE) {
+    console.log(`[CUSTOMERS-PAGE ${new Date().toISOString().split('T')[1].slice(0, 12)}]`, ...args);
+  }
+};
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -124,14 +132,42 @@ export default function CrmCustomers() {
     return params.toString();
   }, [debouncedSearch, customerType, statusTab, hasAgreement, sourceFilter, page]);
 
+  // Debug: Check cache before query runs
+  useEffect(() => {
+    const myQueryKey = ["/api/crm/customers/merged", queryParams];
+    const cachedData = globalQueryClient.getQueryData(myQueryKey);
+    logCache('========================================');
+    logCache('PAGE MOUNTING / QUERY PARAMS CHANGED');
+    logCache('My queryKey:', JSON.stringify(myQueryKey));
+    logCache('queryParams string:', queryParams);
+    logCache('Cache data exists:', !!cachedData);
+    if (cachedData) {
+      logCache('CACHE HIT - should render instantly!');
+    } else {
+      logCache('CACHE MISS - will fetch from network');
+      // Check what keys ARE in cache
+      const allQueries = globalQueryClient.getQueryCache().getAll();
+      const customerQueries = allQueries.filter(q => 
+        JSON.stringify(q.queryKey).includes('customers')
+      );
+      logCache('Existing customer-related cache keys:', 
+        customerQueries.map(q => JSON.stringify(q.queryKey))
+      );
+    }
+    logCache('========================================');
+  }, [queryParams]);
+
   const { data: customersData, isLoading: customersLoading } = useQuery<CustomersResponse>({
     queryKey: ["/api/crm/customers/merged", queryParams],
     queryFn: async () => {
+      logCache('queryFn EXECUTING - fetching from network!');
       const res = await fetch(`/api/crm/customers/merged?${queryParams}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch customers");
-      return res.json();
+      const data = await res.json();
+      logCache('queryFn COMPLETE - got data');
+      return data;
     },
     enabled: !!currentUser,
     staleTime: 2 * 60 * 1000,

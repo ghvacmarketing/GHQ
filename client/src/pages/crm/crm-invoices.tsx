@@ -3,6 +3,14 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
+
+// Debug logging for cache hits
+const DEBUG_CACHE = true;
+const logCache = (...args: unknown[]) => {
+  if (DEBUG_CACHE) {
+    console.log(`[INVOICES-PAGE ${new Date().toISOString().split('T')[1].slice(0, 12)}]`, ...args);
+  }
+};
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -152,14 +160,41 @@ export default function CrmInvoices() {
     return params.toString();
   }, [statusFilter, sourceFilter, page]);
 
+  // Debug: Check cache before query runs
+  useEffect(() => {
+    const myQueryKey = ["/api/crm/invoices", queryParams];
+    const cachedData = queryClient.getQueryData(myQueryKey);
+    logCache('========================================');
+    logCache('PAGE MOUNTING / QUERY PARAMS CHANGED');
+    logCache('My queryKey:', JSON.stringify(myQueryKey));
+    logCache('queryParams string:', queryParams);
+    logCache('Cache data exists:', !!cachedData);
+    if (cachedData) {
+      logCache('CACHE HIT - should render instantly!');
+    } else {
+      logCache('CACHE MISS - will fetch from network');
+      const allQueries = queryClient.getQueryCache().getAll();
+      const invoiceQueries = allQueries.filter(q => 
+        JSON.stringify(q.queryKey).includes('invoices')
+      );
+      logCache('Existing invoice-related cache keys:', 
+        invoiceQueries.map(q => JSON.stringify(q.queryKey))
+      );
+    }
+    logCache('========================================');
+  }, [queryParams]);
+
   const { data: invoicesResponse, isLoading: invoicesLoading } = useQuery<{ invoices: InvoiceWithRelations[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>({
     queryKey: ["/api/crm/invoices", queryParams],
     queryFn: async () => {
+      logCache('queryFn EXECUTING - fetching from network!');
       const res = await fetch(`/api/crm/invoices?${queryParams}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch invoices");
-      return res.json();
+      const data = await res.json();
+      logCache('queryFn COMPLETE - got data');
+      return data;
     },
     enabled: !!currentUser,
     staleTime: 2 * 60 * 1000,
