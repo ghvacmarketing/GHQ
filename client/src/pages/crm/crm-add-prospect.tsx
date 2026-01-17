@@ -155,9 +155,10 @@ export default function CrmAddProspect() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects/metrics"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects/overview-analytics"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"], exact: false });
       toast({ title: "Customer converted to lead successfully" });
       navigate("/crm/prospect-funnel");
     },

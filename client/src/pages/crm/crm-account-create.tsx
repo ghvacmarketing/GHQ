@@ -313,10 +313,11 @@ export default function CrmAccountCreate() {
     },
     onSuccess: (data) => {
       toast({ title: "Customer created successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers/stats"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects/metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects/overview-analytics"], exact: false });
       if (data?.customer?.id) {
         navigate(`/crm/customers/${data.customer.id}`);
       } else {

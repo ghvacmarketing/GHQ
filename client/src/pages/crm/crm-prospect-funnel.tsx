@@ -723,11 +723,13 @@ export default function CrmProspectFunnel() {
       return res.json();
     },
     enabled: !!currentUser,
+    refetchInterval: 30000,
   });
 
   const { data: metrics, isLoading: metricsLoading } = useQuery<ProspectMetrics>({
     queryKey: ["/api/crm/prospects/metrics"],
     enabled: !!currentUser,
+    refetchInterval: 30000,
   });
 
   const { data: overviewAnalytics, isLoading: analyticsLoading } = useQuery<OverviewAnalytics>({
