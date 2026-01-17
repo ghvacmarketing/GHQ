@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { clearCrmToken } from "@/lib/crmAuth";
+import { useCrmPrefetch } from "@/hooks/use-crm-prefetch";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
@@ -288,6 +289,8 @@ function SidebarContent({
 
 export function CrmLayout({ children, currentUser, disableScroll = false, hideGlobalSearch = false }: CrmLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  
+  useCrmPrefetch(!!currentUser);
 
   return (
     <div className="min-h-screen bg-white flex">
