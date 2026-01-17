@@ -1130,7 +1130,7 @@ export default function CrmProjects() {
                 <CardDescription>Projects with scheduled dates in the next 14 days</CardDescription>
               </CardHeader>
               <CardContent>
-                {projectsLoading ? (
+                {projectsLoading && !projectsData ? (
                   <div className="space-y-3">
                     {Array.from({ length: 3 }).map((_, i) => (
                       <Skeleton key={i} className="h-16 w-full" />
@@ -1265,7 +1265,7 @@ export default function CrmProjects() {
                 ))}
               </div>
 
-              {projectsLoading ? (
+              {projectsLoading && !projectsData ? (
                 <div className="space-y-2">
                   {Array.from({ length: 6 }).map((_, i) => (
                     <Skeleton key={i} className="h-14 rounded-lg" />

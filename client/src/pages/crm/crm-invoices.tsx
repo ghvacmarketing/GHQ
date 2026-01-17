@@ -693,7 +693,7 @@ export default function CrmInvoices() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {invoicesLoading ? (
+                {invoicesLoading && !invoicesResponse ? (
                   Array.from({ length: 10 }).map((_, i) => (
                     <TableRow key={i}>
                       <TableCell><Skeleton className="h-5 w-24" /></TableCell>

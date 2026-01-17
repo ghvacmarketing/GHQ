@@ -3295,7 +3295,7 @@ export default function CrmDispatch() {
 
   const activeWorkOrder = activeId ? localWorkOrders.find(wo => wo.id === activeId) : null;
 
-  if (authLoading || workOrdersLoading) {
+  if (authLoading || (workOrdersLoading && !workOrdersData)) {
     return (
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="max-w-7xl mx-auto space-y-6">
