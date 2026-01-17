@@ -1193,6 +1193,9 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   assignedTechIdIdx: index("crm_work_orders_assigned_tech_id_idx").on(table.assignedTechId),
   statusIdx: index("crm_work_orders_status_idx").on(table.status),
   scheduledStartIdx: index("crm_work_orders_scheduled_start_idx").on(table.scheduledStart),
+  customerIdIdx: index("crm_work_orders_customer_id_idx").on(table.customerId),
+  projectIdIdx: index("crm_work_orders_project_id_idx").on(table.projectId),
+  createdAtIdx: index("crm_work_orders_created_at_idx").on(table.createdAt),
 }));
 
 // CRM Quote Status and Scope
@@ -1285,6 +1288,8 @@ export const crmQuotes = pgTable("crm_quotes", {
   depositInvoiceId: varchar("deposit_invoice_id"),
 }, (table) => ({
   statusIdx: index("crm_quotes_status_idx").on(table.status),
+  customerIdIdx: index("crm_quotes_customer_id_idx").on(table.customerId),
+  createdAtIdx: index("crm_quotes_created_at_idx").on(table.createdAt),
 }));
 
 
@@ -1393,6 +1398,9 @@ export const crmInvoices = pgTable("crm_invoices", {
   viewToken: text("view_token"),
 }, (table) => ({
   statusIdx: index("crm_invoices_status_idx").on(table.status),
+  customerIdIdx: index("crm_invoices_customer_id_idx").on(table.customerId),
+  workOrderIdIdx: index("crm_invoices_work_order_id_idx").on(table.workOrderId),
+  createdAtIdx: index("crm_invoices_created_at_idx").on(table.createdAt),
 }));
 
 // CRM Invoice Line Items

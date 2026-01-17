@@ -1,0 +1,1130 @@
+db09c50e6e999668.js:2 Unrecognized feature: 'ambient-light-sensor'.
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+navigateTo @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+onClick @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+eA @ ed1e693c96a75807.js:2
+e$ @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+rt @ ed1e693c96a75807.js:2
+rr @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+iL @ ed1e693c96a75807.js:2
+eO @ ed1e693c96a75807.js:2
+rs @ ed1e693c96a75807.js:2
+nA @ ed1e693c96a75807.js:2
+nU @ ed1e693c96a75807.js:2
+a @ af0e468f89b9aa3c.js:2
+db09c50e6e999668.js:2 Unrecognized feature: 'battery'.
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+navigateTo @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+onClick @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+eA @ ed1e693c96a75807.js:2
+e$ @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+rt @ ed1e693c96a75807.js:2
+rr @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+iL @ ed1e693c96a75807.js:2
+eO @ ed1e693c96a75807.js:2
+rs @ ed1e693c96a75807.js:2
+nA @ ed1e693c96a75807.js:2
+nU @ ed1e693c96a75807.js:2
+a @ af0e468f89b9aa3c.js:2
+db09c50e6e999668.js:2 Unrecognized feature: 'execution-while-not-rendered'.
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+navigateTo @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+onClick @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+eA @ ed1e693c96a75807.js:2
+e$ @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+rt @ ed1e693c96a75807.js:2
+rr @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+iL @ ed1e693c96a75807.js:2
+eO @ ed1e693c96a75807.js:2
+rs @ ed1e693c96a75807.js:2
+nA @ ed1e693c96a75807.js:2
+nU @ ed1e693c96a75807.js:2
+a @ af0e468f89b9aa3c.js:2
+db09c50e6e999668.js:2 Unrecognized feature: 'execution-while-out-of-viewport'.
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+navigateTo @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+onClick @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+eA @ ed1e693c96a75807.js:2
+e$ @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+rt @ ed1e693c96a75807.js:2
+rr @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+iL @ ed1e693c96a75807.js:2
+eO @ ed1e693c96a75807.js:2
+rs @ ed1e693c96a75807.js:2
+nA @ ed1e693c96a75807.js:2
+nU @ ed1e693c96a75807.js:2
+a @ af0e468f89b9aa3c.js:2
+db09c50e6e999668.js:2 Unrecognized feature: 'layout-animations'.
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+navigateTo @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+onClick @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+eA @ ed1e693c96a75807.js:2
+e$ @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+rt @ ed1e693c96a75807.js:2
+rr @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+iL @ ed1e693c96a75807.js:2
+eO @ ed1e693c96a75807.js:2
+rs @ ed1e693c96a75807.js:2
+nA @ ed1e693c96a75807.js:2
+nU @ ed1e693c96a75807.js:2
+a @ af0e468f89b9aa3c.js:2
+db09c50e6e999668.js:2 Unrecognized feature: 'legacy-image-formats'.
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+navigateTo @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+onClick @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+eA @ ed1e693c96a75807.js:2
+e$ @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+rt @ ed1e693c96a75807.js:2
+rr @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+iL @ ed1e693c96a75807.js:2
+eO @ ed1e693c96a75807.js:2
+rs @ ed1e693c96a75807.js:2
+nA @ ed1e693c96a75807.js:2
+nU @ ed1e693c96a75807.js:2
+a @ af0e468f89b9aa3c.js:2
+db09c50e6e999668.js:2 Unrecognized feature: 'navigation-override'.
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+navigateTo @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+onClick @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+eA @ ed1e693c96a75807.js:2
+e$ @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+rt @ ed1e693c96a75807.js:2
+rr @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+iL @ ed1e693c96a75807.js:2
+eO @ ed1e693c96a75807.js:2
+rs @ ed1e693c96a75807.js:2
+nA @ ed1e693c96a75807.js:2
+nU @ ed1e693c96a75807.js:2
+a @ af0e468f89b9aa3c.js:2
+db09c50e6e999668.js:2 Unrecognized feature: 'oversized-images'.
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+navigateTo @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+onClick @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+eA @ ed1e693c96a75807.js:2
+e$ @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+rt @ ed1e693c96a75807.js:2
+rr @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+iL @ ed1e693c96a75807.js:2
+eO @ ed1e693c96a75807.js:2
+rs @ ed1e693c96a75807.js:2
+nA @ ed1e693c96a75807.js:2
+nU @ ed1e693c96a75807.js:2
+a @ af0e468f89b9aa3c.js:2
+db09c50e6e999668.js:2 Unrecognized feature: 'publickey-credentials'.
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+navigateTo @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+onClick @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+eA @ ed1e693c96a75807.js:2
+e$ @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+rt @ ed1e693c96a75807.js:2
+rr @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+iL @ ed1e693c96a75807.js:2
+eO @ ed1e693c96a75807.js:2
+rs @ ed1e693c96a75807.js:2
+nA @ ed1e693c96a75807.js:2
+nU @ ed1e693c96a75807.js:2
+a @ af0e468f89b9aa3c.js:2
+db09c50e6e999668.js:2 Unrecognized feature: 'speaker-selection'.
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+navigateTo @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+onClick @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+eA @ ed1e693c96a75807.js:2
+e$ @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+rt @ ed1e693c96a75807.js:2
+rr @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+iL @ ed1e693c96a75807.js:2
+eO @ ed1e693c96a75807.js:2
+rs @ ed1e693c96a75807.js:2
+nA @ ed1e693c96a75807.js:2
+nU @ ed1e693c96a75807.js:2
+a @ af0e468f89b9aa3c.js:2
+db09c50e6e999668.js:2 Unrecognized feature: 'unoptimized-images'.
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+navigateTo @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+onClick @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+eA @ ed1e693c96a75807.js:2
+e$ @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+rt @ ed1e693c96a75807.js:2
+rr @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+iL @ ed1e693c96a75807.js:2
+eO @ ed1e693c96a75807.js:2
+rs @ ed1e693c96a75807.js:2
+nA @ ed1e693c96a75807.js:2
+nU @ ed1e693c96a75807.js:2
+a @ af0e468f89b9aa3c.js:2
+db09c50e6e999668.js:2 Unrecognized feature: 'unsized-media'.
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+navigateTo @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+onClick @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+eA @ ed1e693c96a75807.js:2
+e$ @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+rt @ ed1e693c96a75807.js:2
+rr @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+iL @ ed1e693c96a75807.js:2
+eO @ ed1e693c96a75807.js:2
+rs @ ed1e693c96a75807.js:2
+nA @ ed1e693c96a75807.js:2
+nU @ ed1e693c96a75807.js:2
+a @ af0e468f89b9aa3c.js:2
+db09c50e6e999668.js:2 Unrecognized feature: 'pointer-lock'.
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+navigateTo @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+onClick @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+eA @ ed1e693c96a75807.js:2
+e$ @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+rt @ ed1e693c96a75807.js:2
+rr @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+iL @ ed1e693c96a75807.js:2
+eO @ ed1e693c96a75807.js:2
+rs @ ed1e693c96a75807.js:2
+nA @ ed1e693c96a75807.js:2
+nU @ ed1e693c96a75807.js:2
+a @ af0e468f89b9aa3c.js:2
+db09c50e6e999668.js:2 Allow attribute will take precedence over 'allowfullscreen'.
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+navigateTo @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+onClick @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+eA @ ed1e693c96a75807.js:2
+e$ @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+rt @ ed1e693c96a75807.js:2
+rr @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+iL @ ed1e693c96a75807.js:2
+eO @ ed1e693c96a75807.js:2
+rs @ ed1e693c96a75807.js:2
+nA @ ed1e693c96a75807.js:2
+nU @ ed1e693c96a75807.js:2
+a @ af0e468f89b9aa3c.js:2
+db09c50e6e999668.js:2 Allow attribute will take precedence over 'allowpaymentrequest'.
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 7599154bd2118454.js:2
+r @ 7599154bd2118454.js:2
+s @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ db09c50e6e999668.js:2
+navigateTo @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ db09c50e6e999668.js:2
+(anonymous) @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+onClick @ 610ada605a17aca7.js:2
+(anonymous) @ cd07c7a6f0f3b06b.js:2
+eA @ ed1e693c96a75807.js:2
+e$ @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+rt @ ed1e693c96a75807.js:2
+rr @ ed1e693c96a75807.js:2
+(anonymous) @ ed1e693c96a75807.js:2
+iL @ ed1e693c96a75807.js:2
+eO @ ed1e693c96a75807.js:2
+rs @ ed1e693c96a75807.js:2
+nA @ ed1e693c96a75807.js:2
+nU @ ed1e693c96a75807.js:2
+a @ af0e468f89b9aa3c.js:2
+af0e468f89b9aa3c.js:2  POST https://prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1768630673705&sid=942963f6-4c27-4869-8fd9-657888741745&ec=2545&gz=1 net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ af0e468f89b9aa3c.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+s @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+l @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+l @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+l @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+r._notifyVisibilityChanged @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+workspace_iframe.html?initialPath=%2Fcrm&id=%3Ar2bn%3A:32 Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+workspace_iframe.html?initialPath=%2Fcrm&id=%3Ar2bn%3A:32 Unrecognized feature: 'ambient-light-sensor'.
+workspace_iframe.html?initialPath=%2Fcrm&id=%3Ar2bn%3A:32 Unrecognized feature: 'battery'.
+workspace_iframe.html?initialPath=%2Fcrm&id=%3Ar2bn%3A:32 Unrecognized feature: 'execution-while-not-rendered'.
+workspace_iframe.html?initialPath=%2Fcrm&id=%3Ar2bn%3A:32 Unrecognized feature: 'execution-while-out-of-viewport'.
+workspace_iframe.html?initialPath=%2Fcrm&id=%3Ar2bn%3A:32 Unrecognized feature: 'layout-animations'.
+workspace_iframe.html?initialPath=%2Fcrm&id=%3Ar2bn%3A:32 Unrecognized feature: 'legacy-image-formats'.
+workspace_iframe.html?initialPath=%2Fcrm&id=%3Ar2bn%3A:32 Unrecognized feature: 'navigation-override'.
+workspace_iframe.html?initialPath=%2Fcrm&id=%3Ar2bn%3A:32 Unrecognized feature: 'oversized-images'.
+workspace_iframe.html?initialPath=%2Fcrm&id=%3Ar2bn%3A:32 Unrecognized feature: 'publickey-credentials'.
+workspace_iframe.html?initialPath=%2Fcrm&id=%3Ar2bn%3A:32 Unrecognized feature: 'speaker-selection'.
+workspace_iframe.html?initialPath=%2Fcrm&id=%3Ar2bn%3A:32 Unrecognized feature: 'unoptimized-images'.
+workspace_iframe.html?initialPath=%2Fcrm&id=%3Ar2bn%3A:32 Unrecognized feature: 'unsized-media'.
+workspace_iframe.html?initialPath=%2Fcrm&id=%3Ar2bn%3A:32 Allow attribute will take precedence over 'allowfullscreen'.
+workspace_iframe.html?initialPath=%2Fcrm&id=%3Ar2bn%3A:32 Allow attribute will take precedence over 'allowpaymentrequest'.
+af0e468f89b9aa3c.js:2  POST https://prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1768630674357&sid=942963f6-4c27-4869-8fd9-657888741745&ec=2545&gz=1 net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ af0e468f89b9aa3c.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+s @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+s @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+s @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+l @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+l @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+l @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+r._notifyVisibilityChanged @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+af0e468f89b9aa3c.js:2  POST https://prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1768630676374&sid=942963f6-4c27-4869-8fd9-657888741745&ec=2545&gz=1 net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ af0e468f89b9aa3c.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+s @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+s @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+s @ df6212602bad8342.js:2
+main.tsx:13 Service Worker registered successfully: https://1571a8b3-4ba1-4e05-8e06-fafee9ee64aa-00-135633vc7z2nc.worf.repl.co/
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.669] Hook called {isAuthenticated: true, hasPrefetched: false}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.669] ========================================
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.669] STARTING PREFETCH OF ALL CRM DATA
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.670] Total endpoints: 13
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.670] Endpoints: (13) ['customers/merged', 'customers/stats', 'prospects', 'prospects/metrics', 'quotes', 'invoices', 'work-orders/list', 'projects', 'projects/stats', 'agreements', 'items', 'follow-ups', 'users']
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.670] ========================================
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.670] [0] START fetching: customers/merged
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.671] [0] Fetching from network: /api/crm/customers/merged?page=1&limit=25
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.671] [1] START fetching: customers/stats
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.672] [1] Fetching from network: /api/crm/customers/stats
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.672] [2] START fetching: prospects
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.672] [2] Fetching from network: /api/crm/prospects
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.673] [3] START fetching: prospects/metrics
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.673] [3] Fetching from network: /api/crm/prospects/metrics
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.673] [4] START fetching: quotes
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.674] [4] Fetching from network: /api/crm/quotes?page=1&type=all
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.674] [5] START fetching: invoices
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.675] [5] Fetching from network: /api/crm/invoices?page=1&limit=25
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.675] [6] START fetching: work-orders/list
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.676] [6] Fetching from network: /api/crm/work-orders/list
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.676] [7] START fetching: projects
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.677] [7] Fetching from network: /api/crm/projects?page=1&limit=25
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.677] [8] START fetching: projects/stats
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.677] [8] Fetching from network: /api/crm/projects/stats
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.678] [9] START fetching: agreements
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.678] [9] Fetching from network: /api/crm/agreements?page=1&search=&status=active
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.679] [10] START fetching: items
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.679] [10] Fetching from network: /api/crm/items
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.679] [11] START fetching: follow-ups
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.680] [11] Fetching from network: /api/crm/follow-ups
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.680] [12] START fetching: users
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.680] [12] Fetching from network: /api/crm/users
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.927] [2] FETCH SUCCESS: prospects {dataType: 'array[27]', hasData: true}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.928] [2] COMPLETE: prospects in 256ms
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.928] [2] CACHE VERIFY: prospects - data stored: true {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.956] [3] FETCH SUCCESS: prospects/metrics {dataType: 'object', hasData: true}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.957] [3] COMPLETE: prospects/metrics in 284ms
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:57.957] [3] CACHE VERIFY: prospects/metrics - data stored: true {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.073] [4] FETCH SUCCESS: quotes {dataType: 'object', hasData: true}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.073] [4] COMPLETE: quotes in 399ms
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.073] [4] CACHE VERIFY: quotes - data stored: true {queryKey: Array(3)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.448] [0] FETCH SUCCESS: customers/merged {dataType: 'object', hasData: true}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.448] [0] COMPLETE: customers/merged in 778ms
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.448] [0] CACHE VERIFY: customers/merged - data stored: true {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.520] [5] FETCH SUCCESS: invoices {dataType: 'object', hasData: true}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.521] [5] COMPLETE: invoices in 847ms
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.521] [5] CACHE VERIFY: invoices - data stored: true {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.524] [8] FETCH SUCCESS: projects/stats {dataType: 'object', hasData: true}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.524] [8] COMPLETE: projects/stats in 847ms
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.524] [8] CACHE VERIFY: projects/stats - data stored: true {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.674] [7] FETCH SUCCESS: projects {dataType: 'object', hasData: true}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.675] [7] COMPLETE: projects in 998ms
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.675] [7] CACHE VERIFY: projects - data stored: true {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.793] [11] FETCH SUCCESS: follow-ups {dataType: 'array[18]', hasData: true}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.793] [11] COMPLETE: follow-ups in 1114ms
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.793] [11] CACHE VERIFY: follow-ups - data stored: true {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.813] [10] FETCH SUCCESS: items {dataType: 'array[216]', hasData: true}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.813] [10] COMPLETE: items in 1135ms
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.813] [10] CACHE VERIFY: items - data stored: true {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.896] [12] FETCH SUCCESS: users {dataType: 'array[10]', hasData: true}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.897] [12] COMPLETE: users in 1217ms
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.897] [12] CACHE VERIFY: users - data stored: true {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.897] [9] FETCH SUCCESS: agreements {dataType: 'object', hasData: true}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.897] [9] COMPLETE: agreements in 1219ms
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:17:58.897] [9] CACHE VERIFY: agreements - data stored: true {queryKey: Array(4)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.153] [1] FETCH SUCCESS: customers/stats {dataType: 'object', hasData: true}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.154] [1] COMPLETE: customers/stats in 2482ms
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.154] [1] CACHE VERIFY: customers/stats - data stored: true {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.573] [6] FETCH SUCCESS: work-orders/list {dataType: 'array[7]', hasData: true}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.573] [6] COMPLETE: work-orders/list in 2898ms
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.573] [6] CACHE VERIFY: work-orders/list - data stored: true {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.573] ========================================
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.573] PREFETCH COMPLETE
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.573] Total duration: 2904ms
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.573] Success: 13/13
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.573] Individual times: (13) ['customers/merged: 778ms', 'customers/stats: 2482ms', 'prospects: 256ms', 'prospects/metrics: 284ms', 'quotes: 399ms', 'invoices: 847ms', 'work-orders/list: 2898ms', 'projects: 998ms', 'projects/stats: 847ms', 'agreements: 1219ms', 'items: 1135ms', 'follow-ups: 1114ms', 'users: 1217ms']
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.574] ========================================
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.574] CACHE STATE AFTER PREFETCH:
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.574]   [0] customers/merged: HAS DATA {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.574]   [1] customers/stats: HAS DATA {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.574]   [2] prospects: HAS DATA {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.574]   [3] prospects/metrics: HAS DATA {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.574]   [4] quotes: HAS DATA {queryKey: Array(3)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.574]   [5] invoices: HAS DATA {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.574]   [6] work-orders/list: HAS DATA {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.574]   [7] projects: HAS DATA {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.574]   [8] projects/stats: HAS DATA {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.574]   [9] agreements: HAS DATA {queryKey: Array(4)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.574]   [10] items: HAS DATA {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.574]   [11] follow-ups: HAS DATA {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:00.574]   [12] users: HAS DATA {queryKey: Array(1)}
+af0e468f89b9aa3c.js:2  POST https://prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1768630680882&sid=942963f6-4c27-4869-8fd9-657888741745&ec=2545&gz=1 net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ af0e468f89b9aa3c.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+s @ df6212602bad8342.js:2
+installHook.js:1  ERROR  [Statsig] A networking error occurred during POST request to https://prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1768630680882&sid=942963f6-4c27-4869-8fd9-657888741745&ec=2545&gz=1. TypeError: Failed to fetch TypeError: Failed to fetch
+    at af0e468f89b9aa3c.js:2:107286
+    at t.<anonymous> (df6212602bad8342.js:2:49018)
+    at Object.next (7599154bd2118454.js:2:14082)
+    at df6212602bad8342.js:2:46120
+    at new Promise (<anonymous>)
+    at u (df6212602bad8342.js:2:45874)
+    at t.value (df6212602bad8342.js:2:48108)
+    at df6212602bad8342.js:2:34936
+    at e.value (df6212602bad8342.js:2:35343)
+    at e.<computed> [as _sendRequest] (df6212602bad8342.js:2:34876)
+    at t.<anonymous> (df6212602bad8342.js:2:50494)
+    at Object.next (7599154bd2118454.js:2:14082)
+    at s (df6212602bad8342.js:2:45930)
+overrideMethod @ installHook.js:1
+(anonymous) @ af0e468f89b9aa3c.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+s @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+s @ df6212602bad8342.js:2
+installHook.js:1   WARN  [Statsig] Failed to flush events.
+overrideMethod @ installHook.js:1
+(anonymous) @ af0e468f89b9aa3c.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+s @ df6212602bad8342.js:2
+installHook.js:1   WARN  [Statsig] Unable to save failed logs to storage
+overrideMethod @ installHook.js:1
+(anonymous) @ af0e468f89b9aa3c.js:2
+value @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+s @ df6212602bad8342.js:2
+af0e468f89b9aa3c.js:2  POST https://prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1768630682716&sid=942963f6-4c27-4869-8fd9-657888741745&ec=1&gz=1 net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ af0e468f89b9aa3c.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+s @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+l @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+l @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+l @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+t @ df6212602bad8342.js:2
+a @ af0e468f89b9aa3c.js:2
+af0e468f89b9aa3c.js:2  POST https://prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1768630683220&sid=942963f6-4c27-4869-8fd9-657888741745&ec=1&gz=1 net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ af0e468f89b9aa3c.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+s @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+s @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+s @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+l @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+l @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+l @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+t @ df6212602bad8342.js:2
+a @ af0e468f89b9aa3c.js:2
+af0e468f89b9aa3c.js:2  POST https://prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1768630685236&sid=942963f6-4c27-4869-8fd9-657888741745&ec=1&gz=1 net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ af0e468f89b9aa3c.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+s @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+s @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+s @ df6212602bad8342.js:2
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.395] Hook called {isAuthenticated: true, hasPrefetched: false}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.395] ========================================
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.395] STARTING PREFETCH OF ALL CRM DATA
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.395] Total endpoints: 13
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.395] Endpoints: (13) ['customers/merged', 'customers/stats', 'prospects', 'prospects/metrics', 'quotes', 'invoices', 'work-orders/list', 'projects', 'projects/stats', 'agreements', 'items', 'follow-ups', 'users']
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.395] ========================================
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.395] [0] START fetching: customers/merged
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.395] [0] CACHE HIT - data already exists for: customers/merged {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.396] [1] START fetching: customers/stats
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.396] [1] CACHE HIT - data already exists for: customers/stats {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.396] [2] START fetching: prospects
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.396] [2] CACHE HIT - data already exists for: prospects {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.396] [3] START fetching: prospects/metrics
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.396] [3] CACHE HIT - data already exists for: prospects/metrics {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.396] [4] START fetching: quotes
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.396] [4] CACHE HIT - data already exists for: quotes {queryKey: Array(3)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.396] [5] START fetching: invoices
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.397] [5] CACHE HIT - data already exists for: invoices {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.397] [6] START fetching: work-orders/list
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.397] [6] CACHE HIT - data already exists for: work-orders/list {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.397] [7] START fetching: projects
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.397] [7] CACHE HIT - data already exists for: projects {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.397] [8] START fetching: projects/stats
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.397] [8] CACHE HIT - data already exists for: projects/stats {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.397] [9] START fetching: agreements
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.398] [9] CACHE HIT - data already exists for: agreements {queryKey: Array(4)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.398] [10] START fetching: items
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.398] [10] CACHE HIT - data already exists for: items {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.398] [11] START fetching: follow-ups
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.398] [11] CACHE HIT - data already exists for: follow-ups {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.398] [12] START fetching: users
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.398] [12] CACHE HIT - data already exists for: users {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.399] ========================================
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.399] PREFETCH COMPLETE
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.399] Total duration: 4ms
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.399] Success: 13/13
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.399] Individual times: (13) ['customers/merged: 0ms', 'customers/stats: 0ms', 'prospects: 0ms', 'prospects/metrics: 0ms', 'quotes: 0ms', 'invoices: 0ms', 'work-orders/list: 0ms', 'projects: 0ms', 'projects/stats: 0ms', 'agreements: 0ms', 'items: 0ms', 'follow-ups: 0ms', 'users: 0ms']
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.399] ========================================
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.399] CACHE STATE AFTER PREFETCH:
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.399]   [0] customers/merged: HAS DATA {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.399]   [1] customers/stats: HAS DATA {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.399]   [2] prospects: HAS DATA {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.399]   [3] prospects/metrics: HAS DATA {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.399]   [4] quotes: HAS DATA {queryKey: Array(3)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.399]   [5] invoices: HAS DATA {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.399]   [6] work-orders/list: HAS DATA {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.400]   [7] projects: HAS DATA {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.400]   [8] projects/stats: HAS DATA {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.400]   [9] agreements: HAS DATA {queryKey: Array(4)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.400]   [10] items: HAS DATA {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.400]   [11] follow-ups: HAS DATA {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:09.400]   [12] users: HAS DATA {queryKey: Array(1)}
+af0e468f89b9aa3c.js:2  POST https://prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1768630689743&sid=942963f6-4c27-4869-8fd9-657888741745&ec=1&gz=1 net::ERR_BLOCKED_BY_CLIENT
+(anonymous) @ af0e468f89b9aa3c.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+(anonymous) @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+s @ df6212602bad8342.js:2
+installHook.js:1  ERROR  [Statsig] A networking error occurred during POST request to https://prodregistryv2.org/v1/rgstr?k=client-Bp7m7pNB6H0fnSGjVtxN5BeWQw4BSAat4OFsXa3VcTF&st=javascript-client&sv=3.26.0&t=1768630689743&sid=942963f6-4c27-4869-8fd9-657888741745&ec=1&gz=1. TypeError: Failed to fetch TypeError: Failed to fetch
+    at af0e468f89b9aa3c.js:2:107286
+    at t.<anonymous> (df6212602bad8342.js:2:49018)
+    at Object.next (7599154bd2118454.js:2:14082)
+    at df6212602bad8342.js:2:46120
+    at new Promise (<anonymous>)
+    at u (df6212602bad8342.js:2:45874)
+    at t.value (df6212602bad8342.js:2:48108)
+    at df6212602bad8342.js:2:34936
+    at e.value (df6212602bad8342.js:2:35343)
+    at e.<computed> [as _sendRequest] (df6212602bad8342.js:2:34876)
+    at t.<anonymous> (df6212602bad8342.js:2:50494)
+    at Object.next (7599154bd2118454.js:2:14082)
+    at s (df6212602bad8342.js:2:45930)
+overrideMethod @ installHook.js:1
+(anonymous) @ af0e468f89b9aa3c.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+s @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+Promise.then
+l @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+u @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+value @ df6212602bad8342.js:2
+e.<computed> @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+s @ df6212602bad8342.js:2
+installHook.js:1   WARN  [Statsig] Failed to flush events.
+overrideMethod @ installHook.js:1
+(anonymous) @ af0e468f89b9aa3c.js:2
+value @ df6212602bad8342.js:2
+(anonymous) @ df6212602bad8342.js:2
+(anonymous) @ 7599154bd2118454.js:2
+s @ df6212602bad8342.js:2
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.271] Hook called {isAuthenticated: true, hasPrefetched: false}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.271] ========================================
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.271] STARTING PREFETCH OF ALL CRM DATA
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.272] Total endpoints: 13
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.272] Endpoints: (13) ['customers/merged', 'customers/stats', 'prospects', 'prospects/metrics', 'quotes', 'invoices', 'work-orders/list', 'projects', 'projects/stats', 'agreements', 'items', 'follow-ups', 'users']
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.272] ========================================
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.272] [0] START fetching: customers/merged
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.272] [0] CACHE HIT - data already exists for: customers/merged {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.272] [1] START fetching: customers/stats
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.272] [1] CACHE HIT - data already exists for: customers/stats {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.273] [2] START fetching: prospects
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.273] [2] CACHE HIT - data already exists for: prospects {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.273] [3] START fetching: prospects/metrics
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.273] [3] CACHE HIT - data already exists for: prospects/metrics {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.273] [4] START fetching: quotes
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.273] [4] CACHE HIT - data already exists for: quotes {queryKey: Array(3)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.273] [5] START fetching: invoices
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.273] [5] CACHE HIT - data already exists for: invoices {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.273] [6] START fetching: work-orders/list
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.274] [6] CACHE HIT - data already exists for: work-orders/list {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.274] [7] START fetching: projects
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.274] [7] CACHE HIT - data already exists for: projects {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.274] [8] START fetching: projects/stats
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.274] [8] CACHE HIT - data already exists for: projects/stats {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.274] [9] START fetching: agreements
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.274] [9] CACHE HIT - data already exists for: agreements {queryKey: Array(4)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.274] [10] START fetching: items
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.274] [10] CACHE HIT - data already exists for: items {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.275] [11] START fetching: follow-ups
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.275] [11] CACHE HIT - data already exists for: follow-ups {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.275] [12] START fetching: users
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.275] [12] CACHE HIT - data already exists for: users {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.276] ========================================
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.276] PREFETCH COMPLETE
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.276] Total duration: 5ms
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.276] Success: 13/13
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.276] Individual times: (13) ['customers/merged: 0ms', 'customers/stats: 0ms', 'prospects: 0ms', 'prospects/metrics: 0ms', 'quotes: 0ms', 'invoices: 0ms', 'work-orders/list: 0ms', 'projects: 0ms', 'projects/stats: 0ms', 'agreements: 0ms', 'items: 0ms', 'follow-ups: 0ms', 'users: 0ms']
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.276] ========================================
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.276] CACHE STATE AFTER PREFETCH:
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.277]   [0] customers/merged: HAS DATA {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.277]   [1] customers/stats: HAS DATA {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.277]   [2] prospects: HAS DATA {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.277]   [3] prospects/metrics: HAS DATA {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.277]   [4] quotes: HAS DATA {queryKey: Array(3)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.277]   [5] invoices: HAS DATA {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.277]   [6] work-orders/list: HAS DATA {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.277]   [7] projects: HAS DATA {queryKey: Array(2)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.278]   [8] projects/stats: HAS DATA {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.278]   [9] agreements: HAS DATA {queryKey: Array(4)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.278]   [10] items: HAS DATA {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.278]   [11] follow-ups: HAS DATA {queryKey: Array(1)}
+use-crm-prefetch.ts:8 [CRM-PREFETCH 06:18:10.278]   [12] users: HAS DATA {queryKey: Array(1)}
