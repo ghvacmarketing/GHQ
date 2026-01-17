@@ -1,0 +1,137 @@
+flowchart TD
+    Login([POST /api/portal/auth/login]) --> ValidateInput{Validate<br/>Email & Password}
+    ValidateInput -->|Invalid| Error400[400 Bad Request]
+    ValidateInput -->|Yes| LookupCustomer[Query crm_customers<br/>by Email]
+
+    LookupCustomer --> CustomerExists{Customer<br/>Exists & Active?}
+    CustomerExists -->|No| Error401[401 Unauthorized]
+    CustomerExists -->|Yes| CheckPassword{Has Portal<br/>Password?}
+
+    CheckPassword -->|No| Error401
+    CheckPassword -->|Yes| VerifyPassword[Verify Password<br/>bcrypt hash]
+
+    VerifyPassword --> PasswordMatch{Password<br/>Match?}
+    PasswordMatch -->|No| Error401
+    PasswordMatch -->|Yes| GenerateToken[Generate Session Token<br/>32-byte hex]
+
+    GenerateToken --> SaveSession[Create customer_portal_sessions<br/>24 Hour Expiry]
+    SaveSession --> SetCookie[Set portal_session Cookie]
+    SetCookie --> ReturnCustomer[Return Customer Profile<br/>ID, Name, Email]
+
+    ReturnCustomer --> Success([200 OK])
+    Error400 --> End([Response])
+    Error401 --> End
+    Success --> End
+
+    Register([POST /api/portal/auth/register]) --> ValidateRegInput{Validate<br/>Registration Data}
+    ValidateRegInput -->|Invalid| Error400b[400 Bad Request]
+    ValidateRegInput -->|Valid| LookupExisting[Query crm_customers<br/>by Email]
+
+    LookupExisting --> AlreadyExists{Customer<br/>Exists?}
+    AlreadyExists -->|No| Error404[404 Not Found<br/>Contact us to create account]
+    AlreadyExists -->|Yes| HasPassword{Already Has<br/>Portal Password?}
+
+    HasPassword -->|Yes| Error409[409 Conflict<br/>Already Registered]
+    HasPassword -->|No| HashPassword[Hash Password<br/>bcrypt]
+
+    HashPassword --> UpdateCustomer[Update crm_customers<br/>Set portalPassword]
+    UpdateCustomer --> SendWelcomeEmail[Send Welcome Email<br/>via Resend]
+    SendWelcomeEmail --> Success2([201 Created])
+
+    Dashboard([GET /api/portal/dashboard]) --> ValidateSession{Portal Session<br/>Valid?}
+    ValidateSession -->|No| Error401b[401 Unauthorized]
+    ValidateSession -->|Yes| FetchDashboardData[Fetch Customer Data]
+
+    FetchDashboardData --> GetCustomerInfo[Get Customer Profile<br/>Name, Address, Contact]
+    GetCustomerInfo --> GetProperties[Get Associated Properties]
+    GetProperties --> GetRecentActivity[Get Recent Activity<br/>Work Orders, Invoices]
+
+    GetRecentActivity --> GetAgreements[Get Active Agreements<br/>Maintenance Plans]
+    GetAgreements --> GetUpcoming[Get Upcoming Appointments<br/>Next 30 Days]
+    GetUpcoming --> FormatDashboard[Format Dashboard Object]
+
+    FormatDashboard --> Success3([200 OK])
+
+    ViewInvoices([GET /api/portal/invoices]) --> ValidateSessionInv{Portal Session<br/>Valid?}
+    ValidateSessionInv -->|No| Error401c[401 Unauthorized]
+    ValidateSessionInv -->|Yes| QueryInvoices[Query crm_invoices<br/>WHERE customerID]
+
+    QueryInvoices --> FetchLineItems[Include Invoice Line Items]
+    FetchLineItems --> CalculateTotals[Calculate Totals<br/>& Outstanding Balance]
+    CalculateTotals --> FilterDeleted[Exclude Deleted Invoices]
+    FilterDeleted --> SortByDate[Sort by Date DESC]
+    SortByDate --> Success4([200 OK])
+
+    ViewQuotes([GET /api/portal/quotes]) --> ValidateSessionQuote{Portal Session<br/>Valid?}
+    ValidateSessionQuote -->|No| Error401d[401 Unauthorized]
+    ValidateSessionQuote -->|Yes| QueryQuotes[Query crm_quotes<br/>WHERE customerID]
+
+    QueryQuotes --> FetchQuoteItems[Include Quote Line Items]
+    FetchQuoteItems --> FilterDeletedQuotes[Exclude Deleted Quotes]
+    FilterDeletedQuotes --> SortQuotes[Sort by Date DESC]
+    SortQuotes --> Success5([200 OK])
+
+    ViewAgreements([GET /api/portal/agreements]) --> ValidateSessionAgr{Portal Session<br/>Valid?}
+    ValidateSessionAgr -->|No| Error401e[401 Unauthorized]
+    ValidateSessionAgr -->|Yes| QueryAgreements[Query crm_agreements<br/>WHERE customerID]
+
+    QueryAgreements --> GetAgreementDetails[Include Tasks & Visits<br/>Schedule Information]
+    GetAgreementDetails --> FilterActiveOnly[Filter Active Agreements]
+    FilterActiveOnly --> Success6([200 OK])
+
+    ServiceHistory([GET /api/portal/service-history]) --> ValidateSessionHist{Portal Session<br/>Valid?}
+    ValidateSessionHist -->|No| Error401f[401 Unauthorized]
+    ValidateSessionHist -->|Yes| QueryWorkOrders[Query crm_work_orders<br/>WHERE customerID]
+
+    QueryWorkOrders --> FilterCompleted[Filter Completed<br/>Work Orders]
+    FilterCompleted --> IncludeProperty[Include Property Info]
+    IncludeProperty --> IncludeTech[Include Tech Name]
+    IncludeTech --> SortHistory[Sort by Completion Date DESC]
+    SortHistory --> Success7([200 OK])
+
+    PublicInvoice([GET /api/public/invoices/:token]) --> ValidateToken{Token<br/>Valid?}
+    ValidateToken -->|No| Error404b[404 Not Found]
+    ValidateToken -->|Yes| FetchInvoiceByToken[Query crm_invoices<br/>WHERE publicViewToken]
+
+    FetchInvoiceByToken --> InvoiceFound{Invoice<br/>Found?}
+    InvoiceFound -->|No| Error404b
+    InvoiceFound -->|Yes| CheckDeleted{Invoice<br/>Deleted?}
+
+    CheckDeleted -->|Yes| Error410[410 Gone]
+    CheckDeleted -->|No| GetFullInvoice[Get Invoice with<br/>Line Items & Customer]
+
+    GetFullInvoice --> Success8([200 OK])
+
+    PublicQuote([GET /api/public/quotes/:token]) --> ValidateQuoteToken{Token<br/>Valid?}
+    ValidateQuoteToken -->|No| Error404c[404 Not Found]
+    ValidateQuoteToken -->|Yes| FetchQuoteByToken[Query crm_quotes<br/>WHERE publicViewToken]
+
+    FetchQuoteByToken --> QuoteFound{Quote<br/>Found?}
+    QuoteFound -->|No| Error404c
+    QuoteFound -->|Yes| CheckQuoteDeleted{Quote<br/>Deleted?}
+
+    CheckQuoteDeleted -->|Yes| Error410b[410 Gone]
+    CheckQuoteDeleted -->|No| GetFullQuote[Get Quote with<br/>Line Items & Customer]
+
+    GetFullQuote --> Success9([200 OK])
+
+    Error400b --> End2([Response])
+    Error404 --> End2
+    Error409 --> End2
+    Error401b --> End2
+    Error401c --> End2
+    Error401d --> End2
+    Error401e --> End2
+    Error401f --> End2
+    Error404b --> End2
+    Error410 --> End2
+    Error404c --> End2
+    Error410b --> End2
+    Success2 --> End2
+    Success3 --> End2
+    Success4 --> End2
+    Success5 --> End2
+    Success6 --> End2
+    Success7 --> End2
+    Success8 --> End2
+    Success9 --> End2

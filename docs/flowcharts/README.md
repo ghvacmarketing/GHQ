@@ -2,7 +2,11 @@
 
 This directory contains Mermaid flowcharts documenting the backend architecture and logic flows.
 
-## Files
+## Master Architecture
+
+**00-master-application-architecture.mmd** - Complete application architecture overview showing all systems, integrations, and data flows in one comprehensive diagram
+
+## Detailed Flowcharts
 
 Each flowchart is in a separate `.mmd` file that can be rendered in Mermaid-compatible viewers:
 
@@ -19,6 +23,11 @@ Each flowchart is in a separate `.mmd` file that can be rendered in Mermaid-comp
 11. **11-database-architecture.mmd** - Database entity relationships
 12. **12-external-integrations.mmd** - Third-party API integrations
 13. **13-role-based-access.mmd** - Permission hierarchy and access control
+14. **14-quickbooks-integration.mmd** - QuickBooks OAuth and sync flows (NEW)
+15. **15-customer-portal.mmd** - Customer self-service portal (NEW)
+16. **16-messaging-system.mmd** - SMS/Textline integration and automation (NEW)
+17. **17-mobile-api.mmd** - Mobile tech app endpoints (NEW)
+18. **18-background-services.mmd** - Scheduled jobs and automation (NEW)
 
 ## How to View
 
@@ -53,17 +62,26 @@ mmdc -i 01-main-request-flow.mmd -o main-request-flow.png
 - **Authentication:**
   - Employee Portal: Passport.js with sessions
   - CRM: Token-based with 8-hour sessions
-- **AI:** OpenAI (GPT-3.5-turbo, Whisper)
+  - Customer Portal: Token-based with 24-hour sessions
+  - Mobile: JWT tokens with 30-day expiry
+- **AI:** OpenAI (GPT-3.5-turbo, Whisper, Embeddings)
 - **Email:** Resend
+- **SMS:** Textline integration
 - **Storage:** Google Cloud Storage
+- **Payment Processing:** Stripe
+- **Integrations:** QuickBooks Online, FieldEdge, Bouncie, Google Sheets
 
 ### Key Flows
-- **Authentication:** Dual system for employees and CRM users
+- **Authentication:** Triple system for employees, CRM users, and customers
 - **Customer Management:** CRUD operations with audit logging
-- **Work Order Dispatch:** Full lifecycle from scheduling to completion
+- **Work Order Dispatch:** Full lifecycle from scheduling to completion with mobile support
 - **Quote Generation:** AI-assisted proposal creation
-- **Invoicing:** Creation, sending, and payment tracking
-- **Project Pipeline:** Status-based project management
+- **Invoicing:** Creation, sending, payment tracking, and QuickBooks sync
+- **Project Pipeline:** Status-based project management with activity timeline
+- **Messaging:** Automated SMS notifications and two-way conversations
+- **Customer Portal:** Self-service access to invoices, quotes, and service history
+- **Mobile App:** Tech work order management with GPS tracking and time clock
+- **Background Services:** Automated syncs, renewals, reminders, and review requests
 
 ### Role Hierarchy
 1. **owner** (100) - Full system access
@@ -72,3 +90,24 @@ mmdc -i 01-main-request-flow.mmd -o main-request-flow.png
 4. **sales** (40) - Customer and quote management
 5. **tech** (20) - Assigned work and status updates
 6. **viewer** (10) - Read-only access
+
+### New Features (2024-2026)
+- **QuickBooks Integration:** OAuth-based sync for customers, invoices, and payments
+- **Customer Portal:** Self-service dashboard with invoice/quote viewing
+- **SMS/Textline:** Automated notifications and two-way messaging
+- **Mobile Tech App:** Work order management with GPS tracking and time clock
+- **FieldEdge Sync:** Auto-importing customer data from Google Sheets
+- **Pricebook Management:** Real-time package pricing sync
+- **Service Checklists:** AI-powered summaries of field service calls
+- **Goals & Performance:** Monthly tracking dashboard for sales and tech performance
+- **Bouncie Integration:** Real-time vehicle tracking for fleet management
+- **Review Automation:** Automated Google review requests after job completion
+- **Background Services:** 9+ automated jobs for syncs, renewals, and reminders
+
+### Total API Coverage
+- **468 Total Routes** across all modules
+- **200+ CRM Endpoints** for core business operations
+- **60+ Integration Endpoints** for external services
+- **30+ QuickBooks Endpoints** for accounting sync
+- **10+ Mobile Endpoints** for tech app
+- **8+ Customer Portal Endpoints** for self-service

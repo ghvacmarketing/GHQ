@@ -1,0 +1,229 @@
+flowchart TD
+    ServerStart([Server Startup]) --> InitServices[Initialize Background Services]
+
+    InitServices --> QBSync[QuickBooks Sync Service]
+    InitServices --> FESync[FieldEdge Customer Sync]
+    InitServices --> PBSync[Pricebook Sync Service]
+    InitServices --> AgreementRenew[Agreement Renewal Service]
+    InitServices --> MaintenanceRemind[Maintenance Reminder Service]
+    InitServices --> ReviewReq[Review Request Service]
+    InitServices --> BouncieSync[Bouncie Location Sync]
+    InitServices --> WeatherSync[Weather Update Service]
+    InitServices --> StripeSync[Stripe Product Sync]
+
+    QBSync --> QBSchedule{Schedule:<br/>Every 6 Hours}
+    QBSchedule -->|Trigger| QBRun[Run QuickBooks Sync]
+
+    QBRun --> QBCheckConnection{QuickBooks<br/>Connected?}
+    QBCheckConnection -->|No| QBSkip[Skip Sync]
+    QBCheckConnection -->|Yes| QBRefreshToken{Token<br/>Expired?}
+
+    QBRefreshToken -->|Yes| QBRefresh[Refresh Access Token]
+    QBRefreshToken -->|No| QBProceed[Proceed with Sync]
+    QBRefresh --> QBProceed
+
+    QBProceed --> QBSyncCustomers[Sync Customers to QuickBooks<br/>Create/Update]
+    QBSyncCustomers --> QBSyncInvoices[Sync Unpaid Invoices<br/>to QuickBooks]
+    QBSyncInvoices --> QBSyncPayments[Sync Recent Payments<br/>to QuickBooks]
+    QBSyncPayments --> QBLog[Log Sync Results<br/>Success/Failure Counts]
+    QBLog --> QBComplete[Update Last Sync Time]
+
+    QBSkip --> QBWait[Wait for Next Schedule]
+    QBComplete --> QBWait
+
+    FESync --> FESchedule{Schedule:<br/>Every 5 Minutes}
+    FESchedule -->|Trigger| FERun[Run FieldEdge Sync]
+
+    FERun --> FEFetchSheets[Fetch Google Sheets<br/>Customer Data]
+    FEFetchSheets --> FESuccess{API Call<br/>Success?}
+
+    FESuccess -->|Error| FELogError[Log Error & Skip]
+    FESuccess -->|Success| FECalculateHash[Calculate Data Hash]
+
+    FECalculateHash --> FEDataChanged{Hash<br/>Changed?}
+    FEDataChanged -->|No| FEUpdateCheck[Update Last Check Time]
+    FEDataChanged -->|Yes| FEProcessRows[Process All Rows]
+
+    FEProcessRows --> FECacheUpdate[Update In-Memory Cache<br/>for Fast Search]
+    FECacheUpdate --> FEUpdateTimestamp[Update Last Sync Time]
+    FEUpdateTimestamp --> FEWait[Wait for Next Schedule]
+
+    FELogError --> FEWait
+    FEUpdateCheck --> FEWait
+
+    PBSync --> PBSchedule{Schedule:<br/>Every 1 Minute}
+    PBSchedule -->|Trigger| PBRun[Run Pricebook Sync]
+
+    PBRun --> PBFetchSheets[Fetch Google Sheets<br/>Package Pricing]
+    PBFetchSheets --> PBSuccess{API Call<br/>Success?}
+
+    PBSuccess -->|Error| PBLogError[Log Error & Skip]
+    PBSuccess -->|Success| PBParsePackages[Parse Package Data<br/>All Tonnages & Tiers]
+
+    PBParsePackages --> PBUpsertDB[Upsert to pricebook_packages<br/>Update Prices]
+    PBUpsertDB --> PBUpdateItems[Update Related Line Items<br/>in Active Quotes]
+    PBUpdateItems --> PBLog[Log Sync Results]
+    PBLog --> PBWait[Wait for Next Schedule]
+
+    PBLogError --> PBWait
+
+    AgreementRenew --> ARSchedule{Schedule:<br/>Daily at 2 AM}
+    ARSchedule -->|Trigger| ARRun[Run Agreement Renewal Check]
+
+    ARRun --> ARQueryExpiring[Query Expiring Agreements<br/>expirationDate <= 30 days]
+    ARQueryExpiring --> ARForEach{For Each<br/>Agreement}
+
+    ARForEach -->|Agreement| ARCheckAutoRenew{Auto Renew<br/>Enabled?}
+    ARCheckAutoRenew -->|No| ARSendReminder[Send Renewal Reminder<br/>Email to Customer]
+    ARCheckAutoRenew -->|Yes| ARCheckPayment{Payment Method<br/>on File?}
+
+    ARCheckPayment -->|No| ARSendReminder
+    ARCheckPayment -->|Yes| ARProcessRenewal[Process Auto Renewal<br/>Charge Card via Stripe]
+
+    ARProcessRenewal --> ARPaymentSuccess{Payment<br/>Success?}
+    ARPaymentSuccess -->|No| ARSendFailedEmail[Send Payment Failed Email]
+    ARPaymentSuccess -->|Yes| ARCreateNewAgreement[Create New Agreement<br/>1-Year Extension]
+
+    ARCreateNewAgreement --> ARSendConfirmation[Send Renewal Confirmation<br/>Email with Invoice]
+    ARSendConfirmation --> ARNextAgreement{More<br/>Agreements?}
+    ARSendReminder --> ARNextAgreement
+    ARSendFailedEmail --> ARNextAgreement
+
+    ARNextAgreement -->|Yes| ARForEach
+    ARNextAgreement -->|No| ARLog[Log Renewal Results]
+    ARLog --> ARWait[Wait for Next Schedule]
+
+    MaintenanceRemind --> MRSchedule{Schedule:<br/>Daily at 9 AM}
+    MRSchedule -->|Trigger| MRRun[Run Maintenance Reminder Check]
+
+    MRRun --> MRQueryDue[Query Agreements<br/>with Upcoming Visits]
+    MRQueryDue --> MRForEach{For Each<br/>Visit Due}
+
+    MRForEach -->|Visit| MRCheckNotified{Reminder Sent<br/>< 7 Days?}
+    MRCheckNotified -->|Yes| MRSkip[Skip Reminder]
+    MRCheckNotified -->|No| MRBuildMessage[Build Reminder Message<br/>Visit Type, Date]
+
+    MRBuildMessage --> MRCustomerConsent{Customer<br/>SMS Opt-In?}
+    MRCustomerConsent -->|Yes| MRSendSMS[Send SMS via Textline]
+    MRCustomerConsent -->|No| MRSendEmail[Send Email via Resend]
+
+    MRSendSMS --> MRLogNotification[Log Reminder Sent<br/>Update lastReminderAt]
+    MRSendEmail --> MRLogNotification
+
+    MRLogNotification --> MRNext{More<br/>Visits?}
+    MRSkip --> MRNext
+
+    MRNext -->|Yes| MRForEach
+    MRNext -->|No| MRLog[Log Reminder Results]
+    MRLog --> MRWait[Wait for Next Schedule]
+
+    ReviewReq --> RRSchedule{Schedule:<br/>Daily at 6 PM}
+    RRSchedule -->|Trigger| RRRun[Run Review Request Check]
+
+    RRRun --> RRQueryCompleted[Query Completed Work Orders<br/>completedAt = Yesterday]
+    RRQueryCompleted --> RRForEach{For Each<br/>Work Order}
+
+    RRForEach -->|Work Order| RRCheckPaid{Invoice<br/>Paid?}
+    RRCheckPaid -->|No| RRSkip[Skip Review Request]
+    RRCheckPaid -->|Yes| RRCheckRecent{Review Request<br/>< 90 Days?}
+
+    RRCheckRecent -->|Yes| RRSkip
+    RRCheckRecent -->|No| RRBuildReview[Build Review Request SMS<br/>Google Review Link]
+
+    RRBuildReview --> RRCheckPhone{Customer<br/>Phone Valid?}
+    RRCheckPhone -->|No| RRSkip
+    RRCheckPhone -->|Yes| RRSendSMS[Send SMS via Textline]
+
+    RRSendSMS --> RRSuccess{SMS<br/>Sent?}
+    RRSuccess -->|Error| RRLogError[Log Error]
+    RRSuccess -->|Success| RRLogSent[Log to crm_message_log<br/>Update lastReviewRequestAt]
+
+    RRLogSent --> RRNext{More<br/>Work Orders?}
+    RRLogError --> RRNext
+    RRSkip --> RRNext
+
+    RRNext -->|Yes| RRForEach
+    RRNext -->|No| RRLog[Log Review Request Results]
+    RRLog --> RRWait[Wait for Next Schedule]
+
+    BouncieSync --> BSSchedule{Schedule:<br/>Every 15 Minutes}
+    BSSchedule -->|Trigger| BSRun[Run Bouncie Location Sync]
+
+    BSRun --> BSCheckConnection{Bouncie<br/>Connected?}
+    BSCheckConnection -->|No| BSSkip[Skip Sync]
+    BSCheckConnection -->|Yes| BSRefreshToken{Token<br/>Expired?}
+
+    BSRefreshToken -->|Yes| BSRefresh[Refresh OAuth Token]
+    BSRefreshToken -->|No| BSProceed[Proceed with Sync]
+    BSRefresh --> BSProceed
+
+    BSProceed --> BSFetchVehicles[Fetch Vehicle List<br/>from Bouncie API]
+    BSFetchVehicles --> BSForEach{For Each<br/>Vehicle}
+
+    BSForEach -->|Vehicle| BSGetLocation[Get Current Location<br/>GPS Coordinates]
+    BSGetLocation --> BSSaveLocation[Save to vehicle_locations<br/>Timestamp, Lat/Lng]
+    BSSaveLocation --> BSUpdateTech[Update Tech Location<br/>if Assigned]
+
+    BSUpdateTech --> BSNextVehicle{More<br/>Vehicles?}
+    BSNextVehicle -->|Yes| BSForEach
+    BSNextVehicle -->|No| BSLog[Log Sync Results]
+
+    BSLog --> BSWait[Wait for Next Schedule]
+    BSSkip --> BSWait
+
+    WeatherSync --> WSSchedule{Schedule:<br/>Every 4 Hours}
+    WSSchedule -->|Trigger| WSRun[Run Weather Update]
+
+    WSRun --> WSGetLocations[Get Active Service Areas<br/>Unique Zip Codes]
+    WSGetLocations --> WSForEach{For Each<br/>Location}
+
+    WSForEach -->|Location| WSFetchForecast[Fetch Forecast<br/>from Weather API]
+    WSFetchForecast --> WSSuccess{API Call<br/>Success?}
+
+    WSSuccess -->|Error| WSLogError[Log Error & Skip]
+    WSSuccess -->|Success| WSParseForecast[Parse 7-Day Forecast]
+
+    WSParseForecast --> WSSaveForecast[Save to weather_forecasts<br/>Temperature, Conditions]
+    WSSaveForecast --> WSAnalyzeImpact{Extreme<br/>Weather?}
+
+    WSAnalyzeImpact -->|Yes| WSCreateAlert[Create Weather Alert<br/>Notify Dispatchers]
+    WSAnalyzeImpact -->|No| WSSkipAlert[Skip Alert]
+
+    WSCreateAlert --> WSNext{More<br/>Locations?}
+    WSSkipAlert --> WSNext
+    WSLogError --> WSNext
+
+    WSNext -->|Yes| WSForEach
+    WSNext -->|No| WSLog[Log Weather Update Results]
+    WSLog --> WSWait[Wait for Next Schedule]
+
+    StripeSync --> SSSchedule{Schedule:<br/>On Server Start<br/>+ Manual Trigger}
+    SSSchedule -->|Trigger| SSRun[Run Stripe Product Sync]
+
+    SSRun --> SSFetchProducts[Fetch All Products<br/>from Stripe API]
+    SSFetchProducts --> SSSuccess{API Call<br/>Success?}
+
+    SSSuccess -->|Error| SSLogError[Log Error]
+    SSSuccess -->|Success| SSForEach{For Each<br/>Product}
+
+    SSForEach -->|Product| SSUpsertProduct[Upsert to stripe_products]
+    SSUpsertProduct --> SSFetchPrices[Fetch Prices for Product<br/>from Stripe API]
+    SSFetchPrices --> SSUpsertPrices[Upsert to stripe_prices]
+
+    SSUpsertPrices --> SSNext{More<br/>Products?}
+    SSNext -->|Yes| SSForEach
+    SSNext -->|No| SSLog[Log Sync Results]
+
+    SSLog --> SSComplete[Sync Complete]
+    SSLogError --> SSComplete
+
+    style ServerStart fill:#e1f5ff
+    style QBSync fill:#fff3cd
+    style FESync fill:#fff3cd
+    style PBSync fill:#fff3cd
+    style AgreementRenew fill:#d4edda
+    style MaintenanceRemind fill:#d4edda
+    style ReviewReq fill:#d4edda
+    style BouncieSync fill:#f8d7da
+    style WeatherSync fill:#f8d7da
+    style StripeSync fill:#e2e3e5

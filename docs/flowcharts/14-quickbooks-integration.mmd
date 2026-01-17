@@ -1,0 +1,141 @@
+flowchart TD
+    Connect([GET /api/quickbooks/connect]) --> ValidateAuth{Admin Auth<br/>Valid?}
+    ValidateAuth -->|No| Error401[401 Unauthorized]
+    ValidateAuth -->|Yes| GenerateState[Generate OAuth State<br/>Store in Session]
+
+    GenerateState --> BuildAuthURL[Build QuickBooks<br/>Authorization URL]
+    BuildAuthURL --> Redirect[Redirect to QuickBooks]
+
+    Redirect --> QBAuth[QuickBooks Login<br/>User Authorization]
+    QBAuth --> Callback([GET /api/quickbooks/callback])
+
+    Callback --> ValidateState{State<br/>Valid?}
+    ValidateState -->|No| Error400[400 Bad Request]
+    ValidateState -->|Yes| ExchangeCode[Exchange Code<br/>for Tokens]
+
+    ExchangeCode --> TokenSuccess{Token<br/>Received?}
+    TokenSuccess -->|No| Error500[500 Internal Error]
+    TokenSuccess -->|Yes| GetCompanyInfo[Fetch Company Info<br/>QuickBooks API]
+
+    GetCompanyInfo --> SaveTokens[Save to qb_tokens<br/>Access + Refresh Tokens]
+    SaveTokens --> UpdateConfig[Update qb_config<br/>Realm ID, Company]
+    UpdateConfig --> RedirectSuccess[Redirect to Dashboard<br/>Connection Success]
+
+    RedirectSuccess --> End([Response])
+    Error401 --> End
+    Error400 --> End
+    Error500 --> End
+
+    SyncCustomers([POST /api/quickbooks/sync/customers]) --> ValidateAuthSync{Admin Auth<br/>Valid?}
+    ValidateAuthSync -->|No| Error401b[401 Unauthorized]
+    ValidateAuthSync -->|Yes| CheckConnection{QuickBooks<br/>Connected?}
+
+    CheckConnection -->|No| Error400b[400 Not Connected]
+    CheckConnection -->|Yes| RefreshToken{Token<br/>Expired?}
+
+    RefreshToken -->|Yes| RefreshAccessToken[Use Refresh Token<br/>Get New Access Token]
+    RefreshToken -->|No| UseExistingToken[Use Existing Token]
+
+    RefreshAccessToken --> QueryCRM[Query CRM Customers<br/>Need Sync]
+    UseExistingToken --> QueryCRM
+
+    QueryCRM --> ForEach{For Each<br/>Customer}
+    ForEach -->|Customer| CheckQBID{Has QBCustomerID?}
+
+    CheckQBID -->|Yes| FetchQB[Fetch from QuickBooks<br/>GET Customer API]
+    CheckQBID -->|No| CreateQB[Create in QuickBooks<br/>POST Customer API]
+
+    FetchQB --> QBExists{Customer<br/>Exists?}
+    QBExists -->|No| CreateQB
+    QBExists -->|Yes| CompareData{Data<br/>Changed?}
+
+    CompareData -->|Yes| UpdateQB[Update in QuickBooks<br/>POST Customer Update]
+    CompareData -->|No| SkipSync[Skip Sync]
+
+    CreateQB --> SaveQBID[Save QBCustomerID<br/>to CRM]
+    UpdateQB --> SaveQBID
+
+    SaveQBID --> LogSuccess[Log Sync Success<br/>Update lastQBSync]
+    SkipSync --> LogSuccess
+
+    LogSuccess --> NextCustomer{More<br/>Customers?}
+    NextCustomer -->|Yes| ForEach
+    NextCustomer -->|No| ReturnStats[Return Sync Stats<br/>Created/Updated/Skipped]
+
+    ReturnStats --> Success([200 OK])
+
+    SyncInvoice([POST /api/quickbooks/sync/invoice/:id]) --> ValidateAuthInv{Admin Auth<br/>Valid?}
+    ValidateAuthInv -->|No| Error401c[401 Unauthorized]
+    ValidateAuthInv -->|Yes| FetchInvoice[Fetch CRM Invoice<br/>with Line Items]
+
+    FetchInvoice --> InvoiceExists{Invoice<br/>Exists?}
+    InvoiceExists -->|No| Error404[404 Not Found]
+    InvoiceExists -->|Yes| CheckCustomerQBID{Customer has<br/>QBCustomerID?}
+
+    CheckCustomerQBID -->|No| Error400c[400 Customer Not Synced]
+    CheckCustomerQBID -->|Yes| CheckInvoiceQBID{Invoice has<br/>QBInvoiceID?}
+
+    CheckInvoiceQBID -->|Yes| UpdateQBInvoice[Update QuickBooks Invoice<br/>POST Update API]
+    CheckInvoiceQBID -->|No| MapLineItems[Map CRM Line Items<br/>to QB Items]
+
+    MapLineItems --> ProvisionItems{Items<br/>Exist?}
+    ProvisionItems -->|Missing| CreateQBItems[Create Items in QuickBooks<br/>Service/Product Items]
+    ProvisionItems -->|All Exist| BuildInvoicePayload
+
+    CreateQBItems --> BuildInvoicePayload[Build QB Invoice Payload<br/>Customer, Line Items, Classes]
+    BuildInvoicePayload --> CreateQBInvoice[Create QuickBooks Invoice<br/>POST Invoice API]
+
+    CreateQBInvoice --> QBInvoiceCreated{Invoice<br/>Created?}
+    QBInvoiceCreated -->|Error| Error500b[500 QB API Error]
+    QBInvoiceCreated -->|Success| SaveInvoiceQBID[Save QBInvoiceID<br/>DocNumber to CRM]
+
+    UpdateQBInvoice --> SaveInvoiceQBID
+
+    SaveInvoiceQBID --> UpdateSyncStatus[Update lastQBSync<br/>syncedToQB flag]
+    UpdateSyncStatus --> Success2([200 OK])
+
+    SyncPayment([POST /api/quickbooks/sync/payment/:id]) --> ValidateAuthPay{Admin Auth<br/>Valid?}
+    ValidateAuthPay -->|No| Error401d[401 Unauthorized]
+    ValidateAuthPay -->|Yes| FetchPayment[Fetch CRM Payment<br/>with Invoice]
+
+    FetchPayment --> PaymentExists{Payment<br/>Exists?}
+    PaymentExists -->|No| Error404b[404 Not Found]
+    PaymentExists -->|Yes| CheckInvoiceSync{Invoice Synced<br/>to QB?}
+
+    CheckInvoiceSync -->|No| Error400d[400 Invoice Not Synced]
+    CheckInvoiceSync -->|Yes| CheckPaymentQBID{Payment has<br/>QBPaymentID?}
+
+    CheckPaymentQBID -->|Yes| SkipPaymentSync[Already Synced<br/>Skip]
+    CheckPaymentQBID -->|No| BuildPaymentPayload[Build QB Payment Payload<br/>Amount, Method, Invoice Ref]
+
+    BuildPaymentPayload --> CreateQBPayment[Create QuickBooks Payment<br/>POST Payment API]
+    CreateQBPayment --> QBPaymentCreated{Payment<br/>Created?}
+
+    QBPaymentCreated -->|Error| Error500c[500 QB API Error]
+    QBPaymentCreated -->|Success| SavePaymentQBID[Save QBPaymentID<br/>to CRM Payment]
+
+    SavePaymentQBID --> Success3([200 OK])
+    SkipPaymentSync --> Success3
+
+    Disconnect([POST /api/quickbooks/disconnect]) --> ValidateAuthDisc{Admin Auth<br/>Valid?}
+    ValidateAuthDisc -->|No| Error401e[401 Unauthorized]
+    ValidateAuthDisc -->|Yes| RevokeToken[Revoke QB Tokens<br/>POST Revoke API]
+
+    RevokeToken --> DeleteConfig[Delete qb_config<br/>Delete qb_tokens]
+    DeleteConfig --> Success4([200 OK])
+
+    Error401b --> End2([Response])
+    Error400b --> End2
+    Error401c --> End2
+    Error404 --> End2
+    Error400c --> End2
+    Error500b --> End2
+    Error401d --> End2
+    Error404b --> End2
+    Error400d --> End2
+    Error500c --> End2
+    Error401e --> End2
+    Success --> End2
+    Success2 --> End2
+    Success3 --> End2
+    Success4 --> End2

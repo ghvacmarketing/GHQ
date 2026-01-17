@@ -1,0 +1,189 @@
+flowchart TD
+    MobileLogin([POST /api/mobile/auth/login]) --> ValidateCredentials{Validate<br/>Username & Password}
+    ValidateCredentials -->|Invalid| Error401[401 Unauthorized]
+    ValidateCredentials -->|Yes| LookupUser[Query crmUsers<br/>WHERE username]
+
+    LookupUser --> UserExists{User Exists<br/>& Active?}
+    UserExists -->|No| Error401
+    UserExists -->|Yes| CheckRole{Role =<br/>tech or higher?}
+
+    CheckRole -->|No| Error403[403 Forbidden<br/>Tech Access Only]
+    CheckRole -->|Yes| VerifyPassword[Verify Password Hash]
+
+    VerifyPassword --> PasswordMatch{Password<br/>Match?}
+    PasswordMatch -->|No| Error401
+    PasswordMatch -->|Yes| GenerateToken[Generate Mobile Token<br/>JWT with 30-day expiry]
+
+    GenerateToken --> SaveToken[Save to mobile_sessions<br/>Device ID, FCM Token]
+    SaveToken --> ReturnAuth[Return Token + User Profile]
+    ReturnAuth --> Success([200 OK])
+
+    GetWorkOrders([GET /api/mobile/work-orders]) --> ValidateMobileAuth{Mobile Token<br/>Valid?}
+    ValidateMobileAuth -->|No| Error401b[401 Unauthorized]
+    ValidateMobileAuth -->|Yes| ExtractTechID[Extract Tech ID<br/>from Token]
+
+    ExtractTechID --> QueryAssigned[Query crm_work_orders<br/>WHERE assignedTechID]
+    QueryAssigned --> FilterStatus{Filter by<br/>Status}
+
+    FilterStatus -->|Today| FilterToday[status IN scheduled,<br/>dispatched, en_route, on_site<br/>AND scheduledDate = TODAY]
+    FilterStatus -->|Upcoming| FilterUpcoming[status = scheduled<br/>AND scheduledDate > TODAY]
+    FilterStatus -->|All| FilterAll[All Assigned Work Orders]
+
+    FilterToday --> IncludeCustomer[Include Customer,<br/>Property, Equipment]
+    FilterUpcoming --> IncludeCustomer
+    FilterAll --> IncludeCustomer
+
+    IncludeCustomer --> CalculateDistance[Calculate Distance<br/>from Tech Location]
+    CalculateDistance --> SortOrders[Sort by Scheduled Time<br/>or Distance]
+    SortOrders --> Success2([200 OK])
+
+    GetWorkOrderDetail([GET /api/mobile/work-orders/:id]) --> ValidateMobileAuthDetail{Mobile Token<br/>Valid?}
+    ValidateMobileAuthDetail -->|No| Error401c[401 Unauthorized]
+    ValidateMobileAuthDetail -->|Yes| FetchWorkOrder[Fetch Work Order<br/>with Full Details]
+
+    FetchWorkOrder --> WOExists{Work Order<br/>Exists?}
+    WOExists -->|No| Error404[404 Not Found]
+    WOExists -->|Yes| CheckAssignment{Assigned to<br/>This Tech?}
+
+    CheckAssignment -->|No| Error403b[403 Forbidden]
+    CheckAssignment -->|Yes| GetFullDetails[Get Customer, Property,<br/>Equipment, Checklist]
+
+    GetFullDetails --> GetHistory[Get Service History<br/>for Property]
+    GetHistory --> Success3([200 OK])
+
+    UpdateStatus([PATCH /api/mobile/work-orders/:id/status]) --> ValidateMobileAuthUpdate{Mobile Token<br/>Valid?}
+    ValidateMobileAuthUpdate -->|No| Error401d[401 Unauthorized]
+    ValidateMobileAuthUpdate -->|Yes| FetchWO[Fetch Work Order]
+
+    FetchWO --> WOExistsUpdate{Work Order<br/>Exists?}
+    WOExistsUpdate -->|No| Error404b[404 Not Found]
+    WOExistsUpdate -->|Yes| CheckTechAssignment{Assigned to<br/>This Tech?}
+
+    CheckTechAssignment -->|No| Error403c[403 Forbidden]
+    CheckTechAssignment -->|Yes| ValidateStatusChange{Valid Status<br/>Transition?}
+
+    ValidateStatusChange -->|Invalid| Error400[400 Bad Request]
+    ValidateStatusChange -->|Valid| UpdateStatusField[Update status Field]
+
+    UpdateStatusField --> CaptureLocation{Location<br/>Data Provided?}
+    CaptureLocation -->|Yes| SaveLocation[Save GPS Coordinates<br/>to Work Order]
+    CaptureLocation -->|No| SkipLocation[Skip Location]
+
+    SaveLocation --> SetTimestamps[Set Status Timestamps<br/>dispatchedAt, arrivedAt, etc.]
+    SkipLocation --> SetTimestamps
+
+    SetTimestamps --> TriggerNotification{Trigger<br/>Notification?}
+    TriggerNotification -->|dispatched/en_route| SendCustomerSMS[Send Customer SMS<br/>via Messaging System]
+    TriggerNotification -->|completed| SendCompletionSMS[Send Completion SMS<br/>with Invoice Link]
+    TriggerNotification -->|Other| SkipNotification
+
+    SendCustomerSMS --> AuditLogStatus[Log to crm_audit_log<br/>Action: status_updated_mobile]
+    SendCompletionSMS --> AuditLogStatus
+    SkipNotification --> AuditLogStatus
+
+    AuditLogStatus --> Success4([200 OK])
+
+    SubmitChecklist([POST /api/mobile/work-orders/:id/checklist]) --> ValidateMobileAuthChecklist{Mobile Token<br/>Valid?}
+    ValidateMobileAuthChecklist -->|No| Error401e[401 Unauthorized]
+    ValidateMobileAuthChecklist -->|Yes| FetchWOChecklist[Fetch Work Order]
+
+    FetchWOChecklist --> WOExistsChecklist{Work Order<br/>Exists?}
+    WOExistsChecklist -->|No| Error404c[404 Not Found]
+    WOExistsChecklist -->|Yes| CheckTechChecklist{Assigned to<br/>This Tech?}
+
+    CheckTechChecklist -->|No| Error403d[403 Forbidden]
+    CheckTechChecklist -->|Yes| ValidateChecklist{Validate<br/>Checklist Data}
+
+    ValidateChecklist -->|Invalid| Error400b[400 Bad Request]
+    ValidateChecklist -->|Valid| SaveChecklistResponse[Save to crm_checklist_responses<br/>Field Values, Photos]
+
+    SaveChecklistResponse --> UploadPhotos{Photos<br/>Attached?}
+    UploadPhotos -->|Yes| UploadToStorage[Upload to Google Cloud Storage<br/>Generate URLs]
+    UploadPhotos -->|No| SkipUpload[Skip Upload]
+
+    UploadToStorage --> CallAI{AI Summary<br/>Requested?}
+    SkipUpload --> CallAI
+
+    CallAI -->|Yes| GenerateSummary[Call OpenAI<br/>Summarize Checklist]
+    CallAI -->|No| SkipAI
+
+    GenerateSummary --> SaveSummary[Save AI Summary<br/>to Response]
+    SkipAI --> UpdateCompletion[Mark Checklist Complete]
+    SaveSummary --> UpdateCompletion
+
+    UpdateCompletion --> Success5([200 OK])
+
+    ClockIn([POST /api/mobile/time/clock-in]) --> ValidateMobileAuthTime{Mobile Token<br/>Valid?}
+    ValidateMobileAuthTime -->|No| Error401f[401 Unauthorized]
+    ValidateMobileAuthTime -->|Yes| CheckExisting{Already<br/>Clocked In?}
+
+    CheckExisting -->|Yes| Error409[409 Conflict<br/>Already on Clock]
+    CheckExisting -->|No| CaptureClockInLocation[Capture GPS Location<br/>& Timestamp]
+
+    CaptureClockInLocation --> CreateTimeEntry[Create tech_time_entries<br/>clockInAt, location]
+    CreateTimeEntry --> Success6([200 OK])
+
+    ClockOut([POST /api/mobile/time/clock-out]) --> ValidateMobileAuthClockOut{Mobile Token<br/>Valid?}
+    ValidateMobileAuthClockOut -->|No| Error401g[401 Unauthorized]
+    ValidateMobileAuthClockOut -->|Yes| FindActiveEntry{Active Time<br/>Entry Exists?}
+
+    FindActiveEntry -->|No| Error404d[404 Not Found<br/>Not Clocked In]
+    FindActiveEntry -->|Yes| CaptureClockOutLocation[Capture GPS Location<br/>& Timestamp]
+
+    CaptureClockOutLocation --> UpdateTimeEntry[Update tech_time_entries<br/>clockOutAt, location]
+    UpdateTimeEntry --> CalculateHours[Calculate Total Hours<br/>Worked]
+    CalculateHours --> Success7([200 OK])
+
+    GetPerformance([GET /api/crm/mobile/my-performance]) --> ValidateMobileAuthPerf{Mobile Token<br/>Valid?}
+    ValidateMobileAuthPerf -->|No| Error401h[401 Unauthorized]
+    ValidateMobileAuthPerf -->|Yes| GetTechStats[Query Performance Metrics]
+
+    GetTechStats --> CompletedJobs[Count Completed Jobs<br/>This Month]
+    CompletedJobs --> Revenue[Calculate Revenue Generated<br/>From Invoices]
+    Revenue --> AvgRating[Calculate Average Rating<br/>From Customer Reviews]
+    AvgRating --> OnTimeRate[Calculate On-Time Rate<br/>Scheduled vs Actual]
+    OnTimeRate --> FormatStats[Format Performance Object]
+    FormatStats --> Success8([200 OK])
+
+    GetCustomers([GET /api/mobile/customers]) --> ValidateMobileAuthCust{Mobile Token<br/>Valid?}
+    ValidateMobileAuthCust -->|No| Error401i[401 Unauthorized]
+    ValidateMobileAuthCust -->|Yes| SearchParams{Search<br/>Parameters?}
+
+    SearchParams -->|Query String| SearchCustomers[Search by Name,<br/>Phone, Email, Address]
+    SearchParams -->|No Query| GetRecentCustomers[Get Recent Customers<br/>From Tech's Jobs]
+
+    SearchCustomers --> LimitResults[Limit to 50 Results]
+    GetRecentCustomers --> LimitResults
+
+    LimitResults --> IncludeProperties[Include Property Info<br/>& Equipment]
+    IncludeProperties --> Success9([200 OK])
+
+    Error401 --> End([Response])
+    Error403 --> End
+    Error401b --> End
+    Error401c --> End
+    Error404 --> End
+    Error403b --> End
+    Error401d --> End
+    Error404b --> End
+    Error403c --> End
+    Error400 --> End
+    Error401e --> End
+    Error404c --> End
+    Error403d --> End
+    Error400b --> End
+    Error401f --> End
+    Error409 --> End
+    Error401g --> End
+    Error404d --> End
+    Error401h --> End
+    Error401i --> End
+    Success --> End
+    Success2 --> End
+    Success3 --> End
+    Success4 --> End
+    Success5 --> End
+    Success6 --> End
+    Success7 --> End
+    Success8 --> End
+    Success9 --> End

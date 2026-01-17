@@ -1,0 +1,134 @@
+flowchart TD
+    GetConversations([GET /api/crm/messaging/conversations]) --> ValidateAuth{CRM Auth<br/>Valid?}
+    ValidateAuth -->|No| Error401[401 Unauthorized]
+    ValidateAuth -->|Yes| FetchConversations[Fetch from Textline API<br/>GET /conversations]
+
+    FetchConversations --> TextlineSuccess{API Call<br/>Success?}
+    TextlineSuccess -->|Error| Error500[500 Textline Error]
+    TextlineSuccess -->|Success| ParseConversations[Parse Conversation List]
+
+    ParseConversations --> EnrichData[Enrich with Customer Data<br/>Match Phone Numbers]
+    EnrichData --> LinkCustomers[Link to crm_customers<br/>if Match Found]
+    LinkCustomers --> SortByRecent[Sort by Last Message<br/>DESC]
+    SortByRecent --> Success([200 OK])
+
+    GetMessages([GET /api/crm/messaging/conversations/:id/messages]) --> ValidateAuthMsg{CRM Auth<br/>Valid?}
+    ValidateAuthMsg -->|No| Error401b[401 Unauthorized]
+    ValidateAuthMsg -->|Yes| FetchMessages[Fetch from Textline API<br/>GET /conversations/:id/messages]
+
+    FetchMessages --> MessagesSuccess{API Call<br/>Success?}
+    MessagesSuccess -->|Error| Error500b[500 Textline Error]
+    MessagesSuccess -->|Success| ParseMessages[Parse Message List<br/>Inbound & Outbound]
+
+    ParseMessages --> MarkAsRead[Mark Conversation as Read<br/>if Unread Flag Set]
+    MarkAsRead --> FormatMessages[Format Message Objects<br/>Timestamps, Direction]
+    FormatMessages --> Success2([200 OK])
+
+    SendMessage([POST /api/crm/messaging/conversations/:id/send]) --> ValidateAuthSend{CRM Auth<br/>Sales or Above?}
+    ValidateAuthSend -->|No| Error403[403 Forbidden]
+    ValidateAuthSend -->|Yes| ValidateInput{Validate<br/>Message Content}
+
+    ValidateInput -->|Invalid| Error400[400 Bad Request]
+    ValidateInput -->|Valid| CallTextline[Call Textline API<br/>POST /conversations/:id/messages]
+
+    CallTextline --> SendSuccess{Message<br/>Sent?}
+    SendSuccess -->|Error| Error500c[500 Textline Error]
+    SendSuccess -->|Success| LogOutbound[Log Outbound Message<br/>to crm_message_log]
+
+    LogOutbound --> AuditLog[Log to crm_audit_log<br/>Action: message_sent]
+    AuditLog --> Success3([200 OK])
+
+    InboundWebhook([POST /api/webhooks/textline]) --> ValidateWebhook{Webhook<br/>Signature Valid?}
+    ValidateWebhook -->|No| Error401c[401 Unauthorized]
+    ValidateWebhook -->|Yes| ParsePayload[Parse Textline Payload<br/>Event Type]
+
+    ParsePayload --> EventType{Event<br/>Type?}
+    EventType -->|message.received| ProcessInbound[Process Inbound Message]
+    EventType -->|message.sent| ProcessOutbound[Process Outbound Confirmation]
+    EventType -->|conversation.created| ProcessNewConv[Process New Conversation]
+    EventType -->|Other| IgnoreEvent[Ignore Event]
+
+    ProcessInbound --> ExtractData[Extract Phone, Content<br/>Conversation ID]
+    ExtractData --> LookupCustomer[Lookup crm_customers<br/>by Phone Number]
+
+    LookupCustomer --> CustomerFound{Customer<br/>Found?}
+    CustomerFound -->|Yes| LinkMessage[Link Message to Customer]
+    CustomerFound -->|No| CreateUnlinked[Create Unlinked Message]
+
+    LinkMessage --> SaveMessage[Save to crm_message_log<br/>Direction: inbound]
+    CreateUnlinked --> SaveMessage
+
+    SaveMessage --> CheckAutoResponse{Auto Response<br/>Enabled?}
+    CheckAutoResponse -->|Yes| TriggerAutoReply[Send Auto Reply<br/>via Textline]
+    CheckAutoResponse -->|No| NotifyUser
+
+    TriggerAutoReply --> NotifyUser[Notify CRM Users<br/>Real-time Update]
+    NotifyUser --> WebhookSuccess([200 OK])
+
+    ProcessOutbound --> LogOutboundConfirm[Log Sent Confirmation<br/>Update Message Status]
+    LogOutboundConfirm --> WebhookSuccess
+
+    ProcessNewConv --> CreateConvRecord[Create Conversation Record<br/>if Needed]
+    CreateConvRecord --> WebhookSuccess
+
+    IgnoreEvent --> WebhookSuccess
+
+    WorkOrderSMS([Work Order Status Update]) --> Trigger{Trigger<br/>Event}
+    Trigger -->|Status: dispatched| BuildDispatchSMS[Build Dispatch SMS<br/>Tech Name, ETA]
+    Trigger -->|Status: en_route| BuildEnRouteSMS[Build En Route SMS<br/>Tech Name, Arrival Time]
+    Trigger -->|Status: completed| BuildCompletionSMS[Build Completion SMS<br/>Invoice Link]
+    Trigger -->|Other| SkipSMS[Skip SMS]
+
+    BuildDispatchSMS --> CheckCustomerPhone{Customer<br/>Phone Valid?}
+    BuildEnRouteSMS --> CheckCustomerPhone
+    BuildCompletionSMS --> CheckCustomerPhone
+
+    CheckCustomerPhone -->|No| SkipSMS
+    CheckCustomerPhone -->|Yes| CheckSMSConsent{SMS Opt-In<br/>Confirmed?}
+
+    CheckSMSConsent -->|No| SkipSMS
+    CheckSMSConsent -->|Yes| SendSMS[Send via Textline API<br/>POST /messages]
+
+    SendSMS --> SMSSuccess{SMS<br/>Sent?}
+    SMSSuccess -->|Error| LogError[Log SMS Error]
+    SMSSuccess -->|Success| LogSMSSuccess[Log to crm_message_log<br/>Direction: outbound_auto]
+
+    LogSMSSuccess --> UpdateWO[Update Work Order<br/>lastSMSSentAt]
+    UpdateWO --> Complete([Complete])
+
+    LogError --> Complete
+    SkipSMS --> Complete
+
+    ReviewRequest([Review Request Trigger]) --> CheckEligibility{Work Order<br/>Completed & Paid?}
+    CheckEligibility -->|No| SkipReview[Skip Review Request]
+    CheckEligibility -->|Yes| CheckPreviousRequest{Review Request<br/>Sent < 90 Days?}
+
+    CheckPreviousRequest -->|Yes| SkipReview
+    CheckPreviousRequest -->|No| BuildReviewSMS[Build Review Request SMS<br/>Google Review Link]
+
+    BuildReviewSMS --> CheckReviewPhone{Customer<br/>Phone Valid?}
+    CheckReviewPhone -->|No| SkipReview
+    CheckReviewPhone -->|Yes| SendReviewSMS[Send via Textline API<br/>POST /messages]
+
+    SendReviewSMS --> ReviewSuccess{SMS<br/>Sent?}
+    ReviewSuccess -->|Error| LogReviewError[Log Error]
+    ReviewSuccess -->|Success| LogReviewSent[Log to crm_message_log<br/>messageType: review_request]
+
+    LogReviewSent --> UpdateCustomer[Update Customer<br/>lastReviewRequestAt]
+    UpdateCustomer --> ReviewComplete([Complete])
+
+    LogReviewError --> ReviewComplete
+    SkipReview --> ReviewComplete
+
+    Error401 --> End([Response])
+    Error500 --> End
+    Error401b --> End
+    Error500b --> End
+    Error403 --> End
+    Error400 --> End
+    Error500c --> End
+    Error401c --> End
+    Success --> End
+    Success2 --> End
+    Success3 --> End
+    WebhookSuccess --> End
