@@ -1,0 +1,220 @@
+flowchart TD
+    Start([HTTP Request]) --> Server[Express Server<br/>Port 5000]
+
+    Server --> Middleware{Middleware<br/>Pipeline}
+
+    Middleware --> Compression[Compression]
+    Compression --> Static{Static Files?}
+    Static -->|/assets| Assets[Equipment Images]
+    Static -->|/uploads| Uploads[Activity Attachments]
+    Static -->|No| Session[Session Store<br/>PostgreSQL]
+
+    Assets --> Response([Response])
+    Uploads --> Response
+
+    Session --> Passport[Passport.js Init]
+    Passport --> BodyParser{Body Parser}
+
+    BodyParser -->|Stripe Webhook| RawBody[Raw Body]
+    BodyParser -->|PDF Upload| Skip[Skip Parsing]
+    BodyParser -->|Standard| JSON[JSON Parser<br/>1MB Limit]
+
+    RawBody --> RouteMatch{Route<br/>Matching}
+    Skip --> RouteMatch
+    JSON --> RouteMatch
+
+    RouteMatch -->|/health| Health[Health Check ✓]
+    RouteMatch -->|/api/webhooks/stripe| StripeWebhook[Stripe Webhook Handler]
+    RouteMatch -->|/api/webhooks/textline| TextlineWebhook[Textline Webhook]
+    RouteMatch -->|Auth Routes| AuthRoutes[Authentication]
+    RouteMatch -->|API Routes| APIRoutes[API Endpoints]
+
+    Health --> Response
+    StripeWebhook --> Response
+    TextlineWebhook --> Response
+
+    AuthRoutes --> AuthType{Auth<br/>System}
+
+    AuthType -->|Employee Portal| PortalAuth[Passport Local Strategy<br/>Session-Based]
+    AuthType -->|CRM| CRMAuth[Token-Based Auth<br/>8-Hour Sessions]
+    AuthType -->|Admin API| AdminAuth[Bearer Token<br/>+ API Key]
+
+    PortalAuth --> PortalSession{Session<br/>Valid?}
+    PortalSession -->|No| Auth401[401 Unauthorized]
+    PortalSession -->|Yes| PortalRole{Role<br/>Check}
+    PortalRole -->|Admin| PortalRoutes
+    PortalRole -->|Employee| PortalRoutes
+
+    CRMAuth --> CRMSession{Session<br/>Valid?}
+    CRMSession -->|No| Auth401
+    CRMSession -->|Yes| CRMRole{Role<br/>Hierarchy}
+
+    CRMRole -->|owner: 100| CRMRoutes
+    CRMRole -->|manager: 80| CRMRoutes
+    CRMRole -->|dispatcher: 60| CRMRoutes
+    CRMRole -->|sales: 40| CRMRoutes
+    CRMRole -->|tech: 20| CRMRoutes
+    CRMRole -->|viewer: 10| CRMRoutes
+    CRMRole -->|Insufficient| Auth403[403 Forbidden]
+
+    AdminAuth --> AdminValid{Token/Key<br/>Valid?}
+    AdminValid -->|No| Auth401
+    AdminValid -->|Yes| AdminRoutes
+
+    APIRoutes --> Category{Route<br/>Category}
+
+    Category -->|Customer Portal| PortalRoutes[Customer Portal<br/>8 endpoints]
+    Category -->|Mobile App| MobileRoutes[Mobile Tech App<br/>10+ endpoints]
+    Category -->|CRM Core| CRMRoutes[CRM Modules<br/>200+ endpoints]
+    Category -->|Integrations| IntegrationRoutes[External APIs<br/>60+ endpoints]
+    Category -->|Public| PublicRoutes[Public Access<br/>Invoice/Quote View]
+
+    PortalRoutes --> PortalFeatures{Feature}
+    PortalFeatures -->|Auth| PortalAuthOps[Login/Logout]
+    PortalFeatures -->|Dashboard| PortalDashboard[Customer Dashboard]
+    PortalFeatures -->|Invoices| PortalInvoices[View Invoices]
+    PortalFeatures -->|Quotes| PortalQuotes[View Quotes]
+    PortalFeatures -->|Agreements| PortalAgreements[Maintenance Plans]
+    PortalFeatures -->|History| ServiceHistory[Service History]
+
+    MobileRoutes --> MobileFeatures{Feature}
+    MobileFeatures -->|Work Orders| MobileWO[Tech Work Orders]
+    MobileFeatures -->|Time Tracking| TimeTrack[Clock In/Out]
+    MobileFeatures -->|Messaging| MobileMsg[Tech Messages]
+    MobileFeatures -->|Performance| TechPerf[Performance Stats]
+
+    CRMRoutes --> CRMModules{CRM Module}
+
+    CRMModules -->|Customers| CustomerOps[Customers Module<br/>15+ endpoints]
+    CRMModules -->|Accounts| AccountOps[Commercial Accounts<br/>Multi-site Management]
+    CRMModules -->|Properties| PropertyOps[Property Management<br/>Equipment Tracking]
+    CRMModules -->|Work Orders| WorkOrderOps[Work Order Lifecycle<br/>20+ endpoints]
+    CRMModules -->|Projects| ProjectOps[Project Pipeline<br/>Activities & Timeline]
+    CRMModules -->|Quotes| QuoteOps[AI Quote Generation<br/>20+ endpoints]
+    CRMModules -->|Invoices| InvoiceOps[Invoice Management<br/>15+ endpoints]
+    CRMModules -->|Agreements| AgreementOps[Maintenance Agreements<br/>Tasks & Visits]
+    CRMModules -->|Messaging| MessagingOps[SMS/Textline<br/>12+ endpoints]
+    CRMModules -->|Checklists| ChecklistOps[Service Call Checklists<br/>AI Summaries]
+    CRMModules -->|Goals| GoalsOps[Performance Goals<br/>Tracking Dashboard]
+    CRMModules -->|Follow-ups| FollowUpOps[Follow-up Management]
+    CRMModules -->|Users| UserOps[User & Role Management]
+
+    IntegrationRoutes --> Integration{Integration<br/>Type}
+
+    Integration -->|QuickBooks| QBOps[QuickBooks Online<br/>OAuth + Sync<br/>30+ endpoints]
+    Integration -->|FieldEdge| FEOps[FieldEdge Customers<br/>Google Sheets Sync]
+    Integration -->|Bouncie| BouncieOps[Vehicle Tracking<br/>OAuth + GPS<br/>8 endpoints]
+    Integration -->|Pricebook| PricebookOps[Package Management<br/>Google Sheets Sync]
+    Integration -->|Stripe| StripeOps[Payment Processing<br/>Subscription Billing]
+    Integration -->|Weather| WeatherOps[Weather API<br/>Impact Analysis]
+    Integration -->|Voice| VoiceOps[OpenAI Whisper<br/>Transcription]
+
+    CustomerOps --> DBOps[Database Operations]
+    AccountOps --> DBOps
+    PropertyOps --> DBOps
+    WorkOrderOps --> DBOps
+    ProjectOps --> DBOps
+    QuoteOps --> AIService[OpenAI Service]
+    InvoiceOps --> DBOps
+    AgreementOps --> DBOps
+    MessagingOps --> TextlineService[Textline API]
+    ChecklistOps --> AIService
+    GoalsOps --> DBOps
+    FollowUpOps --> DBOps
+    UserOps --> DBOps
+
+    PortalAuthOps --> DBOps
+    PortalDashboard --> DBOps
+    PortalInvoices --> DBOps
+    PortalQuotes --> DBOps
+    PortalAgreements --> DBOps
+    ServiceHistory --> DBOps
+
+    MobileWO --> DBOps
+    TimeTrack --> DBOps
+    MobileMsg --> DBOps
+    TechPerf --> DBOps
+
+    QBOps --> QBService[QuickBooks Service<br/>OAuth Flow<br/>Customer/Invoice Sync]
+    FEOps --> FEService[FieldEdge Service<br/>5-min Auto Refresh]
+    BouncieOps --> BouncieService[Bouncie Service<br/>OAuth + Location Sync]
+    PricebookOps --> PricebookService[Package Sync Service<br/>1-min Interval]
+    StripeOps --> StripeService[Stripe Service<br/>Webhook Processing]
+    WeatherOps --> WeatherService[Weather API Client]
+    VoiceOps --> AIService
+
+    PublicRoutes --> PublicOps{Public Feature}
+    PublicOps -->|Invoice View| PublicInvoice[View Invoice by Token]
+    PublicOps -->|Quote View| PublicQuote[View Quote by Token]
+
+    PublicInvoice --> DBOps
+    PublicQuote --> DBOps
+
+    AIService --> OpenAI[OpenAI API<br/>GPT-3.5-turbo<br/>Whisper<br/>Embeddings]
+    TextlineService --> Textline[Textline SMS API]
+    QBService --> QuickBooks[QuickBooks Online API]
+    FEService --> GoogleSheets[Google Sheets API]
+    BouncieService --> BouncieAPI[Bouncie API]
+    PricebookService --> GoogleSheets
+    StripeService --> StripeAPI[Stripe API]
+    WeatherService --> WeatherAPI[Weather API]
+
+    DBOps --> DB[(PostgreSQL<br/>Neon<br/>Drizzle ORM)]
+
+    DB --> AuditLog[crm_audit_log<br/>Action Tracking]
+
+    DBOps --> EmailService{Email<br/>Needed?}
+    EmailService -->|Quote Send| ResendEmail[Resend API<br/>Quote Template]
+    EmailService -->|Invoice Send| ResendEmail
+    EmailService -->|No| ResponseData[Format Response Data]
+
+    ResendEmail --> ResponseData
+    OpenAI --> ResponseData
+    Textline --> ResponseData
+    QuickBooks --> ResponseData
+    BouncieAPI --> ResponseData
+    StripeAPI --> ResponseData
+    WeatherAPI --> ResponseData
+    AuditLog --> ResponseData
+
+    ResponseData --> Cache{Cache<br/>Available?}
+    Cache -->|Analytics| CacheHit[30s TTL Cache]
+    Cache -->|No| ResponseFinal
+
+    CacheHit --> ResponseFinal[Return JSON Response]
+    ResponseFinal --> Response
+
+    Auth401 --> Response
+    Auth403 --> Response
+
+    Server -.->|Background| BackgroundJobs[Background Services]
+
+    BackgroundJobs --> BG1[QuickBooks Sync Scheduler]
+    BackgroundJobs --> BG2[FieldEdge 5-min Refresh]
+    BackgroundJobs --> BG3[Pricebook 1-min Sync]
+    BackgroundJobs --> BG4[Agreement Renewals]
+    BackgroundJobs --> BG5[Maintenance Reminders]
+    BackgroundJobs --> BG6[Review Request Automation]
+    BackgroundJobs --> BG7[Bouncie Location Sync]
+    BackgroundJobs --> BG8[Weather Updates]
+    BackgroundJobs --> BG9[Stripe Product Backfill]
+
+    BG1 --> DB
+    BG2 --> DB
+    BG3 --> DB
+    BG4 --> DB
+    BG5 --> DB
+    BG6 --> DB
+    BG7 --> DB
+    BG8 --> DB
+    BG9 --> DB
+
+    style Start fill:#e1f5ff
+    style Response fill:#e1f5ff
+    style Server fill:#fff3cd
+    style DB fill:#d4edda
+    style OpenAI fill:#f8d7da
+    style QuickBooks fill:#f8d7da
+    style StripeAPI fill:#f8d7da
+    style Textline fill:#f8d7da
+    style BackgroundJobs fill:#e2e3e5
