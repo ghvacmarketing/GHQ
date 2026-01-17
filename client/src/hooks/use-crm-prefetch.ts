@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import { queryClient } from "@/lib/queryClient";
 
-// Debug logging helper
-const DEBUG_PREFETCH = true;
+// Debug logging helper - set to false for production
+const DEBUG_PREFETCH = false;
 const log = (...args: unknown[]) => {
   if (DEBUG_PREFETCH) {
     console.log(`[CRM-PREFETCH ${new Date().toISOString().split('T')[1].slice(0, 12)}]`, ...args);

@@ -5939,34 +5939,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/crm/customers/stats - Get customer counts by status (from crmCustomers only)
+  // Uses caching (60s) and optimized single query to reduce database load
   app.get("/api/crm/customers/stats", requireCrmAuth, async (req, res) => {
     try {
-      const [prospectsResult] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(crmCustomers)
-        .where(sql`LOWER(${crmCustomers.customerStatus}) = 'prospect'`);
-      
-      const [customersResult] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(crmCustomers)
-        .where(sql`LOWER(${crmCustomers.customerStatus}) = 'customer'`);
-      
-      const [totalResult] = await db
-        .select({ count: sql<number>`count(*)` })
+      const cacheKey = "crm:customer:stats";
+      const cached = getCachedAnalytics(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
+      // Single optimized query with conditional counting (avoids 4 separate queries)
+      // Using LOWER() to handle mixed-case status values
+      const [result] = await db
+        .select({
+          total: sql<number>`count(*)`,
+          prospects: sql<number>`count(*) FILTER (WHERE LOWER(customer_status) = 'prospect')`,
+          customers: sql<number>`count(*) FILTER (WHERE LOWER(customer_status) = 'customer')`,
+        })
         .from(crmCustomers);
 
-      // Count customers with at least one agreement
+      // Count customers with at least one agreement (separate query since it needs JOIN)
       const [withAgreementsResult] = await db
         .select({ count: sql<number>`count(DISTINCT ${crmCustomers.id})` })
         .from(crmCustomers)
         .innerJoin(crmAgreements, eq(crmAgreements.customerId, crmCustomers.id));
 
-      return res.json({
-        prospects: Number(prospectsResult?.count || 0),
-        customers: Number(customersResult?.count || 0),
-        total: Number(totalResult?.count || 0),
+      const stats = {
+        prospects: Number(result?.prospects || 0),
+        customers: Number(result?.customers || 0),
+        total: Number(result?.total || 0),
         withAgreements: Number(withAgreementsResult?.count || 0),
-      });
+      };
+
+      setCachedAnalytics(cacheKey, stats);
+      return res.json(stats);
     } catch (error) {
       console.error("Error fetching customer stats:", error);
       return res.status(500).json({ message: "Failed to fetch stats" });
@@ -17570,49 +17576,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/crm/prospects/metrics - Get prospect funnel metrics
+  // Uses caching (30s) and optimized queries to reduce database load
   app.get("/api/crm/prospects/metrics", requireCrmAuth, async (req, res) => {
     try {
-      const allProspects = await db.select()
+      const cacheKey = "crm:prospect:metrics";
+      const cached = getCachedAnalytics(cacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
+      // Optimized: Get counts and sum in a single query
+      const [statsResult] = await db
+        .select({
+          totalActive: sql<number>`count(*) FILTER (WHERE sales_stage IS NOT NULL AND sales_stage NOT IN ('won', 'lost'))`,
+          wonCount: sql<number>`count(*) FILTER (WHERE sales_stage = 'won')`,
+          lostCount: sql<number>`count(*) FILTER (WHERE sales_stage = 'lost')`,
+          newCount: sql<number>`count(*) FILTER (WHERE sales_stage = 'new')`,
+          contactedCount: sql<number>`count(*) FILTER (WHERE sales_stage = 'contacted')`,
+          quoteSentCount: sql<number>`count(*) FILTER (WHERE sales_stage = 'quote_sent')`,
+          negotiatingCount: sql<number>`count(*) FILTER (WHERE sales_stage = 'negotiating')`,
+          pipelineValue: sql<number>`COALESCE(SUM(potential_value) FILTER (WHERE sales_stage IS NOT NULL AND sales_stage NOT IN ('won', 'lost')), 0)`,
+        })
         .from(crmCustomers)
         .where(sql`${crmCustomers.salesStage} IS NOT NULL`);
       
-      const activeProspects = allProspects.filter(p => 
-        p.salesStage !== 'won' && p.salesStage !== 'lost'
-      );
-      const wonProspects = allProspects.filter(p => p.salesStage === 'won');
-      const lostProspects = allProspects.filter(p => p.salesStage === 'lost');
-      
       // Get pending follow-ups count
-      const pendingFollowUps = await db.select({ count: sql<number>`count(*)` })
+      const [pendingFollowUps] = await db.select({ count: sql<number>`count(*)` })
         .from(crmFollowUps)
-        .where(sql`${crmFollowUps.completedAt} IS NULL`);
+        .where(isNull(crmFollowUps.completedAt));
       
       // Calculate conversion rate
-      const totalClosed = wonProspects.length + lostProspects.length;
-      const conversionRate = totalClosed > 0 
-        ? (wonProspects.length / totalClosed) * 100 
-        : 0;
+      const wonCount = Number(statsResult?.wonCount || 0);
+      const lostCount = Number(statsResult?.lostCount || 0);
+      const totalClosed = wonCount + lostCount;
+      const conversionRate = totalClosed > 0 ? (wonCount / totalClosed) * 100 : 0;
       
-      // Calculate pipeline value (sum of potentialValue for active prospects)
-      const pipelineValue = activeProspects.reduce((sum, p) => sum + (p.potentialValue || 0), 0);
-      
-      // Build funnel counts
-      const funnelCounts = {
-        new: activeProspects.filter(p => p.salesStage === 'new').length,
-        contacted: activeProspects.filter(p => p.salesStage === 'contacted').length,
-        quote_sent: activeProspects.filter(p => p.salesStage === 'quote_sent').length,
-        negotiating: activeProspects.filter(p => p.salesStage === 'negotiating').length,
-        won: wonProspects.length,
-        lost: lostProspects.length,
+      const metrics = {
+        activeProspects: Number(statsResult?.totalActive || 0),
+        pendingActions: Number(pendingFollowUps?.count || 0),
+        conversionRate: conversionRate.toFixed(1),
+        pipelineValue: Number(statsResult?.pipelineValue || 0),
+        funnelCounts: {
+          new: Number(statsResult?.newCount || 0),
+          contacted: Number(statsResult?.contactedCount || 0),
+          quote_sent: Number(statsResult?.quoteSentCount || 0),
+          negotiating: Number(statsResult?.negotiatingCount || 0),
+          won: wonCount,
+          lost: lostCount,
+        },
       };
       
-      return res.json({
-        activeProspects: activeProspects.length,
-        pendingActions: Number(pendingFollowUps[0]?.count || 0),
-        conversionRate: conversionRate.toFixed(1),
-        pipelineValue,
-        funnelCounts,
-      });
+      setCachedAnalytics(cacheKey, metrics);
+      return res.json(metrics);
     } catch (error) {
       console.error("Error fetching prospect metrics:", error);
       return res.status(500).json({ message: "Failed to fetch prospect metrics" });
