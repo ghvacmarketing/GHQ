@@ -134,6 +134,7 @@ export default function CrmCustomers() {
       return res.json();
     },
     enabled: !!currentUser,
+    staleTime: 2 * 60 * 1000,
   });
 
   const { data: statsData } = useQuery<{ prospects: number; customers: number; total: number; withAgreements: number }>({

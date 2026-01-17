@@ -723,6 +723,7 @@ export default function CrmProspectFunnel() {
       return res.json();
     },
     enabled: !!currentUser,
+    staleTime: 2 * 60 * 1000,
     refetchInterval: 30000,
   });
 

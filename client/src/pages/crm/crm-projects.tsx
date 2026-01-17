@@ -644,6 +644,7 @@ export default function CrmProjects() {
       return res.json();
     },
     enabled: !!currentUser,
+    staleTime: 2 * 60 * 1000,
   });
 
   const { data: allProjectsData, isLoading: allProjectsLoading } = useQuery<ProjectsResponse>({

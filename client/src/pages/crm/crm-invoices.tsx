@@ -162,6 +162,7 @@ export default function CrmInvoices() {
       return res.json();
     },
     enabled: !!currentUser,
+    staleTime: 2 * 60 * 1000,
   });
 
   const invoicesData = invoicesResponse?.invoices;

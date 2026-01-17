@@ -205,6 +205,7 @@ export default function CrmQuotes() {
       return res.json();
     },
     enabled: !!currentUser,
+    staleTime: 2 * 60 * 1000,
   });
 
   // Customer search query

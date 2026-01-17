@@ -77,23 +77,11 @@ export function useCrmPrefetch(isAuthenticated: boolean) {
 
   useEffect(() => {
     if (!isAuthenticated || hasPrefetched.current) return;
+    hasPrefetched.current = true;
 
-    const runPrefetch = () => {
-      hasPrefetched.current = true;
-      
-      // Stagger the prefetch calls to avoid overwhelming the server
-      CRM_PREFETCH_ENDPOINTS.forEach((endpoint, index) => {
-        setTimeout(() => {
-          prefetchEndpoint(endpoint.queryKey, endpoint.url);
-        }, index * 150); // 150ms delay between each prefetch
-      });
-    };
-
-    // Use requestIdleCallback if available, otherwise setTimeout
-    if ("requestIdleCallback" in window) {
-      (window as any).requestIdleCallback(runPrefetch, { timeout: 3000 });
-    } else {
-      setTimeout(runPrefetch, 1000);
-    }
+    // Run all prefetches immediately in parallel for instant page loads
+    CRM_PREFETCH_ENDPOINTS.forEach((endpoint) => {
+      prefetchEndpoint(endpoint.queryKey, endpoint.url);
+    });
   }, [isAuthenticated]);
 }
