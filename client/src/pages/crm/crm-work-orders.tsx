@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 
 // Debug logging for cache hits
-const DEBUG_CACHE = true;
+const DEBUG_CACHE = false;
 const logCache = (...args: unknown[]) => {
   if (DEBUG_CACHE) {
     console.log(`[WORKORDERS-PAGE ${new Date().toISOString().split('T')[1].slice(0, 12)}]`, ...args);
@@ -689,7 +689,7 @@ export default function CrmWorkOrders() {
       return data;
     },
     enabled: !!currentUser,
-    staleTime: 2 * 60 * 1000, // Cache for 2 minutes for better performance
+    staleTime: 10 * 60 * 1000, // 10 min - show cached data instantly, refresh in background when stale
     refetchInterval: 60000, // Refresh every 60 seconds to catch sync updates
     refetchIntervalInBackground: true, // Keep syncing even when tab is not focused
   });

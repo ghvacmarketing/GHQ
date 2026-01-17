@@ -5,7 +5,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 
 // Debug logging for cache hits
-const DEBUG_CACHE = true;
+const DEBUG_CACHE = false;
 const logCache = (...args: unknown[]) => {
   if (DEBUG_CACHE) {
     console.log(`[INVOICES-PAGE ${new Date().toISOString().split('T')[1].slice(0, 12)}]`, ...args);
@@ -197,7 +197,7 @@ export default function CrmInvoices() {
       return data;
     },
     enabled: !!currentUser,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 10 * 60 * 1000, // 10 min - show cached data instantly, refresh in background when stale
   });
 
   const invoicesData = invoicesResponse?.invoices;

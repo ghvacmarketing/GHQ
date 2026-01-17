@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn, queryClient as globalQueryClient } from "@/lib/queryClient";
 
 // Debug logging for cache hits
-const DEBUG_CACHE = true;
+const DEBUG_CACHE = false;
 const logCache = (...args: unknown[]) => {
   if (DEBUG_CACHE) {
     console.log(`[CUSTOMERS-PAGE ${new Date().toISOString().split('T')[1].slice(0, 12)}]`, ...args);
@@ -170,7 +170,7 @@ export default function CrmCustomers() {
       return data;
     },
     enabled: !!currentUser,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 10 * 60 * 1000, // 10 min - show cached data instantly, refresh in background when stale
   });
 
   const { data: statsData } = useQuery<{ prospects: number; customers: number; total: number; withAgreements: number }>({
@@ -181,6 +181,7 @@ export default function CrmCustomers() {
       return res.json();
     },
     enabled: !!currentUser,
+    staleTime: 10 * 60 * 1000,
   });
 
   // Background prefetch next page of customers for instant pagination

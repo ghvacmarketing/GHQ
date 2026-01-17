@@ -205,7 +205,7 @@ export default function CrmQuotes() {
       return res.json();
     },
     enabled: !!currentUser,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 10 * 60 * 1000, // 10 min - show cached data instantly, refresh in background when stale
   });
 
   // Customer search query

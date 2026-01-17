@@ -644,7 +644,7 @@ export default function CrmProjects() {
       return res.json();
     },
     enabled: !!currentUser,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 10 * 60 * 1000, // 10 min - show cached data instantly, refresh in background when stale
   });
 
   const { data: allProjectsData, isLoading: allProjectsLoading } = useQuery<ProjectsResponse>({
@@ -667,6 +667,7 @@ export default function CrmProjects() {
     statusFunnel: Record<string, number>;
   }>({
     queryKey: ["/api/crm/projects/stats"],
+    staleTime: 10 * 60 * 1000, // 10 min - show cached data instantly
   });
 
   const calendarQueryParams = useMemo(() => {
