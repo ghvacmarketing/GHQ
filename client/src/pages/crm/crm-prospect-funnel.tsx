@@ -452,12 +452,12 @@ function DraggableFollowUp({ followUp, onClick, calendarItemStyle, isCompleted }
       {...listeners}
       onClick={handleClick}
       style={style}
-      className={`w-full text-left text-xs p-1 rounded truncate cursor-grab active:cursor-grabbing hover:opacity-80 touch-manipulation ${calendarItemStyle}`}
+      className={`w-full min-w-0 max-w-full text-left text-xs p-1 rounded cursor-grab active:cursor-grabbing hover:opacity-80 touch-manipulation overflow-hidden ${calendarItemStyle}`}
       data-testid={`calendar-followup-${followUp.id}`}
     >
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 min-w-0">
         <FollowUpTypeIcon type={followUp.followUpType as FollowUpType} />
-        <span className={`truncate ${isCompleted ? 'line-through' : ''}`}>{followUp.prospect?.name || "Unknown"}</span>
+        <span className={`truncate min-w-0 ${isCompleted ? 'line-through' : ''}`}>{followUp.prospect?.name || "Unknown"}</span>
       </div>
       {followUp.notes && (
         <div className="truncate text-[10px] opacity-75">{followUp.notes}</div>
@@ -492,6 +492,35 @@ function DroppableCalendarDay({ day, calendarMonth, children }: DroppableCalenda
       data-testid={`calendar-day-${dateStr}`}
     >
       {children}
+    </div>
+  );
+}
+
+interface DroppableTimeSlotProps {
+  day: Date;
+  hour: number;
+  children: ReactNode;
+  isTodayDate: boolean;
+}
+
+function DroppableTimeSlot({ day, hour, children, isTodayDate }: DroppableTimeSlotProps) {
+  const dateStr = format(day, "yyyy-MM-dd");
+  const slotId = `calendar-slot-${dateStr}-${hour.toString().padStart(2, '0')}`;
+  const { setNodeRef, isOver } = useDroppable({
+    id: slotId,
+  });
+
+  return (
+    <div 
+      ref={setNodeRef}
+      className={`bg-white p-1 min-h-[50px] border-t border-gray-100 overflow-hidden ${
+        isTodayDate ? 'bg-amber-50/30' : ''
+      } ${isOver ? 'bg-blue-50 ring-2 ring-blue-400 ring-inset' : ''}`}
+      data-testid={slotId}
+    >
+      <div className="space-y-0.5 w-full overflow-hidden">
+        {children}
+      </div>
     </div>
   );
 }
@@ -1199,21 +1228,32 @@ export default function CrmProspectFunnel() {
     if (!over) return;
 
     const followUpId = active.id as string;
-    const targetDateStr = over.id as string;
+    const targetId = over.id as string;
 
-    if (!targetDateStr.startsWith("calendar-day-")) return;
-
-    const targetDate = parseISO(targetDateStr.replace("calendar-day-", ""));
     const followUp = followUps.find((f) => f.id === followUpId);
-
     if (!followUp) return;
 
     const originalDate = typeof followUp.dueAt === "string" ? parseISO(followUp.dueAt) : followUp.dueAt;
 
-    if (isSameDay(originalDate, targetDate)) return;
+    let targetDate: Date;
+    let targetHour: number | null = null;
 
-    const hours = originalDate.getHours();
-    const minutes = originalDate.getMinutes();
+    if (targetId.startsWith("calendar-slot-")) {
+      const parts = targetId.replace("calendar-slot-", "").split("-");
+      const dateStr = `${parts[0]}-${parts[1]}-${parts[2]}`;
+      targetHour = parseInt(parts[3], 10);
+      targetDate = parseISO(dateStr);
+    } else if (targetId.startsWith("calendar-day-")) {
+      targetDate = parseISO(targetId.replace("calendar-day-", ""));
+    } else {
+      return;
+    }
+
+    const hours = targetHour !== null ? targetHour : originalDate.getHours();
+    const minutes = targetHour !== null ? 0 : originalDate.getMinutes();
+
+    if (isSameDay(originalDate, targetDate) && originalDate.getHours() === hours) return;
+
     const newDate = new Date(targetDate);
     newDate.setHours(hours, minutes, 0, 0);
 
@@ -2151,12 +2191,12 @@ export default function CrmProspectFunnel() {
 
                     return (
                       <div className="border rounded-lg overflow-hidden bg-white">
-                        <div className={`grid gap-px bg-gray-200`} style={{ gridTemplateColumns: `60px repeat(${viewDays.length}, 1fr)` }}>
+                        <div className={`grid gap-px bg-gray-200`} style={{ gridTemplateColumns: `60px repeat(${viewDays.length}, minmax(0, 1fr))` }}>
                           <div className="bg-gray-100 p-2 text-xs font-medium text-gray-600"></div>
                           {viewDays.map((day, idx) => (
                             <div 
                               key={idx} 
-                              className={`bg-gray-100 p-2 text-center text-xs font-medium ${isToday(day) ? 'text-amber-600 bg-amber-50' : 'text-gray-600'}`}
+                              className={`bg-gray-100 p-2 text-center text-xs font-medium min-w-0 ${isToday(day) ? 'text-amber-600 bg-amber-50' : 'text-gray-600'}`}
                             >
                               <div>{format(day, "EEE")}</div>
                               <div className={`text-lg ${isToday(day) ? 'font-bold' : ''}`}>{format(day, "d")}</div>
@@ -2168,9 +2208,9 @@ export default function CrmProspectFunnel() {
                             <div 
                               key={hour} 
                               className={`grid gap-px bg-gray-200`} 
-                              style={{ gridTemplateColumns: `60px repeat(${viewDays.length}, 1fr)` }}
+                              style={{ gridTemplateColumns: `60px repeat(${viewDays.length}, minmax(0, 1fr))` }}
                             >
-                              <div className="bg-white p-1 text-xs text-gray-500 text-right pr-2 min-h-[50px]">
+                              <div className="bg-white p-1 text-xs text-gray-500 text-right pr-2 min-h-[50px] flex-shrink-0">
                                 {format(setHours(new Date(), hour), "h a")}
                               </div>
                               {viewDays.map((day, dayIdx) => {
@@ -2182,9 +2222,11 @@ export default function CrmProspectFunnel() {
                                 const isTodayDate = isToday(day);
 
                                 return (
-                                  <div 
-                                    key={dayIdx} 
-                                    className={`bg-white p-1 min-h-[50px] border-t border-gray-100 ${isTodayDate ? 'bg-amber-50/30' : ''}`}
+                                  <DroppableTimeSlot
+                                    key={dayIdx}
+                                    day={day}
+                                    hour={hour}
+                                    isTodayDate={isTodayDate}
                                   >
                                     {hourFollowUps.map((followUp) => {
                                       const followUpDate = typeof followUp.dueAt === "string" ? parseISO(followUp.dueAt) : followUp.dueAt;
@@ -2214,7 +2256,7 @@ export default function CrmProspectFunnel() {
                                         />
                                       );
                                     })}
-                                  </div>
+                                  </DroppableTimeSlot>
                                 );
                               })}
                             </div>
