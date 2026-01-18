@@ -892,17 +892,41 @@ export default function CrmProspectFunnel() {
       const res = await apiRequest("PATCH", `/api/crm/follow-ups/${id}`, data);
       return res.json();
     },
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/follow-ups"] });
+      const previousFollowUps = queryClient.getQueryData<CrmFollowUp[]>(["/api/crm/follow-ups"]);
+      if (previousFollowUps) {
+        queryClient.setQueryData<CrmFollowUp[]>(["/api/crm/follow-ups"], (old) =>
+          old?.map((f) =>
+            f.id === id
+              ? {
+                  ...f,
+                  ...(data.dueAt && { dueAt: new Date(data.dueAt) }),
+                  ...(data.followUpType && { followUpType: data.followUpType }),
+                  ...(data.notes !== undefined && { notes: data.notes }),
+                }
+              : f
+          )
+        );
+      }
+      return { previousFollowUps };
+    },
+    onError: (error: Error, _variables, context) => {
+      if (context?.previousFollowUps) {
+        queryClient.setQueryData(["/api/crm/follow-ups"], context.previousFollowUps);
+      }
+      toast({ title: "Failed to update follow-up", description: error.message, variant: "destructive" });
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/follow-ups"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
       setEditingFollowUpId(null);
       setEditFollowUpType("call");
       setEditFollowUpDueDate("");
       setEditFollowUpNotes("");
       toast({ title: "Follow-up updated" });
     },
-    onError: (error: Error) => {
-      toast({ title: "Failed to update follow-up", description: error.message, variant: "destructive" });
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/follow-ups"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
     },
   });
 
