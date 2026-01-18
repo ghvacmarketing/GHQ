@@ -2203,7 +2203,7 @@ export default function CrmProspectFunnel() {
                   )}
 
                   {(calendarView === "week" || calendarView === "3day" || calendarView === "day") && (() => {
-                    const timeSlots = Array.from({ length: 11 }, (_, i) => i + 8);
+                    const timeSlots = Array.from({ length: 24 }, (_, i) => i);
                     const viewDays = calendarView === "week"
                       ? eachDayOfInterval({
                           start: startOfWeek(calendarMonth, { weekStartsOn: 0 }),
