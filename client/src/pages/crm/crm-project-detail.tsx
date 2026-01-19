@@ -300,7 +300,6 @@ export default function CrmProjectDetail() {
   const [equipmentHasChanges, setEquipmentHasChanges] = useState(false);
 
   // Admin Tasks state
-  const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDescription, setNewTaskDescription] = useState("");
   const [newTaskAssignee, setNewTaskAssignee] = useState<string | null>(null);
@@ -454,7 +453,6 @@ export default function CrmProjectDetail() {
     onSuccess: () => {
       toast({ title: "Task added" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "tasks"] });
-      setShowAddTaskDialog(false);
       setNewTaskTitle("");
       setNewTaskDescription("");
       setNewTaskAssignee(null);
@@ -1434,88 +1432,147 @@ export default function CrmProjectDetail() {
 
             {/* Admin Tasks Section */}
             <Card data-testid="card-admin-tasks">
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <ListTodo className="h-5 w-5 text-[#711419]" />
                   Admin Tasks
                 </CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowAddTaskDialog(true)}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Task
-                </Button>
               </CardHeader>
               <CardContent>
-                {tasksLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
+                <div className="space-y-2">
+                  {/* Tasks table header */}
+                  <div className="grid grid-cols-12 gap-2 text-sm font-medium text-muted-foreground border-b pb-2">
+                    <div className="col-span-1"></div>
+                    <div className="col-span-4">Task</div>
+                    <div className="col-span-3">Assigned To</div>
+                    <div className="col-span-3">Due Date</div>
+                    <div className="col-span-1">Actions</div>
                   </div>
-                ) : !projectTasks || projectTasks.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    No tasks yet. Add a task to get started.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {projectTasks.map((task) => (
-                      <div
-                        key={task.id}
-                        className={cn(
-                          "flex items-start gap-3 p-3 rounded-lg border",
-                          task.completedAt ? "bg-muted/50" : "bg-white"
-                        )}
-                      >
-                        <Checkbox
-                          checked={!!task.completedAt}
-                          onCheckedChange={(checked) => {
-                            updateTaskMutation.mutate({
-                              id: task.id,
-                              completedAt: checked ? new Date().toISOString() : null,
-                            });
-                          }}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className={cn(
-                            "font-medium text-sm",
-                            task.completedAt && "line-through text-muted-foreground"
-                          )}>
-                            {task.title}
-                          </p>
-                          {task.description && (
-                            <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                              {task.description}
+
+                  {/* Tasks loading state */}
+                  {tasksLoading ? (
+                    <div className="space-y-2">
+                      <Skeleton className="h-10 w-full" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                  ) : (
+                    <>
+                      {/* Empty state */}
+                      {(!projectTasks || projectTasks.length === 0) && (
+                        <p className="text-sm text-muted-foreground italic py-4 text-center">No tasks added yet</p>
+                      )}
+
+                      {/* Tasks list */}
+                      {projectTasks?.map((task) => (
+                        <div key={task.id} className="grid grid-cols-12 gap-2 items-center py-2 border-b border-slate-100">
+                          <div className="col-span-1">
+                            <Checkbox
+                              checked={!!task.completedAt}
+                              onCheckedChange={(checked) => {
+                                updateTaskMutation.mutate({
+                                  id: task.id,
+                                  completedAt: checked ? new Date().toISOString() : null,
+                                });
+                              }}
+                            />
+                          </div>
+                          <div className="col-span-4">
+                            <p className={cn(
+                              "text-sm",
+                              task.completedAt && "line-through text-muted-foreground"
+                            )}>
+                              {task.title}
                             </p>
-                          )}
-                          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                            {task.assignedUserName && (
-                              <span className="flex items-center gap-1">
-                                <User className="h-3 w-3" />
-                                {task.assignedUserName}
-                              </span>
-                            )}
-                            {task.dueDate && (
-                              <span className="flex items-center gap-1">
-                                <CalendarIcon className="h-3 w-3" />
-                                {format(new Date(task.dueDate), "MMM d")}
-                              </span>
+                            {task.description && (
+                              <p className="text-xs text-muted-foreground truncate">{task.description}</p>
                             )}
                           </div>
+                          <div className="col-span-3 text-sm text-muted-foreground">
+                            {task.assignedUserName || "—"}
+                          </div>
+                          <div className="col-span-3 text-sm text-muted-foreground">
+                            {task.dueDate ? format(new Date(task.dueDate), "MMM d, yyyy") : "—"}
+                          </div>
+                          <div className="col-span-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:text-destructive"
+                              onClick={() => deleteTaskMutation.mutate(task.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                          onClick={() => deleteTaskMutation.mutate(task.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                      ))}
+                    </>
+                  )}
+
+                  {/* Add new task row */}
+                  <div className="grid grid-cols-12 gap-2 items-center pt-3 border-t mt-2">
+                    <div className="col-span-1"></div>
+                    <div className="col-span-4">
+                      <Input
+                        value={newTaskTitle}
+                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                        placeholder="New task..."
+                        data-testid="input-new-task-title"
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <Select value={newTaskAssignee || "unassigned"} onValueChange={(v) => setNewTaskAssignee(v === "unassigned" ? null : v)}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Assign to..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          {users?.map((user) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-3">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="w-full h-9 justify-start text-left font-normal">
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {newTaskDueDate ? format(newTaskDueDate, "MMM d") : "Due date..."}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <CalendarPicker
+                            mode="single"
+                            selected={newTaskDueDate}
+                            onSelect={setNewTaskDueDate}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="col-span-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          createTaskMutation.mutate({
+                            title: newTaskTitle,
+                            description: newTaskDescription || undefined,
+                            assignedUserId: newTaskAssignee,
+                            dueDate: newTaskDueDate?.toISOString(),
+                          });
+                        }}
+                        disabled={!newTaskTitle.trim() || createTaskMutation.isPending}
+                        className="h-8 w-8 p-0"
+                        data-testid="button-add-task"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
 
@@ -2653,86 +2710,6 @@ export default function CrmProjectDetail() {
           </DialogContent>
         </Dialog>
 
-        {/* Add Task Dialog */}
-        <Dialog open={showAddTaskDialog} onOpenChange={setShowAddTaskDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Task</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Task Title *</Label>
-                <Input
-                  value={newTaskTitle}
-                  onChange={(e) => setNewTaskTitle(e.target.value)}
-                  placeholder="Enter task title..."
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Textarea
-                  value={newTaskDescription}
-                  onChange={(e) => setNewTaskDescription(e.target.value)}
-                  placeholder="Optional description..."
-                  rows={2}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Assign To</Label>
-                <Select value={newTaskAssignee || "unassigned"} onValueChange={(v) => setNewTaskAssignee(v === "unassigned" ? null : v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select user..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {users?.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Due Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left font-normal">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {newTaskDueDate ? format(newTaskDueDate, "PPP") : "Select date..."}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <CalendarPicker
-                      mode="single"
-                      selected={newTaskDueDate}
-                      onSelect={setNewTaskDueDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowAddTaskDialog(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  createTaskMutation.mutate({
-                    title: newTaskTitle,
-                    description: newTaskDescription || undefined,
-                    assignedUserId: newTaskAssignee,
-                    dueDate: newTaskDueDate?.toISOString(),
-                  });
-                }}
-                disabled={!newTaskTitle.trim() || createTaskMutation.isPending}
-              >
-                {createTaskMutation.isPending ? "Adding..." : "Add Task"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
     </CrmLayout>
   );
