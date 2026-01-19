@@ -84,12 +84,19 @@ import {
   Activity,
   List,
   GripVertical,
+  ListTodo,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, addDays, isBefore, isAfter, startOfDay } from "date-fns";
-import type { CrmUser, CrmProject, CrmProperty } from "@shared/schema";
+import type { CrmUser, CrmProject, CrmProperty, CrmProjectTask } from "@shared/schema";
 import { cn } from "@/lib/utils";
+
+type CalendarTask = CrmProjectTask & {
+  projectTitle: string | null;
+  customerName: string | null;
+  assignedUserName: string | null;
+};
 
 type ProjectWithDetails = CrmProject & {
   customerName: string | null;
@@ -495,6 +502,43 @@ function formatCurrency(value: number | string | null | undefined): string {
   return `$${num.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
+function DraggableTask({
+  task,
+  onClick,
+}: {
+  task: CalendarTask;
+  onClick: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `task-${task.id}`,
+  });
+  
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+  } : {};
+
+  return (
+    <button
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      onClick={(e) => {
+        if (!isDragging) onClick();
+      }}
+      className={cn(
+        "flex items-center gap-1 text-[9px] leading-tight py-0.5 px-1.5 rounded cursor-grab active:cursor-grabbing w-full",
+        task.completedAt ? "bg-gray-100 text-gray-400 line-through" : "bg-indigo-100 text-indigo-700",
+        isDragging && "opacity-50 z-50"
+      )}
+      style={style}
+      title={`${task.title} - ${task.projectTitle || "No project"}`}
+    >
+      <ListTodo className="w-3 h-3 flex-shrink-0" />
+      <span className="truncate">{task.title}</span>
+    </button>
+  );
+}
+
 function DraggableProject({ 
   project, 
   lane, 
@@ -589,6 +633,7 @@ export default function CrmProjects() {
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   
   const [activeDragProject, setActiveDragProject] = useState<ProjectWithDetails | null>(null);
+  const [activeDragTask, setActiveDragTask] = useState<CalendarTask | null>(null);
   const [isDraggingCard, setIsDraggingCard] = useState(false);
   const [activeKanbanProjectId, setActiveKanbanProjectId] = useState<string | null>(null);
   
@@ -685,6 +730,11 @@ export default function CrmProjects() {
       if (!res.ok) throw new Error("Failed to fetch calendar projects");
       return res.json();
     },
+    enabled: !!currentUser && mainViewTab === "calendar",
+  });
+
+  const { data: calendarTasksData } = useQuery<CalendarTask[]>({
+    queryKey: ["/api/crm/project-tasks"],
     enabled: !!currentUser && mainViewTab === "calendar",
   });
 
@@ -789,28 +839,63 @@ export default function CrmProjects() {
     },
   });
 
+  const updateTaskDueDateMutation = useMutation({
+    mutationFn: async ({ taskId, dueDate }: { taskId: string; dueDate: string }) => {
+      const res = await apiRequest("PATCH", `/api/crm/project-tasks/${taskId}`, { dueDate });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/project-tasks"] });
+      toast({ title: "Task rescheduled" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to reschedule task", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleCalendarDragStart = (event: DragStartEvent) => {
-    const projectId = event.active.id as string;
-    const allProjects = calendarProjectsData?.projects || [];
-    const project = allProjects.find(p => p.id === projectId);
-    setActiveDragProject(project || null);
+    const activeId = event.active.id as string;
+    
+    if (activeId.startsWith("task-")) {
+      const taskId = activeId.replace("task-", "");
+      const task = calendarTasksData?.find(t => t.id === taskId);
+      if (task) setActiveDragTask(task);
+    } else {
+      const allProjects = calendarProjectsData?.projects || [];
+      const project = allProjects.find(p => p.id === activeId);
+      if (project) setActiveDragProject(project);
+    }
   };
 
   const handleCalendarDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+    
     setActiveDragProject(null);
+    setActiveDragTask(null);
     
     if (!over || !active) return;
     
-    const projectId = active.id as string;
-    const newDateStr = over.id as string;
+    const activeId = active.id as string;
+    const overId = over.id as string;
+    
+    if (activeId.startsWith("task-")) {
+      const taskId = activeId.replace("task-", "");
+      const newDate = new Date(overId);
+      if (!isNaN(newDate.getTime())) {
+        updateTaskDueDateMutation.mutate({
+          taskId,
+          dueDate: newDate.toISOString(),
+        });
+      }
+      return;
+    }
     
     const allProjects = calendarProjectsData?.projects || [];
-    const project = allProjects.find(p => p.id === projectId);
+    const project = allProjects.find(p => p.id === activeId);
     if (!project || !project.startDate) return;
     
     const oldStartDate = startOfDay(new Date(project.startDate));
-    const newDate = startOfDay(new Date(newDateStr));
+    const newDate = startOfDay(new Date(overId));
     
     const daysDiff = Math.round((newDate.getTime() - oldStartDate.getTime()) / (1000 * 60 * 60 * 24));
     if (daysDiff === 0) return;
@@ -820,7 +905,7 @@ export default function CrmProjects() {
     const newEndDate = addDays(oldEndDate, daysDiff);
     
     updateProjectDatesMutation.mutate({
-      projectId,
+      projectId: activeId,
       startDate: format(newStartDate, "yyyy-MM-dd"),
       endDate: format(newEndDate, "yyyy-MM-dd"),
     });
@@ -1523,10 +1608,11 @@ export default function CrmProjects() {
                                   }
                                   
                                   return (
-                                    <div
+                                    <button
                                       key={project.id}
+                                      onClick={() => navigate(`/crm/projects/${project.id}`)}
                                       className={cn(
-                                        "absolute left-0 right-0 h-10 cursor-default",
+                                        "absolute left-0 right-0 h-10 cursor-pointer text-left text-[10px] leading-tight py-1 px-1.5 overflow-hidden hover:opacity-90 transition-opacity",
                                         colors.bg, colors.text,
                                         activeDragProject?.id === project.id && "opacity-30",
                                         isSingleDayProject && "rounded mx-0.5",
@@ -1535,11 +1621,43 @@ export default function CrmProjects() {
                                         !isSingleDayProject && showRoundedLeft && showRoundedRight && "rounded mx-0.5"
                                       )}
                                       style={{ top: `${lane * 44}px` }}
-                                      title={`${project.customerName || "Customer"} - ${project.title}`}
-                                    />
+                                      title={`${project.customerName || "Customer"} - ${project.title} (click to view)`}
+                                    >
+                                      {isStartOfWeekDay && (
+                                        <>
+                                          <div className="font-medium truncate">{project.customerName || "Customer"}</div>
+                                          <div className="truncate opacity-90">{project.title}</div>
+                                        </>
+                                      )}
+                                    </button>
                                   );
                                 })}
                               </div>
+                              {/* Tasks due on this day */}
+                              {(() => {
+                                const dayTasks = calendarTasksData?.filter(task => {
+                                  if (!task.dueDate) return false;
+                                  const taskDate = startOfDay(new Date(task.dueDate));
+                                  return isSameDay(taskDate, dayStart);
+                                }) || [];
+                                
+                                return dayTasks.length > 0 && (
+                                  <div className="mt-1 space-y-0.5 px-0.5">
+                                    {dayTasks.slice(0, 2).map(task => (
+                                      <DraggableTask
+                                        key={task.id}
+                                        task={task}
+                                        onClick={() => navigate(`/crm/projects/${task.projectId}`)}
+                                      />
+                                    ))}
+                                    {dayTasks.length > 2 && (
+                                      <div className="text-[9px] text-muted-foreground pl-1">
+                                        +{dayTasks.length - 2} more tasks
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                               {dayProjects.length > 3 && (
                                 <div className="text-xs text-muted-foreground px-1 absolute bottom-0.5">+{dayProjects.length - 3} more</div>
                               )}
@@ -1563,6 +1681,12 @@ export default function CrmProjects() {
                       {activeDragProject.expectedValue && (
                         <div className="font-medium">{formatCurrency(activeDragProject.expectedValue)}</div>
                       )}
+                    </div>
+                  )}
+                  {activeDragTask && (
+                    <div className="flex items-center gap-1 text-[9px] py-0.5 px-1.5 rounded bg-indigo-100 text-indigo-700 shadow-lg opacity-90">
+                      <ListTodo className="w-3 h-3" />
+                      <span>{activeDragTask.title}</span>
                     </div>
                   )}
                 </DragOverlay>

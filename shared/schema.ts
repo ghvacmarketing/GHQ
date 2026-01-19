@@ -1063,6 +1063,33 @@ export const crmProjects = pgTable("crm_projects", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// CRM Project Tasks (admin task list for project management)
+export const crmProjectTasks = pgTable("crm_project_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => crmProjects.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  assignedUserId: varchar("assigned_user_id").references(() => crmUsers.id, { onDelete: "set null" }),
+  dueDate: timestamp("due_date"),
+  completedAt: timestamp("completed_at"),
+  sortOrder: integer("sort_order").default(0),
+  createdBy: varchar("created_by").references(() => crmUsers.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  projectIdIdx: index("crm_project_tasks_project_id_idx").on(table.projectId),
+  assignedUserIdIdx: index("crm_project_tasks_assigned_user_id_idx").on(table.assignedUserId),
+  dueDateIdx: index("crm_project_tasks_due_date_idx").on(table.dueDate),
+}));
+
+export const insertCrmProjectTaskSchema = createInsertSchema(crmProjectTasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmProjectTask = z.infer<typeof insertCrmProjectTaskSchema>;
+export type CrmProjectTask = typeof crmProjectTasks.$inferSelect;
+
 // CRM Work Orders (standalone scheduled visits - can optionally link to projects)
 // Work Order Visit Types (appointment purpose)
 export const workOrderVisitTypeEnum = ["SERVICE", "INSTALL", "MAINTENANCE", "SALES"] as const;

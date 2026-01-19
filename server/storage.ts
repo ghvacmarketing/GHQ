@@ -1,4 +1,4 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type CallLogTask, type InsertCallLogTask, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, type CrmItem, type InsertCrmItem, type CrmMessagingConversation, type InsertCrmMessagingConversation, type CrmMessagingMessage, type InsertCrmMessagingMessage, type CrmMessagingConversationTag, type InsertCrmMessagingConversationTag, type CrmTimeEntry, type InsertCrmTimeEntry, type SmsNotificationLog, type InsertSmsNotificationLog, type SmsNotificationType, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, callLogTasks, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems, crmItems, crmMessagingConversations, crmMessagingMessages, crmMessagingConversationTags, crmCustomers, crmTimeEntries, smsNotificationLog, crmUsers } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type CallLogTask, type InsertCallLogTask, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, type CrmItem, type InsertCrmItem, type CrmMessagingConversation, type InsertCrmMessagingConversation, type CrmMessagingMessage, type InsertCrmMessagingMessage, type CrmMessagingConversationTag, type InsertCrmMessagingConversationTag, type CrmTimeEntry, type InsertCrmTimeEntry, type SmsNotificationLog, type InsertSmsNotificationLog, type SmsNotificationType, type CrmProjectTask, type InsertCrmProjectTask, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, callLogTasks, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems, crmItems, crmMessagingConversations, crmMessagingMessages, crmMessagingConversationTags, crmCustomers, crmTimeEntries, smsNotificationLog, crmUsers, crmProjectTasks } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, or, and, ilike, sql, notInArray, desc, gte, lte, asc, isNull } from "drizzle-orm";
@@ -274,6 +274,13 @@ export interface IStorage {
   createSmsNotificationLog(data: InsertSmsNotificationLog): Promise<SmsNotificationLog>;
   getSmsNotificationByReference(notificationType: SmsNotificationType, referenceId: string, referenceType: 'maintenance_visit' | 'work_order' | 'invoice'): Promise<SmsNotificationLog | undefined>;
   updateSmsNotificationLog(id: string, data: Partial<InsertSmsNotificationLog>): Promise<SmsNotificationLog | undefined>;
+
+  // CRM Project Task operations
+  getProjectTasks(projectId: string): Promise<CrmProjectTask[]>;
+  getProjectTask(id: string): Promise<CrmProjectTask | undefined>;
+  createProjectTask(data: InsertCrmProjectTask): Promise<CrmProjectTask>;
+  updateProjectTask(id: string, data: Partial<InsertCrmProjectTask>): Promise<CrmProjectTask | undefined>;
+  deleteProjectTask(id: string): Promise<boolean>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -2268,6 +2275,42 @@ export class DatabaseStorage implements IStorage {
       .where(eq(smsNotificationLog.id, id))
       .returning();
     return updated || undefined;
+  }
+
+  // CRM Project Task operations
+  async getProjectTasks(projectId: string): Promise<CrmProjectTask[]> {
+    return await db
+      .select()
+      .from(crmProjectTasks)
+      .where(eq(crmProjectTasks.projectId, projectId))
+      .orderBy(asc(crmProjectTasks.sortOrder), asc(crmProjectTasks.createdAt));
+  }
+
+  async getProjectTask(id: string): Promise<CrmProjectTask | undefined> {
+    const [task] = await db.select().from(crmProjectTasks).where(eq(crmProjectTasks.id, id));
+    return task || undefined;
+  }
+
+  async createProjectTask(data: InsertCrmProjectTask): Promise<CrmProjectTask> {
+    const [task] = await db
+      .insert(crmProjectTasks)
+      .values(data as typeof crmProjectTasks.$inferInsert)
+      .returning();
+    return task;
+  }
+
+  async updateProjectTask(id: string, data: Partial<InsertCrmProjectTask>): Promise<CrmProjectTask | undefined> {
+    const [task] = await db
+      .update(crmProjectTasks)
+      .set({ ...data, updatedAt: new Date() } as Partial<typeof crmProjectTasks.$inferInsert>)
+      .where(eq(crmProjectTasks.id, id))
+      .returning();
+    return task || undefined;
+  }
+
+  async deleteProjectTask(id: string): Promise<boolean> {
+    const result = await db.delete(crmProjectTasks).where(eq(crmProjectTasks.id, id));
+    return (result.rowCount || 0) > 0;
   }
 
   // Initialize default data if needed

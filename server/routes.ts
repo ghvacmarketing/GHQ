@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
@@ -13225,6 +13225,196 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting project:", error);
       return res.status(500).json({ message: "Failed to delete project" });
+    }
+  });
+
+  // ============================================
+  // PROJECT TASKS CRUD ENDPOINTS
+  // ============================================
+
+  // GET /api/crm/project-tasks - Get all project tasks (for calendar view)
+  app.get("/api/crm/project-tasks", requireCrmAuth, async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      
+      let whereClause;
+      if (startDate && endDate) {
+        whereClause = and(
+          gte(crmProjectTasks.dueDate, new Date(startDate as string)),
+          lte(crmProjectTasks.dueDate, new Date(endDate as string))
+        );
+      } else {
+        whereClause = isNotNull(crmProjectTasks.dueDate);
+      }
+      
+      const results = await db.select({
+        task: crmProjectTasks,
+        projectTitle: crmProjects.title,
+        customerName: crmCustomers.displayName,
+        assignedUserName: crmUsers.displayName,
+      })
+      .from(crmProjectTasks)
+      .leftJoin(crmProjects, eq(crmProjectTasks.projectId, crmProjects.id))
+      .leftJoin(crmCustomers, eq(crmProjects.customerId, crmCustomers.id))
+      .leftJoin(crmUsers, eq(crmProjectTasks.assignedUserId, crmUsers.id))
+      .where(whereClause)
+      .orderBy(crmProjectTasks.dueDate);
+      
+      const tasks = results.map(r => ({
+        ...r.task,
+        projectTitle: r.projectTitle,
+        customerName: r.customerName,
+        assignedUserName: r.assignedUserName,
+      }));
+      
+      res.json(tasks);
+    } catch (error) {
+      console.error("Error fetching project tasks:", error);
+      res.status(500).json({ message: "Failed to fetch project tasks" });
+    }
+  });
+
+  // GET /api/crm/projects/:projectId/tasks - List tasks for a project with assigned user name
+  app.get("/api/crm/projects/:projectId/tasks", requireCrmAuth, async (req, res) => {
+    try {
+      const { projectId } = req.params;
+
+      const tasks = await db
+        .select({
+          id: crmProjectTasks.id,
+          projectId: crmProjectTasks.projectId,
+          title: crmProjectTasks.title,
+          description: crmProjectTasks.description,
+          assignedUserId: crmProjectTasks.assignedUserId,
+          dueDate: crmProjectTasks.dueDate,
+          completedAt: crmProjectTasks.completedAt,
+          sortOrder: crmProjectTasks.sortOrder,
+          createdBy: crmProjectTasks.createdBy,
+          createdAt: crmProjectTasks.createdAt,
+          updatedAt: crmProjectTasks.updatedAt,
+          assignedUserName: crmUsers.name,
+        })
+        .from(crmProjectTasks)
+        .leftJoin(crmUsers, eq(crmProjectTasks.assignedUserId, crmUsers.id))
+        .where(eq(crmProjectTasks.projectId, projectId))
+        .orderBy(asc(crmProjectTasks.sortOrder), asc(crmProjectTasks.createdAt));
+
+      return res.json(tasks);
+    } catch (error) {
+      console.error("Error fetching project tasks:", error);
+      return res.status(500).json({ message: "Failed to fetch project tasks" });
+    }
+  });
+
+  // POST /api/crm/projects/:projectId/tasks - Create a new task for a project
+  app.post("/api/crm/projects/:projectId/tasks", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { projectId } = req.params;
+
+      const [project] = await db.select().from(crmProjects).where(eq(crmProjects.id, projectId));
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const taskData = {
+        ...req.body,
+        projectId,
+        createdBy: user.id,
+      };
+
+      const result = insertCrmProjectTaskSchema.safeParse(taskData);
+      if (!result.success) {
+        return res.status(400).json({ message: "Invalid task data", errors: result.error.issues });
+      }
+
+      const task = await storage.createProjectTask(result.data);
+
+      await logCrmAudit(
+        user.id,
+        "project_task.created",
+        "project_task",
+        task.id,
+        { projectId, title: task.title },
+        req.ip
+      );
+
+      return res.status(201).json(task);
+    } catch (error) {
+      console.error("Error creating project task:", error);
+      return res.status(500).json({ message: "Failed to create project task" });
+    }
+  });
+
+  // PATCH /api/crm/project-tasks/:id - Update a task
+  app.patch("/api/crm/project-tasks/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { id } = req.params;
+
+      const existing = await storage.getProjectTask(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+
+      const updated = await storage.updateProjectTask(id, req.body);
+
+      await logCrmAudit(
+        user.id,
+        "project_task.updated",
+        "project_task",
+        id,
+        { changes: req.body },
+        req.ip
+      );
+
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error updating project task:", error);
+      return res.status(500).json({ message: "Failed to update project task" });
+    }
+  });
+
+  // DELETE /api/crm/project-tasks/:id - Delete a task
+  app.delete("/api/crm/project-tasks/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { id } = req.params;
+
+      const existing = await storage.getProjectTask(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+
+      const deleted = await storage.deleteProjectTask(id);
+
+      if (deleted) {
+        await logCrmAudit(
+          user.id,
+          "project_task.deleted",
+          "project_task",
+          id,
+          { projectId: existing.projectId, title: existing.title },
+          req.ip
+        );
+      }
+
+      return res.json({ message: "Task deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting project task:", error);
+      return res.status(500).json({ message: "Failed to delete project task" });
     }
   });
 
