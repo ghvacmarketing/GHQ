@@ -1560,7 +1560,7 @@ export default function CrmProjectDetail() {
                           createTaskMutation.mutate({
                             title: newTaskTitle,
                             description: newTaskDescription || undefined,
-                            assignedUserId: newTaskAssignee,
+                            assignedUserId: newTaskAssignee || undefined,
                             dueDate: newTaskDueDate?.toISOString(),
                           });
                         }}
