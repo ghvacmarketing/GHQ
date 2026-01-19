@@ -2679,12 +2679,12 @@ export default function CrmProjectDetail() {
               </div>
               <div className="space-y-2">
                 <Label>Assign To</Label>
-                <Select value={newTaskAssignee || ""} onValueChange={(v) => setNewTaskAssignee(v || null)}>
+                <Select value={newTaskAssignee || "unassigned"} onValueChange={(v) => setNewTaskAssignee(v === "unassigned" ? null : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select user..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
                     {users?.map((user) => (
                       <SelectItem key={user.id} value={user.id}>
                         {user.name}
