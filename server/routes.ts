@@ -13488,9 +13488,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "No valid items found in CSV. Make sure there is a 'Name' or 'Item' column." });
       }
 
-      // Delete existing catalog items and insert new ones
-      await db.delete(materialsCatalog);
-      await db.insert(materialsCatalog).values(items);
+      // Delete existing catalog items and insert new ones (transactional)
+      await db.transaction(async (tx) => {
+        await tx.delete(materialsCatalog);
+        await tx.insert(materialsCatalog).values(items);
+      });
 
       return res.json({ message: `Successfully imported ${items.length} items`, count: items.length });
     } catch (error) {
@@ -13556,15 +13558,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { projectId } = req.params;
       const body = req.body;
 
+      // Validate required fields
+      if (!body.date) {
+        return res.status(400).json({ message: "Date is required" });
+      }
+      if (!body.contractor || !body.contractor.trim()) {
+        return res.status(400).json({ message: "Contractor is required" });
+      }
+      if (body.amount === undefined || body.amount === null || isNaN(parseFloat(body.amount))) {
+        return res.status(400).json({ message: "Amount is required and must be a number" });
+      }
+
       const [entry] = await db.insert(projectLaborEntries).values({
         projectId,
         date: body.date,
-        contractor: body.contractor,
+        contractor: body.contractor.trim(),
         description: body.description || null,
         laborType: body.laborType || null,
         hours: body.hours?.toString() || null,
         hourlyRate: body.hourlyRate?.toString() || null,
-        amount: body.amount.toString(),
+        amount: parseFloat(body.amount).toString(),
         createdBy: user?.id || null,
       }).returning();
 
