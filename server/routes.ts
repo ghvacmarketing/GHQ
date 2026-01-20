@@ -13251,7 +13251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         task: crmProjectTasks,
         projectTitle: crmProjects.title,
         customerName: crmCustomers.displayName,
-        assignedUserName: crmUsers.displayName,
+        assignedUserName: crmUsers.name,
       })
       .from(crmProjectTasks)
       .leftJoin(crmProjects, eq(crmProjectTasks.projectId, crmProjects.id))
