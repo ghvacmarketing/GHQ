@@ -26,6 +26,12 @@ Preferred communication style: Simple, everyday language.
     -   **Dispatch Board**: Focuses on Work Orders.
 -   **Quotes and Invoices System**: Integrated CRM quotes attached to Work Orders or Projects with status workflows (draft → sent → accepted/declined/expired). CRM Invoices tied to Work Orders with status workflows (draft → sent → paid/void). **Install Quote Financing**: Deposit-required quotes (custom_install, proposal, custom_service) display dual payment options: Stripe deposit payment or financing application. Financing link is configurable in CRM Settings > Payment Settings with default GreenSky integration.
 -   **Project Timeline**: Aggregates all project activities (notes, photos, files, status changes, financial updates) chronologically.
+-   **Job Costing System**: Track project profitability with live calculations:
+    -   **Materials Catalog**: CSV-uploadable catalog of duct materials and equipment in Settings. Upload replaces entire catalog transactionally.
+    -   **Equipment & Materials**: Enhanced project section with unit cost, vendor, date tracking. "Add from Catalog" multi-select for quick item addition. Auto-calculates total materials cost.
+    -   **Labor Entries**: Track labor costs per project (date, contractor, description, type, amount). Full CRUD in Job Costing tab.
+    -   **Profitability Dashboard**: Live summary showing Revenue, Labor Cost, Materials/COGS, Gross Profit, Overhead (configurable %), Sales Commission (configurable %), and Net Profit. Green/red coloring for positive/negative values.
+    -   **Settings**: Overhead % and Commission % configurable in CRM Settings > Materials Catalog page (default 30% and 6%).
 -   **Customer Database**: FieldEdge CSV import, Google Sheets two-way sync, customer lookup integration.
 -   **Processes and Systems Module**: Searchable, voice-guided wiki with Tiptap editor, PDF export, and backward compatibility.
 -   **Maintenance Agreements System**: Flexible billing frequencies (weekly, monthly, annual), configurable visits, regional reminders, auto-creation from paid invoices, and **payment-based lifecycle**. Statuses: pending (awaiting first payment), active (fully operational), grace_period (renewal invoice sent, 30-day window), expired (grace period passed), cancelled. Billing preferences: auto_invoice (automatic renewal invoicing), pay_on_visit (technician collects on site). Key behaviors:
