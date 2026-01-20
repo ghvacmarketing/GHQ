@@ -2688,24 +2688,36 @@ export default function CrmProjectDetail() {
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setScheduleWODialogOpen(false);
-                  resetWOForm();
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => createWorkOrderMutation.mutate()}
-                disabled={!scheduledDate || !woTitle.trim() || !woDescription.trim() || !areRequiredQuestionsAnswered() || createWorkOrderMutation.isPending}
-                className="bg-[#711419] hover:bg-[#5a1014]"
-                data-testid="button-submit-wo"
-              >
-                {createWorkOrderMutation.isPending ? "Scheduling..." : "Schedule Work Order"}
-              </Button>
+            <DialogFooter className="flex-col gap-2">
+              {(!scheduledDate || !woTitle.trim() || !woDescription.trim() || !areRequiredQuestionsAnswered()) && (
+                <p className="text-xs text-amber-600 w-full text-left">
+                  Missing: {[
+                    !scheduledDate && "date",
+                    !woTitle.trim() && "title",
+                    !woDescription.trim() && "description",
+                    !areRequiredQuestionsAnswered() && "required checklist questions"
+                  ].filter(Boolean).join(", ")}
+                </p>
+              )}
+              <div className="flex gap-2 w-full justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setScheduleWODialogOpen(false);
+                    resetWOForm();
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => createWorkOrderMutation.mutate()}
+                  disabled={!scheduledDate || !woTitle.trim() || !woDescription.trim() || !areRequiredQuestionsAnswered() || createWorkOrderMutation.isPending}
+                  className="bg-[#711419] hover:bg-[#5a1014]"
+                  data-testid="button-submit-wo"
+                >
+                  {createWorkOrderMutation.isPending ? "Scheduling..." : "Schedule Work Order"}
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>
