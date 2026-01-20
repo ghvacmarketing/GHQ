@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
@@ -13415,6 +13415,262 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting project task:", error);
       return res.status(500).json({ message: "Failed to delete project task" });
+    }
+  });
+
+  // ============================================
+  // MATERIALS CATALOG ENDPOINTS
+  // ============================================
+
+  // GET /api/crm/materials-catalog - List all catalog items
+  app.get("/api/crm/materials-catalog", requireCrmAuth, async (req, res) => {
+    try {
+      const items = await db.select().from(materialsCatalog).orderBy(asc(materialsCatalog.name));
+      return res.json(items);
+    } catch (error) {
+      console.error("Error fetching materials catalog:", error);
+      return res.status(500).json({ message: "Failed to fetch materials catalog" });
+    }
+  });
+
+  // POST /api/crm/materials-catalog - Add a single item
+  app.post("/api/crm/materials-catalog", requireCrmAuth, async (req, res) => {
+    try {
+      const validated = insertMaterialsCatalogSchema.parse(req.body);
+      const [item] = await db.insert(materialsCatalog).values({
+        ...validated,
+        unitCost: validated.unitCost.toString(),
+      }).returning();
+      return res.json(item);
+    } catch (error) {
+      console.error("Error adding catalog item:", error);
+      return res.status(500).json({ message: "Failed to add catalog item" });
+    }
+  });
+
+  // POST /api/crm/materials-catalog/upload-csv - Upload CSV to replace catalog
+  app.post("/api/crm/materials-catalog/upload-csv", requireCrmAuth, upload.single("file"), async (req, res) => {
+    try {
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      // Parse CSV using xlsx
+      const workbook = xlsx.read(file.buffer, { type: "buffer" });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const data = xlsx.utils.sheet_to_json<Record<string, any>>(sheet);
+
+      if (data.length === 0) {
+        return res.status(400).json({ message: "CSV file is empty" });
+      }
+
+      // Map CSV rows to catalog items
+      const items: InsertMaterialsCatalog[] = data.map((row) => {
+        // Try to find the cost column (various possible names)
+        const cost = row["Unit Cost"] || row["unit_cost"] || row["Cost"] || row["cost"] || row["Price"] || row["price"] || 0;
+        const parsedCost = typeof cost === "string" ? parseFloat(cost.replace(/[$,]/g, "")) : cost;
+
+        return {
+          name: row["Name"] || row["name"] || row["Item"] || row["item"] || row["Description"] || "",
+          description: row["Description"] || row["description"] || row["Desc"] || null,
+          category: row["Category"] || row["category"] || row["Type"] || row["type"] || null,
+          partNumber: row["Part Number"] || row["part_number"] || row["PartNumber"] || row["SKU"] || row["sku"] || null,
+          unitCost: (isNaN(parsedCost) ? 0 : parsedCost).toString(),
+          unit: row["Unit"] || row["unit"] || "each",
+          vendor: row["Vendor"] || row["vendor"] || row["Supplier"] || row["supplier"] || null,
+          isActive: true,
+        };
+      }).filter(item => item.name); // Filter out items without names
+
+      if (items.length === 0) {
+        return res.status(400).json({ message: "No valid items found in CSV. Make sure there is a 'Name' or 'Item' column." });
+      }
+
+      // Delete existing catalog items and insert new ones
+      await db.delete(materialsCatalog);
+      await db.insert(materialsCatalog).values(items);
+
+      return res.json({ message: `Successfully imported ${items.length} items`, count: items.length });
+    } catch (error) {
+      console.error("Error uploading materials catalog CSV:", error);
+      return res.status(500).json({ message: "Failed to upload CSV" });
+    }
+  });
+
+  // PUT /api/crm/materials-catalog/:id - Update a catalog item
+  app.put("/api/crm/materials-catalog/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      if (updates.unitCost !== undefined) {
+        updates.unitCost = updates.unitCost.toString();
+      }
+      const [updated] = await db.update(materialsCatalog)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(materialsCatalog.id, id))
+        .returning();
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error updating catalog item:", error);
+      return res.status(500).json({ message: "Failed to update catalog item" });
+    }
+  });
+
+  // DELETE /api/crm/materials-catalog/:id - Delete a catalog item
+  app.delete("/api/crm/materials-catalog/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await db.delete(materialsCatalog).where(eq(materialsCatalog.id, id));
+      return res.json({ message: "Item deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting catalog item:", error);
+      return res.status(500).json({ message: "Failed to delete catalog item" });
+    }
+  });
+
+  // ============================================
+  // PROJECT LABOR ENTRIES ENDPOINTS
+  // ============================================
+
+  // GET /api/crm/projects/:projectId/labor - List labor entries for a project
+  app.get("/api/crm/projects/:projectId/labor", requireCrmAuth, async (req, res) => {
+    try {
+      const { projectId } = req.params;
+      const entries = await db.select()
+        .from(projectLaborEntries)
+        .where(eq(projectLaborEntries.projectId, projectId))
+        .orderBy(desc(projectLaborEntries.date));
+      return res.json(entries);
+    } catch (error) {
+      console.error("Error fetching labor entries:", error);
+      return res.status(500).json({ message: "Failed to fetch labor entries" });
+    }
+  });
+
+  // POST /api/crm/projects/:projectId/labor - Add a labor entry
+  app.post("/api/crm/projects/:projectId/labor", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const { projectId } = req.params;
+      const body = req.body;
+
+      const [entry] = await db.insert(projectLaborEntries).values({
+        projectId,
+        date: body.date,
+        contractor: body.contractor,
+        description: body.description || null,
+        laborType: body.laborType || null,
+        hours: body.hours?.toString() || null,
+        hourlyRate: body.hourlyRate?.toString() || null,
+        amount: body.amount.toString(),
+        createdBy: user?.id || null,
+      }).returning();
+
+      return res.json(entry);
+    } catch (error) {
+      console.error("Error adding labor entry:", error);
+      return res.status(500).json({ message: "Failed to add labor entry" });
+    }
+  });
+
+  // PUT /api/crm/projects/:projectId/labor/:id - Update a labor entry
+  app.put("/api/crm/projects/:projectId/labor/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const body = req.body;
+      const updates: any = { updatedAt: new Date() };
+      
+      if (body.date !== undefined) updates.date = body.date;
+      if (body.contractor !== undefined) updates.contractor = body.contractor;
+      if (body.description !== undefined) updates.description = body.description;
+      if (body.laborType !== undefined) updates.laborType = body.laborType;
+      if (body.hours !== undefined) updates.hours = body.hours?.toString();
+      if (body.hourlyRate !== undefined) updates.hourlyRate = body.hourlyRate?.toString();
+      if (body.amount !== undefined) updates.amount = body.amount.toString();
+
+      const [updated] = await db.update(projectLaborEntries)
+        .set(updates)
+        .where(eq(projectLaborEntries.id, id))
+        .returning();
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error updating labor entry:", error);
+      return res.status(500).json({ message: "Failed to update labor entry" });
+    }
+  });
+
+  // DELETE /api/crm/projects/:projectId/labor/:id - Delete a labor entry
+  app.delete("/api/crm/projects/:projectId/labor/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await db.delete(projectLaborEntries).where(eq(projectLaborEntries.id, id));
+      return res.json({ message: "Labor entry deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting labor entry:", error);
+      return res.status(500).json({ message: "Failed to delete labor entry" });
+    }
+  });
+
+  // GET /api/crm/job-costing-settings - Get job costing settings (overhead %, commission %)
+  app.get("/api/crm/job-costing-settings", requireCrmAuth, async (req, res) => {
+    try {
+      const settings = await db.select()
+        .from(appSettings)
+        .where(or(
+          eq(appSettings.key, "job_costing_overhead_percent"),
+          eq(appSettings.key, "job_costing_commission_percent")
+        ));
+      
+      const result: Record<string, number> = {
+        overheadPercent: 30, // Default 30%
+        commissionPercent: 6, // Default 6%
+      };
+
+      for (const setting of settings) {
+        if (setting.key === "job_costing_overhead_percent" && setting.value) {
+          result.overheadPercent = parseFloat(setting.value);
+        }
+        if (setting.key === "job_costing_commission_percent" && setting.value) {
+          result.commissionPercent = parseFloat(setting.value);
+        }
+      }
+
+      return res.json(result);
+    } catch (error) {
+      console.error("Error fetching job costing settings:", error);
+      return res.status(500).json({ message: "Failed to fetch job costing settings" });
+    }
+  });
+
+  // PUT /api/crm/job-costing-settings - Update job costing settings
+  app.put("/api/crm/job-costing-settings", requireCrmAuth, async (req, res) => {
+    try {
+      const { overheadPercent, commissionPercent } = req.body;
+
+      if (overheadPercent !== undefined) {
+        await db.insert(appSettings)
+          .values({ key: "job_costing_overhead_percent", value: overheadPercent.toString() })
+          .onConflictDoUpdate({
+            target: appSettings.key,
+            set: { value: overheadPercent.toString(), updatedAt: new Date() }
+          });
+      }
+
+      if (commissionPercent !== undefined) {
+        await db.insert(appSettings)
+          .values({ key: "job_costing_commission_percent", value: commissionPercent.toString() })
+          .onConflictDoUpdate({
+            target: appSettings.key,
+            set: { value: commissionPercent.toString(), updatedAt: new Date() }
+          });
+      }
+
+      return res.json({ message: "Settings updated successfully" });
+    } catch (error) {
+      console.error("Error updating job costing settings:", error);
+      return res.status(500).json({ message: "Failed to update job costing settings" });
     }
   });
 

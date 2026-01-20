@@ -74,6 +74,13 @@ import {
   ClipboardCheck,
   Pencil,
   ListTodo,
+  Search,
+  Package,
+  Calculator,
+  TrendingUp,
+  TrendingDown,
+  Users,
+  Boxes,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -95,7 +102,7 @@ import type {
   ActivityAttachment, NoteMetadata, PhotoMetadata, FileMetadata, FinancialMetadata, 
   ApprovalMetadata, FinancialSubtype, ApprovalStatus,
   WorkOrderVisitType, WorkSubtype, ChecklistQuestion,
-  ProjectEquipmentItem, CrmProjectTask
+  ProjectEquipmentItem, CrmProjectTask, MaterialsCatalogItem, ProjectLaborEntry
 } from "@shared/schema";
 import { 
   projectActivityTypeEnum, financialSubtypeEnum, approvalStatusEnum,
@@ -296,8 +303,15 @@ export default function CrmProjectDetail() {
   const [editChallengePoints, setEditChallengePoints] = useState("");
   const [equipmentItems, setEquipmentItems] = useState<ProjectEquipmentItem[]>([]);
   const [editingEquipmentId, setEditingEquipmentId] = useState<string | null>(null);
-  const [newEquipmentItem, setNewEquipmentItem] = useState<Partial<ProjectEquipmentItem>>({ name: "", quantity: 1, modelNumber: "", notes: "" });
+  const [newEquipmentItem, setNewEquipmentItem] = useState<Partial<ProjectEquipmentItem>>({ 
+    name: "", quantity: 1, modelNumber: "", notes: "", unitCost: undefined, vendor: "", date: format(new Date(), "yyyy-MM-dd") 
+  });
   const [equipmentHasChanges, setEquipmentHasChanges] = useState(false);
+  
+  // Materials Catalog Dialog state
+  const [catalogDialogOpen, setCatalogDialogOpen] = useState(false);
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [selectedCatalogItems, setSelectedCatalogItems] = useState<Map<string, { item: MaterialsCatalogItem; quantity: number }>>(new Map());
 
   // Admin Tasks state
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -399,6 +413,12 @@ export default function CrmProjectDetail() {
   const { data: projectTasks, isLoading: tasksLoading } = useQuery<ProjectTaskWithUser[]>({
     queryKey: ["/api/crm/projects", projectId, "tasks"],
     enabled: !!projectId,
+  });
+
+  // Query for materials catalog (for Add from Catalog dialog)
+  const { data: materialsCatalog, isLoading: catalogLoading } = useQuery<MaterialsCatalogItem[]>({
+    queryKey: ["/api/crm/materials-catalog"],
+    enabled: !!currentUser && catalogDialogOpen,
   });
 
   // Query for activities in overview tab
@@ -882,9 +902,12 @@ export default function CrmProjectDetail() {
       quantity: newEquipmentItem.quantity || 1,
       modelNumber: newEquipmentItem.modelNumber?.trim() || undefined,
       notes: newEquipmentItem.notes?.trim() || undefined,
+      unitCost: newEquipmentItem.unitCost,
+      vendor: newEquipmentItem.vendor?.trim() || undefined,
+      date: newEquipmentItem.date || format(new Date(), "yyyy-MM-dd"),
     };
     setEquipmentItems([...equipmentItems, item]);
-    setNewEquipmentItem({ name: "", quantity: 1, modelNumber: "", notes: "" });
+    setNewEquipmentItem({ name: "", quantity: 1, modelNumber: "", notes: "", unitCost: undefined, vendor: "", date: format(new Date(), "yyyy-MM-dd") });
     setEquipmentHasChanges(true);
   };
 
@@ -897,6 +920,70 @@ export default function CrmProjectDetail() {
     setEquipmentItems(equipmentItems.filter(item => item.id !== id));
     setEquipmentHasChanges(true);
   };
+
+  // Catalog dialog helpers
+  const filteredCatalogItems = useMemo(() => {
+    if (!materialsCatalog) return [];
+    if (!catalogSearch.trim()) return materialsCatalog;
+    const search = catalogSearch.toLowerCase();
+    return materialsCatalog.filter(item => 
+      item.name.toLowerCase().includes(search) ||
+      item.category?.toLowerCase().includes(search) ||
+      item.partNumber?.toLowerCase().includes(search) ||
+      item.vendor?.toLowerCase().includes(search)
+    );
+  }, [materialsCatalog, catalogSearch]);
+
+  const handleToggleCatalogItem = (item: MaterialsCatalogItem, checked: boolean) => {
+    setSelectedCatalogItems(prev => {
+      const newMap = new Map(prev);
+      if (checked) {
+        newMap.set(item.id, { item, quantity: 1 });
+      } else {
+        newMap.delete(item.id);
+      }
+      return newMap;
+    });
+  };
+
+  const handleCatalogItemQuantityChange = (itemId: string, quantity: number) => {
+    setSelectedCatalogItems(prev => {
+      const newMap = new Map(prev);
+      const existing = newMap.get(itemId);
+      if (existing) {
+        newMap.set(itemId, { ...existing, quantity: Math.max(1, quantity) });
+      }
+      return newMap;
+    });
+  };
+
+  const handleAddFromCatalog = () => {
+    const newItems: ProjectEquipmentItem[] = Array.from(selectedCatalogItems.values()).map(({ item, quantity }) => ({
+      id: crypto.randomUUID(),
+      name: item.name,
+      quantity,
+      modelNumber: item.partNumber || undefined,
+      notes: item.description || undefined,
+      unitCost: item.unitCost ? parseFloat(item.unitCost.toString()) : undefined,
+      vendor: item.vendor || undefined,
+      date: format(new Date(), "yyyy-MM-dd"),
+      itemType: "material" as const,
+    }));
+    setEquipmentItems([...equipmentItems, ...newItems]);
+    setSelectedCatalogItems(new Map());
+    setCatalogSearch("");
+    setCatalogDialogOpen(false);
+    setEquipmentHasChanges(true);
+    toast({ title: `Added ${newItems.length} item${newItems.length > 1 ? 's' : ''} from catalog` });
+  };
+
+  // Calculate total materials cost
+  const totalMaterialsCost = useMemo(() => {
+    return equipmentItems.reduce((sum, item) => {
+      const cost = (item.unitCost || 0) * (item.quantity || 1);
+      return sum + cost;
+    }, 0);
+  }, [equipmentItems]);
 
   const uploadEquipmentFilesHandler = async () => {
     if (equipmentFiles.length === 0) return;
@@ -1280,6 +1367,13 @@ export default function CrmProjectDetail() {
               data-testid="tab-timeline"
             >
               Timeline
+            </TabsTrigger>
+            <TabsTrigger 
+              value="job-costing" 
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+              data-testid="tab-job-costing"
+            >
+              Job Costing
             </TabsTrigger>
           </TabsList>
 
@@ -1697,146 +1791,244 @@ export default function CrmProjectDetail() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {/* Equipment table header */}
-                  <div className="grid grid-cols-12 gap-2 text-sm font-medium text-muted-foreground border-b pb-2">
-                    <div className="col-span-4">Name</div>
-                    <div className="col-span-1">Qty</div>
-                    <div className="col-span-3">Model Number</div>
-                    <div className="col-span-3">Notes</div>
-                    <div className="col-span-1">Actions</div>
+                  {/* Add from Catalog button */}
+                  <div className="flex justify-end mb-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCatalogDialogOpen(true)}
+                      className="gap-2"
+                      data-testid="button-add-from-catalog"
+                    >
+                      <Package className="h-4 w-4" />
+                      Add from Catalog
+                    </Button>
                   </div>
-                  
-                  {/* Equipment items list */}
-                  {equipmentItems.length === 0 && (
-                    <p className="text-sm text-muted-foreground italic py-4 text-center">No equipment or materials added yet</p>
-                  )}
-                  
-                  {equipmentItems.map((item) => (
-                    <div key={item.id} className="grid grid-cols-12 gap-2 items-center py-2 border-b border-slate-100">
-                      {editingEquipmentId === item.id ? (
-                        <>
-                          <div className="col-span-4">
-                            <Input
-                              value={item.name}
-                              onChange={(e) => handleUpdateEquipmentItem(item.id, { name: e.target.value })}
-                              placeholder="Item name"
-                              data-testid={`input-equipment-name-${item.id}`}
-                            />
+
+                  {/* Equipment table - responsive scroll wrapper */}
+                  <div className="overflow-x-auto">
+                    <div className="min-w-[900px]">
+                      {/* Equipment table header */}
+                      <div className="grid grid-cols-[2fr_0.5fr_1fr_1fr_1fr_1fr_1fr_0.5fr] gap-2 text-sm font-medium text-muted-foreground border-b pb-2">
+                        <div>Name</div>
+                        <div>Qty</div>
+                        <div>Unit Cost</div>
+                        <div>Vendor</div>
+                        <div>Date</div>
+                        <div>Model #</div>
+                        <div>Total</div>
+                        <div>Actions</div>
+                      </div>
+                      
+                      {/* Equipment items list */}
+                      {equipmentItems.length === 0 && (
+                        <p className="text-sm text-muted-foreground italic py-4 text-center">No equipment or materials added yet</p>
+                      )}
+                      
+                      {equipmentItems.map((item) => {
+                        const itemTotal = (item.unitCost || 0) * (item.quantity || 1);
+                        return (
+                          <div key={item.id} className="grid grid-cols-[2fr_0.5fr_1fr_1fr_1fr_1fr_1fr_0.5fr] gap-2 items-center py-2 border-b border-slate-100">
+                            {editingEquipmentId === item.id ? (
+                              <>
+                                <div>
+                                  <Input
+                                    value={item.name}
+                                    onChange={(e) => handleUpdateEquipmentItem(item.id, { name: e.target.value })}
+                                    placeholder="Item name"
+                                    data-testid={`input-equipment-name-${item.id}`}
+                                  />
+                                </div>
+                                <div>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    value={item.quantity}
+                                    onChange={(e) => handleUpdateEquipmentItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
+                                    className="text-center"
+                                    data-testid={`input-equipment-qty-${item.id}`}
+                                  />
+                                </div>
+                                <div>
+                                  <div className="relative">
+                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      step={0.01}
+                                      value={item.unitCost ?? ""}
+                                      onChange={(e) => handleUpdateEquipmentItem(item.id, { unitCost: e.target.value ? parseFloat(e.target.value) : undefined })}
+                                      className="pl-6"
+                                      placeholder="0.00"
+                                      data-testid={`input-equipment-cost-${item.id}`}
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <Input
+                                    value={item.vendor || ""}
+                                    onChange={(e) => handleUpdateEquipmentItem(item.id, { vendor: e.target.value })}
+                                    placeholder="Vendor"
+                                    data-testid={`input-equipment-vendor-${item.id}`}
+                                  />
+                                </div>
+                                <div>
+                                  <Input
+                                    type="date"
+                                    value={item.date || ""}
+                                    onChange={(e) => handleUpdateEquipmentItem(item.id, { date: e.target.value })}
+                                    data-testid={`input-equipment-date-${item.id}`}
+                                  />
+                                </div>
+                                <div>
+                                  <Input
+                                    value={item.modelNumber || ""}
+                                    onChange={(e) => handleUpdateEquipmentItem(item.id, { modelNumber: e.target.value })}
+                                    placeholder="Model #"
+                                    data-testid={`input-equipment-model-${item.id}`}
+                                  />
+                                </div>
+                                <div className="text-sm font-medium text-green-700">
+                                  {formatCurrency(itemTotal)}
+                                </div>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setEditingEquipmentId(null)}
+                                    className="h-8 w-8 p-0"
+                                    data-testid={`button-done-equipment-${item.id}`}
+                                  >
+                                    <CheckCircle className="h-4 w-4 text-green-600" />
+                                  </Button>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="text-sm font-medium">{item.name}</div>
+                                <div className="text-sm text-center">{item.quantity}</div>
+                                <div className="text-sm">{item.unitCost ? formatCurrency(item.unitCost) : "—"}</div>
+                                <div className="text-sm text-muted-foreground">{item.vendor || "—"}</div>
+                                <div className="text-sm text-muted-foreground">{item.date ? format(new Date(item.date), "MMM d, yyyy") : "—"}</div>
+                                <div className="text-sm text-muted-foreground">{item.modelNumber || "—"}</div>
+                                <div className="text-sm font-medium text-green-700">
+                                  {item.unitCost ? (
+                                    <span title={`${item.quantity} × ${formatCurrency(item.unitCost)}`}>
+                                      {formatCurrency(itemTotal)}
+                                    </span>
+                                  ) : "—"}
+                                </div>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setEditingEquipmentId(item.id)}
+                                    className="h-8 w-8 p-0"
+                                    data-testid={`button-edit-equipment-${item.id}`}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteEquipmentItem(item.id)}
+                                    className="h-8 w-8 p-0 hover:text-destructive"
+                                    data-testid={`button-delete-equipment-${item.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </>
+                            )}
                           </div>
-                          <div className="col-span-1">
+                        );
+                      })}
+                      
+                      {/* Add new item row */}
+                      <div className="grid grid-cols-[2fr_0.5fr_1fr_1fr_1fr_1fr_1fr_0.5fr] gap-2 items-center pt-3 border-t mt-2">
+                        <div>
+                          <Input
+                            value={newEquipmentItem.name || ""}
+                            onChange={(e) => setNewEquipmentItem({ ...newEquipmentItem, name: e.target.value })}
+                            placeholder="New item name"
+                            data-testid="input-new-equipment-name"
+                          />
+                        </div>
+                        <div>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={newEquipmentItem.quantity || 1}
+                            onChange={(e) => setNewEquipmentItem({ ...newEquipmentItem, quantity: parseInt(e.target.value) || 1 })}
+                            className="text-center"
+                            data-testid="input-new-equipment-qty"
+                          />
+                        </div>
+                        <div>
+                          <div className="relative">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
                             <Input
                               type="number"
-                              min={1}
-                              value={item.quantity}
-                              onChange={(e) => handleUpdateEquipmentItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
-                              data-testid={`input-equipment-qty-${item.id}`}
+                              min={0}
+                              step={0.01}
+                              value={newEquipmentItem.unitCost ?? ""}
+                              onChange={(e) => setNewEquipmentItem({ ...newEquipmentItem, unitCost: e.target.value ? parseFloat(e.target.value) : undefined })}
+                              className="pl-6"
+                              placeholder="0.00"
+                              data-testid="input-new-equipment-cost"
                             />
                           </div>
-                          <div className="col-span-3">
-                            <Input
-                              value={item.modelNumber || ""}
-                              onChange={(e) => handleUpdateEquipmentItem(item.id, { modelNumber: e.target.value })}
-                              placeholder="Model #"
-                              data-testid={`input-equipment-model-${item.id}`}
-                            />
+                        </div>
+                        <div>
+                          <Input
+                            value={newEquipmentItem.vendor || ""}
+                            onChange={(e) => setNewEquipmentItem({ ...newEquipmentItem, vendor: e.target.value })}
+                            placeholder="Vendor"
+                            data-testid="input-new-equipment-vendor"
+                          />
+                        </div>
+                        <div>
+                          <Input
+                            type="date"
+                            value={newEquipmentItem.date || format(new Date(), "yyyy-MM-dd")}
+                            onChange={(e) => setNewEquipmentItem({ ...newEquipmentItem, date: e.target.value })}
+                            data-testid="input-new-equipment-date"
+                          />
+                        </div>
+                        <div>
+                          <Input
+                            value={newEquipmentItem.modelNumber || ""}
+                            onChange={(e) => setNewEquipmentItem({ ...newEquipmentItem, modelNumber: e.target.value })}
+                            placeholder="Model #"
+                            data-testid="input-new-equipment-model"
+                          />
+                        </div>
+                        <div className="text-sm font-medium text-muted-foreground">
+                          {newEquipmentItem.unitCost ? formatCurrency((newEquipmentItem.unitCost || 0) * (newEquipmentItem.quantity || 1)) : "—"}
+                        </div>
+                        <div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleAddEquipmentItem}
+                            disabled={!newEquipmentItem.name?.trim()}
+                            className="h-8 w-8 p-0"
+                            data-testid="button-add-equipment"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Total Materials Cost */}
+                      {equipmentItems.length > 0 && (
+                        <div className="flex justify-end mt-4 pt-4 border-t-2">
+                          <div className="flex items-center gap-3 bg-green-50 px-4 py-2 rounded-lg border border-green-200">
+                            <span className="text-sm font-medium text-green-800">Total Materials Cost:</span>
+                            <span className="text-lg font-bold text-green-700">{formatCurrency(totalMaterialsCost)}</span>
                           </div>
-                          <div className="col-span-3">
-                            <Input
-                              value={item.notes || ""}
-                              onChange={(e) => handleUpdateEquipmentItem(item.id, { notes: e.target.value })}
-                              placeholder="Notes"
-                              data-testid={`input-equipment-notes-${item.id}`}
-                            />
-                          </div>
-                          <div className="col-span-1 flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEditingEquipmentId(null)}
-                              className="h-8 w-8 p-0"
-                              data-testid={`button-done-equipment-${item.id}`}
-                            >
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                            </Button>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="col-span-4 text-sm">{item.name}</div>
-                          <div className="col-span-1 text-sm">{item.quantity}</div>
-                          <div className="col-span-3 text-sm text-muted-foreground">{item.modelNumber || "—"}</div>
-                          <div className="col-span-3 text-sm text-muted-foreground">{item.notes || "—"}</div>
-                          <div className="col-span-1 flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEditingEquipmentId(item.id)}
-                              className="h-8 w-8 p-0"
-                              data-testid={`button-edit-equipment-${item.id}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteEquipmentItem(item.id)}
-                              className="h-8 w-8 p-0 hover:text-destructive"
-                              data-testid={`button-delete-equipment-${item.id}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </>
+                        </div>
                       )}
-                    </div>
-                  ))}
-                  
-                  {/* Add new item row */}
-                  <div className="grid grid-cols-12 gap-2 items-center pt-3 border-t mt-2">
-                    <div className="col-span-4">
-                      <Input
-                        value={newEquipmentItem.name || ""}
-                        onChange={(e) => setNewEquipmentItem({ ...newEquipmentItem, name: e.target.value })}
-                        placeholder="New item name"
-                        data-testid="input-new-equipment-name"
-                      />
-                    </div>
-                    <div className="col-span-1">
-                      <Input
-                        type="number"
-                        min={1}
-                        value={newEquipmentItem.quantity || 1}
-                        onChange={(e) => setNewEquipmentItem({ ...newEquipmentItem, quantity: parseInt(e.target.value) || 1 })}
-                        data-testid="input-new-equipment-qty"
-                      />
-                    </div>
-                    <div className="col-span-3">
-                      <Input
-                        value={newEquipmentItem.modelNumber || ""}
-                        onChange={(e) => setNewEquipmentItem({ ...newEquipmentItem, modelNumber: e.target.value })}
-                        placeholder="Model # (optional)"
-                        data-testid="input-new-equipment-model"
-                      />
-                    </div>
-                    <div className="col-span-3">
-                      <Input
-                        value={newEquipmentItem.notes || ""}
-                        onChange={(e) => setNewEquipmentItem({ ...newEquipmentItem, notes: e.target.value })}
-                        placeholder="Notes (optional)"
-                        data-testid="input-new-equipment-notes"
-                      />
-                    </div>
-                    <div className="col-span-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleAddEquipmentItem}
-                        disabled={!newEquipmentItem.name?.trim()}
-                        className="h-8 w-8 p-0"
-                        data-testid="button-add-equipment"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
                     </div>
                   </div>
 
@@ -2353,6 +2545,10 @@ export default function CrmProjectDetail() {
           <TabsContent value="timeline" className="mt-4 data-[state=inactive]:hidden" forceMount>
             <ProjectTimelineTab projectId={projectId!} />
           </TabsContent>
+
+          <TabsContent value="job-costing" className="mt-4 data-[state=inactive]:hidden" forceMount>
+            <JobCostingTab projectId={projectId!} project={project} />
+          </TabsContent>
         </Tabs>
 
         <Dialog open={createQuoteDialogOpen} onOpenChange={setCreateQuoteDialogOpen}>
@@ -2722,6 +2918,121 @@ export default function CrmProjectDetail() {
           </DialogContent>
         </Dialog>
 
+        {/* Add from Catalog Dialog */}
+        <Dialog open={catalogDialogOpen} onOpenChange={(open) => {
+          setCatalogDialogOpen(open);
+          if (!open) {
+            setSelectedCatalogItems(new Map());
+            setCatalogSearch("");
+          }
+        }}>
+          <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Add from Materials Catalog
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="flex-1 overflow-hidden flex flex-col gap-4">
+              {/* Search input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={catalogSearch}
+                  onChange={(e) => setCatalogSearch(e.target.value)}
+                  placeholder="Search by name, category, part number, or vendor..."
+                  className="pl-9"
+                  data-testid="input-catalog-search"
+                />
+              </div>
+
+              {/* Catalog items list */}
+              <div className="flex-1 overflow-y-auto border rounded-lg">
+                {catalogLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : filteredCatalogItems.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    {catalogSearch ? "No items match your search" : "No items in catalog"}
+                  </div>
+                ) : (
+                  <div className="divide-y">
+                    {filteredCatalogItems.map((item) => {
+                      const isSelected = selectedCatalogItems.has(item.id);
+                      const selectedItem = selectedCatalogItems.get(item.id);
+                      return (
+                        <div 
+                          key={item.id} 
+                          className={cn(
+                            "p-3 flex items-center gap-3 hover:bg-slate-50 transition-colors",
+                            isSelected && "bg-blue-50"
+                          )}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => handleToggleCatalogItem(item, !!checked)}
+                            data-testid={`checkbox-catalog-${item.id}`}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-sm">{item.name}</span>
+                              {item.category && (
+                                <Badge variant="outline" className="text-xs">{item.category}</Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                              {item.partNumber && <span>#{item.partNumber}</span>}
+                              {item.vendor && <span>Vendor: {item.vendor}</span>}
+                              {item.unitCost && <span className="text-green-600 font-medium">{formatCurrency(parseFloat(item.unitCost.toString()))}</span>}
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <div className="flex items-center gap-2">
+                              <Label className="text-xs text-muted-foreground">Qty:</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                value={selectedItem?.quantity || 1}
+                                onChange={(e) => handleCatalogItemQuantityChange(item.id, parseInt(e.target.value) || 1)}
+                                className="w-16 h-8 text-center"
+                                data-testid={`input-catalog-qty-${item.id}`}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Selected count */}
+              {selectedCatalogItems.size > 0 && (
+                <div className="text-sm text-muted-foreground">
+                  {selectedCatalogItems.size} item{selectedCatalogItems.size > 1 ? 's' : ''} selected
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCatalogDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleAddFromCatalog}
+                disabled={selectedCatalogItems.size === 0}
+                className="bg-[#711419] hover:bg-[#5a1014] gap-2"
+                data-testid="button-add-selected-catalog"
+              >
+                <Plus className="h-4 w-4" />
+                Add Selected ({selectedCatalogItems.size})
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       </div>
     </CrmLayout>
   );
@@ -3049,6 +3360,504 @@ function ProjectTimelineTab({ projectId }: { projectId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+type JobCostingSettings = {
+  overheadPercent: number;
+  commissionPercent: number;
+};
+
+const LABOR_TYPES = ["Install", "Service", "Supervision", "Other"] as const;
+
+function JobCostingTab({ projectId, project }: { projectId: string; project: CrmProject }) {
+  const { toast } = useToast();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Partial<ProjectLaborEntry>>({});
+  const [newEntry, setNewEntry] = useState<{
+    date: string;
+    contractor: string;
+    description: string;
+    laborType: string;
+    amount: string;
+  }>({
+    date: format(new Date(), "yyyy-MM-dd"),
+    contractor: "",
+    description: "",
+    laborType: "Install",
+    amount: "",
+  });
+
+  const { data: laborEntries, isLoading: laborLoading, refetch: refetchLabor } = useQuery<ProjectLaborEntry[]>({
+    queryKey: ["/api/crm/projects", projectId, "labor"],
+    queryFn: async () => {
+      const response = await fetch(`/api/crm/projects/${projectId}/labor`, { credentials: 'include' });
+      if (!response.ok) throw new Error("Failed to fetch labor entries");
+      return response.json();
+    },
+  });
+
+  const { data: jobCostingSettings, isLoading: settingsLoading } = useQuery<JobCostingSettings>({
+    queryKey: ["/api/crm/job-costing-settings"],
+    queryFn: async () => {
+      const response = await fetch("/api/crm/job-costing-settings", { credentials: 'include' });
+      if (!response.ok) throw new Error("Failed to fetch job costing settings");
+      return response.json();
+    },
+  });
+
+  const createLaborMutation = useMutation({
+    mutationFn: async (data: typeof newEntry) => {
+      const response = await apiRequest("POST", `/api/crm/projects/${projectId}/labor`, {
+        date: data.date,
+        contractor: data.contractor,
+        description: data.description || null,
+        laborType: data.laborType,
+        amount: parseFloat(data.amount),
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Labor entry added" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "labor"] });
+      setNewEntry({
+        date: format(new Date(), "yyyy-MM-dd"),
+        contractor: "",
+        description: "",
+        laborType: "Install",
+        amount: "",
+      });
+    },
+    onError: () => {
+      toast({ title: "Failed to add labor entry", variant: "destructive" });
+    },
+  });
+
+  const updateLaborMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<ProjectLaborEntry> }) => {
+      const response = await apiRequest("PUT", `/api/crm/projects/${projectId}/labor/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Labor entry updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "labor"] });
+      setEditingId(null);
+      setEditForm({});
+    },
+    onError: () => {
+      toast({ title: "Failed to update labor entry", variant: "destructive" });
+    },
+  });
+
+  const deleteLaborMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/crm/projects/${projectId}/labor/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Labor entry deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "labor"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete labor entry", variant: "destructive" });
+    },
+  });
+
+  const revenue = parseFloat((project.actualValue || project.expectedValue || "0").toString());
+  
+  const laborTotal = (laborEntries || []).reduce((sum, entry) => 
+    sum + parseFloat(entry.amount?.toString() || "0"), 0);
+  
+  const equipmentMaterials = (project.equipmentMaterials || []) as ProjectEquipmentItem[];
+  const materialsTotal = equipmentMaterials.reduce((sum, item) => 
+    sum + ((item.unitCost || 0) * (item.quantity || 1)), 0);
+  
+  const grossProfit = revenue - laborTotal - materialsTotal;
+  
+  const overheadPercent = jobCostingSettings?.overheadPercent || 30;
+  const commissionPercent = jobCostingSettings?.commissionPercent || 5;
+  
+  const overhead = grossProfit * (overheadPercent / 100);
+  const commission = revenue * (commissionPercent / 100);
+  const netProfit = grossProfit - overhead - commission;
+
+  const laborPercent = revenue > 0 ? (laborTotal / revenue) * 100 : 0;
+  const materialsPercent = revenue > 0 ? (materialsTotal / revenue) * 100 : 0;
+  const grossProfitPercent = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+  const overheadPercentOfRevenue = revenue > 0 ? (overhead / revenue) * 100 : 0;
+  const commissionPercentOfRevenue = revenue > 0 ? (commission / revenue) * 100 : 0;
+  const netProfitPercent = revenue > 0 ? (netProfit / revenue) * 100 : 0;
+
+  const handleAddEntry = () => {
+    if (!newEntry.date || !newEntry.contractor || !newEntry.amount) {
+      toast({ title: "Please fill in required fields", variant: "destructive" });
+      return;
+    }
+    createLaborMutation.mutate(newEntry);
+  };
+
+  const startEdit = (entry: ProjectLaborEntry) => {
+    setEditingId(entry.id);
+    setEditForm({
+      date: entry.date,
+      contractor: entry.contractor,
+      description: entry.description,
+      laborType: entry.laborType,
+      amount: entry.amount,
+    });
+  };
+
+  const handleUpdate = () => {
+    if (!editingId) return;
+    updateLaborMutation.mutate({
+      id: editingId,
+      data: {
+        date: editForm.date,
+        contractor: editForm.contractor,
+        description: editForm.description,
+        laborType: editForm.laborType,
+        amount: editForm.amount,
+      },
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-2">
+            <Calculator className="h-5 w-5 text-[#711419]" />
+            Profitability Summary
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {settingsLoading ? (
+            <Skeleton className="h-40 w-full" />
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+              <div className="text-center p-3 rounded-lg bg-slate-50">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Revenue</p>
+                <p className="text-lg font-semibold">{formatCurrency(revenue)}</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-slate-50">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Labor</p>
+                <p className="text-lg font-semibold text-orange-600">{formatCurrency(laborTotal)}</p>
+                <p className="text-xs text-muted-foreground">{laborPercent.toFixed(1)}%</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-slate-50">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Materials</p>
+                <p className="text-lg font-semibold text-orange-600">{formatCurrency(materialsTotal)}</p>
+                <p className="text-xs text-muted-foreground">{materialsPercent.toFixed(1)}%</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-slate-50">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Gross Profit</p>
+                <p className={cn("text-lg font-semibold", grossProfit >= 0 ? "text-green-600" : "text-red-600")}>
+                  {formatCurrency(grossProfit)}
+                </p>
+                <p className="text-xs text-muted-foreground">{grossProfitPercent.toFixed(1)}%</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-slate-50">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Overhead ({overheadPercent}%)</p>
+                <p className="text-lg font-semibold text-slate-600">{formatCurrency(overhead)}</p>
+                <p className="text-xs text-muted-foreground">{overheadPercentOfRevenue.toFixed(1)}%</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-slate-50">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Commission ({commissionPercent}%)</p>
+                <p className="text-lg font-semibold text-slate-600">{formatCurrency(commission)}</p>
+                <p className="text-xs text-muted-foreground">{commissionPercentOfRevenue.toFixed(1)}%</p>
+              </div>
+              <div className={cn(
+                "text-center p-3 rounded-lg border-2",
+                netProfit >= 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
+              )}>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 font-medium">Net Profit</p>
+                <p className={cn("text-xl font-bold", netProfit >= 0 ? "text-green-600" : "text-red-600")}>
+                  {formatCurrency(netProfit)}
+                </p>
+                <p className="text-xs text-muted-foreground font-medium">{netProfitPercent.toFixed(1)}%</p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-[#711419]" />
+            Labor Entries
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {laborLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : (
+            <>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="text-left px-4 py-3 font-medium">Date</th>
+                      <th className="text-left px-4 py-3 font-medium">Contractor</th>
+                      <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Description</th>
+                      <th className="text-left px-4 py-3 font-medium">Type</th>
+                      <th className="text-right px-4 py-3 font-medium">Amount</th>
+                      <th className="text-right px-4 py-3 font-medium w-24">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {(laborEntries || []).map((entry) => (
+                      <tr key={entry.id} className="hover:bg-slate-50">
+                        {editingId === entry.id ? (
+                          <>
+                            <td className="px-4 py-2">
+                              <Input
+                                type="date"
+                                value={editForm.date?.toString() || ""}
+                                onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+                                className="h-8"
+                              />
+                            </td>
+                            <td className="px-4 py-2">
+                              <Input
+                                value={editForm.contractor || ""}
+                                onChange={(e) => setEditForm({ ...editForm, contractor: e.target.value })}
+                                className="h-8"
+                              />
+                            </td>
+                            <td className="px-4 py-2 hidden md:table-cell">
+                              <Input
+                                value={editForm.description || ""}
+                                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                                className="h-8"
+                              />
+                            </td>
+                            <td className="px-4 py-2">
+                              <Select 
+                                value={editForm.laborType || "Install"} 
+                                onValueChange={(v) => setEditForm({ ...editForm, laborType: v })}
+                              >
+                                <SelectTrigger className="h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {LABOR_TYPES.map((type) => (
+                                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </td>
+                            <td className="px-4 py-2">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={editForm.amount?.toString() || ""}
+                                onChange={(e) => setEditForm({ ...editForm, amount: e.target.value as any })}
+                                className="h-8 text-right"
+                              />
+                            </td>
+                            <td className="px-4 py-2 text-right">
+                              <div className="flex gap-1 justify-end">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleUpdate}
+                                  disabled={updateLaborMutation.isPending}
+                                  className="h-8 w-8 p-0 text-green-600"
+                                >
+                                  <CheckCircle className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => { setEditingId(null); setEditForm({}); }}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-4 py-3">{entry.date ? format(new Date(entry.date), "MMM d, yyyy") : "—"}</td>
+                            <td className="px-4 py-3">{entry.contractor}</td>
+                            <td className="px-4 py-3 hidden md:table-cell text-muted-foreground">{entry.description || "—"}</td>
+                            <td className="px-4 py-3">
+                              <Badge variant="outline">{entry.laborType || "Other"}</Badge>
+                            </td>
+                            <td className="px-4 py-3 text-right font-medium">{formatCurrency(entry.amount)}</td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex gap-1 justify-end">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => startEdit(entry)}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => deleteLaborMutation.mutate(entry.id)}
+                                  className="h-8 w-8 p-0 hover:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    ))}
+                    <tr className="bg-slate-50/50">
+                      <td className="px-4 py-2">
+                        <Input
+                          type="date"
+                          value={newEntry.date}
+                          onChange={(e) => setNewEntry({ ...newEntry, date: e.target.value })}
+                          className="h-8"
+                          data-testid="input-labor-date"
+                        />
+                      </td>
+                      <td className="px-4 py-2">
+                        <Input
+                          placeholder="Contractor name"
+                          value={newEntry.contractor}
+                          onChange={(e) => setNewEntry({ ...newEntry, contractor: e.target.value })}
+                          className="h-8"
+                          data-testid="input-labor-contractor"
+                        />
+                      </td>
+                      <td className="px-4 py-2 hidden md:table-cell">
+                        <Input
+                          placeholder="Description (optional)"
+                          value={newEntry.description}
+                          onChange={(e) => setNewEntry({ ...newEntry, description: e.target.value })}
+                          className="h-8"
+                          data-testid="input-labor-description"
+                        />
+                      </td>
+                      <td className="px-4 py-2">
+                        <Select value={newEntry.laborType} onValueChange={(v) => setNewEntry({ ...newEntry, laborType: v })}>
+                          <SelectTrigger className="h-8" data-testid="select-labor-type">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {LABOR_TYPES.map((type) => (
+                              <SelectItem key={type} value={type}>{type}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="px-4 py-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={newEntry.amount}
+                          onChange={(e) => setNewEntry({ ...newEntry, amount: e.target.value })}
+                          className="h-8 text-right"
+                          data-testid="input-labor-amount"
+                        />
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleAddEntry}
+                          disabled={createLaborMutation.isPending || !newEntry.date || !newEntry.contractor || !newEntry.amount}
+                          className="h-8"
+                          data-testid="button-add-labor"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  </tbody>
+                  <tfoot className="border-t-2">
+                    <tr className="bg-slate-100">
+                      <td colSpan={4} className="px-4 py-3 text-right font-semibold">Total Labor:</td>
+                      <td className="px-4 py-3 text-right font-bold text-lg">{formatCurrency(laborTotal)}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-4 flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Boxes className="h-5 w-5 text-[#711419]" />
+            Equipment & Materials
+          </CardTitle>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => {
+              const overviewTab = document.querySelector('[data-testid="tab-overview"]') as HTMLButtonElement;
+              if (overviewTab) overviewTab.click();
+            }}
+          >
+            Edit in Overview
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {equipmentMaterials.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Boxes className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>No equipment or materials added</p>
+              <p className="text-sm mt-1">Add items in the Overview tab</p>
+            </div>
+          ) : (
+            <div className="border rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="text-left px-4 py-3 font-medium">Item</th>
+                    <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Model #</th>
+                    <th className="text-center px-4 py-3 font-medium">Qty</th>
+                    <th className="text-right px-4 py-3 font-medium">Unit Cost</th>
+                    <th className="text-right px-4 py-3 font-medium">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {equipmentMaterials.map((item) => (
+                    <tr key={item.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        <div>
+                          <p className="font-medium">{item.name}</p>
+                          {item.vendor && <p className="text-xs text-muted-foreground">{item.vendor}</p>}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell text-muted-foreground">{item.modelNumber || "—"}</td>
+                      <td className="px-4 py-3 text-center">{item.quantity}</td>
+                      <td className="px-4 py-3 text-right">{item.unitCost ? formatCurrency(item.unitCost) : "—"}</td>
+                      <td className="px-4 py-3 text-right font-medium">
+                        {formatCurrency((item.unitCost || 0) * (item.quantity || 1))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="border-t-2">
+                  <tr className="bg-slate-100">
+                    <td colSpan={4} className="px-4 py-3 text-right font-semibold">Total Materials:</td>
+                    <td className="px-4 py-3 text-right font-bold text-lg">{formatCurrency(materialsTotal)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
