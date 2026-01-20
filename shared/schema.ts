@@ -1029,13 +1029,18 @@ export const crmJobs = pgTable("crm_jobs", {
 }));
 
 // CRM Projects (big-ticket scope containers - $5k+ jobs)
-// Equipment/Materials item type for projects
+// Equipment/Materials item type for projects (used for job costing)
 export type ProjectEquipmentItem = {
   id: string;
   name: string;
   quantity: number;
   modelNumber?: string;
   notes?: string;
+  unitCost?: number; // Cost per unit in dollars
+  vendor?: string;
+  purchaseOrder?: string;
+  date?: string; // ISO date string
+  itemType?: "material" | "equipment"; // For categorization
 };
 
 export const crmProjects = pgTable("crm_projects", {
@@ -3064,3 +3069,55 @@ export type PackagePriceAdjustment = typeof packagePriceAdjustments.$inferSelect
 
 // Default financing link for install quotes
 export const DEFAULT_FINANCING_LINK = "https://projects.greensky.com/merchantloanapplication?apptype=short&merchant=81087766&dealerplan=2832&channel=External-Button-03";
+
+// Materials Catalog - CSV-uploaded duct materials and other items for quick selection
+export const materialsCatalog = pgTable("materials_catalog", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category"), // e.g., "Duct", "Fitting", "Insulation", "Equipment"
+  partNumber: text("part_number"),
+  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }).notNull(), // Cost in dollars
+  unit: text("unit").default("each"), // each, ft, roll, etc.
+  vendor: text("vendor"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertMaterialsCatalogSchema = createInsertSchema(materialsCatalog).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMaterialsCatalog = z.infer<typeof insertMaterialsCatalogSchema>;
+export type MaterialsCatalogItem = typeof materialsCatalog.$inferSelect;
+
+// Project Labor Entries - Track labor costs for job costing
+export const projectLaborEntries = pgTable("project_labor_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => crmProjects.id, { onDelete: "cascade" }),
+  date: date("date").notNull(),
+  contractor: text("contractor").notNull(), // Contractor or employee name
+  description: text("description"),
+  laborType: text("labor_type"), // e.g., "Install", "Service", "Supervision"
+  hours: decimal("hours", { precision: 5, scale: 2 }),
+  hourlyRate: decimal("hourly_rate", { precision: 10, scale: 2 }),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(), // Total labor cost
+  createdBy: varchar("created_by").references(() => crmUsers.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  projectIdIdx: index("project_labor_entries_project_id_idx").on(table.projectId),
+  dateIdx: index("project_labor_entries_date_idx").on(table.date),
+}));
+
+export const insertProjectLaborEntrySchema = createInsertSchema(projectLaborEntries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertProjectLaborEntry = z.infer<typeof insertProjectLaborEntrySchema>;
+export type ProjectLaborEntry = typeof projectLaborEntries.$inferSelect;
