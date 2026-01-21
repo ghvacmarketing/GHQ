@@ -12796,7 +12796,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (customerId) {
-        conditions.push(eq(crmProjects.customerId, customerId as string));
+        // Support multiple customer IDs (comma-separated or array from query params)
+        const customerIds = Array.isArray(customerId) 
+          ? customerId as string[]
+          : (customerId as string).split(",");
+        if (customerIds.length === 1) {
+          conditions.push(eq(crmProjects.customerId, customerIds[0]));
+        } else {
+          conditions.push(inArray(crmProjects.customerId, customerIds));
+        }
       }
 
       // Filter for projects with scheduled dates (for calendar view)
@@ -13033,16 +13041,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Get the next project number (start at 1000, or max + 1)
-      const [maxProjectNumber] = await db
-        .select({ maxNum: sql<number>`COALESCE(MAX(project_number), 999)` })
-        .from(crmProjects);
-      const nextProjectNumber = (maxProjectNumber?.maxNum || 999) + 1;
+      // Get the next project number (start at 1000, or max + 1) using transaction for safety
+      const [project] = await db.transaction(async (tx) => {
+        const [maxProjectNumber] = await tx
+          .select({ maxNum: sql<number>`COALESCE(MAX(project_number), 999)` })
+          .from(crmProjects);
+        const nextProjectNumber = (maxProjectNumber?.maxNum || 999) + 1;
 
-      const [project] = await db.insert(crmProjects).values({
-        ...result.data,
-        projectNumber: nextProjectNumber,
-      }).returning();
+        return tx.insert(crmProjects).values({
+          ...result.data,
+          projectNumber: nextProjectNumber,
+        }).returning();
+      });
 
       await logCrmAudit(
         user.id,
