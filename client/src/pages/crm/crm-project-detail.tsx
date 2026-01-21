@@ -1440,113 +1440,113 @@ export default function CrmProjectDetail() {
                 </CardContent>
               </Card>
             )}
-            <Card className="border shadow-sm">
-              <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                <CardTitle className="text-lg font-semibold">Project Schedule</CardTitle>
-                <Button variant="outline" size="sm" onClick={() => setShowEditScheduleDialog(true)}>
-                  Edit
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Start Date</p>
-                    <p className="text-sm text-slate-700">{formatDate(project.startDate)}</p>
+            {/* Compact Project Schedule with Progress */}
+            <Card className="border-0 shadow-sm bg-gradient-to-r from-slate-50 to-white">
+              <CardContent className="py-3 px-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-6 flex-1">
+                    <div className="flex items-center gap-2">
+                      <CalendarIcon className="w-4 h-4 text-slate-400" />
+                      <div>
+                        <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Start</p>
+                        <p className="text-sm font-medium text-slate-700">{formatDate(project.startDate)}</p>
+                      </div>
+                    </div>
+                    <div className="flex-1 max-w-[200px]">
+                      {(() => {
+                        const start = project.startDate ? new Date(project.startDate).getTime() : Date.now();
+                        const end = project.endDate ? new Date(project.endDate).getTime() : Date.now();
+                        const now = Date.now();
+                        const progress = Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100));
+                        return (
+                          <div className="relative">
+                            <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-gradient-to-r from-[#711419] to-[#8B1A1F] rounded-full transition-all duration-300"
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+                            <p className="text-[10px] text-slate-400 text-center mt-1">{Math.round(progress)}% elapsed</p>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CalendarIcon className="w-4 h-4 text-slate-400" />
+                      <div>
+                        <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">End</p>
+                        <p className="text-sm font-medium text-slate-700">{formatDate(project.endDate)}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">End Date</p>
-                    <p className="text-sm text-slate-700">{formatDate(project.endDate)}</p>
-                  </div>
+                  <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setShowEditScheduleDialog(true)}>
+                    Edit
+                  </Button>
                 </div>
               </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card data-testid="card-total-quoted">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <FileText className="w-5 h-5 text-green-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Quoted</p>
-                      <p className="text-xl font-semibold">{formatCurrency(totalQuoted)}</p>
-                    </div>
+            {/* Unified Financial Metrics Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              <Card data-testid="card-total-quoted" className="border-0 shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <FileText className="w-4 h-4 text-slate-400" />
+                    <p className="text-xs text-slate-500">Total Quoted</p>
                   </div>
+                  <p className="text-lg font-semibold text-slate-800">{formatCurrency(totalQuoted)}</p>
                 </CardContent>
               </Card>
 
-              <Card data-testid="card-total-invoiced">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <Receipt className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Invoiced</p>
-                      <p className="text-xl font-semibold">{formatCurrency(totalInvoiced)}</p>
-                    </div>
+              <Card data-testid="card-total-invoiced" className="border-0 shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Receipt className="w-4 h-4 text-slate-400" />
+                    <p className="text-xs text-slate-500">Invoiced</p>
                   </div>
+                  <p className="text-lg font-semibold text-slate-800">{formatCurrency(totalInvoiced)}</p>
                 </CardContent>
               </Card>
 
-              <Card data-testid="card-balance-due">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${balanceDue > 0 ? "bg-orange-100" : "bg-green-100"}`}>
-                      <DollarSign className={`w-5 h-5 ${balanceDue > 0 ? "text-orange-600" : "text-green-600"}`} />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Balance Due</p>
-                      <p className={`text-xl font-semibold ${balanceDue > 0 ? "text-orange-600" : ""}`}>
-                        {formatCurrency(balanceDue)}
-                      </p>
-                    </div>
+              <Card data-testid="card-balance-due" className="border-0 shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <DollarSign className={`w-4 h-4 ${balanceDue > 0 ? "text-orange-500" : "text-slate-400"}`} />
+                    <p className="text-xs text-slate-500">Balance Due</p>
                   </div>
+                  <p className={`text-lg font-semibold ${balanceDue > 0 ? "text-orange-600" : "text-slate-800"}`}>
+                    {formatCurrency(balanceDue)}
+                  </p>
                 </CardContent>
               </Card>
 
-              <Card data-testid="card-work-orders-count">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <ClipboardList className="w-5 h-5 text-purple-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Work Orders</p>
-                      <p className="text-xl font-semibold">{workOrderCount}</p>
-                    </div>
+              <Card data-testid="card-expected-value" className="border-0 shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <TrendingUp className="w-4 h-4 text-slate-400" />
+                    <p className="text-xs text-slate-500">Expected</p>
                   </div>
+                  <p className="text-lg font-semibold text-slate-800">{formatCurrency(project.expectedValue)}</p>
                 </CardContent>
               </Card>
-            </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <DollarSign className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Expected Value</span>
+              <Card data-testid="card-actual-value" className="border-0 shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <DollarSign className="w-4 h-4 text-slate-400" />
+                    <p className="text-xs text-slate-500">Actual</p>
                   </div>
-                  <p className="text-lg font-semibold">{formatCurrency(project.expectedValue)}</p>
+                  <p className="text-lg font-semibold text-slate-800">{formatCurrency(project.actualValue)}</p>
                 </CardContent>
               </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <DollarSign className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Actual Value</span>
+
+              <Card data-testid="card-work-orders-count" className="border-0 shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <ClipboardList className="w-4 h-4 text-slate-400" />
+                    <p className="text-xs text-slate-500">Work Orders</p>
                   </div>
-                  <p className="text-lg font-semibold">{formatCurrency(project.actualValue)}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CalendarIcon className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Created</span>
-                  </div>
-                  <p className="text-lg font-semibold">{formatDate(project.createdAt)}</p>
+                  <p className="text-lg font-semibold text-slate-800">{workOrderCount}</p>
                 </CardContent>
               </Card>
             </div>
