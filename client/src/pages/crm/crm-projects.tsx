@@ -632,6 +632,98 @@ function DraggableProject({
   );
 }
 
+function DraggableTimeSlotProject({
+  project,
+  colors,
+  onClick,
+}: {
+  project: ProjectWithDetails;
+  colors: { bg: string; text: string; border: string };
+  onClick: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: project.id,
+  });
+  
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+  } : {};
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      onClick={(e) => {
+        if (!isDragging) onClick();
+      }}
+      className={cn(
+        "text-[9px] leading-tight py-0.5 px-1 rounded cursor-grab active:cursor-grabbing border overflow-hidden",
+        colors.bg, colors.text, colors.border,
+        isDragging && "opacity-50 z-50"
+      )}
+      style={style}
+      title={`${project.customerName || "Customer"} - ${formatProjectNumber(project.projectNumber)} - ${project.title} (drag to reschedule)`}
+    >
+      <div className="font-medium truncate">
+        {project.customerName || "Customer"} - {formatProjectNumber(project.projectNumber)}
+      </div>
+      <div className="truncate opacity-75">{project.title}</div>
+    </div>
+  );
+}
+
+function DraggableSpanningProject({
+  project,
+  colors,
+  style,
+  showRoundedLeft,
+  showRoundedRight,
+  onClick,
+}: {
+  project: ProjectWithDetails;
+  colors: { bg: string; text: string; border: string };
+  style: React.CSSProperties;
+  showRoundedLeft: boolean;
+  showRoundedRight: boolean;
+  onClick: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: project.id,
+  });
+  
+  const dragStyle = transform ? {
+    ...style,
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+  } : style;
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      onClick={(e) => {
+        if (!isDragging) onClick();
+      }}
+      className={cn(
+        "absolute h-9 text-[10px] leading-tight py-1 px-1.5 cursor-grab active:cursor-grabbing overflow-hidden border",
+        colors.bg, colors.text, colors.border,
+        isDragging && "opacity-50 z-50",
+        showRoundedLeft && showRoundedRight && "rounded",
+        showRoundedLeft && !showRoundedRight && "rounded-l",
+        !showRoundedLeft && showRoundedRight && "rounded-r"
+      )}
+      style={dragStyle}
+      title={`${project.customerName || "Customer"} - ${formatProjectNumber(project.projectNumber)} - ${project.title} (drag to reschedule)`}
+    >
+      <div className="font-medium truncate">
+        {project.customerName || "Customer"} - {formatProjectNumber(project.projectNumber)}
+      </div>
+      <div className="truncate opacity-75">{project.title}</div>
+    </div>
+  );
+}
+
 export default function CrmProjects() {
   usePageTitle("Projects");
   const [, navigate] = useLocation();
@@ -1926,6 +2018,117 @@ export default function CrmProjects() {
                           ))}
                         </div>
                         
+                        {/* Multi-day spanning projects section */}
+                        {(() => {
+                          const viewStart = startOfDay(viewDays[0]);
+                          const viewEnd = startOfDay(viewDays[viewDays.length - 1]);
+                          
+                          const spanningProjects = allProjects.filter(project => {
+                            if (!project.startDate || !project.endDate) return false;
+                            const projectStart = startOfDay(new Date(project.startDate));
+                            const projectEnd = startOfDay(new Date(project.endDate));
+                            const durationDays = Math.round((projectEnd.getTime() - projectStart.getTime()) / (1000 * 60 * 60 * 24));
+                            if (durationDays < 1) return false;
+                            return !(isAfter(projectStart, viewEnd) || isBefore(projectEnd, viewStart));
+                          });
+                          
+                          if (spanningProjects.length === 0) return null;
+                          
+                          const projectLanes = new Map<string, number>();
+                          const sortedSpanning = [...spanningProjects].sort((a, b) => {
+                            const aStart = new Date(a.startDate!).getTime();
+                            const bStart = new Date(b.startDate!).getTime();
+                            if (aStart !== bStart) return aStart - bStart;
+                            const aEnd = a.endDate ? new Date(a.endDate).getTime() : aStart;
+                            const bEnd = b.endDate ? new Date(b.endDate).getTime() : bStart;
+                            return (bEnd - bStart) - (aEnd - aStart);
+                          });
+                          
+                          sortedSpanning.forEach(project => {
+                            const projectStart = startOfDay(new Date(project.startDate!));
+                            const projectEnd = startOfDay(new Date(project.endDate!));
+                            
+                            let lane = 0;
+                            while (true) {
+                              let laneAvailable = true;
+                              const entries = Array.from(projectLanes.entries());
+                              for (let i = 0; i < entries.length; i++) {
+                                const [otherId, otherLane] = entries[i];
+                                if (otherLane !== lane) continue;
+                                const other = sortedSpanning.find(p => p.id === otherId);
+                                if (!other) continue;
+                                const otherStart = startOfDay(new Date(other.startDate!));
+                                const otherEnd = startOfDay(new Date(other.endDate!));
+                                if (!(isAfter(projectStart, otherEnd) || isBefore(projectEnd, otherStart))) {
+                                  laneAvailable = false;
+                                  break;
+                                }
+                              }
+                              if (laneAvailable) break;
+                              lane++;
+                            }
+                            projectLanes.set(project.id, lane);
+                          });
+                          
+                          const maxLane = Math.max(0, ...Array.from(projectLanes.values()));
+                          const numDays = viewDays.length;
+                          
+                          return (
+                            <div className="border-b bg-gray-50/50">
+                              <div className="flex">
+                                <div className="w-[60px] flex-shrink-0 border-r bg-muted/30" />
+                                <div 
+                                  className="flex-1 relative"
+                                  style={{ height: `${(maxLane + 1) * 40 + 8}px` }}
+                                >
+                                  {sortedSpanning.map(project => {
+                                    const lane = projectLanes.get(project.id) || 0;
+                                    const colors = statusColors[project.status] || statusColors.lead;
+                                    const projectStart = startOfDay(new Date(project.startDate!));
+                                    const projectEnd = startOfDay(new Date(project.endDate!));
+                                    
+                                    let startDayIndex = viewDays.findIndex(d => isSameDay(d, projectStart));
+                                    let endDayIndex = viewDays.findIndex(d => isSameDay(d, projectEnd));
+                                    
+                                    if (startDayIndex === -1) {
+                                      startDayIndex = isBefore(projectStart, viewStart) ? 0 : -1;
+                                    }
+                                    if (endDayIndex === -1) {
+                                      endDayIndex = isAfter(projectEnd, viewEnd) ? numDays - 1 : -1;
+                                    }
+                                    
+                                    if (startDayIndex === -1 || endDayIndex === -1 || startDayIndex > endDayIndex) {
+                                      return null;
+                                    }
+                                    
+                                    const leftPercent = (startDayIndex / numDays) * 100;
+                                    const widthPercent = ((endDayIndex - startDayIndex + 1) / numDays) * 100;
+                                    
+                                    const showRoundedLeft = isSameDay(projectStart, viewDays[startDayIndex]) || startDayIndex === 0;
+                                    const showRoundedRight = isSameDay(projectEnd, viewDays[endDayIndex]) || endDayIndex === numDays - 1;
+                                    
+                                    return (
+                                      <DraggableSpanningProject
+                                        key={project.id}
+                                        project={project}
+                                        colors={colors}
+                                        style={{
+                                          left: `calc(${leftPercent}% + 2px)`,
+                                          width: `calc(${widthPercent}% - 4px)`,
+                                          top: `${lane * 40 + 4}px`,
+                                        }}
+                                        showRoundedLeft={showRoundedLeft}
+                                        showRoundedRight={showRoundedRight}
+                                        onClick={() => navigate(`/crm/projects/${project.id}`)}
+                                      />
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                        
                         <div className="max-h-[600px] overflow-y-auto">
                           {hours.map((hour) => (
                             <div key={hour} className="flex">
@@ -1940,6 +2143,13 @@ export default function CrmProjects() {
                                   if (!project.startDate) return false;
                                   const projectStart = new Date(project.startDate);
                                   if (!isSameDay(projectStart, dayStart)) return false;
+                                  
+                                  // Exclude multi-day projects (they appear in the spanning section)
+                                  if (project.endDate) {
+                                    const projectEnd = new Date(project.endDate);
+                                    if (!isSameDay(projectStart, projectEnd)) return false;
+                                  }
+                                  
                                   const projectHour = getHours(projectStart);
                                   if (projectHour === 0 && hour === 8) return true;
                                   return projectHour === hour;
@@ -1956,20 +2166,12 @@ export default function CrmProjects() {
                                       {hourProjects.slice(0, 3).map((project) => {
                                         const colors = statusColors[project.status] || statusColors.lead;
                                         return (
-                                          <div
+                                          <DraggableTimeSlotProject
                                             key={project.id}
+                                            project={project}
+                                            colors={colors}
                                             onClick={() => navigate(`/crm/projects/${project.id}`)}
-                                            className={cn(
-                                              "text-[9px] leading-tight py-0.5 px-1 rounded cursor-pointer hover:opacity-80 border overflow-hidden",
-                                              colors.bg, colors.text, colors.border
-                                            )}
-                                            title={`${project.customerName || "Customer"} - ${formatProjectNumber(project.projectNumber)} - ${project.title}`}
-                                          >
-                                            <div className="font-medium truncate">
-                                              {project.customerName || "Customer"} - {formatProjectNumber(project.projectNumber)}
-                                            </div>
-                                            <div className="truncate opacity-75">{project.title}</div>
-                                          </div>
+                                          />
                                         );
                                       })}
                                       {hourProjects.length > 3 && (
