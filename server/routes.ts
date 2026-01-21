@@ -13033,7 +13033,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const [project] = await db.insert(crmProjects).values(result.data).returning();
+      // Get the next project number (start at 1000, or max + 1)
+      const [maxProjectNumber] = await db
+        .select({ maxNum: sql<number>`COALESCE(MAX(project_number), 999)` })
+        .from(crmProjects);
+      const nextProjectNumber = (maxProjectNumber?.maxNum || 999) + 1;
+
+      const [project] = await db.insert(crmProjects).values({
+        ...result.data,
+        projectNumber: nextProjectNumber,
+      }).returning();
 
       await logCrmAudit(
         user.id,

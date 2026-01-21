@@ -1045,6 +1045,7 @@ export type ProjectEquipmentItem = {
 
 export const crmProjects = pgTable("crm_projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectNumber: integer("project_number"),
   customerId: varchar("customer_id"),
   propertyId: varchar("property_id"),
   projectType: text("project_type").$type<ProjectType>().notNull(),

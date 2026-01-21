@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, Link } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -30,10 +30,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  FolderOpen,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
-import type { CrmUser, CrmCustomer } from "@shared/schema";
+import type { CrmUser, CrmCustomer, CrmProject } from "@shared/schema";
 
 type CustomerWithAddress = CrmCustomer & {
   fullAddress: string | null;
@@ -182,6 +183,48 @@ export default function CrmCustomers() {
     },
     enabled: !!currentUser,
   });
+
+  // Fetch projects for customers on the current page
+  const customerIds = useMemo(() => {
+    return customersData?.customers?.map(c => c.id) || [];
+  }, [customersData?.customers]);
+
+  const { data: projectsData } = useQuery<{ projects: CrmProject[] }>({
+    queryKey: ["/api/crm/projects", "forCustomers", customerIds],
+    queryFn: async () => {
+      if (customerIds.length === 0) return { projects: [] };
+      const params = new URLSearchParams();
+      customerIds.forEach(id => params.append("customerId", id));
+      const res = await fetch(`/api/crm/projects?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch projects");
+      return res.json();
+    },
+    enabled: !!currentUser && customerIds.length > 0,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // Group projects by customer ID
+  const projectsByCustomerId = useMemo(() => {
+    const grouped: Record<string, CrmProject[]> = {};
+    const projects = projectsData?.projects || [];
+    for (const project of projects) {
+      if (project.customerId) {
+        if (!grouped[project.customerId]) {
+          grouped[project.customerId] = [];
+        }
+        grouped[project.customerId].push(project);
+      }
+    }
+    return grouped;
+  }, [projectsData]);
+
+  // Format project number as 4-digit string
+  const formatProjectNumber = (projectNumber: number | null) => {
+    if (projectNumber === null || projectNumber === undefined) return "0000";
+    return String(projectNumber).padStart(4, "0");
+  };
 
   // Background prefetch next page of customers for instant pagination
   useEffect(() => {
@@ -444,54 +487,103 @@ export default function CrmCustomers() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  customers.map((customer) => (
-                    <TableRow
-                      key={customer.id}
-                      className="cursor-pointer hover:bg-slate-50 transition-colors"
-                      data-testid={`row-customer-${customer.id}`}
-                      onMouseEnter={() => prefetchCustomer(customer.id)}
-                      onTouchStart={() => prefetchCustomer(customer.id)}
-                      onClick={() => {
-                        navigate(`/crm/customers/${customer.id}`);
-                      }}
-                    >
-                      <TableCell className="font-medium text-slate-900">
-                        <div className="flex items-center gap-2">
-                          {customer.name}
-                          {customer.source === 'fieldedge' && (
-                            <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 text-xs">
-                              FE
+                  customers.map((customer) => {
+                    const customerProjects = projectsByCustomerId[customer.id] || [];
+                    return (
+                      <React.Fragment key={customer.id}>
+                        <TableRow
+                          className="cursor-pointer hover:bg-slate-50 transition-colors"
+                          data-testid={`row-customer-${customer.id}`}
+                          onMouseEnter={() => prefetchCustomer(customer.id)}
+                          onTouchStart={() => prefetchCustomer(customer.id)}
+                          onClick={() => {
+                            navigate(`/crm/customers/${customer.id}`);
+                          }}
+                        >
+                          <TableCell className="font-medium text-slate-900">
+                            <div className="flex items-center gap-2">
+                              {customer.name}
+                              {customer.source === 'fieldedge' && (
+                                <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 text-xs">
+                                  FE
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={getCustomerTypeBadgeClass(customer.customerType)}
+                            >
+                              {formatCustomerType(customer.customerType)}
                             </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={getCustomerTypeBadgeClass(customer.customerType)}
-                        >
-                          {formatCustomerType(customer.customerType)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={getStatusBadgeClass(customer.customerStatus)}
-                        >
-                          {formatCustomerStatus(customer.customerStatus)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell text-slate-600 max-w-xs truncate">
-                        {formatAddress(customer)}
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell text-slate-600">
-                        {customer.phone || "—"}
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell text-slate-600">
-                        {formatCustomerSince(customer.createdAt)}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={getStatusBadgeClass(customer.customerStatus)}
+                            >
+                              {formatCustomerStatus(customer.customerStatus)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell text-slate-600 max-w-xs truncate">
+                            {formatAddress(customer)}
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell text-slate-600">
+                            {customer.phone || "—"}
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell text-slate-600">
+                            {formatCustomerSince(customer.createdAt)}
+                          </TableCell>
+                        </TableRow>
+                        {customerProjects.map((project) => (
+                          <TableRow
+                            key={`project-${project.id}`}
+                            className="cursor-pointer hover:bg-slate-100 transition-colors bg-slate-50/50"
+                            data-testid={`row-project-${project.id}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/crm/projects/${project.id}`);
+                            }}
+                          >
+                            <TableCell className="font-medium text-slate-700">
+                              <div className="flex items-center gap-2 pl-6">
+                                <FolderOpen className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                                <span className="text-slate-600">
+                                  {customer.name} - {formatProjectNumber(project.projectNumber)}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className="bg-slate-100 text-slate-600 border-slate-200"
+                              >
+                                Project
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className="bg-blue-50 text-blue-600 border-blue-200"
+                              >
+                                {project.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell text-slate-500 max-w-xs truncate">
+                              {project.title || "—"}
+                            </TableCell>
+                            <TableCell className="hidden lg:table-cell text-slate-500">
+                              —
+                            </TableCell>
+                            <TableCell className="hidden sm:table-cell text-slate-500">
+                              {project.createdAt ? formatCustomerSince(project.createdAt) : "—"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </React.Fragment>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
