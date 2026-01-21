@@ -2129,6 +2129,91 @@ export default function CrmProjects() {
                           );
                         })()}
                         
+                        {/* Tasks Due section */}
+                        {(() => {
+                          const tasksByDay = viewDays.map(day => {
+                            const dayStart = startOfDay(day);
+                            return calendarTasksData?.filter(task => {
+                              if (!task.dueDate) return false;
+                              return isSameDay(new Date(task.dueDate), dayStart);
+                            }) || [];
+                          });
+                          
+                          const hasTasks = tasksByDay.some(tasks => tasks.length > 0);
+                          if (!hasTasks) return null;
+                          
+                          return (
+                            <div className="border-b bg-indigo-50/30">
+                              <div className="flex">
+                                <div className="w-[60px] flex-shrink-0 border-r bg-muted/30 p-1 pr-2 text-right">
+                                  <div className="text-[10px] text-muted-foreground flex items-center justify-end gap-1">
+                                    <ListTodo className="w-3 h-3" />
+                                    Tasks
+                                  </div>
+                                </div>
+                                {viewDays.map((day, idx) => {
+                                  const dayTasks = tasksByDay[idx];
+                                  return (
+                                    <div
+                                      key={day.toISOString()}
+                                      className={cn(
+                                        "flex-1 min-w-0 p-1 border-r last:border-r-0 min-h-[40px]",
+                                        isToday(day) && "bg-amber-50/50"
+                                      )}
+                                    >
+                                      {dayTasks.length > 0 ? (
+                                        <div className="space-y-0.5">
+                                          {dayTasks.slice(0, 3).map(task => (
+                                            <DraggableTask
+                                              key={task.id}
+                                              task={task}
+                                              onClick={() => navigate(`/crm/projects/${task.projectId}`)}
+                                            />
+                                          ))}
+                                          {dayTasks.length > 3 && (
+                                            <Popover>
+                                              <PopoverTrigger asChild>
+                                                <button className="text-[9px] text-indigo-600 hover:text-indigo-700 px-1">
+                                                  +{dayTasks.length - 3} more tasks
+                                                </button>
+                                              </PopoverTrigger>
+                                              <PopoverContent className="w-64 p-2" align="start">
+                                                <div className="font-medium text-sm mb-2">{format(day, "EEEE, MMM d")} - Tasks</div>
+                                                <div className="space-y-1 max-h-40 overflow-y-auto">
+                                                  {dayTasks.map(task => (
+                                                    <button
+                                                      key={task.id}
+                                                      onClick={() => navigate(`/crm/projects/${task.projectId}`)}
+                                                      className={cn(
+                                                        "w-full text-left p-2 rounded text-xs hover:bg-indigo-100 border border-indigo-200",
+                                                        task.completedAt ? "bg-gray-100 text-gray-400 line-through" : "bg-indigo-50 text-indigo-700"
+                                                      )}
+                                                    >
+                                                      <div className="flex items-center gap-1.5">
+                                                        <ListTodo className="w-3 h-3 flex-shrink-0" />
+                                                        <span className="truncate font-medium">{task.title}</span>
+                                                      </div>
+                                                      <div className="text-[10px] opacity-75 mt-0.5 truncate">
+                                                        {task.projectTitle || "No project"} {task.assignedUserName && `• ${task.assignedUserName}`}
+                                                      </div>
+                                                    </button>
+                                                  ))}
+                                                </div>
+                                              </PopoverContent>
+                                            </Popover>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <div className="text-[9px] text-muted-foreground italic">—</div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                        
                         <div className="max-h-[600px] overflow-y-auto">
                           {hours.map((hour) => (
                             <div key={hour} className="flex">
