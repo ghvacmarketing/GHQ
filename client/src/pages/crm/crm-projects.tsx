@@ -514,7 +514,7 @@ function DroppableTimeSlot({
     <div
       ref={setNodeRef}
       className={cn(
-        "bg-white p-1 min-h-[50px] border-b border-r",
+        "flex-1 bg-white p-1 min-h-[50px] border-b border-r overflow-hidden",
         isTodayDate && "bg-amber-50/30",
         isOver && "bg-blue-50 ring-2 ring-blue-400 ring-inset"
       )}
@@ -1911,7 +1911,7 @@ export default function CrmProjects() {
                             <div
                               key={day.toISOString()}
                               className={cn(
-                                "flex-1 p-2 text-center border-r last:border-r-0",
+                                "flex-1 min-w-0 p-2 text-center border-r last:border-r-0",
                                 isToday(day) && "bg-amber-50"
                               )}
                             >
@@ -1952,17 +1952,18 @@ export default function CrmProjects() {
                                     hour={hour}
                                     isTodayDate={isTodayDate}
                                   >
-                                    <div className="space-y-0.5">
-                                      {hourProjects.map((project) => {
+                                    <div className="space-y-0.5 min-w-0 w-full">
+                                      {hourProjects.slice(0, 3).map((project) => {
                                         const colors = statusColors[project.status] || statusColors.lead;
                                         return (
                                           <div
                                             key={project.id}
                                             onClick={() => navigate(`/crm/projects/${project.id}`)}
                                             className={cn(
-                                              "text-[10px] leading-tight py-0.5 px-1.5 rounded cursor-pointer hover:opacity-80 border",
+                                              "text-[9px] leading-tight py-0.5 px-1 rounded cursor-pointer hover:opacity-80 border overflow-hidden",
                                               colors.bg, colors.text, colors.border
                                             )}
+                                            title={`${project.customerName || "Customer"} - ${formatProjectNumber(project.projectNumber)} - ${project.title}`}
                                           >
                                             <div className="font-medium truncate">
                                               {project.customerName || "Customer"} - {formatProjectNumber(project.projectNumber)}
@@ -1971,6 +1972,11 @@ export default function CrmProjects() {
                                           </div>
                                         );
                                       })}
+                                      {hourProjects.length > 3 && (
+                                        <div className="text-[8px] text-muted-foreground text-center">
+                                          +{hourProjects.length - 3} more
+                                        </div>
+                                      )}
                                     </div>
                                   </DroppableTimeSlot>
                                 );
