@@ -13466,20 +13466,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "CSV file is empty" });
       }
 
+      // Helper function to find a value from multiple possible column names (case-insensitive, exact match only)
+      const findColumn = (row: Record<string, any>, possibleNames: string[]): any => {
+        const rowKeys = Object.keys(row);
+        // Try exact and case-insensitive matches in priority order
+        for (const name of possibleNames) {
+          // Exact match first
+          if (row[name] !== undefined) return row[name];
+          // Case-insensitive match
+          const lowerName = name.toLowerCase();
+          const matchingKey = rowKeys.find(k => k.toLowerCase() === lowerName);
+          if (matchingKey && row[matchingKey] !== undefined) return row[matchingKey];
+        }
+        return undefined;
+      };
+
       // Map CSV rows to catalog items
       const items: InsertMaterialsCatalog[] = data.map((row) => {
+        // Try to find the name/description column (HVAC supplier formats)
+        const name = findColumn(row, [
+          "Name", "name", "Item", "item", 
+          "Product Description", "Product Name", "Product",
+          "Material Description", "Material", "Material Name",
+          "Item Description", "Item Name",
+          "Description", "Desc"
+        ]) || "";
+
         // Try to find the cost column (various possible names)
-        const cost = row["Unit Cost"] || row["unit_cost"] || row["Cost"] || row["cost"] || row["Price"] || row["price"] || 0;
-        const parsedCost = typeof cost === "string" ? parseFloat(cost.replace(/[$,]/g, "")) : cost;
+        const costValue = findColumn(row, [
+          "Unit Cost", "unit_cost", "Cost", "cost", 
+          "Price", "price", "Unit Price",
+          "List Price", "Net Price", "Your Price", "Customer Price",
+          "Sell Price", "Sale Price", "Extended Price"
+        ]) || 0;
+        const parsedCost = typeof costValue === "string" ? parseFloat(costValue.replace(/[$,]/g, "")) : costValue;
+
+        // Try to find part number column
+        const partNumber = findColumn(row, [
+          "Part Number", "part_number", "PartNumber", "Part #", "Part#",
+          "SKU", "sku", "Catalog #", "Catalog Number", "CatalogNumber",
+          "Item Number", "Item #", "Item#", "ItemNumber",
+          "Product Number", "Product #", "Model", "Model Number", "Model #"
+        ]);
+
+        // Try to find category column
+        const category = findColumn(row, [
+          "Category", "category", "Type", "type",
+          "Product Category", "Product Type", "Group", "Product Group",
+          "Class", "Classification", "Department"
+        ]);
+
+        // Try to find unit column
+        const unit = findColumn(row, [
+          "Unit", "unit", "UOM", "U/M", "Unit of Measure",
+          "Units", "Measure", "Pkg", "Package"
+        ]) || "each";
+
+        // Try to find vendor column
+        const vendor = findColumn(row, [
+          "Vendor", "vendor", "Supplier", "supplier",
+          "Manufacturer", "Mfr", "Mfg", "Brand", "Make"
+        ]);
+
+        // Try to find description (separate from name if both exist)
+        const description = findColumn(row, [
+          "Description", "Desc", "Details", "Notes", "Comments", "Remarks"
+        ]);
 
         return {
-          name: row["Name"] || row["name"] || row["Item"] || row["item"] || row["Description"] || "",
-          description: row["Description"] || row["description"] || row["Desc"] || null,
-          category: row["Category"] || row["category"] || row["Type"] || row["type"] || null,
-          partNumber: row["Part Number"] || row["part_number"] || row["PartNumber"] || row["SKU"] || row["sku"] || null,
+          name: String(name).trim(),
+          description: description ? String(description).trim() : null,
+          category: category ? String(category).trim() : null,
+          partNumber: partNumber ? String(partNumber).trim() : null,
           unitCost: (isNaN(parsedCost) ? 0 : parsedCost).toString(),
-          unit: row["Unit"] || row["unit"] || "each",
-          vendor: row["Vendor"] || row["vendor"] || row["Supplier"] || row["supplier"] || null,
+          unit: String(unit).trim(),
+          vendor: vendor ? String(vendor).trim() : null,
           isActive: true,
         };
       }).filter(item => item.name); // Filter out items without names
