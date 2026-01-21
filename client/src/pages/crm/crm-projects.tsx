@@ -565,10 +565,18 @@ function DraggableTask({
         isDragging && "opacity-50 z-50"
       )}
       style={style}
-      title={`${task.title} - ${task.projectTitle || "No project"}`}
+      title={`${task.title}${task.assignedUserName ? ` • ${task.assignedUserName}` : ""}${task.dueDate ? ` • Due: ${format(new Date(task.dueDate), "MMM d")}` : ""} - ${task.projectTitle || "No project"}`}
     >
       <ListTodo className="w-3 h-3 flex-shrink-0" />
-      <span className="truncate">{task.title}</span>
+      <span className="truncate flex-1">{task.title}</span>
+      <span className="flex-shrink-0 text-[8px] opacity-75 flex items-center gap-0.5">
+        {task.dueDate && (
+          <span>{format(new Date(task.dueDate), "M/d")}</span>
+        )}
+        {task.assignedUserName && (
+          <span className="truncate max-w-[30px]">• {task.assignedUserName.split(" ")[0]}</span>
+        )}
+      </span>
     </button>
   );
 }
@@ -1007,8 +1015,21 @@ export default function CrmProjects() {
     
     if (activeId.startsWith("task-")) {
       const taskId = activeId.replace("task-", "");
-      const newDate = new Date(overId);
-      if (!isNaN(newDate.getTime())) {
+      let newDate: Date | null = null;
+      
+      // Handle time slot drops (format: timeslot:ISO:hour)
+      if (overId.startsWith("timeslot:")) {
+        const parts = overId.split(":");
+        if (parts.length >= 3) {
+          const datePartStr = parts.slice(1, -1).join(":");
+          newDate = new Date(datePartStr);
+        }
+      } else {
+        // Regular date drop (month view)
+        newDate = new Date(overId);
+      }
+      
+      if (newDate && !isNaN(newDate.getTime())) {
         updateTaskDueDateMutation.mutate({
           taskId,
           dueDate: newDate.toISOString(),
@@ -1920,9 +1941,38 @@ export default function CrmProjects() {
                                       />
                                     ))}
                                     {dayTasks.length > 2 && (
-                                      <div className="text-[9px] text-muted-foreground pl-1">
-                                        +{dayTasks.length - 2} more tasks
-                                      </div>
+                                      <Popover>
+                                        <PopoverTrigger asChild>
+                                          <button className="text-[9px] text-indigo-600 hover:text-indigo-700 pl-1">
+                                            +{dayTasks.length - 2} more tasks
+                                          </button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-64 p-2" align="start">
+                                          <div className="font-medium text-sm mb-2">{format(day, "EEEE, MMM d")} - Tasks</div>
+                                          <div className="space-y-1 max-h-40 overflow-y-auto">
+                                            {dayTasks.map(task => (
+                                              <button
+                                                key={task.id}
+                                                onClick={() => navigate(`/crm/projects/${task.projectId}`)}
+                                                className={cn(
+                                                  "w-full text-left p-2 rounded text-xs hover:bg-indigo-100 border border-indigo-200",
+                                                  task.completedAt ? "bg-gray-100 text-gray-400 line-through" : "bg-indigo-50 text-indigo-700"
+                                                )}
+                                              >
+                                                <div className="flex items-center gap-1.5">
+                                                  <ListTodo className="w-3 h-3 flex-shrink-0" />
+                                                  <span className="truncate font-medium">{task.title}</span>
+                                                </div>
+                                                <div className="text-[10px] opacity-75 mt-0.5 truncate">
+                                                  {task.dueDate && <span className="font-medium">{format(new Date(task.dueDate), "MMM d")}</span>}
+                                                  {task.projectTitle && ` • ${task.projectTitle}`}
+                                                  {task.assignedUserName && ` • ${task.assignedUserName}`}
+                                                </div>
+                                              </button>
+                                            ))}
+                                          </div>
+                                        </PopoverContent>
+                                      </Popover>
                                     )}
                                   </div>
                                 );
@@ -2194,7 +2244,9 @@ export default function CrmProjects() {
                                                         <span className="truncate font-medium">{task.title}</span>
                                                       </div>
                                                       <div className="text-[10px] opacity-75 mt-0.5 truncate">
-                                                        {task.projectTitle || "No project"} {task.assignedUserName && `• ${task.assignedUserName}`}
+                                                        {task.dueDate && <span className="font-medium">{format(new Date(task.dueDate), "MMM d")}</span>}
+                                                        {task.projectTitle && ` • ${task.projectTitle}`}
+                                                        {task.assignedUserName && ` • ${task.assignedUserName}`}
                                                       </div>
                                                     </button>
                                                   ))}
