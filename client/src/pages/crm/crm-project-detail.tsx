@@ -487,6 +487,7 @@ export default function CrmProjectDetail() {
     onSuccess: () => {
       toast({ title: "Task added" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/project-tasks"] });
       setNewTaskTitle("");
       setNewTaskDescription("");
       setNewTaskAssignee(null);
@@ -512,6 +513,7 @@ export default function CrmProjectDetail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/project-tasks"] });
       setEditingTask(null);
     },
     onError: () => {
@@ -526,6 +528,7 @@ export default function CrmProjectDetail() {
     onSuccess: () => {
       toast({ title: "Task deleted" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/project-tasks"] });
     },
     onError: () => {
       toast({ title: "Failed to delete task", variant: "destructive" });
