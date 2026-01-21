@@ -88,7 +88,7 @@ import {
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, addDays, isBefore, isAfter, startOfDay } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, addDays, subDays, addWeeks, subWeeks, isBefore, isAfter, startOfDay, setHours, getHours, isToday } from "date-fns";
 import type { CrmUser, CrmProject, CrmProperty, CrmProjectTask } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
@@ -495,6 +495,35 @@ function DroppableDay({ day, isCurrentMonth, children }: { day: Date; isCurrentM
   );
 }
 
+function DroppableTimeSlot({ 
+  day, 
+  hour, 
+  isTodayDate, 
+  children 
+}: { 
+  day: Date; 
+  hour: number; 
+  isTodayDate: boolean; 
+  children: React.ReactNode; 
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `timeslot:${day.toISOString()}:${hour}`,
+  });
+  
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "bg-white p-1 min-h-[50px] border-b border-r",
+        isTodayDate && "bg-amber-50/30",
+        isOver && "bg-blue-50 ring-2 ring-blue-400 ring-inset"
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 function formatCurrency(value: number | string | null | undefined): string {
   if (value === null || value === undefined || value === "") return "";
   const num = typeof value === "string" ? parseFloat(value) : value;
@@ -622,6 +651,7 @@ export default function CrmProjects() {
   };
   const [mainViewTab, setMainViewTab] = useState<"overview" | "list" | "calendar" | "kanban">(getInitialTab);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [calendarView, setCalendarView] = useState<"month" | "week" | "3day" | "day">("month");
   const [page, setPage] = useState(1);
   
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -899,21 +929,80 @@ export default function CrmProjects() {
     const project = allProjects.find(p => p.id === activeId);
     if (!project || !project.startDate) return;
     
-    const oldStartDate = startOfDay(new Date(project.startDate));
-    const newDate = startOfDay(new Date(overId));
+    const isTimeSlotDrop = overId.startsWith("timeslot:");
     
-    const daysDiff = Math.round((newDate.getTime() - oldStartDate.getTime()) / (1000 * 60 * 60 * 24));
-    if (daysDiff === 0) return;
-    
-    const newStartDate = addDays(oldStartDate, daysDiff);
-    const oldEndDate = project.endDate ? startOfDay(new Date(project.endDate)) : oldStartDate;
-    const newEndDate = addDays(oldEndDate, daysDiff);
-    
-    updateProjectDatesMutation.mutate({
-      projectId: activeId,
-      startDate: format(newStartDate, "yyyy-MM-dd"),
-      endDate: format(newEndDate, "yyyy-MM-dd"),
-    });
+    if (isTimeSlotDrop) {
+      const parts = overId.split(":");
+      if (parts.length < 3) return;
+      
+      const hourStr = parts[parts.length - 1];
+      const newHour = parseInt(hourStr, 10);
+      const datePartStr = parts.slice(1, -1).join(":");
+      const newDateBase = new Date(datePartStr);
+      
+      if (isNaN(newDateBase.getTime()) || isNaN(newHour)) return;
+      
+      const oldStartDate = new Date(project.startDate);
+      const newStartDate = setHours(startOfDay(newDateBase), newHour);
+      
+      const timeDiff = newStartDate.getTime() - oldStartDate.getTime();
+      if (timeDiff === 0) return;
+      
+      const oldEndDate = project.endDate ? new Date(project.endDate) : oldStartDate;
+      const newEndDate = new Date(oldEndDate.getTime() + timeDiff);
+      
+      queryClient.setQueryData(
+        ["/api/crm/projects/calendar", calendarQueryParams],
+        (oldData: any) => {
+          if (!oldData?.projects) return oldData;
+          return {
+            ...oldData,
+            projects: oldData.projects.map((p: any) =>
+              p.id === activeId
+                ? { ...p, startDate: format(newStartDate, "yyyy-MM-dd'T'HH:mm:ss"), endDate: format(newEndDate, "yyyy-MM-dd'T'HH:mm:ss") }
+                : p
+            ),
+          };
+        }
+      );
+      
+      updateProjectDatesMutation.mutate({
+        projectId: activeId,
+        startDate: format(newStartDate, "yyyy-MM-dd'T'HH:mm:ss"),
+        endDate: format(newEndDate, "yyyy-MM-dd'T'HH:mm:ss"),
+      });
+    } else {
+      const oldStartDate = startOfDay(new Date(project.startDate));
+      const newDate = startOfDay(new Date(overId));
+      
+      const daysDiff = Math.round((newDate.getTime() - oldStartDate.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysDiff === 0) return;
+      
+      const newStartDate = addDays(oldStartDate, daysDiff);
+      const oldEndDate = project.endDate ? startOfDay(new Date(project.endDate)) : oldStartDate;
+      const newEndDate = addDays(oldEndDate, daysDiff);
+      
+      queryClient.setQueryData(
+        ["/api/crm/projects/calendar", calendarQueryParams],
+        (oldData: any) => {
+          if (!oldData?.projects) return oldData;
+          return {
+            ...oldData,
+            projects: oldData.projects.map((p: any) =>
+              p.id === activeId
+                ? { ...p, startDate: format(newStartDate, "yyyy-MM-dd"), endDate: format(newEndDate, "yyyy-MM-dd") }
+                : p
+            ),
+          };
+        }
+      );
+      
+      updateProjectDatesMutation.mutate({
+        projectId: activeId,
+        startDate: format(newStartDate, "yyyy-MM-dd"),
+        endDate: format(newEndDate, "yyyy-MM-dd"),
+      });
+    }
   };
 
   const handleKanbanDragStart = (event: DragStartEvent) => {
@@ -1478,26 +1567,109 @@ export default function CrmProjects() {
           <TabsContent value="calendar" className="mt-4">
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleCalendarDragStart} onDragEnd={handleCalendarDragEnd}>
               <div className="space-y-4">
-                <div className="flex items-center justify-between mb-4">
-                  <Button variant="outline" size="sm" onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}>
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <h2 className="text-lg font-semibold">{format(calendarMonth, "MMMM yyyy")}</h2>
-                  <Button variant="outline" size="sm" onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (calendarView === "month") {
+                          setCalendarMonth(subMonths(calendarMonth, 1));
+                        } else if (calendarView === "week") {
+                          setCalendarMonth(subWeeks(calendarMonth, 1));
+                        } else if (calendarView === "3day") {
+                          setCalendarMonth(subDays(calendarMonth, 3));
+                        } else {
+                          setCalendarMonth(subDays(calendarMonth, 1));
+                        }
+                      }}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <h2 className="text-lg font-semibold min-w-[180px] text-center">
+                      {calendarView === "month" 
+                        ? format(calendarMonth, "MMMM yyyy")
+                        : calendarView === "week"
+                        ? `Week of ${format(startOfWeek(calendarMonth, { weekStartsOn: 0 }), "MMM d, yyyy")}`
+                        : calendarView === "3day"
+                        ? `${format(calendarMonth, "MMM d")} - ${format(addDays(calendarMonth, 2), "MMM d, yyyy")}`
+                        : format(calendarMonth, "EEEE, MMM d, yyyy")
+                      }
+                    </h2>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (calendarView === "month") {
+                          setCalendarMonth(addMonths(calendarMonth, 1));
+                        } else if (calendarView === "week") {
+                          setCalendarMonth(addWeeks(calendarMonth, 1));
+                        } else if (calendarView === "3day") {
+                          setCalendarMonth(addDays(calendarMonth, 3));
+                        } else {
+                          setCalendarMonth(addDays(calendarMonth, 1));
+                        }
+                      }}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setCalendarMonth(new Date())}
+                      className="text-xs"
+                    >
+                      Today
+                    </Button>
+                  </div>
+                  <div className="flex items-center rounded-lg border bg-muted p-1 gap-1">
+                    <Button
+                      variant={calendarView === "month" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setCalendarView("month")}
+                      className="h-7 px-3 text-xs"
+                    >
+                      Month
+                    </Button>
+                    <Button
+                      variant={calendarView === "week" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setCalendarView("week")}
+                      className="h-7 px-3 text-xs"
+                    >
+                      Week
+                    </Button>
+                    <Button
+                      variant={calendarView === "3day" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setCalendarView("3day")}
+                      className="h-7 px-3 text-xs"
+                    >
+                      3 Day
+                    </Button>
+                    <Button
+                      variant={calendarView === "day" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setCalendarView("day")}
+                      className="h-7 px-3 text-xs"
+                    >
+                      Day
+                    </Button>
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {Object.entries(statusColors).filter(([key]) => !["archived", "proposal_sent"].includes(key)).map(([status, colors]) => (
-                    <div key={status} className="flex items-center gap-1.5 text-xs">
-                      <div className={cn("w-3 h-3 rounded", colors.bg, colors.border, "border")} />
-                      <span>{statusLabels[status]}</span>
-                    </div>
-                  ))}
-                </div>
+                {calendarView === "month" && (
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {Object.entries(statusColors).filter(([key]) => !["archived", "proposal_sent"].includes(key)).map(([status, colors]) => (
+                      <div key={status} className="flex items-center gap-1.5 text-xs">
+                        <div className={cn("w-3 h-3 rounded", colors.bg, colors.border, "border")} />
+                        <span>{statusLabels[status]}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-                {calendarLoading ? (
+                {calendarView === "month" && (calendarLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
                   </div>
@@ -1664,7 +1836,41 @@ export default function CrmProjects() {
                                 );
                               })()}
                               {dayProjects.length > 3 && (
-                                <div className="text-xs text-muted-foreground px-1 absolute bottom-0.5">+{dayProjects.length - 3} more</div>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button className="text-[10px] text-muted-foreground px-1 absolute bottom-0.5 hover:text-foreground hover:bg-gray-100 rounded transition-colors cursor-pointer">
+                                      +{dayProjects.length - 3} more
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-72 p-2" align="start">
+                                    <div className="font-medium text-sm mb-2">{format(day, "EEEE, MMM d")}</div>
+                                    <div className="space-y-1 max-h-60 overflow-y-auto">
+                                      {dayProjects.map((project) => {
+                                        const projColors = statusColors[project.status] || statusColors.lead;
+                                        return (
+                                          <div
+                                            key={project.id}
+                                            onClick={() => navigate(`/crm/projects/${project.id}`)}
+                                            className={cn(
+                                              "p-2 rounded text-xs cursor-pointer hover:opacity-80 border",
+                                              projColors.bg, projColors.text, projColors.border
+                                            )}
+                                          >
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="font-medium truncate">
+                                                {project.customerName || "Customer"} - {formatProjectNumber(project.projectNumber)}
+                                              </span>
+                                            </div>
+                                            <div className="mt-0.5 truncate opacity-75">{project.title}</div>
+                                            {project.expectedValue && (
+                                              <div className="mt-0.5 font-medium">{formatCurrency(project.expectedValue)}</div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
                               )}
                             </DroppableDay>
                           );
@@ -1672,6 +1878,109 @@ export default function CrmProjects() {
                       })()}
                     </div>
                   </div>
+                ))}
+
+                {/* Week/3-Day/Day views with time slots */}
+                {(calendarView === "week" || calendarView === "3day" || calendarView === "day") && (
+                  calendarLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                    </div>
+                  ) : (() => {
+                    const allProjects = calendarProjectsData?.projects || [];
+                    let viewDays: Date[] = [];
+                    
+                    if (calendarView === "week") {
+                      const weekStart = startOfWeek(calendarMonth, { weekStartsOn: 0 });
+                      viewDays = eachDayOfInterval({ start: weekStart, end: addDays(weekStart, 6) });
+                    } else if (calendarView === "3day") {
+                      viewDays = [calendarMonth, addDays(calendarMonth, 1), addDays(calendarMonth, 2)];
+                    } else {
+                      viewDays = [calendarMonth];
+                    }
+                    
+                    const hours = Array.from({ length: 24 }, (_, i) => i);
+                    
+                    return (
+                      <div className="border rounded-lg overflow-hidden">
+                        <div className="flex border-b bg-muted">
+                          <div className="w-[60px] flex-shrink-0 p-2 border-r text-center text-xs font-medium text-muted-foreground">
+                            Time
+                          </div>
+                          {viewDays.map((day) => (
+                            <div
+                              key={day.toISOString()}
+                              className={cn(
+                                "flex-1 p-2 text-center border-r last:border-r-0",
+                                isToday(day) && "bg-amber-50"
+                              )}
+                            >
+                              <div className="text-xs font-medium">{format(day, "EEE")}</div>
+                              <div className={cn(
+                                "text-lg font-bold",
+                                isToday(day) ? "text-amber-600" : "text-foreground"
+                              )}>
+                                {format(day, "d")}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <div className="max-h-[600px] overflow-y-auto">
+                          {hours.map((hour) => (
+                            <div key={hour} className="flex">
+                              <div className="w-[60px] flex-shrink-0 p-1 border-r text-right pr-2 text-xs text-muted-foreground bg-muted/30">
+                                {format(setHours(new Date(), hour), "h a")}
+                              </div>
+                              {viewDays.map((day) => {
+                                const isTodayDate = isToday(day);
+                                const dayStart = startOfDay(day);
+                                
+                                const hourProjects = allProjects.filter((project) => {
+                                  if (!project.startDate) return false;
+                                  const projectStart = new Date(project.startDate);
+                                  if (!isSameDay(projectStart, dayStart)) return false;
+                                  const projectHour = getHours(projectStart);
+                                  if (projectHour === 0 && hour === 8) return true;
+                                  return projectHour === hour;
+                                });
+                                
+                                return (
+                                  <DroppableTimeSlot
+                                    key={`${day.toISOString()}-${hour}`}
+                                    day={day}
+                                    hour={hour}
+                                    isTodayDate={isTodayDate}
+                                  >
+                                    <div className="space-y-0.5">
+                                      {hourProjects.map((project) => {
+                                        const colors = statusColors[project.status] || statusColors.lead;
+                                        return (
+                                          <div
+                                            key={project.id}
+                                            onClick={() => navigate(`/crm/projects/${project.id}`)}
+                                            className={cn(
+                                              "text-[10px] leading-tight py-0.5 px-1.5 rounded cursor-pointer hover:opacity-80 border",
+                                              colors.bg, colors.text, colors.border
+                                            )}
+                                          >
+                                            <div className="font-medium truncate">
+                                              {project.customerName || "Customer"} - {formatProjectNumber(project.projectNumber)}
+                                            </div>
+                                            <div className="truncate opacity-75">{project.title}</div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </DroppableTimeSlot>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()
                 )}
 
                 <DragOverlay>
