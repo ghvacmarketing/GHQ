@@ -1132,18 +1132,21 @@ export default function CrmQuoteCreate() {
           </CardContent>
         </Card>
 
-        {currentStep > 1 && (
-          <div className="flex justify-between">
+        <div className="flex justify-between">
+          {currentStep > 1 ? (
             <Button variant="outline" onClick={handleBack} data-testid="button-previous">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Previous
             </Button>
-            {currentStep < 4 ? (
-              <Button onClick={handleNext} disabled={!canProceed(currentStep)} data-testid="button-next">
-                Next
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
-            ) : (
+          ) : (
+            <div />
+          )}
+          {currentStep < 4 ? (
+            <Button onClick={handleNext} disabled={!canProceed(currentStep)} data-testid="button-next">
+              Next
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          ) : (
               <Button 
                 className="bg-green-600 hover:bg-green-700" 
                 onClick={handleCreateQuote}
@@ -1163,8 +1166,7 @@ export default function CrmQuoteCreate() {
                 )}
               </Button>
             )}
-          </div>
-        )}
+        </div>
       </div>
 
       <Dialog open={discountModalOpen} onOpenChange={setDiscountModalOpen}>
