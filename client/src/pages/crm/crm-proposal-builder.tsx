@@ -3627,10 +3627,12 @@ export default function CrmProposalBuilder() {
                       <Button
                         className="flex-1 min-h-[44px]"
                         onClick={openQuoteDialog}
+                        disabled={!selectedCustomer}
+                        title={!selectedCustomer ? "Select a customer first" : undefined}
                         data-testid="button-generate-quote"
                       >
                         <FileText className="h-4 w-4 mr-2" />
-                        View Quote
+                        {selectedCustomer ? 'View Quote' : 'Select Customer First'}
                       </Button>
                     </div>
                   </div>
@@ -3640,31 +3642,49 @@ export default function CrmProposalBuilder() {
             </div>
           </div>
           
-          {/* Customer Selection Section - Always visible at top */}
-          <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
-            <CardContent className="py-3 px-4">
-              <div className="flex items-center gap-4 flex-wrap">
-                <div className="flex items-center gap-2 text-sm font-medium text-blue-800 dark:text-blue-200">
-                  <Search className="h-4 w-4" />
-                  <span>Customer:</span>
-                </div>
-                
-                {selectedCustomer ? (
-                  <div className="flex items-center gap-2 flex-wrap flex-1">
-                    <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      {selectedCustomer.name}
-                    </Badge>
-                    {selectedCustomer.fullAddress && (
-                      <span className="text-sm text-muted-foreground flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {selectedCustomer.fullAddress}
-                      </span>
+          {/* Customer Selection Section - REQUIRED FIRST STEP */}
+          <Card className={`border-2 ${selectedCustomer ? 'bg-green-50 dark:bg-green-950 border-green-300 dark:border-green-700' : 'bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-700'}`}>
+            <CardContent className="py-4 px-5">
+              {selectedCustomer ? (
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-full text-sm font-medium">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Step 1 Complete
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-lg">{selectedCustomer.name}</span>
+                      {selectedCustomer.fullAddress && (
+                        <span className="text-sm text-muted-foreground flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {selectedCustomer.fullAddress}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {/* Property selection for customers with multiple sites */}
+                    {customerProperties.length > 1 && (
+                      <select
+                        value={selectedPropertyId || ""}
+                        onChange={(e) => setSelectedPropertyId(e.target.value || null)}
+                        className="h-9 px-3 border rounded-md bg-white dark:bg-gray-900 text-sm"
+                        data-testid="select-property-main"
+                      >
+                        <option value="">Select Property...</option>
+                        {customerProperties.map((prop) => (
+                          <option key={prop.id} value={prop.id}>
+                            {prop.address1}, {prop.city}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {isLoadingProperties && (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     )}
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      className="h-6 text-xs text-muted-foreground hover:text-destructive"
                       onClick={() => {
                         setSelectedCustomer(null);
                         setCustomerName('');
@@ -3673,12 +3693,23 @@ export default function CrmProposalBuilder() {
                         setSelectedPropertyId(null);
                       }}
                     >
-                      <X className="h-3 w-3 mr-1" />
-                      Clear
+                      <Pencil className="h-3 w-3 mr-1" />
+                      Change Customer
                     </Button>
                   </div>
-                ) : (
-                  <div className="flex-1 max-w-md">
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 bg-amber-600 text-white px-3 py-1.5 rounded-full text-sm font-medium">
+                      <span className="font-bold">1</span>
+                      Step 1: Select Customer
+                    </div>
+                    <span className="text-amber-800 dark:text-amber-200 text-sm font-medium">
+                      Search and select a customer to continue
+                    </span>
+                  </div>
+                  <div className="max-w-lg">
                     <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
                       <PopoverTrigger asChild>
                         <div className="relative">
@@ -3697,8 +3728,9 @@ export default function CrmProposalBuilder() {
                               }
                             }}
                             placeholder="Search by name, phone, email, or address..."
-                            className="pl-10 pr-10 h-9 bg-white dark:bg-gray-900"
+                            className="pl-10 pr-10 h-11 bg-white dark:bg-gray-900 text-base"
                             data-testid="input-customer-search-main"
+                            autoFocus
                           />
                           {isSearchingCustomers && (
                             <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
@@ -3752,35 +3784,8 @@ export default function CrmProposalBuilder() {
                       </PopoverContent>
                     </Popover>
                   </div>
-                )}
-                
-                {/* Property selection for customers with multiple sites */}
-                {selectedCustomer && customerProperties.length > 1 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-amber-700 dark:text-amber-300 font-medium">Property:</span>
-                    <select
-                      value={selectedPropertyId || ""}
-                      onChange={(e) => setSelectedPropertyId(e.target.value || null)}
-                      className="h-9 px-2 border rounded-md bg-white dark:bg-gray-900 text-sm"
-                      data-testid="select-property-main"
-                    >
-                      <option value="">-- Select --</option>
-                      {customerProperties.map((prop) => (
-                        <option key={prop.id} value={prop.id}>
-                          {prop.address1}, {prop.city}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                
-                {isLoadingProperties && (
-                  <div className="text-sm text-muted-foreground flex items-center gap-2">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Loading properties...
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -5233,174 +5238,49 @@ export default function CrmProposalBuilder() {
           </div>
           
           <ScrollArea className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6">
-            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-3 flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4" />
-                CUSTOMER
-              </h3>
-              
-              {selectedCustomer ? (
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <div className="flex items-center gap-3">
-                    <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-base py-1.5 px-3">
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      {selectedCustomer.name}
-                    </Badge>
-                    {selectedCustomer.fullAddress && (
-                      <span className="text-sm text-muted-foreground flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {selectedCustomer.fullAddress}
-                      </span>
-                    )}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8"
-                    onClick={() => {
-                      setSelectedCustomer(null);
-                      setCustomerName('');
-                      setCustomerAddress('');
-                      setCustomerProperties([]);
-                      setSelectedPropertyId(null);
-                    }}
-                  >
-                    <Pencil className="h-3 w-3 mr-1" />
-                    Change
-                  </Button>
+            {/* Customer Display - Read-only, selected on main page */}
+            <div className="mb-6 p-4 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <span className="font-semibold text-lg">{selectedCustomer?.name || 'No Customer Selected'}</span>
+                  {selectedCustomer?.fullAddress && (
+                    <span className="text-sm text-muted-foreground flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      {selectedCustomer.fullAddress}
+                    </span>
+                  )}
+                  {customerProperties.length === 1 && (
+                    <span className="text-sm text-muted-foreground">
+                      ({customerProperties[0].city}, {customerProperties[0].state})
+                    </span>
+                  )}
                 </div>
-              ) : (
-                <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        value={customerSearchTerm}
-                        onChange={(e) => {
-                          setCustomerSearchTerm(e.target.value);
-                          if (e.target.value.length >= 2) {
-                            setIsCustomerPopoverOpen(true);
-                          }
-                        }}
-                        onFocus={() => {
-                          if (customerSearchTerm.length >= 2) {
-                            setIsCustomerPopoverOpen(true);
-                          }
-                        }}
-                        placeholder="Search by name, phone, email, or address..."
-                        className="pl-10 pr-10"
-                        data-testid="input-customer-search"
-                      />
-                      {isSearchingCustomers && (
-                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-                      )}
-                    </div>
-                  </PopoverTrigger>
-                  <PopoverContent 
-                    className="w-[calc(100vw-4rem)] sm:w-[500px] p-0" 
-                    align="start"
-                    onOpenAutoFocus={(e) => e.preventDefault()}
-                  >
-                    <div className="p-2 border-b">
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="searchAll"
-                          checked={searchAllFields}
-                          onCheckedChange={(checked) => setSearchAllFields(checked === true)}
-                        />
-                        <label htmlFor="searchAll" className="text-xs text-muted-foreground cursor-pointer">
-                          Search all fields (address, email, phone)
-                        </label>
-                      </div>
-                    </div>
-                    <ScrollArea className="max-h-64">
-                      {customerSearchResults.length === 0 && debouncedCustomerSearch.length >= 2 && !isSearchingCustomers && (
-                        <div className="p-4 text-center text-muted-foreground text-sm">
-                          No customers found for "{debouncedCustomerSearch}"
-                        </div>
-                      )}
-                      {customerSearchResults.map((customer) => (
-                        <div
-                          key={customer.id}
-                          className="p-3 hover:bg-muted cursor-pointer border-b last:border-0"
-                          onClick={() => handleSelectCustomer(customer)}
-                          data-testid={`customer-result-${customer.id}`}
-                        >
-                          <p className="font-medium">{customer.name}</p>
-                          <div className="text-sm text-muted-foreground space-y-0.5">
-                            {customer.fullAddress && <p className="truncate">{customer.fullAddress}</p>}
-                            {(customer.phone || customer.email) && (
-                              <p className="truncate">
-                                {customer.phone && <span>{customer.phone}</span>}
-                                {customer.phone && customer.email && <span> • </span>}
-                                {customer.email && <span>{customer.email}</span>}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </ScrollArea>
-                  </PopoverContent>
-                </Popover>
-              )}
-              
-              {/* Property Selection for customers with multiple sites */}
-              {selectedCustomer && customerProperties.length > 1 && (
-                <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg">
-                  <label className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-2 block">
-                    Select Property/Site *
-                  </label>
-                  <select
-                    value={selectedPropertyId || ""}
-                    onChange={(e) => setSelectedPropertyId(e.target.value || null)}
-                    className="w-full p-2 border rounded-md bg-white dark:bg-gray-900 text-sm"
-                    data-testid="select-property"
-                  >
-                    <option value="">-- Select a property --</option>
-                    {customerProperties.map((prop) => (
-                      <option key={prop.id} value={prop.id}>
-                        {prop.address1}{prop.address2 ? ` ${prop.address2}` : ''}, {prop.city}, {prop.state} {prop.zip}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              {selectedCustomer && isLoadingProperties && (
-                <div className="mt-2 text-sm text-muted-foreground flex items-center gap-2">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Loading properties...
-                </div>
-              )}
-              {selectedCustomer && customerProperties.length === 1 && (
-                <div className="mt-2 text-sm text-muted-foreground flex items-center gap-2">
-                  <MapPin className="h-3 w-3" />
-                  {customerProperties[0].address1}, {customerProperties[0].city}, {customerProperties[0].state} {customerProperties[0].zip}
-                </div>
-              )}
-              
-              {/* Assign To dropdown - for install quotes (sales+ users only) */}
-              <div className="mt-4">
-                <Label className="text-xs text-muted-foreground mb-1 block">Assign To (Sales Team)</Label>
-                <Select
-                  value={assignedToId || ""}
-                  onValueChange={(value) => setAssignedToId(value || null)}
-                >
-                  <SelectTrigger className="w-full" data-testid="select-assigned-user">
-                    <SelectValue placeholder="Select team member..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {assignableUsers && assignableUsers.length > 0 ? (
-                      assignableUsers.map((user) => (
-                        <SelectItem key={user.id} value={user.id}>
-                          {user.displayName}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="" disabled>No users available</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
               </div>
+            </div>
+              
+            {/* Assign To dropdown - for install quotes (sales+ users only) */}
+            <div className="mb-6">
+              <Label className="text-xs text-muted-foreground mb-1 block">Assign To (Sales Team)</Label>
+              <Select
+                value={assignedToId || ""}
+                onValueChange={(value) => setAssignedToId(value || null)}
+              >
+                <SelectTrigger className="w-full" data-testid="select-assigned-user">
+                  <SelectValue placeholder="Select team member..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {assignableUsers && assignableUsers.length > 0 ? (
+                    assignableUsers.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.displayName}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="" disabled>No users available</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
 
 
