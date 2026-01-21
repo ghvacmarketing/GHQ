@@ -390,7 +390,7 @@ function ProjectCard({ project, onClick, isDragging: isDraggingProp }: ProjectCa
           </div>
           <div className="flex-1 min-w-0">
             <h4 className="font-semibold text-sm truncate">
-              {project.customerName || "No customer"}
+              {project.customerName || "No customer"} - {formatProjectNumber(project.projectNumber)}
             </h4>
             <p className="text-xs text-muted-foreground truncate mt-0.5">
               {project.title}
@@ -502,6 +502,11 @@ function formatCurrency(value: number | string | null | undefined): string {
   return `$${num.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
+function formatProjectNumber(num: number | null | undefined): string {
+  if (num === null || num === undefined) return "";
+  return num.toString();
+}
+
 function DraggableTask({
   task,
   onClick,
@@ -589,9 +594,9 @@ function DraggableProject({
         !isSingleDay && showRoundedLeft && showRoundedRight && "rounded mx-0.5"
       )}
       style={style}
-      title={`${project.customerName || "Customer"} - ${project.title}${expectedValueFormatted ? ` - ${expectedValueFormatted}` : ""} (drag to reschedule)`}
+      title={`${project.customerName || "Customer"} - ${formatProjectNumber(project.projectNumber)} - ${project.title}${expectedValueFormatted ? ` - ${expectedValueFormatted}` : ""} (drag to reschedule)`}
     >
-      <div className="font-medium truncate">{project.customerName || "Customer"}</div>
+      <div className="font-medium truncate">{project.customerName || "Customer"} - {formatProjectNumber(project.projectNumber)}</div>
       <div className="truncate opacity-90">{project.title}</div>
       {expectedValueFormatted && <div className="truncate font-medium">{expectedValueFormatted}</div>}
     </button>
@@ -1283,7 +1288,7 @@ export default function CrmProjects() {
                                 </Badge>
                               </div>
                               <div className="text-sm text-muted-foreground">
-                                {project.customerName || "No customer"}
+                                {project.customerName || "No customer"} - {formatProjectNumber(project.projectNumber)}
                               </div>
                             </div>
                             <div className="text-right flex-shrink-0 space-y-0.5">
@@ -1391,7 +1396,7 @@ export default function CrmProjects() {
                             onClick={() => navigate(`/crm/projects/${project.id}`)}
                           >
                             <TableCell className="font-medium">
-                              {project.customerName || "—"}
+                              {project.customerName || "—"} - {formatProjectNumber(project.projectNumber)}
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
@@ -1621,11 +1626,11 @@ export default function CrmProjects() {
                                         !isSingleDayProject && showRoundedLeft && showRoundedRight && "rounded mx-0.5"
                                       )}
                                       style={{ top: `${lane * 44}px` }}
-                                      title={`${project.customerName || "Customer"} - ${project.title} (click to view)`}
+                                      title={`${project.customerName || "Customer"} - ${formatProjectNumber(project.projectNumber)} - ${project.title} (click to view)`}
                                     >
                                       {isStartOfWeekDay && (
                                         <>
-                                          <div className="font-medium truncate">{project.customerName || "Customer"}</div>
+                                          <div className="font-medium truncate">{project.customerName || "Customer"} - {formatProjectNumber(project.projectNumber)}</div>
                                           <div className="truncate opacity-90">{project.title}</div>
                                         </>
                                       )}
@@ -1676,7 +1681,7 @@ export default function CrmProjects() {
                       statusColors[activeDragProject.status]?.bg || "bg-slate-100",
                       statusColors[activeDragProject.status]?.text || "text-slate-700"
                     )}>
-                      <div className="font-medium">{activeDragProject.customerName || "Customer"}</div>
+                      <div className="font-medium">{activeDragProject.customerName || "Customer"} - {formatProjectNumber(activeDragProject.projectNumber)}</div>
                       <div className="opacity-90">{activeDragProject.title}</div>
                       {activeDragProject.expectedValue && (
                         <div className="font-medium">{formatCurrency(activeDragProject.expectedValue)}</div>
@@ -1727,7 +1732,7 @@ export default function CrmProjects() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <h4 className="font-semibold text-sm truncate">
-                            {activeKanbanProject.customerName || "No customer"}
+                            {activeKanbanProject.customerName || "No customer"} - {formatProjectNumber(activeKanbanProject.projectNumber)}
                           </h4>
                           <p className="text-xs text-muted-foreground truncate mt-0.5">
                             {activeKanbanProject.title}

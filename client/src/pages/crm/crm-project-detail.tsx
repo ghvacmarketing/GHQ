@@ -246,6 +246,11 @@ function formatCurrency(amount: number | string | null | undefined): string {
   }).format(num);
 }
 
+function formatProjectNumber(num: number | null | undefined): string {
+  if (num === null || num === undefined) return "";
+  return num.toString();
+}
+
 function getPropertyAddress(property: CrmProperty | null): string {
   if (!property) return "No property";
   const parts = [
@@ -1114,7 +1119,7 @@ export default function CrmProjectDetail() {
             </Button>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold" data-testid="text-project-title">{project.title}</h1>
+                <h1 className="text-2xl font-bold" data-testid="text-project-title">{project.customerName || project.customer?.name || "No customer"} - {formatProjectNumber(project.projectNumber)}</h1>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1125,6 +1130,7 @@ export default function CrmProjectDetail() {
                   <Pencil className="w-4 h-4" />
                 </Button>
               </div>
+              <p className="text-sm text-muted-foreground mt-2">{project.title}</p>
               {project.customer && (
                 <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                   <button
