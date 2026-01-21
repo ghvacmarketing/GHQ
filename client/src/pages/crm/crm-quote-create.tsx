@@ -141,6 +141,7 @@ export default function CrmQuoteCreate() {
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomer | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasSelectedQuoteType, setHasSelectedQuoteType] = useState(false);
 
   // CRM Items catalog state
   const [itemsCatalogOpen, setItemsCatalogOpen] = useState(false);
@@ -189,7 +190,7 @@ export default function CrmQuoteCreate() {
       if (!response.ok) throw new Error("Failed to fetch users");
       return response.json();
     },
-    enabled: currentStep >= 2,
+    enabled: currentStep >= 2 && formData.quoteType === "quick",
   });
 
   const handleAddItemFromCatalog = (item: CrmItem) => {
@@ -319,7 +320,8 @@ export default function CrmQuoteCreate() {
       return;
     }
     updateField("quoteType", type);
-    setCurrentStep(2);
+    setHasSelectedQuoteType(true);
+    // Don't auto-advance - let user fill in title/description/assignee first
   };
 
   const addLineItem = () => {
@@ -552,9 +554,10 @@ export default function CrmQuoteCreate() {
   const canProceed = (step: FormStep): boolean => {
     switch (step) {
       case 1:
-        return true;
-      case 2:
         return formData.customerId !== null;
+      case 2:
+        // Require explicit quote type selection before proceeding
+        return hasSelectedQuoteType && formData.quoteType === "quick";
       case 3:
         return formData.lineItems.some(item => item.description.trim().length > 0);
       case 4:
@@ -580,8 +583,8 @@ export default function CrmQuoteCreate() {
   }
 
   const steps = [
-    { number: 1, label: "Quote Type" },
-    { number: 2, label: "Customer Info" },
+    { number: 1, label: "Customer" },
+    { number: 2, label: "Quote Type" },
     { number: 3, label: "Line Items" },
     { number: 4, label: "Review" },
   ];
@@ -604,7 +607,7 @@ export default function CrmQuoteCreate() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">Create New Quote</h1>
-            <p className="text-slate-500 text-sm mt-1">Choose how you want to create your quote</p>
+            <p className="text-slate-500 text-sm mt-1">Start by selecting a customer</p>
           </div>
         </div>
 
@@ -649,55 +652,8 @@ export default function CrmQuoteCreate() {
             {currentStep === 1 && (
               <div className="space-y-6">
                 <CardHeader className="px-0 pt-0">
-                  <CardTitle>Select Quote Type</CardTitle>
-                  <CardDescription>Choose how you want to create your quote</CardDescription>
-                </CardHeader>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {QUOTE_TYPES.map((type) => {
-                    const Icon = type.icon;
-                    const isSelected = formData.quoteType === type.value;
-                    return (
-                      <button
-                        key={type.value}
-                        type="button"
-                        onClick={() => handleQuoteTypeSelect(type.value as "quick" | "proposal" | "worksheet")}
-                        className={cn(
-                          "flex flex-col items-center p-6 rounded-lg border-2 transition-all text-left",
-                          isSelected
-                            ? "border-[#d3b07d] bg-[#faf6ef]"
-                            : "border-slate-200 hover:border-[#e5cfa6] hover:bg-slate-50"
-                        )}
-                        data-testid={`select-type-${type.value}`}
-                      >
-                        <div
-                          className={cn(
-                            "p-3 rounded-full mb-3",
-                            isSelected ? "bg-[#d3b07d] text-white" : "bg-slate-100 text-slate-600"
-                          )}
-                        >
-                          <Icon className="h-6 w-6" />
-                        </div>
-                        <h3 className={cn("font-semibold", isSelected ? "text-[#b8944d]" : "text-slate-900")}>
-                          {type.label}
-                        </h3>
-                        <p className="text-sm text-slate-500 text-center mt-1">{type.description}</p>
-                        {isSelected && (
-                          <div className="mt-3">
-                            <Check className="h-5 w-5 text-[#d3b07d]" />
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {currentStep === 2 && (
-              <div className="space-y-6">
-                <CardHeader className="px-0 pt-0">
-                  <CardTitle>Customer Information</CardTitle>
-                  <CardDescription>Search and select a customer from the database</CardDescription>
+                  <CardTitle>Select Customer</CardTitle>
+                  <CardDescription>Start by selecting the customer for this quote</CardDescription>
                 </CardHeader>
                 
                 {/* Customer Search/Selection */}
@@ -802,54 +758,107 @@ export default function CrmQuoteCreate() {
                     </div>
                   </div>
                 )}
-                <div className="space-y-2">
-                  <Label htmlFor="title">Quote Title</Label>
-                  <Input
-                    id="title"
-                    placeholder="HVAC Service Quote"
-                    value={formData.title}
-                    onChange={(e) => updateField("title", e.target.value)}
-                    data-testid="input-quote-title"
-                  />
+              </div>
+            )}
+
+            {currentStep === 2 && (
+              <div className="space-y-6">
+                <CardHeader className="px-0 pt-0">
+                  <CardTitle>Quote Type & Details</CardTitle>
+                  <CardDescription>Choose quote type and enter details for {selectedCustomer?.name}</CardDescription>
+                </CardHeader>
+                
+                {/* Quote Type Selection */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {QUOTE_TYPES.map((type) => {
+                    const Icon = type.icon;
+                    const isSelected = formData.quoteType === type.value;
+                    return (
+                      <button
+                        key={type.value}
+                        type="button"
+                        onClick={() => handleQuoteTypeSelect(type.value as "quick" | "proposal" | "worksheet")}
+                        className={cn(
+                          "flex flex-col items-center p-6 rounded-lg border-2 transition-all text-left",
+                          isSelected
+                            ? "border-[#d3b07d] bg-[#faf6ef]"
+                            : "border-slate-200 hover:border-[#e5cfa6] hover:bg-slate-50"
+                        )}
+                        data-testid={`select-type-${type.value}`}
+                      >
+                        <div
+                          className={cn(
+                            "p-3 rounded-full mb-3",
+                            isSelected ? "bg-[#d3b07d] text-white" : "bg-slate-100 text-slate-600"
+                          )}
+                        >
+                          <Icon className="h-6 w-6" />
+                        </div>
+                        <h3 className={cn("font-semibold", isSelected ? "text-[#b8944d]" : "text-slate-900")}>
+                          {type.label}
+                        </h3>
+                        <p className="text-sm text-slate-500 text-center mt-1">{type.description}</p>
+                        {isSelected && (
+                          <div className="mt-3">
+                            <Check className="h-5 w-5 text-[#d3b07d]" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <RichTextEditor
-                    content={formData.description}
-                    onChange={(content) => updateField("description", content)}
-                    placeholder="Brief description of the quote..."
-                    minHeight="min-h-[150px]"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="assignedTo">Assigned To</Label>
-                  <Select
-                    value={formData.assignedToId || ""}
-                    onValueChange={(value) => updateField("assignedToId", value || null)}
-                  >
-                    <SelectTrigger id="assignedTo" data-testid="select-assigned-to">
-                      <SelectValue placeholder={isLoadingUsers ? "Loading users..." : "Select assignee"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {assignableUsers && assignableUsers.length > 0 ? (
-                        assignableUsers.map((user) => (
-                          <SelectItem key={user.id} value={user.id} data-testid={`assignee-option-${user.id}`}>
-                            {user.displayName}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="_no_users" disabled>
-                          No users available
-                        </SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-slate-500">
-                    {formData.quoteType === "quick" 
-                      ? "Service quotes can be assigned to admin or owner users" 
-                      : "Install quotes can be assigned to sales, admin, or owner users"}
-                  </p>
-                </div>
+
+                {/* Only show these fields for Quick Quote after selection */}
+                {formData.quoteType === "quick" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="title">Quote Title</Label>
+                      <Input
+                        id="title"
+                        placeholder="HVAC Service Quote"
+                        value={formData.title}
+                        onChange={(e) => updateField("title", e.target.value)}
+                        data-testid="input-quote-title"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Description</Label>
+                      <RichTextEditor
+                        content={formData.description}
+                        onChange={(content) => updateField("description", content)}
+                        placeholder="Brief description of the quote..."
+                        minHeight="min-h-[150px]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="assignedTo">Assigned To</Label>
+                      <Select
+                        value={formData.assignedToId || ""}
+                        onValueChange={(value) => updateField("assignedToId", value || null)}
+                      >
+                        <SelectTrigger id="assignedTo" data-testid="select-assigned-to">
+                          <SelectValue placeholder={isLoadingUsers ? "Loading users..." : "Select assignee"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {assignableUsers && assignableUsers.length > 0 ? (
+                            assignableUsers.map((user) => (
+                              <SelectItem key={user.id} value={user.id} data-testid={`assignee-option-${user.id}`}>
+                                {user.displayName}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="_no_users" disabled>
+                              No users available
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-slate-500">
+                        Service quotes can be assigned to admin or owner users
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
