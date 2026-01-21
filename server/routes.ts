@@ -13274,7 +13274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const results = await db.select({
         task: crmProjectTasks,
         projectTitle: crmProjects.title,
-        customerName: crmCustomers.displayName,
+        customerName: crmCustomers.name,
         assignedUserName: crmUsers.name,
       })
       .from(crmProjectTasks)
