@@ -13345,10 +13345,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Project not found" });
       }
 
+      // Convert date strings to Date objects for Drizzle/Zod validation
       const taskData = {
         ...req.body,
         projectId,
         createdBy: user.id,
+        dueDate: req.body.dueDate ? new Date(req.body.dueDate) : undefined,
+        completedAt: req.body.completedAt ? new Date(req.body.completedAt) : undefined,
       };
 
       const result = insertCrmProjectTaskSchema.safeParse(taskData);
@@ -13389,7 +13392,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Task not found" });
       }
 
-      const updated = await storage.updateProjectTask(id, req.body);
+      // Convert date strings to Date objects for Drizzle
+      const updateData = {
+        ...req.body,
+        ...(req.body.dueDate !== undefined && { dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null }),
+        ...(req.body.completedAt !== undefined && { completedAt: req.body.completedAt ? new Date(req.body.completedAt) : null }),
+      };
+
+      const updated = await storage.updateProjectTask(id, updateData);
 
       await logCrmAudit(
         user.id,

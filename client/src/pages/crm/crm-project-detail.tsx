@@ -323,6 +323,15 @@ export default function CrmProjectDetail() {
   const [newTaskDescription, setNewTaskDescription] = useState("");
   const [newTaskAssignee, setNewTaskAssignee] = useState<string | null>(null);
   const [newTaskDueDate, setNewTaskDueDate] = useState<Date | undefined>(undefined);
+  
+  // Edit task dialog state
+  const [editingTask, setEditingTask] = useState<{
+    id: string;
+    title: string;
+    description: string;
+    assignedUserId: string | null;
+    dueDate: Date | undefined;
+  } | null>(null);
 
   // Equipment file attachment state
   const {
@@ -489,12 +498,21 @@ export default function CrmProjectDetail() {
   });
 
   const updateTaskMutation = useMutation({
-    mutationFn: async (data: { id: string; completedAt: string | null }) => {
-      const response = await apiRequest("PATCH", `/api/crm/project-tasks/${data.id}`, { completedAt: data.completedAt });
+    mutationFn: async (data: { 
+      id: string; 
+      completedAt?: string | null;
+      title?: string;
+      description?: string;
+      assignedUserId?: string | null;
+      dueDate?: string | null;
+    }) => {
+      const { id, ...updateData } = data;
+      const response = await apiRequest("PATCH", `/api/crm/project-tasks/${id}`, updateData);
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "tasks"] });
+      setEditingTask(null);
     },
     onError: () => {
       toast({ title: "Failed to update task", variant: "destructive" });
@@ -1545,8 +1563,8 @@ export default function CrmProjectDetail() {
                     <div className="col-span-1"></div>
                     <div className="col-span-4">Task</div>
                     <div className="col-span-3">Assigned To</div>
-                    <div className="col-span-3">Due Date</div>
-                    <div className="col-span-1">Actions</div>
+                    <div className="col-span-2">Due Date</div>
+                    <div className="col-span-2 text-right">Actions</div>
                   </div>
 
                   {/* Tasks loading state */}
@@ -1590,10 +1608,24 @@ export default function CrmProjectDetail() {
                           <div className="col-span-3 text-sm text-muted-foreground">
                             {task.assignedUserName || "—"}
                           </div>
-                          <div className="col-span-3 text-sm text-muted-foreground">
+                          <div className="col-span-2 text-sm text-muted-foreground">
                             {task.dueDate ? format(new Date(task.dueDate), "MMM d, yyyy") : "—"}
                           </div>
-                          <div className="col-span-1">
+                          <div className="col-span-2 flex gap-1 justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => setEditingTask({
+                                id: task.id,
+                                title: task.title,
+                                description: task.description || "",
+                                assignedUserId: task.assignedUserId || null,
+                                dueDate: task.dueDate ? new Date(task.dueDate) : undefined,
+                              })}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -1607,6 +1639,95 @@ export default function CrmProjectDetail() {
                       ))}
                     </>
                   )}
+
+                  {/* Edit Task Dialog */}
+                  <Dialog open={!!editingTask} onOpenChange={(open) => !open && setEditingTask(null)}>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Edit Task</DialogTitle>
+                      </DialogHeader>
+                      {editingTask && (
+                        <div className="space-y-4">
+                          <div>
+                            <Label>Title</Label>
+                            <Input
+                              value={editingTask.title}
+                              onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
+                              placeholder="Task title..."
+                            />
+                          </div>
+                          <div>
+                            <Label>Description</Label>
+                            <Textarea
+                              value={editingTask.description}
+                              onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
+                              placeholder="Task description..."
+                              rows={3}
+                            />
+                          </div>
+                          <div>
+                            <Label>Assign To</Label>
+                            <Select 
+                              value={editingTask.assignedUserId || "unassigned"} 
+                              onValueChange={(v) => setEditingTask({ ...editingTask, assignedUserId: v === "unassigned" ? null : v })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Assign to..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="unassigned">Unassigned</SelectItem>
+                                {users?.map((user) => (
+                                  <SelectItem key={user.id} value={user.id}>
+                                    {user.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label>Due Date</Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {editingTask.dueDate ? format(editingTask.dueDate, "MMM d, yyyy") : "Select date..."}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0">
+                                <CalendarPicker
+                                  mode="single"
+                                  selected={editingTask.dueDate}
+                                  onSelect={(date) => setEditingTask({ ...editingTask, dueDate: date })}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </div>
+                      )}
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditingTask(null)}>
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            if (editingTask) {
+                              updateTaskMutation.mutate({
+                                id: editingTask.id,
+                                title: editingTask.title,
+                                description: editingTask.description || undefined,
+                                assignedUserId: editingTask.assignedUserId,
+                                dueDate: editingTask.dueDate?.toISOString() || null,
+                              });
+                            }
+                          }}
+                          disabled={!editingTask?.title.trim() || updateTaskMutation.isPending}
+                        >
+                          {updateTaskMutation.isPending ? "Saving..." : "Save Changes"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
 
                   {/* Add new task row */}
                   <div className="grid grid-cols-12 gap-2 items-center pt-3 border-t mt-2">
@@ -1634,7 +1755,7 @@ export default function CrmProjectDetail() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="col-span-3">
+                    <div className="col-span-2">
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button variant="outline" className="w-full h-9 justify-start text-left font-normal">
@@ -1652,7 +1773,7 @@ export default function CrmProjectDetail() {
                         </PopoverContent>
                       </Popover>
                     </div>
-                    <div className="col-span-1">
+                    <div className="col-span-2 flex justify-end">
                       <Button
                         variant="outline"
                         size="sm"
