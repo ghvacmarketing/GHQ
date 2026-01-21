@@ -12797,9 +12797,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (customerId) {
         // Support multiple customer IDs (comma-separated or array from query params)
-        const customerIds = Array.isArray(customerId) 
-          ? customerId as string[]
-          : (customerId as string).split(",");
+        let customerIds: string[];
+        if (Array.isArray(customerId)) {
+          customerIds = customerId as string[];
+        } else if (typeof customerId === 'string') {
+          customerIds = customerId.split(",");
+        } else {
+          customerIds = [String(customerId)];
+        }
         if (customerIds.length === 1) {
           conditions.push(eq(crmProjects.customerId, customerIds[0]));
         } else {
@@ -13479,11 +13484,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workbook = xlsx.read(file.buffer, { type: "buffer" });
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
-      const data = xlsx.utils.sheet_to_json<Record<string, any>>(sheet);
+      const rawData = xlsx.utils.sheet_to_json<Record<string, any>>(sheet);
 
-      if (data.length === 0) {
+      if (rawData.length === 0) {
         return res.status(400).json({ message: "CSV file is empty" });
       }
+
+      // Normalize column headers: trim whitespace and remove BOM characters
+      const data = rawData.map((row) => {
+        const normalizedRow: Record<string, any> = {};
+        for (const [key, value] of Object.entries(row)) {
+          // Remove BOM, trim whitespace, and normalize
+          const cleanKey = key.replace(/^\uFEFF/, "").trim();
+          normalizedRow[cleanKey] = value;
+        }
+        return normalizedRow;
+      });
+
+      // Log detected columns for debugging
+      const sampleRow = data[0];
+      const detectedColumns = Object.keys(sampleRow);
+      console.log("[Materials CSV] Detected columns:", detectedColumns);
 
       // Helper function to find a value from multiple possible column names (case-insensitive, exact match only)
       const findColumn = (row: Record<string, any>, possibleNames: string[]): any => {
@@ -13492,9 +13513,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const name of possibleNames) {
           // Exact match first
           if (row[name] !== undefined) return row[name];
-          // Case-insensitive match
-          const lowerName = name.toLowerCase();
-          const matchingKey = rowKeys.find(k => k.toLowerCase() === lowerName);
+          // Case-insensitive match (also trim and compare)
+          const lowerName = name.toLowerCase().trim();
+          const matchingKey = rowKeys.find(k => k.toLowerCase().trim() === lowerName);
           if (matchingKey && row[matchingKey] !== undefined) return row[matchingKey];
         }
         return undefined;
