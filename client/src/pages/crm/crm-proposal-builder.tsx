@@ -3639,6 +3639,150 @@ export default function CrmProposalBuilder() {
               </Sheet>
             </div>
           </div>
+          
+          {/* Customer Selection Section - Always visible at top */}
+          <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+            <CardContent className="py-3 px-4">
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex items-center gap-2 text-sm font-medium text-blue-800 dark:text-blue-200">
+                  <Search className="h-4 w-4" />
+                  <span>Customer:</span>
+                </div>
+                
+                {selectedCustomer ? (
+                  <div className="flex items-center gap-2 flex-wrap flex-1">
+                    <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      {selectedCustomer.name}
+                    </Badge>
+                    {selectedCustomer.fullAddress && (
+                      <span className="text-sm text-muted-foreground flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {selectedCustomer.fullAddress}
+                      </span>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        setSelectedCustomer(null);
+                        setCustomerName('');
+                        setCustomerAddress('');
+                        setCustomerProperties([]);
+                        setSelectedPropertyId(null);
+                      }}
+                    >
+                      <X className="h-3 w-3 mr-1" />
+                      Clear
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex-1 max-w-md">
+                    <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            value={customerSearchTerm}
+                            onChange={(e) => {
+                              setCustomerSearchTerm(e.target.value);
+                              if (e.target.value.length >= 2) {
+                                setIsCustomerPopoverOpen(true);
+                              }
+                            }}
+                            onFocus={() => {
+                              if (customerSearchTerm.length >= 2) {
+                                setIsCustomerPopoverOpen(true);
+                              }
+                            }}
+                            placeholder="Search by name, phone, email, or address..."
+                            className="pl-10 pr-10 h-9 bg-white dark:bg-gray-900"
+                            data-testid="input-customer-search-main"
+                          />
+                          {isSearchingCustomers && (
+                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                          )}
+                        </div>
+                      </PopoverTrigger>
+                      <PopoverContent 
+                        className="w-[calc(100vw-4rem)] sm:w-[500px] p-0" 
+                        align="start"
+                        onOpenAutoFocus={(e) => e.preventDefault()}
+                      >
+                        <div className="p-2 border-b">
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id="searchAllMain"
+                              checked={searchAllFields}
+                              onCheckedChange={(checked) => setSearchAllFields(checked === true)}
+                            />
+                            <label htmlFor="searchAllMain" className="text-xs text-muted-foreground cursor-pointer">
+                              Search all fields (address, email, phone)
+                            </label>
+                          </div>
+                        </div>
+                        <ScrollArea className="max-h-64">
+                          {customerSearchResults.length === 0 && debouncedCustomerSearch.length >= 2 && !isSearchingCustomers && (
+                            <div className="p-4 text-center text-muted-foreground text-sm">
+                              No customers found for "{debouncedCustomerSearch}"
+                            </div>
+                          )}
+                          {customerSearchResults.map((customer) => (
+                            <div
+                              key={customer.id}
+                              className="p-3 hover:bg-muted cursor-pointer border-b last:border-0"
+                              onClick={() => handleSelectCustomer(customer)}
+                              data-testid={`customer-result-main-${customer.id}`}
+                            >
+                              <p className="font-medium">{customer.name}</p>
+                              <div className="text-sm text-muted-foreground space-y-0.5">
+                                {customer.fullAddress && <p className="truncate">{customer.fullAddress}</p>}
+                                {(customer.phone || customer.email) && (
+                                  <p className="truncate">
+                                    {customer.phone && <span>{customer.phone}</span>}
+                                    {customer.phone && customer.email && <span> • </span>}
+                                    {customer.email && <span>{customer.email}</span>}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </ScrollArea>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                )}
+                
+                {/* Property selection for customers with multiple sites */}
+                {selectedCustomer && customerProperties.length > 1 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-amber-700 dark:text-amber-300 font-medium">Property:</span>
+                    <select
+                      value={selectedPropertyId || ""}
+                      onChange={(e) => setSelectedPropertyId(e.target.value || null)}
+                      className="h-9 px-2 border rounded-md bg-white dark:bg-gray-900 text-sm"
+                      data-testid="select-property-main"
+                    >
+                      <option value="">-- Select --</option>
+                      {customerProperties.map((prop) => (
+                        <option key={prop.id} value={prop.id}>
+                          {prop.address1}, {prop.city}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                
+                {isLoadingProperties && (
+                  <div className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Loading properties...
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
@@ -5091,91 +5235,28 @@ export default function CrmProposalBuilder() {
           <ScrollArea className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-6">
             <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
               <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-3 flex items-center gap-2">
-                <Search className="h-4 w-4" />
-                SEARCH CUSTOMER DATABASE
+                <CheckCircle2 className="h-4 w-4" />
+                CUSTOMER
               </h3>
-              <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      value={customerSearchTerm}
-                      onChange={(e) => {
-                        setCustomerSearchTerm(e.target.value);
-                        if (e.target.value.length >= 2) {
-                          setIsCustomerPopoverOpen(true);
-                        }
-                      }}
-                      onFocus={() => {
-                        if (customerSearchTerm.length >= 2) {
-                          setIsCustomerPopoverOpen(true);
-                        }
-                      }}
-                      placeholder="Search by name, phone, email, or address..."
-                      className="pl-10 pr-10"
-                      data-testid="input-customer-search"
-                    />
-                    {isSearchingCustomers && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+              
+              {selectedCustomer ? (
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-base py-1.5 px-3">
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      {selectedCustomer.name}
+                    </Badge>
+                    {selectedCustomer.fullAddress && (
+                      <span className="text-sm text-muted-foreground flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {selectedCustomer.fullAddress}
+                      </span>
                     )}
                   </div>
-                </PopoverTrigger>
-                <PopoverContent 
-                  className="w-[calc(100vw-4rem)] sm:w-[500px] p-0" 
-                  align="start"
-                  onOpenAutoFocus={(e) => e.preventDefault()}
-                >
-                  <div className="p-2 border-b">
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="searchAll"
-                        checked={searchAllFields}
-                        onCheckedChange={(checked) => setSearchAllFields(checked === true)}
-                      />
-                      <label htmlFor="searchAll" className="text-xs text-muted-foreground cursor-pointer">
-                        Search all fields (address, email, phone)
-                      </label>
-                    </div>
-                  </div>
-                  <ScrollArea className="max-h-64">
-                    {customerSearchResults.length === 0 && debouncedCustomerSearch.length >= 2 && !isSearchingCustomers && (
-                      <div className="p-4 text-center text-muted-foreground text-sm">
-                        No customers found for "{debouncedCustomerSearch}"
-                      </div>
-                    )}
-                    {customerSearchResults.map((customer) => (
-                      <div
-                        key={customer.id}
-                        className="p-3 hover:bg-muted cursor-pointer border-b last:border-0"
-                        onClick={() => handleSelectCustomer(customer)}
-                        data-testid={`customer-result-${customer.id}`}
-                      >
-                        <p className="font-medium">{customer.name}</p>
-                        <div className="text-sm text-muted-foreground space-y-0.5">
-                          {customer.fullAddress && <p className="truncate">{customer.fullAddress}</p>}
-                          {(customer.phone || customer.email) && (
-                            <p className="truncate">
-                              {customer.phone && <span>{customer.phone}</span>}
-                              {customer.phone && customer.email && <span> • </span>}
-                              {customer.email && <span>{customer.email}</span>}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </ScrollArea>
-                </PopoverContent>
-              </Popover>
-              {selectedCustomer && (
-                <div className="mt-2 flex items-center gap-2">
-                  <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    {selectedCustomer.name}
-                  </Badge>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    className="h-6 text-xs"
+                    className="h-8"
                     onClick={() => {
                       setSelectedCustomer(null);
                       setCustomerName('');
@@ -5184,9 +5265,83 @@ export default function CrmProposalBuilder() {
                       setSelectedPropertyId(null);
                     }}
                   >
-                    Clear
+                    <Pencil className="h-3 w-3 mr-1" />
+                    Change
                   </Button>
                 </div>
+              ) : (
+                <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        value={customerSearchTerm}
+                        onChange={(e) => {
+                          setCustomerSearchTerm(e.target.value);
+                          if (e.target.value.length >= 2) {
+                            setIsCustomerPopoverOpen(true);
+                          }
+                        }}
+                        onFocus={() => {
+                          if (customerSearchTerm.length >= 2) {
+                            setIsCustomerPopoverOpen(true);
+                          }
+                        }}
+                        placeholder="Search by name, phone, email, or address..."
+                        className="pl-10 pr-10"
+                        data-testid="input-customer-search"
+                      />
+                      {isSearchingCustomers && (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
+                  </PopoverTrigger>
+                  <PopoverContent 
+                    className="w-[calc(100vw-4rem)] sm:w-[500px] p-0" 
+                    align="start"
+                    onOpenAutoFocus={(e) => e.preventDefault()}
+                  >
+                    <div className="p-2 border-b">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="searchAll"
+                          checked={searchAllFields}
+                          onCheckedChange={(checked) => setSearchAllFields(checked === true)}
+                        />
+                        <label htmlFor="searchAll" className="text-xs text-muted-foreground cursor-pointer">
+                          Search all fields (address, email, phone)
+                        </label>
+                      </div>
+                    </div>
+                    <ScrollArea className="max-h-64">
+                      {customerSearchResults.length === 0 && debouncedCustomerSearch.length >= 2 && !isSearchingCustomers && (
+                        <div className="p-4 text-center text-muted-foreground text-sm">
+                          No customers found for "{debouncedCustomerSearch}"
+                        </div>
+                      )}
+                      {customerSearchResults.map((customer) => (
+                        <div
+                          key={customer.id}
+                          className="p-3 hover:bg-muted cursor-pointer border-b last:border-0"
+                          onClick={() => handleSelectCustomer(customer)}
+                          data-testid={`customer-result-${customer.id}`}
+                        >
+                          <p className="font-medium">{customer.name}</p>
+                          <div className="text-sm text-muted-foreground space-y-0.5">
+                            {customer.fullAddress && <p className="truncate">{customer.fullAddress}</p>}
+                            {(customer.phone || customer.email) && (
+                              <p className="truncate">
+                                {customer.phone && <span>{customer.phone}</span>}
+                                {customer.phone && customer.email && <span> • </span>}
+                                {customer.email && <span>{customer.email}</span>}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </ScrollArea>
+                  </PopoverContent>
+                </Popover>
               )}
               
               {/* Property Selection for customers with multiple sites */}
