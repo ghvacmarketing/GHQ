@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -819,6 +819,42 @@ export default function CrmProposalBuilder() {
     return transformApiCrawlspaceTiers(crawlspaceTiersData);
   }, [crawlspaceTiersData]);
   
+  // Sync cart items with fresh package data to update image URLs
+  // This handles cases where cart was stored before images were available
+  const syncCartWithPackages = useCallback((packagesData: PricebookPackage[], currentCart: CartItem[]) => {
+    let hasUpdates = false;
+    const updatedCart = currentCart.map(item => {
+      if (isHvacPackage(item)) {
+        const matchingPkg = packagesData.find(pkg => 
+          pkg.unitType === item.unitType &&
+          pkg.tier === item.tier &&
+          pkg.tonnage === item.tonnage &&
+          pkg.packageLevel === item.packageLevel
+        );
+        if (matchingPkg) {
+          const needsUpdate = (
+            (matchingPkg.outdoorImageUrl && matchingPkg.outdoorImageUrl !== item.outdoorImageUrl) ||
+            (matchingPkg.coilImageUrl && matchingPkg.coilImageUrl !== item.coilImageUrl) ||
+            (matchingPkg.furnaceImageUrl && matchingPkg.furnaceImageUrl !== item.furnaceImageUrl) ||
+            (matchingPkg.thermostatImageUrl && matchingPkg.thermostatImageUrl !== item.thermostatImageUrl)
+          );
+          if (needsUpdate) {
+            hasUpdates = true;
+            return {
+              ...item,
+              outdoorImageUrl: matchingPkg.outdoorImageUrl || item.outdoorImageUrl,
+              coilImageUrl: matchingPkg.coilImageUrl || item.coilImageUrl,
+              furnaceImageUrl: matchingPkg.furnaceImageUrl || item.furnaceImageUrl,
+              thermostatImageUrl: matchingPkg.thermostatImageUrl || item.thermostatImageUrl,
+            };
+          }
+        }
+      }
+      return item;
+    });
+    return { updatedCart, hasUpdates };
+  }, []);
+
   const [activeTab, setActiveTab] = useState<string>("preset");
   const [selectedUnitType, setSelectedUnitType] = useState<string | null>(null);
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
@@ -923,6 +959,16 @@ export default function CrmProposalBuilder() {
         .catch(console.error);
     }
   }, []);
+
+  // Sync cart image URLs with fresh package data when packages are loaded
+  useEffect(() => {
+    if (packages.length > 0 && cart.length > 0) {
+      const { updatedCart, hasUpdates } = syncCartWithPackages(packages, cart);
+      if (hasUpdates) {
+        setCart(updatedCart);
+      }
+    }
+  }, [packages]); // Only run when packages change, not on every cart change
 
   // Fetch customer properties whenever selectedCustomer changes
   useEffect(() => {
