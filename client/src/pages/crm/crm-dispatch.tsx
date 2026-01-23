@@ -2062,7 +2062,6 @@ export default function CrmDispatch() {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [localWorkOrders, setLocalWorkOrders] = useState<DispatchWorkOrder[]>([]);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [newNote, setNewNote] = useState("");
   const [dispatchNote, setDispatchNote] = useState("");
   const [workOrderDescription, setWorkOrderDescription] = useState("");
@@ -2133,7 +2132,6 @@ export default function CrmDispatch() {
   const handleWorkOrderClick = useCallback((workOrderId: string) => {
     const wo = localWorkOrders.find(w => w.id === workOrderId);
     setSelectedWorkOrderId(workOrderId);
-    setIsSheetOpen(true);
     setNewNote("");
     setWorkOrderDescription(wo?.description || "");
   }, [localWorkOrders]);
@@ -2702,7 +2700,7 @@ export default function CrmDispatch() {
         setLocalWorkOrders(prev => prev.map(wo => 
           wo.id === selectedWorkOrderId ? { ...wo, status: "cancelled" as WorkOrderStatus, scheduledStart: null, scheduledEnd: null } as DispatchWorkOrder : wo
         ));
-        setIsSheetOpen(false);
+        setSelectedWorkOrderId(null);
       }
     });
   }, [selectedWorkOrderId, updateWorkOrderMutation, toast]);
@@ -3326,7 +3324,9 @@ export default function CrmDispatch() {
 
   return (
     <CrmLayout currentUser={currentUser} disableScroll>
-      <div className="flex flex-col h-full max-w-full overflow-hidden">
+      <div className="flex h-full max-w-full overflow-hidden">
+        {/* Main Content - shrinks when panel is open */}
+        <div className={cn("flex flex-col overflow-hidden transition-all duration-200", selectedWorkOrder ? "flex-1 min-w-0" : "w-full")}>
         {/* Fixed Header Section */}
         <div className="flex-shrink-0 space-y-3 pb-3">
           <div className="flex justify-center">
@@ -3673,18 +3673,28 @@ export default function CrmDispatch() {
           </DragOverlay>
         </DndContext>
 
-      </div>
+        </div>
 
-      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto" data-testid="workorder-detail-sheet">
-          {selectedWorkOrder && (
-            <>
-              <SheetHeader>
-                <SheetTitle className="text-lg" data-testid="sheet-workorder-title">Work Order #{selectedWorkOrder.workOrderNumber}</SheetTitle>
-                <SheetDescription>View and manage work order details</SheetDescription>
-              </SheetHeader>
-
-              <div className="mt-6 space-y-6">
+        {/* Side Panel - Push Layout */}
+        {selectedWorkOrder && (
+          <div className="w-[400px] border-l border-slate-200 bg-white flex-shrink-0 flex flex-col overflow-hidden" data-testid="workorder-detail-panel">
+            {/* Panel Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-[#1e7e34] text-white flex-shrink-0">
+              <div>
+                <h2 className="text-lg font-semibold" data-testid="panel-workorder-title">Work Order: {selectedWorkOrder.workOrderNumber}</h2>
+                <p className="text-sm text-white/80">Status: {statusLabels[selectedWorkOrder.status] || selectedWorkOrder.status}</p>
+              </div>
+              <button
+                onClick={() => setSelectedWorkOrderId(null)}
+                className="p-1.5 hover:bg-white/20 rounded-full transition-colors"
+                aria-label="Close panel"
+              >
+                <XCircle className="h-5 w-5" />
+              </button>
+            </div>
+            
+            {/* Panel Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-6">
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-slate-900">Work Order Information</h3>
                   
@@ -3940,12 +3950,11 @@ export default function CrmDispatch() {
                       </AlertDialogContent>
                     </AlertDialog>
                   </div>
-                </div>
               </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
+            </div>
+          </div>
+        )}
+      </div>
 
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
