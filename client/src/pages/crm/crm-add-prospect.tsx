@@ -59,8 +59,13 @@ export default function CrmAddProspect() {
   usePageTitle("Add Lead");
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const [mode, setMode] = useState<ProspectMode>("choose");
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+  
+  // Check for customerId URL param on initial mount (passed from customer account page)
+  const urlParams = new URLSearchParams(window.location.search);
+  const preselectedCustomerId = urlParams.get("customerId") || "";
+  
+  const [mode, setMode] = useState<ProspectMode>(() => preselectedCustomerId ? "existing" : "choose");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>(() => preselectedCustomerId);
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");

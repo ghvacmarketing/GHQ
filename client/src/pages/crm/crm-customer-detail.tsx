@@ -5649,15 +5649,7 @@ export default function CrmCustomerDetail() {
           onCreateProject={() => setCreateProjectDialogOpen(true)}
           onScheduleVisit={() => setScheduleVisitDialogOpen(true)}
           onCreateLead={() => {
-            const params = new URLSearchParams({
-              customerId: customer.id,
-              name: customer.name,
-              phone: customer.phone || "",
-              email: customer.email || "",
-              address: customer.fullAddress || "",
-              customerType: customer.customerType || "residential",
-            });
-            navigate(`/sales-prospects/create?${params.toString()}`);
+            navigate(`/crm/add-prospect?customerId=${customer.id}`);
           }}
           onEditCustomer={() => setEditDialogOpen(true)}
           onEditProperty={handleEditProperty}
