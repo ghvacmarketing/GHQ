@@ -2615,26 +2615,28 @@ export default function CrmProspectFunnel() {
                       </SelectContent>
                     </Select>
                     <Select
+                      key={`temp-${expandedLead.id}-${expandedLead.leadTempId || 'none'}`}
                       value={expandedLead.leadTempId || "none"}
                       onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { leadTempId: value === "none" ? null : value } })}
                     >
-                      <SelectTrigger className="h-8 w-auto min-w-[80px] text-xs">
-                        <SelectValue placeholder="Temp" />
+                      <SelectTrigger className="h-8 w-auto min-w-[120px] text-xs">
+                        <SelectValue placeholder="Temperature" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">No Temp</SelectItem>
+                        <SelectItem value="none">No Temperature</SelectItem>
                         {leadTempOptions.map((option) => (
                           <SelectItem key={option.id} value={option.id}>
-                            T{option.numericValue}
+                            T{option.numericValue} - {option.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                     <Select
+                      key={`driver-${expandedLead.id}-${expandedLead.leadDriverId || 'none'}`}
                       value={expandedLead.leadDriverId || "none"}
                       onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { leadDriverId: value === "none" ? null : value } })}
                     >
-                      <SelectTrigger className="h-8 w-auto min-w-[90px] text-xs">
+                      <SelectTrigger className="h-8 w-auto min-w-[100px] text-xs">
                         <SelectValue placeholder="Driver" />
                       </SelectTrigger>
                       <SelectContent>
