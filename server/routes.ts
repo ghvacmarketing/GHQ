@@ -15072,6 +15072,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.ip
       );
       
+      // Auto-update customer status from "prospect" to "client" when their first invoice is paid
+      if (newStatus === "paid" && invoice.customerId) {
+        try {
+          const [customer] = await db.select({ customerStatus: crmCustomers.customerStatus })
+            .from(crmCustomers)
+            .where(eq(crmCustomers.id, invoice.customerId))
+            .limit(1);
+          
+          if (customer && customer.customerStatus === "prospect") {
+            await db.update(crmCustomers)
+              .set({ customerStatus: "client", updatedAt: new Date() })
+              .where(eq(crmCustomers.id, invoice.customerId));
+            
+            await logCrmAudit(
+              user.id,
+              "customer.status_changed",
+              "customer",
+              invoice.customerId,
+              { previousStatus: "prospect", newStatus: "client", reason: "Invoice paid" },
+              req.ip
+            );
+          }
+        } catch (statusErr) {
+          console.error(`[Invoice] Failed to update customer status:`, statusErr);
+          // Don't fail the payment - just log the error
+        }
+      }
+      
       // Auto-create maintenance agreement if invoice is fully paid and contains maintenance items
       // BUT skip if invoice is already linked to an existing agreement (to avoid duplication)
       if (newStatus === "paid" && invoice.customerId && !invoice.agreementId) {
