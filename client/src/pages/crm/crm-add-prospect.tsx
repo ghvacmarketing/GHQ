@@ -132,7 +132,7 @@ export default function CrmAddProspect() {
 
   // Fetch lead types for dropdown
   const { data: leadTypes = [] } = useQuery<CrmLeadType[]>({
-    queryKey: ["/api/crm/lead-types", { activeOnly: "true" }],
+    queryKey: ["/api/crm/lead-types"],
     enabled: !!currentUser,
   });
 
