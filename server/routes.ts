@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry, crmLeads, crmLeadTypes, insertCrmLeadSchema, insertCrmLeadTypeSchema, type CrmLead, type CrmLeadType, type InsertCrmLead, type InsertCrmLeadType } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
@@ -18613,6 +18613,327 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating customer interest level:", error);
       return res.status(500).json({ message: "Failed to update interest level" });
+    }
+  });
+
+  // ============================================
+  // CRM LEAD TYPES ROUTES
+  // ============================================
+
+  // GET /api/crm/lead-types - Get all lead types
+  app.get("/api/crm/lead-types", requireCrmAuth, async (req, res) => {
+    try {
+      const { activeOnly } = req.query;
+      let types;
+      if (activeOnly === "true") {
+        types = await db.select().from(crmLeadTypes)
+          .where(eq(crmLeadTypes.isActive, true))
+          .orderBy(asc(crmLeadTypes.sortOrder), asc(crmLeadTypes.name));
+      } else {
+        types = await db.select().from(crmLeadTypes)
+          .orderBy(asc(crmLeadTypes.sortOrder), asc(crmLeadTypes.name));
+      }
+      return res.json(types);
+    } catch (error) {
+      console.error("Error fetching lead types:", error);
+      return res.status(500).json({ message: "Failed to fetch lead types" });
+    }
+  });
+
+  // POST /api/crm/lead-types - Create a new lead type
+  app.post("/api/crm/lead-types", requireCrmAdmin, async (req, res) => {
+    try {
+      const parsed = insertCrmLeadTypeSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid lead type data", errors: parsed.error.format() });
+      }
+      const [newType] = await db.insert(crmLeadTypes).values(parsed.data).returning();
+      return res.status(201).json(newType);
+    } catch (error) {
+      console.error("Error creating lead type:", error);
+      return res.status(500).json({ message: "Failed to create lead type" });
+    }
+  });
+
+  // PATCH /api/crm/lead-types/:id - Update a lead type
+  app.patch("/api/crm/lead-types/:id", requireCrmAdmin, async (req, res) => {
+    try {
+      const { name, isActive, sortOrder } = req.body;
+      const [existingType] = await db.select().from(crmLeadTypes).where(eq(crmLeadTypes.id, req.params.id)).limit(1);
+      if (!existingType) {
+        return res.status(404).json({ message: "Lead type not found" });
+      }
+      const updateData: Partial<CrmLeadType> = {};
+      if (name !== undefined) updateData.name = name;
+      if (isActive !== undefined) updateData.isActive = isActive;
+      if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
+      
+      const [updated] = await db.update(crmLeadTypes).set(updateData).where(eq(crmLeadTypes.id, req.params.id)).returning();
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error updating lead type:", error);
+      return res.status(500).json({ message: "Failed to update lead type" });
+    }
+  });
+
+  // DELETE /api/crm/lead-types/:id - Delete a lead type (soft delete by setting inactive)
+  app.delete("/api/crm/lead-types/:id", requireCrmAdmin, async (req, res) => {
+    try {
+      const [existingType] = await db.select().from(crmLeadTypes).where(eq(crmLeadTypes.id, req.params.id)).limit(1);
+      if (!existingType) {
+        return res.status(404).json({ message: "Lead type not found" });
+      }
+      // Soft delete - set inactive instead of deleting
+      await db.update(crmLeadTypes).set({ isActive: false }).where(eq(crmLeadTypes.id, req.params.id));
+      return res.json({ message: "Lead type deactivated" });
+    } catch (error) {
+      console.error("Error deleting lead type:", error);
+      return res.status(500).json({ message: "Failed to delete lead type" });
+    }
+  });
+
+  // ============================================
+  // CRM LEADS (OPPORTUNITIES) ROUTES
+  // ============================================
+
+  // GET /api/crm/leads - Get all leads with customer and type info
+  app.get("/api/crm/leads", requireCrmAuth, async (req, res) => {
+    try {
+      const { status, customerId, assignedTo } = req.query;
+      
+      let whereClause;
+      if (status === 'won' || status === 'lost') {
+        whereClause = eq(crmLeads.salesStage, status);
+      } else if (status && typeof status === 'string') {
+        whereClause = eq(crmLeads.salesStage, status);
+      } else if (customerId && typeof customerId === 'string') {
+        whereClause = eq(crmLeads.customerId, customerId);
+      } else if (assignedTo && typeof assignedTo === 'string') {
+        whereClause = eq(crmLeads.assignedSalesRepId, assignedTo);
+      } else {
+        // Default: get all active leads (not won or lost)
+        whereClause = and(
+          sql`${crmLeads.salesStage} != 'won'`,
+          sql`${crmLeads.salesStage} != 'lost'`
+        );
+      }
+
+      const leadsData = await db.select({
+        lead: crmLeads,
+        customer: crmCustomers,
+        leadType: crmLeadTypes,
+        salesRep: crmUsers,
+      })
+        .from(crmLeads)
+        .leftJoin(crmCustomers, eq(crmLeads.customerId, crmCustomers.id))
+        .leftJoin(crmLeadTypes, eq(crmLeads.leadTypeId, crmLeadTypes.id))
+        .leftJoin(crmUsers, eq(crmLeads.assignedSalesRepId, crmUsers.id))
+        .where(whereClause)
+        .orderBy(desc(crmLeads.createdAt));
+
+      // Flatten the results for easier consumption
+      const leads = leadsData.map(row => ({
+        ...row.lead,
+        customerName: row.customer?.name || null,
+        customerPhone: row.customer?.phone || null,
+        customerEmail: row.customer?.email || null,
+        customerAddress: row.customer?.fullAddress || null,
+        leadTypeName: row.leadType?.name || null,
+        salesRepName: row.salesRep?.name || null,
+      }));
+
+      return res.json(leads);
+    } catch (error) {
+      console.error("Error fetching leads:", error);
+      return res.status(500).json({ message: "Failed to fetch leads" });
+    }
+  });
+
+  // GET /api/crm/leads/:id - Get a single lead with details
+  app.get("/api/crm/leads/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const [leadData] = await db.select({
+        lead: crmLeads,
+        customer: crmCustomers,
+        leadType: crmLeadTypes,
+        salesRep: crmUsers,
+      })
+        .from(crmLeads)
+        .leftJoin(crmCustomers, eq(crmLeads.customerId, crmCustomers.id))
+        .leftJoin(crmLeadTypes, eq(crmLeads.leadTypeId, crmLeadTypes.id))
+        .leftJoin(crmUsers, eq(crmLeads.assignedSalesRepId, crmUsers.id))
+        .where(eq(crmLeads.id, req.params.id))
+        .limit(1);
+
+      if (!leadData) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const lead = {
+        ...leadData.lead,
+        customerName: leadData.customer?.name || null,
+        customerPhone: leadData.customer?.phone || null,
+        customerEmail: leadData.customer?.email || null,
+        customerAddress: leadData.customer?.fullAddress || null,
+        leadTypeName: leadData.leadType?.name || null,
+        salesRepName: leadData.salesRep?.name || null,
+      };
+
+      return res.json(lead);
+    } catch (error) {
+      console.error("Error fetching lead:", error);
+      return res.status(500).json({ message: "Failed to fetch lead" });
+    }
+  });
+
+  // POST /api/crm/leads - Create a new lead
+  app.post("/api/crm/leads", requireCrmAuth, async (req, res) => {
+    try {
+      const parsed = insertCrmLeadSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid lead data", errors: parsed.error.format() });
+      }
+
+      // Verify customer exists
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, parsed.data.customerId)).limit(1);
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      const [newLead] = await db.insert(crmLeads).values({
+        ...parsed.data,
+        salesStage: parsed.data.salesStage || "new",
+      }).returning();
+
+      return res.status(201).json(newLead);
+    } catch (error) {
+      console.error("Error creating lead:", error);
+      return res.status(500).json({ message: "Failed to create lead" });
+    }
+  });
+
+  // PATCH /api/crm/leads/:id - Update a lead
+  app.patch("/api/crm/leads/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const [existingLead] = await db.select().from(crmLeads).where(eq(crmLeads.id, req.params.id)).limit(1);
+      if (!existingLead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const { potentialValue, assignedSalesRepId, interestLevel, salesStage, notes, leadTypeId, lostReason } = req.body;
+      
+      const updateData: Partial<CrmLead> = { updatedAt: new Date() };
+      if (potentialValue !== undefined) updateData.potentialValue = potentialValue;
+      if (assignedSalesRepId !== undefined) updateData.assignedSalesRepId = assignedSalesRepId;
+      if (interestLevel !== undefined) updateData.interestLevel = interestLevel;
+      if (notes !== undefined) updateData.notes = notes;
+      if (leadTypeId !== undefined) updateData.leadTypeId = leadTypeId;
+      if (lostReason !== undefined) updateData.lostReason = lostReason;
+      
+      // Handle stage transitions
+      if (salesStage !== undefined) {
+        updateData.salesStage = salesStage;
+        if (salesStage === 'won' && existingLead.salesStage !== 'won') {
+          updateData.wonAt = new Date();
+        }
+        if (salesStage === 'lost' && existingLead.salesStage !== 'lost') {
+          updateData.lostAt = new Date();
+        }
+      }
+
+      const [updated] = await db.update(crmLeads).set(updateData).where(eq(crmLeads.id, req.params.id)).returning();
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error updating lead:", error);
+      return res.status(500).json({ message: "Failed to update lead" });
+    }
+  });
+
+  // PATCH /api/crm/leads/:id/stage - Update lead sales stage (for drag-drop on kanban)
+  app.patch("/api/crm/leads/:id/stage", requireCrmAuth, async (req, res) => {
+    try {
+      const { salesStage } = req.body;
+      
+      if (!salesStage || !salesStageEnum.includes(salesStage)) {
+        return res.status(400).json({ message: "Invalid sales stage", validStages: salesStageEnum });
+      }
+
+      const [existingLead] = await db.select().from(crmLeads).where(eq(crmLeads.id, req.params.id)).limit(1);
+      if (!existingLead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+
+      const updateData: Partial<CrmLead> = { salesStage, updatedAt: new Date() };
+      
+      if (salesStage === 'won' && existingLead.salesStage !== 'won') {
+        updateData.wonAt = new Date();
+      }
+      if (salesStage === 'lost' && existingLead.salesStage !== 'lost') {
+        updateData.lostAt = new Date();
+      }
+
+      const [updated] = await db.update(crmLeads).set(updateData).where(eq(crmLeads.id, req.params.id)).returning();
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error updating lead stage:", error);
+      return res.status(500).json({ message: "Failed to update lead stage" });
+    }
+  });
+
+  // DELETE /api/crm/leads/:id - Delete a lead
+  app.delete("/api/crm/leads/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const [existingLead] = await db.select().from(crmLeads).where(eq(crmLeads.id, req.params.id)).limit(1);
+      if (!existingLead) {
+        return res.status(404).json({ message: "Lead not found" });
+      }
+      await db.delete(crmLeads).where(eq(crmLeads.id, req.params.id));
+      return res.json({ message: "Lead deleted" });
+    } catch (error) {
+      console.error("Error deleting lead:", error);
+      return res.status(500).json({ message: "Failed to delete lead" });
+    }
+  });
+
+  // GET /api/crm/leads/metrics - Get lead funnel metrics
+  app.get("/api/crm/lead-metrics", requireCrmAuth, async (req, res) => {
+    try {
+      const [statsResult] = await db
+        .select({
+          totalActive: sql<number>`count(*) FILTER (WHERE sales_stage NOT IN ('won', 'lost'))`,
+          wonCount: sql<number>`count(*) FILTER (WHERE sales_stage = 'won')`,
+          lostCount: sql<number>`count(*) FILTER (WHERE sales_stage = 'lost')`,
+          newCount: sql<number>`count(*) FILTER (WHERE sales_stage = 'new')`,
+          contactedCount: sql<number>`count(*) FILTER (WHERE sales_stage = 'contacted')`,
+          quoteSentCount: sql<number>`count(*) FILTER (WHERE sales_stage = 'quote_sent')`,
+          negotiatingCount: sql<number>`count(*) FILTER (WHERE sales_stage = 'negotiating')`,
+          pipelineValue: sql<number>`COALESCE(SUM(potential_value) FILTER (WHERE sales_stage NOT IN ('won', 'lost')), 0)`,
+        })
+        .from(crmLeads);
+      
+      const wonCount = Number(statsResult?.wonCount || 0);
+      const lostCount = Number(statsResult?.lostCount || 0);
+      const totalClosed = wonCount + lostCount;
+      const conversionRate = totalClosed > 0 ? (wonCount / totalClosed) * 100 : 0;
+      
+      const metrics = {
+        activeLeads: Number(statsResult?.totalActive || 0),
+        conversionRate: conversionRate.toFixed(1),
+        pipelineValue: Number(statsResult?.pipelineValue || 0),
+        funnelCounts: {
+          new: Number(statsResult?.newCount || 0),
+          contacted: Number(statsResult?.contactedCount || 0),
+          quote_sent: Number(statsResult?.quoteSentCount || 0),
+          negotiating: Number(statsResult?.negotiatingCount || 0),
+          won: wonCount,
+          lost: lostCount,
+        },
+      };
+      
+      return res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching lead metrics:", error);
+      return res.status(500).json({ message: "Failed to fetch lead metrics" });
     }
   });
 

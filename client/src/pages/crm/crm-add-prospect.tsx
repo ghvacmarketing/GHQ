@@ -5,7 +5,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,17 +34,15 @@ import {
   UserPlus,
   Users,
   Check,
-  Search,
   Loader2,
   Phone,
   Mail,
   MapPin,
   ChevronsUpDown,
-  AlertCircle,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { cn } from "@/lib/utils";
-import type { CrmUser, CrmCustomer, InterestLevel } from "@shared/schema";
+import type { CrmUser, CrmCustomer, InterestLevel, CrmLeadType } from "@shared/schema";
 
 type ProspectMode = "choose" | "existing";
 
@@ -72,6 +69,7 @@ export default function CrmAddProspect() {
   const [potentialValue, setPotentialValue] = useState("");
   const [assignedSalesRepId, setAssignedSalesRepId] = useState("");
   const [interestLevel, setInterestLevel] = useState<InterestLevel | "">("");
+  const [leadTypeId, setLeadTypeId] = useState<string>("");
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -118,21 +116,25 @@ export default function CrmAddProspect() {
     enabled: !!currentUser && !!selectedCustomerId,
   });
 
-  // Fetch CRM users for sales rep dropdown (sales role only)
-  const { data: salesUsers } = useQuery<CrmUser[]>({
-    queryKey: ["/api/crm/users/by-role", "sales"],
-    queryFn: async () => {
-      const response = await fetch(`/api/crm/users/by-role?exactRole=sales`, { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to fetch sales users");
-      return response.json();
-    },
+  // Fetch CRM users for sales rep dropdown (owner, admin, supervisor, sales roles)
+  const { data: allUsers } = useQuery<CrmUser[]>({
+    queryKey: ["/api/crm/users"],
     enabled: !!currentUser,
   });
 
   const salesReps = useMemo(() => {
-    if (!salesUsers) return [];
-    return salesUsers.map(u => ({ value: u.id, label: u.name }));
-  }, [salesUsers]);
+    if (!allUsers) return [];
+    const salesRoles = ["owner", "admin", "supervisor", "sales"];
+    return allUsers
+      .filter(u => u.isActive && salesRoles.includes(u.role))
+      .map(u => ({ value: u.id, label: u.name }));
+  }, [allUsers]);
+
+  // Fetch lead types for dropdown
+  const { data: leadTypes = [] } = useQuery<CrmLeadType[]>({
+    queryKey: ["/api/crm/lead-types", { activeOnly: "true" }],
+    enabled: !!currentUser,
+  });
 
   const customers = customersData?.customers || [];
 
@@ -145,30 +147,28 @@ export default function CrmAddProspect() {
   // No client-side filtering needed - API handles search
   const filteredCustomers = customers;
 
-  // Check if customer is already in the sales funnel (has a salesStage)
-  const isAlreadyProspect = !!selectedCustomer?.salesStage;
-
-  const convertToProspectMutation = useMutation({
+  const createLeadMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("PATCH", `/api/crm/customers/${selectedCustomerId}`, {
-        customerStatus: "prospect",
-        salesStage: "new",
-        potentialValue: potentialValue ? parseFloat(potentialValue) : null,
+      const res = await apiRequest("POST", `/api/crm/leads`, {
+        customerId: selectedCustomerId,
+        leadTypeId: leadTypeId || null,
+        potentialValue: potentialValue ? parseInt(potentialValue) : null,
         assignedSalesRepId: assignedSalesRepId || null,
         interestLevel: interestLevel || null,
       });
       return res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects/metrics"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects/overview-analytics"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"], exact: false });
-      toast({ title: "Customer converted to lead successfully" });
+      toast({ title: "Lead created successfully" });
       navigate("/crm/prospect-funnel");
     },
     onError: (error: Error) => {
-      toast({ title: "Failed to convert customer", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to create lead", description: error.message, variant: "destructive" });
     },
   });
 
@@ -177,8 +177,8 @@ export default function CrmAddProspect() {
       toast({ title: "Please select a customer", variant: "destructive" });
       return;
     }
-    if (isAlreadyProspect) {
-      toast({ title: "This customer is already in the lead funnel", variant: "destructive" });
+    if (!leadTypeId) {
+      toast({ title: "Please select a lead type", variant: "destructive" });
       return;
     }
     if (!potentialValue) {
@@ -189,7 +189,7 @@ export default function CrmAddProspect() {
       toast({ title: "Please select a sales person", variant: "destructive" });
       return;
     }
-    convertToProspectMutation.mutate();
+    createLeadMutation.mutate();
   };
 
   const handleModeSelect = (selectedMode: "new" | "existing") => {
@@ -275,9 +275,9 @@ export default function CrmAddProspect() {
         {mode === "existing" && (
           <Card>
             <CardHeader>
-              <CardTitle>Convert Customer to Lead</CardTitle>
+              <CardTitle>Create New Lead</CardTitle>
               <CardDescription>
-                Select an existing customer and enter lead details
+                Select a customer and enter lead details
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -314,41 +314,31 @@ export default function CrmAddProspect() {
                           ) : searchQuery ? "No customers found matching your search." : "Type to search all customers..."}
                         </CommandEmpty>
                         <CommandGroup>
-                          {filteredCustomers.map((customer) => {
-                            const isProspect = !!customer.salesStage;
-                            return (
-                              <CommandItem
-                                key={customer.id}
-                                value={`${customer.name} ${customer.phone || ''} ${customer.email || ''}`}
-                                onSelect={() => {
-                                  setSelectedCustomerId(customer.id);
-                                  setCustomerSearchOpen(false);
-                                  setSearchQuery("");
-                                }}
-                                data-testid={`customer-option-${customer.id}`}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    selectedCustomerId === customer.id ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                <div className="flex flex-col flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium">{customer.name}</span>
-                                    {isProspect && (
-                                      <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
-                                        Already a Lead
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="text-xs text-muted-foreground">
-                                    {customer.phone || customer.email || "No contact info"}
-                                  </span>
-                                </div>
-                              </CommandItem>
-                            );
-                          })}
+                          {filteredCustomers.map((customer) => (
+                            <CommandItem
+                              key={customer.id}
+                              value={`${customer.name} ${customer.phone || ''} ${customer.email || ''}`}
+                              onSelect={() => {
+                                setSelectedCustomerId(customer.id);
+                                setCustomerSearchOpen(false);
+                                setSearchQuery("");
+                              }}
+                              data-testid={`customer-option-${customer.id}`}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  selectedCustomerId === customer.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <div className="flex flex-col flex-1">
+                                <span className="font-medium">{customer.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {customer.phone || customer.email || "No contact info"}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
                         </CommandGroup>
                       </CommandList>
                     </Command>
@@ -358,15 +348,6 @@ export default function CrmAddProspect() {
 
               {selectedCustomer && (
                 <>
-                  {isAlreadyProspect && (
-                    <Alert variant="destructive" className="border-amber-500 bg-amber-50 text-amber-800">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>
-                        This customer is already in the lead funnel. You cannot convert them again.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  
                   <div className="bg-muted/50 rounded-lg p-4 space-y-3">
                     <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
                       Customer Details
@@ -424,7 +405,27 @@ export default function CrmAddProspect() {
                     <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
                       Lead Details
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="leadType">
+                          Lead Type <span className="text-destructive">*</span>
+                        </Label>
+                        <Select
+                          value={leadTypeId}
+                          onValueChange={setLeadTypeId}
+                        >
+                          <SelectTrigger data-testid="select-lead-type">
+                            <SelectValue placeholder="Select lead type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {leadTypes.filter(lt => lt.isActive).map((type) => (
+                              <SelectItem key={type.id} value={type.id}>
+                                {type.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <div className="space-y-2">
                         <Label htmlFor="potentialValue">
                           Potential Value <span className="text-destructive">*</span>
@@ -494,6 +495,7 @@ export default function CrmAddProspect() {
                         setPotentialValue("");
                         setAssignedSalesRepId("");
                         setInterestLevel("");
+                        setLeadTypeId("");
                       }}
                       data-testid="button-cancel"
                     >
@@ -501,13 +503,13 @@ export default function CrmAddProspect() {
                     </Button>
                     <Button
                       onClick={handleSubmit}
-                      disabled={convertToProspectMutation.isPending || isAlreadyProspect}
+                      disabled={createLeadMutation.isPending}
                       data-testid="button-submit"
                     >
-                      {convertToProspectMutation.isPending && (
+                      {createLeadMutation.isPending && (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       )}
-                      {isAlreadyProspect ? "Already a Lead" : "Convert to Lead"}
+                      Create Lead
                     </Button>
                   </div>
                 </>

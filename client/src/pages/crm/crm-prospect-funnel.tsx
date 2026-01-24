@@ -108,6 +108,29 @@ import { format, isToday, isPast, parseISO, startOfMonth, endOfMonth, eachDayOfI
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { CrmUser, CrmCustomer, CrmFollowUp, SalesStage, InterestLevel, FollowUpType, CrmQuote } from "@shared/schema";
 
+type Lead = {
+  id: string;
+  customerId: string;
+  leadTypeId: string | null;
+  potentialValue: number | null;
+  assignedSalesRepId: string | null;
+  interestLevel: string | null;
+  salesStage: SalesStage;
+  notes: string | null;
+  wonAt: string | null;
+  lostAt: string | null;
+  lostReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  customerName: string | null;
+  customerPhone: string | null;
+  customerEmail: string | null;
+  customerAddress: string | null;
+  leadTypeName: string | null;
+  salesRepName: string | null;
+  nextFollowUpAt?: string | null;
+};
+
 type ProspectMetrics = {
   activeProspects: number;
   pendingActions: number;
@@ -416,7 +439,7 @@ interface DraggableFollowUpProps {
     dueAt: string | Date;
     notes: string | null;
     completedAt: string | Date | null;
-    prospect?: CrmCustomer;
+    lead?: Lead;
   };
   onClick: () => void;
   calendarItemStyle: string;
@@ -457,7 +480,7 @@ function DraggableFollowUp({ followUp, onClick, calendarItemStyle, isCompleted }
     >
       <div className="flex items-center gap-1 min-w-0">
         <FollowUpTypeIcon type={followUp.followUpType as FollowUpType} />
-        <span className={`truncate min-w-0 ${isCompleted ? 'line-through' : ''}`}>{followUp.prospect?.name || "Unknown"}</span>
+        <span className={`truncate min-w-0 ${isCompleted ? 'line-through' : ''}`}>{followUp.lead?.customerName || "Unknown"}</span>
       </div>
       {followUp.notes && (
         <div className="truncate text-[10px] opacity-75">{followUp.notes}</div>
@@ -525,13 +548,13 @@ function DroppableTimeSlot({ day, hour, children, isTodayDate }: DroppableTimeSl
   );
 }
 
-interface ProspectCardProps {
-  prospect: CrmCustomer;
+interface LeadCardProps {
+  lead: Lead;
   onClick: () => void;
   isDragging?: boolean;
 }
 
-function ProspectCard({ prospect, onClick, isDragging: isDraggingProp }: ProspectCardProps) {
+function LeadCard({ lead, onClick, isDragging: isDraggingProp }: LeadCardProps) {
   const {
     attributes,
     listeners,
@@ -540,11 +563,11 @@ function ProspectCard({ prospect, onClick, isDragging: isDraggingProp }: Prospec
     transition,
     isDragging,
   } = useSortable({ 
-    id: prospect.id,
+    id: lead.id,
     data: {
       type: "card",
-      prospect,
-      stage: prospect.salesStage || "new",
+      lead,
+      stage: lead.salesStage || "new",
     }
   });
 
@@ -554,10 +577,10 @@ function ProspectCard({ prospect, onClick, isDragging: isDraggingProp }: Prospec
     opacity: isDragging || isDraggingProp ? 0.5 : 1,
   };
 
-  const nextFollowUp = prospect.nextFollowUpAt
-    ? typeof prospect.nextFollowUpAt === "string"
-      ? parseISO(prospect.nextFollowUpAt)
-      : prospect.nextFollowUpAt
+  const nextFollowUp = lead.nextFollowUpAt
+    ? typeof lead.nextFollowUpAt === "string"
+      ? parseISO(lead.nextFollowUpAt)
+      : lead.nextFollowUpAt
     : null;
 
   return (
@@ -566,7 +589,7 @@ function ProspectCard({ prospect, onClick, isDragging: isDraggingProp }: Prospec
       style={style}
       className="mb-2 cursor-pointer hover:shadow-md transition-shadow bg-white touch-manipulation"
       onClick={onClick}
-      data-testid={`card-prospect-${prospect.id}`}
+      data-testid={`card-lead-${lead.id}`}
       data-no-drag
     >
       <CardContent className="p-3">
@@ -576,18 +599,23 @@ function ProspectCard({ prospect, onClick, isDragging: isDraggingProp }: Prospec
             {...listeners}
             className="flex-shrink-0 cursor-grab active:cursor-grabbing p-1 min-h-[44px] min-w-[44px] flex items-center justify-center"
             onClick={(e) => e.stopPropagation()}
-            data-testid={`drag-handle-${prospect.id}`}
+            data-testid={`drag-handle-${lead.id}`}
           >
             <GripVertical className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-sm truncate" data-testid={`text-prospect-name-${prospect.id}`}>
-              {prospect.name}
+            <h4 className="font-semibold text-sm truncate" data-testid={`text-lead-name-${lead.id}`}>
+              {lead.customerName}
             </h4>
-            {prospect.phone && (
+            {lead.leadTypeName && (
+              <Badge variant="outline" className="text-xs mt-1">
+                {lead.leadTypeName}
+              </Badge>
+            )}
+            {lead.customerPhone && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                 <Phone className="h-3 w-3 flex-shrink-0" />
-                <span>{prospect.phone}</span>
+                <span>{lead.customerPhone}</span>
               </div>
             )}
             {nextFollowUp && (
@@ -603,7 +631,7 @@ function ProspectCard({ prospect, onClick, isDragging: isDraggingProp }: Prospec
               </div>
             )}
             <div className="flex flex-wrap gap-1 mt-2">
-              <InterestBadge level={prospect.interestLevel as InterestLevel} />
+              <InterestBadge level={lead.interestLevel as InterestLevel} />
             </div>
           </div>
         </div>
@@ -612,13 +640,13 @@ function ProspectCard({ prospect, onClick, isDragging: isDraggingProp }: Prospec
   );
 }
 
-interface ProspectKanbanColumnProps {
+interface LeadKanbanColumnProps {
   stage: SalesStage;
-  prospects: CrmCustomer[];
-  onCardClick: (prospect: CrmCustomer) => void;
+  leads: Lead[];
+  onCardClick: (lead: Lead) => void;
 }
 
-function ProspectKanbanColumn({ stage, prospects, onCardClick }: ProspectKanbanColumnProps) {
+function LeadKanbanColumn({ stage, leads, onCardClick }: LeadKanbanColumnProps) {
   const columnId = getColumnId(stage);
   
   const { setNodeRef, isOver } = useDroppable({
@@ -638,7 +666,7 @@ function ProspectKanbanColumn({ stage, prospects, onCardClick }: ProspectKanbanC
               {STAGE_LABELS[stage]}
             </CardTitle>
             <Badge variant="outline" className="ml-2 flex-shrink-0" data-testid={`column-count-${stage}`}>
-              {prospects.length}
+              {leads.length}
             </Badge>
           </div>
         </CardHeader>
@@ -649,17 +677,17 @@ function ProspectKanbanColumn({ stage, prospects, onCardClick }: ProspectKanbanC
             style={{ scrollbarWidth: 'thin' }}
             data-testid={`kanban-column-${stage}`}
           >
-            <SortableContext items={prospects.map(p => p.id)} strategy={verticalListSortingStrategy}>
-              {prospects.length === 0 ? (
+            <SortableContext items={leads.map(l => l.id)} strategy={verticalListSortingStrategy}>
+              {leads.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground text-sm">
                   No leads
                 </div>
               ) : (
-                prospects.map((prospect) => (
-                  <ProspectCard
-                    key={prospect.id}
-                    prospect={prospect}
-                    onClick={() => onCardClick(prospect)}
+                leads.map((lead) => (
+                  <LeadCard
+                    key={lead.id}
+                    lead={lead}
+                    onClick={() => onCardClick(lead)}
                   />
                 ))
               )}
@@ -680,7 +708,7 @@ export default function CrmProspectFunnel() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("all");
   
-  const [expandedProspectId, setExpandedProspectId] = useState<string | null>(null);
+  const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("details");
   
   const [followUpDialogOpen, setFollowUpDialogOpen] = useState(false);
@@ -700,17 +728,14 @@ export default function CrmProspectFunnel() {
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
   const [calendarView, setCalendarView] = useState<"month" | "week" | "3day" | "day">("month");
   
-  const [activeProspectId, setActiveProspectId] = useState<string | null>(null);
+  const [activeLeadId, setActiveLeadId] = useState<string | null>(null);
   const [isDraggingCard, setIsDraggingCard] = useState(false);
   const [activeCalendarFollowUpId, setActiveCalendarFollowUpId] = useState<string | null>(null);
   
   const [isEditing, setIsEditing] = useState(false);
-  const [editPhone, setEditPhone] = useState("");
-  const [editEmail, setEditEmail] = useState("");
-  const [editAddress, setEditAddress] = useState("");
-  const [editCompanyName, setEditCompanyName] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editInterestLevel, setEditInterestLevel] = useState<InterestLevel | "">("");
+  const [editPotentialValue, setEditPotentialValue] = useState("");
 
   const [editingFollowUpId, setEditingFollowUpId] = useState<string | null>(null);
   const [editFollowUpType, setEditFollowUpType] = useState<FollowUpType>("call");
@@ -743,12 +768,12 @@ export default function CrmProspectFunnel() {
 
   const apiStatus = getApiStatus(activeFilter);
   
-  const { data: prospects = [], isLoading: prospectsLoading } = useQuery<CrmCustomer[]>({
-    queryKey: ["/api/crm/prospects", apiStatus],
+  const { data: leads = [], isLoading: leadsLoading } = useQuery<Lead[]>({
+    queryKey: ["/api/crm/leads", apiStatus],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (apiStatus) params.set("status", apiStatus);
-      const res = await fetch(`/api/crm/prospects?${params.toString()}`);
+      const res = await fetch(`/api/crm/leads?${params.toString()}`);
       return res.json();
     },
     enabled: !!currentUser,
@@ -757,7 +782,7 @@ export default function CrmProspectFunnel() {
   });
 
   const { data: metrics, isLoading: metricsLoading } = useQuery<ProspectMetrics>({
-    queryKey: ["/api/crm/prospects/metrics"],
+    queryKey: ["/api/crm/lead-metrics"],
     enabled: !!currentUser,
     refetchInterval: 30000,
   });
@@ -784,6 +809,13 @@ export default function CrmProspectFunnel() {
     enabled: !!currentUser,
   });
 
+  // Get the customerId for the expanded lead (needed for notes/quotes queries)
+  const expandedLeadCustomerId = useMemo(() => {
+    if (!expandedLeadId) return null;
+    const lead = leads.find(l => l.id === expandedLeadId);
+    return lead?.customerId || null;
+  }, [expandedLeadId, leads]);
+
   type LeadNote = {
     id: string;
     customerId: string;
@@ -794,24 +826,24 @@ export default function CrmProspectFunnel() {
   };
 
   const { data: leadNotes = [], isLoading: leadNotesLoading } = useQuery<LeadNote[]>({
-    queryKey: ["/api/crm/customers", expandedProspectId, "notes"],
+    queryKey: ["/api/crm/customers", expandedLeadCustomerId, "notes"],
     queryFn: async () => {
-      const res = await fetch(`/api/crm/customers/${expandedProspectId}/notes`);
+      const res = await fetch(`/api/crm/customers/${expandedLeadCustomerId}/notes`);
       return res.json();
     },
-    enabled: !!currentUser && !!expandedProspectId,
+    enabled: !!currentUser && !!expandedLeadCustomerId,
   });
 
   const { data: leadQuotes = [] } = useQuery<CrmQuote[]>({
-    queryKey: ['/api/crm/quotes', 'lead', expandedProspectId],
+    queryKey: ['/api/crm/quotes', 'lead', expandedLeadCustomerId],
     queryFn: async () => {
-      if (!expandedProspectId) return [];
-      const res = await fetch(`/api/crm/quotes?customerId=${expandedProspectId}&sourceType=lead`);
+      if (!expandedLeadCustomerId) return [];
+      const res = await fetch(`/api/crm/quotes?customerId=${expandedLeadCustomerId}&sourceType=lead`);
       if (!res.ok) return [];
       const data = await res.json();
       return data.quotes || [];
     },
-    enabled: !!expandedProspectId,
+    enabled: !!expandedLeadId,
   });
 
   const salesUsers = useMemo(() => {
@@ -826,12 +858,12 @@ export default function CrmProspectFunnel() {
 
   const updateStageMutation = useMutation({
     mutationFn: async ({ id, salesStage }: { id: string; salesStage: SalesStage }) => {
-      const res = await apiRequest("PATCH", `/api/crm/customers/${id}/stage`, { salesStage });
+      const res = await apiRequest("PATCH", `/api/crm/leads/${id}/stage`, { salesStage });
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects/metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/lead-metrics"] });
       toast({ title: "Stage updated successfully" });
     },
     onError: (error: Error) => {
@@ -851,7 +883,7 @@ export default function CrmProspectFunnel() {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/follow-ups"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"] });
       if (result.openInEditMode && result.followUp?.id) {
         setEditingFollowUpId(result.followUp.id);
         setEditFollowUpType(result.followUp.followUpType || "call");
@@ -879,7 +911,7 @@ export default function CrmProspectFunnel() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/follow-ups"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"] });
       toast({ title: variables.completedAt ? "Follow-up completed" : "Follow-up marked incomplete" });
     },
     onError: (error: Error) => {
@@ -926,7 +958,7 @@ export default function CrmProspectFunnel() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/follow-ups"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"] });
     },
   });
 
@@ -937,7 +969,7 @@ export default function CrmProspectFunnel() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/follow-ups"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"] });
       setDeleteFollowUpConfirmOpen(false);
       setDeleteFollowUpId(null);
       toast({ title: "Follow-up deleted" });
@@ -949,11 +981,11 @@ export default function CrmProspectFunnel() {
 
   const updateSalesRepMutation = useMutation({
     mutationFn: async ({ id, assignedSalesRepId }: { id: string; assignedSalesRepId: string | null }) => {
-      const res = await apiRequest("PATCH", `/api/crm/customers/${id}`, { assignedSalesRepId });
+      const res = await apiRequest("PATCH", `/api/crm/leads/${id}`, { assignedSalesRepId });
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"] });
       toast({ title: "Salesperson updated successfully" });
     },
     onError: (error: Error) => {
@@ -963,18 +995,14 @@ export default function CrmProspectFunnel() {
 
   const removeFromFunnelMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await apiRequest("PATCH", `/api/crm/customers/${id}`, {
-        salesStage: null,
-        interestLevel: null,
-        customerStatus: "client",
-      });
+      const res = await apiRequest("DELETE", `/api/crm/leads/${id}`);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects/metrics"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/lead-metrics"] });
       toast({ title: "Removed from lead funnel" });
-      setExpandedProspectId(null);
+      setExpandedLeadId(null);
     },
     onError: (error: Error) => {
       toast({ title: "Failed to remove from funnel", description: error.message, variant: "destructive" });
@@ -987,7 +1015,7 @@ export default function CrmProspectFunnel() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", expandedProspectId, "notes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", expandedLeadCustomerId, "notes"] });
       setLeadNoteBody("");
       toast({ title: "Comment posted" });
     },
@@ -997,13 +1025,12 @@ export default function CrmProspectFunnel() {
   });
 
   const updateLeadMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { phone?: string; email?: string; fullAddress?: string; companyName?: string; notes?: string; interestLevel?: string | null } }) => {
-      const res = await apiRequest("PATCH", `/api/crm/customers/${id}`, data);
+    mutationFn: async ({ id, data }: { id: string; data: { notes?: string; interestLevel?: string | null } }) => {
+      const res = await apiRequest("PATCH", `/api/crm/leads/${id}`, data);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"] });
       toast({ title: "Lead updated successfully" });
       setIsEditing(false);
     },
@@ -1013,37 +1040,28 @@ export default function CrmProspectFunnel() {
   });
 
   const handleEditLead = () => {
-    if (!expandedProspect) return;
-    setEditPhone(expandedProspect.phone || "");
-    setEditEmail(expandedProspect.email || "");
-    setEditAddress(expandedProspect.fullAddress || "");
-    setEditCompanyName(expandedProspect.companyName || "");
-    setEditNotes(expandedProspect.notes || "");
-    setEditInterestLevel((expandedProspect.interestLevel as InterestLevel) || "");
+    if (!expandedLead) return;
+    setEditNotes(expandedLead.notes || "");
+    setEditInterestLevel((expandedLead.interestLevel as InterestLevel) || "");
+    setEditPotentialValue(expandedLead.potentialValue?.toString() || "");
     setIsEditing(true);
   };
 
   const handleCancelEdit = () => {
     setIsEditing(false);
-    setEditPhone("");
-    setEditEmail("");
-    setEditAddress("");
-    setEditCompanyName("");
     setEditNotes("");
     setEditInterestLevel("");
+    setEditPotentialValue("");
   };
 
   const handleSaveLead = () => {
-    if (!expandedProspect) return;
+    if (!expandedLead) return;
     updateLeadMutation.mutate({
-      id: expandedProspect.id,
+      id: expandedLead.id,
       data: {
-        phone: editPhone,
-        email: editEmail,
-        fullAddress: editAddress,
-        companyName: editCompanyName,
         notes: editNotes,
         interestLevel: editInterestLevel || null,
+        potentialValue: editPotentialValue ? parseInt(editPotentialValue, 10) : null,
       },
     });
   };
@@ -1079,44 +1097,44 @@ export default function CrmProspectFunnel() {
     return 0;
   };
 
-  const filteredProspects = useMemo(() => {
-    return prospects
-      .map((prospect) => {
+  const filteredLeads = useMemo(() => {
+    return leads
+      .map((lead) => {
         let searchScore = 0;
         if (searchTerm.trim()) {
           const search = searchTerm.trim();
-          const nameScore = fuzzyMatch(prospect.name || '', search);
-          const phoneDigits = prospect.phone?.replace(/\D/g, '') || '';
+          const nameScore = fuzzyMatch(lead.customerName || '', search);
+          const phoneDigits = lead.customerPhone?.replace(/\D/g, '') || '';
           const searchDigits = search.replace(/\D/g, '');
           const phoneScore = searchDigits && phoneDigits.includes(searchDigits) ? 100 : 0;
           searchScore = Math.max(nameScore, phoneScore);
         }
-        return { prospect, searchScore };
+        return { lead, searchScore };
       })
-      .filter(({ prospect, searchScore }) => {
+      .filter(({ lead, searchScore }) => {
         if (searchTerm.trim() && searchScore === 0) return false;
-        if (selectedEmployeeId !== "all" && prospect.assignedSalesRepId !== selectedEmployeeId) return false;
+        if (selectedEmployeeId !== "all" && lead.assignedSalesRepId !== selectedEmployeeId) return false;
         
         if (activeFilter === "All Active") {
-          return prospect.salesStage !== "won" && prospect.salesStage !== "lost";
+          return lead.salesStage !== "won" && lead.salesStage !== "lost";
         }
-        if (activeFilter === "Won") return prospect.salesStage === "won";
-        if (activeFilter === "Lost") return prospect.salesStage === "lost";
+        if (activeFilter === "Won") return lead.salesStage === "won";
+        if (activeFilter === "Lost") return lead.salesStage === "lost";
         
-        return prospect.salesStage === activeFilter.toLowerCase().replace(" ", "_");
+        return lead.salesStage === activeFilter.toLowerCase().replace(" ", "_");
       })
       .sort((a, b) => b.searchScore - a.searchScore)
-      .map(({ prospect }) => prospect);
-  }, [prospects, searchTerm, selectedEmployeeId, activeFilter]);
+      .map(({ lead }) => lead);
+  }, [leads, searchTerm, selectedEmployeeId, activeFilter]);
 
-  const handleMoveToNextStage = (prospect: CrmCustomer) => {
-    const nextStage = prospect.salesStage ? NEXT_STAGE[prospect.salesStage] : null;
+  const handleMoveToNextStage = (lead: Lead) => {
+    const nextStage = lead.salesStage ? NEXT_STAGE[lead.salesStage] : null;
     if (nextStage) {
       if (nextStage === "won") {
-        setConfirmProspectId(prospect.id);
+        setConfirmProspectId(lead.id);
         setWonConfirmOpen(true);
       } else {
-        updateStageMutation.mutate({ id: prospect.id, salesStage: nextStage });
+        updateStageMutation.mutate({ id: lead.id, salesStage: nextStage });
       }
     }
   };
@@ -1126,7 +1144,7 @@ export default function CrmProspectFunnel() {
       updateStageMutation.mutate({ id: confirmProspectId, salesStage: "won" });
       setWonConfirmOpen(false);
       setConfirmProspectId(null);
-      setExpandedProspectId(null);
+      setExpandedLeadId(null);
     }
   };
 
@@ -1135,7 +1153,7 @@ export default function CrmProspectFunnel() {
       updateStageMutation.mutate({ id: confirmProspectId, salesStage: "lost" });
       setLostConfirmOpen(false);
       setConfirmProspectId(null);
-      setExpandedProspectId(null);
+      setExpandedLeadId(null);
     }
   };
 
@@ -1163,8 +1181,8 @@ export default function CrmProspectFunnel() {
     });
   };
 
-  const getProspectFollowUps = (prospectId: string) => {
-    return followUps.filter(f => f.customerId === prospectId)
+  const getLeadFollowUps = (customerId: string) => {
+    return followUps.filter(f => f.customerId === customerId)
       .sort((a, b) => new Date(b.dueAt).getTime() - new Date(a.dueAt).getTime());
   };
 
@@ -1182,8 +1200,8 @@ export default function CrmProspectFunnel() {
     return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   }, [calendarMonth]);
 
-  const prospectsByStage = useMemo(() => {
-    const grouped: Record<SalesStage, CrmCustomer[]> = {
+  const leadsByStage = useMemo(() => {
+    const grouped: Record<SalesStage, Lead[]> = {
       new: [],
       contacted: [],
       quote_sent: [],
@@ -1191,23 +1209,23 @@ export default function CrmProspectFunnel() {
       won: [],
       lost: [],
     };
-    prospects.forEach((p) => {
-      const stage = (p.salesStage || "new") as SalesStage;
+    leads.forEach((l) => {
+      const stage = (l.salesStage || "new") as SalesStage;
       if (grouped[stage]) {
-        grouped[stage].push(p);
+        grouped[stage].push(l);
       }
     });
     return grouped;
-  }, [prospects]);
+  }, [leads]);
 
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveProspectId(event.active.id as string);
+    setActiveLeadId(event.active.id as string);
     setIsDraggingCard(true);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    setActiveProspectId(null);
+    setActiveLeadId(null);
     setIsDraggingCard(false);
 
     if (!over) return;
@@ -1226,8 +1244,8 @@ export default function CrmProspectFunnel() {
     }
 
     if (newStage) {
-      const prospect = prospects.find((p) => p.id === activeId);
-      if (prospect && prospect.salesStage !== newStage) {
+      const lead = leads.find((l) => l.id === activeId);
+      if (lead && lead.salesStage !== newStage) {
         if (newStage === "won") {
           setConfirmProspectId(activeId);
           setWonConfirmOpen(true);
@@ -1287,18 +1305,18 @@ export default function CrmProspectFunnel() {
     });
   };
 
-  const filteredProspectIds = useMemo(() => {
-    return new Set(filteredProspects.map((p) => p.id));
-  }, [filteredProspects]);
+  const filteredLeadIds = useMemo(() => {
+    return new Set(filteredLeads.map((l) => l.id));
+  }, [filteredLeads]);
 
   const getFollowUpsForDate = (date: Date) => {
     return followUps.filter((f) => {
-      if (!filteredProspectIds.has(f.customerId)) return false;
+      if (!filteredLeadIds.has(f.customerId)) return false;
       const followUpDate = typeof f.dueAt === "string" ? parseISO(f.dueAt) : f.dueAt;
       return isSameDay(followUpDate, date);
     }).map((f) => {
-      const prospect = filteredProspects.find((p) => p.id === f.customerId);
-      return { ...f, prospect };
+      const lead = filteredLeads.find((l) => l.customerId === f.customerId);
+      return { ...f, lead };
     });
   };
 
@@ -1318,9 +1336,9 @@ export default function CrmProspectFunnel() {
     return null;
   }
 
-  const isLoading = prospectsLoading || followUpsLoading;
+  const isLoading = leadsLoading || followUpsLoading;
 
-  const expandedProspect = expandedProspectId ? filteredProspects.find(p => p.id === expandedProspectId) : null;
+  const expandedLead = expandedLeadId ? filteredLeads.find(l => l.id === expandedLeadId) : null;
 
   const SearchFiltersComponent = () => (
     <div className="space-y-4">
@@ -1683,7 +1701,7 @@ export default function CrmProspectFunnel() {
                         key={deal.customerId}
                         className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 cursor-pointer transition-colors"
                         onClick={() => {
-                          setExpandedProspectId(deal.customerId);
+                          setExpandedLeadId(deal.customerId);
                           setActiveTab("details");
                         }}
                         data-testid={`stalled-deal-${deal.customerId}`}
@@ -1826,7 +1844,7 @@ export default function CrmProspectFunnel() {
                             <TableCell><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
                           </TableRow>
                         ))
-                      ) : filteredProspects.length === 0 ? (
+                      ) : filteredLeads.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={5} className="text-center py-12">
                             <Users className="h-12 w-12 text-slate-300 mx-auto mb-3" />
@@ -1839,15 +1857,8 @@ export default function CrmProspectFunnel() {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        filteredProspects.map((prospect) => {
-                          const nextFollowUpDate = prospect.nextFollowUpAt
-                            ? typeof prospect.nextFollowUpAt === "string"
-                              ? parseISO(prospect.nextFollowUpAt)
-                              : prospect.nextFollowUpAt
-                            : null;
-                          const isOverdue = nextFollowUpDate && isPast(nextFollowUpDate) && !isToday(nextFollowUpDate);
-                          const isDueToday = nextFollowUpDate && isToday(nextFollowUpDate);
-                          const isActive = prospect.salesStage !== "won" && prospect.salesStage !== "lost";
+                        filteredLeads.map((lead) => {
+                          const isActive = lead.salesStage !== "won" && lead.salesStage !== "lost";
 
                           const getStageBadgeClass = (stage: string | null) => {
                             switch (stage) {
@@ -1870,38 +1881,38 @@ export default function CrmProspectFunnel() {
 
                           return (
                             <TableRow
-                              key={prospect.id}
+                              key={lead.id}
                               className="cursor-pointer hover:bg-slate-50 transition-colors"
-                              data-testid={`row-prospect-${prospect.id}`}
+                              data-testid={`row-lead-${lead.id}`}
                             >
                               <TableCell className="py-3">
                                 <div className="flex items-center gap-3">
-                                  <InitialsAvatar name={prospect.name} size="md" />
+                                  <InitialsAvatar name={lead.customerName || "Unknown"} size="md" />
                                   <div className="min-w-0">
                                     <div 
                                       className="font-medium text-slate-900 truncate cursor-pointer hover:text-[#711419]"
                                       onClick={() => {
-                                        setExpandedProspectId(prospect.id);
+                                        setExpandedLeadId(lead.id);
                                         setActiveTab("details");
                                       }}
-                                      data-testid={`text-prospect-name-${prospect.id}`}
+                                      data-testid={`text-lead-name-${lead.id}`}
                                     >
-                                      {prospect.name}
+                                      {lead.customerName || "Unknown"}
                                     </div>
-                                    {prospect.companyName && (
-                                      <div className="text-xs text-slate-500 truncate">{prospect.companyName}</div>
+                                    {lead.leadTypeName && (
+                                      <div className="text-xs text-slate-500 truncate">{lead.leadTypeName}</div>
                                     )}
                                     <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
-                                      {prospect.phone && (
+                                      {lead.customerPhone && (
                                         <span className="flex items-center gap-1">
                                           <Phone className="h-3 w-3" />
-                                          {prospect.phone}
+                                          {lead.customerPhone}
                                         </span>
                                       )}
-                                      {prospect.email && (
+                                      {lead.customerEmail && (
                                         <span className="flex items-center gap-1 truncate max-w-[150px]">
                                           <Mail className="h-3 w-3 flex-shrink-0" />
-                                          <span className="truncate">{prospect.email}</span>
+                                          <span className="truncate">{lead.customerEmail}</span>
                                         </span>
                                       )}
                                     </div>
@@ -1911,29 +1922,13 @@ export default function CrmProspectFunnel() {
                               <TableCell>
                                 <Badge 
                                   variant="outline" 
-                                  className={`text-xs ${getStageBadgeClass(prospect.salesStage)}`}
+                                  className={`text-xs ${getStageBadgeClass(lead.salesStage)}`}
                                 >
-                                  {STAGE_LABELS[prospect.salesStage as SalesStage] || "New"}
+                                  {STAGE_LABELS[lead.salesStage as SalesStage] || "New"}
                                 </Badge>
                               </TableCell>
                               <TableCell>
-                                <InterestBadge level={prospect.interestLevel as InterestLevel} />
-                              </TableCell>
-                              <TableCell className="hidden md:table-cell">
-                                {nextFollowUpDate ? (
-                                  <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                                    isOverdue 
-                                      ? "text-red-700" 
-                                      : isDueToday 
-                                      ? "text-amber-700" 
-                                      : "text-slate-600"
-                                  }`}>
-                                    <Calendar className="h-3.5 w-3.5" />
-                                    {isOverdue ? `Overdue (${format(nextFollowUpDate, "MMM d")})` : isDueToday ? "Today" : format(nextFollowUpDate, "MMM d")}
-                                  </span>
-                                ) : (
-                                  <span className="text-xs text-slate-400">—</span>
-                                )}
+                                <InterestBadge level={lead.interestLevel as InterestLevel} />
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex items-center justify-end gap-1">
@@ -1945,11 +1940,11 @@ export default function CrmProspectFunnel() {
                                         className="h-7 w-7 text-green-600 hover:bg-green-50" 
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          setConfirmProspectId(prospect.id);
+                                          setConfirmProspectId(lead.id);
                                           setWonConfirmOpen(true);
                                         }}
                                         title="Mark Won"
-                                        data-testid={`button-mark-won-${prospect.id}`}
+                                        data-testid={`button-mark-won-${lead.id}`}
                                       >
                                         <CheckCircle2 className="h-4 w-4" />
                                       </Button>
@@ -1959,11 +1954,11 @@ export default function CrmProspectFunnel() {
                                         className="h-7 w-7 text-red-600 hover:bg-red-50" 
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          setConfirmProspectId(prospect.id);
+                                          setConfirmProspectId(lead.id);
                                           setLostConfirmOpen(true);
                                         }}
                                         title="Mark Lost"
-                                        data-testid={`button-mark-lost-${prospect.id}`}
+                                        data-testid={`button-mark-lost-${lead.id}`}
                                       >
                                         <X className="h-4 w-4" />
                                       </Button>
@@ -1975,10 +1970,10 @@ export default function CrmProspectFunnel() {
                                     className="h-7 px-2 text-xs text-slate-600 hover:text-slate-900" 
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setExpandedProspectId(prospect.id);
+                                      setExpandedLeadId(lead.id);
                                       setActiveTab("details");
                                     }} 
-                                    data-testid={`button-expand-${prospect.id}`}
+                                    data-testid={`button-expand-${lead.id}`}
                                   >
                                     View
                                     <ChevronRight className="h-3 w-3 ml-0.5" />
@@ -2134,8 +2129,8 @@ export default function CrmProspectFunnel() {
                                     key={followUp.id}
                                     followUp={followUp}
                                     onClick={() => {
-                                      if (followUp.prospect) {
-                                        setExpandedProspectId(followUp.prospect.id);
+                                      if (followUp.lead) {
+                                        setExpandedLeadId(followUp.lead.id);
                                         setActiveTab("followups");
                                       }
                                     }}
@@ -2169,8 +2164,8 @@ export default function CrmProspectFunnel() {
                                           <div
                                             key={followUp.id}
                                             onClick={() => {
-                                              if (followUp.prospect) {
-                                                setExpandedProspectId(followUp.prospect.id);
+                                              if (followUp.lead) {
+                                                setExpandedLeadId(followUp.lead.id);
                                                 setActiveTab("followups");
                                               }
                                             }}
@@ -2179,7 +2174,7 @@ export default function CrmProspectFunnel() {
                                             <div className="flex items-center gap-1.5">
                                               <FollowUpTypeIcon type={followUp.followUpType as FollowUpType} />
                                               <span className={`font-medium ${isCompleted ? 'line-through' : ''}`}>
-                                                {followUp.prospect?.name || "Unknown"}
+                                                {followUp.lead?.customerName || "Unknown"}
                                               </span>
                                               <span className="text-[10px] ml-auto opacity-75">
                                                 {format(followUpDate, "h:mm a")}
@@ -2270,8 +2265,8 @@ export default function CrmProspectFunnel() {
                                           key={followUp.id}
                                           followUp={followUp}
                                           onClick={() => {
-                                            if (followUp.prospect) {
-                                              setExpandedProspectId(followUp.prospect.id);
+                                            if (followUp.lead) {
+                                              setExpandedLeadId(followUp.lead.id);
                                               setActiveTab("followups");
                                             }
                                           }}
@@ -2295,7 +2290,7 @@ export default function CrmProspectFunnel() {
                     (() => {
                       const followUp = followUps.find((f) => f.id === activeCalendarFollowUpId);
                       if (!followUp) return null;
-                      const prospect = filteredProspects.find((p) => p.id === followUp.customerId);
+                      const lead = filteredLeads.find((l) => l.customerId === followUp.customerId);
                       const followUpDate = typeof followUp.dueAt === "string" ? parseISO(followUp.dueAt) : followUp.dueAt;
                       const isCompleted = !!followUp.completedAt;
                       const isOverdue = isPast(followUpDate) && !isToday(followUpDate) && !isCompleted;
@@ -2308,7 +2303,7 @@ export default function CrmProspectFunnel() {
                         <div className={`text-xs p-1 rounded truncate shadow-lg ${calendarItemStyle}`}>
                           <div className="flex items-center gap-1">
                             <FollowUpTypeIcon type={followUp.followUpType as FollowUpType} />
-                            <span>{prospect?.name || "Unknown"}</span>
+                            <span>{lead?.customerName || "Unknown"}</span>
                           </div>
                         </div>
                       );
@@ -2337,24 +2332,24 @@ export default function CrmProspectFunnel() {
                   data-testid="kanban-board"
                 >
                   {KANBAN_STAGES.map((stage) => (
-                    <ProspectKanbanColumn
+                    <LeadKanbanColumn
                       key={stage}
                       stage={stage}
-                      prospects={prospectsByStage[stage]}
-                      onCardClick={(prospect) => {
-                        setExpandedProspectId(prospect.id);
+                      leads={leadsByStage[stage]}
+                      onCardClick={(lead) => {
+                        setExpandedLeadId(lead.id);
                         setActiveTab("details");
                       }}
                     />
                   ))}
                 </div>
                 <DragOverlay>
-                  {activeProspectId ? (
+                  {activeLeadId ? (
                     (() => {
-                      const prospect = prospects.find((p) => p.id === activeProspectId);
-                      return prospect ? (
-                        <ProspectCard
-                          prospect={prospect}
+                      const lead = leads.find((l) => l.id === activeLeadId);
+                      return lead ? (
+                        <LeadCard
+                          lead={lead}
                           onClick={() => {}}
                           isDragging
                         />
@@ -2367,38 +2362,39 @@ export default function CrmProspectFunnel() {
           </Tabs>
         </div>
 
-        <Sheet open={!!expandedProspectId} onOpenChange={(open) => {
+        <Sheet open={!!expandedLeadId} onOpenChange={(open) => {
           if (!open) {
-            setExpandedProspectId(null);
+            setExpandedLeadId(null);
             setIsEditing(false);
           }
         }}>
           <SheetContent side="right" className="w-[90vw] sm:w-[530px] sm:max-w-[530px] p-0 flex flex-col overflow-y-auto">
-            {expandedProspect && (
+            {expandedLead && (
               <>
                 <SheetHeader className="px-4 py-3 border-b flex-shrink-0 pr-12">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <SheetTitle className="text-lg truncate">
-                        <Link href={`/crm/customers/${expandedProspect.id}`} className="hover:text-[#711419] hover:underline">
-                          {expandedProspect.name}
+                        <Link href={`/crm/customers/${expandedLead.customerId}`} className="hover:text-[#711419] hover:underline">
+                          {expandedLead.customerName || "Unknown"}
                           <ExternalLink className="h-3 w-3 inline ml-1 opacity-50" />
                         </Link>
                       </SheetTitle>
                       <SheetDescription className="text-xs">
-                        {expandedProspect.phone && <span className="mr-3">{expandedProspect.phone}</span>}
-                        {expandedProspect.email && <span className="truncate">{expandedProspect.email}</span>}
+                        {expandedLead.leadTypeName && <span className="mr-3 text-blue-600">{expandedLead.leadTypeName}</span>}
+                        {expandedLead.customerPhone && <span className="mr-3">{expandedLead.customerPhone}</span>}
+                        {expandedLead.customerEmail && <span className="truncate">{expandedLead.customerEmail}</span>}
                       </SheetDescription>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <Select
-                        value={expandedProspect.interestLevel || ""}
-                        onValueChange={(value) => updateLeadMutation.mutate({ id: expandedProspect.id, data: { interestLevel: value || null } })}
+                        value={expandedLead.interestLevel || ""}
+                        onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { interestLevel: value || null } })}
                       >
                         <SelectTrigger className="h-8 w-[90px] text-xs border-0 bg-transparent p-0 gap-1">
                           <SelectValue placeholder="Set temp">
-                            {expandedProspect.interestLevel ? (() => {
-                              const level = expandedProspect.interestLevel as InterestLevel;
+                            {expandedLead.interestLevel ? (() => {
+                              const level = expandedLead.interestLevel as InterestLevel;
                               const config = temperatureConfig[level];
                               const Icon = config.icon;
                               return (
@@ -2432,8 +2428,8 @@ export default function CrmProspectFunnel() {
                         </SelectContent>
                       </Select>
                       <Select
-                        value={expandedProspect.salesStage || "new"}
-                        onValueChange={(value) => updateStageMutation.mutate({ id: expandedProspect.id, salesStage: value as SalesStage })}
+                        value={expandedLead.salesStage || "new"}
+                        onValueChange={(value) => updateStageMutation.mutate({ id: expandedLead.id, salesStage: value as SalesStage })}
                       >
                         <SelectTrigger className="h-8 w-[120px] text-xs">
                           <SelectValue />
@@ -2457,7 +2453,7 @@ export default function CrmProspectFunnel() {
                       <TabsTrigger value="details" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">Details</TabsTrigger>
                       <TabsTrigger value="followups" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
                         <Calendar className="h-3 w-3 mr-1" />
-                        Follow-ups ({getProspectFollowUps(expandedProspect.id).length})
+                        Follow-ups ({getLeadFollowUps(expandedLead.customerId).length})
                       </TabsTrigger>
                       <TabsTrigger value="notes" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
                         <StickyNote className="h-3 w-3 mr-1" />
@@ -2473,8 +2469,8 @@ export default function CrmProspectFunnel() {
                       <div className="space-y-2">
                         <h4 className="text-sm font-medium">Assigned Salesperson</h4>
                         <Select
-                          value={expandedProspect.assignedSalesRepId || ""}
-                          onValueChange={(value) => updateSalesRepMutation.mutate({ id: expandedProspect.id, assignedSalesRepId: value || null })}
+                          value={expandedLead.assignedSalesRepId || ""}
+                          onValueChange={(value) => updateSalesRepMutation.mutate({ id: expandedLead.id, assignedSalesRepId: value || null })}
                         >
                           <SelectTrigger className="w-full" data-testid="select-salesperson">
                             <SelectValue placeholder="Select salesperson" />
@@ -2509,49 +2505,19 @@ export default function CrmProspectFunnel() {
                         {isEditing ? (
                           <div className="grid gap-3">
                             <div className="space-y-1.5">
-                              <Label htmlFor="edit-phone" className="text-xs text-muted-foreground">Phone</Label>
-                              <Input
-                                id="edit-phone"
-                                value={editPhone}
-                                onChange={(e) => setEditPhone(e.target.value)}
-                                placeholder="Enter phone number"
-                                className="h-9"
-                                data-testid="input-edit-phone"
-                              />
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label htmlFor="edit-email" className="text-xs text-muted-foreground">Email</Label>
-                              <Input
-                                id="edit-email"
-                                type="email"
-                                value={editEmail}
-                                onChange={(e) => setEditEmail(e.target.value)}
-                                placeholder="Enter email address"
-                                className="h-9"
-                                data-testid="input-edit-email"
-                              />
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label htmlFor="edit-address" className="text-xs text-muted-foreground">Address</Label>
-                              <Input
-                                id="edit-address"
-                                value={editAddress}
-                                onChange={(e) => setEditAddress(e.target.value)}
-                                placeholder="Enter address"
-                                className="h-9"
-                                data-testid="input-edit-address"
-                              />
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label htmlFor="edit-company" className="text-xs text-muted-foreground">Company</Label>
-                              <Input
-                                id="edit-company"
-                                value={editCompanyName}
-                                onChange={(e) => setEditCompanyName(e.target.value)}
-                                placeholder="Enter company name"
-                                className="h-9"
-                                data-testid="input-edit-company"
-                              />
+                              <Label htmlFor="edit-potential-value" className="text-xs text-muted-foreground">Potential Value</Label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                                <Input
+                                  id="edit-potential-value"
+                                  type="number"
+                                  value={editPotentialValue}
+                                  onChange={(e) => setEditPotentialValue(e.target.value)}
+                                  placeholder="0"
+                                  className="h-9 pl-7"
+                                  data-testid="input-edit-potential-value"
+                                />
+                              </div>
                             </div>
                             <div className="space-y-1.5">
                               <Label htmlFor="edit-temperature" className="text-xs text-muted-foreground">Temperature</Label>
@@ -2613,39 +2579,38 @@ export default function CrmProspectFunnel() {
                           </div>
                         ) : (
                           <div className="grid gap-2 text-sm">
-                            {expandedProspect.phone && (
-                              <a href={`tel:${expandedProspect.phone}`} className="flex items-center gap-2 hover:underline">
+                            {expandedLead.customerPhone && (
+                              <a href={`tel:${expandedLead.customerPhone}`} className="flex items-center gap-2 hover:underline">
                                 <Phone className="h-4 w-4 text-muted-foreground" />
-                                {expandedProspect.phone}
+                                {expandedLead.customerPhone}
                               </a>
                             )}
-                            {expandedProspect.email && (
-                              <a href={`mailto:${expandedProspect.email}`} className="flex items-center gap-2 hover:underline">
+                            {expandedLead.customerEmail && (
+                              <a href={`mailto:${expandedLead.customerEmail}`} className="flex items-center gap-2 hover:underline">
                                 <Mail className="h-4 w-4 text-muted-foreground" />
-                                {expandedProspect.email}
+                                {expandedLead.customerEmail}
                               </a>
                             )}
-                            {expandedProspect.fullAddress && (
+                            {expandedLead.customerAddress && (
                               <div className="flex items-center gap-2">
                                 <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                <span>{expandedProspect.fullAddress}</span>
+                                <span>{expandedLead.customerAddress}</span>
+                              </div>
+                            )}
+                            {expandedLead.potentialValue && (
+                              <div className="flex items-center gap-2">
+                                <DollarSign className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                <span>Potential Value: ${expandedLead.potentialValue.toLocaleString()}</span>
                               </div>
                             )}
                           </div>
                         )}
                       </div>
 
-                      {!isEditing && expandedProspect.companyName && (
+                      {!isEditing && expandedLead.notes && (
                         <div className="space-y-2">
-                          <h4 className="text-sm font-medium">Company</h4>
-                          <p className="text-sm text-muted-foreground">{expandedProspect.companyName}</p>
-                        </div>
-                      )}
-
-                      {!isEditing && expandedProspect.notes && (
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-medium">Notes</h4>
-                          <p className="text-sm text-muted-foreground whitespace-pre-wrap">{expandedProspect.notes}</p>
+                          <h4 className="text-sm font-medium">Lead Notes</h4>
+                          <p className="text-sm text-muted-foreground whitespace-pre-wrap">{expandedLead.notes}</p>
                         </div>
                       )}
 
@@ -2668,9 +2633,9 @@ export default function CrmProspectFunnel() {
                                 size="sm"
                                 className="self-end"
                                 onClick={() => {
-                                  if (expandedProspect && leadNoteBody.trim()) {
+                                  if (expandedLead && leadNoteBody.trim()) {
                                     createLeadNoteMutation.mutate({
-                                      customerId: expandedProspect.id,
+                                      customerId: expandedLead.customerId,
                                       body: leadNoteBody.trim(),
                                     });
                                   }
@@ -2734,13 +2699,13 @@ export default function CrmProspectFunnel() {
                       {!isEditing && (
                         <>
                           <div className="pt-4 border-t flex gap-2">
-                            {expandedProspect.salesStage !== "won" && expandedProspect.salesStage !== "lost" && (
+                            {expandedLead.salesStage !== "won" && expandedLead.salesStage !== "lost" && (
                               <>
                                 <Button 
                                   className="flex-1" 
                                   variant="outline"
                                   onClick={() => {
-                                    setConfirmProspectId(expandedProspect.id);
+                                    setConfirmProspectId(expandedLead.id);
                                     setWonConfirmOpen(true);
                                   }}
                                 >
@@ -2751,7 +2716,7 @@ export default function CrmProspectFunnel() {
                                   className="flex-1" 
                                   variant="outline"
                                   onClick={() => {
-                                    setConfirmProspectId(expandedProspect.id);
+                                    setConfirmProspectId(expandedLead.id);
                                     setLostConfirmOpen(true);
                                   }}
                                 >
@@ -2762,7 +2727,7 @@ export default function CrmProspectFunnel() {
                             )}
                             <Button
                               className="flex-1"
-                              onClick={() => navigate(`/crm/customers/${expandedProspect.id}`)}
+                              onClick={() => navigate(`/crm/customers/${expandedLead.customerId}`)}
                             >
                               View Full Profile
                             </Button>
@@ -2773,7 +2738,7 @@ export default function CrmProspectFunnel() {
                               variant="outline"
                               className="w-full"
                               onClick={() => {
-                                setConfirmProspectId(expandedProspect.id);
+                                setConfirmProspectId(expandedLead.id);
                                 setDeleteConfirmOpen(true);
                               }}
                               data-testid="button-remove-from-funnel"
@@ -2789,13 +2754,13 @@ export default function CrmProspectFunnel() {
                     <TabsContent value="followups" className="space-y-4">
                       <div className="flex justify-between items-center">
                         <h4 className="text-sm font-medium">Follow-ups</h4>
-                        <Button size="sm" onClick={() => handleAddFollowUp(expandedProspect.id)}>
+                        <Button size="sm" onClick={() => handleAddFollowUp(expandedLead.id)}>
                           <Plus className="h-4 w-4 mr-1" />
                           Add Follow-up
                         </Button>
                       </div>
 
-                      {getProspectFollowUps(expandedProspect.id).length === 0 ? (
+                      {getLeadFollowUps(expandedLead.customerId).length === 0 ? (
                         <Card className="p-6">
                           <p className="text-center text-muted-foreground text-sm">
                             No follow-ups scheduled
@@ -2803,7 +2768,7 @@ export default function CrmProspectFunnel() {
                         </Card>
                       ) : (
                         <div className="space-y-3">
-                          {getProspectFollowUps(expandedProspect.id).map((followUp) => {
+                          {getLeadFollowUps(expandedLead.customerId).map((followUp) => {
                             const dueDate = new Date(followUp.dueAt);
                             const isCompleted = !!followUp.completedAt;
                             const isOverdue = isPast(dueDate) && !isToday(dueDate) && !isCompleted;
@@ -2986,9 +2951,9 @@ export default function CrmProspectFunnel() {
                     <TabsContent value="notes" className="space-y-4">
                       <div className="space-y-2">
                         <h4 className="text-sm font-medium">Customer Notes</h4>
-                        {expandedProspect.notes ? (
+                        {expandedLead.notes ? (
                           <div className="bg-gray-50 rounded-lg p-4">
-                            <p className="text-sm whitespace-pre-wrap">{expandedProspect.notes}</p>
+                            <p className="text-sm whitespace-pre-wrap">{expandedLead.notes}</p>
                           </div>
                         ) : (
                           <Card className="p-6">
@@ -3003,7 +2968,7 @@ export default function CrmProspectFunnel() {
                     <TabsContent value="quotes" className="space-y-4">
                       <div className="flex justify-between items-center">
                         <h4 className="text-sm font-medium">Quotes</h4>
-                        <Link href={`/crm/quotes/new?customerId=${expandedProspect.id}&sourceType=lead`}>
+                        <Link href={`/crm/quotes/new?customerId=${expandedLead.customerId}&sourceType=lead`}>
                           <Button size="sm" className="h-8 text-xs">
                             <Plus className="h-3 w-3 mr-1" />
                             Create Quote

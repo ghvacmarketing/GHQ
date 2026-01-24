@@ -964,6 +964,35 @@ export const crmProperties = pgTable("crm_properties", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// CRM Lead Types (configurable lead/opportunity types)
+export const crmLeadTypes = pgTable("crm_lead_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// CRM Leads (multiple leads/opportunities per customer)
+export const crmLeads = pgTable("crm_leads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").notNull().references(() => crmCustomers.id, { onDelete: "cascade" }),
+  leadTypeId: varchar("lead_type_id").references(() => crmLeadTypes.id),
+  potentialValue: integer("potential_value"),
+  assignedSalesRepId: varchar("assigned_sales_rep_id").references(() => crmUsers.id),
+  interestLevel: text("interest_level").$type<InterestLevel>(),
+  salesStage: text("sales_stage").$type<SalesStage>().notNull().default("new"),
+  notes: text("notes"),
+  wonAt: timestamp("won_at"),
+  lostAt: timestamp("lost_at"),
+  lostReason: text("lost_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  customerIdIdx: index("crm_leads_customer_id_idx").on(table.customerId),
+  salesStageIdx: index("crm_leads_sales_stage_idx").on(table.salesStage),
+}));
+
 // CRM Follow-Ups (scheduled follow-ups for prospects)
 export const crmFollowUps = pgTable("crm_follow_ups", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -2263,6 +2292,17 @@ export const insertCrmFollowUpSchema = createInsertSchema(crmFollowUps).omit({
   createdAt: true,
 });
 
+export const insertCrmLeadTypeSchema = createInsertSchema(crmLeadTypes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCrmLeadSchema = createInsertSchema(crmLeads).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertCrmQuoteLineItemSchema = createInsertSchema(crmQuoteLineItems).omit({
   id: true,
   createdAt: true,
@@ -2305,6 +2345,10 @@ export type InsertCrmQuoteLineItem = z.infer<typeof insertCrmQuoteLineItemSchema
 export type CrmQuoteLineItem = typeof crmQuoteLineItems.$inferSelect;
 export type InsertCrmFollowUp = z.infer<typeof insertCrmFollowUpSchema>;
 export type CrmFollowUp = typeof crmFollowUps.$inferSelect;
+export type InsertCrmLeadType = z.infer<typeof insertCrmLeadTypeSchema>;
+export type CrmLeadType = typeof crmLeadTypes.$inferSelect;
+export type InsertCrmLead = z.infer<typeof insertCrmLeadSchema>;
+export type CrmLead = typeof crmLeads.$inferSelect;
 export type InsertCrmAgreement = z.infer<typeof insertCrmAgreementSchema>;
 export type CrmAgreement = typeof crmAgreements.$inferSelect;
 
