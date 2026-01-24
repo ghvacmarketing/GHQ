@@ -42,15 +42,9 @@ import {
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { cn } from "@/lib/utils";
-import type { CrmUser, CrmCustomer, InterestLevel, CrmLeadType, CrmLeadTempOption, CrmLeadDriverOption } from "@shared/schema";
+import type { CrmUser, CrmCustomer, CrmLeadType, CrmLeadTempOption, CrmLeadDriverOption } from "@shared/schema";
 
 type ProspectMode = "choose" | "existing";
-
-const INTEREST_LEVELS: { value: InterestLevel; label: string }[] = [
-  { value: "hot", label: "Hot" },
-  { value: "warm", label: "Warm" },
-  { value: "cold", label: "Cold" },
-];
 
 export default function CrmAddProspect() {
   usePageTitle("Add Lead");
@@ -68,7 +62,6 @@ export default function CrmAddProspect() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [potentialValue, setPotentialValue] = useState("");
   const [assignedSalesRepId, setAssignedSalesRepId] = useState("");
-  const [interestLevel, setInterestLevel] = useState<InterestLevel | "">("");
   const [leadTypeId, setLeadTypeId] = useState<string>("");
   const [leadTempId, setLeadTempId] = useState<string>("");
   const [leadDriverId, setLeadDriverId] = useState<string>("");
@@ -166,7 +159,6 @@ export default function CrmAddProspect() {
         leadTypeId: leadTypeId || null,
         potentialValue: potentialValue ? parseInt(potentialValue) : null,
         assignedSalesRepId: assignedSalesRepId || null,
-        interestLevel: interestLevel || null,
         leadTempId: leadTempId || null,
         leadDriverId: leadDriverId || null,
       });
@@ -480,24 +472,6 @@ export default function CrmAddProspect() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="interestLevel">Interest Level</Label>
-                        <Select
-                          value={interestLevel}
-                          onValueChange={(val) => setInterestLevel(val as InterestLevel | "")}
-                        >
-                          <SelectTrigger data-testid="select-interest-level">
-                            <SelectValue placeholder="Select level (optional)" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {INTEREST_LEVELS.map((level) => (
-                              <SelectItem key={level.value} value={level.value}>
-                                {level.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
                         <Label htmlFor="leadTemp">Lead Temperature</Label>
                         <Select
                           value={leadTempId}
@@ -554,7 +528,6 @@ export default function CrmAddProspect() {
                         setSelectedCustomerId("");
                         setPotentialValue("");
                         setAssignedSalesRepId("");
-                        setInterestLevel("");
                         setLeadTypeId("");
                         setLeadTempId("");
                         setLeadDriverId("");

@@ -75,9 +75,6 @@ import {
   MapPin,
   Calendar,
   AlertTriangle,
-  Flame,
-  Thermometer,
-  Snowflake,
   Clock,
   Users,
   Activity,
@@ -107,7 +104,7 @@ import {
 } from "lucide-react";
 import { format, isToday, isPast, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, getDay, addDays, subDays, addWeeks, subWeeks, startOfDay, getHours, getMinutes, setHours } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import type { CrmUser, CrmCustomer, CrmFollowUp, SalesStage, InterestLevel, FollowUpType, CrmQuote, CrmLeadType, CrmLeadTempOption, CrmLeadDriverOption } from "@shared/schema";
+import type { CrmUser, CrmCustomer, CrmFollowUp, SalesStage, FollowUpType, CrmQuote, CrmLeadType, CrmLeadTempOption, CrmLeadDriverOption } from "@shared/schema";
 
 type Lead = {
   id: string;
@@ -117,7 +114,6 @@ type Lead = {
   leadDriverId: string | null;
   potentialValue: number | null;
   assignedSalesRepId: string | null;
-  interestLevel: string | null;
   salesStage: SalesStage;
   notes: string | null;
   wonAt: string | null;
@@ -199,25 +195,6 @@ const STAGE_LABELS: Record<SalesStage, string> = {
   won: "Won",
   lost: "Lost",
 };
-
-const temperatureConfig: Record<InterestLevel, { icon: React.ComponentType<{ className?: string }>; className: string }> = {
-  hot: { icon: Flame, className: "bg-red-100 text-red-700 border-red-200" },
-  warm: { icon: Thermometer, className: "bg-amber-100 text-amber-700 border-amber-200" },
-  cold: { icon: Snowflake, className: "bg-slate-100 text-slate-600 border-slate-200" },
-};
-
-function InterestBadge({ level }: { level: InterestLevel | null | undefined }) {
-  if (!level) return null;
-  
-  const { icon: Icon, className } = temperatureConfig[level];
-  
-  return (
-    <Badge variant="outline" className={`text-xs ${className}`}>
-      <Icon className="h-3 w-3 mr-1" />
-      {level.charAt(0).toUpperCase() + level.slice(1)}
-    </Badge>
-  );
-}
 
 function FollowUpBadge({ nextFollowUpAt }: { nextFollowUpAt: Date | string | null | undefined }) {
   if (!nextFollowUpAt) return null;
@@ -637,7 +614,6 @@ function LeadCard({ lead, onClick, isDragging: isDraggingProp }: LeadCardProps) 
               </div>
             )}
             <div className="flex flex-wrap gap-1 mt-2">
-              <InterestBadge level={lead.interestLevel as InterestLevel} />
               {lead.leadTempNumericValue && (
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-blue-50 text-blue-700 border-blue-200">
                   T{lead.leadTempNumericValue}
@@ -750,7 +726,6 @@ export default function CrmProspectFunnel() {
   
   const [isEditing, setIsEditing] = useState(false);
   const [editNotes, setEditNotes] = useState("");
-  const [editInterestLevel, setEditInterestLevel] = useState<InterestLevel | "">("");
   const [editPotentialValue, setEditPotentialValue] = useState("");
   const [editLeadTypeId, setEditLeadTypeId] = useState<string>("");
 
@@ -1084,7 +1059,7 @@ export default function CrmProspectFunnel() {
   });
 
   const updateLeadMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { notes?: string; interestLevel?: string | null; potentialValue?: number | null; leadTypeId?: string | null; leadTempId?: string | null; leadDriverId?: string | null } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: { notes?: string; potentialValue?: number | null; leadTypeId?: string | null; leadTempId?: string | null; leadDriverId?: string | null } }) => {
       const res = await apiRequest("PATCH", `/api/crm/leads/${id}`, data);
       return res.json();
     },
@@ -1101,7 +1076,6 @@ export default function CrmProspectFunnel() {
   const handleEditLead = () => {
     if (!expandedLead) return;
     setEditNotes(expandedLead.notes || "");
-    setEditInterestLevel((expandedLead.interestLevel as InterestLevel) || "");
     setEditPotentialValue(expandedLead.potentialValue?.toString() || "");
     setEditLeadTypeId(expandedLead.leadTypeId || "");
     setIsEditing(true);
@@ -1110,7 +1084,6 @@ export default function CrmProspectFunnel() {
   const handleCancelEdit = () => {
     setIsEditing(false);
     setEditNotes("");
-    setEditInterestLevel("");
     setEditPotentialValue("");
     setEditLeadTypeId("");
   };
@@ -1121,7 +1094,6 @@ export default function CrmProspectFunnel() {
       id: expandedLead.id,
       data: {
         notes: editNotes,
-        interestLevel: editInterestLevel || null,
         potentialValue: editPotentialValue ? parseInt(editPotentialValue, 10) : null,
         leadTypeId: editLeadTypeId || null,
       },
@@ -2151,9 +2123,6 @@ export default function CrmProspectFunnel() {
                                   {STAGE_LABELS[lead.salesStage as SalesStage] || "New"}
                                 </Badge>
                               </TableCell>
-                              <TableCell>
-                                <InterestBadge level={lead.interestLevel as InterestLevel} />
-                              </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex items-center justify-end gap-1">
                                   {isActive && (
@@ -2591,141 +2560,103 @@ export default function CrmProspectFunnel() {
             setExpandedLeadId(null);
             setIsEditing(false);
           }
-        }}>
+        }} modal={false}>
           <SheetContent side="right" className="w-[90vw] sm:w-[530px] sm:max-w-[530px] p-0 flex flex-col overflow-y-auto">
             {expandedLead && (
               <>
-                <SheetHeader className="px-4 py-3 border-b flex-shrink-0 pr-12">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <SheetTitle className="text-lg truncate">
-                        <Link href={`/crm/customers/${expandedLead.customerId}`} className="hover:text-[#711419] hover:underline">
-                          {expandedLead.customerName || "Unknown"}
-                          <ExternalLink className="h-3 w-3 inline ml-1 opacity-50" />
-                        </Link>
-                      </SheetTitle>
-                      <SheetDescription className="text-xs">
-                        {expandedLead.customerPhone && <span className="mr-3">{expandedLead.customerPhone}</span>}
-                        {expandedLead.customerEmail && <span className="truncate">{expandedLead.customerEmail}</span>}
-                      </SheetDescription>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <Select
-                        value={expandedLead.leadTypeId || ""}
-                        onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { leadTypeId: value || null } })}
-                      >
-                        <SelectTrigger className="h-8 w-auto min-w-[120px] text-xs">
-                          <SelectValue placeholder="Lead Type">
-                            {expandedLead.leadTypeName ? (
-                              <span className="text-blue-600 font-medium">{expandedLead.leadTypeName}</span>
-                            ) : "Lead Type"}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {leadTypes.filter(lt => lt.isActive).map((type) => (
-                            <SelectItem key={type.id} value={type.id}>
-                              {type.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={expandedLead.interestLevel || ""}
-                        onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { interestLevel: value || null } })}
-                      >
-                        <SelectTrigger className="h-8 w-[90px] text-xs border-0 bg-transparent p-0 gap-1">
-                          <SelectValue placeholder="Set temp">
-                            {expandedLead.interestLevel ? (() => {
-                              const level = expandedLead.interestLevel as InterestLevel;
-                              const config = temperatureConfig[level];
-                              const Icon = config.icon;
-                              return (
-                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${config.className}`}>
-                                  <Icon className="h-3 w-3" />
-                                  {level.charAt(0).toUpperCase() + level.slice(1)}
-                                </span>
-                              );
-                            })() : null}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="hot">
-                            <div className="flex items-center gap-2">
-                              <Flame className="h-4 w-4 text-red-600" />
-                              Hot
-                            </div>
+                <SheetHeader className="px-4 py-4 border-b flex-shrink-0 space-y-3">
+                  <div className="pr-8">
+                    <SheetTitle className="text-lg font-semibold">
+                      <Link href={`/crm/customers/${expandedLead.customerId}`} className="hover:text-[#711419] hover:underline">
+                        {expandedLead.customerName || "Unknown"}
+                        <ExternalLink className="h-3 w-3 inline ml-1 opacity-50" />
+                      </Link>
+                    </SheetTitle>
+                    <SheetDescription className="text-sm text-muted-foreground mt-1">
+                      {expandedLead.customerPhone && <span className="mr-3">{expandedLead.customerPhone}</span>}
+                      {expandedLead.customerEmail && <span className="truncate">{expandedLead.customerEmail}</span>}
+                    </SheetDescription>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <Select
+                      value={expandedLead.leadTypeId || ""}
+                      onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { leadTypeId: value || null } })}
+                    >
+                      <SelectTrigger className="h-8 w-auto min-w-[120px] text-xs">
+                        <SelectValue placeholder="Lead Type">
+                          {expandedLead.leadTypeName ? (
+                            <span className="text-blue-600 font-medium">{expandedLead.leadTypeName}</span>
+                          ) : "Lead Type"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {leadTypes.filter(lt => lt.isActive).map((type) => (
+                          <SelectItem key={type.id} value={type.id}>
+                            {type.name}
                           </SelectItem>
-                          <SelectItem value="warm">
-                            <div className="flex items-center gap-2">
-                              <Thermometer className="h-4 w-4 text-amber-600" />
-                              Warm
-                            </div>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={expandedLead.salesStage || "new"}
+                      onValueChange={(value) => updateStageMutation.mutate({ id: expandedLead.id, salesStage: value as SalesStage })}
+                    >
+                      <SelectTrigger className="h-8 w-[120px] text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="new">New</SelectItem>
+                        <SelectItem value="contacted">Contacted</SelectItem>
+                        <SelectItem value="quote_sent">Quote Sent</SelectItem>
+                        <SelectItem value="negotiating">Negotiating</SelectItem>
+                        <SelectItem value="won">Won</SelectItem>
+                        <SelectItem value="lost">Lost</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={expandedLead.leadTempId || ""}
+                      onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { leadTempId: value === "none" ? null : value || null } })}
+                    >
+                      <SelectTrigger className="h-8 w-auto min-w-[80px] text-xs">
+                        <SelectValue placeholder="Temp">
+                          {expandedLead.leadTempId ? (() => {
+                            const option = leadTempOptions.find(o => o.id === expandedLead.leadTempId);
+                            return option ? (
+                              <span className="font-medium">T{option.numericValue}</span>
+                            ) : "Temp";
+                          })() : "Temp"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Temperature</SelectItem>
+                        {leadTempOptions.map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.numericValue} - {option.label}
                           </SelectItem>
-                          <SelectItem value="cold">
-                            <div className="flex items-center gap-2">
-                              <Snowflake className="h-4 w-4 text-slate-500" />
-                              Cold
-                            </div>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={expandedLead.leadDriverId || ""}
+                      onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { leadDriverId: value === "none" ? null : value || null } })}
+                    >
+                      <SelectTrigger className="h-8 w-auto min-w-[90px] text-xs">
+                        <SelectValue placeholder="Driver">
+                          {expandedLead.leadDriverLabel ? (
+                            <span className="font-medium">{expandedLead.leadDriverLabel.split('-')[0]}</span>
+                          ) : "Driver"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Driver</SelectItem>
+                        {leadDriverOptions.map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.label}
                           </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={expandedLead.salesStage || "new"}
-                        onValueChange={(value) => updateStageMutation.mutate({ id: expandedLead.id, salesStage: value as SalesStage })}
-                      >
-                        <SelectTrigger className="h-8 w-[120px] text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="new">New</SelectItem>
-                          <SelectItem value="contacted">Contacted</SelectItem>
-                          <SelectItem value="quote_sent">Quote Sent</SelectItem>
-                          <SelectItem value="negotiating">Negotiating</SelectItem>
-                          <SelectItem value="won">Won</SelectItem>
-                          <SelectItem value="lost">Lost</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={expandedLead.leadTempId || ""}
-                        onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { leadTempId: value === "none" ? null : value || null } })}
-                      >
-                        <SelectTrigger className="h-8 w-auto min-w-[80px] text-xs">
-                          <SelectValue placeholder="Temp">
-                            {expandedLead.leadTempNumericValue ? (
-                              <span className="font-medium">Temp {expandedLead.leadTempNumericValue}</span>
-                            ) : "Temp"}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No Temperature</SelectItem>
-                          {leadTempOptions.map((option) => (
-                            <SelectItem key={option.id} value={option.id}>
-                              {option.numericValue} - {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={expandedLead.leadDriverId || ""}
-                        onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { leadDriverId: value === "none" ? null : value || null } })}
-                      >
-                        <SelectTrigger className="h-8 w-auto min-w-[90px] text-xs">
-                          <SelectValue placeholder="Driver">
-                            {expandedLead.leadDriverLabel ? (
-                              <span className="font-medium">{expandedLead.leadDriverLabel.split('-')[0]}</span>
-                            ) : "Driver"}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No Driver</SelectItem>
-                          {leadDriverOptions.map((option) => (
-                            <SelectItem key={option.id} value={option.id}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </SheetHeader>
 
@@ -2815,34 +2746,6 @@ export default function CrmProspectFunnel() {
                                   data-testid="input-edit-potential-value"
                                 />
                               </div>
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label htmlFor="edit-temperature" className="text-xs text-muted-foreground">Temperature</Label>
-                              <Select value={editInterestLevel} onValueChange={(v) => setEditInterestLevel(v as InterestLevel)}>
-                                <SelectTrigger className="h-9" data-testid="select-edit-temperature">
-                                  <SelectValue placeholder="Select temperature" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="hot">
-                                    <div className="flex items-center gap-2">
-                                      <Flame className="h-4 w-4 text-red-600" />
-                                      Hot
-                                    </div>
-                                  </SelectItem>
-                                  <SelectItem value="warm">
-                                    <div className="flex items-center gap-2">
-                                      <Thermometer className="h-4 w-4 text-amber-600" />
-                                      Warm
-                                    </div>
-                                  </SelectItem>
-                                  <SelectItem value="cold">
-                                    <div className="flex items-center gap-2">
-                                      <Snowflake className="h-4 w-4 text-slate-500" />
-                                      Cold
-                                    </div>
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
                             </div>
                             <div className="space-y-1.5">
                               <Label htmlFor="edit-notes" className="text-xs text-muted-foreground">Notes</Label>
