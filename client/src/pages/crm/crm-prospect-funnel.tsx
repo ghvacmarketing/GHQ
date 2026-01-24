@@ -1351,7 +1351,7 @@ export default function CrmProspectFunnel() {
 
   const expandedLead = expandedLeadId ? filteredLeads.find(l => l.id === expandedLeadId) : null;
 
-  const SearchFiltersComponent = () => (
+  const searchFiltersContent = (
     <div className="space-y-4">
       <div className="flex justify-center">
         <div className="relative w-full max-w-xl">
@@ -1845,7 +1845,7 @@ export default function CrmProspectFunnel() {
             </TabsContent>
 
             <TabsContent value="list" className="space-y-4 mt-4">
-              <SearchFiltersComponent />
+              {searchFiltersContent}
               <Card className="bg-white border shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                   <Table>
@@ -2016,7 +2016,7 @@ export default function CrmProspectFunnel() {
           </TabsContent>
 
             <TabsContent value="calendar" className="space-y-4 mt-4">
-              <SearchFiltersComponent />
+              {searchFiltersContent}
               <DndContext
                 sensors={sensors}
                 onDragStart={handleCalendarDragStart}
