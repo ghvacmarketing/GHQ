@@ -6163,6 +6163,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/crm/customers/check-duplicates - Check for potential duplicate customers
+  app.post("/api/crm/customers/check-duplicates", requireCrmAuth, async (req, res) => {
+    try {
+      const { name, phone, email, address, excludeId } = req.body;
+      
+      if (!name && !phone && !email && !address) {
+        return res.json({ duplicates: [] });
+      }
+      
+      const conditions: SQL<unknown>[] = [];
+      
+      // Normalize inputs for comparison
+      const normalizedName = name?.toLowerCase().trim();
+      const normalizedPhone = phone?.replace(/\D/g, ''); // Remove non-digits
+      const normalizedEmail = email?.toLowerCase().trim();
+      const normalizedAddress = address?.toLowerCase().trim();
+      
+      // Check for name match (fuzzy - contains comparison for parts of name)
+      if (normalizedName && normalizedName.length >= 2) {
+        conditions.push(sql`LOWER(${crmCustomers.name}) LIKE ${'%' + normalizedName + '%'}`);
+      }
+      
+      // Check for phone match (normalized - just digits)
+      if (normalizedPhone && normalizedPhone.length >= 7) {
+        conditions.push(sql`REPLACE(REPLACE(REPLACE(REPLACE(${crmCustomers.phone}, '-', ''), '(', ''), ')', ''), ' ', '') LIKE ${'%' + normalizedPhone + '%'}`);
+      }
+      
+      // Check for email match (exact or partial domain match)
+      if (normalizedEmail && normalizedEmail.length >= 3) {
+        conditions.push(sql`LOWER(${crmCustomers.email}) = ${normalizedEmail}`);
+      }
+      
+      // Check for address match (fuzzy)
+      if (normalizedAddress && normalizedAddress.length >= 5) {
+        conditions.push(sql`LOWER(${crmCustomers.fullAddress}) LIKE ${'%' + normalizedAddress + '%'}`);
+      }
+      
+      if (conditions.length === 0) {
+        return res.json({ duplicates: [] });
+      }
+      
+      // Build query with OR conditions
+      let query = db.select({
+        id: crmCustomers.id,
+        name: crmCustomers.name,
+        phone: crmCustomers.phone,
+        email: crmCustomers.email,
+        fullAddress: crmCustomers.fullAddress,
+        customerType: crmCustomers.customerType,
+        createdAt: crmCustomers.createdAt,
+      })
+      .from(crmCustomers)
+      .where(or(...conditions))
+      .limit(10);
+      
+      let duplicates = await query;
+      
+      // Exclude the current customer if editing
+      if (excludeId) {
+        duplicates = duplicates.filter(d => d.id !== excludeId);
+      }
+      
+      // Calculate match score for each duplicate
+      const scoredDuplicates = duplicates.map(dup => {
+        let matchReasons: string[] = [];
+        
+        if (normalizedName && dup.name?.toLowerCase().includes(normalizedName)) {
+          matchReasons.push('name');
+        }
+        if (normalizedPhone && dup.phone?.replace(/\D/g, '').includes(normalizedPhone)) {
+          matchReasons.push('phone');
+        }
+        if (normalizedEmail && dup.email?.toLowerCase() === normalizedEmail) {
+          matchReasons.push('email');
+        }
+        if (normalizedAddress && dup.fullAddress?.toLowerCase().includes(normalizedAddress)) {
+          matchReasons.push('address');
+        }
+        
+        return {
+          ...dup,
+          matchReasons,
+        };
+      });
+      
+      return res.json({ duplicates: scoredDuplicates });
+    } catch (error) {
+      console.error("Error checking for duplicate customers:", error);
+      return res.status(500).json({ message: "Failed to check for duplicates" });
+    }
+  });
+
   // POST /api/crm/customers - Create customer (ADMIN/SALES only)
   app.post("/api/crm/customers", requireCrmSalesOrAbove, async (req, res) => {
     try {
@@ -12176,7 +12268,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/['"]/g, ""));
       const imported: any[] = [];
+      const skipped: { row: number; name: string; reason: string }[] = [];
       const errors: string[] = [];
+
+      // Helper function to check for duplicate
+      const checkDuplicate = async (name: string, phone: string | null, email: string | null, address: string | null): Promise<boolean> => {
+        const conditions: SQL<unknown>[] = [];
+        
+        // Normalize inputs
+        const normalizedName = name?.toLowerCase().trim();
+        const normalizedPhone = phone?.replace(/\D/g, '');
+        const normalizedEmail = email?.toLowerCase().trim();
+        const normalizedAddress = address?.toLowerCase().trim();
+        
+        // Exact name match
+        if (normalizedName && normalizedName.length >= 2) {
+          conditions.push(sql`LOWER(${crmCustomers.name}) = ${normalizedName}`);
+        }
+        
+        // Phone match (normalized)
+        if (normalizedPhone && normalizedPhone.length >= 7) {
+          conditions.push(sql`REPLACE(REPLACE(REPLACE(REPLACE(${crmCustomers.phone}, '-', ''), '(', ''), ')', ''), ' ', '') = ${normalizedPhone}`);
+        }
+        
+        // Exact email match
+        if (normalizedEmail && normalizedEmail.length >= 3 && normalizedEmail.includes('@')) {
+          conditions.push(sql`LOWER(${crmCustomers.email}) = ${normalizedEmail}`);
+        }
+        
+        if (conditions.length === 0) return false;
+        
+        const matches = await db.select({ id: crmCustomers.id })
+          .from(crmCustomers)
+          .where(or(...conditions))
+          .limit(1);
+        
+        return matches.length > 0;
+      };
 
       for (let i = 1; i < lines.length; i++) {
         try {
@@ -12209,6 +12337,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             customerData.fullAddress = addressParts.join(", ");
           }
 
+          // Check for duplicates before inserting
+          const isDuplicate = await checkDuplicate(
+            customerData.name,
+            customerData.phone,
+            customerData.email,
+            customerData.fullAddress
+          );
+          
+          if (isDuplicate) {
+            skipped.push({
+              row: i + 1,
+              name: customerData.name,
+              reason: "Duplicate detected (matching name, phone, or email)"
+            });
+            continue;
+          }
+
           const [newCustomer] = await db.insert(crmCustomers).values({
             id: nanoid(),
             name: customerData.name,
@@ -12230,12 +12375,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "customers.imported",
         "crm_customers",
         null,
-        { count: imported.length, errors: errors.length },
+        { count: imported.length, skipped: skipped.length, errors: errors.length },
         req.ip
       );
 
       return res.json({
         imported: imported.length,
+        skipped: skipped.length,
+        skippedDetails: skipped.slice(0, 10),
         errors: errors.length,
         errorDetails: errors.slice(0, 10),
       });

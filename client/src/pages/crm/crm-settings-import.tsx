@@ -49,9 +49,10 @@ export default function CrmSettingsImport() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
       setImportFile(null);
+      const skippedMsg = data.skipped > 0 ? `, ${data.skipped} duplicate(s) skipped` : '';
       toast({
         title: "Customers imported successfully",
-        description: `Imported ${data.imported || data.count || 0} customer(s)`,
+        description: `Imported ${data.imported || data.count || 0} customer(s)${skippedMsg}`,
       });
     },
     onError: (error: Error) => {
