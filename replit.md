@@ -22,10 +22,16 @@ Preferred communication style: Simple, everyday language.
 -   **CRM & Sales Funnel**: Kanban-style pipeline for leads (New → Contacted → Quote Sent → Negotiating → Won/Lost), lead management, follow-up tracking, CSV import/export, and address auto-completion.
 -   **Lead Management System**: Supports multiple leads/opportunities per customer. Leads are separate entities in `crm_leads` table with their own lifecycle:
     -   **Lead Types**: Configurable types (HVAC Change-Out, New Construction, Maintenance, Crawlspace Encapsulation, Duct Cleaning) managed in CRM Settings > Lead Types
-    -   **Lead Fields**: leadTypeId, potentialValue (integer), assignedSalesRepId, interestLevel (hot/warm/cold), salesStage (new/contacted/quote_sent/negotiating/won/lost), notes
+    -   **Lead Classification System**: Two-dimensional classification for leads:
+        -   **Lead Temperature (1-5 scale)**: Info Only/Cold (T1), Interested/Warm (T2), Qualified/Hot (T3), Proposal Ready (T4), Committed/Won (T5). Configurable in CRM Settings > Lead Classification.
+        -   **Customer Driver**: Pain (urgent issue), Health (comfort/air quality), Financial (savings/efficiency), Preventive (maintenance). Configurable in CRM Settings > Lead Classification.
+        -   Lead cards display compact badges (T1-T5 for temperature, driver label for driver)
+        -   Lead Board includes multi-select filters for Temperature and Driver with URL persistence
+        -   Quick counts section in board header shows distribution by Temperature and Driver
+    -   **Lead Fields**: leadTypeId, leadTempId, leadDriverId, potentialValue (integer), assignedSalesRepId, interestLevel (hot/warm/cold), salesStage (new/contacted/quote_sent/negotiating/won/lost), notes
     -   **Lead Funnel Board**: Kanban-style board displays lead cards (customer name + lead type badge), supports drag-drop between stages
-    -   **Lead Detail/Edit**: Quick edit for potential value, interest level, sales rep assignment, and notes without navigating away from funnel
-    -   **API Endpoints**: CRUD at `/api/crm/leads`, Lead Types at `/api/crm/lead-types`, metrics at `/api/crm/lead-metrics`
+    -   **Lead Detail/Edit**: Quick edit for potential value, interest level, temperature, driver, sales rep assignment, and notes without navigating away from funnel
+    -   **API Endpoints**: CRUD at `/api/crm/leads`, Lead Types at `/api/crm/lead-types`, Lead Temp Options at `/api/crm/lead-temp-options`, Lead Driver Options at `/api/crm/lead-driver-options`, metrics at `/api/crm/lead-metrics`
 -   **Project & Work Order Management**:
     -   **Projects**: High-value scope containers ($5k+) with pipeline statuses (Lead → Proposal Sent → Approved → In Progress → Completed → Closed → Archived). Can contain multiple Work Orders.
     -   **Work Orders**: Scheduled visits/appointments with dispatch statuses (Scheduled → Dispatched → En Route → On Site → Completed). Can be independent or linked to Projects.
