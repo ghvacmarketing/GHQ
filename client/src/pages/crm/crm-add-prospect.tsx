@@ -42,7 +42,7 @@ import {
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { cn } from "@/lib/utils";
-import type { CrmUser, CrmCustomer, InterestLevel, CrmLeadType } from "@shared/schema";
+import type { CrmUser, CrmCustomer, InterestLevel, CrmLeadType, CrmLeadTempOption, CrmLeadDriverOption } from "@shared/schema";
 
 type ProspectMode = "choose" | "existing";
 
@@ -70,6 +70,8 @@ export default function CrmAddProspect() {
   const [assignedSalesRepId, setAssignedSalesRepId] = useState("");
   const [interestLevel, setInterestLevel] = useState<InterestLevel | "">("");
   const [leadTypeId, setLeadTypeId] = useState<string>("");
+  const [leadTempId, setLeadTempId] = useState<string>("");
+  const [leadDriverId, setLeadDriverId] = useState<string>("");
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -136,6 +138,16 @@ export default function CrmAddProspect() {
     enabled: !!currentUser,
   });
 
+  const { data: leadTempOptions = [] } = useQuery<CrmLeadTempOption[]>({
+    queryKey: ["/api/crm/lead-temp-options?activeOnly=true"],
+    enabled: !!currentUser,
+  });
+
+  const { data: leadDriverOptions = [] } = useQuery<CrmLeadDriverOption[]>({
+    queryKey: ["/api/crm/lead-driver-options?activeOnly=true"],
+    enabled: !!currentUser,
+  });
+
   const customers = customersData?.customers || [];
 
   // Use selectedCustomerData if available, otherwise find from search results
@@ -155,6 +167,8 @@ export default function CrmAddProspect() {
         potentialValue: potentialValue ? parseInt(potentialValue) : null,
         assignedSalesRepId: assignedSalesRepId || null,
         interestLevel: interestLevel || null,
+        leadTempId: leadTempId || null,
+        leadDriverId: leadDriverId || null,
       });
       return res.json();
     },
@@ -483,6 +497,52 @@ export default function CrmAddProspect() {
                           </SelectContent>
                         </Select>
                       </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="leadTemp">Lead Temperature</Label>
+                        <Select
+                          value={leadTempId}
+                          onValueChange={setLeadTempId}
+                        >
+                          <SelectTrigger data-testid="select-lead-temp">
+                            <SelectValue placeholder="Select temperature (optional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {leadTempOptions.map((option) => (
+                              <SelectItem key={option.id} value={option.id}>
+                                <span className="font-medium">{option.numericValue}</span> - {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {leadTempId && leadTempOptions.find(o => o.id === leadTempId)?.description && (
+                          <p className="text-xs text-muted-foreground">
+                            {leadTempOptions.find(o => o.id === leadTempId)?.description}
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="leadDriver">Customer Driver</Label>
+                        <Select
+                          value={leadDriverId}
+                          onValueChange={setLeadDriverId}
+                        >
+                          <SelectTrigger data-testid="select-lead-driver">
+                            <SelectValue placeholder="Select driver (optional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {leadDriverOptions.map((option) => (
+                              <SelectItem key={option.id} value={option.id}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {leadDriverId && leadDriverOptions.find(o => o.id === leadDriverId)?.description && (
+                          <p className="text-xs text-muted-foreground">
+                            {leadDriverOptions.find(o => o.id === leadDriverId)?.description}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -496,6 +556,8 @@ export default function CrmAddProspect() {
                         setAssignedSalesRepId("");
                         setInterestLevel("");
                         setLeadTypeId("");
+                        setLeadTempId("");
+                        setLeadDriverId("");
                       }}
                       data-testid="button-cancel"
                     >

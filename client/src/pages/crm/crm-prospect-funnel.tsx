@@ -103,15 +103,18 @@ import {
   FileText,
   ExternalLink,
   Trash2,
+  ChevronDown,
 } from "lucide-react";
 import { format, isToday, isPast, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, getDay, addDays, subDays, addWeeks, subWeeks, startOfDay, getHours, getMinutes, setHours } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import type { CrmUser, CrmCustomer, CrmFollowUp, SalesStage, InterestLevel, FollowUpType, CrmQuote, CrmLeadType } from "@shared/schema";
+import type { CrmUser, CrmCustomer, CrmFollowUp, SalesStage, InterestLevel, FollowUpType, CrmQuote, CrmLeadType, CrmLeadTempOption, CrmLeadDriverOption } from "@shared/schema";
 
 type Lead = {
   id: string;
   customerId: string;
   leadTypeId: string | null;
+  leadTempId: string | null;
+  leadDriverId: string | null;
   potentialValue: number | null;
   assignedSalesRepId: string | null;
   interestLevel: string | null;
@@ -127,6 +130,9 @@ type Lead = {
   customerEmail: string | null;
   customerAddress: string | null;
   leadTypeName: string | null;
+  leadTempLabel: string | null;
+  leadTempNumericValue: number | null;
+  leadDriverLabel: string | null;
   salesRepName: string | null;
   nextFollowUpAt?: string | null;
 };
@@ -632,6 +638,16 @@ function LeadCard({ lead, onClick, isDragging: isDraggingProp }: LeadCardProps) 
             )}
             <div className="flex flex-wrap gap-1 mt-2">
               <InterestBadge level={lead.interestLevel as InterestLevel} />
+              {lead.leadTempNumericValue && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-blue-50 text-blue-700 border-blue-200">
+                  T{lead.leadTempNumericValue}
+                </Badge>
+              )}
+              {lead.leadDriverLabel && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-purple-50 text-purple-700 border-purple-200">
+                  {lead.leadDriverLabel.split('-')[0].trim()}
+                </Badge>
+              )}
             </div>
           </div>
         </div>
@@ -746,6 +762,32 @@ export default function CrmProspectFunnel() {
   const [leadNoteBody, setLeadNoteBody] = useState("");
   const [showAllNotes, setShowAllNotes] = useState(false);
   const [selectedLeadTypeId, setSelectedLeadTypeId] = useState<string>("all");
+  const [selectedTempIds, setSelectedTempIds] = useState<string[]>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tempIds = params.get("tempIds");
+    return tempIds ? tempIds.split(",").filter(Boolean) : [];
+  });
+  const [selectedDriverIds, setSelectedDriverIds] = useState<string[]>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const driverIds = params.get("driverIds");
+    return driverIds ? driverIds.split(",").filter(Boolean) : [];
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (selectedTempIds.length > 0) {
+      params.set("tempIds", selectedTempIds.join(","));
+    } else {
+      params.delete("tempIds");
+    }
+    if (selectedDriverIds.length > 0) {
+      params.set("driverIds", selectedDriverIds.join(","));
+    } else {
+      params.delete("driverIds");
+    }
+    const newUrl = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
+    window.history.replaceState({}, "", newUrl);
+  }, [selectedTempIds, selectedDriverIds]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -772,6 +814,16 @@ export default function CrmProspectFunnel() {
 
   const { data: leadTypes = [] } = useQuery<CrmLeadType[]>({
     queryKey: ["/api/crm/lead-types"],
+    enabled: !!currentUser,
+  });
+
+  const { data: leadTempOptions = [] } = useQuery<CrmLeadTempOption[]>({
+    queryKey: ["/api/crm/lead-temp-options?activeOnly=true"],
+    enabled: !!currentUser,
+  });
+
+  const { data: leadDriverOptions = [] } = useQuery<CrmLeadDriverOption[]>({
+    queryKey: ["/api/crm/lead-driver-options?activeOnly=true"],
     enabled: !!currentUser,
   });
   
@@ -1032,7 +1084,7 @@ export default function CrmProspectFunnel() {
   });
 
   const updateLeadMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { notes?: string; interestLevel?: string | null } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: { notes?: string; interestLevel?: string | null; potentialValue?: number | null; leadTypeId?: string | null; leadTempId?: string | null; leadDriverId?: string | null } }) => {
       const res = await apiRequest("PATCH", `/api/crm/leads/${id}`, data);
       return res.json();
     },
@@ -1126,6 +1178,12 @@ export default function CrmProspectFunnel() {
         if (selectedEmployeeId !== "all" && lead.assignedSalesRepId !== selectedEmployeeId) return false;
         if (selectedLeadTypeId !== "all" && lead.leadTypeId !== selectedLeadTypeId) return false;
         
+        // Filter by lead temperature
+        if (selectedTempIds.length > 0 && !selectedTempIds.includes(lead.leadTempId || "")) return false;
+
+        // Filter by customer driver
+        if (selectedDriverIds.length > 0 && !selectedDriverIds.includes(lead.leadDriverId || "")) return false;
+        
         if (activeFilter === "All Active") {
           return lead.salesStage !== "won" && lead.salesStage !== "lost";
         }
@@ -1136,7 +1194,39 @@ export default function CrmProspectFunnel() {
       })
       .sort((a, b) => b.searchScore - a.searchScore)
       .map(({ lead }) => lead);
-  }, [leads, searchTerm, selectedEmployeeId, activeFilter, selectedLeadTypeId]);
+  }, [leads, searchTerm, selectedEmployeeId, activeFilter, selectedLeadTypeId, selectedTempIds, selectedDriverIds]);
+
+  const tempDriverCounts = useMemo(() => {
+    const tempCounts: Record<string, { label: string; numericValue: number; count: number }> = {};
+    const driverCounts: Record<string, { label: string; count: number }> = {};
+    
+    filteredLeads.forEach(lead => {
+      if (lead.leadTempId && lead.leadTempNumericValue) {
+        if (!tempCounts[lead.leadTempId]) {
+          tempCounts[lead.leadTempId] = { 
+            label: lead.leadTempLabel || '', 
+            numericValue: lead.leadTempNumericValue, 
+            count: 0 
+          };
+        }
+        tempCounts[lead.leadTempId].count++;
+      }
+      if (lead.leadDriverId && lead.leadDriverLabel) {
+        if (!driverCounts[lead.leadDriverId]) {
+          driverCounts[lead.leadDriverId] = { 
+            label: lead.leadDriverLabel, 
+            count: 0 
+          };
+        }
+        driverCounts[lead.leadDriverId].count++;
+      }
+    });
+    
+    return {
+      temp: Object.values(tempCounts).sort((a, b) => a.numericValue - b.numericValue),
+      driver: Object.values(driverCounts).sort((a, b) => b.count - a.count),
+    };
+  }, [filteredLeads]);
 
   const handleMoveToNextStage = (lead: Lead) => {
     const nextStage = lead.salesStage ? NEXT_STAGE[lead.salesStage] : null;
@@ -1421,6 +1511,78 @@ export default function CrmProspectFunnel() {
             ))}
           </SelectContent>
         </Select>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="h-9 text-sm bg-white border-slate-300 min-w-[120px]">
+              {selectedTempIds.length > 0 ? `Temp (${selectedTempIds.length})` : "All Temps"}
+              <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[200px] p-2">
+            <div className="space-y-2">
+              {leadTempOptions.map((option) => (
+                <div key={option.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`temp-${option.id}`}
+                    checked={selectedTempIds.includes(option.id)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedTempIds([...selectedTempIds, option.id]);
+                      } else {
+                        setSelectedTempIds(selectedTempIds.filter(id => id !== option.id));
+                      }
+                    }}
+                  />
+                  <label htmlFor={`temp-${option.id}`} className="text-sm cursor-pointer">
+                    {option.numericValue} - {option.label}
+                  </label>
+                </div>
+              ))}
+              {selectedTempIds.length > 0 && (
+                <Button variant="ghost" size="sm" className="w-full mt-2" onClick={() => setSelectedTempIds([])}>
+                  Clear
+                </Button>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="h-9 text-sm bg-white border-slate-300 min-w-[120px]">
+              {selectedDriverIds.length > 0 ? `Driver (${selectedDriverIds.length})` : "All Drivers"}
+              <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[220px] p-2">
+            <div className="space-y-2">
+              {leadDriverOptions.map((option) => (
+                <div key={option.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`driver-${option.id}`}
+                    checked={selectedDriverIds.includes(option.id)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedDriverIds([...selectedDriverIds, option.id]);
+                      } else {
+                        setSelectedDriverIds(selectedDriverIds.filter(id => id !== option.id));
+                      }
+                    }}
+                  />
+                  <label htmlFor={`driver-${option.id}`} className="text-sm cursor-pointer">
+                    {option.label}
+                  </label>
+                </div>
+              ))}
+              {selectedDriverIds.length > 0 && (
+                <Button variant="ghost" size="sm" className="w-full mt-2" onClick={() => setSelectedDriverIds([])}>
+                  Clear
+                </Button>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
     </div>
   );
@@ -1640,6 +1802,43 @@ export default function CrmProspectFunnel() {
                 <div className="text-sm text-muted-foreground">Lost</div>
                 <div className="text-2xl font-bold text-red-600" data-testid="text-funnel-lost">
                   {metrics?.funnelCounts?.lost || 0}
+                </div>
+              </div>
+            </div>
+            {/* Quick Counts by Temperature and Driver */}
+            <div className="mt-4 pt-4 border-t">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Temperature Counts */}
+                <div>
+                  <h4 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">By Temperature</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {tempDriverCounts.temp.length > 0 ? (
+                      tempDriverCounts.temp.map((t) => (
+                        <div key={t.numericValue} className="flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                          <span className="font-semibold">T{t.numericValue}</span>
+                          <span className="text-blue-500">({t.count})</span>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No temperature data</span>
+                    )}
+                  </div>
+                </div>
+                {/* Driver Counts */}
+                <div>
+                  <h4 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">By Driver</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {tempDriverCounts.driver.length > 0 ? (
+                      tempDriverCounts.driver.map((d) => (
+                        <div key={d.label} className="flex items-center gap-1 text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded">
+                          <span className="font-semibold">{d.label.split('-')[0].trim()}</span>
+                          <span className="text-purple-500">({d.count})</span>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No driver data</span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -2484,6 +2683,46 @@ export default function CrmProspectFunnel() {
                           <SelectItem value="negotiating">Negotiating</SelectItem>
                           <SelectItem value="won">Won</SelectItem>
                           <SelectItem value="lost">Lost</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={expandedLead.leadTempId || ""}
+                        onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { leadTempId: value === "none" ? null : value || null } })}
+                      >
+                        <SelectTrigger className="h-8 w-auto min-w-[80px] text-xs">
+                          <SelectValue placeholder="Temp">
+                            {expandedLead.leadTempNumericValue ? (
+                              <span className="font-medium">Temp {expandedLead.leadTempNumericValue}</span>
+                            ) : "Temp"}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Temperature</SelectItem>
+                          {leadTempOptions.map((option) => (
+                            <SelectItem key={option.id} value={option.id}>
+                              {option.numericValue} - {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={expandedLead.leadDriverId || ""}
+                        onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { leadDriverId: value === "none" ? null : value || null } })}
+                      >
+                        <SelectTrigger className="h-8 w-auto min-w-[90px] text-xs">
+                          <SelectValue placeholder="Driver">
+                            {expandedLead.leadDriverLabel ? (
+                              <span className="font-medium">{expandedLead.leadDriverLabel.split('-')[0]}</span>
+                            ) : "Driver"}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Driver</SelectItem>
+                          {leadDriverOptions.map((option) => (
+                            <SelectItem key={option.id} value={option.id}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>

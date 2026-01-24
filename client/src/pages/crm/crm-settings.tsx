@@ -61,6 +61,12 @@ const settingsCategories: SettingsCategory[] = [
         icon: Target,
       },
       {
+        title: "Lead Classification",
+        description: "Configure lead temperature scale and customer driver options",
+        href: "/crm/settings/lead-classification",
+        icon: Tags,
+      },
+      {
         title: "Payment Settings",
         description: "Configure default deposit percentage for payment links",
         href: "/crm/settings/payments",

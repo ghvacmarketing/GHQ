@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry, crmLeads, crmLeadTypes, insertCrmLeadSchema, insertCrmLeadTypeSchema, type CrmLead, type CrmLeadType, type InsertCrmLead, type InsertCrmLeadType } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry, crmLeads, crmLeadTypes, insertCrmLeadSchema, insertCrmLeadTypeSchema, type CrmLead, type CrmLeadType, type InsertCrmLead, type InsertCrmLeadType, crmLeadTempOptions, crmLeadDriverOptions, insertCrmLeadTempOptionSchema, insertCrmLeadDriverOptionSchema, type CrmLeadTempOption, type CrmLeadDriverOption, type InsertCrmLeadTempOption, type InsertCrmLeadDriverOption } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
@@ -18693,6 +18693,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================
+  // CRM LEAD TEMPERATURE OPTIONS ROUTES
+  // ============================================
+
+  // GET /api/crm/lead-temp-options - Get all lead temperature options
+  app.get("/api/crm/lead-temp-options", requireCrmAuth, async (req, res) => {
+    try {
+      const { activeOnly } = req.query;
+      let options;
+      if (activeOnly === "true") {
+        options = await db.select().from(crmLeadTempOptions)
+          .where(eq(crmLeadTempOptions.isActive, true))
+          .orderBy(asc(crmLeadTempOptions.sortOrder), asc(crmLeadTempOptions.numericValue));
+      } else {
+        options = await db.select().from(crmLeadTempOptions)
+          .orderBy(asc(crmLeadTempOptions.sortOrder), asc(crmLeadTempOptions.numericValue));
+      }
+      return res.json(options);
+    } catch (error) {
+      console.error("Error fetching lead temperature options:", error);
+      return res.status(500).json({ message: "Failed to fetch lead temperature options" });
+    }
+  });
+
+  // POST /api/crm/lead-temp-options - Create a new lead temperature option
+  app.post("/api/crm/lead-temp-options", requireCrmAdmin, async (req, res) => {
+    try {
+      const parsed = insertCrmLeadTempOptionSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid lead temperature option data", errors: parsed.error.format() });
+      }
+      const [newOption] = await db.insert(crmLeadTempOptions).values(parsed.data).returning();
+      return res.status(201).json(newOption);
+    } catch (error: any) {
+      console.error("Error creating lead temperature option:", error);
+      if (error?.code === "23505") {
+        return res.status(400).json({ message: "A temperature option with this numeric value already exists" });
+      }
+      return res.status(500).json({ message: "Failed to create lead temperature option" });
+    }
+  });
+
+  // PATCH /api/crm/lead-temp-options/:id - Update a lead temperature option
+  app.patch("/api/crm/lead-temp-options/:id", requireCrmAdmin, async (req, res) => {
+    try {
+      const { numericValue, label, description, isActive, sortOrder } = req.body;
+      const [existing] = await db.select().from(crmLeadTempOptions).where(eq(crmLeadTempOptions.id, req.params.id)).limit(1);
+      if (!existing) {
+        return res.status(404).json({ message: "Lead temperature option not found" });
+      }
+      const updateData: Partial<CrmLeadTempOption> = {};
+      if (numericValue !== undefined) updateData.numericValue = numericValue;
+      if (label !== undefined) updateData.label = label;
+      if (description !== undefined) updateData.description = description;
+      if (isActive !== undefined) updateData.isActive = isActive;
+      if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
+      
+      const [updated] = await db.update(crmLeadTempOptions).set(updateData).where(eq(crmLeadTempOptions.id, req.params.id)).returning();
+      return res.json(updated);
+    } catch (error: any) {
+      console.error("Error updating lead temperature option:", error);
+      if (error?.code === "23505") {
+        return res.status(400).json({ message: "A temperature option with this numeric value already exists" });
+      }
+      return res.status(500).json({ message: "Failed to update lead temperature option" });
+    }
+  });
+
+  // DELETE /api/crm/lead-temp-options/:id - Delete a lead temperature option (soft delete)
+  app.delete("/api/crm/lead-temp-options/:id", requireCrmAdmin, async (req, res) => {
+    try {
+      const [existing] = await db.select().from(crmLeadTempOptions).where(eq(crmLeadTempOptions.id, req.params.id)).limit(1);
+      if (!existing) {
+        return res.status(404).json({ message: "Lead temperature option not found" });
+      }
+      await db.update(crmLeadTempOptions).set({ isActive: false }).where(eq(crmLeadTempOptions.id, req.params.id));
+      return res.json({ message: "Lead temperature option deactivated" });
+    } catch (error) {
+      console.error("Error deleting lead temperature option:", error);
+      return res.status(500).json({ message: "Failed to delete lead temperature option" });
+    }
+  });
+
+  // ============================================
+  // CRM LEAD DRIVER OPTIONS ROUTES
+  // ============================================
+
+  // GET /api/crm/lead-driver-options - Get all customer driver options
+  app.get("/api/crm/lead-driver-options", requireCrmAuth, async (req, res) => {
+    try {
+      const { activeOnly } = req.query;
+      let options;
+      if (activeOnly === "true") {
+        options = await db.select().from(crmLeadDriverOptions)
+          .where(eq(crmLeadDriverOptions.isActive, true))
+          .orderBy(asc(crmLeadDriverOptions.sortOrder));
+      } else {
+        options = await db.select().from(crmLeadDriverOptions)
+          .orderBy(asc(crmLeadDriverOptions.sortOrder));
+      }
+      return res.json(options);
+    } catch (error) {
+      console.error("Error fetching customer driver options:", error);
+      return res.status(500).json({ message: "Failed to fetch customer driver options" });
+    }
+  });
+
+  // POST /api/crm/lead-driver-options - Create a new customer driver option
+  app.post("/api/crm/lead-driver-options", requireCrmAdmin, async (req, res) => {
+    try {
+      const parsed = insertCrmLeadDriverOptionSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid customer driver option data", errors: parsed.error.format() });
+      }
+      const [newOption] = await db.insert(crmLeadDriverOptions).values(parsed.data).returning();
+      return res.status(201).json(newOption);
+    } catch (error) {
+      console.error("Error creating customer driver option:", error);
+      return res.status(500).json({ message: "Failed to create customer driver option" });
+    }
+  });
+
+  // PATCH /api/crm/lead-driver-options/:id - Update a customer driver option
+  app.patch("/api/crm/lead-driver-options/:id", requireCrmAdmin, async (req, res) => {
+    try {
+      const { label, description, isActive, sortOrder } = req.body;
+      const [existing] = await db.select().from(crmLeadDriverOptions).where(eq(crmLeadDriverOptions.id, req.params.id)).limit(1);
+      if (!existing) {
+        return res.status(404).json({ message: "Customer driver option not found" });
+      }
+      const updateData: Partial<CrmLeadDriverOption> = {};
+      if (label !== undefined) updateData.label = label;
+      if (description !== undefined) updateData.description = description;
+      if (isActive !== undefined) updateData.isActive = isActive;
+      if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
+      
+      const [updated] = await db.update(crmLeadDriverOptions).set(updateData).where(eq(crmLeadDriverOptions.id, req.params.id)).returning();
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error updating customer driver option:", error);
+      return res.status(500).json({ message: "Failed to update customer driver option" });
+    }
+  });
+
+  // DELETE /api/crm/lead-driver-options/:id - Delete a customer driver option (soft delete)
+  app.delete("/api/crm/lead-driver-options/:id", requireCrmAdmin, async (req, res) => {
+    try {
+      const [existing] = await db.select().from(crmLeadDriverOptions).where(eq(crmLeadDriverOptions.id, req.params.id)).limit(1);
+      if (!existing) {
+        return res.status(404).json({ message: "Customer driver option not found" });
+      }
+      await db.update(crmLeadDriverOptions).set({ isActive: false }).where(eq(crmLeadDriverOptions.id, req.params.id));
+      return res.json({ message: "Customer driver option deactivated" });
+    } catch (error) {
+      console.error("Error deleting customer driver option:", error);
+      return res.status(500).json({ message: "Failed to delete customer driver option" });
+    }
+  });
+
+  // ============================================
   // CRM LEADS (OPPORTUNITIES) ROUTES
   // ============================================
 
@@ -18723,11 +18882,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customer: crmCustomers,
         leadType: crmLeadTypes,
         salesRep: crmUsers,
+        leadTemp: crmLeadTempOptions,
+        leadDriver: crmLeadDriverOptions,
       })
         .from(crmLeads)
         .leftJoin(crmCustomers, eq(crmLeads.customerId, crmCustomers.id))
         .leftJoin(crmLeadTypes, eq(crmLeads.leadTypeId, crmLeadTypes.id))
         .leftJoin(crmUsers, eq(crmLeads.assignedSalesRepId, crmUsers.id))
+        .leftJoin(crmLeadTempOptions, eq(crmLeads.leadTempId, crmLeadTempOptions.id))
+        .leftJoin(crmLeadDriverOptions, eq(crmLeads.leadDriverId, crmLeadDriverOptions.id))
         .where(whereClause)
         .orderBy(desc(crmLeads.createdAt));
 
@@ -18740,6 +18903,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerAddress: row.customer?.fullAddress || null,
         leadTypeName: row.leadType?.name || null,
         salesRepName: row.salesRep?.name || null,
+        leadTempLabel: row.leadTemp?.label || null,
+        leadTempNumericValue: row.leadTemp?.numericValue || null,
+        leadDriverLabel: row.leadDriver?.label || null,
       }));
 
       return res.json(leads);
@@ -18757,11 +18923,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customer: crmCustomers,
         leadType: crmLeadTypes,
         salesRep: crmUsers,
+        leadTemp: crmLeadTempOptions,
+        leadDriver: crmLeadDriverOptions,
       })
         .from(crmLeads)
         .leftJoin(crmCustomers, eq(crmLeads.customerId, crmCustomers.id))
         .leftJoin(crmLeadTypes, eq(crmLeads.leadTypeId, crmLeadTypes.id))
         .leftJoin(crmUsers, eq(crmLeads.assignedSalesRepId, crmUsers.id))
+        .leftJoin(crmLeadTempOptions, eq(crmLeads.leadTempId, crmLeadTempOptions.id))
+        .leftJoin(crmLeadDriverOptions, eq(crmLeads.leadDriverId, crmLeadDriverOptions.id))
         .where(eq(crmLeads.id, req.params.id))
         .limit(1);
 
@@ -18777,6 +18947,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerAddress: leadData.customer?.fullAddress || null,
         leadTypeName: leadData.leadType?.name || null,
         salesRepName: leadData.salesRep?.name || null,
+        leadTempLabel: leadData.leadTemp?.label || null,
+        leadTempNumericValue: leadData.leadTemp?.numericValue || null,
+        leadDriverLabel: leadData.leadDriver?.label || null,
       };
 
       return res.json(lead);

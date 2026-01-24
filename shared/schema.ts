@@ -973,11 +973,34 @@ export const crmLeadTypes = pgTable("crm_lead_types", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Lead Temperature Options (admin-configurable 1-5 scale)
+export const crmLeadTempOptions = pgTable("crm_lead_temp_options", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  numericValue: integer("numeric_value").notNull().unique(), // 1-5
+  label: text("label").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Customer Driver Options (admin-configurable categories)
+export const crmLeadDriverOptions = pgTable("crm_lead_driver_options", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  label: text("label").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // CRM Leads (multiple leads/opportunities per customer)
 export const crmLeads = pgTable("crm_leads", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   customerId: varchar("customer_id").notNull().references(() => crmCustomers.id, { onDelete: "cascade" }),
   leadTypeId: varchar("lead_type_id").references(() => crmLeadTypes.id),
+  leadTempId: varchar("lead_temp_id").references(() => crmLeadTempOptions.id),
+  leadDriverId: varchar("lead_driver_id").references(() => crmLeadDriverOptions.id),
   potentialValue: integer("potential_value"),
   assignedSalesRepId: varchar("assigned_sales_rep_id").references(() => crmUsers.id),
   interestLevel: text("interest_level").$type<InterestLevel>(),
@@ -2297,6 +2320,16 @@ export const insertCrmLeadTypeSchema = createInsertSchema(crmLeadTypes).omit({
   createdAt: true,
 });
 
+export const insertCrmLeadTempOptionSchema = createInsertSchema(crmLeadTempOptions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCrmLeadDriverOptionSchema = createInsertSchema(crmLeadDriverOptions).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertCrmLeadSchema = createInsertSchema(crmLeads).omit({
   id: true,
   createdAt: true,
@@ -2347,6 +2380,10 @@ export type InsertCrmFollowUp = z.infer<typeof insertCrmFollowUpSchema>;
 export type CrmFollowUp = typeof crmFollowUps.$inferSelect;
 export type InsertCrmLeadType = z.infer<typeof insertCrmLeadTypeSchema>;
 export type CrmLeadType = typeof crmLeadTypes.$inferSelect;
+export type InsertCrmLeadTempOption = z.infer<typeof insertCrmLeadTempOptionSchema>;
+export type CrmLeadTempOption = typeof crmLeadTempOptions.$inferSelect;
+export type InsertCrmLeadDriverOption = z.infer<typeof insertCrmLeadDriverOptionSchema>;
+export type CrmLeadDriverOption = typeof crmLeadDriverOptions.$inferSelect;
 export type InsertCrmLead = z.infer<typeof insertCrmLeadSchema>;
 export type CrmLead = typeof crmLeads.$inferSelect;
 export type InsertCrmAgreement = z.infer<typeof insertCrmAgreementSchema>;
