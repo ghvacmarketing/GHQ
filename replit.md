@@ -19,7 +19,13 @@ Preferred communication style: Simple, everyday language.
 -   **Monorepo**: Shared TypeScript types and Zod schemas.
 -   **Pricing Engine**: Google Sheets as source of truth with server-side and client-side caching. Sophisticated formulas for overhead, profit, financing, and warranty.
 -   **Quote Generation**: Text-based output with server-side calculations, editable drafts, and toggleable detailed breakdowns. AI-powered quote generation using OpenAI GPT-5.2 with structured outputs and conversation memory.
--   **CRM & Sales Funnel**: Kanban-style pipeline for prospects (New → Contacted → Quote Sent → Negotiating → Won/Lost), lead management, follow-up tracking, CSV import/export, and address auto-completion.
+-   **CRM & Sales Funnel**: Kanban-style pipeline for leads (New → Contacted → Quote Sent → Negotiating → Won/Lost), lead management, follow-up tracking, CSV import/export, and address auto-completion.
+-   **Lead Management System**: Supports multiple leads/opportunities per customer. Leads are separate entities in `crm_leads` table with their own lifecycle:
+    -   **Lead Types**: Configurable types (HVAC Change-Out, New Construction, Maintenance, Crawlspace Encapsulation, Duct Cleaning) managed in CRM Settings > Lead Types
+    -   **Lead Fields**: leadTypeId, potentialValue (integer), assignedSalesRepId, interestLevel (hot/warm/cold), salesStage (new/contacted/quote_sent/negotiating/won/lost), notes
+    -   **Lead Funnel Board**: Kanban-style board displays lead cards (customer name + lead type badge), supports drag-drop between stages
+    -   **Lead Detail/Edit**: Quick edit for potential value, interest level, sales rep assignment, and notes without navigating away from funnel
+    -   **API Endpoints**: CRUD at `/api/crm/leads`, Lead Types at `/api/crm/lead-types`, metrics at `/api/crm/lead-metrics`
 -   **Project & Work Order Management**:
     -   **Projects**: High-value scope containers ($5k+) with pipeline statuses (Lead → Proposal Sent → Approved → In Progress → Completed → Closed → Archived). Can contain multiple Work Orders.
     -   **Work Orders**: Scheduled visits/appointments with dispatch statuses (Scheduled → Dispatched → En Route → On Site → Completed). Can be independent or linked to Projects.
