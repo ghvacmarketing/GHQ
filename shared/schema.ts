@@ -1113,6 +1113,8 @@ export const crmProjects = pgTable("crm_projects", {
   scopeOfWork: text("scope_of_work"),
   challengePoints: text("challenge_points"),
   equipmentMaterials: json("equipment_materials").$type<ProjectEquipmentItem[]>().default([]),
+  overheadPercent: decimal("overhead_percent", { precision: 5, scale: 2 }),
+  commissionPercent: decimal("commission_percent", { precision: 5, scale: 2 }),
   proposalSentAt: timestamp("proposal_sent_at"),
   approvedAt: timestamp("approved_at"),
   completedAt: timestamp("completed_at"),

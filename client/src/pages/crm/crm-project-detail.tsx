@@ -3,7 +3,7 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -81,6 +81,7 @@ import {
   TrendingDown,
   Users,
   Boxes,
+  Settings,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -3537,6 +3538,20 @@ function JobCostingTab({ projectId, project }: { projectId: string; project: Crm
     },
   });
 
+  const updateJobCostingSettingsMutation = useMutation({
+    mutationFn: async (data: { overheadPercent?: number; commissionPercent?: number }) => {
+      const res = await apiRequest("PATCH", `/api/crm/projects/${projectId}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Project cost settings updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId] });
+    },
+    onError: () => {
+      toast({ title: "Failed to update cost settings", variant: "destructive" });
+    },
+  });
+
   const createLaborMutation = useMutation({
     mutationFn: async (data: typeof newEntry) => {
       const response = await apiRequest("POST", `/api/crm/projects/${projectId}/labor`, {
@@ -3604,10 +3619,10 @@ function JobCostingTab({ projectId, project }: { projectId: string; project: Crm
   
   const grossProfit = revenue - laborTotal - materialsTotal;
   
-  const overheadPercent = jobCostingSettings?.overheadPercent || 30;
-  const commissionPercent = jobCostingSettings?.commissionPercent || 5;
+  const overheadPercent = project?.overheadPercent != null ? Number(project.overheadPercent) : (jobCostingSettings?.overheadPercent || 30);
+  const commissionPercent = project?.commissionPercent != null ? Number(project.commissionPercent) : (jobCostingSettings?.commissionPercent || 5);
   
-  const overhead = grossProfit * (overheadPercent / 100);
+  const overhead = revenue * (overheadPercent / 100);
   const commission = revenue * (commissionPercent / 100);
   const netProfit = grossProfit - overhead - commission;
 
@@ -3653,6 +3668,66 @@ function JobCostingTab({ projectId, project }: { projectId: string; project: Crm
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5 text-[#711419]" />
+            Project Cost Settings
+          </CardTitle>
+          <CardDescription>
+            Adjust overhead and commission percentages for this project. Leave blank to use global defaults.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-6">
+            <div className="flex items-center gap-3">
+              <Label htmlFor="project-overhead" className="text-sm font-medium whitespace-nowrap">
+                Overhead %
+              </Label>
+              <Input
+                id="project-overhead"
+                type="number"
+                min="0"
+                max="100"
+                step="0.5"
+                className="w-24"
+                placeholder={String(jobCostingSettings?.overheadPercent || 30)}
+                defaultValue={project?.overheadPercent != null ? Number(project.overheadPercent) : ""}
+                onBlur={(e) => {
+                  const value = e.target.value ? parseFloat(e.target.value) : null;
+                  if (value !== (project?.overheadPercent != null ? Number(project.overheadPercent) : null)) {
+                    updateJobCostingSettingsMutation.mutate({ overheadPercent: value ?? undefined });
+                  }
+                }}
+              />
+              <span className="text-xs text-muted-foreground">(Default: {jobCostingSettings?.overheadPercent || 30}%)</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Label htmlFor="project-commission" className="text-sm font-medium whitespace-nowrap">
+                Commission %
+              </Label>
+              <Input
+                id="project-commission"
+                type="number"
+                min="0"
+                max="100"
+                step="0.5"
+                className="w-24"
+                placeholder={String(jobCostingSettings?.commissionPercent || 5)}
+                defaultValue={project?.commissionPercent != null ? Number(project.commissionPercent) : ""}
+                onBlur={(e) => {
+                  const value = e.target.value ? parseFloat(e.target.value) : null;
+                  if (value !== (project?.commissionPercent != null ? Number(project.commissionPercent) : null)) {
+                    updateJobCostingSettingsMutation.mutate({ commissionPercent: value ?? undefined });
+                  }
+                }}
+              />
+              <span className="text-xs text-muted-foreground">(Default: {jobCostingSettings?.commissionPercent || 5}%)</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2">
