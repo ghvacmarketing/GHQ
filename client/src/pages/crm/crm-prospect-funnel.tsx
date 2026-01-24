@@ -1063,12 +1063,47 @@ export default function CrmProspectFunnel() {
       const res = await apiRequest("PATCH", `/api/crm/leads/${id}`, data);
       return res.json();
     },
+    onMutate: async ({ id, data }) => {
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/leads"] });
+      
+      // Snapshot the previous value
+      const previousLeads = queryClient.getQueryData<Lead[]>(["/api/crm/leads", apiStatus]);
+      
+      // Optimistically update the cache
+      if (previousLeads) {
+        const updatedLeads = previousLeads.map((lead) => {
+          if (lead.id === id) {
+            const updatedLead = { ...lead, ...data };
+            // Also update the display labels if changing temp or driver
+            if (data.leadTempId !== undefined) {
+              const tempOption = leadTempOptions.find(t => t.id === data.leadTempId);
+              updatedLead.leadTempLabel = tempOption?.label || null;
+              updatedLead.leadTempNumericValue = tempOption?.numericValue || null;
+            }
+            if (data.leadDriverId !== undefined) {
+              const driverOption = leadDriverOptions.find(d => d.id === data.leadDriverId);
+              updatedLead.leadDriverLabel = driverOption?.label || null;
+            }
+            return updatedLead;
+          }
+          return lead;
+        });
+        queryClient.setQueryData(["/api/crm/leads", apiStatus], updatedLeads);
+      }
+      
+      return { previousLeads };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"] });
       toast({ title: "Lead updated successfully" });
       setIsEditing(false);
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _variables, context) => {
+      // Rollback on error
+      if (context?.previousLeads) {
+        queryClient.setQueryData(["/api/crm/leads", apiStatus], context.previousLeads);
+      }
       toast({ title: "Failed to update lead", description: error.message, variant: "destructive" });
     },
   });
