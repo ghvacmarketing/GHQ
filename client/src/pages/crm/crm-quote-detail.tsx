@@ -2693,13 +2693,20 @@ export default function CrmQuoteDetail() {
             {quote.quoteMode !== "options" && (
               <div className="mt-6 border-t pt-4 space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Equipment & Labor</span>
+                  <span className="text-slate-600">
+                    {quote.quoteType === "custom_install" ? "Internal Costs" : "Equipment & Labor"}
+                  </span>
                   <span>{formatCurrency(calculateLineItemsSubtotal())}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-lg font-semibold">
                   <span>Sell Price</span>
-                  <span className="text-[#d3b07d]">{formatCurrency(calculateLineItemsTotal())}</span>
+                  <span className="text-[#d3b07d]">
+                    {/* For worksheet/custom_install quotes, line items are internal costs - use quote.total as the selling price */}
+                    {quote.quoteType === "custom_install" 
+                      ? formatCurrency(quote.total)
+                      : formatCurrency(calculateLineItemsTotal())}
+                  </span>
                 </div>
               </div>
             )}
