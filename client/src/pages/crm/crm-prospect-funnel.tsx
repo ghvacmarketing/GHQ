@@ -2406,12 +2406,30 @@ export default function CrmProspectFunnel() {
                         </Link>
                       </SheetTitle>
                       <SheetDescription className="text-xs">
-                        {expandedLead.leadTypeName && <span className="mr-3 text-blue-600">{expandedLead.leadTypeName}</span>}
                         {expandedLead.customerPhone && <span className="mr-3">{expandedLead.customerPhone}</span>}
                         {expandedLead.customerEmail && <span className="truncate">{expandedLead.customerEmail}</span>}
                       </SheetDescription>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      <Select
+                        value={expandedLead.leadTypeId || ""}
+                        onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { leadTypeId: value || null } })}
+                      >
+                        <SelectTrigger className="h-8 w-auto min-w-[120px] text-xs">
+                          <SelectValue placeholder="Lead Type">
+                            {expandedLead.leadTypeName ? (
+                              <span className="text-blue-600 font-medium">{expandedLead.leadTypeName}</span>
+                            ) : "Lead Type"}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {leadTypes.filter(lt => lt.isActive).map((type) => (
+                            <SelectItem key={type.id} value={type.id}>
+                              {type.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <Select
                         value={expandedLead.interestLevel || ""}
                         onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { interestLevel: value || null } })}
