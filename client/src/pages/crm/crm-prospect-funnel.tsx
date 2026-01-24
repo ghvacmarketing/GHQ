@@ -106,7 +106,7 @@ import {
 } from "lucide-react";
 import { format, isToday, isPast, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, getDay, addDays, subDays, addWeeks, subWeeks, startOfDay, getHours, getMinutes, setHours } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import type { CrmUser, CrmCustomer, CrmFollowUp, SalesStage, InterestLevel, FollowUpType, CrmQuote } from "@shared/schema";
+import type { CrmUser, CrmCustomer, CrmFollowUp, SalesStage, InterestLevel, FollowUpType, CrmQuote, CrmLeadType } from "@shared/schema";
 
 type Lead = {
   id: string;
@@ -744,6 +744,7 @@ export default function CrmProspectFunnel() {
 
   const [leadNoteBody, setLeadNoteBody] = useState("");
   const [showAllNotes, setShowAllNotes] = useState(false);
+  const [selectedLeadTypeId, setSelectedLeadTypeId] = useState<string>("all");
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -767,6 +768,11 @@ export default function CrmProspectFunnel() {
   };
 
   const apiStatus = getApiStatus(activeFilter);
+
+  const { data: leadTypes = [] } = useQuery<CrmLeadType[]>({
+    queryKey: ["/api/crm/lead-types"],
+    enabled: !!currentUser,
+  });
   
   const { data: leads = [], isLoading: leadsLoading } = useQuery<Lead[]>({
     queryKey: ["/api/crm/leads", apiStatus],
@@ -1114,6 +1120,7 @@ export default function CrmProspectFunnel() {
       .filter(({ lead, searchScore }) => {
         if (searchTerm.trim() && searchScore === 0) return false;
         if (selectedEmployeeId !== "all" && lead.assignedSalesRepId !== selectedEmployeeId) return false;
+        if (selectedLeadTypeId !== "all" && lead.leadTypeId !== selectedLeadTypeId) return false;
         
         if (activeFilter === "All Active") {
           return lead.salesStage !== "won" && lead.salesStage !== "lost";
@@ -1125,7 +1132,7 @@ export default function CrmProspectFunnel() {
       })
       .sort((a, b) => b.searchScore - a.searchScore)
       .map(({ lead }) => lead);
-  }, [leads, searchTerm, selectedEmployeeId, activeFilter]);
+  }, [leads, searchTerm, selectedEmployeeId, activeFilter, selectedLeadTypeId]);
 
   const handleMoveToNextStage = (lead: Lead) => {
     const nextStage = lead.salesStage ? NEXT_STAGE[lead.salesStage] : null;
@@ -1392,6 +1399,20 @@ export default function CrmProspectFunnel() {
             {salesUsers.map((user) => (
               <SelectItem key={user.id} value={user.id}>
                 {user.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={selectedLeadTypeId} onValueChange={setSelectedLeadTypeId}>
+          <SelectTrigger className="w-[180px] h-9 text-sm bg-white border-slate-300" data-testid="select-lead-type-filter">
+            <SelectValue placeholder="All Lead Types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Lead Types</SelectItem>
+            {leadTypes.filter(lt => lt.isActive).map((type) => (
+              <SelectItem key={type.id} value={type.id}>
+                {type.name}
               </SelectItem>
             ))}
           </SelectContent>
