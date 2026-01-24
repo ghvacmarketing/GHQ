@@ -5657,7 +5657,7 @@ export default function CrmCustomerDetail() {
               address: customer.fullAddress || "",
               customerType: customer.customerType || "residential",
             });
-            navigate(`/create-lead?${params.toString()}`);
+            navigate(`/sales-prospects/create?${params.toString()}`);
           }}
           onEditCustomer={() => setEditDialogOpen(true)}
           onEditProperty={handleEditProperty}
