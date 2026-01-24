@@ -736,6 +736,7 @@ export default function CrmProspectFunnel() {
   const [editNotes, setEditNotes] = useState("");
   const [editInterestLevel, setEditInterestLevel] = useState<InterestLevel | "">("");
   const [editPotentialValue, setEditPotentialValue] = useState("");
+  const [editLeadTypeId, setEditLeadTypeId] = useState<string>("");
 
   const [editingFollowUpId, setEditingFollowUpId] = useState<string | null>(null);
   const [editFollowUpType, setEditFollowUpType] = useState<FollowUpType>("call");
@@ -1050,6 +1051,7 @@ export default function CrmProspectFunnel() {
     setEditNotes(expandedLead.notes || "");
     setEditInterestLevel((expandedLead.interestLevel as InterestLevel) || "");
     setEditPotentialValue(expandedLead.potentialValue?.toString() || "");
+    setEditLeadTypeId(expandedLead.leadTypeId || "");
     setIsEditing(true);
   };
 
@@ -1058,6 +1060,7 @@ export default function CrmProspectFunnel() {
     setEditNotes("");
     setEditInterestLevel("");
     setEditPotentialValue("");
+    setEditLeadTypeId("");
   };
 
   const handleSaveLead = () => {
@@ -1068,6 +1071,7 @@ export default function CrmProspectFunnel() {
         notes: editNotes,
         interestLevel: editInterestLevel || null,
         potentialValue: editPotentialValue ? parseInt(editPotentialValue, 10) : null,
+        leadTypeId: editLeadTypeId || null,
       },
     });
   };
@@ -1905,17 +1909,17 @@ export default function CrmProspectFunnel() {
                               key={lead.id}
                               className="cursor-pointer hover:bg-slate-50 transition-colors"
                               data-testid={`row-lead-${lead.id}`}
+                              onClick={() => {
+                                setExpandedLeadId(lead.id);
+                                setActiveTab("details");
+                              }}
                             >
                               <TableCell className="py-3">
                                 <div className="flex items-center gap-3">
                                   <InitialsAvatar name={lead.customerName || "Unknown"} size="md" />
                                   <div className="min-w-0">
                                     <div 
-                                      className="font-medium text-slate-900 truncate cursor-pointer hover:text-[#711419]"
-                                      onClick={() => {
-                                        setExpandedLeadId(lead.id);
-                                        setActiveTab("details");
-                                      }}
+                                      className="font-medium text-slate-900 truncate"
                                       data-testid={`text-lead-name-${lead.id}`}
                                     >
                                       {lead.customerName || "Unknown"}
@@ -2525,6 +2529,21 @@ export default function CrmProspectFunnel() {
                         
                         {isEditing ? (
                           <div className="grid gap-3">
+                            <div className="space-y-1.5">
+                              <Label htmlFor="edit-lead-type" className="text-xs text-muted-foreground">Lead Type</Label>
+                              <Select value={editLeadTypeId} onValueChange={setEditLeadTypeId}>
+                                <SelectTrigger className="h-9" data-testid="select-edit-lead-type">
+                                  <SelectValue placeholder="Select lead type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {leadTypes.filter(lt => lt.isActive).map((type) => (
+                                    <SelectItem key={type.id} value={type.id}>
+                                      {type.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
                             <div className="space-y-1.5">
                               <Label htmlFor="edit-potential-value" className="text-xs text-muted-foreground">Potential Value</Label>
                               <div className="relative">
