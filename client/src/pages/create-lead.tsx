@@ -30,18 +30,27 @@ export default function CreateLeadPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   
+  // Parse URL params for pre-filling from customer account
+  const urlParams = new URLSearchParams(window.location.search);
+  const prefilledName = urlParams.get('name') || "";
+  const prefilledPhone = urlParams.get('phone') || "";
+  const prefilledEmail = urlParams.get('email') || "";
+  const prefilledAddress = urlParams.get('address') || "";
+  const prefilledCustomerType = urlParams.get('customerType') || "";
+  const prefilledCustomerId = urlParams.get('customerId') || "";
+  
   const [formData, setFormData] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    address: "",
+    name: prefilledName,
+    phone: prefilledPhone,
+    email: prefilledEmail,
+    address: prefilledAddress,
     estimatedValue: "",
     status: "New",
     jobType: "",
     clientIssue: "",
     projectedCloseDate: "",
-    customerType: "",
-    leadSource: "",
+    customerType: prefilledCustomerType,
+    leadSource: prefilledCustomerId ? "CRM Customer" : "",
     assignedEmployeeId: "",
     quoteId: "",
   });
@@ -50,15 +59,15 @@ export default function CreateLeadPage() {
   const [phoneError, setPhoneError] = useState("");
   const addressContainerRef = useRef<HTMLDivElement>(null);
   const autocompleteElementRef = useRef<any>(null);
-  const [selectedAddress, setSelectedAddress] = useState("");
+  const [selectedAddress, setSelectedAddress] = useState(prefilledAddress);
   const [isQuoteImportOpen, setIsQuoteImportOpen] = useState(false);
   const [quoteSearchTerm, setQuoteSearchTerm] = useState("");
   
   const [customerSearchTerm, setCustomerSearchTerm] = useState("");
   const [debouncedCustomerSearch, setDebouncedCustomerSearch] = useState("");
   const [isCustomerPopoverOpen, setIsCustomerPopoverOpen] = useState(false);
-  const [importedCustomerId, setImportedCustomerId] = useState<string | null>(null);
-  const [importedCustomerName, setImportedCustomerName] = useState("");
+  const [importedCustomerId, setImportedCustomerId] = useState<string | null>(prefilledCustomerId || null);
+  const [importedCustomerName, setImportedCustomerName] = useState(prefilledName);
   const [searchAllFields, setSearchAllFields] = useState(false);
 
   const { data: technicians = [] } = useQuery<any[]>({

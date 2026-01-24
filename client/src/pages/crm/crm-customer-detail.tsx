@@ -182,13 +182,14 @@ interface CustomerOverviewProps {
   jobs: JobWithTech[];
   onCreateProject: () => void;
   onCreateWorkOrder: () => void;
+  onCreateLead: () => void;
 }
 
 interface CustomerNoteWithUser extends CrmCustomerNote {
   userName: string | null;
 }
 
-function CustomerOverview({ customer, jobs, onCreateProject, onCreateWorkOrder }: CustomerOverviewProps) {
+function CustomerOverview({ customer, jobs, onCreateProject, onCreateWorkOrder, onCreateLead }: CustomerOverviewProps) {
   const customerType = (customer.customerType || "residential").toLowerCase();
   
   const openProjects = jobs?.filter(j => !["completed", "invoiced", "paid", "cancelled"].includes(j.status)).length || 0;
@@ -200,14 +201,14 @@ function CustomerOverview({ customer, jobs, onCreateProject, onCreateWorkOrder }
   const completedProjects = jobs?.filter(j => ["completed", "invoiced", "paid"].includes(j.status)).length || 0;
   
   if (customerType === "property_manager" || customerType === "property manager") {
-    return <PropertyManagerOverview customer={customer} openProjects={openProjects} upcomingVisits={upcomingVisits} completedProjects={completedProjects} onCreateProject={onCreateProject} onCreateWorkOrder={onCreateWorkOrder} />;
+    return <PropertyManagerOverview customer={customer} openProjects={openProjects} upcomingVisits={upcomingVisits} completedProjects={completedProjects} onCreateProject={onCreateProject} onCreateWorkOrder={onCreateWorkOrder} onCreateLead={onCreateLead} />;
   }
   
   if (customerType === "commercial") {
-    return <CommercialOverview customer={customer} openProjects={openProjects} upcomingVisits={upcomingVisits} completedProjects={completedProjects} onCreateProject={onCreateProject} onCreateWorkOrder={onCreateWorkOrder} />;
+    return <CommercialOverview customer={customer} openProjects={openProjects} upcomingVisits={upcomingVisits} completedProjects={completedProjects} onCreateProject={onCreateProject} onCreateWorkOrder={onCreateWorkOrder} onCreateLead={onCreateLead} />;
   }
   
-  return <ResidentialOverview customer={customer} openProjects={openProjects} upcomingVisits={upcomingVisits} completedProjects={completedProjects} onCreateProject={onCreateProject} onCreateWorkOrder={onCreateWorkOrder} />;
+  return <ResidentialOverview customer={customer} openProjects={openProjects} upcomingVisits={upcomingVisits} completedProjects={completedProjects} onCreateProject={onCreateProject} onCreateWorkOrder={onCreateWorkOrder} onCreateLead={onCreateLead} />;
 }
 
 interface OverviewLayoutProps {
@@ -217,9 +218,10 @@ interface OverviewLayoutProps {
   completedProjects: number;
   onCreateProject: () => void;
   onCreateWorkOrder: () => void;
+  onCreateLead: () => void;
 }
 
-function ResidentialOverview({ customer, openProjects, upcomingVisits, completedProjects, onCreateProject, onCreateWorkOrder }: OverviewLayoutProps) {
+function ResidentialOverview({ customer, openProjects, upcomingVisits, completedProjects, onCreateProject, onCreateWorkOrder, onCreateLead }: OverviewLayoutProps) {
   return (
     <div className="space-y-6">
       <Card className="border shadow-sm" data-testid="card-residential-info">
@@ -247,7 +249,7 @@ function ResidentialOverview({ customer, openProjects, upcomingVisits, completed
               </div>
               <div>
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Status</p>
-                <Badge variant="outline" className="text-xs">{customer.status || "Active"}</Badge>
+                <Badge variant="outline" className="text-xs">{customer.customerStatus || "Active"}</Badge>
               </div>
             </div>
             <div className="space-y-4">
@@ -303,6 +305,16 @@ function ResidentialOverview({ customer, openProjects, upcomingVisits, completed
               <Plus className="h-4 w-4 mr-1" />
               New Work Order
             </Button>
+            <Button 
+              size="sm"
+              onClick={onCreateLead}
+              variant="outline"
+              className="border-amber-600 text-amber-600 hover:bg-amber-50"
+              data-testid="button-quick-create-lead"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New Lead
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -310,7 +322,7 @@ function ResidentialOverview({ customer, openProjects, upcomingVisits, completed
   );
 }
 
-function PropertyManagerOverview({ customer, openProjects, upcomingVisits, completedProjects, onCreateProject, onCreateWorkOrder }: OverviewLayoutProps) {
+function PropertyManagerOverview({ customer, openProjects, upcomingVisits, completedProjects, onCreateProject, onCreateWorkOrder, onCreateLead }: OverviewLayoutProps) {
   return (
     <div className="space-y-6">
       <Card className="border shadow-sm" data-testid="card-property-manager-info">
@@ -338,7 +350,7 @@ function PropertyManagerOverview({ customer, openProjects, upcomingVisits, compl
               </div>
               <div>
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Status</p>
-                <Badge variant="outline" className="text-xs">{customer.status || "Active"}</Badge>
+                <Badge variant="outline" className="text-xs">{customer.customerStatus || "Active"}</Badge>
               </div>
             </div>
             <div className="space-y-4">
@@ -394,6 +406,16 @@ function PropertyManagerOverview({ customer, openProjects, upcomingVisits, compl
               <Plus className="h-4 w-4 mr-1" />
               New Work Order
             </Button>
+            <Button 
+              size="sm"
+              onClick={onCreateLead}
+              variant="outline"
+              className="border-amber-600 text-amber-600 hover:bg-amber-50"
+              data-testid="button-quick-create-lead"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New Lead
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -401,7 +423,7 @@ function PropertyManagerOverview({ customer, openProjects, upcomingVisits, compl
   );
 }
 
-function CommercialOverview({ customer, openProjects, upcomingVisits, completedProjects, onCreateProject, onCreateWorkOrder }: OverviewLayoutProps) {
+function CommercialOverview({ customer, openProjects, upcomingVisits, completedProjects, onCreateProject, onCreateWorkOrder, onCreateLead }: OverviewLayoutProps) {
   return (
     <div className="space-y-6">
       <Card className="border shadow-sm" data-testid="card-commercial-info">
@@ -429,7 +451,7 @@ function CommercialOverview({ customer, openProjects, upcomingVisits, completedP
               </div>
               <div>
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Status</p>
-                <Badge variant="outline" className="text-xs">{customer.status || "Active"}</Badge>
+                <Badge variant="outline" className="text-xs">{customer.customerStatus || "Active"}</Badge>
               </div>
             </div>
             <div className="space-y-4">
@@ -484,6 +506,16 @@ function CommercialOverview({ customer, openProjects, upcomingVisits, completedP
             >
               <Plus className="h-4 w-4 mr-1" />
               New Work Order
+            </Button>
+            <Button 
+              size="sm"
+              onClick={onCreateLead}
+              variant="outline"
+              className="border-amber-600 text-amber-600 hover:bg-amber-50"
+              data-testid="button-quick-create-lead"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New Lead
             </Button>
           </div>
         </CardContent>
@@ -1333,6 +1365,7 @@ interface CustomerTabbedViewProps {
   addNotePending: boolean;
   onCreateProject: () => void;
   onScheduleVisit: () => void;
+  onCreateLead: () => void;
   onEditCustomer: () => void;
   onEditProperty: (property: CrmProperty) => void;
   toast: ReturnType<typeof useToast>['toast'];
@@ -1368,6 +1401,7 @@ function CustomerTabbedView({
   addNotePending,
   onCreateProject,
   onScheduleVisit,
+  onCreateLead,
   onEditCustomer,
   onEditProperty,
   toast,
@@ -1639,6 +1673,16 @@ function CustomerTabbedView({
               >
                 <Plus className="h-4 w-4 mr-1" />
                 New Work Order
+              </Button>
+              <Button 
+                size="sm"
+                onClick={onCreateLead}
+                variant="outline"
+                className="border-amber-600 text-amber-600 hover:bg-amber-50"
+                data-testid="button-quick-create-lead"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                New Lead
               </Button>
             </div>
           </CardContent>
@@ -5604,6 +5648,17 @@ export default function CrmCustomerDetail() {
           addNotePending={addNoteMutation.isPending}
           onCreateProject={() => setCreateProjectDialogOpen(true)}
           onScheduleVisit={() => setScheduleVisitDialogOpen(true)}
+          onCreateLead={() => {
+            const params = new URLSearchParams({
+              customerId: customer.id,
+              name: customer.name,
+              phone: customer.phone || "",
+              email: customer.email || "",
+              address: customer.fullAddress || "",
+              customerType: customer.customerType || "residential",
+            });
+            navigate(`/create-lead?${params.toString()}`);
+          }}
           onEditCustomer={() => setEditDialogOpen(true)}
           onEditProperty={handleEditProperty}
           toast={toast}
