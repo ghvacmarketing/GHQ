@@ -101,6 +101,8 @@ import {
   ExternalLink,
   Trash2,
   ChevronDown,
+  Thermometer,
+  Target,
 } from "lucide-react";
 import { format, isToday, isPast, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, getDay, addDays, subDays, addWeeks, subWeeks, startOfDay, getHours, getMinutes, setHours } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -811,7 +813,7 @@ export default function CrmProspectFunnel() {
       return res.json();
     },
     enabled: !!currentUser,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 0,
     refetchInterval: 30000,
   });
 
@@ -1067,42 +1069,49 @@ export default function CrmProspectFunnel() {
       // Cancel any outgoing refetches so they don't overwrite our optimistic update
       await queryClient.cancelQueries({ queryKey: ["/api/crm/leads"] });
       
-      // Snapshot the previous value
-      const previousLeads = queryClient.getQueryData<Lead[]>(["/api/crm/leads", apiStatus]);
+      // Get all lead queries currently in the cache
+      const allLeadQueries = queryClient.getQueriesData<Lead[]>({ queryKey: ["/api/crm/leads"] });
+      const previousData: Array<{ queryKey: readonly unknown[]; leads: Lead[] }> = [];
       
-      // Optimistically update the cache
-      if (previousLeads) {
-        const updatedLeads = previousLeads.map((lead) => {
-          if (lead.id === id) {
-            const updatedLead = { ...lead, ...data };
-            // Also update the display labels if changing temp or driver
-            if (data.leadTempId !== undefined) {
-              const tempOption = leadTempOptions.find(t => t.id === data.leadTempId);
-              updatedLead.leadTempLabel = tempOption?.label || null;
-              updatedLead.leadTempNumericValue = tempOption?.numericValue || null;
+      // Update all cached lead lists
+      allLeadQueries.forEach(([queryKey, leads]) => {
+        if (leads) {
+          previousData.push({ queryKey, leads });
+          const updatedLeads = leads.map((lead) => {
+            if (lead.id === id) {
+              const updatedLead = { ...lead, ...data };
+              // Also update the display labels if changing temp or driver
+              if (data.leadTempId !== undefined) {
+                const tempOption = leadTempOptions.find(t => t.id === data.leadTempId);
+                updatedLead.leadTempLabel = tempOption?.label || null;
+                updatedLead.leadTempNumericValue = tempOption?.numericValue || null;
+              }
+              if (data.leadDriverId !== undefined) {
+                const driverOption = leadDriverOptions.find(d => d.id === data.leadDriverId);
+                updatedLead.leadDriverLabel = driverOption?.label || null;
+              }
+              return updatedLead;
             }
-            if (data.leadDriverId !== undefined) {
-              const driverOption = leadDriverOptions.find(d => d.id === data.leadDriverId);
-              updatedLead.leadDriverLabel = driverOption?.label || null;
-            }
-            return updatedLead;
-          }
-          return lead;
-        });
-        queryClient.setQueryData(["/api/crm/leads", apiStatus], updatedLeads);
-      }
+            return lead;
+          });
+          queryClient.setQueryData(queryKey, updatedLeads);
+        }
+      });
       
-      return { previousLeads };
+      return { previousData };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/leads"] });
+      // Force refetch all lead queries to ensure data is fresh
+      queryClient.refetchQueries({ queryKey: ["/api/crm/leads"] });
       toast({ title: "Lead updated successfully" });
       setIsEditing(false);
     },
     onError: (error: Error, _variables, context) => {
-      // Rollback on error
-      if (context?.previousLeads) {
-        queryClient.setQueryData(["/api/crm/leads", apiStatus], context.previousLeads);
+      // Rollback on error - restore all cached queries
+      if (context?.previousData) {
+        context.previousData.forEach(({ queryKey, leads }) => {
+          queryClient.setQueryData(queryKey, leads);
+        });
       }
       toast({ title: "Failed to update lead", description: error.message, variant: "destructive" });
     },
@@ -2649,40 +2658,46 @@ export default function CrmProspectFunnel() {
                         <SelectItem value="lost">Lost</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Select
-                      key={`temp-${expandedLead.id}-${expandedLead.leadTempId || 'none'}`}
-                      value={expandedLead.leadTempId || "none"}
-                      onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { leadTempId: value === "none" ? null : value } })}
-                    >
-                      <SelectTrigger className="h-8 w-auto min-w-[120px] text-xs">
-                        <SelectValue placeholder="Temperature" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No Temperature</SelectItem>
-                        {leadTempOptions.map((option) => (
-                          <SelectItem key={option.id} value={option.id}>
-                            T{option.numericValue} - {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      key={`driver-${expandedLead.id}-${expandedLead.leadDriverId || 'none'}`}
-                      value={expandedLead.leadDriverId || "none"}
-                      onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { leadDriverId: value === "none" ? null : value } })}
-                    >
-                      <SelectTrigger className="h-8 w-auto min-w-[100px] text-xs">
-                        <SelectValue placeholder="Driver" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No Driver</SelectItem>
-                        {leadDriverOptions.map((option) => (
-                          <SelectItem key={option.id} value={option.id}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-1">
+                      <Thermometer className="h-4 w-4 text-[#711419]" />
+                      <Select
+                        key={`temp-${expandedLead.id}-${expandedLead.leadTempId || 'none'}`}
+                        value={expandedLead.leadTempId || "none"}
+                        onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { leadTempId: value === "none" ? null : value } })}
+                      >
+                        <SelectTrigger className="h-8 w-auto min-w-[120px] text-xs">
+                          <SelectValue placeholder="Temperature" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Temperature</SelectItem>
+                          {leadTempOptions.map((option) => (
+                            <SelectItem key={option.id} value={option.id}>
+                              T{option.numericValue} - {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Target className="h-4 w-4 text-[#711419]" />
+                      <Select
+                        key={`driver-${expandedLead.id}-${expandedLead.leadDriverId || 'none'}`}
+                        value={expandedLead.leadDriverId || "none"}
+                        onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { leadDriverId: value === "none" ? null : value } })}
+                      >
+                        <SelectTrigger className="h-8 w-auto min-w-[100px] text-xs">
+                          <SelectValue placeholder="Driver" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Driver</SelectItem>
+                          {leadDriverOptions.map((option) => (
+                            <SelectItem key={option.id} value={option.id}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </SheetHeader>
 
