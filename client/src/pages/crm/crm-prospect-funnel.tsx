@@ -2615,38 +2615,27 @@ export default function CrmProspectFunnel() {
                       </SelectContent>
                     </Select>
                     <Select
-                      value={expandedLead.leadTempId || ""}
-                      onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { leadTempId: value === "none" ? null : value || null } })}
+                      value={expandedLead.leadTempId || "none"}
+                      onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { leadTempId: value === "none" ? null : value } })}
                     >
                       <SelectTrigger className="h-8 w-auto min-w-[80px] text-xs">
-                        <SelectValue placeholder="Temp">
-                          {expandedLead.leadTempId ? (() => {
-                            const option = leadTempOptions.find(o => o.id === expandedLead.leadTempId);
-                            return option ? (
-                              <span className="font-medium">T{option.numericValue}</span>
-                            ) : "Temp";
-                          })() : "Temp"}
-                        </SelectValue>
+                        <SelectValue placeholder="Temp" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">No Temperature</SelectItem>
+                        <SelectItem value="none">No Temp</SelectItem>
                         {leadTempOptions.map((option) => (
                           <SelectItem key={option.id} value={option.id}>
-                            {option.numericValue} - {option.label}
+                            T{option.numericValue}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                     <Select
-                      value={expandedLead.leadDriverId || ""}
-                      onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { leadDriverId: value === "none" ? null : value || null } })}
+                      value={expandedLead.leadDriverId || "none"}
+                      onValueChange={(value) => updateLeadMutation.mutate({ id: expandedLead.id, data: { leadDriverId: value === "none" ? null : value } })}
                     >
                       <SelectTrigger className="h-8 w-auto min-w-[90px] text-xs">
-                        <SelectValue placeholder="Driver">
-                          {expandedLead.leadDriverLabel ? (
-                            <span className="font-medium">{expandedLead.leadDriverLabel.split('-')[0]}</span>
-                          ) : "Driver"}
-                        </SelectValue>
+                        <SelectValue placeholder="Driver" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">No Driver</SelectItem>
