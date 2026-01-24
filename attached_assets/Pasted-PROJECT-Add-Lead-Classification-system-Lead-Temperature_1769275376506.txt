@@ -1,0 +1,69 @@
+PROJECT: Add “Lead Classification” system (Lead Temperature + Customer Driver) to GHQ/GHVAC CRM Leads.
+
+GOALS
+1) Add two new classification fields to each Lead:
+   A) Lead Temperature (1–5)
+   B) Customer Driver (Pain / Health / Financial / Preventive)
+2) Make both sets of dropdown options editable in Settings (admin-configurable).
+3) Allow editing these fields after a Lead is created (inline edit on Lead detail + editable in Lead creation form).
+4) Add Lead Board filters for both new fields (multi-select), alongside existing filters (e.g., Crawlspace/HVAC/etc.).
+
+DEFINITIONS (default dropdown options)
+Lead Temperature (store as key/value with label + description):
+- 1: "1 – Info Only (Cold): researching/ballpark, no appointment, no timeline"
+- 2: "2 – Aware (Warm): has a problem/goal, open to help, not booked yet"
+- 3: "3 – Actively Shopping (Hot): comparing, wants firm pricing, willing to schedule within ~14 days"
+- 4: "4 – Ready to Decide (Very Hot): decision imminent; asks about schedule/install/deposit/financing"
+- 5: "5 – Committed / Won: approved + scheduled and/or paid (convert to Project, but keep for reporting)"
+
+Customer Driver (store as key/value with label + description):
+- "Pain-Driven (Discomfort/Urgency): no heat/no cool, major discomfort, urgent fix"
+- "Health-Driven (Humidity/IAQ): musty odor, high humidity, mold concern, air quality motivation"
+- "Financial-Driven (Cost/Value): high bills, ROI, rebates, financing/monthly payment focus"
+- "Preventive-Driven (Avoid Problems): proactive maintenance mindset, replace before failure, reliability planning"
+
+DATA MODEL / DB
+- Update Leads table/collection to include:
+  - leadTempId (nullable; references settings option id for temperature)
+  - leadDriverId (nullable; references settings option id for driver)
+- Create settings-managed tables/collections:
+  - LeadTempOptions: { id, sortOrder, isActive, label, description, numericValue (1–5) }
+  - LeadDriverOptions: { id, sortOrder, isActive, label, description }
+- Seed defaults above on migration if none exist.
+- Ensure soft-delete or isActive toggle so old leads referencing inactive options still display correctly.
+
+SETTINGS UI (Admin)
+Add a Settings page section: “Lead Classification”
+- Manage Lead Temperature options:
+  - Add/Edit/Reorder/Deactivate
+  - numericValue must remain unique 1–5 (validation)
+- Manage Customer Driver options:
+  - Add/Edit/Reorder/Deactivate
+- Editing an option updates label/description everywhere, but does not break existing lead references.
+
+LEAD CREATE + EDIT UX
+- On Lead Create form: add two dropdowns (Temperature, Driver).
+  - Show label + short description in dropdown (tooltip or helper text beneath selection).
+- On Lead Detail view: allow inline edit for both fields (dropdown edit + save).
+- On Lead cards (board view): show compact badges:
+  - Temp badge: “Temp 1/2/3/4/5”
+  - Driver badge: “Pain/Health/Financial/Preventive” (or abbreviated if space-limited)
+
+LEAD BOARD FILTERS
+- Add filter controls for:
+  - Lead Temperature (multi-select)
+  - Customer Driver (multi-select)
+- Combine with existing filters (lead type like HVAC/Crawlspace/etc.).
+- Filtering should work with AND logic across categories (e.g., HVAC + Temp 3/4 + Financial).
+- Persist selected filters in URL query params so sharing a filtered view works.
+
+REPORTING (lightweight)
+- Add optional quick counts on board header:
+  - Count by Temp (1–5) for currently filtered leads
+  - Count by Driver for currently filtered leads
+
+ACCEPTANCE CHECKLIST
+- Admin can change option labels/descriptions and they update in forms + lead detail + board.
+- Can edit Temp/Driver after lead creation.
+- Board filters work and persist via URL.
+- Leads created before feature show empty values safely.
