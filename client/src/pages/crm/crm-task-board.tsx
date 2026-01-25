@@ -442,6 +442,8 @@ export default function CrmTaskBoard() {
       return response.json();
     },
     enabled: !!currentUser,
+    refetchOnMount: "always",
+    staleTime: 0,
   });
 
   const { data: taskTypes = [] } = useQuery<TaskType[]>({

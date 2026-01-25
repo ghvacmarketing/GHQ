@@ -308,6 +308,8 @@ export default function CrmMyTasks() {
       return res.json();
     },
     enabled: !!currentUser?.id,
+    refetchOnMount: "always",
+    staleTime: 0,
   });
 
   const { data: taskTypes = [] } = useQuery<TaskType[]>({

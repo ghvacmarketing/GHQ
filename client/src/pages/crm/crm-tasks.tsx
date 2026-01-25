@@ -592,6 +592,11 @@ export default function CrmTasks() {
     queryKey: ["/api/subtasks/calendar", "calendar", statusFilter, priorityFilter, typeFilter, assignedToFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
+      const today = new Date();
+      const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      const endDate = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+      params.set("start", startDate.toISOString());
+      params.set("end", endDate.toISOString());
       const response = await fetch(`/api/subtasks/calendar?${params.toString()}`, {
         credentials: "include",
       });
