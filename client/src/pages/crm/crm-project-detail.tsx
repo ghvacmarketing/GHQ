@@ -3540,7 +3540,14 @@ function JobCostingTab({ projectId, project }: { projectId: string; project: Crm
 
   const updateJobCostingSettingsMutation = useMutation({
     mutationFn: async (data: { overheadPercent?: number; commissionPercent?: number }) => {
-      const res = await apiRequest("PATCH", `/api/crm/projects/${projectId}`, data);
+      const payload: Record<string, string | null> = {};
+      if (data.overheadPercent !== undefined) {
+        payload.overheadPercent = data.overheadPercent !== null ? String(data.overheadPercent) : null;
+      }
+      if (data.commissionPercent !== undefined) {
+        payload.commissionPercent = data.commissionPercent !== null ? String(data.commissionPercent) : null;
+      }
+      const res = await apiRequest("PATCH", `/api/crm/projects/${projectId}`, payload);
       return res.json();
     },
     onSuccess: () => {
