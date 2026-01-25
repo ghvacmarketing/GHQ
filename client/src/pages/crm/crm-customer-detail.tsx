@@ -78,6 +78,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { CommentComposer } from "@/components/crm/comment-composer";
 import type { CrmUser, CrmCustomer, CrmJob, CrmCustomerNote, CrmProject, CrmWorkOrder, CrmProperty, CrmQuote, ChecklistQuestion } from "@shared/schema";
 import { workOrderVisitTypeEnum, type WorkOrderVisitType, projectTypeEnum, type ProjectType, projectStatusEnum, type ProjectStatus, workOrderStatusEnum, type WorkOrderStatus, type WorkSubtype, type WorkOrderSubtype } from "@shared/schema";
 import { createLocalDateTime } from "@/lib/timezone";
@@ -527,13 +528,11 @@ function CommercialOverview({ customer, openProjects, upcomingVisits, completedP
 interface NotesSectionProps {
   notes: CustomerNoteWithUser[];
   notesLoading: boolean;
-  noteBody: string;
-  setNoteBody: (value: string) => void;
-  handleAddNote: () => void;
-  addNotePending: boolean;
+  customerId: string;
+  onCommentPosted: () => void;
 }
 
-function NotesSection({ notes, notesLoading, noteBody, setNoteBody, handleAddNote, addNotePending }: NotesSectionProps) {
+function NotesSection({ notes, notesLoading, customerId, onCommentPosted }: NotesSectionProps) {
   return (
     <Card data-testid="card-notes-overview">
       <CardHeader>
@@ -544,31 +543,12 @@ function NotesSection({ notes, notesLoading, noteBody, setNoteBody, handleAddNot
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <div className="flex gap-2">
-            <Textarea
-              placeholder="Add a note about this customer..."
-              value={noteBody}
-              onChange={(e) => setNoteBody(e.target.value)}
-              rows={2}
-              className="flex-1"
-              data-testid="textarea-note-overview"
-            />
-            <Button
-              onClick={handleAddNote}
-              disabled={!noteBody.trim() || addNotePending}
-              className="self-end"
-              data-testid="button-add-note-overview"
-            >
-              {addNotePending ? (
-                "Adding..."
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-1" />
-                  Add
-                </>
-              )}
-            </Button>
-          </div>
+          <CommentComposer
+            entityType="customer"
+            entityId={customerId}
+            onCommentPosted={onCommentPosted}
+            placeholder="Add a note about this customer..."
+          />
 
           {notesLoading ? (
             <div className="space-y-3 py-4">
@@ -1359,10 +1339,7 @@ interface CustomerTabbedViewProps {
   jobs: JobWithTech[] | undefined;
   notes: CustomerNoteWithUser[];
   notesLoading: boolean;
-  noteBody: string;
-  setNoteBody: (value: string) => void;
-  handleAddNote: () => void;
-  addNotePending: boolean;
+  onCommentPosted: () => void;
   onCreateProject: () => void;
   onScheduleVisit: () => void;
   onCreateLead: () => void;
@@ -1395,10 +1372,7 @@ function CustomerTabbedView({
   jobs,
   notes,
   notesLoading,
-  noteBody,
-  setNoteBody,
-  handleAddNote,
-  addNotePending,
+  onCommentPosted,
   onCreateProject,
   onScheduleVisit,
   onCreateLead,
@@ -1816,31 +1790,12 @@ function CustomerTabbedView({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex gap-2">
-                <Textarea
-                  placeholder="Add a comment about this customer..."
-                  value={noteBody}
-                  onChange={(e) => setNoteBody(e.target.value)}
-                  rows={2}
-                  className="flex-1"
-                  data-testid="textarea-timeline-comment"
-                />
-                <Button
-                  onClick={handleAddNote}
-                  disabled={!noteBody.trim() || addNotePending}
-                  className="self-end bg-[#711419] hover:bg-[#5a1014] text-white"
-                  data-testid="button-add-timeline-comment"
-                >
-                  {addNotePending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-1" />
-                      Post
-                    </>
-                  )}
-                </Button>
-              </div>
+              <CommentComposer
+                entityType="customer"
+                entityId={customer.id}
+                onCommentPosted={onCommentPosted}
+                placeholder="Add a comment about this customer..."
+              />
 
               {timelineLoading || notesLoading ? (
                 <div className="space-y-3 py-4">
@@ -2497,7 +2452,6 @@ export default function CrmCustomerDetail() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleteReason, setDeleteReason] = useState("");
-  const [noteBody, setNoteBody] = useState("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [propertyDialogOpen, setPropertyDialogOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<CrmProperty | null>(null);
@@ -3864,32 +3818,6 @@ export default function CrmCustomerDetail() {
       });
     },
   });
-
-  const addNoteMutation = useMutation({
-    mutationFn: async (body: string) => {
-      const res = await apiRequest("POST", `/api/crm/customers/${customerId}/notes`, { body });
-      if (!res.ok) throw new Error("Failed to add note");
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Note added" });
-      setNoteBody("");
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "notes"] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to add note",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleAddNote = () => {
-    if (noteBody.trim()) {
-      addNoteMutation.mutate(noteBody.trim());
-    }
-  };
 
   const deleteCustomerMutation = useMutation({
     mutationFn: async () => {
@@ -5642,10 +5570,9 @@ export default function CrmCustomerDetail() {
           jobs={jobs}
           notes={notes || []}
           notesLoading={notesLoading}
-          noteBody={noteBody}
-          setNoteBody={setNoteBody}
-          handleAddNote={handleAddNote}
-          addNotePending={addNoteMutation.isPending}
+          onCommentPosted={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "notes"] });
+          }}
           onCreateProject={() => setCreateProjectDialogOpen(true)}
           onScheduleVisit={() => setScheduleVisitDialogOpen(true)}
           onCreateLead={() => {
