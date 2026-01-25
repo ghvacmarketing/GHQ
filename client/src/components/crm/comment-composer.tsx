@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -65,12 +66,13 @@ export function renderCommentBody(
     const userName = mentionMap.get(userId) || "Unknown User";
 
     parts.push(
-      <span
+      <Link
         key={`mention-${match.index}`}
-        className="bg-primary/10 text-primary rounded px-1.5 py-0.5 text-sm font-medium"
+        href={`/crm/team/${userId}`}
+        className="bg-primary/10 text-primary rounded px-1.5 py-0.5 text-sm font-medium hover:underline"
       >
         @{userName}
-      </span>
+      </Link>
     );
 
     lastIndex = match.index + match[0].length;
@@ -246,6 +248,12 @@ export function CommentComposer({
   return (
     <div className="relative">
       <div className="space-y-3">
+        {insertedMentions.size > 0 && value && (
+          <div className="p-3 bg-muted/50 rounded-md border text-sm whitespace-pre-wrap">
+            <div className="text-xs text-muted-foreground mb-1">Preview:</div>
+            {renderDisplayValue()}
+          </div>
+        )}
         <div className="relative">
           <Textarea
             ref={textareaRef}

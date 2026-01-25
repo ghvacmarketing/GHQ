@@ -7774,7 +7774,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!mentionsMap[mention.commentId]) {
             mentionsMap[mention.commentId] = [];
           }
-          mentionsMap[mention.commentId].push({ userId: mention.userId, userName: mention.userName });
+          mentionsMap[mention.commentId].push({ userId: mention.userId, userName: mention.userName || "Unknown User" });
         }
       }
 
@@ -7826,13 +7826,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse mentions and create mention entries + notifications
       const mentionedUserIds = parseMentions(body);
       
-      for (const userId of mentionedUserIds) {
-        // Verify user exists
-        const [mentionedUser] = await db.select({ id: crmUsers.id })
+      // Build a map of userId -> userName for all mentioned users
+      const mentionedUsersMap = new Map<string, string>();
+      if (mentionedUserIds.length > 0) {
+        const mentionedUsers = await db.select({ id: crmUsers.id, name: crmUsers.name })
           .from(crmUsers)
-          .where(eq(crmUsers.id, userId));
+          .where(inArray(crmUsers.id, mentionedUserIds));
+        for (const user of mentionedUsers) {
+          mentionedUsersMap.set(user.id, user.name || "Unknown User");
+        }
+      }
 
-        if (mentionedUser) {
+      // Create a preview with resolved mentions (replace @[userId] with @Name)
+      const resolvedPreview = body.replace(/@\[([^\]]+)\]/g, (match: string, matchedUserId: string) => {
+        const userName = mentionedUsersMap.get(matchedUserId);
+        return userName ? `@${userName}` : match;
+      }).substring(0, 100);
+      
+      for (const userId of mentionedUserIds) {
+        if (mentionedUsersMap.has(userId)) {
           // Always create mention record (for display purposes)
           await db.insert(crmCommentMentions).values({
             commentId: comment.id,
@@ -7846,7 +7858,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               userId,
               type: "mention",
               title: `${currentUser.name} mentioned you in a comment`,
-              preview: body.substring(0, 100),
+              preview: resolvedPreview,
               entityType,
               entityId,
               actorId: currentUser.id,
