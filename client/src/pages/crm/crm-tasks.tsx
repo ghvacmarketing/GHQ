@@ -71,6 +71,7 @@ import {
   Calendar as CalendarViewIcon,
   GripVertical,
   CheckSquare,
+  ListChecks,
   X,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -183,6 +184,17 @@ type TaskSubtask = {
   createdAt: string;
 };
 
+type CalendarSubtask = {
+  id: string;
+  taskId: string;
+  title: string;
+  isCompleted: boolean;
+  dueAt: string;
+  sortOrder: number;
+  createdAt: string;
+  taskTitle: string;
+};
+
 type TasksResponse = {
   tasks: TaskWithRelations[];
   total: number;
@@ -245,14 +257,18 @@ function DraggableTask({
 function DroppableDay({ 
   date, 
   isCurrentMonth, 
-  tasks, 
+  tasks,
+  subtasks,
   onTaskClick,
+  onSubtaskClick,
   checkOverdue 
 }: { 
   date: Date; 
   isCurrentMonth: boolean; 
   tasks: TaskWithRelations[];
+  subtasks: CalendarSubtask[];
   onTaskClick: (task: TaskWithRelations) => void;
+  onSubtaskClick: (subtask: CalendarSubtask) => void;
   checkOverdue: (task: TaskWithRelations) => boolean;
 }) {
   const { isOver, setNodeRef } = useDroppable({
@@ -289,20 +305,48 @@ function DroppableDay({
             isOverdue={checkOverdue(task)}
           />
         ))}
+        {subtasks.map((subtask) => (
+          <div
+            key={`subtask-${subtask.id}`}
+            className={`flex flex-col gap-0.5 p-1.5 rounded text-xs cursor-pointer hover:bg-slate-100 transition-colors border ${
+              subtask.isCompleted 
+                ? "bg-green-50 border-green-200" 
+                : "bg-purple-50 border-purple-200"
+            }`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSubtaskClick(subtask);
+            }}
+          >
+            <div className="flex items-center gap-1">
+              <ListChecks className={`h-3 w-3 flex-shrink-0 ${subtask.isCompleted ? "text-green-500" : "text-purple-500"}`} />
+              <span className={`truncate flex-1 ${subtask.isCompleted ? "line-through text-slate-400" : "text-slate-700"}`}>
+                {subtask.title}
+              </span>
+            </div>
+            <div className="pl-4 text-[10px] text-slate-400 truncate">
+              ↳ {subtask.taskTitle}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
 function CalendarView({ 
-  tasks, 
-  onTaskClick, 
+  tasks,
+  subtasks,
+  onTaskClick,
+  onSubtaskClick,
   onTaskDrop,
   checkOverdue,
   isUpdating
 }: { 
-  tasks: TaskWithRelations[]; 
+  tasks: TaskWithRelations[];
+  subtasks: CalendarSubtask[];
   onTaskClick: (task: TaskWithRelations) => void;
+  onSubtaskClick: (subtask: CalendarSubtask) => void;
   onTaskDrop: (taskId: string, newDueDate: Date) => void;
   checkOverdue: (task: TaskWithRelations) => boolean;
   isUpdating: boolean;
@@ -327,6 +371,18 @@ function CalendarView({
     });
     return map;
   }, [tasks]);
+
+  const subtasksByDate = useMemo(() => {
+    const map = new Map<string, CalendarSubtask[]>();
+    subtasks.forEach(subtask => {
+      if (subtask.dueAt) {
+        const key = format(new Date(subtask.dueAt), "yyyy-MM-dd");
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(subtask);
+      }
+    });
+    return map;
+  }, [subtasks]);
 
   const unscheduledTasks = useMemo(() => {
     return tasks.filter(task => !task.dueAt);
@@ -407,7 +463,9 @@ function CalendarView({
                   date={day}
                   isCurrentMonth={isSameMonth(day, currentMonth)}
                   tasks={tasksByDate.get(format(day, "yyyy-MM-dd")) || []}
+                  subtasks={subtasksByDate.get(format(day, "yyyy-MM-dd")) || []}
                   onTaskClick={onTaskClick}
+                  onSubtaskClick={onSubtaskClick}
                   checkOverdue={checkOverdue}
                 />
               ))}
@@ -532,6 +590,19 @@ export default function CrmTasks() {
         credentials: "include",
       });
       if (!response.ok) throw new Error("Failed to fetch tasks");
+      return response.json();
+    },
+    enabled: !!currentUser && viewMode === "calendar",
+  });
+
+  const { data: calendarSubtasksData = [] } = useQuery<CalendarSubtask[]>({
+    queryKey: ["/api/subtasks/calendar", "calendar", statusFilter, priorityFilter, typeFilter, assignedToFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      const response = await fetch(`/api/subtasks/calendar?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch calendar subtasks");
       return response.json();
     },
     enabled: !!currentUser && viewMode === "calendar",
@@ -729,6 +800,22 @@ export default function CrmTasks() {
       customerId: task.customerId || undefined,
     });
     setIsDrawerOpen(true);
+  };
+
+  const handleSubtaskClick = (subtask: CalendarSubtask) => {
+    const parentTask = calendarTasks.find(t => t.id === subtask.taskId);
+    if (parentTask) {
+      handleOpenEdit(parentTask);
+    } else {
+      fetch(`/api/tasks/${subtask.taskId}`, { credentials: "include" })
+        .then(res => res.json())
+        .then((task: TaskWithRelations) => {
+          handleOpenEdit(task);
+        })
+        .catch(() => {
+          toast({ title: "Failed to load parent task", variant: "destructive" });
+        });
+    }
   };
 
   const handleCloseDrawer = () => {
@@ -937,7 +1024,9 @@ export default function CrmTasks() {
               ) : (
                 <CalendarView
                   tasks={calendarTasks}
+                  subtasks={calendarSubtasksData}
                   onTaskClick={handleOpenEdit}
+                  onSubtaskClick={handleSubtaskClick}
                   onTaskDrop={handleTaskDrop}
                   checkOverdue={isOverdue}
                   isUpdating={rescheduleMutation.isPending}
