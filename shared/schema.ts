@@ -3233,6 +3233,80 @@ export const insertCrmNotificationSchema = createInsertSchema(crmNotifications).
 export type InsertCrmNotification = z.infer<typeof insertCrmNotificationSchema>;
 export type CrmNotification = typeof crmNotifications.$inferSelect;
 
+// =============================================
+// TASK MANAGEMENT MODULE
+// =============================================
+
+// Task Status Enum
+export const taskStatusEnum = ["pending", "in_progress", "completed", "cancelled"] as const;
+export type TaskStatus = typeof taskStatusEnum[number];
+
+// Task Priority Enum
+export const taskPriorityEnum = ["low", "normal", "high", "urgent"] as const;
+export type TaskPriority = typeof taskPriorityEnum[number];
+
+// Task Related Entity Type Enum
+export const taskRelatedEntityTypeEnum = ["customer", "lead", "project", "work_order", "invoice", "none"] as const;
+export type TaskRelatedEntityType = typeof taskRelatedEntityTypeEnum[number];
+
+// Task Types - Configurable task templates
+export const taskTypes = pgTable("task_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  icon: text("icon"),
+  defaultDurationMinutes: integer("default_duration_minutes"),
+  defaultPriority: text("default_priority").$type<"low" | "normal" | "high" | "urgent">(),
+  isCustomerActionable: boolean("is_customer_actionable").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTaskTypeSchema = createInsertSchema(taskTypes).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTaskType = z.infer<typeof insertTaskTypeSchema>;
+export type TaskType = typeof taskTypes.$inferSelect;
+
+// Tasks - Main task records
+export const tasks = pgTable("tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status").$type<TaskStatus>().notNull().default("pending"),
+  priority: text("priority").$type<TaskPriority>().notNull().default("normal"),
+  typeId: varchar("type_id").references(() => taskTypes.id),
+  assignedToUserId: varchar("assigned_to_user_id").references(() => crmUsers.id),
+  createdByUserId: varchar("created_by_user_id").references(() => crmUsers.id).notNull(),
+  dueAt: timestamp("due_at"),
+  startAt: timestamp("start_at"),
+  endAt: timestamp("end_at"),
+  completedAt: timestamp("completed_at"),
+  remindAt: timestamp("remind_at"),
+  isAllDay: boolean("is_all_day").default(false),
+  relatedEntityType: text("related_entity_type").$type<TaskRelatedEntityType>().default("none"),
+  relatedEntityId: varchar("related_entity_id"),
+  customerId: varchar("customer_id").references(() => crmCustomers.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, createdAt: true, updatedAt: true, completedAt: true });
+export type InsertTask = z.infer<typeof insertTaskSchema>;
+export type Task = typeof tasks.$inferSelect;
+
+// Task Activity - Audit trail for task changes
+export const taskActivity = pgTable("task_activity", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").references(() => tasks.id).notNull(),
+  userId: varchar("user_id").references(() => crmUsers.id).notNull(),
+  action: text("action").notNull(),
+  beforeJson: text("before_json"),
+  afterJson: text("after_json"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTaskActivitySchema = createInsertSchema(taskActivity).omit({ id: true, createdAt: true });
+export type InsertTaskActivity = z.infer<typeof insertTaskActivitySchema>;
+export type TaskActivity = typeof taskActivity.$inferSelect;
+
 // CRM Comments - Comments on any entity (leads, projects, work orders, tasks, customers)
 export const crmComments = pgTable("crm_comments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
