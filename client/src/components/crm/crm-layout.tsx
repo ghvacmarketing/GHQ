@@ -29,6 +29,7 @@ import {
   Smartphone,
   MessageSquare,
   Bell,
+  ListTodo,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 import ghqLogo from "@assets/redlogo.webp";
@@ -79,6 +80,7 @@ const navSections: NavSection[] = [
     items: [
       { label: "Work Orders", href: "/crm/work-orders", icon: ClipboardList },
       { label: "Projects", href: "/crm/projects", icon: FolderKanban },
+      { label: "Tasks", href: "/crm/tasks", icon: ListTodo },
       { label: "Items", href: "/crm/items", icon: Package },
     ],
   },
