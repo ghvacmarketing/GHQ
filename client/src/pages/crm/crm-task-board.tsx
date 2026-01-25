@@ -658,18 +658,58 @@ export default function CrmTaskBoard() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="flex h-full">
+        {/* Left Sidebar Navigation */}
+        <div className="w-56 flex-shrink-0 bg-slate-50 border-r border-slate-200 p-4 hidden md:block">
+          <div className="space-y-1">
+            <Button
+              variant="ghost"
+              className="w-full justify-start bg-slate-200 text-slate-900 font-medium"
+              onClick={() => navigate("/crm/tasks/board")}
+            >
+              <Inbox className="h-4 w-4 mr-2" />
+              Master Inbox
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-slate-600 hover:bg-slate-100"
+              onClick={() => navigate("/crm/tasks/mine")}
+            >
+              <User className="h-4 w-4 mr-2" />
+              My Tasks
+            </Button>
+          </div>
+          <div className="mt-6 border-t border-slate-200 pt-4">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Lists</p>
+            <div className="space-y-1">
+              {COLUMNS.map((col) => {
+                const Icon = col.icon;
+                const count = tasksByColumn[col.id]?.length || 0;
+                return (
+                  <div key={col.id} className="flex items-center justify-between px-2 py-1.5 text-sm text-slate-600 rounded hover:bg-slate-100">
+                    <div className="flex items-center gap-2">
+                      <Icon className="h-4 w-4" />
+                      <span>{col.label}</span>
+                    </div>
+                    <Badge variant="secondary" className="text-xs">{count}</Badge>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
         <div className={`flex-1 min-w-0 transition-all duration-300 ease-in-out ${isDrawerOpen ? 'mr-0' : ''}`}>
-          <div className="space-y-4 p-0">
+          <div className="space-y-4 p-0 md:pl-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">Task Board</h1>
+                <h1 className="text-2xl font-bold text-slate-900">Master Inbox</h1>
                 <p className="text-slate-500 text-sm mt-1">
                   Drag tasks between columns to organize your workflow
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <Button variant="outline" onClick={() => navigate("/crm/tasks")}>
-                  List View
+                <Button variant="outline" className="md:hidden" onClick={() => navigate("/crm/tasks/mine")}>
+                  My Tasks
                 </Button>
                 <Button onClick={handleOpenCreate} className="bg-[#711419] hover:bg-[#5a1014]">
                   <Plus className="h-4 w-4 mr-2" />

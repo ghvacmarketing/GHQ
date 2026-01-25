@@ -47,6 +47,11 @@ import {
   User,
   LayoutGrid,
   CheckSquare,
+  Inbox,
+  FolderKanban,
+  Zap,
+  Hourglass,
+  UserCheck,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { 
@@ -604,11 +609,55 @@ export default function CrmMyTasks() {
 
   const totalActiveTasks = overdueTasks.length + todayTasks.length + upcomingTasks.length + noDateTasks.length;
 
+  const LISTS = [
+    { id: "inbox", label: "Inbox", icon: Inbox },
+    { id: "projects", label: "Projects", icon: FolderKanban },
+    { id: "next_actions", label: "Next Actions", icon: Zap },
+    { id: "waiting_on", label: "Waiting On", icon: Hourglass },
+    { id: "follow_up", label: "Follow Up", icon: UserCheck },
+  ];
+
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="flex h-full">
+        {/* Left Sidebar Navigation */}
+        <div className="w-56 flex-shrink-0 bg-slate-50 border-r border-slate-200 p-4 hidden md:block">
+          <div className="space-y-1">
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-slate-600 hover:bg-slate-100"
+              onClick={() => navigate("/crm/tasks/board")}
+            >
+              <Inbox className="h-4 w-4 mr-2" />
+              Master Inbox
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start bg-slate-200 text-slate-900 font-medium"
+              onClick={() => navigate("/crm/tasks/mine")}
+            >
+              <User className="h-4 w-4 mr-2" />
+              My Tasks
+            </Button>
+          </div>
+          <div className="mt-6 border-t border-slate-200 pt-4">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Lists</p>
+            <div className="space-y-1">
+              {LISTS.map((list) => {
+                const Icon = list.icon;
+                return (
+                  <div key={list.id} className="flex items-center gap-2 px-2 py-1.5 text-sm text-slate-600 rounded hover:bg-slate-100 cursor-pointer" onClick={() => navigate("/crm/tasks/board")}>
+                    <Icon className="h-4 w-4" />
+                    <span>{list.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
         <div className={`flex-1 min-w-0 transition-all duration-300 ease-in-out ${isDrawerOpen ? 'mr-0' : ''}`}>
-          <div className="max-w-3xl mx-auto space-y-6">
+          <div className="max-w-3xl mx-auto space-y-6 md:pl-4">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">My Tasks</h1>
@@ -618,6 +667,7 @@ export default function CrmMyTasks() {
               </div>
               <Button
                 variant="outline"
+                className="md:hidden"
                 onClick={() => navigate("/crm/tasks/board")}
               >
                 <LayoutGrid className="h-4 w-4 mr-2" />
