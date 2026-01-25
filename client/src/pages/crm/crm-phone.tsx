@@ -38,7 +38,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { GripVertical, Phone, Calendar, CalendarDays, Play, Pause, RefreshCw, ChevronDown, ChevronRight, Plus, Search, Edit2, Trash2, X, Check, Cloud, Sun, CloudRain, CloudSnow, Wind, AlertTriangle, BarChart3, ClipboardList, Send } from "lucide-react";
+import { GripVertical, Phone, Calendar, CalendarDays, Play, Pause, RefreshCw, ChevronDown, ChevronRight, Plus, Search, Edit2, Trash2, X, Check, Cloud, Sun, CloudRain, CloudSnow, Wind, AlertTriangle, BarChart3, ClipboardList, Send, MessageSquare } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { CommentComposer } from "@/components/crm/comment-composer";
@@ -403,6 +403,12 @@ function CallLogEntry({ log, isHighlighted, entryRef, onEdit, onDelete }: CallLo
     enabled: isExpanded,
   });
 
+  const { data: comments = [] } = useQuery<{ id: string }[]>({
+    queryKey: ["/api/crm/comments", "call_log", log.id],
+  });
+
+  const commentCount = comments.length;
+
   const createTaskMutation = useMutation({
     mutationFn: async (description: string) => {
       const res = await apiRequest("POST", `/api/call-logs/${log.id}/tasks`, { description });
@@ -505,6 +511,16 @@ function CallLogEntry({ log, isHighlighted, entryRef, onEdit, onDelete }: CallLo
                 Billable
               </Badge>
             )}
+            {commentCount > 0 && (
+              <Badge 
+                variant="outline" 
+                className="text-[10px] h-4 px-1 flex items-center gap-0.5 cursor-pointer hover:bg-muted"
+                onClick={() => setIsExpanded(true)}
+              >
+                <MessageSquare className="h-2.5 w-2.5" />
+                {commentCount}
+              </Badge>
+            )}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{log.description}</p>
           <div className="flex items-center gap-1.5 mt-0.5">
@@ -589,38 +605,58 @@ function CallLogEntry({ log, isHighlighted, entryRef, onEdit, onDelete }: CallLo
           ) : tasks.length === 0 ? (
             <div className="text-xs text-muted-foreground py-1">No tasks yet</div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-2">
               {tasks.map((task) => (
                 <div
                   key={task.id}
-                  className="flex items-center gap-2 group/task"
+                  className="border border-border/30 rounded-md p-2 bg-muted/20"
                   data-testid={`crm-phone-task-${task.id}`}
                 >
-                  <Checkbox
-                    checked={task.isCompleted}
-                    onCheckedChange={(checked) =>
-                      toggleTaskMutation.mutate({ taskId: task.id, isCompleted: !!checked })
-                    }
-                    className="h-3.5 w-3.5"
-                    data-testid={`crm-phone-task-checkbox-${task.id}`}
-                  />
-                  <span
-                    className={cn(
-                      "text-xs flex-1",
-                      task.isCompleted && "line-through text-muted-foreground"
-                    )}
-                  >
-                    {task.description}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5 opacity-0 group-hover/task:opacity-100 transition-opacity"
-                    onClick={() => deleteTaskMutation.mutate(task.id)}
-                    data-testid={`crm-phone-delete-task-${task.id}`}
-                  >
-                    <X className="h-3 w-3 text-destructive" />
-                  </Button>
+                  <div className="flex items-center gap-2 group/task">
+                    <Checkbox
+                      checked={task.isCompleted}
+                      onCheckedChange={(checked) =>
+                        toggleTaskMutation.mutate({ taskId: task.id, isCompleted: !!checked })
+                      }
+                      className="h-3.5 w-3.5"
+                      data-testid={`crm-phone-task-checkbox-${task.id}`}
+                    />
+                    <span
+                      className={cn(
+                        "text-xs flex-1",
+                        task.isCompleted && "line-through text-muted-foreground"
+                      )}
+                    >
+                      {task.description}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 opacity-0 group-hover/task:opacity-100 transition-opacity"
+                      onClick={() => deleteTaskMutation.mutate(task.id)}
+                      data-testid={`crm-phone-delete-task-${task.id}`}
+                    >
+                      <X className="h-3 w-3 text-destructive" />
+                    </Button>
+                  </div>
+                  <Collapsible>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-5 px-1 mt-1 text-muted-foreground hover:text-foreground">
+                        <MessageSquare className="h-3 w-3 mr-1" />
+                        <span className="text-[10px]">Comments</span>
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-2 pl-5 border-l-2 border-border/50">
+                      <CommentThread entityType="call_log_task" entityId={task.id} />
+                      <div className="mt-2">
+                        <CommentComposer 
+                          entityType="call_log_task" 
+                          entityId={task.id}
+                          placeholder="Add comment on this task..."
+                        />
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                 </div>
               ))}
             </div>
