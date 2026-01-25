@@ -3288,7 +3288,21 @@ export const tasks = pgTable("tasks", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, createdAt: true, updatedAt: true, completedAt: true });
+// Helper schema to coerce date strings to Date objects for JSON API compatibility
+const coerceDateOrNull = z.union([
+  z.string().transform((val) => val ? new Date(val) : null),
+  z.date(),
+  z.null(),
+]).nullable().optional();
+
+export const insertTaskSchema = createInsertSchema(tasks)
+  .omit({ id: true, createdAt: true, updatedAt: true, completedAt: true })
+  .extend({
+    dueAt: coerceDateOrNull,
+    startAt: coerceDateOrNull,
+    endAt: coerceDateOrNull,
+    remindAt: coerceDateOrNull,
+  });
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type Task = typeof tasks.$inferSelect;
 
