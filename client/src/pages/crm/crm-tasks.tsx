@@ -27,13 +27,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -860,7 +853,10 @@ export default function CrmTasks() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="space-y-6">
+      <div className="flex h-full">
+        {/* Main content - shrinks when drawer is open */}
+        <div className={`flex-1 min-w-0 transition-all duration-300 ease-in-out ${isDrawerOpen ? 'mr-0' : ''}`}>
+          <div className="space-y-6 p-0">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Company Tasks</h1>
@@ -1182,18 +1178,31 @@ export default function CrmTasks() {
           </CardContent>
         </Card>
         )}
-      </div>
+          </div>
+        </div>
 
-      <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{isCreateMode ? "Create Task" : "Edit Task"}</SheetTitle>
-            <SheetDescription>
-              {isCreateMode ? "Add a new task to your company task list" : "Update task details"}
-            </SheetDescription>
-          </SheetHeader>
+        {/* Side panel - push style drawer */}
+        <div 
+          className={`
+            flex-shrink-0 bg-white border-l border-slate-200 overflow-y-auto
+            transition-all duration-300 ease-in-out
+            ${isDrawerOpen ? 'w-[500px] opacity-100' : 'w-0 opacity-0 overflow-hidden'}
+          `}
+        >
+          <div className="w-[500px] p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">{isCreateMode ? "Create Task" : "Edit Task"}</h2>
+                <p className="text-sm text-slate-500">
+                  {isCreateMode ? "Add a new task to your company task list" : "Update task details"}
+                </p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={handleCloseDrawer}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
 
-          <Form {...form}>
+            <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-6">
               <FormField
                 control={form.control}
@@ -1675,8 +1684,9 @@ export default function CrmTasks() {
               </div>
             </form>
           </Form>
-        </SheetContent>
-      </Sheet>
+          </div>
+        </div>
+      </div>
 
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
