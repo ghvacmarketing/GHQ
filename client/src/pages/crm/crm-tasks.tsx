@@ -70,7 +70,12 @@ import {
   List,
   Calendar as CalendarViewIcon,
   GripVertical,
+  CheckSquare,
+  X,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { CommentComposer } from "@/components/crm/comment-composer";
+import { CommentThread } from "@/components/crm/comment-thread";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { 
   format, 
@@ -166,6 +171,16 @@ type TaskWithRelations = Task & {
   createdByUser?: CrmUser | null;
   type?: TaskType | null;
   customer?: CrmCustomer | null;
+};
+
+type TaskSubtask = {
+  id: string;
+  taskId: string;
+  title: string;
+  isCompleted: boolean;
+  dueAt: string | null;
+  sortOrder: number;
+  createdAt: string;
 };
 
 type TasksResponse = {
@@ -456,6 +471,10 @@ export default function CrmTasks() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   
+  const [isAddingSubtask, setIsAddingSubtask] = useState(false);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [newSubtaskDueAt, setNewSubtaskDueAt] = useState<Date | null>(null);
+  
   const debouncedSearch = useDebounce(searchInput, 300);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
@@ -526,6 +545,57 @@ export default function CrmTasks() {
   const { data: crmUsers = [] } = useQuery<CrmUser[]>({
     queryKey: ["/api/crm/users"],
     enabled: !!currentUser,
+  });
+
+  const { data: subtasks = [], isLoading: subtasksLoading } = useQuery<TaskSubtask[]>({
+    queryKey: ["/api/tasks", selectedTask?.id, "subtasks"],
+    queryFn: async () => {
+      const response = await fetch(`/api/tasks/${selectedTask!.id}/subtasks`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch subtasks");
+      return response.json();
+    },
+    enabled: !!selectedTask?.id && !isCreateMode,
+  });
+
+  const createSubtaskMutation = useMutation({
+    mutationFn: async (data: { title: string; dueAt?: string | null }) => {
+      return apiRequest("POST", `/api/tasks/${selectedTask!.id}/subtasks`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", selectedTask?.id, "subtasks"] });
+      setNewSubtaskTitle("");
+      setNewSubtaskDueAt(null);
+      setIsAddingSubtask(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create subtask", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateSubtaskMutation = useMutation({
+    mutationFn: async ({ subtaskId, data }: { subtaskId: string; data: Partial<TaskSubtask> }) => {
+      return apiRequest("PUT", `/api/tasks/${selectedTask!.id}/subtasks/${subtaskId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", selectedTask?.id, "subtasks"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update subtask", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteSubtaskMutation = useMutation({
+    mutationFn: async (subtaskId: string) => {
+      return apiRequest("DELETE", `/api/tasks/${selectedTask!.id}/subtasks/${subtaskId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", selectedTask?.id, "subtasks"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete subtask", description: error.message, variant: "destructive" });
+    },
   });
 
   const form = useForm<TaskFormData>({
@@ -1299,6 +1369,188 @@ export default function CrmTasks() {
                         Text
                       </Button>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {!isCreateMode && selectedTask && (
+                <div className="space-y-2 mt-4 border-t pt-4">
+                  <h4 className="text-sm font-medium flex items-center gap-2">
+                    <CheckSquare className="h-4 w-4" />
+                    Subtasks
+                    {subtasks.length > 0 && (
+                      <Badge variant="secondary">
+                        {subtasks.filter(s => s.isCompleted).length}/{subtasks.length}
+                      </Badge>
+                    )}
+                  </h4>
+
+                  {subtasksLoading ? (
+                    <div className="flex items-center gap-2 py-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm text-muted-foreground">Loading subtasks...</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {subtasks.map((subtask) => (
+                        <div key={subtask.id} className="flex items-center gap-2 group">
+                          <Checkbox
+                            checked={subtask.isCompleted}
+                            onCheckedChange={(checked) => {
+                              updateSubtaskMutation.mutate({
+                                subtaskId: subtask.id,
+                                data: { isCompleted: !!checked }
+                              });
+                            }}
+                          />
+                          <span className={`flex-1 text-sm ${subtask.isCompleted ? "line-through text-muted-foreground" : ""}`}>
+                            {subtask.title}
+                          </span>
+                          {subtask.dueAt && (
+                            <Badge variant="outline" className="text-xs">
+                              {format(new Date(subtask.dueAt), "MMM d")}
+                            </Badge>
+                          )}
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                              >
+                                <CalendarIcon className="h-3 w-3" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="end">
+                              <Calendar
+                                mode="single"
+                                selected={subtask.dueAt ? new Date(subtask.dueAt) : undefined}
+                                onSelect={(date) => {
+                                  updateSubtaskMutation.mutate({
+                                    subtaskId: subtask.id,
+                                    data: { dueAt: date ? date.toISOString() : null }
+                                  });
+                                }}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
+                            onClick={() => deleteSubtaskMutation.mutate(subtask.id)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+
+                      {isAddingSubtask ? (
+                        <div className="flex items-center gap-2 pt-2">
+                          <Input
+                            value={newSubtaskTitle}
+                            onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                            placeholder="Subtask title..."
+                            className="flex-1 h-8 text-sm"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && newSubtaskTitle.trim()) {
+                                createSubtaskMutation.mutate({
+                                  title: newSubtaskTitle.trim(),
+                                  dueAt: newSubtaskDueAt ? newSubtaskDueAt.toISOString() : null
+                                });
+                              } else if (e.key === "Escape") {
+                                setIsAddingSubtask(false);
+                                setNewSubtaskTitle("");
+                                setNewSubtaskDueAt(null);
+                              }
+                            }}
+                          />
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <CalendarIcon className="h-4 w-4" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="end">
+                              <Calendar
+                                mode="single"
+                                selected={newSubtaskDueAt || undefined}
+                                onSelect={(date) => setNewSubtaskDueAt(date || null)}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-8"
+                            onClick={() => {
+                              if (newSubtaskTitle.trim()) {
+                                createSubtaskMutation.mutate({
+                                  title: newSubtaskTitle.trim(),
+                                  dueAt: newSubtaskDueAt ? newSubtaskDueAt.toISOString() : null
+                                });
+                              }
+                            }}
+                            disabled={!newSubtaskTitle.trim() || createSubtaskMutation.isPending}
+                          >
+                            {createSubtaskMutation.isPending ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              "Add"
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8"
+                            onClick={() => {
+                              setIsAddingSubtask(false);
+                              setNewSubtaskTitle("");
+                              setNewSubtaskDueAt(null);
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-sm"
+                          onClick={() => setIsAddingSubtask(true)}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Subtask
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!isCreateMode && selectedTask && (
+                <div className="space-y-3 mt-4 border-t pt-4">
+                  <h4 className="text-sm font-medium flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Comments
+                  </h4>
+                  <CommentComposer
+                    entityType="task"
+                    entityId={selectedTask.id}
+                    placeholder="Add a comment about this task..."
+                    onCommentPosted={() => {
+                      queryClient.invalidateQueries({ queryKey: ["/api/crm/comments", "task", selectedTask.id] });
+                    }}
+                  />
+                  <div className="mt-4 max-h-[300px] overflow-y-auto">
+                    <CommentThread entityType="task" entityId={selectedTask.id} />
                   </div>
                 </div>
               )}
