@@ -74,6 +74,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { workOrderVisitTypeEnum, type WorkOrderVisitType, type WorkOrderStatus, type WorkSubtype, type ChecklistQuestion, type WorkOrderSubtype } from "@shared/schema";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { CommentComposer } from "@/components/crm/comment-composer";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, isToday, isThisWeek, addDays } from "date-fns";
 import { createLocalDateTime, formatLocalDateTime } from "@/lib/timezone";
@@ -1759,6 +1760,20 @@ export default function CrmWorkOrders() {
                   >
                     Save Notes
                   </Button>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-slate-700">Comments</h4>
+                  <CommentComposer
+                    entityType="work_order"
+                    entityId={selectedWorkOrder.id}
+                    placeholder="Add notes..."
+                    onCommentPosted={() => {
+                      queryClientInstance.invalidateQueries({ queryKey: ["/api/crm/work-orders/list"] });
+                    }}
+                  />
                 </div>
 
                 {editingChecklist && editingChecklist.length > 0 && (

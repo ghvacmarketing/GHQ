@@ -95,6 +95,7 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { CommentComposer } from "@/components/crm/comment-composer";
 import type { CrmUser, CrmWorkOrder, CrmJob, CrmCustomer, CrmProperty, CrmProject, WorkOrderStatus, ChecklistQuestion } from "@shared/schema";
 import { workOrderVisitTypeEnum, type WorkOrderVisitType, type WorkSubtype, dispatchQueueStageEnum, type DispatchQueueStage, type WorkOrderSubtype } from "@shared/schema";
 
@@ -3893,6 +3894,21 @@ export default function CrmDispatch() {
                   >
                     Save Notes
                   </Button>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-slate-900">Comments</h3>
+                  <p className="text-xs text-slate-500">Add comments with @mentions to notify team members.</p>
+                  <CommentComposer
+                    entityType="work_order"
+                    entityId={selectedWorkOrder.id}
+                    placeholder="Add notes..."
+                    onCommentPosted={() => {
+                      queryClient.invalidateQueries({ queryKey: ["/api/crm/comments", "work_order", selectedWorkOrder.id] });
+                    }}
+                  />
                 </div>
 
                 <Separator />
