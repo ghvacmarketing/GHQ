@@ -3321,6 +3321,29 @@ export const insertTaskActivitySchema = createInsertSchema(taskActivity).omit({ 
 export type InsertTaskActivity = z.infer<typeof insertTaskActivitySchema>;
 export type TaskActivity = typeof taskActivity.$inferSelect;
 
+// Task Subtasks - Checklist items within a task
+export const taskSubtasks = pgTable("task_subtasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").references(() => tasks.id, { onDelete: "cascade" }).notNull(),
+  title: text("title").notNull(),
+  isCompleted: boolean("is_completed").default(false).notNull(),
+  dueAt: timestamp("due_at"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+const coerceSubtaskDate = z.union([
+  z.string().transform((val) => val ? new Date(val) : null),
+  z.date(),
+  z.null(),
+]).nullable().optional();
+
+export const insertTaskSubtaskSchema = createInsertSchema(taskSubtasks)
+  .omit({ id: true, createdAt: true })
+  .extend({ dueAt: coerceSubtaskDate });
+export type InsertTaskSubtask = z.infer<typeof insertTaskSubtaskSchema>;
+export type TaskSubtask = typeof taskSubtasks.$inferSelect;
+
 // CRM Comments - Comments on any entity (leads, projects, work orders, tasks, customers)
 export const crmComments = pgTable("crm_comments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
