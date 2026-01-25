@@ -67,9 +67,29 @@ import {
   AlertCircle,
   User,
   Building,
+  List,
+  Calendar as CalendarViewIcon,
+  GripVertical,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import { format, isAfter, isBefore, startOfDay, parseISO } from "date-fns";
+import { 
+  format, 
+  isAfter, 
+  isBefore, 
+  startOfDay, 
+  parseISO, 
+  startOfMonth, 
+  endOfMonth, 
+  startOfWeek, 
+  endOfWeek, 
+  eachDayOfInterval, 
+  addMonths, 
+  subMonths, 
+  isSameMonth, 
+  isToday, 
+  isSameDay 
+} from "date-fns";
+import { DndContext, useDraggable, useDroppable, DragEndEvent, DragOverlay, DragStartEvent } from "@dnd-kit/core";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -139,6 +159,8 @@ const relatedEntityLabels: Record<TaskRelatedEntityType, string> = {
   none: "None",
 };
 
+type ViewMode = "list" | "calendar";
+
 type TaskWithRelations = Task & {
   assignedToUser?: CrmUser | null;
   createdByUser?: CrmUser | null;
@@ -150,6 +172,268 @@ type TasksResponse = {
   tasks: TaskWithRelations[];
   total: number;
 };
+
+function DraggableTask({ 
+  task, 
+  onTaskClick,
+  isOverdue 
+}: { 
+  task: TaskWithRelations; 
+  onTaskClick: (task: TaskWithRelations) => void;
+  isOverdue: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: task.id,
+    data: { task },
+  });
+
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+  } : undefined;
+
+  const priorityIndicatorColors: Record<TaskPriority, string> = {
+    urgent: "bg-red-500",
+    high: "bg-orange-500",
+    normal: "bg-gray-400",
+    low: "bg-blue-500",
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`group flex items-center gap-1 p-1.5 rounded text-xs cursor-pointer hover:bg-slate-100 transition-colors ${
+        isDragging ? "opacity-50 z-50" : ""
+      } ${isOverdue ? "bg-red-50 border border-red-200" : "bg-white border border-slate-200"}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onTaskClick(task);
+      }}
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <GripVertical className="h-3 w-3 text-slate-400" />
+      </div>
+      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${priorityIndicatorColors[task.priority as TaskPriority]}`} />
+      <span className={`truncate flex-1 ${isOverdue ? "text-red-700" : "text-slate-700"}`}>
+        {task.title}
+      </span>
+      {isOverdue && <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />}
+    </div>
+  );
+}
+
+function DroppableDay({ 
+  date, 
+  isCurrentMonth, 
+  tasks, 
+  onTaskClick,
+  checkOverdue 
+}: { 
+  date: Date; 
+  isCurrentMonth: boolean; 
+  tasks: TaskWithRelations[];
+  onTaskClick: (task: TaskWithRelations) => void;
+  checkOverdue: (task: TaskWithRelations) => boolean;
+}) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: format(date, "yyyy-MM-dd"),
+    data: { date },
+  });
+
+  const dayIsToday = isToday(date);
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`min-h-[100px] p-1 border-b border-r border-slate-200 ${
+        !isCurrentMonth ? "bg-slate-50" : "bg-white"
+      } ${isOver ? "bg-blue-50 ring-2 ring-blue-400 ring-inset" : ""} ${
+        dayIsToday ? "bg-amber-50" : ""
+      }`}
+    >
+      <div className={`text-xs font-medium mb-1 ${
+        dayIsToday 
+          ? "text-white bg-[#711419] rounded-full w-6 h-6 flex items-center justify-center" 
+          : !isCurrentMonth 
+            ? "text-slate-400" 
+            : "text-slate-700"
+      }`}>
+        {format(date, "d")}
+      </div>
+      <div className="space-y-1 max-h-[80px] overflow-y-auto">
+        {tasks.map((task) => (
+          <DraggableTask 
+            key={task.id} 
+            task={task} 
+            onTaskClick={onTaskClick}
+            isOverdue={checkOverdue(task)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CalendarView({ 
+  tasks, 
+  onTaskClick, 
+  onTaskDrop,
+  checkOverdue,
+  isUpdating
+}: { 
+  tasks: TaskWithRelations[]; 
+  onTaskClick: (task: TaskWithRelations) => void;
+  onTaskDrop: (taskId: string, newDueDate: Date) => void;
+  checkOverdue: (task: TaskWithRelations) => boolean;
+  isUpdating: boolean;
+}) {
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [activeTask, setActiveTask] = useState<TaskWithRelations | null>(null);
+
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
+  const calendarStart = startOfWeek(monthStart);
+  const calendarEnd = endOfWeek(monthEnd);
+  const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+
+  const tasksByDate = useMemo(() => {
+    const map = new Map<string, TaskWithRelations[]>();
+    tasks.forEach(task => {
+      if (task.dueAt) {
+        const key = format(new Date(task.dueAt), "yyyy-MM-dd");
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(task);
+      }
+    });
+    return map;
+  }, [tasks]);
+
+  const unscheduledTasks = useMemo(() => {
+    return tasks.filter(task => !task.dueAt);
+  }, [tasks]);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const task = event.active.data.current?.task as TaskWithRelations;
+    setActiveTask(task);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveTask(null);
+    const { active, over } = event;
+    if (!over) return;
+    
+    const taskId = active.id as string;
+    const dateString = over.id as string;
+    const newDate = new Date(dateString);
+    
+    if (!isNaN(newDate.getTime())) {
+      onTaskDrop(taskId, newDate);
+    }
+  };
+
+  const priorityIndicatorColors: Record<TaskPriority, string> = {
+    urgent: "bg-red-500",
+    high: "bg-orange-500",
+    normal: "bg-gray-400",
+    low: "bg-blue-500",
+  };
+
+  return (
+    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div className="flex gap-4">
+        <div className="flex-1">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-slate-900">
+              {format(currentMonth, "MMMM yyyy")}
+            </h2>
+            <div className="flex items-center gap-2">
+              {isUpdating && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentMonth(new Date())}
+              >
+                Today
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <div className="grid grid-cols-7 bg-slate-100 border-b border-slate-200">
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                <div key={day} className="p-2 text-center text-xs font-medium text-slate-600">
+                  {day}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7">
+              {days.map((day) => (
+                <DroppableDay
+                  key={day.toISOString()}
+                  date={day}
+                  isCurrentMonth={isSameMonth(day, currentMonth)}
+                  tasks={tasksByDate.get(format(day, "yyyy-MM-dd")) || []}
+                  onTaskClick={onTaskClick}
+                  checkOverdue={checkOverdue}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {unscheduledTasks.length > 0 && (
+          <div className="w-64 flex-shrink-0">
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+              <h3 className="text-sm font-medium text-slate-700 mb-3">
+                Unscheduled ({unscheduledTasks.length})
+              </h3>
+              <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                {unscheduledTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className="flex items-center gap-2 p-2 bg-white border border-slate-200 rounded text-xs cursor-pointer hover:bg-slate-50 transition-colors"
+                    onClick={() => onTaskClick(task)}
+                  >
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${priorityIndicatorColors[task.priority as TaskPriority]}`} />
+                    <span className="truncate flex-1 text-slate-700">{task.title}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <DragOverlay>
+        {activeTask && (
+          <div className="flex items-center gap-2 p-2 bg-white border-2 border-blue-400 rounded shadow-lg text-xs">
+            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${priorityIndicatorColors[activeTask.priority as TaskPriority]}`} />
+            <span className="text-slate-700">{activeTask.title}</span>
+          </div>
+        )}
+      </DragOverlay>
+    </DndContext>
+  );
+}
 
 export default function CrmTasks() {
   usePageTitle("Company Tasks");
@@ -170,6 +454,7 @@ export default function CrmTasks() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isCreateMode, setIsCreateMode] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   
   const debouncedSearch = useDebounce(searchInput, 300);
 
@@ -212,7 +497,25 @@ export default function CrmTasks() {
       if (!response.ok) throw new Error("Failed to fetch tasks");
       return response.json();
     },
-    enabled: !!currentUser,
+    enabled: !!currentUser && viewMode === "list",
+  });
+
+  const { data: calendarTasksData, isLoading: calendarTasksLoading } = useQuery<TasksResponse>({
+    queryKey: ["/api/tasks", "calendar", statusFilter, priorityFilter, typeFilter, assignedToFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("limit", "1000");
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (priorityFilter !== "all") params.set("priority", priorityFilter);
+      if (typeFilter !== "all") params.set("typeId", typeFilter);
+      if (assignedToFilter !== "all") params.set("assignedToUserId", assignedToFilter);
+      const response = await fetch(`/api/tasks?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch tasks");
+      return response.json();
+    },
+    enabled: !!currentUser && viewMode === "calendar",
   });
 
   const { data: taskTypes = [] } = useQuery<TaskType[]>({
@@ -305,6 +608,23 @@ export default function CrmTasks() {
     },
   });
 
+  const rescheduleMutation = useMutation({
+    mutationFn: async ({ taskId, newDueAt }: { taskId: string; newDueAt: Date }) => {
+      return apiRequest("PUT", `/api/tasks/${taskId}`, { dueAt: newDueAt.toISOString() });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      toast({ title: "Task rescheduled successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to reschedule task", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleTaskDrop = (taskId: string, newDueDate: Date) => {
+    rescheduleMutation.mutate({ taskId, newDueAt: newDueDate });
+  };
+
   const handleOpenCreate = () => {
     setIsCreateMode(true);
     setSelectedTask(null);
@@ -362,6 +682,7 @@ export default function CrmTasks() {
   };
 
   const tasks = tasksData?.tasks || [];
+  const calendarTasks = calendarTasksData?.tasks || [];
   const totalTasks = tasksData?.total || 0;
   const totalPages = Math.ceil(totalTasks / ITEMS_PER_PAGE);
 
@@ -390,10 +711,32 @@ export default function CrmTasks() {
               Manage and track all company tasks
             </p>
           </div>
-          <Button onClick={handleOpenCreate} className="bg-[#711419] hover:bg-[#5a1014]">
-            <Plus className="h-4 w-4 mr-2" />
-            Create Task
-          </Button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center border border-slate-200 rounded-lg p-1 bg-slate-50">
+              <Button
+                variant={viewMode === "list" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("list")}
+                className="gap-2"
+              >
+                <List className="h-4 w-4" />
+                List
+              </Button>
+              <Button
+                variant={viewMode === "calendar" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("calendar")}
+                className="gap-2"
+              >
+                <CalendarViewIcon className="h-4 w-4" />
+                Calendar
+              </Button>
+            </div>
+            <Button onClick={handleOpenCreate} className="bg-[#711419] hover:bg-[#5a1014]">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Task
+            </Button>
+          </div>
         </div>
 
         <Card className="bg-white border shadow-sm">
@@ -513,32 +856,52 @@ export default function CrmTasks() {
           </CardContent>
         </Card>
 
-        <Card className="bg-white border shadow-sm">
-          <CardContent className="p-0">
-            {tasksLoading ? (
-              <div className="p-8 space-y-4">
-                {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
-              </div>
-            ) : tasks.length === 0 ? (
-              <div className="p-12 text-center">
-                <CheckCircle2 className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-900 mb-2">No tasks found</h3>
-                <p className="text-slate-500 mb-4">
-                  {debouncedSearch || statusFilter !== "all" || priorityFilter !== "all"
-                    ? "Try adjusting your filters"
-                    : "Create your first task to get started"}
-                </p>
-                <Button onClick={handleOpenCreate} variant="outline">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Task
-                </Button>
-              </div>
-            ) : (
-              <>
-                <div className="overflow-x-auto">
-                  <Table>
+        {viewMode === "calendar" ? (
+          <Card className="bg-white border shadow-sm">
+            <CardContent className="p-4">
+              {calendarTasksLoading ? (
+                <div className="p-8 space-y-4">
+                  <Skeleton className="h-8 w-64 mb-4" />
+                  <Skeleton className="h-[400px] w-full" />
+                </div>
+              ) : (
+                <CalendarView
+                  tasks={calendarTasks}
+                  onTaskClick={handleOpenEdit}
+                  onTaskDrop={handleTaskDrop}
+                  checkOverdue={isOverdue}
+                  isUpdating={rescheduleMutation.isPending}
+                />
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="bg-white border shadow-sm">
+            <CardContent className="p-0">
+              {tasksLoading ? (
+                <div className="p-8 space-y-4">
+                  {[...Array(5)].map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : tasks.length === 0 ? (
+                <div className="p-12 text-center">
+                  <CheckCircle2 className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-slate-900 mb-2">No tasks found</h3>
+                  <p className="text-slate-500 mb-4">
+                    {debouncedSearch || statusFilter !== "all" || priorityFilter !== "all"
+                      ? "Try adjusting your filters"
+                      : "Create your first task to get started"}
+                  </p>
+                  <Button onClick={handleOpenCreate} variant="outline">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Task
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto">
+                    <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[300px]">Title</TableHead>
@@ -659,6 +1022,7 @@ export default function CrmTasks() {
             )}
           </CardContent>
         </Card>
+        )}
       </div>
 
       <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
