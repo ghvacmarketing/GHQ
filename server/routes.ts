@@ -991,6 +991,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/call-logs/:id - Get a single call log by ID
+  app.get("/api/call-logs/:id", async (req, res) => {
+    try {
+      const log = await storage.getCallLogById(req.params.id);
+      if (!log) {
+        return res.status(404).json({ message: "Call log not found" });
+      }
+      res.json(log);
+    } catch (error) {
+      console.error("Error fetching call log:", error);
+      res.status(500).json({ message: "Error fetching call log" });
+    }
+  });
+
+  // GET /api/call-log-tasks/:id - Get a single call log task by ID
+  app.get("/api/call-log-tasks/:id", async (req, res) => {
+    try {
+      const task = await storage.getCallLogTaskById(req.params.id);
+      if (!task) {
+        return res.status(404).json({ message: "Call log task not found" });
+      }
+      res.json(task);
+    } catch (error) {
+      console.error("Error fetching call log task:", error);
+      res.status(500).json({ message: "Error fetching call log task" });
+    }
+  });
+
   // GET /api/call-logs/:callLogId/tasks - Get tasks for a call log
   app.get("/api/call-logs/:callLogId/tasks", async (req, res) => {
     try {

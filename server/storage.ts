@@ -157,6 +157,7 @@ export interface IStorage {
   updateCallLog(id: string, data: Partial<InsertCallLog>): Promise<CallLog | undefined>;
   deleteCallLog(id: string): Promise<boolean>;
   searchCallLogs(query: string): Promise<(CallLog & { date: string })[]>;
+  getCallLogById(id: string): Promise<CallLog | null>;
 
   // Call Log Task operations
   getTasksByCallLog(callLogId: string): Promise<CallLogTask[]>;
@@ -164,6 +165,7 @@ export interface IStorage {
   updateCallLogTask(id: string, data: Partial<InsertCallLogTask>): Promise<CallLogTask | undefined>;
   deleteCallLogTask(id: string): Promise<boolean>;
   getTasksByDay(date: string): Promise<(CallLogTask & { callLogId: string })[]>;
+  getCallLogTaskById(id: string): Promise<CallLogTask | null>;
 
   // Portal Users operations
   getPortalUser(id: string): Promise<PortalUser | undefined>;
@@ -1330,6 +1332,11 @@ export class DatabaseStorage implements IStorage {
     return logs;
   }
 
+  async getCallLogById(id: string): Promise<CallLog | null> {
+    const [log] = await db.select().from(callLogs).where(eq(callLogs.id, id)).limit(1);
+    return log || null;
+  }
+
   // Call Log Task operations
   async getTasksByCallLog(callLogId: string): Promise<CallLogTask[]> {
     return await db
@@ -1376,6 +1383,11 @@ export class DatabaseStorage implements IStorage {
       .where(sql`${callLogTasks.callLogId} = ANY(${logIds})`)
       .orderBy(asc(callLogTasks.createdAt));
     return tasks;
+  }
+
+  async getCallLogTaskById(id: string): Promise<CallLogTask | null> {
+    const [task] = await db.select().from(callLogTasks).where(eq(callLogTasks.id, id)).limit(1);
+    return task || null;
   }
 
   // Portal Users operations

@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect, type ReactNode } from "react";
+import { useSearch, useLocation } from "wouter";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -1196,6 +1197,9 @@ function DailyCallLog() {
   const entryRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchString = useSearch();
+  const [, setLocation] = useLocation();
+  const [urlParamsProcessed, setUrlParamsProcessed] = useState(false);
   
   const todayDate = useMemo(() => formatLocal(new Date(), "yyyy-MM-dd"), []);
 
@@ -1213,6 +1217,65 @@ function DailyCallLog() {
     },
     enabled: searchQuery.length >= 2,
   });
+
+  // Handle URL params for notification click-through (log= or task=)
+  useEffect(() => {
+    if (urlParamsProcessed || isDaysLoading || days.length === 0) return;
+    
+    const params = new URLSearchParams(searchString);
+    const logId = params.get("log");
+    const taskId = params.get("task");
+    
+    if (!logId && !taskId) {
+      setUrlParamsProcessed(true);
+      return;
+    }
+    
+    const navigateToLog = async (targetLogId: string) => {
+      try {
+        // Fetch the call log to get its date
+        const res = await fetch(`/api/call-logs/${targetLogId}`);
+        if (!res.ok) {
+          console.error("Failed to fetch call log");
+          return;
+        }
+        const log = await res.json();
+        if (log && log.date) {
+          setHighlightedLogId(targetLogId);
+          setPendingScrollTarget({ date: log.date, logId: targetLogId });
+        }
+      } catch (error) {
+        console.error("Error navigating to call log:", error);
+      }
+      // Clear URL params
+      setLocation("/crm/phone", { replace: true });
+    };
+    
+    const navigateToTask = async (targetTaskId: string) => {
+      try {
+        // Fetch the task to get its parent callLogId
+        const res = await fetch(`/api/call-log-tasks/${targetTaskId}`);
+        if (!res.ok) {
+          console.error("Failed to fetch call log task");
+          return;
+        }
+        const task = await res.json();
+        if (task && task.callLogId) {
+          navigateToLog(task.callLogId);
+        }
+      } catch (error) {
+        console.error("Error navigating to call log task:", error);
+      }
+    };
+    
+    setUrlParamsProcessed(true);
+    
+    if (logId) {
+      navigateToLog(logId);
+    } else if (taskId) {
+      navigateToTask(taskId);
+    }
+  }, [searchString, days, isDaysLoading, urlParamsProcessed, setLocation]);
 
   useEffect(() => {
     if (!pendingScrollTarget) return;

@@ -54,6 +54,10 @@ function getEntityUrl(entityType: string | null, entityId: string | null): strin
       return `/crm/projects/${entityId}`;
     case "work_order":
       return `/crm/work-orders/${entityId}`;
+    case "call_log":
+      return `/crm/phone?log=${entityId}`;
+    case "call_log_task":
+      return `/crm/phone?task=${entityId}`;
     default:
       return null;
   }
