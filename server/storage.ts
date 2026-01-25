@@ -2417,10 +2417,20 @@ export class DatabaseStorage implements IStorage {
   }): Promise<Task[]> {
     const conditions: SQL[] = [];
 
-    if (filters?.assignedToUserId) {
+    // Handle user ownership filtering: if BOTH assignedToUserId and createdByUserId are provided,
+    // use OR logic (show tasks assigned to user OR created by user).
+    // If only one is provided, use AND logic (exact filter).
+    if (filters?.assignedToUserId && filters?.createdByUserId) {
+      const userOwnershipCondition = or(
+        eq(tasks.assignedToUserId, filters.assignedToUserId),
+        eq(tasks.createdByUserId, filters.createdByUserId)
+      );
+      if (userOwnershipCondition) {
+        conditions.push(userOwnershipCondition);
+      }
+    } else if (filters?.assignedToUserId) {
       conditions.push(eq(tasks.assignedToUserId, filters.assignedToUserId));
-    }
-    if (filters?.createdByUserId) {
+    } else if (filters?.createdByUserId) {
       conditions.push(eq(tasks.createdByUserId, filters.createdByUserId));
     }
     if (filters?.status) {
