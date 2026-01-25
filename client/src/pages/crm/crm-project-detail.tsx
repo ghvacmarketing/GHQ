@@ -2265,10 +2265,16 @@ export default function CrmProjectDetail() {
                     entityId={projectId || ""}
                     placeholder="Add a comment about this project..."
                     onCommentPosted={() => {
+                      queryClient.invalidateQueries({ queryKey: ["/api/crm/comments", "project", projectId] });
                       queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "activities"] });
                       refetchOverviewActivities();
                     }}
                   />
+
+                  {/* Comments section */}
+                  <div className="mt-4">
+                    <CommentThread entityType="project" entityId={projectId || ""} />
+                  </div>
 
                   {/* Recent activity entries */}
                   {overviewActivitiesLoading ? (

@@ -79,6 +79,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { CommentComposer } from "@/components/crm/comment-composer";
+import { CommentThread } from "@/components/crm/comment-thread";
 import type { CrmUser, CrmCustomer, CrmJob, CrmCustomerNote, CrmProject, CrmWorkOrder, CrmProperty, CrmQuote, ChecklistQuestion } from "@shared/schema";
 import { workOrderVisitTypeEnum, type WorkOrderVisitType, projectTypeEnum, type ProjectType, projectStatusEnum, type ProjectStatus, workOrderStatusEnum, type WorkOrderStatus, type WorkSubtype, type WorkOrderSubtype } from "@shared/schema";
 import { createLocalDateTime } from "@/lib/timezone";
@@ -1795,6 +1796,11 @@ function CustomerTabbedView({
                 entityId={customer.id}
                 onCommentPosted={onCommentPosted}
                 placeholder="Add a comment about this customer..."
+              />
+
+              <CommentThread
+                entityType="customer"
+                entityId={customer.id}
               />
 
               {timelineLoading || notesLoading ? (
