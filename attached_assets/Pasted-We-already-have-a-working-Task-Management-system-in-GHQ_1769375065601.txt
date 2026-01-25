@@ -1,0 +1,57 @@
+We already have a working Task Management system in GHQ (DB + API). DO NOT rebuild the task system. Build ONLY the dashboard UI/UX described below using existing endpoints/models.
+
+GOAL
+Create a Google-Tasks-inspired dashboard:
+1) Master Inbox Kanban board for the entire company (single master view).
+2) Simple “My Tasks” list view for individual users.
+3) Rule: Any task created from the user-level “My Tasks” view is automatically assigned to that user AND appears in the Master Inbox.
+
+ASSUMPTIONS
+- Use existing GHQ tasks table/model and task endpoints.
+- If the existing schema already has list_id or inbox flag, reuse it. If it does not, add the MINIMAL field required to support “Master Inbox membership” (prefer list_id = INBOX if lists exist; otherwise add boolean is_in_master_inbox default true for user-created tasks).
+- Keep styling consistent with GHQ design system.
+
+VIEW 1: MASTER INBOX (COMPANY)
+- Route: /tasks/inbox (or similar)
+- Layout:
+  - Left sidebar nav: Master Inbox (default), My Tasks.
+  - Main: Kanban board with columns by Assigned User (recommended default).
+    - Columns: Unassigned + one column per active user.
+- Cards:
+  - Checkbox to complete
+  - Title
+  - Due date chip (Overdue/Today/Tomorrow/Date)
+  - Type icon
+  - Related record chip (Customer/Lead/Job) clickable
+- Actions:
+  - Drag & drop task card between user columns:
+    - Dropping into a user column assigns task.assigned_to_user_id = that user
+    - Dropping into Unassigned clears assigned_to_user_id
+  - Click card opens a right-side Task Drawer.
+- Filters/search at top:
+  - Search text
+  - Overdue/Today/Next 7 days/No due date
+  - Type filter
+  - Show Completed toggle (default off)
+- Master board query:
+  - Only tasks in Master Inbox (by existing list/flag) and status not completed (unless show completed is on)
+
+VIEW 2: MY TASKS (USER)
+- Route: /tasks/mine
+- Simple list grouped: Overdue, Today, Upcoming, No due date
+- Each item has checkbox and opens same Task Drawer.
+- Create task inline:
+  - When a user creates a task here:
+    - Automatically set assigned_to_user_id = current user
+    - Automatically add it to Master Inbox (set inbox list/flag)
+- “My Tasks” list shows tasks assigned_to_user_id = current user (optionally plus tasks created by user).
+
+TASK DRAWER (BOTH VIEWS)
+- Right-side drawer: title, notes, status, due date/time, type, assigned user (editable in master), related record chip.
+- If linked to a customer and type is actionable, show buttons:
+  - Call (tel:)
+  - Email (mailto:)
+  - Text (open existing GHQ texting module with customer preselected)
+
+DELIVERABLE
+Implement these two views, drag/drop assignment behavior, and the automatic assignment + master inbox placement when creating tasks from My Tasks. Use existing GHQ code patterns and components.
