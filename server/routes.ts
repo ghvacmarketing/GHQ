@@ -7779,7 +7779,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const commentsWithMentions = comments.map(comment => ({
-        ...comment,
+        id: comment.id,
+        entityType: comment.entityType,
+        entityId: comment.entityId,
+        authorId: comment.authorId,
+        body: comment.body,
+        editedAt: comment.editedAt,
+        createdAt: comment.createdAt,
+        author: {
+          id: comment.authorId,
+          name: comment.authorName || "Unknown User",
+          role: comment.authorRole || "user",
+        },
         mentions: mentionsMap[comment.id] || [],
       }));
 
@@ -7862,7 +7873,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .leftJoin(crmUsers, eq(crmComments.authorId, crmUsers.id))
       .where(eq(crmComments.id, comment.id));
 
-      return res.status(201).json(commentWithAuthor);
+      // Get mentions for the newly created comment
+      const mentions = await db.select({
+        userId: crmCommentMentions.mentionedUserId,
+        userName: crmUsers.name,
+      })
+      .from(crmCommentMentions)
+      .leftJoin(crmUsers, eq(crmCommentMentions.mentionedUserId, crmUsers.id))
+      .where(eq(crmCommentMentions.commentId, comment.id));
+
+      return res.status(201).json({
+        id: commentWithAuthor.id,
+        entityType: commentWithAuthor.entityType,
+        entityId: commentWithAuthor.entityId,
+        authorId: commentWithAuthor.authorId,
+        body: commentWithAuthor.body,
+        editedAt: commentWithAuthor.editedAt,
+        createdAt: commentWithAuthor.createdAt,
+        author: {
+          id: commentWithAuthor.authorId,
+          name: commentWithAuthor.authorName || "Unknown User",
+          role: commentWithAuthor.authorRole || "user",
+        },
+        mentions: mentions.map(m => ({ userId: m.userId, userName: m.userName })),
+      });
     } catch (error) {
       console.error("Error creating comment:", error);
       return res.status(500).json({ message: "Failed to create comment" });
@@ -7940,7 +7974,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .leftJoin(crmUsers, eq(crmComments.authorId, crmUsers.id))
       .where(eq(crmComments.id, commentId));
 
-      return res.json(commentWithAuthor);
+      // Get updated mentions for the comment
+      const updatedMentions = await db.select({
+        userId: crmCommentMentions.mentionedUserId,
+        userName: crmUsers.name,
+      })
+      .from(crmCommentMentions)
+      .leftJoin(crmUsers, eq(crmCommentMentions.mentionedUserId, crmUsers.id))
+      .where(eq(crmCommentMentions.commentId, commentId));
+
+      return res.json({
+        id: commentWithAuthor.id,
+        entityType: commentWithAuthor.entityType,
+        entityId: commentWithAuthor.entityId,
+        authorId: commentWithAuthor.authorId,
+        body: commentWithAuthor.body,
+        editedAt: commentWithAuthor.editedAt,
+        createdAt: commentWithAuthor.createdAt,
+        author: {
+          id: commentWithAuthor.authorId,
+          name: commentWithAuthor.authorName || "Unknown User",
+          role: commentWithAuthor.authorRole || "user",
+        },
+        mentions: updatedMentions.map(m => ({ userId: m.userId, userName: m.userName })),
+      });
     } catch (error) {
       console.error("Error updating comment:", error);
       return res.status(500).json({ message: "Failed to update comment" });
