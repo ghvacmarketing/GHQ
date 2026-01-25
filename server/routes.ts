@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry, crmLeads, crmLeadTypes, insertCrmLeadSchema, insertCrmLeadTypeSchema, type CrmLead, type CrmLeadType, type InsertCrmLead, type InsertCrmLeadType, crmLeadTempOptions, crmLeadDriverOptions, insertCrmLeadTempOptionSchema, insertCrmLeadDriverOptionSchema, type CrmLeadTempOption, type CrmLeadDriverOption, type InsertCrmLeadTempOption, type InsertCrmLeadDriverOption } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, crmNotifications, crmComments, crmCommentMentions, insertCrmNotificationSchema, insertCrmCommentSchema, insertCrmCommentMentionSchema, type CrmNotification, type InsertCrmNotification, type CrmComment, type InsertCrmComment, type CrmCommentMention, type InsertCrmCommentMention, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry, crmLeads, crmLeadTypes, insertCrmLeadSchema, insertCrmLeadTypeSchema, type CrmLead, type CrmLeadType, type InsertCrmLead, type InsertCrmLeadType, crmLeadTempOptions, crmLeadDriverOptions, insertCrmLeadTempOptionSchema, insertCrmLeadDriverOptionSchema, type CrmLeadTempOption, type CrmLeadDriverOption, type InsertCrmLeadTempOption, type InsertCrmLeadDriverOption } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
@@ -7531,6 +7531,455 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error permanently deleting CRM user:", error);
       return res.status(500).json({ message: "Failed to permanently delete user" });
+    }
+  });
+
+  // ============================================
+  // USER SEARCH FOR MENTIONS
+  // ============================================
+
+  // GET /api/crm/users/search - Search users for @mention picker
+  app.get("/api/crm/users/search", requireCrmAuth, async (req, res) => {
+    try {
+      const { q } = req.query as { q?: string };
+      
+      if (!q || q.trim().length === 0) {
+        return res.json([]);
+      }
+
+      const searchTerm = `%${q.trim()}%`;
+      const users = await db.select({
+        id: crmUsers.id,
+        name: crmUsers.name,
+        role: crmUsers.role,
+        email: crmUsers.email,
+      })
+      .from(crmUsers)
+      .where(
+        and(
+          eq(crmUsers.isActive, true),
+          ilike(crmUsers.name, searchTerm)
+        )
+      )
+      .orderBy(crmUsers.name)
+      .limit(10);
+
+      return res.json(users);
+    } catch (error) {
+      console.error("Error searching CRM users:", error);
+      return res.status(500).json({ message: "Failed to search users" });
+    }
+  });
+
+  // ============================================
+  // NOTIFICATIONS ENDPOINTS
+  // ============================================
+
+  // GET /api/crm/notifications - List notifications for current user
+  app.get("/api/crm/notifications", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { unreadOnly, type, limit: limitParam } = req.query as { 
+        unreadOnly?: string; 
+        type?: string; 
+        limit?: string;
+      };
+
+      const queryLimit = Math.min(parseInt(limitParam || "50", 10), 100);
+      
+      const conditions = [eq(crmNotifications.userId, currentUser.id)];
+      
+      if (unreadOnly === "true") {
+        conditions.push(eq(crmNotifications.isRead, false));
+      }
+      
+      if (type) {
+        conditions.push(eq(crmNotifications.type, type as any));
+      }
+
+      const notifications = await db.select({
+        id: crmNotifications.id,
+        userId: crmNotifications.userId,
+        type: crmNotifications.type,
+        title: crmNotifications.title,
+        preview: crmNotifications.preview,
+        entityType: crmNotifications.entityType,
+        entityId: crmNotifications.entityId,
+        actorId: crmNotifications.actorId,
+        isRead: crmNotifications.isRead,
+        readAt: crmNotifications.readAt,
+        createdAt: crmNotifications.createdAt,
+        actorName: crmUsers.name,
+        actorEmail: crmUsers.email,
+      })
+      .from(crmNotifications)
+      .leftJoin(crmUsers, eq(crmNotifications.actorId, crmUsers.id))
+      .where(and(...conditions))
+      .orderBy(desc(crmNotifications.createdAt))
+      .limit(queryLimit);
+
+      return res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      return res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  // GET /api/crm/notifications/unread-count - Get unread notification count
+  app.get("/api/crm/notifications/unread-count", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const result = await db.select({ count: count() })
+        .from(crmNotifications)
+        .where(
+          and(
+            eq(crmNotifications.userId, currentUser.id),
+            eq(crmNotifications.isRead, false)
+          )
+        );
+
+      return res.json({ count: result[0]?.count || 0 });
+    } catch (error) {
+      console.error("Error fetching unread count:", error);
+      return res.status(500).json({ message: "Failed to fetch unread count" });
+    }
+  });
+
+  // PATCH /api/crm/notifications/:id/read - Mark single notification as read
+  app.patch("/api/crm/notifications/:id/read", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const notificationId = req.params.id;
+
+      const [notification] = await db.select()
+        .from(crmNotifications)
+        .where(eq(crmNotifications.id, notificationId));
+
+      if (!notification) {
+        return res.status(404).json({ message: "Notification not found" });
+      }
+
+      if (notification.userId !== currentUser.id) {
+        return res.status(403).json({ message: "Cannot mark another user's notification as read" });
+      }
+
+      const [updated] = await db.update(crmNotifications)
+        .set({ isRead: true, readAt: new Date() })
+        .where(eq(crmNotifications.id, notificationId))
+        .returning();
+
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      return res.status(500).json({ message: "Failed to mark notification as read" });
+    }
+  });
+
+  // POST /api/crm/notifications/mark-all-read - Mark all unread notifications as read
+  app.post("/api/crm/notifications/mark-all-read", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const result = await db.update(crmNotifications)
+        .set({ isRead: true, readAt: new Date() })
+        .where(
+          and(
+            eq(crmNotifications.userId, currentUser.id),
+            eq(crmNotifications.isRead, false)
+          )
+        );
+
+      return res.json({ updated: result.rowCount || 0 });
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+      return res.status(500).json({ message: "Failed to mark all notifications as read" });
+    }
+  });
+
+  // ============================================
+  // COMMENTS ENDPOINTS
+  // ============================================
+
+  // Helper function to parse @mentions from comment body
+  // Format: @[userId]
+  function parseMentions(body: string): string[] {
+    const mentionRegex = /@\[([a-zA-Z0-9-]+)\]/g;
+    const matches = body.matchAll(mentionRegex);
+    const userIds: string[] = [];
+    for (const match of matches) {
+      if (match[1] && !userIds.includes(match[1])) {
+        userIds.push(match[1]);
+      }
+    }
+    return userIds;
+  }
+
+  // GET /api/crm/comments/:entityType/:entityId - Get comments for an entity
+  app.get("/api/crm/comments/:entityType/:entityId", requireCrmAuth, async (req, res) => {
+    try {
+      const { entityType, entityId } = req.params;
+
+      const comments = await db.select({
+        id: crmComments.id,
+        entityType: crmComments.entityType,
+        entityId: crmComments.entityId,
+        authorId: crmComments.authorId,
+        body: crmComments.body,
+        editedAt: crmComments.editedAt,
+        createdAt: crmComments.createdAt,
+        authorName: crmUsers.name,
+        authorEmail: crmUsers.email,
+        authorRole: crmUsers.role,
+      })
+      .from(crmComments)
+      .leftJoin(crmUsers, eq(crmComments.authorId, crmUsers.id))
+      .where(
+        and(
+          eq(crmComments.entityType, entityType),
+          eq(crmComments.entityId, entityId)
+        )
+      )
+      .orderBy(asc(crmComments.createdAt));
+
+      // Get mentions for each comment
+      const commentIds = comments.map(c => c.id);
+      let mentionsMap: Record<string, Array<{ userId: string; userName: string | null }>> = {};
+      
+      if (commentIds.length > 0) {
+        const mentions = await db.select({
+          commentId: crmCommentMentions.commentId,
+          userId: crmCommentMentions.mentionedUserId,
+          userName: crmUsers.name,
+        })
+        .from(crmCommentMentions)
+        .leftJoin(crmUsers, eq(crmCommentMentions.mentionedUserId, crmUsers.id))
+        .where(inArray(crmCommentMentions.commentId, commentIds));
+
+        for (const mention of mentions) {
+          if (!mentionsMap[mention.commentId]) {
+            mentionsMap[mention.commentId] = [];
+          }
+          mentionsMap[mention.commentId].push({ userId: mention.userId, userName: mention.userName });
+        }
+      }
+
+      const commentsWithMentions = comments.map(comment => ({
+        ...comment,
+        mentions: mentionsMap[comment.id] || [],
+      }));
+
+      return res.json(commentsWithMentions);
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+      return res.status(500).json({ message: "Failed to fetch comments" });
+    }
+  });
+
+  // POST /api/crm/comments - Create a comment
+  app.post("/api/crm/comments", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { entityType, entityId, body } = req.body;
+
+      if (!entityType || !entityId || !body) {
+        return res.status(400).json({ message: "entityType, entityId, and body are required" });
+      }
+
+      // Create the comment
+      const [comment] = await db.insert(crmComments).values({
+        entityType,
+        entityId,
+        authorId: currentUser.id,
+        body,
+      }).returning();
+
+      // Parse mentions and create mention entries + notifications
+      const mentionedUserIds = parseMentions(body);
+      
+      for (const userId of mentionedUserIds) {
+        // Skip if user mentions themselves
+        if (userId === currentUser.id) continue;
+
+        // Verify user exists
+        const [mentionedUser] = await db.select({ id: crmUsers.id })
+          .from(crmUsers)
+          .where(eq(crmUsers.id, userId));
+
+        if (mentionedUser) {
+          // Create mention record
+          await db.insert(crmCommentMentions).values({
+            commentId: comment.id,
+            mentionedUserId: userId,
+          });
+
+          // Create notification for mentioned user
+          await db.insert(crmNotifications).values({
+            userId,
+            type: "mention",
+            title: `${currentUser.name} mentioned you in a comment`,
+            preview: body.substring(0, 100),
+            entityType,
+            entityId,
+            actorId: currentUser.id,
+            isRead: false,
+          });
+        }
+      }
+
+      // Return comment with author info
+      const [commentWithAuthor] = await db.select({
+        id: crmComments.id,
+        entityType: crmComments.entityType,
+        entityId: crmComments.entityId,
+        authorId: crmComments.authorId,
+        body: crmComments.body,
+        editedAt: crmComments.editedAt,
+        createdAt: crmComments.createdAt,
+        authorName: crmUsers.name,
+        authorEmail: crmUsers.email,
+        authorRole: crmUsers.role,
+      })
+      .from(crmComments)
+      .leftJoin(crmUsers, eq(crmComments.authorId, crmUsers.id))
+      .where(eq(crmComments.id, comment.id));
+
+      return res.status(201).json(commentWithAuthor);
+    } catch (error) {
+      console.error("Error creating comment:", error);
+      return res.status(500).json({ message: "Failed to create comment" });
+    }
+  });
+
+  // PATCH /api/crm/comments/:id - Update a comment (only if author)
+  app.patch("/api/crm/comments/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const commentId = req.params.id;
+      const { body } = req.body;
+
+      if (!body) {
+        return res.status(400).json({ message: "body is required" });
+      }
+
+      const [existingComment] = await db.select()
+        .from(crmComments)
+        .where(eq(crmComments.id, commentId));
+
+      if (!existingComment) {
+        return res.status(404).json({ message: "Comment not found" });
+      }
+
+      if (existingComment.authorId !== currentUser.id) {
+        return res.status(403).json({ message: "Only the author can edit this comment" });
+      }
+
+      // Update the comment
+      const [updated] = await db.update(crmComments)
+        .set({ body, editedAt: new Date() })
+        .where(eq(crmComments.id, commentId))
+        .returning();
+
+      // Update mentions: delete old, create new
+      await db.delete(crmCommentMentions)
+        .where(eq(crmCommentMentions.commentId, commentId));
+
+      const mentionedUserIds = parseMentions(body);
+      
+      for (const userId of mentionedUserIds) {
+        if (userId === currentUser.id) continue;
+
+        const [mentionedUser] = await db.select({ id: crmUsers.id })
+          .from(crmUsers)
+          .where(eq(crmUsers.id, userId));
+
+        if (mentionedUser) {
+          await db.insert(crmCommentMentions).values({
+            commentId,
+            mentionedUserId: userId,
+          });
+        }
+      }
+
+      // Return updated comment with author info
+      const [commentWithAuthor] = await db.select({
+        id: crmComments.id,
+        entityType: crmComments.entityType,
+        entityId: crmComments.entityId,
+        authorId: crmComments.authorId,
+        body: crmComments.body,
+        editedAt: crmComments.editedAt,
+        createdAt: crmComments.createdAt,
+        authorName: crmUsers.name,
+        authorEmail: crmUsers.email,
+        authorRole: crmUsers.role,
+      })
+      .from(crmComments)
+      .leftJoin(crmUsers, eq(crmComments.authorId, crmUsers.id))
+      .where(eq(crmComments.id, commentId));
+
+      return res.json(commentWithAuthor);
+    } catch (error) {
+      console.error("Error updating comment:", error);
+      return res.status(500).json({ message: "Failed to update comment" });
+    }
+  });
+
+  // DELETE /api/crm/comments/:id - Delete a comment (only if author or admin)
+  app.delete("/api/crm/comments/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const commentId = req.params.id;
+
+      const [existingComment] = await db.select()
+        .from(crmComments)
+        .where(eq(crmComments.id, commentId));
+
+      if (!existingComment) {
+        return res.status(404).json({ message: "Comment not found" });
+      }
+
+      const isAuthor = existingComment.authorId === currentUser.id;
+      const isAdmin = currentUser.role === "admin" || currentUser.role === "owner";
+
+      if (!isAuthor && !isAdmin) {
+        return res.status(403).json({ message: "Only the author or an admin can delete this comment" });
+      }
+
+      // Delete comment (mentions will be cascade deleted due to FK constraint)
+      await db.delete(crmComments)
+        .where(eq(crmComments.id, commentId));
+
+      return res.json({ message: "Comment deleted" });
+    } catch (error) {
+      console.error("Error deleting comment:", error);
+      return res.status(500).json({ message: "Failed to delete comment" });
     }
   });
 
