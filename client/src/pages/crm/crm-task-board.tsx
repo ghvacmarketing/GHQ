@@ -911,7 +911,7 @@ export default function CrmTaskBoard() {
                     <DroppableColumn
                       key={column.id}
                       column={column}
-                      tasks={tasksByColumn[column.id]}
+                      tasks={tasksByColumn[column.id] || []}
                       onTaskClick={handleOpenEdit}
                       onTaskComplete={(taskId, completed) =>
                         completeTaskMutation.mutate({ taskId, completed })
