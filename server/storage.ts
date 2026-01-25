@@ -1,7 +1,7 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type CallLogTask, type InsertCallLogTask, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, type CrmItem, type InsertCrmItem, type CrmMessagingConversation, type InsertCrmMessagingConversation, type CrmMessagingMessage, type InsertCrmMessagingMessage, type CrmMessagingConversationTag, type InsertCrmMessagingConversationTag, type CrmTimeEntry, type InsertCrmTimeEntry, type SmsNotificationLog, type InsertSmsNotificationLog, type SmsNotificationType, type CrmProjectTask, type InsertCrmProjectTask, type Task, type InsertTask, type TaskType, type InsertTaskType, type TaskActivity, type InsertTaskActivity, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, callLogTasks, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems, crmItems, crmMessagingConversations, crmMessagingMessages, crmMessagingConversationTags, crmCustomers, crmTimeEntries, smsNotificationLog, crmUsers, crmProjectTasks, tasks, taskTypes, taskActivity } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type CallLogTask, type InsertCallLogTask, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, type CrmItem, type InsertCrmItem, type CrmMessagingConversation, type InsertCrmMessagingConversation, type CrmMessagingMessage, type InsertCrmMessagingMessage, type CrmMessagingConversationTag, type InsertCrmMessagingConversationTag, type CrmTimeEntry, type InsertCrmTimeEntry, type SmsNotificationLog, type InsertSmsNotificationLog, type SmsNotificationType, type CrmProjectTask, type InsertCrmProjectTask, type Task, type InsertTask, type TaskType, type InsertTaskType, type TaskActivity, type InsertTaskActivity, type TaskSubtask, type InsertTaskSubtask, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, callLogTasks, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems, crmItems, crmMessagingConversations, crmMessagingMessages, crmMessagingConversationTags, crmCustomers, crmTimeEntries, smsNotificationLog, crmUsers, crmProjectTasks, tasks, taskTypes, taskActivity, taskSubtasks } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, or, and, ilike, sql, notInArray, desc, gte, lte, asc, isNull, lt, ne, type SQL } from "drizzle-orm";
+import { eq, or, and, ilike, sql, notInArray, desc, gte, lte, asc, isNull, isNotNull, lt, ne, type SQL } from "drizzle-orm";
 
 export interface IStorage {
   // Quote operations
@@ -316,6 +316,14 @@ export interface IStorage {
 
   createTaskActivity(data: InsertTaskActivity): Promise<TaskActivity>;
   getTaskActivities(taskId: string): Promise<TaskActivity[]>;
+
+  // Task Subtasks
+  getSubtasksByTaskId(taskId: string): Promise<TaskSubtask[]>;
+  getSubtaskById(id: string): Promise<TaskSubtask | null>;
+  createSubtask(data: InsertTaskSubtask): Promise<TaskSubtask>;
+  updateSubtask(id: string, data: Partial<InsertTaskSubtask>): Promise<TaskSubtask | null>;
+  deleteSubtask(id: string): Promise<boolean>;
+  getSubtasksWithDueDate(startDate: Date, endDate: Date): Promise<(TaskSubtask & { taskTitle: string })[]>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -2534,6 +2542,59 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(taskActivity)
       .where(eq(taskActivity.taskId, taskId))
       .orderBy(desc(taskActivity.createdAt));
+  }
+
+  // Task Subtasks
+  async getSubtasksByTaskId(taskId: string): Promise<TaskSubtask[]> {
+    return await db.select().from(taskSubtasks)
+      .where(eq(taskSubtasks.taskId, taskId))
+      .orderBy(taskSubtasks.sortOrder, taskSubtasks.createdAt);
+  }
+
+  async getSubtaskById(id: string): Promise<TaskSubtask | null> {
+    const [subtask] = await db.select().from(taskSubtasks).where(eq(taskSubtasks.id, id));
+    return subtask || null;
+  }
+
+  async createSubtask(data: InsertTaskSubtask): Promise<TaskSubtask> {
+    const [subtask] = await db.insert(taskSubtasks).values(data).returning();
+    return subtask;
+  }
+
+  async updateSubtask(id: string, data: Partial<InsertTaskSubtask>): Promise<TaskSubtask | null> {
+    const [subtask] = await db.update(taskSubtasks)
+      .set(data)
+      .where(eq(taskSubtasks.id, id))
+      .returning();
+    return subtask || null;
+  }
+
+  async deleteSubtask(id: string): Promise<boolean> {
+    const result = await db.delete(taskSubtasks).where(eq(taskSubtasks.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getSubtasksWithDueDate(startDate: Date, endDate: Date): Promise<(TaskSubtask & { taskTitle: string })[]> {
+    const results = await db.select({
+      id: taskSubtasks.id,
+      taskId: taskSubtasks.taskId,
+      title: taskSubtasks.title,
+      isCompleted: taskSubtasks.isCompleted,
+      dueAt: taskSubtasks.dueAt,
+      sortOrder: taskSubtasks.sortOrder,
+      createdAt: taskSubtasks.createdAt,
+      taskTitle: tasks.title,
+    })
+    .from(taskSubtasks)
+    .innerJoin(tasks, eq(taskSubtasks.taskId, tasks.id))
+    .where(
+      and(
+        isNotNull(taskSubtasks.dueAt),
+        gte(taskSubtasks.dueAt, startDate),
+        lte(taskSubtasks.dueAt, endDate)
+      )
+    );
+    return results;
   }
 
   // Initialize default data if needed
