@@ -26609,7 +26609,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       }
       
       const taskList = await storage.getTasks(filters);
-      res.json(taskList);
+      res.json({ tasks: taskList, total: taskList.length });
     } catch (error) {
       console.error("Error fetching tasks:", error);
       res.status(500).json({ message: "Error fetching tasks" });
@@ -26802,7 +26802,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     try {
       const { customerId } = req.params;
       const taskList = await storage.getTasksByCustomer(customerId);
-      res.json(taskList);
+      res.json({ tasks: taskList, total: taskList.length });
     } catch (error) {
       console.error("Error fetching customer tasks:", error);
       res.status(500).json({ message: "Error fetching customer tasks" });
@@ -26814,7 +26814,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     try {
       const { entityType, entityId } = req.params;
       const taskList = await storage.getTasksByRelatedEntity(entityType, entityId);
-      res.json(taskList);
+      res.json({ tasks: taskList, total: taskList.length });
     } catch (error) {
       console.error("Error fetching entity tasks:", error);
       res.status(500).json({ message: "Error fetching entity tasks" });
