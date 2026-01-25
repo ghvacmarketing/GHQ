@@ -26821,6 +26821,97 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // ========== Task Subtasks Endpoints ==========
+
+  // GET /api/tasks/:taskId/subtasks - Get all subtasks for a task
+  app.get("/api/tasks/:taskId/subtasks", requireCrmAuth, async (req, res) => {
+    try {
+      const { taskId } = req.params;
+      const subtasks = await storage.getSubtasksByTaskId(taskId);
+      res.json(subtasks);
+    } catch (error) {
+      console.error("Error fetching subtasks:", error);
+      res.status(500).json({ message: "Error fetching subtasks" });
+    }
+  });
+
+  // POST /api/tasks/:taskId/subtasks - Create a new subtask
+  app.post("/api/tasks/:taskId/subtasks", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { taskId } = req.params;
+      const task = await storage.getTaskById(taskId);
+      if (!task) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+
+      const { insertTaskSubtaskSchema } = await import("@shared/schema");
+      const subtaskData = { ...req.body, taskId };
+      const parsed = insertTaskSubtaskSchema.safeParse(subtaskData);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid subtask data", errors: parsed.error.errors });
+      }
+
+      const subtask = await storage.createSubtask(parsed.data);
+      res.status(201).json(subtask);
+    } catch (error) {
+      console.error("Error creating subtask:", error);
+      res.status(500).json({ message: "Error creating subtask" });
+    }
+  });
+
+  // PUT /api/tasks/:taskId/subtasks/:subtaskId - Update a subtask
+  app.put("/api/tasks/:taskId/subtasks/:subtaskId", requireCrmAuth, async (req, res) => {
+    try {
+      const { subtaskId } = req.params;
+      const subtask = await storage.updateSubtask(subtaskId, req.body);
+      if (!subtask) {
+        return res.status(404).json({ message: "Subtask not found" });
+      }
+      res.json(subtask);
+    } catch (error) {
+      console.error("Error updating subtask:", error);
+      res.status(500).json({ message: "Error updating subtask" });
+    }
+  });
+
+  // DELETE /api/tasks/:taskId/subtasks/:subtaskId - Delete a subtask
+  app.delete("/api/tasks/:taskId/subtasks/:subtaskId", requireCrmAuth, async (req, res) => {
+    try {
+      const { subtaskId } = req.params;
+      const deleted = await storage.deleteSubtask(subtaskId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Subtask not found" });
+      }
+      res.json({ message: "Subtask deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting subtask:", error);
+      res.status(500).json({ message: "Error deleting subtask" });
+    }
+  });
+
+  // GET /api/subtasks/calendar - Get subtasks with due dates for calendar view
+  app.get("/api/subtasks/calendar", requireCrmAuth, async (req, res) => {
+    try {
+      const { start, end } = req.query;
+      if (!start || !end) {
+        return res.status(400).json({ message: "Start and end dates required" });
+      }
+      const subtasks = await storage.getSubtasksWithDueDate(
+        new Date(start as string),
+        new Date(end as string)
+      );
+      res.json(subtasks);
+    } catch (error) {
+      console.error("Error fetching calendar subtasks:", error);
+      res.status(500).json({ message: "Error fetching calendar subtasks" });
+    }
+  });
+
 
 
   const httpServer = createServer(app);
