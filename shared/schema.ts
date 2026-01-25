@@ -3205,3 +3205,66 @@ export const insertProjectLaborEntrySchema = createInsertSchema(projectLaborEntr
 
 export type InsertProjectLaborEntry = z.infer<typeof insertProjectLaborEntrySchema>;
 export type ProjectLaborEntry = typeof projectLaborEntries.$inferSelect;
+
+// CRM Notifications - User notifications for mentions, assignments, etc.
+export const notificationTypeEnum = ["mention", "task_assigned", "task_due", "comment", "status_change", "system"] as const;
+export type NotificationType = typeof notificationTypeEnum[number];
+
+export const crmNotifications = pgTable("crm_notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  type: text("type").$type<NotificationType>().notNull(),
+  title: text("title").notNull(),
+  preview: text("preview"),
+  entityType: text("entity_type"),
+  entityId: varchar("entity_id"),
+  actorId: varchar("actor_id").references(() => crmUsers.id, { onDelete: "set null" }),
+  isRead: boolean("is_read").notNull().default(false),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCrmNotificationSchema = createInsertSchema(crmNotifications).omit({
+  id: true,
+  createdAt: true,
+  readAt: true,
+});
+
+export type InsertCrmNotification = z.infer<typeof insertCrmNotificationSchema>;
+export type CrmNotification = typeof crmNotifications.$inferSelect;
+
+// CRM Comments - Comments on any entity (leads, projects, work orders, tasks, customers)
+export const crmComments = pgTable("crm_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: text("entity_type").notNull(),
+  entityId: varchar("entity_id").notNull(),
+  authorId: varchar("author_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  body: text("body").notNull(),
+  editedAt: timestamp("edited_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCrmCommentSchema = createInsertSchema(crmComments).omit({
+  id: true,
+  createdAt: true,
+  editedAt: true,
+});
+
+export type InsertCrmComment = z.infer<typeof insertCrmCommentSchema>;
+export type CrmComment = typeof crmComments.$inferSelect;
+
+// CRM Comment Mentions - Junction table for tracking mentions in comments
+export const crmCommentMentions = pgTable("crm_comment_mentions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  commentId: varchar("comment_id").notNull().references(() => crmComments.id, { onDelete: "cascade" }),
+  mentionedUserId: varchar("mentioned_user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCrmCommentMentionSchema = createInsertSchema(crmCommentMentions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCrmCommentMention = z.infer<typeof insertCrmCommentMentionSchema>;
+export type CrmCommentMention = typeof crmCommentMentions.$inferSelect;
