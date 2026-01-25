@@ -299,8 +299,8 @@ function Router() {
       <Route path="/crm/messaging">{() => <ProtectedCrmWrapper><CrmMessaging /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/notifications">{() => <ProtectedCrmWrapper><CrmNotifications /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/tasks/board">{() => <ProtectedCrmWrapper><CrmTaskBoard /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/tasks/mine">{() => <ProtectedCrmWrapper><CrmMyTasks /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/tasks">{() => <ProtectedCrmWrapper><CrmTasks /></ProtectedCrmWrapper>}</Route>
-      <Route path="/crm/my-tasks">{() => <ProtectedCrmWrapper><CrmMyTasks /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm">{() => <ProtectedCrmWrapper><CrmBusinessDashboard /></ProtectedCrmWrapper>}</Route>
       <Route path="/mobile/job/:id">{() => <MobileWrapper><MobileJobDetail /></MobileWrapper>}</Route>
       <Route path="/mobile/job">{() => <MobileWrapper><MobileJob /></MobileWrapper>}</Route>
