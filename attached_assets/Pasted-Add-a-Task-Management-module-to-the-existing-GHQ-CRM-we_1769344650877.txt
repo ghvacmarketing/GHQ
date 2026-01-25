@@ -1,0 +1,36 @@
+Add a “Task Management” module to the existing GHQ CRM (web + mobile-friendly views) using the current project stack/patterns.
+
+REQUIREMENTS
+1) Database
+- Create tables:
+  - tasks: id, title, description, status, priority, type_id, assigned_to_user_id (nullable), created_by_user_id, due_at (nullable), start_at (nullable), end_at (nullable), completed_at (nullable), remind_at (nullable), is_all_day (bool), related_entity_type (enum: customer|lead|job|proposal|invoice|none), related_entity_id (nullable), customer_id (nullable), created_at, updated_at
+  - task_types: id, name, icon (string), default_duration_minutes (nullable), default_priority (nullable), is_customer_actionable (bool), created_at, updated_at
+  - task_activity: id, task_id, user_id, action, before_json, after_json, created_at
+- Seed default task_types: Call Customer, Text Customer, Email Customer, Admin, Warehouse Duty, Training, Sales Follow-up.
+
+2) API
+- CRUD for tasks (create/read/update/delete) + list endpoint with filters:
+  assigned_to, status, type_id, priority, due date range, overdue, related_entity_type, related_entity_id, customer_id, search text.
+- Endpoints for task_types (admin-only CRUD).
+- All endpoints must enforce role-based permissions (admin sees all; standard users see assigned tasks + tasks they created; add roles as already defined in the app).
+
+3) UI (Web)
+- Add a Company Tasks page with:
+  - List view (table) + filters + “Create Task” button
+  - Calendar view with drag/drop rescheduling (updates due_at or start/end)
+  - Task Drawer modal/panel to view/edit: title, description, status, priority, type, assigned_to, due date/time, related link.
+- Add “My Tasks” view (simple list grouped by Overdue/Today/Upcoming/No Due Date) with quick complete.
+- Add a Tasks tab to Customer, Lead, and Job detail pages:
+  - Shows tasks filtered to that record
+  - “Add Task” creates task pre-linked to that entity and customer if available
+
+4) Actions
+- If a task is linked to a customer, show quick actions:
+  - Call (tel:)
+  - Email (mailto:)
+  - Text (deep link to existing GHQ texting page with that customer selected)
+
+5) Quality
+- Editing a task anywhere (dashboard/calendar/customer page) updates the same record everywhere.
+- Log changes to task_activity on create/update/status change/reassign/reschedule.
+- Use existing UI components/styles and routing conventions already in the codebase.
