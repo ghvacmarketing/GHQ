@@ -20,7 +20,10 @@ Preferred communication style: Simple, everyday language.
 -   **Pricing Engine**: Google Sheets as source of truth with server-side and client-side caching. Sophisticated formulas for overhead, profit, financing, and warranty.
 -   **Quote Generation**: Text-based output with server-side calculations, editable drafts, toggleable detailed breakdowns, and AI-powered generation using OpenAI GPT-5.2.
 -   **CRM & Sales Funnel**: Kanban-style pipeline for leads with configurable types and a two-dimensional classification system (Lead Temperature, Customer Driver). Supports lead management, follow-up tracking, and CSV import/export.
--   **Task Management System**: Comprehensive task tracking with configurable task types, role-based permissions, and integration with customer, lead, and project entities.
+-   **Task Management System**: Comprehensive task tracking with configurable task types, role-based permissions, and integration with customer, lead, and project entities. Features include:
+    -   **Subtasks**: Checklist items within tasks with optional due dates, inline add/edit UI, completion toggles, and calendar integration
+    -   **Task Comments**: @mention support for team collaboration with notifications linking back to tasks
+    -   **Calendar View**: Shows both tasks and dated subtasks with drag/drop rescheduling
 -   **Project & Work Order Management**: Projects for high-value scopes with pipeline statuses; Work Orders for scheduled visits with dispatch statuses. Features a Dispatch Board focused on Work Orders.
 -   **Quotes and Invoices System**: Integrated CRM quotes and invoices with status workflows. Supports deposit-required quotes with dual payment options (Stripe/financing).
 -   **Job Costing System**: Tracks project profitability with live calculations, materials catalog, labor entry tracking, and configurable overhead/commission percentages.
