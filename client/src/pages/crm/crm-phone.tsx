@@ -41,6 +41,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { GripVertical, Phone, Calendar, CalendarDays, Play, Pause, RefreshCw, ChevronDown, ChevronRight, Plus, Search, Edit2, Trash2, X, Check, Cloud, Sun, CloudRain, CloudSnow, Wind, AlertTriangle, BarChart3, ClipboardList, Send } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { CommentComposer } from "@/components/crm/comment-composer";
+import { CommentThread } from "@/components/crm/comment-thread";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO, formatDistanceToNow, subDays } from "date-fns";
@@ -623,6 +625,19 @@ function CallLogEntry({ log, isHighlighted, entryRef, onEdit, onDelete }: CallLo
               ))}
             </div>
           )}
+
+          {/* Comments Section */}
+          <div className="mt-4 pt-3 border-t border-border/30">
+            <div className="text-xs font-medium text-muted-foreground mb-2">Comments</div>
+            <CommentThread entityType="call_log" entityId={log.id} />
+            <div className="mt-3">
+              <CommentComposer 
+                entityType="call_log" 
+                entityId={log.id}
+                placeholder="Add a comment about this call..."
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
