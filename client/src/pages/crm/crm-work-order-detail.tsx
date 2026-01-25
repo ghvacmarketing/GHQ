@@ -2440,7 +2440,11 @@ export default function CrmWorkOrderDetail() {
                   <CommentComposer 
                     entityType="work_order" 
                     entityId={workOrderId!}
-                    onCommentPosted={() => queryClient.invalidateQueries({ queryKey: ["/api/crm/comments", "work_order", workOrderId] })}
+                    placeholder="Add notes..."
+                    onCommentPosted={() => {
+                      queryClient.invalidateQueries({ queryKey: ["/api/crm/comments", "work_order", workOrderId] });
+                      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", workOrderId] });
+                    }}
                   />
                 </div>
               </CardContent>

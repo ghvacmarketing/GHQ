@@ -2259,98 +2259,16 @@ export default function CrmProjectDetail() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {/* Comment input with drag-and-drop file upload */}
-                  <div className="space-y-3">
-                    <Textarea
-                      placeholder="Add a comment about this project..."
-                      value={overviewComment}
-                      onChange={(e) => setOverviewComment(e.target.value)}
-                      rows={2}
-                      className="w-full"
-                      data-testid="textarea-project-timeline-comment"
-                    />
-                    
-                    {/* Drag-and-drop file upload area */}
-                    <div
-                      {...overviewDropZoneProps}
-                      className={cn(
-                        "border-2 border-dashed rounded-lg p-4 text-center transition-colors",
-                        isDraggingOverview
-                          ? "border-[#711419] bg-[#711419]/5"
-                          : "border-slate-200 hover:border-slate-300"
-                      )}
-                      data-testid="overview-file-dropzone"
-                    >
-                      <input
-                        type="file"
-                        multiple
-                        onChange={handleOverviewFileSelect}
-                        className="hidden"
-                        id="overview-file-upload"
-                      />
-                      <label htmlFor="overview-file-upload" className="cursor-pointer">
-                        <Upload className={cn(
-                          "w-6 h-6 mx-auto mb-2",
-                          isDraggingOverview ? "text-[#711419]" : "text-muted-foreground"
-                        )} />
-                        <p className={cn(
-                          "text-sm",
-                          isDraggingOverview ? "text-[#711419] font-medium" : "text-muted-foreground"
-                        )}>
-                          {isDraggingOverview ? "Drop files here" : "Drag & drop files or click to upload"}
-                        </p>
-                      </label>
-                    </div>
-
-                    {/* File queue with thumbnails */}
-                    {overviewFiles.length > 0 && (
-                      <div className="flex flex-wrap gap-2" data-testid="overview-file-queue">
-                        {overviewFiles.map((f, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center gap-2 p-2 border rounded-lg bg-slate-50"
-                          >
-                            {f.preview ? (
-                              <img src={f.preview} alt="" className="w-10 h-10 object-cover rounded" />
-                            ) : (
-                              <div className="w-10 h-10 bg-slate-200 rounded flex items-center justify-center">
-                                <File className="w-5 h-5 text-slate-500" />
-                              </div>
-                            )}
-                            <span className="text-xs truncate max-w-[100px]">{f.file.name}</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                              onClick={() => removeOverviewFile(idx)}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Save button */}
-                    <Button
-                      onClick={handleSubmitOverviewComment}
-                      disabled={(!overviewComment.trim() && overviewFiles.length === 0) || isSubmittingOverviewComment}
-                      className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                      data-testid="button-save-project-timeline-comment"
-                    >
-                      {isSubmittingOverviewComment ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="h-4 w-4 mr-1" />
-                          Save
-                        </>
-                      )}
-                    </Button>
-                  </div>
+                  {/* Comment input with @mention support */}
+                  <CommentComposer
+                    entityType="project"
+                    entityId={projectId || ""}
+                    placeholder="Add a comment about this project..."
+                    onCommentPosted={() => {
+                      queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectId, "activities"] });
+                      refetchOverviewActivities();
+                    }}
+                  />
 
                   {/* Recent activity entries */}
                   {overviewActivitiesLoading ? (

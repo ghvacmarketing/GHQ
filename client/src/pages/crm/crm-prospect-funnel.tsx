@@ -2869,77 +2869,18 @@ export default function CrmProspectFunnel() {
                           </CardTitle>
                         </CardHeader>
                           <CardContent className="space-y-4">
-                            <div className="flex gap-2">
-                              <Textarea
-                                placeholder="Add a comment..."
-                                value={leadNoteBody}
-                                onChange={(e) => setLeadNoteBody(e.target.value)}
-                                className="min-h-[60px] resize-none flex-1"
-                              />
-                              <Button
-                                size="sm"
-                                className="self-end"
-                                onClick={() => {
-                                  if (expandedLead && leadNoteBody.trim()) {
-                                    createLeadNoteMutation.mutate({
-                                      customerId: expandedLead.customerId,
-                                      body: leadNoteBody.trim(),
-                                    });
-                                  }
-                                }}
-                                disabled={!leadNoteBody.trim() || createLeadNoteMutation.isPending}
-                              >
-                                <Send className="h-4 w-4" />
-                              </Button>
-                            </div>
-
-                            {leadNotesLoading ? (
-                              <div className="space-y-2">
-                                <Skeleton className="h-16 w-full" />
-                                <Skeleton className="h-16 w-full" />
-                              </div>
-                            ) : leadNotes.length === 0 ? (
-                              <p className="text-center text-muted-foreground text-sm py-4">
-                                No comments yet
-                              </p>
-                            ) : (
-                              <>
-                                <div className="space-y-2">
-                                  {[...leadNotes]
-                                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                                    .slice(0, showAllNotes ? leadNotes.length : 5)
-                                    .map((note) => (
-                                      <div
-                                        key={note.id}
-                                        className="flex gap-3 p-3 rounded-lg border bg-gray-50"
-                                      >
-                                        <MessageSquare className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                                        <div className="flex-1 min-w-0">
-                                          <div className="flex items-baseline gap-2 flex-wrap">
-                                            <span className="font-semibold text-sm">{note.userName}</span>
-                                            <span className="text-xs text-muted-foreground">
-                                              {format(parseISO(note.createdAt), "MMM d, yyyy 'at' h:mm a")}
-                                            </span>
-                                          </div>
-                                          <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
-                                            {note.body}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    ))}
-                                </div>
-                                {leadNotes.length > 5 && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="w-full"
-                                    onClick={() => setShowAllNotes(!showAllNotes)}
-                                  >
-                                    {showAllNotes ? "Show less" : `Show ${leadNotes.length - 5} more comments`}
-                                  </Button>
-                                )}
-                              </>
-                            )}
+                            <CommentComposer
+                              entityType="lead"
+                              entityId={expandedLead.id}
+                              placeholder="Add a comment... Use @ to mention a teammate."
+                              onCommentPosted={() => {
+                                queryClient.invalidateQueries({ queryKey: ["/api/crm/comments", "lead", expandedLead.id] });
+                              }}
+                            />
+                            <CommentThread
+                              entityType="lead"
+                              entityId={expandedLead.id}
+                            />
                           </CardContent>
                         </Card>
 
