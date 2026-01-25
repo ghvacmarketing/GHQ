@@ -1,0 +1,33 @@
+Implement the GHQ Notifications + @Mentions UI using our existing design system (same colors, font, spacing, border radius). Do not hardcode new colors or fonts; only use existing theme tokens/classes and existing Button/Card/Badge/Tab/Input components.
+
+UI REQUIREMENTS
+1) Add a bell icon in the global header with an unread badge count (cap 99+). Badge must use existing Primary + Primary-foreground tokens.
+
+2) Bell opens a Notifications Drawer:
+- Right-anchored drawer on desktop; bottom sheet/full screen on mobile.
+- Header: “Notifications”, actions: Mark all read, Close.
+- Tabs: Unread | All
+- Filter dropdown: Type = All | Mentions | Tasks | System
+- Scroll list of notification items: icon, title (bold), preview (muted 2 lines), meta (timestamp, module tag, actor). Unread indicator uses Primary (dot or left bar). Hover uses Muted background.
+- Footer: View all notifications link.
+
+3) Create full Notifications page (/notifications):
+- Header + controls: Unread/All tabs, Type filter, Search, bulk actions when selected.
+- Group list by date (Today/Yesterday/This Week/Earlier).
+- Empty states for Unread and All.
+
+4) Create a reusable CommentComposer used everywhere (leads, clients, projects, tasks, intake logs):
+- Textarea placeholder “Write a comment… Use @ to mention a teammate.”
+- Typing @ opens mention picker popover with user search + list (avatar, name, role). Keyboard navigation supported.
+- Selecting a user inserts a styled @mention chip inline (rendered from mention tokens).
+- Post button uses our Primary button style; disabled if empty.
+
+5) Comment thread rendering:
+- Comment item shows avatar, author, timestamp, body, actions (copy link, edit if permitted).
+- Mentions render as styled @Name.
+- Deep link support: /entity/:id#comment-:commentId
+- If navigated from a notification, auto-scroll and temporarily highlight that comment (Muted background + Primary accent border) for ~2–3 seconds.
+
+6) Ensure responsive behavior:
+- Drawer becomes full-screen sheet on mobile.
+- Notification items remain readable and tappable (44px minimum touch targets).
