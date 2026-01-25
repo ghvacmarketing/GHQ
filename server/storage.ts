@@ -1,7 +1,7 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type CallLogTask, type InsertCallLogTask, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, type CrmItem, type InsertCrmItem, type CrmMessagingConversation, type InsertCrmMessagingConversation, type CrmMessagingMessage, type InsertCrmMessagingMessage, type CrmMessagingConversationTag, type InsertCrmMessagingConversationTag, type CrmTimeEntry, type InsertCrmTimeEntry, type SmsNotificationLog, type InsertSmsNotificationLog, type SmsNotificationType, type CrmProjectTask, type InsertCrmProjectTask, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, callLogTasks, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems, crmItems, crmMessagingConversations, crmMessagingMessages, crmMessagingConversationTags, crmCustomers, crmTimeEntries, smsNotificationLog, crmUsers, crmProjectTasks } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type CallLogTask, type InsertCallLogTask, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, type CrmItem, type InsertCrmItem, type CrmMessagingConversation, type InsertCrmMessagingConversation, type CrmMessagingMessage, type InsertCrmMessagingMessage, type CrmMessagingConversationTag, type InsertCrmMessagingConversationTag, type CrmTimeEntry, type InsertCrmTimeEntry, type SmsNotificationLog, type InsertSmsNotificationLog, type SmsNotificationType, type CrmProjectTask, type InsertCrmProjectTask, type Task, type InsertTask, type TaskType, type InsertTaskType, type TaskActivity, type InsertTaskActivity, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, callLogTasks, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems, crmItems, crmMessagingConversations, crmMessagingMessages, crmMessagingConversationTags, crmCustomers, crmTimeEntries, smsNotificationLog, crmUsers, crmProjectTasks, tasks, taskTypes, taskActivity } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, or, and, ilike, sql, notInArray, desc, gte, lte, asc, isNull } from "drizzle-orm";
+import { eq, or, and, ilike, sql, notInArray, desc, gte, lte, asc, isNull, lt, ne, type SQL } from "drizzle-orm";
 
 export interface IStorage {
   // Quote operations
@@ -283,6 +283,39 @@ export interface IStorage {
   createProjectTask(data: InsertCrmProjectTask): Promise<CrmProjectTask>;
   updateProjectTask(id: string, data: Partial<InsertCrmProjectTask>): Promise<CrmProjectTask | undefined>;
   deleteProjectTask(id: string): Promise<boolean>;
+
+  // Task Management
+  getTaskTypes(): Promise<TaskType[]>;
+  getTaskTypeById(id: string): Promise<TaskType | null>;
+  createTaskType(data: InsertTaskType): Promise<TaskType>;
+  updateTaskType(id: string, data: Partial<InsertTaskType>): Promise<TaskType | null>;
+  deleteTaskType(id: string): Promise<boolean>;
+
+  getTasks(filters?: {
+    assignedToUserId?: string;
+    createdByUserId?: string;
+    status?: string;
+    typeId?: string;
+    priority?: string;
+    dueDateStart?: Date;
+    dueDateEnd?: Date;
+    overdue?: boolean;
+    relatedEntityType?: string;
+    relatedEntityId?: string;
+    customerId?: string;
+    searchText?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<Task[]>;
+  getTaskById(id: string): Promise<Task | null>;
+  createTask(data: InsertTask): Promise<Task>;
+  updateTask(id: string, data: Partial<InsertTask>): Promise<Task | null>;
+  deleteTask(id: string): Promise<boolean>;
+  getTasksByCustomer(customerId: string): Promise<Task[]>;
+  getTasksByRelatedEntity(entityType: string, entityId: string): Promise<Task[]>;
+
+  createTaskActivity(data: InsertTaskActivity): Promise<TaskActivity>;
+  getTaskActivities(taskId: string): Promise<TaskActivity[]>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -2323,6 +2356,184 @@ export class DatabaseStorage implements IStorage {
   async deleteProjectTask(id: string): Promise<boolean> {
     const result = await db.delete(crmProjectTasks).where(eq(crmProjectTasks.id, id));
     return (result.rowCount || 0) > 0;
+  }
+
+  // Task Management - Task Types
+  async getTaskTypes(): Promise<TaskType[]> {
+    return await db.select().from(taskTypes).orderBy(asc(taskTypes.name));
+  }
+
+  async getTaskTypeById(id: string): Promise<TaskType | null> {
+    const [taskType] = await db.select().from(taskTypes).where(eq(taskTypes.id, id));
+    return taskType || null;
+  }
+
+  async createTaskType(data: InsertTaskType): Promise<TaskType> {
+    const [taskType] = await db
+      .insert(taskTypes)
+      .values(data as typeof taskTypes.$inferInsert)
+      .returning();
+    return taskType;
+  }
+
+  async updateTaskType(id: string, data: Partial<InsertTaskType>): Promise<TaskType | null> {
+    const [taskType] = await db
+      .update(taskTypes)
+      .set({ ...data, updatedAt: new Date() } as Partial<typeof taskTypes.$inferInsert>)
+      .where(eq(taskTypes.id, id))
+      .returning();
+    return taskType || null;
+  }
+
+  async deleteTaskType(id: string): Promise<boolean> {
+    const result = await db.delete(taskTypes).where(eq(taskTypes.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Task Management - Tasks
+  async getTasks(filters?: {
+    assignedToUserId?: string;
+    createdByUserId?: string;
+    status?: string;
+    typeId?: string;
+    priority?: string;
+    dueDateStart?: Date;
+    dueDateEnd?: Date;
+    overdue?: boolean;
+    relatedEntityType?: string;
+    relatedEntityId?: string;
+    customerId?: string;
+    searchText?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<Task[]> {
+    const conditions: SQL[] = [];
+
+    if (filters?.assignedToUserId) {
+      conditions.push(eq(tasks.assignedToUserId, filters.assignedToUserId));
+    }
+    if (filters?.createdByUserId) {
+      conditions.push(eq(tasks.createdByUserId, filters.createdByUserId));
+    }
+    if (filters?.status) {
+      conditions.push(eq(tasks.status, filters.status as any));
+    }
+    if (filters?.typeId) {
+      conditions.push(eq(tasks.typeId, filters.typeId));
+    }
+    if (filters?.priority) {
+      conditions.push(eq(tasks.priority, filters.priority as any));
+    }
+    if (filters?.dueDateStart) {
+      conditions.push(gte(tasks.dueAt, filters.dueDateStart));
+    }
+    if (filters?.dueDateEnd) {
+      conditions.push(lte(tasks.dueAt, filters.dueDateEnd));
+    }
+    if (filters?.relatedEntityType) {
+      conditions.push(eq(tasks.relatedEntityType, filters.relatedEntityType as any));
+    }
+    if (filters?.relatedEntityId) {
+      conditions.push(eq(tasks.relatedEntityId, filters.relatedEntityId));
+    }
+    if (filters?.customerId) {
+      conditions.push(eq(tasks.customerId, filters.customerId));
+    }
+    if (filters?.overdue) {
+      const overdueCondition = and(
+        lt(tasks.dueAt, new Date()),
+        ne(tasks.status, 'completed' as any),
+        ne(tasks.status, 'cancelled' as any)
+      );
+      if (overdueCondition) {
+        conditions.push(overdueCondition);
+      }
+    }
+    if (filters?.searchText) {
+      const searchCondition = or(
+        ilike(tasks.title, `%${filters.searchText}%`),
+        ilike(tasks.description, `%${filters.searchText}%`)
+      );
+      if (searchCondition) {
+        conditions.push(searchCondition);
+      }
+    }
+
+    const baseQuery = conditions.length > 0
+      ? db.select().from(tasks).where(and(...conditions))
+      : db.select().from(tasks);
+
+    const limitValue = filters?.limit || 100;
+    const offsetValue = filters?.offset || 0;
+
+    return await baseQuery
+      .orderBy(desc(tasks.createdAt))
+      .limit(limitValue)
+      .offset(offsetValue);
+  }
+
+  async getTaskById(id: string): Promise<Task | null> {
+    const [task] = await db.select().from(tasks).where(eq(tasks.id, id));
+    return task || null;
+  }
+
+  async createTask(data: InsertTask): Promise<Task> {
+    const [task] = await db
+      .insert(tasks)
+      .values(data as typeof tasks.$inferInsert)
+      .returning();
+    return task;
+  }
+
+  async updateTask(id: string, data: Partial<InsertTask>): Promise<Task | null> {
+    const updateData: Record<string, any> = { ...data, updatedAt: new Date() };
+    
+    if (data.status === 'completed') {
+      updateData.completedAt = new Date();
+    }
+    
+    const [task] = await db
+      .update(tasks)
+      .set(updateData as Partial<typeof tasks.$inferInsert>)
+      .where(eq(tasks.id, id))
+      .returning();
+    return task || null;
+  }
+
+  async deleteTask(id: string): Promise<boolean> {
+    await db.delete(taskActivity).where(eq(taskActivity.taskId, id));
+    const result = await db.delete(tasks).where(eq(tasks.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async getTasksByCustomer(customerId: string): Promise<Task[]> {
+    return await db.select().from(tasks)
+      .where(eq(tasks.customerId, customerId))
+      .orderBy(desc(tasks.createdAt));
+  }
+
+  async getTasksByRelatedEntity(entityType: string, entityId: string): Promise<Task[]> {
+    return await db.select().from(tasks)
+      .where(and(
+        eq(tasks.relatedEntityType, entityType as any),
+        eq(tasks.relatedEntityId, entityId)
+      ))
+      .orderBy(desc(tasks.createdAt));
+  }
+
+  // Task Management - Task Activity
+  async createTaskActivity(data: InsertTaskActivity): Promise<TaskActivity> {
+    const [activity] = await db
+      .insert(taskActivity)
+      .values(data as typeof taskActivity.$inferInsert)
+      .returning();
+    return activity;
+  }
+
+  async getTaskActivities(taskId: string): Promise<TaskActivity[]> {
+    return await db.select().from(taskActivity)
+      .where(eq(taskActivity.taskId, taskId))
+      .orderBy(desc(taskActivity.createdAt));
   }
 
   // Initialize default data if needed
