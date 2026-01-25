@@ -7827,32 +7827,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const mentionedUserIds = parseMentions(body);
       
       for (const userId of mentionedUserIds) {
-        // Skip if user mentions themselves
-        if (userId === currentUser.id) continue;
-
         // Verify user exists
         const [mentionedUser] = await db.select({ id: crmUsers.id })
           .from(crmUsers)
           .where(eq(crmUsers.id, userId));
 
         if (mentionedUser) {
-          // Create mention record
+          // Always create mention record (for display purposes)
           await db.insert(crmCommentMentions).values({
             commentId: comment.id,
             mentionedUserId: userId,
           });
 
-          // Create notification for mentioned user
-          await db.insert(crmNotifications).values({
-            userId,
-            type: "mention",
-            title: `${currentUser.name} mentioned you in a comment`,
-            preview: body.substring(0, 100),
-            entityType,
-            entityId,
-            actorId: currentUser.id,
-            isRead: false,
-          });
+          // Only create notification if user mentions someone else (not themselves)
+          if (userId !== currentUser.id) {
+            // Create notification for mentioned user
+            await db.insert(crmNotifications).values({
+              userId,
+              type: "mention",
+              title: `${currentUser.name} mentioned you in a comment`,
+              preview: body.substring(0, 100),
+              entityType,
+              entityId,
+              actorId: currentUser.id,
+              isRead: false,
+            });
+          }
         }
       }
 
