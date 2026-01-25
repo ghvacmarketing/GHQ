@@ -80,6 +80,7 @@ import { Switch } from "@/components/ui/switch";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { CommentComposer } from "@/components/crm/comment-composer";
 import { CommentThread } from "@/components/crm/comment-thread";
+import { EntityTasksTab } from "@/components/crm/entity-tasks-tab";
 import type { CrmUser, CrmCustomer, CrmJob, CrmCustomerNote, CrmProject, CrmWorkOrder, CrmProperty, CrmQuote, ChecklistQuestion } from "@shared/schema";
 import { workOrderVisitTypeEnum, type WorkOrderVisitType, projectTypeEnum, type ProjectType, projectStatusEnum, type ProjectStatus, workOrderStatusEnum, type WorkOrderStatus, type WorkSubtype, type WorkOrderSubtype } from "@shared/schema";
 import { createLocalDateTime } from "@/lib/timezone";
@@ -1533,6 +1534,14 @@ function CustomerTabbedView({
           Files / Photos
         </TabsTrigger>
         <TabsTrigger 
+          value="tasks" 
+          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          data-testid="tab-tasks"
+        >
+          <ClipboardList className="h-4 w-4 mr-2" />
+          Tasks
+        </TabsTrigger>
+        <TabsTrigger 
           value="agreements" 
           className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
           data-testid="tab-agreements"
@@ -2410,6 +2419,16 @@ function CustomerTabbedView({
             </div>
           </CardContent>
         </Card>
+      </TabsContent>
+
+      {/* Tasks Tab */}
+      <TabsContent value="tasks" className="space-y-6" data-testid="tab-content-tasks">
+        <EntityTasksTab
+          entityType="customer"
+          entityId={customer.id}
+          customerId={customer.id}
+          customerName={customer.name}
+        />
       </TabsContent>
 
       {/* Agreements Tab */}

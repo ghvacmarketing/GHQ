@@ -112,6 +112,7 @@ import {
 import type { WorkOrderSubtype } from "@shared/schema";
 import { CommentComposer } from "@/components/crm/comment-composer";
 import { CommentThread } from "@/components/crm/comment-thread";
+import { EntityTasksTab } from "@/components/crm/entity-tasks-tab";
 
 type ProjectDetail = CrmProject & {
   customerName: string | null;
@@ -1412,6 +1413,13 @@ export default function CrmProjectDetail() {
             >
               Comments
             </TabsTrigger>
+            <TabsTrigger 
+              value="tasks" 
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+              data-testid="tab-tasks"
+            >
+              Tasks
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-0 space-y-6">
@@ -2633,6 +2641,15 @@ export default function CrmProjectDetail() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="tasks" className="mt-4">
+            <EntityTasksTab
+              entityType="project"
+              entityId={projectId!}
+              customerId={project?.customerId || project?.customer?.id}
+              customerName={project?.customerName || project?.customer?.name}
+            />
           </TabsContent>
         </Tabs>
 
