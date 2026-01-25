@@ -28,10 +28,12 @@ import {
   Phone,
   Smartphone,
   MessageSquare,
+  Bell,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 import ghqLogo from "@assets/redlogo.webp";
 import GhqSearch from "./ghq-search";
+import NotificationsDrawerContent from "./notifications-drawer";
 
 interface CrmLayoutProps {
   children: React.ReactNode;
@@ -60,6 +62,7 @@ const navSections: NavSection[] = [
       { label: "Dispatch Board", href: "/crm/dispatch", icon: CalendarClock },
       { label: "Phone", href: "/crm/phone", icon: Phone },
       { label: "Messaging", href: "/crm/messaging", icon: MessageSquare },
+      { label: "Notifications", href: "/crm/notifications", icon: Bell },
     ],
   },
   {
@@ -289,14 +292,41 @@ function SidebarContent({
 
 export function CrmLayout({ children, currentUser, disableScroll = false, hideGlobalSearch = false }: CrmLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   
   useCrmPrefetch(!!currentUser);
+
+  const { data: notificationCount } = useQuery<{ count: number }>({
+    queryKey: ["/api/crm/notifications/unread-count"],
+  });
 
   return (
     <div className="min-h-screen bg-white flex">
       <aside className="hidden lg:flex w-60 flex-shrink-0 fixed inset-y-0 left-0 z-40">
         <SidebarContent currentUser={currentUser} />
       </aside>
+
+      <div className="hidden lg:flex fixed top-0 left-60 right-0 z-40 bg-white border-b h-14 items-center justify-end px-6 gap-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative"
+          onClick={() => setNotificationsOpen(true)}
+        >
+          <Bell className="h-5 w-5 text-slate-600" />
+          {notificationCount?.count && notificationCount.count > 0 && (
+            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
+              {notificationCount.count > 99 ? "99+" : notificationCount.count}
+            </span>
+          )}
+        </Button>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-slate-600">{currentUser?.name || "User"}</span>
+          <div className="w-8 h-8 rounded-full bg-[#711419] flex items-center justify-center text-white font-semibold text-xs">
+            {currentUser?.name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "U"}
+          </div>
+        </div>
+      </div>
 
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b shadow-sm">
         <div className="flex items-center justify-between px-4 py-3">
@@ -326,6 +356,19 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative"
+              onClick={() => setNotificationsOpen(true)}
+            >
+              <Bell className="h-5 w-5" />
+              {notificationCount?.count && notificationCount.count > 0 && (
+                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
+                  {notificationCount.count > 99 ? "99+" : notificationCount.count}
+                </span>
+              )}
+            </Button>
             <span className="text-sm font-medium text-slate-600">
               {currentUser?.name?.split(" ")[0] || "User"}
             </span>
@@ -340,16 +383,21 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
 
       <main className="flex-1 lg:ml-60 overflow-x-hidden">
         {disableScroll ? (
-          <div className="h-screen pt-16 lg:pt-0 overflow-hidden">
+          <div className="h-screen pt-16 lg:pt-14 overflow-hidden">
             <div className="h-full p-4 lg:p-6 overflow-hidden">{children}</div>
           </div>
         ) : (
-          <div className="h-screen pt-16 lg:pt-0 overflow-y-auto">
+          <div className="h-screen pt-16 lg:pt-14 overflow-y-auto">
             <div className="p-4 lg:p-6">{children}</div>
           </div>
         )}
       </main>
       {!hideGlobalSearch && <GhqSearch />}
+      <Sheet open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+        <SheetContent side="right" className="w-full sm:w-96 p-0">
+          <NotificationsDrawerContent onClose={() => setNotificationsOpen(false)} />
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

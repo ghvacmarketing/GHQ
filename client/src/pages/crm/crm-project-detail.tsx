@@ -110,6 +110,8 @@ import {
   workOrderVisitTypeEnum
 } from "@shared/schema";
 import type { WorkOrderSubtype } from "@shared/schema";
+import { CommentComposer } from "@/components/crm/comment-composer";
+import { CommentThread } from "@/components/crm/comment-thread";
 
 type ProjectDetail = CrmProject & {
   customerName: string | null;
@@ -1403,6 +1405,13 @@ export default function CrmProjectDetail() {
             >
               Job Costing
             </TabsTrigger>
+            <TabsTrigger 
+              value="comments" 
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+              data-testid="tab-comments"
+            >
+              Comments
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-0 space-y-6">
@@ -2679,6 +2688,27 @@ export default function CrmProjectDetail() {
 
           <TabsContent value="job-costing" className="mt-4 data-[state=inactive]:hidden" forceMount>
             <JobCostingTab projectId={projectId!} project={project} />
+          </TabsContent>
+
+          <TabsContent value="comments" className="mt-4">
+            <Card className="shadow-sm">
+              <CardHeader className="border-b bg-slate-50/50">
+                <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                  <MessageSquare className="h-5 w-5 text-[#711419]" />
+                  Comments
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <CommentThread entityType="project" entityId={projectId!} />
+                <div className="border-t pt-4 mt-4">
+                  <CommentComposer 
+                    entityType="project" 
+                    entityId={projectId!}
+                    onCommentPosted={() => queryClient.invalidateQueries({ queryKey: ["/api/crm/comments", "project", projectId] })}
+                  />
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 

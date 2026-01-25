@@ -107,6 +107,8 @@ import {
 import { format, isToday, isPast, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, getDay, addDays, subDays, addWeeks, subWeeks, startOfDay, getHours, getMinutes, setHours } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { CrmUser, CrmCustomer, CrmFollowUp, SalesStage, FollowUpType, CrmQuote, CrmLeadType, CrmLeadTempOption, CrmLeadDriverOption } from "@shared/schema";
+import { CommentComposer } from "@/components/crm/comment-composer";
+import { CommentThread } from "@/components/crm/comment-thread";
 
 type Lead = {
   id: string;
@@ -2717,6 +2719,10 @@ export default function CrmProspectFunnel() {
                         <FileText className="h-3 w-3 mr-1" />
                         Quotes ({leadQuotes.length})
                       </TabsTrigger>
+                      <TabsTrigger value="comments" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
+                        <MessageSquare className="h-3 w-3 mr-1" />
+                        Comments
+                      </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="details" className="space-y-4">
@@ -3245,6 +3251,18 @@ export default function CrmProspectFunnel() {
                           ))}
                         </div>
                       )}
+                    </TabsContent>
+
+                    <TabsContent value="comments" className="space-y-4">
+                      <h4 className="font-medium text-sm mb-3">Comments</h4>
+                      <CommentThread entityType="lead" entityId={expandedLead.id} />
+                      <div className="border-t pt-4 mt-4">
+                        <CommentComposer 
+                          entityType="lead" 
+                          entityId={expandedLead.id}
+                          onCommentPosted={() => queryClient.invalidateQueries({ queryKey: ["/api/crm/comments", "lead", expandedLead.id] })}
+                        />
+                      </div>
                     </TabsContent>
                   </Tabs>
                 </ScrollArea>

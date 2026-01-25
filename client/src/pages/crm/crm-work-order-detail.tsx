@@ -85,6 +85,7 @@ import {
   ChevronUp,
   Check,
   X,
+  MessageSquare,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -97,6 +98,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
 import type { CrmUser, CrmJob, CrmProperty, CrmWorkOrder, CrmInvoice, CrmQuote, CrmCustomer, CrmProject, WorkOrderStatus } from "@shared/schema";
+import { CommentComposer } from "@/components/crm/comment-composer";
+import { CommentThread } from "@/components/crm/comment-thread";
 
 type WorkOrderDetail = CrmWorkOrder & {
   job: CrmJob | null;
@@ -1067,6 +1070,14 @@ export default function CrmWorkOrderDetail() {
             >
               <Clock className="h-4 w-4 md:mr-2" />
               <span className="hidden md:inline">Timeline</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="comments"
+              data-testid="tab-comments"
+              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
+            >
+              <MessageSquare className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Comments</span>
             </TabsTrigger>
           </TabsList>
 
@@ -2413,6 +2424,27 @@ export default function CrmWorkOrderDetail() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="comments" className="mt-6">
+            <Card className="shadow-sm">
+              <CardHeader className="border-b bg-slate-50/50">
+                <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                  <MessageSquare className="h-5 w-5 text-[#711419]" />
+                  Comments
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <CommentThread entityType="work_order" entityId={workOrderId!} />
+                <div className="border-t pt-4 mt-4">
+                  <CommentComposer 
+                    entityType="work_order" 
+                    entityId={workOrderId!}
+                    onCommentPosted={() => queryClient.invalidateQueries({ queryKey: ["/api/crm/comments", "work_order", workOrderId] })}
+                  />
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 
