@@ -26578,7 +26578,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       }
 
       const { 
-        assignedTo, status, typeId, priority, 
+        assignedTo, status, typeId, priority, taskList, hideCompleted, dueDateFilter, 
         dueDateStart, dueDateEnd, overdue,
         relatedEntityType, relatedEntityId, customerId, 
         search, limit, offset 
@@ -26589,6 +26589,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       if (status) filters.status = status as string;
       if (typeId) filters.typeId = typeId as string;
       if (priority) filters.priority = priority as string;
+      if (taskList) filters.taskList = taskList as string;
+      if (hideCompleted === 'true') filters.hideCompleted = true;
+      if (dueDateFilter) filters.dueDateFilter = dueDateFilter as string;
       if (dueDateStart) filters.dueDateStart = new Date(dueDateStart as string);
       if (dueDateEnd) filters.dueDateEnd = new Date(dueDateEnd as string);
       if (overdue === 'true') filters.overdue = true;
@@ -26608,8 +26611,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         }
       }
       
-      const taskList = await storage.getTasks(filters);
-      res.json({ tasks: taskList, total: taskList.length });
+      const fetchedTasks = await storage.getTasks(filters);
+      res.json({ tasks: fetchedTasks, total: fetchedTasks.length });
     } catch (error) {
       console.error("Error fetching tasks:", error);
       res.status(500).json({ message: "Error fetching tasks" });
@@ -26802,7 +26805,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     try {
       const { customerId } = req.params;
       const taskList = await storage.getTasksByCustomer(customerId);
-      res.json({ tasks: taskList, total: taskList.length });
+      res.json({ tasks: fetchedTasks, total: fetchedTasks.length });
     } catch (error) {
       console.error("Error fetching customer tasks:", error);
       res.status(500).json({ message: "Error fetching customer tasks" });
@@ -26814,7 +26817,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     try {
       const { entityType, entityId } = req.params;
       const taskList = await storage.getTasksByRelatedEntity(entityType, entityId);
-      res.json({ tasks: taskList, total: taskList.length });
+      res.json({ tasks: fetchedTasks, total: fetchedTasks.length });
     } catch (error) {
       console.error("Error fetching entity tasks:", error);
       res.status(500).json({ message: "Error fetching entity tasks" });

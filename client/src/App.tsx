@@ -78,6 +78,7 @@ const CrmMessaging = lazy(() => import("@/pages/crm/crm-messaging"));
 const CrmNotifications = lazy(() => import("@/pages/crm/crm-notifications"));
 const CrmTasks = lazy(() => import("@/pages/crm/crm-tasks"));
 const CrmMyTasks = lazy(() => import("@/pages/crm/crm-my-tasks"));
+const CrmTaskBoard = lazy(() => import("@/pages/crm/crm-task-board"));
 
 // Lazy-load Mobile pages to reduce initial bundle size
 const MobileAgenda = lazy(() => import("@/pages/mobile/mobile-agenda"));
@@ -297,6 +298,7 @@ function Router() {
       <Route path="/crm/reports">{() => <ProtectedCrmWrapper><CrmGoalsTracker /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/messaging">{() => <ProtectedCrmWrapper><CrmMessaging /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/notifications">{() => <ProtectedCrmWrapper><CrmNotifications /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/tasks/board">{() => <ProtectedCrmWrapper><CrmTaskBoard /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/tasks">{() => <ProtectedCrmWrapper><CrmTasks /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/my-tasks">{() => <ProtectedCrmWrapper><CrmMyTasks /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm">{() => <ProtectedCrmWrapper><CrmBusinessDashboard /></ProtectedCrmWrapper>}</Route>

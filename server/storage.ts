@@ -2405,6 +2405,7 @@ export class DatabaseStorage implements IStorage {
     status?: string;
     typeId?: string;
     priority?: string;
+    taskList?: string;
     dueDateStart?: Date;
     dueDateEnd?: Date;
     overdue?: boolean;
@@ -2412,6 +2413,8 @@ export class DatabaseStorage implements IStorage {
     relatedEntityId?: string;
     customerId?: string;
     searchText?: string;
+    hideCompleted?: boolean;
+    dueDateFilter?: string;
     limit?: number;
     offset?: number;
   }): Promise<Task[]> {
@@ -2441,6 +2444,34 @@ export class DatabaseStorage implements IStorage {
     }
     if (filters?.priority) {
       conditions.push(eq(tasks.priority, filters.priority as any));
+    }
+    if (filters?.taskList) {
+      conditions.push(eq(tasks.taskList, filters.taskList as any));
+    }
+    if (filters?.hideCompleted) {
+      conditions.push(ne(tasks.status, 'completed' as any));
+      conditions.push(ne(tasks.status, 'cancelled' as any));
+    }
+    if (filters?.dueDateFilter) {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const next7Days = new Date(today);
+      next7Days.setDate(next7Days.getDate() + 7);
+
+      if (filters.dueDateFilter === 'overdue') {
+        conditions.push(lt(tasks.dueAt, today));
+        conditions.push(isNotNull(tasks.dueAt));
+      } else if (filters.dueDateFilter === 'today') {
+        conditions.push(gte(tasks.dueAt, today));
+        conditions.push(lt(tasks.dueAt, tomorrow));
+      } else if (filters.dueDateFilter === 'next7days') {
+        conditions.push(gte(tasks.dueAt, today));
+        conditions.push(lt(tasks.dueAt, next7Days));
+      } else if (filters.dueDateFilter === 'nodate') {
+        conditions.push(isNull(tasks.dueAt));
+      }
     }
     if (filters?.dueDateStart) {
       conditions.push(gte(tasks.dueAt, filters.dueDateStart));

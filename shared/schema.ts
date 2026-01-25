@@ -3249,6 +3249,10 @@ export type TaskPriority = typeof taskPriorityEnum[number];
 export const taskRelatedEntityTypeEnum = ["customer", "lead", "project", "work_order", "invoice", "none"] as const;
 export type TaskRelatedEntityType = typeof taskRelatedEntityTypeEnum[number];
 
+// Task List Enum - Google Tasks-style columns
+export const taskListEnum = ["inbox", "projects", "next_actions", "waiting_on", "follow_up"] as const;
+export type TaskList = typeof taskListEnum[number];
+
 // Task Types - Configurable task templates
 export const taskTypes = pgTable("task_types", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -3272,6 +3276,7 @@ export const tasks = pgTable("tasks", {
   description: text("description"),
   status: text("status").$type<TaskStatus>().notNull().default("pending"),
   priority: text("priority").$type<TaskPriority>().notNull().default("normal"),
+  taskList: text("task_list").$type<TaskList>().notNull().default("inbox"),
   typeId: varchar("type_id").references(() => taskTypes.id),
   assignedToUserId: varchar("assigned_to_user_id").references(() => crmUsers.id),
   createdByUserId: varchar("created_by_user_id").references(() => crmUsers.id).notNull(),
