@@ -260,7 +260,7 @@ export function CommentThread({
   }
 
   const sortedComments = [...comments].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
   return (
