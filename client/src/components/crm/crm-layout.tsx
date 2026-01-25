@@ -30,7 +30,6 @@ import {
   MessageSquare,
   Bell,
   ListTodo,
-  CheckSquare,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 import ghqLogo from "@assets/redlogo.webp";
@@ -79,10 +78,9 @@ const navSections: NavSection[] = [
   {
     title: "Operations",
     items: [
-      { label: "My Tasks", href: "/crm/my-tasks", icon: CheckSquare },
       { label: "Work Orders", href: "/crm/work-orders", icon: ClipboardList },
       { label: "Projects", href: "/crm/projects", icon: FolderKanban },
-      { label: "Tasks", href: "/crm/tasks", icon: ListTodo },
+      { label: "Tasks", href: "/crm/tasks/board", icon: ListTodo },
       { label: "Items", href: "/crm/items", icon: Package },
     ],
   },
