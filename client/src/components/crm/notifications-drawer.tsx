@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -42,9 +42,27 @@ interface NotificationsDrawerContentProps {
   onClose: () => void;
 }
 
+function getEntityUrl(entityType: string | null, entityId: string | null): string | null {
+  if (!entityType || !entityId) return null;
+  
+  switch (entityType) {
+    case "customer":
+      return `/crm/customers/${entityId}`;
+    case "lead":
+      return `/crm/leads/${entityId}`;
+    case "project":
+      return `/crm/projects/${entityId}`;
+    case "work_order":
+      return `/crm/work-orders/${entityId}`;
+    default:
+      return null;
+  }
+}
+
 export function NotificationsDrawerContent({ onClose }: NotificationsDrawerContentProps) {
   const [tab, setTab] = useState<"unread" | "all">("unread");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [, setLocation] = useLocation();
 
   const queryParams = new URLSearchParams();
   if (tab === "unread") queryParams.set("unreadOnly", "true");
@@ -96,6 +114,12 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
   const handleNotificationClick = (notification: Notification) => {
     if (!notification.isRead) {
       markAsReadMutation.mutate(notification.id);
+    }
+    
+    const url = getEntityUrl(notification.entityType, notification.entityId);
+    if (url) {
+      onClose();
+      setLocation(url);
     }
   };
 
