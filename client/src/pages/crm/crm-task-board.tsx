@@ -58,6 +58,8 @@ import {
   CheckSquare,
   X,
   ListChecks,
+  PanelLeftClose,
+  PanelLeft,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -228,17 +230,17 @@ function DraggableTaskCard({
               </Badge>
             )}
 
-            {task.relatedEntityType && task.relatedEntityType !== "none" && (
-              <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                <Building className="h-3 w-3 mr-1" />
-                {task.relatedEntityType.replace("_", " ")}
+            {task.customer && (
+              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 max-w-[150px] truncate">
+                <User className="h-3 w-3 mr-1 flex-shrink-0" />
+                <span className="truncate">{task.customer.name}</span>
               </Badge>
             )}
 
-            {task.customer && !task.relatedEntityType && (
-              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                <User className="h-3 w-3 mr-1" />
-                {task.customer.name}
+            {task.relatedEntityType && task.relatedEntityType !== "none" && task.relatedEntityType !== "customer" && (
+              <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                <Building className="h-3 w-3 mr-1" />
+                {task.relatedEntityType.replace("_", " ")}
               </Badge>
             )}
           </div>
@@ -261,19 +263,33 @@ function DroppableColumn({
   tasks,
   onTaskClick,
   onTaskComplete,
+  onQuickAdd,
   isUpdating,
+  isCreating,
 }: {
   column: typeof COLUMNS[number];
   tasks: TaskWithRelations[];
   onTaskClick: (task: TaskWithRelations) => void;
   onTaskComplete: (taskId: string, completed: boolean) => void;
+  onQuickAdd: (title: string, taskList: TaskList) => void;
   isUpdating: string | null;
+  isCreating: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
   });
+  const [quickAddValue, setQuickAddValue] = useState("");
+  const [isAddingTask, setIsAddingTask] = useState(false);
 
   const Icon = column.icon;
+
+  const handleQuickAdd = () => {
+    if (quickAddValue.trim()) {
+      onQuickAdd(quickAddValue.trim(), column.id);
+      setQuickAddValue("");
+      setIsAddingTask(false);
+    }
+  };
 
   return (
     <div
@@ -289,6 +305,56 @@ function DroppableColumn({
         <Badge variant="secondary" className="ml-auto text-xs">
           {tasks.length}
         </Badge>
+      </div>
+
+      <div className="p-2 border-b border-slate-100">
+        {isAddingTask ? (
+          <div className="flex items-center gap-1">
+            <Input
+              value={quickAddValue}
+              onChange={(e) => setQuickAddValue(e.target.value)}
+              placeholder="Task title..."
+              className="h-8 text-sm"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && quickAddValue.trim()) {
+                  handleQuickAdd();
+                } else if (e.key === "Escape") {
+                  setIsAddingTask(false);
+                  setQuickAddValue("");
+                }
+              }}
+              disabled={isCreating}
+            />
+            <Button
+              size="sm"
+              className="h-8 px-2 bg-[#711419] hover:bg-[#5a1014]"
+              onClick={handleQuickAdd}
+              disabled={!quickAddValue.trim() || isCreating}
+            >
+              {isCreating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 px-2"
+              onClick={() => {
+                setIsAddingTask(false);
+                setQuickAddValue("");
+              }}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setIsAddingTask(true)}
+            className="w-full flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 py-1 px-2 rounded hover:bg-slate-100 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add a task</span>
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 min-h-[200px]">
@@ -322,6 +388,7 @@ export default function CrmTaskBoard() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [dueDateFilter, setDueDateFilter] = useState("all");
   const [showCompleted, setShowCompleted] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const [selectedTask, setSelectedTask] = useState<TaskWithRelations | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -510,6 +577,25 @@ export default function CrmTaskBoard() {
     },
   });
 
+  const quickAddMutation = useMutation({
+    mutationFn: async ({ title, taskList }: { title: string; taskList: TaskList }) => {
+      return apiRequest("POST", "/api/tasks", {
+        title,
+        taskList,
+        status: "pending",
+        priority: "normal",
+        createdByUserId: currentUser!.id,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      toast({ title: "Task created" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create task", description: error.message, variant: "destructive" });
+    },
+  });
+
   const createSubtaskMutation = useMutation({
     mutationFn: async (data: { title: string; dueAt?: string | null }) => {
       return apiRequest("POST", `/api/tasks/${selectedTask!.id}/subtasks`, data);
@@ -658,44 +744,79 @@ export default function CrmTaskBoard() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="flex h-full">
-        {/* Left Sidebar Navigation */}
-        <div className="w-56 flex-shrink-0 bg-slate-50 border-r border-slate-200 p-4 hidden md:block">
-          <div className="space-y-1">
+        {/* Left Sidebar Navigation - Collapsible */}
+        <div className={`
+          flex-shrink-0 bg-slate-50 border-r border-slate-200 hidden md:flex flex-col
+          transition-all duration-300 ease-in-out
+          ${sidebarCollapsed ? 'w-14' : 'w-56'}
+        `}>
+          <div className="p-2 border-b border-slate-200">
             <Button
               variant="ghost"
-              className="w-full justify-start bg-slate-200 text-slate-900 font-medium"
-              onClick={() => navigate("/crm/tasks/board")}
+              size="icon"
+              className="w-full h-8"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              <Inbox className="h-4 w-4 mr-2" />
-              Master Inbox
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start text-slate-600 hover:bg-slate-100"
-              onClick={() => navigate("/crm/tasks/mine")}
-            >
-              <User className="h-4 w-4 mr-2" />
-              My Tasks
+              {sidebarCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </Button>
           </div>
-          <div className="mt-6 border-t border-slate-200 pt-4">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Lists</p>
-            <div className="space-y-1">
+          <div className="flex-1 p-2 space-y-1">
+            <Button
+              variant="ghost"
+              className={`w-full bg-slate-200 text-slate-900 font-medium ${sidebarCollapsed ? 'justify-center px-2' : 'justify-start'}`}
+              onClick={() => navigate("/crm/tasks/board")}
+              title="Master Inbox"
+            >
+              <Inbox className={`h-4 w-4 ${sidebarCollapsed ? '' : 'mr-2'}`} />
+              {!sidebarCollapsed && "Master Inbox"}
+            </Button>
+            <Button
+              variant="ghost"
+              className={`w-full text-slate-600 hover:bg-slate-100 ${sidebarCollapsed ? 'justify-center px-2' : 'justify-start'}`}
+              onClick={() => navigate("/crm/tasks/mine")}
+              title="My Tasks"
+            >
+              <User className={`h-4 w-4 ${sidebarCollapsed ? '' : 'mr-2'}`} />
+              {!sidebarCollapsed && "My Tasks"}
+            </Button>
+          </div>
+          {!sidebarCollapsed && (
+            <div className="p-2 border-t border-slate-200">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-2">Lists</p>
+              <div className="space-y-1">
+                {COLUMNS.map((col) => {
+                  const Icon = col.icon;
+                  const count = tasksByColumn[col.id]?.length || 0;
+                  return (
+                    <div key={col.id} className="flex items-center justify-between px-2 py-1.5 text-sm text-slate-600 rounded hover:bg-slate-100">
+                      <div className="flex items-center gap-2">
+                        <Icon className="h-4 w-4" />
+                        <span>{col.label}</span>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">{count}</Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {sidebarCollapsed && (
+            <div className="p-2 border-t border-slate-200 space-y-1">
               {COLUMNS.map((col) => {
                 const Icon = col.icon;
                 const count = tasksByColumn[col.id]?.length || 0;
                 return (
-                  <div key={col.id} className="flex items-center justify-between px-2 py-1.5 text-sm text-slate-600 rounded hover:bg-slate-100">
-                    <div className="flex items-center gap-2">
-                      <Icon className="h-4 w-4" />
-                      <span>{col.label}</span>
-                    </div>
-                    <Badge variant="secondary" className="text-xs">{count}</Badge>
+                  <div key={col.id} className="flex items-center justify-center py-1.5 text-slate-600 rounded hover:bg-slate-100 relative" title={`${col.label} (${count})`}>
+                    <Icon className="h-4 w-4" />
+                    {count > 0 && (
+                      <span className="absolute -top-1 -right-1 text-[10px] bg-slate-200 rounded-full w-4 h-4 flex items-center justify-center">{count}</span>
+                    )}
                   </div>
                 );
               })}
             </div>
-          </div>
+          )}
         </div>
 
         <div className={`flex-1 min-w-0 transition-all duration-300 ease-in-out ${isDrawerOpen ? 'mr-0' : ''}`}>
@@ -795,7 +916,11 @@ export default function CrmTaskBoard() {
                       onTaskComplete={(taskId, completed) =>
                         completeTaskMutation.mutate({ taskId, completed })
                       }
+                      onQuickAdd={(title, taskList) =>
+                        quickAddMutation.mutate({ title, taskList })
+                      }
                       isUpdating={updatingTaskId}
+                      isCreating={quickAddMutation.isPending}
                     />
                   ))}
                 </div>
