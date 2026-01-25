@@ -103,12 +103,14 @@ import {
   ChevronDown,
   Thermometer,
   Target,
+  ClipboardList,
 } from "lucide-react";
 import { format, isToday, isPast, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, getDay, addDays, subDays, addWeeks, subWeeks, startOfDay, getHours, getMinutes, setHours } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { CrmUser, CrmCustomer, CrmFollowUp, SalesStage, FollowUpType, CrmQuote, CrmLeadType, CrmLeadTempOption, CrmLeadDriverOption } from "@shared/schema";
 import { CommentComposer } from "@/components/crm/comment-composer";
 import { CommentThread } from "@/components/crm/comment-thread";
+import { EntityTasksTab } from "@/components/crm/entity-tasks-tab";
 
 type Lead = {
   id: string;
@@ -3206,6 +3208,19 @@ export default function CrmProspectFunnel() {
                       </div>
                     </TabsContent>
                   </Tabs>
+
+                  <div className="px-4 py-4 border-t mt-4">
+                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <ClipboardList className="h-4 w-4" />
+                      Tasks
+                    </h3>
+                    <EntityTasksTab
+                      entityType="lead"
+                      entityId={expandedLead.id}
+                      customerId={expandedLead.customerId}
+                      customerName={expandedLead.customerName || undefined}
+                    />
+                  </div>
                 </ScrollArea>
               </>
             )}

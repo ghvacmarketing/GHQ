@@ -18,70 +18,32 @@ Preferred communication style: Simple, everyday language.
 ### Key Design Decisions
 -   **Monorepo**: Shared TypeScript types and Zod schemas.
 -   **Pricing Engine**: Google Sheets as source of truth with server-side and client-side caching. Sophisticated formulas for overhead, profit, financing, and warranty.
--   **Quote Generation**: Text-based output with server-side calculations, editable drafts, and toggleable detailed breakdowns. AI-powered quote generation using OpenAI GPT-5.2 with structured outputs and conversation memory.
--   **CRM & Sales Funnel**: Kanban-style pipeline for leads (New → Contacted → Quote Sent → Negotiating → Won/Lost), lead management, follow-up tracking, CSV import/export, and address auto-completion.
--   **Lead Management System**: Supports multiple leads/opportunities per customer. Leads are separate entities in `crm_leads` table with their own lifecycle:
-    -   **Lead Types**: Configurable types (HVAC Change-Out, New Construction, Maintenance, Crawlspace Encapsulation, Duct Cleaning) managed in CRM Settings > Lead Types
-    -   **Lead Classification System**: Two-dimensional classification for leads:
-        -   **Lead Temperature (1-5 scale)**: Info Only/Cold (T1), Interested/Warm (T2), Qualified/Hot (T3), Proposal Ready (T4), Committed/Won (T5). Configurable in CRM Settings > Lead Classification.
-        -   **Customer Driver**: Pain (urgent issue), Health (comfort/air quality), Financial (savings/efficiency), Preventive (maintenance). Configurable in CRM Settings > Lead Classification.
-        -   Lead cards display compact badges (T1-T5 for temperature, driver label for driver)
-        -   Lead Board includes multi-select filters for Temperature and Driver with URL persistence
-        -   Quick counts section in board header shows distribution by Temperature and Driver
-    -   **Lead Fields**: leadTypeId, leadTempId, leadDriverId, potentialValue (integer), assignedSalesRepId, interestLevel (hot/warm/cold), salesStage (new/contacted/quote_sent/negotiating/won/lost), notes
-    -   **Lead Funnel Board**: Kanban-style board displays lead cards (customer name + lead type badge), supports drag-drop between stages
-    -   **Lead Detail/Edit**: Quick edit for potential value, interest level, temperature, driver, sales rep assignment, and notes without navigating away from funnel
-    -   **API Endpoints**: CRUD at `/api/crm/leads`, Lead Types at `/api/crm/lead-types`, Lead Temp Options at `/api/crm/lead-temp-options`, Lead Driver Options at `/api/crm/lead-driver-options`, metrics at `/api/crm/lead-metrics`
--   **Project & Work Order Management**:
-    -   **Projects**: High-value scope containers ($5k+) with pipeline statuses (Lead → Proposal Sent → Approved → In Progress → Completed → Closed → Archived). Can contain multiple Work Orders.
-    -   **Work Orders**: Scheduled visits/appointments with dispatch statuses (Scheduled → Dispatched → En Route → On Site → Completed). Can be independent or linked to Projects.
-    -   **Dispatch Board**: Focuses on Work Orders.
--   **Quotes and Invoices System**: Integrated CRM quotes attached to Work Orders or Projects with status workflows (draft → sent → accepted/declined/expired). CRM Invoices tied to Work Orders with status workflows (draft → sent → paid/void). **Install Quote Financing**: Deposit-required quotes (custom_install, proposal, custom_service) display dual payment options: Stripe deposit payment or financing application. Financing link is configurable in CRM Settings > Payment Settings with default GreenSky integration.
--   **Project Timeline**: Aggregates all project activities (notes, photos, files, status changes, financial updates) chronologically.
--   **Job Costing System**: Track project profitability with live calculations:
-    -   **Materials Catalog**: CSV-uploadable catalog of duct materials and equipment in Settings. Upload replaces entire catalog transactionally.
-    -   **Equipment & Materials**: Enhanced project section with unit cost, vendor, date tracking. "Add from Catalog" multi-select for quick item addition. Auto-calculates total materials cost.
-    -   **Labor Entries**: Track labor costs per project (date, contractor, description, type, amount). Full CRUD in Job Costing tab.
-    -   **Profitability Dashboard**: Live summary showing Revenue, Labor Cost, Materials/COGS, Gross Profit, Overhead (configurable %), Sales Commission (configurable %), and Net Profit. Green/red coloring for positive/negative values.
-    -   **Settings**: Overhead % and Commission % configurable in CRM Settings > Materials Catalog page (default 30% and 6%).
--   **Customer Database**: FieldEdge CSV import, Google Sheets two-way sync, customer lookup integration.
--   **Processes and Systems Module**: Searchable, voice-guided wiki with Tiptap editor, PDF export, and backward compatibility.
--   **Maintenance Agreements System**: Flexible billing frequencies (weekly, monthly, annual), configurable visits, regional reminders, auto-creation from paid invoices, and **payment-based lifecycle**. Statuses: pending (awaiting first payment), active (fully operational), grace_period (renewal invoice sent, 30-day window), expired (grace period passed), cancelled. Billing preferences: auto_invoice (automatic renewal invoicing), pay_on_visit (technician collects on site). Key behaviors:
-    -   New agreements start as `pending` with `isInitialCycle=true`; no automatic invoices sent until manually triggered via "Send First Invoice" button
-    -   When first invoice is paid: agreement activates, `activationDate` is recorded, `isInitialCycle` flips to false
-    -   Auto-renewal only applies to active, non-initial, auto_invoice agreements; daily job checks `nextInvoiceDate`, sends renewal, sets 30-day grace period
-    -   When renewal invoice is paid: pending visits are cancelled and new visits created for the new cycle
-    -   Agreements with unpaid grace periods past 30 days are marked expired
-    -   Admins can manually trigger renewal processing via the "Process Renewals" button on the Agreements page
--   **Service Call Checklists**: Dynamic, service type-mapped intake questionnaires for work orders with AI summarization (OpenAI GPT-3.5) and required question enforcement. Admin UI for template management.
+-   **Quote Generation**: Text-based output with server-side calculations, editable drafts, toggleable detailed breakdowns, and AI-powered generation using OpenAI GPT-5.2.
+-   **CRM & Sales Funnel**: Kanban-style pipeline for leads with configurable types and a two-dimensional classification system (Lead Temperature, Customer Driver). Supports lead management, follow-up tracking, and CSV import/export.
+-   **Task Management System**: Comprehensive task tracking with configurable task types, role-based permissions, and integration with customer, lead, and project entities.
+-   **Project & Work Order Management**: Projects for high-value scopes with pipeline statuses; Work Orders for scheduled visits with dispatch statuses. Features a Dispatch Board focused on Work Orders.
+-   **Quotes and Invoices System**: Integrated CRM quotes and invoices with status workflows. Supports deposit-required quotes with dual payment options (Stripe/financing).
+-   **Job Costing System**: Tracks project profitability with live calculations, materials catalog, labor entry tracking, and configurable overhead/commission percentages.
+-   **Customer Database**: FieldEdge CSV import, Google Sheets two-way sync, customer lookup.
+-   **Processes and Systems Module**: Searchable, voice-guided wiki with Tiptap editor and PDF export.
+-   **Maintenance Agreements System**: Flexible billing frequencies, configurable visits, regional reminders, auto-creation from paid invoices, and a payment-based lifecycle with statuses like pending, active, grace_period, and expired.
+-   **Service Call Checklists**: Dynamic, service type-mapped intake questionnaires with AI summarization (OpenAI GPT-3.5) and required question enforcement.
 -   **Customer Portal**: Self-service portal for customers to view invoices, agreements, and service history via magic link login.
--   **User Roles**: Granular CRM roles (Owner, Admin, Supervisor, Sales, Tech) with distinct access levels for desktop and mobile applications. Supervisor role has admin-level desktop access plus enhanced mobile with self-assign capability ("Assign to Me" button), and ability to edit their assigned work orders directly from mobile. **Mobile Job Visibility**: Supervisor, Tech, and Sales roles all have "All Techs / My Jobs" toggle on mobile agenda and jobs pages. Supervisors default to "All Techs" view, while Tech/Sales default to "My Jobs" view. Owner/Admin always see all jobs without needing a toggle. All three roles (Supervisor/Tech/Sales) can view future jobs (next 30 days) on the Jobs tab. Only the Owner can change user roles.
--   **Mobile Technician PWA**: Offline-first architecture for field technicians with daily agenda, job details, photo capture, background sync for offline changes, time tracking clock in/out, and messaging with customer search.
--   **Security**: Environment variable-based secrets (`SESSION_SECRET`, `ADMIN_API_KEY`, `GLOBAL_PASSWORD`), httpOnly cookies, and strict customer-scoped data filtering.
--   **Vector Store Knowledge Base**: Optional OpenAI vector store integration for enhanced AI quote generation from uploaded sales documents.
--   **Messaging Dashboard**: Textline-style three-panel messaging interface for customer communications. Left panel shows conversation inbox with filters/search, center panel displays message thread with chat bubbles and composer, right panel shows contact sidebar with assignment, tags, and quick actions. Built with adapter pattern for future Textline integration via webhooks. Mobile techs can also access messaging via `/mobile/messages` with contact search.
--   **Automated SMS Notifications**: System for sending automated SMS alerts to customers via Textline with duplicate prevention using `sms_notification_log` table. Notification types include:
-    -   **Maintenance Reminders**: Daily scheduler sends 10-day and 5-day reminders for upcoming maintenance visits to customers with active agreements
-    -   **Invoice SMS**: When invoice email is sent for auto-invoice maintenance agreements, an SMS with payment link is also sent
-    -   **Work Order Status**: Automatic SMS when technician status changes to "En Route" or "On Site"
-    -   All notifications are recorded in the conversation history for CRM visibility
--   **Time Tracking System**: Technicians clock in/out from mobile app (`/mobile/time`). Entries stored in `crm_time_entries` table with tech ID, timestamps, optional work order link, and notes. Admins view/edit all entries via CRM Settings > Time Logs (`/crm/settings/time-logs`) with filters, CSV export, and adjustment capabilities.
--   **QuickBooks Online Integration**: Full bidirectional OAuth 2.0 sync with sandbox/production modes. Syncs customers, invoices, and payments. **Hierarchical QuickBooks Class Assignment** system:
-    -   **Customer Types**: residential, commercial, property_manager
-    -   **Property Types**: Each property has a `propertyType` (residential/commercial) that auto-defaults from customer type. Property managers must manually select for each location.
-    -   **Class Calculation**: Invoice line item class = item category (Service/Install/Maintenance/Discount) + property type (Residential/Commercial)
-    -   **Per-Line Overrides**: Advanced mode in invoice creation allows manual class selection per line item
-    -   **9 Predefined Classes**: Service - Residential, Service - Commercial, Install - Residential, Install - Commercial, Install - Crawlspace, Maintenance - Residential, Maintenance - Commercial, Discount - Promotional, Discount - Maintenance
-    -   **Admin Class Management**: Add/edit/delete classes in QuickBooks Settings with two-way sync (Pull from/Push to QuickBooks)
-    -   **Chart of Accounts (Income Accounts)**: Hierarchical parent/child income account structure for P&L tracking. Parent accounts (Service, Install, Maintenance, Discount) with sub-accounts (Residential, Commercial) under each. Admin UI to pull accounts from QuickBooks and create sub-accounts.
-    -   **Products & Services (Items)**: QuickBooks items mapped to income accounts for P&L routing. Each item has categoryType (Service/Install/Maintenance/Discount) and propertyType (Residential/Commercial) mapping. Invoice sync assigns ItemRef based on line item category + property type, routing revenue to correct income sub-accounts.
+-   **User Roles**: Granular CRM roles (Owner, Admin, Supervisor, Sales, Tech) with distinct access levels for desktop and mobile, including enhanced mobile capabilities for Supervisors.
+-   **Mobile Technician PWA**: Offline-first architecture for field technicians featuring daily agenda, job details, photo capture, background sync, time tracking, and customer messaging.
+-   **Security**: Environment variable-based secrets, httpOnly cookies, and strict customer-scoped data filtering.
+-   **Vector Store Knowledge Base**: Optional OpenAI vector store integration for enhanced AI quote generation.
+-   **Messaging Dashboard**: Three-panel Textline-style messaging interface for customer communications, accessible by mobile techs.
+-   **Automated SMS Notifications**: System for sending automated SMS alerts to customers via Textline for maintenance reminders, invoice payments, and work order status updates.
+-   **Time Tracking System**: Technicians clock in/out from the mobile app, with entries stored and editable by Admins.
+-   **QuickBooks Online Integration**: Full bidirectional OAuth 2.0 sync for customers, invoices, and payments, featuring a hierarchical class assignment system based on customer and property types, and an admin UI for managing classes and chart of accounts.
 
 ## External Dependencies
 -   **Google Sheets API**: Parts pricing, application settings, customer data sync.
 -   **Resend**: Email notifications for CRM quotes and tracking.
 -   **Trello API**: Workflow management.
 -   **Neon Database**: PostgreSQL hosting.
--   **OpenAI API**: Whisper (voice transcription), GPT (intelligent text formatting, AI quote generation, AI checklist summarization), Vector Stores (knowledge base).
+-   **OpenAI API**: Whisper, GPT, Vector Stores.
 -   **Twilio**: SMS Magic Link authentication.
 -   **Geoapify API**: Address autocomplete, reverse geocoding.
 -   **react-pdf**: PDF viewing.
