@@ -335,7 +335,7 @@ export function EntityTasksTab({ entityType, entityId, customerId, customerName 
                         </TableCell>
                         <TableCell>
                           <a
-                            href={`/crm/tasks?taskId=${task.id}`}
+                            href={`/crm/tasks/board?taskId=${task.id}`}
                             onClick={(e) => e.stopPropagation()}
                             className="text-slate-400 hover:text-slate-600"
                           >
