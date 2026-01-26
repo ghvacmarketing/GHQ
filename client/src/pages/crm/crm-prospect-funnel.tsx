@@ -20,7 +20,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -1609,8 +1608,11 @@ export default function CrmProspectFunnel() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4">
+      <div className="flex h-full">
+        {/* Main Content Area - shrinks when drawer is open */}
+        <div className={`flex-1 overflow-auto transition-all duration-300 ease-in-out ${expandedLeadId ? 'mr-0' : ''}`}>
+          <div className="space-y-6 p-0">
+            <div className="flex flex-col gap-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">
@@ -2601,29 +2603,46 @@ export default function CrmProspectFunnel() {
               </DndContext>
             </TabsContent>
           </Tabs>
+          </div>
+        </div>
         </div>
 
-        <Sheet open={!!expandedLeadId} onOpenChange={(open) => {
-          if (!open) {
-            setExpandedLeadId(null);
-            setIsEditing(false);
-          }
-        }} modal={false}>
-          <SheetContent side="right" className="w-[90vw] sm:w-[530px] sm:max-w-[530px] p-0 flex flex-col overflow-y-auto">
+        {/* Push-style drawer for lead details */}
+        <div
+          className={`
+            flex-shrink-0 bg-white border-l border-slate-200 overflow-y-auto
+            transition-all duration-300 ease-in-out
+            ${expandedLeadId ? 'w-[90vw] sm:w-[530px] opacity-100' : 'w-0 opacity-0 overflow-hidden'}
+          `}
+        >
+          <div className="w-[90vw] sm:w-[530px] p-0 flex flex-col">
             {expandedLead && (
               <>
-                <SheetHeader className="px-4 py-4 border-b flex-shrink-0 space-y-3">
-                  <div className="pr-8">
-                    <SheetTitle className="text-lg font-semibold">
-                      <Link href={`/crm/customers/${expandedLead.customerId}`} className="hover:text-[#711419] hover:underline">
-                        {expandedLead.customerName || "Unknown"}
-                        <ExternalLink className="h-3 w-3 inline ml-1 opacity-50" />
-                      </Link>
-                    </SheetTitle>
-                    <SheetDescription className="text-sm text-muted-foreground mt-1">
-                      {expandedLead.customerPhone && <span className="mr-3">{expandedLead.customerPhone}</span>}
-                      {expandedLead.customerEmail && <span className="truncate">{expandedLead.customerEmail}</span>}
-                    </SheetDescription>
+                <div className="px-4 py-4 border-b flex-shrink-0 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="pr-4">
+                      <h2 className="text-lg font-semibold">
+                        <Link href={`/crm/customers/${expandedLead.customerId}`} className="hover:text-[#711419] hover:underline">
+                          {expandedLead.customerName || "Unknown"}
+                          <ExternalLink className="h-3 w-3 inline ml-1 opacity-50" />
+                        </Link>
+                      </h2>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {expandedLead.customerPhone && <span className="mr-3">{expandedLead.customerPhone}</span>}
+                        {expandedLead.customerEmail && <span className="truncate">{expandedLead.customerEmail}</span>}
+                      </p>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => {
+                        setExpandedLeadId(null);
+                        setIsEditing(false);
+                      }}
+                      className="flex-shrink-0"
+                    >
+                      <X className="h-5 w-5" />
+                    </Button>
                   </div>
                   
                   <div className="flex flex-wrap gap-2 items-center">
@@ -2703,7 +2722,7 @@ export default function CrmProspectFunnel() {
                       </Select>
                     </div>
                   </div>
-                </SheetHeader>
+                </div>
 
                 <ScrollArea className="flex-1 px-4 py-3">
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -3224,8 +3243,8 @@ export default function CrmProspectFunnel() {
                 </ScrollArea>
               </>
             )}
-          </SheetContent>
-        </Sheet>
+          </div>
+        </div>
 
         <Dialog open={followUpDialogOpen} onOpenChange={setFollowUpDialogOpen}>
           <DialogContent className="sm:max-w-md">
