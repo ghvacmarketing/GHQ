@@ -6387,6 +6387,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/customers/main-accounts - Get all main accounts (no parent) for parent selector
+  app.get("/api/crm/customers/main-accounts", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Main accounts are customers that either:
+      // 1. Have no parent (parentCustomerId is null)
+      // 2. Are used as parents by other customers
+      // For simplicity, we return all customers with no parent
+      const mainAccounts = await db.select({
+        id: crmCustomers.id,
+        name: crmCustomers.name,
+        companyName: crmCustomers.companyName,
+        customerType: crmCustomers.customerType,
+        customerStatus: crmCustomers.customerStatus,
+        email: crmCustomers.email,
+        phone: crmCustomers.phone,
+        fullAddress: crmCustomers.fullAddress,
+        parentCustomerId: crmCustomers.parentCustomerId,
+        billToParent: crmCustomers.billToParent,
+      })
+        .from(crmCustomers)
+        .where(isNull(crmCustomers.parentCustomerId))
+        .orderBy(asc(crmCustomers.name));
+
+      return res.json(mainAccounts);
+    } catch (error) {
+      console.error("Error fetching main accounts:", error);
+      return res.status(500).json({ message: "Failed to fetch main accounts" });
+    }
+  });
+
   // GET /api/crm/customers/:id - Get single customer from crmCustomers table
   app.get("/api/crm/customers/:id", requireCrmAuth, async (req, res) => {
     try {
@@ -6610,39 +6645,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/crm/customers/main-accounts - Get all customers that can be parent accounts
-  app.get("/api/crm/customers/main-accounts", requireCrmAuth, async (req, res) => {
-    try {
-      const user = await getCurrentCrmUser(req);
-      if (!user) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-
-      // Main accounts are customers that either:
-      // 1. Have no parent (parentCustomerId is null)
-      // 2. Are used as parents by other customers
-      // For simplicity, we return all customers with no parent
-      const mainAccounts = await db.select({
-        id: crmCustomers.id,
-        name: crmCustomers.name,
-        companyName: crmCustomers.companyName,
-        customerType: crmCustomers.customerType,
-        customerStatus: crmCustomers.customerStatus,
-        email: crmCustomers.email,
-        phone: crmCustomers.phone,
-        fullAddress: crmCustomers.fullAddress,
-        parentCustomerId: crmCustomers.parentCustomerId,
-        billToParent: crmCustomers.billToParent,
-      })
-        .from(crmCustomers)
-        .where(isNull(crmCustomers.parentCustomerId))
-        .orderBy(asc(crmCustomers.name));
-
-      return res.json(mainAccounts);
-    } catch (error) {
-      console.error("Error fetching main accounts:", error);
-      return res.status(500).json({ message: "Failed to fetch main accounts" });
-    }
-  });
 
   // GET /api/crm/customers/:id/sub-accounts - Get all sub-accounts of a customer
   app.get("/api/crm/customers/:id/sub-accounts", requireCrmAuth, async (req, res) => {
