@@ -2092,6 +2092,7 @@ export const crmAccounts = pgTable("crm_accounts", {
   accountStatus: text("account_status").$type<AccountStatus>().notNull().default("PROSPECT"),
   leadSource: text("lead_source").$type<LeadSource>(),
   parentAccountId: varchar("parent_account_id").references((): any => crmAccounts.id),
+  billToParent: boolean("bill_to_parent").default(false), // If true, bill the parent account instead
   customerSince: date("customer_since"),
   pinnedNote: text("pinned_note"),
   noCallRecording: boolean("no_call_recording").default(false),

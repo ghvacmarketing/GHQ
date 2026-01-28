@@ -6340,6 +6340,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         interestLevel: customerData.interestLevel || null,
         potentialValue: customerData.potentialValue && !isNaN(Number(customerData.potentialValue)) ? parseInt(String(customerData.potentialValue), 10) : null,
         assignedSalesRepId: customerData.assignedSalesRepId || null,
+        parentCustomerId: customerData.parentCustomerId || null,
+        billToParent: customerData.billToParent || false,
       }).returning();
       autoSyncCustomer(newCustomer.id);
 

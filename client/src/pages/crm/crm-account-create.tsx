@@ -64,7 +64,7 @@ import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { formatPhoneNumber, validateEmail, validatePhone } from "@/lib/form-utils";
-import type { CrmUser, AccountType, AccountStatus, LeadSource, CrmAccount } from "@shared/schema";
+import type { CrmUser, AccountType, AccountStatus, LeadSource, CrmAccount, CrmCustomer } from "@shared/schema";
 
 const ACCOUNT_TYPES: { value: AccountType; label: string; description: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { value: "RESIDENTIAL", label: "Residential", description: "Individual homeowners and renters", icon: Home },
@@ -102,6 +102,7 @@ interface FormData {
   phone: string;
   email: string;
   parentAccountId: string;
+  billToParent: boolean;
   customerSince: Date;
   leadSource: LeadSource | "";
   noCallRecording: boolean;
@@ -151,6 +152,7 @@ const initialFormData: FormData = {
   phone: "",
   email: "",
   parentAccountId: "",
+  billToParent: false,
   customerSince: new Date(),
   leadSource: "",
   noCallRecording: false,
@@ -233,6 +235,39 @@ export default function CrmAccountCreate() {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
+  // Fetch existing customers for parent account selector (using main-accounts endpoint)
+  const { data: availableMainAccounts } = useQuery<CrmCustomer[]>({
+    queryKey: ["/api/crm/customers/main-accounts"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: !!currentUser,
+  });
+
+  // Main accounts are already filtered by the API to only include those without a parent
+  const parentAccountOptions = useMemo(() => {
+    if (!availableMainAccounts) return [];
+    return availableMainAccounts;
+  }, [availableMainAccounts]);
+
+  // Parent account search state
+  const [parentSearchQuery, setParentSearchQuery] = useState("");
+  const [parentSearchOpen, setParentSearchOpen] = useState(false);
+
+  const filteredParentAccounts = useMemo(() => {
+    if (!parentSearchQuery) return parentAccountOptions.slice(0, 10);
+    const query = parentSearchQuery.toLowerCase();
+    return parentAccountOptions
+      .filter(account => 
+        account.name.toLowerCase().includes(query) ||
+        (account.companyName && account.companyName.toLowerCase().includes(query))
+      )
+      .slice(0, 10);
+  }, [parentAccountOptions, parentSearchQuery]);
+
+  const selectedParentAccount = useMemo(() => {
+    if (!formData.parentAccountId || !availableMainAccounts) return null;
+    return availableMainAccounts.find(a => a.id === formData.parentAccountId) || null;
+  }, [formData.parentAccountId, availableMainAccounts]);
+
   useEffect(() => {
     if (!authLoading && !currentUser) {
       navigate("/crm/login");
@@ -297,6 +332,8 @@ export default function CrmAccountCreate() {
           fullAddress: fullAddress,
           leadSource: formData.leadSource || null,
           notes: formData.pinnedNote || null,
+          parentCustomerId: formData.parentAccountId || null,
+          billToParent: formData.billToParent || false,
         },
         property: shouldCreateProperty ? {
           address1: formData.address1,
@@ -796,6 +833,124 @@ export default function CrmAccountCreate() {
                     rows={3}
                     data-testid="textarea-pinned-note"
                   />
+                </div>
+
+                {/* Parent Account Relationship Section */}
+                <Separator className="my-4" />
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-medium text-slate-900">Account Relationship (Optional)</h3>
+                    <p className="text-xs text-slate-500 mt-1">Link this account to a parent account if it's a sub-account location or subsidiary.</p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="parentAccountSearch">Parent Account</Label>
+                    <Popover open={parentSearchOpen} onOpenChange={setParentSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={parentSearchOpen}
+                          className="w-full justify-between font-normal"
+                          data-testid="select-parent-account"
+                        >
+                          {selectedParentAccount ? (
+                            <span className="flex items-center gap-2">
+                              <Building2 className="h-4 w-4 text-slate-500" />
+                              {selectedParentAccount.name}
+                              {selectedParentAccount.companyName && selectedParentAccount.name !== selectedParentAccount.companyName && (
+                                <span className="text-slate-400">({selectedParentAccount.companyName})</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">Select parent account (optional)</span>
+                          )}
+                          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[400px] p-0" align="start">
+                        <div className="p-2 border-b">
+                          <div className="flex items-center gap-2 px-2">
+                            <Search className="h-4 w-4 text-slate-400" />
+                            <Input
+                              placeholder="Search accounts..."
+                              value={parentSearchQuery}
+                              onChange={(e) => setParentSearchQuery(e.target.value)}
+                              className="border-0 focus-visible:ring-0 h-8"
+                            />
+                          </div>
+                        </div>
+                        <div className="max-h-[200px] overflow-y-auto">
+                          {filteredParentAccounts.length === 0 ? (
+                            <div className="p-4 text-center text-sm text-slate-500">
+                              No accounts found
+                            </div>
+                          ) : (
+                            filteredParentAccounts.map((account) => (
+                              <button
+                                key={account.id}
+                                type="button"
+                                className={cn(
+                                  "w-full flex items-center gap-2 p-2 hover:bg-slate-100 text-left",
+                                  formData.parentAccountId === account.id && "bg-slate-50"
+                                )}
+                                onClick={() => {
+                                  updateField("parentAccountId", account.id);
+                                  setParentSearchOpen(false);
+                                  setParentSearchQuery("");
+                                }}
+                              >
+                                <Building2 className="h-4 w-4 text-slate-400" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-sm truncate">{account.name}</div>
+                                  {account.companyName && account.name !== account.companyName && (
+                                    <div className="text-xs text-slate-500 truncate">{account.companyName}</div>
+                                  )}
+                                </div>
+                                {formData.parentAccountId === account.id && (
+                                  <Check className="h-4 w-4 text-[#d3b07d]" />
+                                )}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                        {formData.parentAccountId && (
+                          <div className="p-2 border-t">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full text-slate-500"
+                              onClick={() => {
+                                updateField("parentAccountId", "");
+                                updateField("billToParent", false);
+                                setParentSearchOpen(false);
+                              }}
+                            >
+                              Clear selection
+                            </Button>
+                          </div>
+                        )}
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* Bill to Parent Toggle - only shows when parent is selected */}
+                  {formData.parentAccountId && (
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border">
+                      <div>
+                        <Label htmlFor="billToParent" className="text-sm font-medium">Bill to Parent Account</Label>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Send invoices to the parent account instead of this sub-account
+                        </p>
+                      </div>
+                      <Switch
+                        id="billToParent"
+                        checked={formData.billToParent}
+                        onCheckedChange={(checked) => updateField("billToParent", checked)}
+                        data-testid="switch-bill-to-parent"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
