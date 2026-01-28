@@ -1438,13 +1438,13 @@ export default function CrmProspectFunnel() {
     });
   };
 
-  const filteredLeadIds = useMemo(() => {
-    return new Set(filteredLeads.map((l) => l.id));
+  const filteredLeadCustomerIds = useMemo(() => {
+    return new Set(filteredLeads.map((l) => l.customerId));
   }, [filteredLeads]);
 
   const getFollowUpsForDate = (date: Date) => {
     return followUps.filter((f) => {
-      if (!filteredLeadIds.has(f.customerId)) return false;
+      if (!filteredLeadCustomerIds.has(f.customerId)) return false;
       const followUpDate = typeof f.dueAt === "string" ? parseISO(f.dueAt) : f.dueAt;
       return isSameDay(followUpDate, date);
     }).map((f) => {
