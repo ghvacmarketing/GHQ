@@ -401,6 +401,9 @@ export const customers = pgTable("customers", {
   phone: text("phone"),
   email: text("email"),
   leadSource: text("lead_source"),
+  // Parent/Sub-account relationship
+  parentCustomerId: varchar("parent_customer_id"), // Reference to parent account (null = main account)
+  billToParent: boolean("bill_to_parent").default(false), // If true, bill the parent account instead
   // Import tracking
   checksum: text("checksum"), // Hash of row data for change detection
   importBatchId: varchar("import_batch_id"),
