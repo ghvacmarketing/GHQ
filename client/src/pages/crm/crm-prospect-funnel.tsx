@@ -2997,7 +2997,7 @@ export default function CrmProspectFunnel() {
                     <TabsContent value="followups" className="space-y-4">
                       <div className="flex justify-between items-center">
                         <h4 className="text-sm font-medium">Follow-ups</h4>
-                        <Button size="sm" onClick={() => handleAddFollowUp(expandedLead.id)}>
+                        <Button size="sm" onClick={() => handleAddFollowUp(expandedLead.customerId)}>
                           <Plus className="h-4 w-4 mr-1" />
                           Add Follow-up
                         </Button>
