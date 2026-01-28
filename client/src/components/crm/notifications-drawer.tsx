@@ -49,7 +49,7 @@ function getEntityUrl(entityType: string | null, entityId: string | null): strin
     case "customer":
       return `/crm/customers/${entityId}`;
     case "lead":
-      return `/crm/leads/${entityId}`;
+      return `/crm/prospect-funnel?lead=${entityId}`;
     case "project":
       return `/crm/projects/${entityId}`;
     case "work_order":

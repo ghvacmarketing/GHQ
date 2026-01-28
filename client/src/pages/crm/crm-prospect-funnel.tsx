@@ -769,6 +769,19 @@ export default function CrmProspectFunnel() {
     window.history.replaceState({}, "", newUrl);
   }, [selectedTempIds, selectedDriverIds]);
 
+  // Auto-expand lead from URL parameter (for notification click-throughs)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const leadId = params.get("lead");
+    if (leadId) {
+      setExpandedLeadId(leadId);
+      // Remove the lead parameter from URL after expanding
+      params.delete("lead");
+      const newUrl = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname;
+      window.history.replaceState({}, "", newUrl);
+    }
+  }, []);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 8 },
@@ -2907,6 +2920,27 @@ export default function CrmProspectFunnel() {
 
                       {!isEditing && (
                         <>
+                          {/* Schedule Follow-up button */}
+                          {expandedLead.salesStage !== "won" && expandedLead.salesStage !== "lost" && (
+                            <div className="pt-4 border-t">
+                              <Button
+                                className="w-full"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedProspectId(expandedLead.customerId);
+                                  setFollowUpType("call");
+                                  setFollowUpDueDate("");
+                                  setFollowUpNotes("");
+                                  setFollowUpDialogOpen(true);
+                                }}
+                                data-testid="button-schedule-followup"
+                              >
+                                <Calendar className="h-4 w-4 mr-2" />
+                                Schedule Follow-up
+                              </Button>
+                            </div>
+                          )}
+
                           <div className="pt-4 border-t flex gap-2">
                             {expandedLead.salesStage !== "won" && expandedLead.salesStage !== "lost" && (
                               <>
