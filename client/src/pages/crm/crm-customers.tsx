@@ -31,6 +31,7 @@ import {
   ChevronRight,
   Plus,
   FolderOpen,
+  CornerDownRight,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
@@ -219,6 +220,52 @@ export default function CrmCustomers() {
     }
     return grouped;
   }, [projectsData]);
+
+  // Organize customers with sub-accounts grouped under parents
+  const organizedCustomers = useMemo(() => {
+    const customers = customersData?.customers || [];
+    
+    // Separate main accounts (no parent) and sub-accounts (have parent)
+    const mainAccounts = customers.filter(c => !c.parentCustomerId);
+    const subAccounts = customers.filter(c => c.parentCustomerId);
+    
+    // Create a map of parent IDs that are in the current page
+    const mainAccountIds = new Set(mainAccounts.map(c => c.id));
+    
+    // Group sub-accounts by parent ID
+    const subAccountsByParent: Record<string, CustomerWithAddress[]> = {};
+    for (const sub of subAccounts) {
+      const parentId = sub.parentCustomerId as string;
+      if (!subAccountsByParent[parentId]) {
+        subAccountsByParent[parentId] = [];
+      }
+      subAccountsByParent[parentId].push(sub);
+    }
+    
+    // Build organized list: parent followed by its sub-accounts
+    const result: Array<{ customer: CustomerWithAddress; isSubAccount: boolean; parentName?: string }> = [];
+    const addedSubAccountIds = new Set<string>();
+    
+    for (const parent of mainAccounts) {
+      result.push({ customer: parent, isSubAccount: false });
+      
+      // Add sub-accounts immediately after their parent
+      const children = subAccountsByParent[parent.id] || [];
+      for (const child of children) {
+        result.push({ customer: child, isSubAccount: true, parentName: parent.name });
+        addedSubAccountIds.add(child.id);
+      }
+    }
+    
+    // Add any sub-accounts whose parent is not in the current page
+    for (const sub of subAccounts) {
+      if (!addedSubAccountIds.has(sub.id)) {
+        result.push({ customer: sub, isSubAccount: true });
+      }
+    }
+    
+    return result;
+  }, [customersData]);
 
   // Format project number as 4-digit string
   const formatProjectNumber = (projectNumber: number | null) => {
@@ -476,7 +523,7 @@ export default function CrmCustomers() {
                       <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
                     </TableRow>
                   ))
-                ) : customers.length === 0 ? (
+                ) : organizedCustomers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-12">
                       <Users className="h-12 w-12 text-slate-300 mx-auto mb-3" />
@@ -487,12 +534,12 @@ export default function CrmCustomers() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  customers.map((customer) => {
+                  organizedCustomers.map(({ customer, isSubAccount }) => {
                     const customerProjects = projectsByCustomerId[customer.id] || [];
                     return (
                       <React.Fragment key={customer.id}>
                         <TableRow
-                          className="cursor-pointer hover:bg-slate-50 transition-colors"
+                          className={`cursor-pointer hover:bg-slate-50 transition-colors ${isSubAccount ? 'bg-slate-25' : ''}`}
                           data-testid={`row-customer-${customer.id}`}
                           onMouseEnter={() => prefetchCustomer(customer.id)}
                           onTouchStart={() => prefetchCustomer(customer.id)}
@@ -501,8 +548,16 @@ export default function CrmCustomers() {
                           }}
                         >
                           <TableCell className="font-medium text-slate-900">
-                            <div className="flex items-center gap-2">
+                            <div className={`flex items-center gap-2 ${isSubAccount ? 'pl-6' : ''}`}>
+                              {isSubAccount && (
+                                <CornerDownRight className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                              )}
                               {customer.name}
+                              {isSubAccount && (
+                                <Badge variant="outline" className="bg-purple-50 text-purple-600 border-purple-200 text-xs">
+                                  Sub
+                                </Badge>
+                              )}
                               {customer.source === 'fieldedge' && (
                                 <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 text-xs">
                                   FE

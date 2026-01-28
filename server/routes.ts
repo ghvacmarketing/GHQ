@@ -5949,6 +5949,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         leadSource: c.leadSource,
         createdAt: c.createdAt,
         salesStage: c.salesStage,
+        parentCustomerId: c.parentCustomerId,
+        billToParent: c.billToParent,
       }));
 
       return res.json({
@@ -6077,6 +6079,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         leadSource: c.leadSource,
         createdAt: c.createdAt,
         salesStage: c.salesStage,
+        parentCustomerId: c.parentCustomerId,
+        billToParent: c.billToParent,
         source: 'crm' as const,
       }));
 
