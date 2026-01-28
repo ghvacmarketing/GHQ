@@ -918,6 +918,9 @@ export const crmCustomers = pgTable("crm_customers", {
   portalEnabled: boolean("portal_enabled").default(false).notNull(),
   sourceSystem: text("source_system"),
   sourceId: text("source_id"),
+  // Parent/Sub-account relationship
+  parentCustomerId: varchar("parent_customer_id"), // Reference to parent account (null = main account)
+  billToParent: boolean("bill_to_parent").default(false), // If true, bill the parent account instead
   // Prospect funnel fields
   salesStage: text("sales_stage").$type<SalesStage>(),
   interestLevel: text("interest_level").$type<InterestLevel>(),
@@ -931,6 +934,7 @@ export const crmCustomers = pgTable("crm_customers", {
 }, (table) => ({
   customerTypeIdx: index("crm_customers_customer_type_idx").on(table.customerType),
   customerStatusIdx: index("crm_customers_customer_status_idx").on(table.customerStatus),
+  parentCustomerIdx: index("crm_customers_parent_customer_idx").on(table.parentCustomerId),
 }));
 
 // Property Type Enum - for QuickBooks class determination

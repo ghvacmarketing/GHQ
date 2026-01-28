@@ -6472,11 +6472,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const customerId = req.params.id;
       const { 
         name, customerType, customerStatus, phone, email, fullAddress, leadSource,
-        salesStage, potentialValue, assignedSalesRepId, interestLevel 
+        salesStage, potentialValue, assignedSalesRepId, interestLevel,
+        parentCustomerId, billToParent
       } = req.body;
 
       // Check if user can change customerType (only admin/owner)
       const canChangeType = ["admin", "owner"].includes(user.role);
+
+      // Validate circular reference for parent/sub-account relationship
+      if (parentCustomerId !== undefined && parentCustomerId !== null) {
+        // Can't be your own parent
+        if (parentCustomerId === customerId) {
+          return res.status(400).json({ message: "A customer cannot be its own parent" });
+        }
+
+        // Verify the parent customer exists
+        const [parentExists] = await db.select({ id: crmCustomers.id })
+          .from(crmCustomers)
+          .where(eq(crmCustomers.id, parentCustomerId));
+        if (!parentExists) {
+          return res.status(400).json({ message: "Parent customer not found" });
+        }
+
+        // Check that the new parent isn't one of this customer's sub-accounts (would create a loop)
+        // Recursively gather all sub-accounts of the current customer
+        const getAllSubAccountIds = async (parentId: string, visited: Set<string> = new Set()): Promise<string[]> => {
+          if (visited.has(parentId)) return [];
+          visited.add(parentId);
+          
+          const directSubs = await db.select({ id: crmCustomers.id })
+            .from(crmCustomers)
+            .where(eq(crmCustomers.parentCustomerId, parentId));
+          
+          const allIds: string[] = directSubs.map(s => s.id);
+          for (const sub of directSubs) {
+            const deeperIds = await getAllSubAccountIds(sub.id, visited);
+            allIds.push(...deeperIds);
+          }
+          return allIds;
+        };
+
+        const subAccountIds = await getAllSubAccountIds(customerId);
+        if (subAccountIds.includes(parentCustomerId)) {
+          return res.status(400).json({ 
+            message: "Cannot set parent: would create a circular reference (the selected parent is a sub-account of this customer)" 
+          });
+        }
+      }
 
       // Check crmCustomers table first (primary source)
       const [existingCrmCustomer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
@@ -6503,6 +6545,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (potentialValue !== undefined) updateData.potentialValue = potentialValue;
         if (assignedSalesRepId !== undefined) updateData.assignedSalesRepId = assignedSalesRepId;
         if (interestLevel !== undefined) updateData.interestLevel = interestLevel;
+        
+        // Parent/Sub-account relationship fields
+        if (parentCustomerId !== undefined) updateData.parentCustomerId = parentCustomerId;
+        if (billToParent !== undefined) updateData.billToParent = billToParent;
         
         if (canChangeType && customerType) {
           updateData.customerType = customerType;
@@ -6561,7 +6607,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/crm/jobs - List jobs with search, filters, and pagination
+  // GET /api/crm/customers/main-accounts - Get all customers that can be parent accounts
+  app.get("/api/crm/customers/main-accounts", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Main accounts are customers that either:
+      // 1. Have no parent (parentCustomerId is null)
+      // 2. Are used as parents by other customers
+      // For simplicity, we return all customers with no parent
+      const mainAccounts = await db.select({
+        id: crmCustomers.id,
+        name: crmCustomers.name,
+        companyName: crmCustomers.companyName,
+        customerType: crmCustomers.customerType,
+        customerStatus: crmCustomers.customerStatus,
+        email: crmCustomers.email,
+        phone: crmCustomers.phone,
+        fullAddress: crmCustomers.fullAddress,
+        parentCustomerId: crmCustomers.parentCustomerId,
+        billToParent: crmCustomers.billToParent,
+      })
+        .from(crmCustomers)
+        .where(isNull(crmCustomers.parentCustomerId))
+        .orderBy(asc(crmCustomers.name));
+
+      return res.json(mainAccounts);
+    } catch (error) {
+      console.error("Error fetching main accounts:", error);
+      return res.status(500).json({ message: "Failed to fetch main accounts" });
+    }
+  });
+
+  // GET /api/crm/customers/:id/sub-accounts - Get all sub-accounts of a customer
+  app.get("/api/crm/customers/:id/sub-accounts", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const customerId = req.params.id;
+
+      // Check if the customer exists
+      const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId));
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      // Get all direct sub-accounts (customers whose parentCustomerId equals this customer's id)
+      const subAccounts = await db.select({
+        id: crmCustomers.id,
+        name: crmCustomers.name,
+        companyName: crmCustomers.companyName,
+        customerType: crmCustomers.customerType,
+        customerStatus: crmCustomers.customerStatus,
+        email: crmCustomers.email,
+        phone: crmCustomers.phone,
+        fullAddress: crmCustomers.fullAddress,
+        parentCustomerId: crmCustomers.parentCustomerId,
+        billToParent: crmCustomers.billToParent,
+      })
+        .from(crmCustomers)
+        .where(eq(crmCustomers.parentCustomerId, customerId))
+        .orderBy(asc(crmCustomers.name));
+
+      return res.json(subAccounts);
+    } catch (error) {
+      console.error("Error fetching sub-accounts:", error);
+      return res.status(500).json({ message: "Failed to fetch sub-accounts" });
+    }
+  });
+
+    // GET /api/crm/jobs - List jobs with search, filters, and pagination
   app.get("/api/crm/jobs", requireCrmAuth, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
