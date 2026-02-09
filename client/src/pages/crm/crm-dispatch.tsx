@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo, Fragment } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { cn } from "@/lib/utils";
 import { useLocation, Link } from "wouter";
@@ -1042,7 +1042,7 @@ function DroppableWeekCell({ techId, date, children, onQuickAssign }: DroppableW
 
 interface DroppableScheduleRowProps {
   techId: string;
-  children: React.ReactNode;
+  children: React.ReactNode | ((isOver: boolean) => React.ReactNode);
 }
 
 function DroppableScheduleRow({ techId, children }: DroppableScheduleRowProps) {
@@ -1057,7 +1057,7 @@ function DroppableScheduleRow({ techId, children }: DroppableScheduleRowProps) {
       className={`flex border-b border-slate-100 hover:bg-slate-50/50 transition-colors ${isOver ? "bg-[#711419]/10 ring-2 ring-inset ring-[#711419]/30" : ""}`} 
       style={{ minHeight: 64 }}
     >
-      {children}
+      {typeof children === 'function' ? children(isOver) : children}
     </div>
   );
 }
@@ -1200,6 +1200,69 @@ function DraggableScheduleCard({
   );
 }
 
+function ScheduleRowTimeline({ 
+  children, 
+  isDragActive,
+  isOver
+}: { 
+  children: React.ReactNode; 
+  isDragActive: boolean;
+  isOver: boolean;
+}) {
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const [previewLeft, setPreviewLeft] = useState<number | null>(null);
+  const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
+  const previewWidthPercent = (1 / totalHours) * 100;
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragActive || !timelineRef.current) return;
+    const rect = timelineRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percent = (x / rect.width) * 100;
+    const hourOffset = (percent / 100) * totalHours;
+    const snappedHour = Math.round(hourOffset * 2) / 2;
+    const snappedPercent = (snappedHour / totalHours) * 100;
+    setPreviewLeft(Math.max(0, Math.min(snappedPercent, ((totalHours - 1) / totalHours) * 100)));
+  }, [isDragActive, totalHours]);
+
+  const handleMouseLeave = useCallback(() => {
+    setPreviewLeft(null);
+  }, []);
+
+  return (
+    <div 
+      ref={timelineRef}
+      className="flex-1 relative py-2" 
+      style={{ minWidth: SCHEDULE_TIMELINE_WIDTH }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+    >
+      {Array.from({ length: totalHours }, (_, i) => {
+        const hourPercent = (i / totalHours) * 100;
+        const halfHourPercent = ((i + 0.5) / totalHours) * 100;
+        return (
+          <Fragment key={`grid-${i}`}>
+            <div className="absolute top-0 bottom-0 border-l border-slate-200" style={{ left: `${hourPercent}%` }} />
+            <div className="absolute top-0 bottom-0 border-l border-dashed border-slate-100" style={{ left: `${halfHourPercent}%` }} />
+          </Fragment>
+        );
+      })}
+      <div className="absolute top-0 bottom-0 border-l border-slate-200" style={{ left: '100%' }} />
+      
+      {isDragActive && isOver && previewLeft !== null && (
+        <div 
+          className="absolute top-1 bottom-1 bg-[#711419]/15 border-2 border-dashed border-[#711419]/40 rounded-md pointer-events-none z-[5]"
+          style={{ left: `${previewLeft}%`, width: `${previewWidthPercent}%` }}
+        >
+          <div className="text-[10px] text-[#711419]/60 font-medium text-center mt-1">1 hr</div>
+        </div>
+      )}
+      
+      {children}
+    </div>
+  );
+}
+
 interface TechnicianScheduleBoardProps {
   technicians: Technician[];
   workOrders: DispatchWorkOrder[];
@@ -1241,20 +1304,29 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
   }
 
   return (
-    <Card className="bg-white border overflow-hidden">
-      <div className="overflow-x-auto overflow-y-auto max-h-full">
+    <Card className="bg-white border overflow-hidden h-full">
+      <div className="overflow-x-auto overflow-y-auto h-full">
         <div style={{ minWidth: SCHEDULE_TIMELINE_WIDTH + 200 }}>
           <div className="flex border-b border-slate-200 sticky top-0 bg-white z-20">
             <div className="w-48 flex-shrink-0 px-4 py-3 border-r border-slate-200 text-sm font-semibold text-slate-700 bg-white sticky left-0 z-30">
               Technicians
             </div>
             <div className="flex-1 relative" style={{ minWidth: SCHEDULE_TIMELINE_WIDTH }}>
-              <div className="flex justify-between px-2 py-3">
-                {hourLabels.map((label, i) => (
-                  <div key={i} className="text-xs font-medium text-slate-500 whitespace-nowrap" style={{ width: i === hourLabels.length - 1 ? 'auto' : `${100 / (hourLabels.length - 1)}%` }}>
-                    {label}
-                  </div>
-                ))}
+              <div className="relative py-3" style={{ height: 40 }}>
+                {hourLabels.map((label, i) => {
+                  const leftPercent = (i / (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR)) * 100;
+                  return (
+                    <div key={i} className="absolute text-xs font-medium text-slate-500 whitespace-nowrap" style={{ left: `${leftPercent}%`, transform: 'translateX(-50%)' }}>
+                      {label}
+                    </div>
+                  );
+                })}
+                {Array.from({ length: (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR) + 1 }, (_, i) => {
+                  const leftPercent = (i / (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR)) * 100;
+                  return (
+                    <div key={`line-${i}`} className="absolute bottom-0 border-l border-slate-200" style={{ left: `${leftPercent}%`, height: 6 }} />
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -1263,46 +1335,50 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
             const techWorkOrders = getWorkOrdersForTech(tech.id);
             return (
               <DroppableScheduleRow key={tech.id} techId={tech.id}>
-                <div className="w-48 flex-shrink-0 px-4 py-3 border-r border-slate-100 flex items-center gap-3 bg-white sticky left-0 z-10">
-                  <div className="w-10 h-10 rounded-lg bg-slate-200 flex items-center justify-center">
-                    <User className="w-6 h-6 text-slate-500" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-800 truncate">{tech.name}</p>
-                    <p className="text-xs text-slate-400">{techWorkOrders.length} work orders</p>
-                  </div>
-                </div>
-                
-                <div className="flex-1 relative py-2" style={{ minWidth: SCHEDULE_TIMELINE_WIDTH }}>
-                  {techWorkOrders.map((wo) => {
-                    if (!wo.scheduledStart) return null;
-                    const startDate = new Date(wo.scheduledStart);
-                    const endDate = wo.scheduledEnd ? new Date(wo.scheduledEnd) : null;
+                {(isOver) => (
+                  <>
+                    <div className="w-48 flex-shrink-0 px-4 py-3 border-r border-slate-100 flex items-center gap-3 bg-white sticky left-0 z-10">
+                      <div className="w-10 h-10 rounded-lg bg-slate-200 flex items-center justify-center">
+                        <User className="w-6 h-6 text-slate-500" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-800 truncate">{tech.name}</p>
+                        <p className="text-xs text-slate-400">{techWorkOrders.length} work orders</p>
+                      </div>
+                    </div>
                     
-                    const leftPercent = getScheduleLeftPercent(startDate);
-                    const widthPercent = getScheduleWidthPercent(startDate, endDate);
-                    const visitType = wo.visitType || "SERVICE";
-                    const bgColor = scheduleVisitTypeColors[visitType] || scheduleVisitTypeColors.SERVICE;
-                    const statusStripe = scheduleStatusStripes[wo.status] || scheduleStatusStripes.scheduled;
-                    
-                    const startMinutesFrom8 = (startDate.getHours() - SCHEDULE_START_HOUR) * 60 + startDate.getMinutes();
-                    if (startMinutesFrom8 < 0 || startMinutesFrom8 >= SCHEDULE_TOTAL_MINUTES) return null;
+                    <ScheduleRowTimeline isDragActive={!!activeId && activeId.startsWith('queue-')} isOver={isOver}>
+                      {techWorkOrders.map((wo) => {
+                        if (!wo.scheduledStart) return null;
+                        const startDate = new Date(wo.scheduledStart);
+                        const endDate = wo.scheduledEnd ? new Date(wo.scheduledEnd) : null;
+                        
+                        const leftPercent = getScheduleLeftPercent(startDate);
+                        const widthPercent = getScheduleWidthPercent(startDate, endDate);
+                        const visitType = wo.visitType || "SERVICE";
+                        const bgColor = scheduleVisitTypeColors[visitType] || scheduleVisitTypeColors.SERVICE;
+                        const statusStripe = scheduleStatusStripes[wo.status] || scheduleStatusStripes.scheduled;
+                        
+                        const startMinutesFrom8 = (startDate.getHours() - SCHEDULE_START_HOUR) * 60 + startDate.getMinutes();
+                        if (startMinutesFrom8 < 0 || startMinutesFrom8 >= SCHEDULE_TOTAL_MINUTES) return null;
 
-                    return (
-                      <DraggableScheduleCard
-                        key={wo.id}
-                        workOrder={wo}
-                        leftPercent={leftPercent}
-                        widthPercent={widthPercent}
-                        bgColor={bgColor}
-                        statusStripe={statusStripe}
-                        onWorkOrderClick={onWorkOrderClick}
-                        onResizeComplete={onResizeComplete}
-                        isDragging={activeId === `schedule-${wo.id}`}
-                      />
-                    );
-                  })}
-                </div>
+                        return (
+                          <DraggableScheduleCard
+                            key={wo.id}
+                            workOrder={wo}
+                            leftPercent={leftPercent}
+                            widthPercent={widthPercent}
+                            bgColor={bgColor}
+                            statusStripe={statusStripe}
+                            onWorkOrderClick={onWorkOrderClick}
+                            onResizeComplete={onResizeComplete}
+                            isDragging={activeId === `schedule-${wo.id}`}
+                          />
+                        );
+                      })}
+                    </ScheduleRowTimeline>
+                  </>
+                )}
               </DroppableScheduleRow>
             );
           })}
