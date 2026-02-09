@@ -410,6 +410,7 @@ interface DraggableQueueCardProps {
 function DraggableQueueCard({ workOrder, onClick }: DraggableQueueCardProps) {
   const priorityStyle = priorityBadgeColors[workOrder.priority || "normal"] || priorityBadgeColors.normal;
   const visitTypeColor = getJobTypeColor(workOrder.visitType || workOrder.jobType);
+  const needsSchedulingNow = (workOrder as any).immediateAction === "create_now" && !workOrder.scheduledStart;
   
   const isLocked = workOrder.status === "on_site";
   
@@ -429,7 +430,7 @@ function DraggableQueueCard({ workOrder, onClick }: DraggableQueueCardProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-3 px-3 py-2 border-b border-slate-100 hover:bg-slate-50 transition-colors ${isDragging ? 'z-50 shadow-lg cursor-grabbing bg-white rounded-md ring-2 ring-[#711419]/50' : 'cursor-grab'} ${(workOrder as any).immediateAction === "create_now" && !workOrder.scheduledStart ? 'bg-red-50 border-b-red-200' : ''}`}
+      className={`flex items-center gap-3 px-3 py-2 border-b border-slate-100 hover:bg-slate-50 transition-colors ${isDragging ? 'z-50 shadow-lg cursor-grabbing bg-white rounded-md ring-2 ring-[#711419]/50' : 'cursor-grab'} ${needsSchedulingNow ? 'bg-red-50 border-b-red-200 border-l-4 border-l-red-500' : ''}`}
       data-testid={`queue-card-${workOrder.id}`}
       {...attributes}
       {...listeners}
@@ -438,7 +439,7 @@ function DraggableQueueCard({ workOrder, onClick }: DraggableQueueCardProps) {
         onClick?.(workOrder.id);
       }}
     >
-      {(workOrder as any).immediateAction === "create_now" && !workOrder.scheduledStart ? (
+      {needsSchedulingNow ? (
         <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 animate-pulse" title="Needs scheduling now" />
       ) : (
         <GripVertical className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />
@@ -1032,7 +1033,7 @@ function DroppableWeekCell({ techId, date, children, onQuickAssign }: DroppableW
 
 interface DroppableScheduleRowProps {
   techId: string;
-  children: React.ReactNode | ((isOver: boolean) => React.ReactNode);
+  children: (args: { isOver: boolean; setDroppableRef: (node: HTMLDivElement | null) => void }) => React.ReactNode;
 }
 
 function DroppableScheduleRow({ techId, children }: DroppableScheduleRowProps) {
@@ -1043,11 +1044,10 @@ function DroppableScheduleRow({ techId, children }: DroppableScheduleRowProps) {
 
   return (
     <div 
-      ref={setNodeRef} 
       className={`flex border-b border-slate-100 hover:bg-slate-50/50 transition-colors ${isOver ? "bg-[#711419]/10 ring-2 ring-inset ring-[#711419]/30" : ""}`} 
       style={{ minHeight: 64 }}
     >
-      {typeof children === 'function' ? children(isOver) : children}
+      {children({ isOver, setDroppableRef: setNodeRef })}
     </div>
   );
 }
@@ -1192,12 +1192,14 @@ function DraggableScheduleCard({
 
 function ScheduleRowTimeline({ 
   children, 
-  isDragActive,
-  isOver
+  isDragActive, 
+  isOver,
+  droppableRef,
 }: { 
   children: React.ReactNode; 
-  isDragActive: boolean;
+  isDragActive: boolean; 
   isOver: boolean;
+  droppableRef?: (node: HTMLDivElement | null) => void;
 }) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const [previewLeft, setPreviewLeft] = useState<number | null>(null);
@@ -1221,7 +1223,10 @@ function ScheduleRowTimeline({
 
   return (
     <div 
-      ref={timelineRef}
+      ref={(node) => {
+        timelineRef.current = node;
+        droppableRef?.(node);
+      }}
       className="flex-1 relative py-2" 
       style={{ minWidth: SCHEDULE_TIMELINE_WIDTH }}
       onMouseMove={handleMouseMove}
@@ -1325,7 +1330,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
             const techWorkOrders = getWorkOrdersForTech(tech.id);
             return (
               <DroppableScheduleRow key={tech.id} techId={tech.id}>
-                {(isOver) => (
+                {({ isOver, setDroppableRef }) => (
                   <>
                     <div className="w-48 flex-shrink-0 px-4 py-3 border-r border-slate-100 flex items-center gap-3 bg-white sticky left-0 z-10">
                       <div className="w-10 h-10 rounded-lg bg-slate-200 flex items-center justify-center">
@@ -1337,7 +1342,11 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                       </div>
                     </div>
                     
-                    <ScheduleRowTimeline isDragActive={!!activeId && activeId.startsWith('queue-')} isOver={isOver}>
+                    <ScheduleRowTimeline
+                      isDragActive={!!activeId && activeId.startsWith('queue-')}
+                      isOver={isOver}
+                      droppableRef={setDroppableRef}
+                    >
                       {techWorkOrders.map((wo) => {
                         if (!wo.scheduledStart) return null;
                         const startDate = new Date(wo.scheduledStart);
@@ -2904,9 +2913,8 @@ export default function CrmDispatch() {
         const activatorEvt = event.activatorEvent as MouseEvent | null;
         if (overRect && activatorEvt) {
           const cursorX = activatorEvt.clientX + delta.x;
-          const sidebarWidth = 192;
-          const timelineLeft = overRect.left + sidebarWidth;
-          const timelineWidth = overRect.width - sidebarWidth;
+          const timelineLeft = overRect.left;
+          const timelineWidth = overRect.width;
           const relativeX = cursorX - timelineLeft;
           const percent = Math.max(0, relativeX / timelineWidth);
           const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
