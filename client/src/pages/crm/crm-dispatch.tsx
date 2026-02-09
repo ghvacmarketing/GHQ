@@ -457,20 +457,6 @@ function DraggableQueueCard({ workOrder, onClick }: DraggableQueueCardProps) {
   );
 }
 
-function QueueCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
-  const visitTypeColor = getJobTypeColor(workOrder.visitType || workOrder.jobType);
-  
-  return (
-    <div className="flex items-center gap-3 px-3 py-2 bg-white border rounded-md shadow-lg cursor-grabbing w-72">
-      <GripVertical className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />
-      <Badge variant="outline" className={`${visitTypeColor.bg} ${visitTypeColor.text} border-0 text-[10px] flex-shrink-0`}>
-        {visitTypeLabels[workOrder.visitType || "SERVICE"] || workOrder.visitType}
-      </Badge>
-      <span className="font-medium text-sm text-slate-900 truncate">{workOrder.customerName}</span>
-    </div>
-  );
-}
-
 interface QueueStageBoxProps {
   stage: DispatchQueueStage;
   workOrders: DispatchWorkOrder[];
@@ -3505,29 +3491,21 @@ export default function CrmDispatch() {
             )}
           </div>
           
-          {/* Drag Overlay - only shows when dragging from queue */}
+          {/* Drag Overlay - morphs queue items to look like schedule cards */}
           <DragOverlay dropAnimation={null}>
             {activeId && activeFromQueue ? (
               (() => {
                 const draggingWo = localWorkOrders.find(w => w.id === activeId);
                 if (!draggingWo) return null;
-                const visitTypeColor = getJobTypeColor(draggingWo.visitType || draggingWo.jobType);
-                const scheduledWindow = draggingWo.scheduledStart && draggingWo.scheduledEnd
-                  ? `${format(new Date(draggingWo.scheduledStart), "h:mm a")} - ${format(new Date(draggingWo.scheduledEnd), "h:mm a")}`
-                  : null;
+                const visitType = draggingWo.visitType || "SERVICE";
+                const bgColor = scheduleVisitTypeColors[visitType] || scheduleVisitTypeColors.SERVICE;
+                const statusStripe = scheduleStatusStripes[draggingWo.status] || scheduleStatusStripes.scheduled;
                 return (
-                  <div className="p-3 bg-white border-2 border-[#711419] rounded-lg shadow-2xl w-64 cursor-grabbing">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${visitTypeColor.border.replace('border-', 'bg-')}`} />
-                        <span className="text-xs font-medium text-slate-600">WO #{draggingWo.workOrderNumber}</span>
-                      </div>
-                      {scheduledWindow && (
-                        <span className="text-xs text-slate-500">{scheduledWindow}</span>
-                      )}
+                  <div className={`${bgColor} ${statusStripe} text-slate-800 rounded-md px-2 py-1 shadow-lg cursor-grabbing overflow-hidden`} style={{ width: 160, height: 48 }}>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs font-medium truncate">{draggingWo.customerName}</p>
                     </div>
-                    <p className="text-sm font-semibold text-slate-800 truncate">{draggingWo.customerName}</p>
-                    <p className="text-xs text-slate-500 truncate">{draggingWo.title || draggingWo.description || "No description"}</p>
+                    <p className="text-[10px] text-slate-600 truncate">{draggingWo.propertyAddress || "No address"}</p>
                   </div>
                 );
               })()
