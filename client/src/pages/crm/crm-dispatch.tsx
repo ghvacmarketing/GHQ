@@ -2893,92 +2893,69 @@ export default function CrmDispatch() {
       
       if (isFromQueue && !isFromSchedule) {
         const newTech = technicians.find(t => t.id === newTechId);
+        const defaultDuration = 1;
         
-        // Preserve existing scheduled time if available, otherwise use defaults
-        if (wo.scheduledStart && wo.scheduledEnd) {
-          // Check for conflict with existing scheduled time
-          const existingStart = new Date(wo.scheduledStart);
-          const existingEnd = new Date(wo.scheduledEnd);
-          const conflict = checkSchedulingConflict(localWorkOrders, newTechId, existingStart, existingEnd, workOrderId);
-          if (conflict) {
-            const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
-            toast({
-              title: "Scheduling Conflict",
-              description: `${newTech?.name || 'This technician'} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
-              variant: "destructive",
-            });
-            return;
-          }
-          
-          // Keep the existing scheduled time, just assign the tech
-          setLocalWorkOrders(prev => prev.map(w => 
-            w.id === workOrderId 
-              ? { ...w, assignedTechId: newTechId, techName: newTech?.name || null } 
-              : w
-          ));
-
-          updateWorkOrderMutation.mutate({
-            workOrderId,
-            updates: {
-              assignedTechId: newTechId,
-            },
-          });
-
-          toast({
-            title: "Work order assigned",
-            description: `Assigned to ${newTech?.name || 'technician'} at ${format(existingStart, "h:mm a")}`,
-          });
-        } else {
-          // No scheduled time - set a default time
-          const defaultDuration = 1;
-          const newStartHour = START_HOUR;
-          const newEndHour = Math.min(newStartHour + defaultDuration, END_HOUR);
-          
-          const startHourInt = Math.floor(newStartHour);
-          const startMinutes = Math.round((newStartHour % 1) * 60);
-          const endHourInt = Math.floor(newEndHour);
-          const endMinutes = Math.round((newEndHour % 1) * 60);
-          
-          const startDate = new Date(selectedDate);
-          startDate.setHours(startHourInt, startMinutes, 0, 0);
-          const endDate = new Date(selectedDate);
-          endDate.setHours(endHourInt, endMinutes, 0, 0);
-          
-          // Check for conflict with default time slot
-          const conflict = checkSchedulingConflict(localWorkOrders, newTechId, startDate, endDate, workOrderId);
-          if (conflict) {
-            const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
-            toast({
-              title: "Scheduling Conflict",
-              description: `${newTech?.name || 'This technician'} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
-              variant: "destructive",
-            });
-            return;
-          }
-          
-          const scheduledStartISO = startDate.toISOString();
-          const scheduledEndISO = endDate.toISOString();
-
-          setLocalWorkOrders(prev => prev.map(w => 
-            w.id === workOrderId 
-              ? { ...w, assignedTechId: newTechId, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any, techName: newTech?.name || null } 
-              : w
-          ));
-
-          updateWorkOrderMutation.mutate({
-            workOrderId,
-            updates: {
-              assignedTechId: newTechId,
-              scheduledStart: scheduledStartISO,
-              scheduledEnd: scheduledEndISO,
-            },
-          });
-
-          toast({
-            title: "Work order assigned",
-            description: `Assigned to ${newTech?.name || 'technician'} at ${formatHour(Math.floor(newStartHour))}`,
-          });
+        let newStartHour = SCHEDULE_START_HOUR;
+        const overRect = over.rect;
+        const activatorEvt = event.activatorEvent as MouseEvent | null;
+        if (overRect && activatorEvt) {
+          const cursorX = activatorEvt.clientX + delta.x;
+          const sidebarWidth = 192;
+          const timelineLeft = overRect.left + sidebarWidth;
+          const timelineWidth = overRect.width - sidebarWidth;
+          const relativeX = cursorX - timelineLeft;
+          const percent = Math.max(0, relativeX / timelineWidth);
+          const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
+          const hourOffset = percent * totalHours;
+          const snappedHour = Math.round(hourOffset * 2) / 2;
+          newStartHour = SCHEDULE_START_HOUR + Math.max(0, Math.min(snappedHour, totalHours - defaultDuration));
         }
+        
+        const newEndHour = Math.min(newStartHour + defaultDuration, SCHEDULE_END_HOUR);
+        
+        const startHourInt = Math.floor(newStartHour);
+        const startMinutes = Math.round((newStartHour % 1) * 60);
+        const endHourInt = Math.floor(newEndHour);
+        const endMinutes = Math.round((newEndHour % 1) * 60);
+        
+        const startDate = new Date(selectedDate);
+        startDate.setHours(startHourInt, startMinutes, 0, 0);
+        const endDate = new Date(selectedDate);
+        endDate.setHours(endHourInt, endMinutes, 0, 0);
+        
+        const conflict = checkSchedulingConflict(localWorkOrders, newTechId, startDate, endDate, workOrderId);
+        if (conflict) {
+          const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+          toast({
+            title: "Scheduling Conflict",
+            description: `${newTech?.name || 'This technician'} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        const scheduledStartISO = startDate.toISOString();
+        const scheduledEndISO = endDate.toISOString();
+
+        setLocalWorkOrders(prev => prev.map(w => 
+          w.id === workOrderId 
+            ? { ...w, assignedTechId: newTechId, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any, techName: newTech?.name || null } 
+            : w
+        ));
+
+        updateWorkOrderMutation.mutate({
+          workOrderId,
+          updates: {
+            assignedTechId: newTechId,
+            scheduledStart: scheduledStartISO,
+            scheduledEnd: scheduledEndISO,
+          },
+        });
+
+        toast({
+          title: "Work order assigned",
+          description: `Assigned to ${newTech?.name || 'technician'} at ${formatHour(startHourInt)}`,
+        });
       } else {
         const { startHour, endHour } = getWorkOrderDisplayTimes(wo);
         const duration = endHour - startHour;
