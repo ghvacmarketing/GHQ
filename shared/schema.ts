@@ -1228,6 +1228,9 @@ export const dispatchQueueStageEnum = [
 ] as const;
 export type DispatchQueueStage = typeof dispatchQueueStageEnum[number];
 
+export const immediateActionEnum = ["create_now", "schedule_later"] as const;
+export type ImmediateAction = typeof immediateActionEnum[number];
+
 // Pending Reason - why a tech is waiting during a job
 export const pendingReasonEnum = [
   "waiting_on_parts",
@@ -1281,6 +1284,8 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   fieldEdgeWoNumber: text("field_edge_wo_number"),
   bookingSource: text("booking_source").$type<"phone" | "online" | "walk_in" | "referral">(),
   preferredTimeSlot: text("preferred_time_slot"),
+  immediateAction: text("immediate_action").$type<ImmediateAction>(),
+  dueDate: timestamp("due_date"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({

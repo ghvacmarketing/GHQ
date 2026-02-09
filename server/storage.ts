@@ -222,6 +222,7 @@ export interface IStorage {
   getWorkOrdersByDateRange(startDate: Date, endDate: Date): Promise<CrmWorkOrder[]>;
   getWorkOrdersByTechId(techId: string, date?: Date): Promise<CrmWorkOrder[]>;
   getUnassignedWorkOrders(): Promise<CrmWorkOrder[]>;
+  getSchedulableWorkOrders(): Promise<CrmWorkOrder[]>;
   updateWorkOrder(id: string, data: Partial<InsertCrmWorkOrder>): Promise<CrmWorkOrder | undefined>;
   deleteWorkOrder(id: string): Promise<boolean>;
 
@@ -1774,6 +1775,20 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           isNull(crmWorkOrders.assignedTechId),
+          notInArray(crmWorkOrders.status, ['completed', 'cancelled']),
+          or(eq(crmWorkOrders.isHistorical, false), isNull(crmWorkOrders.isHistorical))
+        )
+      )
+      .orderBy(desc(crmWorkOrders.createdAt));
+  }
+
+  async getSchedulableWorkOrders(): Promise<CrmWorkOrder[]> {
+    return await db
+      .select()
+      .from(crmWorkOrders)
+      .where(
+        and(
+          isNull(crmWorkOrders.scheduledStart),
           notInArray(crmWorkOrders.status, ['completed', 'cancelled']),
           or(eq(crmWorkOrders.isHistorical, false), isNull(crmWorkOrders.isHistorical))
         )

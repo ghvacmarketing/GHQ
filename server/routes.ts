@@ -11506,6 +11506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : undefined,
         startedAt: req.body.startedAt ? new Date(req.body.startedAt) : undefined,
         completedAt: req.body.completedAt ? new Date(req.body.completedAt) : undefined,
+        dueDate: req.body.dueDate ? new Date(req.body.dueDate) : undefined,
       };
 
       const result = insertCrmWorkOrderSchema.safeParse(bodyWithDates);
@@ -11691,6 +11692,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         scheduledEnd: z.union([z.string(), z.date(), z.null()]).optional(),
         startedAt: z.union([z.string(), z.date(), z.null()]).optional(),
         completedAt: z.union([z.string(), z.date(), z.null()]).optional(),
+        dueDate: z.union([z.string(), z.date(), z.null()]).optional(),
         pendingStartedAt: z.union([z.string(), z.date(), z.null()]).optional(),
         updateProjectCustomer: z.boolean().optional(),
       });
@@ -11704,7 +11706,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, completionSummary, checklist, partsUsed, startedAt, completedAt, projectId, agreementId, title, description, priority, visitType, workSubtype, dispatchQueueStage, customerId, propertyId, updateProjectCustomer, dispatchNotes, isPending, pendingReason, pendingStartedAt } = result.data;
+      const { status, assignedTechId, scheduledStart, scheduledEnd, techNotes, completionSummary, checklist, partsUsed, startedAt, completedAt, dueDate, projectId, agreementId, title, description, priority, visitType, workSubtype, dispatchQueueStage, customerId, propertyId, updateProjectCustomer, dispatchNotes, isPending, pendingReason, pendingStartedAt } = result.data;
 
       // If projectId is provided (not null), verify it exists
       if (projectId !== undefined && projectId !== null) {
@@ -11787,6 +11789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (partsUsed !== undefined) updateData.partsUsed = partsUsed;
       if (startedAt !== undefined) updateData.startedAt = startedAt ? new Date(startedAt) : null;
       if (completedAt !== undefined) updateData.completedAt = completedAt ? new Date(completedAt) : null;
+      if (dueDate !== undefined) updateData.dueDate = dueDate ? new Date(dueDate) : null;
       if (projectId !== undefined) updateData.projectId = projectId;
       if (agreementId !== undefined) updateData.agreementId = agreementId;
       if (title !== undefined) updateData.title = title;
@@ -12271,16 +12274,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let workOrders = await storage.getWorkOrdersByDateRange(startOfDay, endOfDay);
       
-      // Also fetch unassigned work orders that have NO scheduled date (ready to be scheduled)
-      // Work orders with a scheduled date will appear on their scheduled date via getWorkOrdersByDateRange
-      const unassignedWorkOrders = await storage.getUnassignedWorkOrders();
+      const schedulableWorkOrders = await storage.getSchedulableWorkOrders();
       
-      // Only add unassigned work orders that don't have a scheduled date
-      // (ones with scheduled dates are already in the date-filtered results)
       const allWorkOrderIds = new Set(workOrders.map(wo => wo.id));
-      for (const uwo of unassignedWorkOrders) {
-        if (!allWorkOrderIds.has(uwo.id) && !uwo.scheduledStart) {
-          workOrders.push(uwo);
+      for (const swo of schedulableWorkOrders) {
+        if (!allWorkOrderIds.has(swo.id)) {
+          workOrders.push(swo);
         }
       }
       

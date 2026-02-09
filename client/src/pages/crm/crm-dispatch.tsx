@@ -96,7 +96,7 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { CommentComposer } from "@/components/crm/comment-composer";
-import type { CrmUser, CrmWorkOrder, CrmJob, CrmCustomer, CrmProperty, CrmProject, WorkOrderStatus, ChecklistQuestion } from "@shared/schema";
+import type { CrmUser, CrmWorkOrder, CrmJob, CrmCustomer, CrmProperty, CrmProject, WorkOrderStatus, ChecklistQuestion, ImmediateAction } from "@shared/schema";
 import { workOrderVisitTypeEnum, type WorkOrderVisitType, type WorkSubtype, dispatchQueueStageEnum, type DispatchQueueStage, type WorkOrderSubtype } from "@shared/schema";
 
 const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
@@ -484,7 +484,7 @@ function DraggableQueueCard({
     <div
       ref={setNodeRef}
       style={style}
-      className={`p-3 bg-white border rounded-lg shadow-sm hover:shadow-md transition-all duration-150 ${isDragging ? 'z-50 shadow-xl cursor-grabbing ring-2 ring-[#711419]/50 scale-105' : ''}`}
+      className={`p-3 border rounded-lg shadow-sm hover:shadow-md transition-all duration-150 ${isDragging ? 'z-50 shadow-xl cursor-grabbing ring-2 ring-[#711419]/50 scale-105' : ''} ${(workOrder as any).immediateAction === "create_now" && !workOrder.scheduledStart ? 'bg-amber-50 border-amber-300 ring-1 ring-amber-200' : 'bg-white'}`}
       data-testid={`queue-card-${workOrder.id}`}
     >
       <div 
@@ -543,6 +543,18 @@ function DraggableQueueCard({
             </span>
           )}
         </div>
+        {(workOrder as any).dueDate && (
+          <div className="flex items-center gap-1 text-xs text-orange-600 mt-1">
+            <Clock className="h-3 w-3" />
+            Due: {format(new Date((workOrder as any).dueDate), "MMM d")}
+          </div>
+        )}
+        {(workOrder as any).immediateAction === "create_now" && !workOrder.scheduledStart && (
+          <div className="flex items-center gap-1 text-xs text-amber-700 font-medium mt-1">
+            <AlertCircle className="h-3 w-3" />
+            Needs scheduling
+          </div>
+        )}
       </div>
       
       <div className="flex items-center gap-1 mt-2 pt-2 border-t border-slate-100">
@@ -2097,6 +2109,8 @@ export default function CrmDispatch() {
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("10:00");
   const [assignedTechId, setAssignedTechId] = useState<string>("unassigned");
+  const [immediateAction, setImmediateAction] = useState<ImmediateAction>("create_now");
+  const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
   
   const timeOptions = useMemo(() => {
     const options: { value: string; label: string }[] = [];
@@ -2392,6 +2406,8 @@ export default function CrmDispatch() {
     setChecklistId(null);
     // Reset source quote ID
     setSourceQuoteId(null);
+    setImmediateAction("create_now");
+    setDueDate(undefined);
   };
 
   // Auto-open work order creation dialog when URL params are present (from quote acceptance flow)
@@ -2547,9 +2563,8 @@ export default function CrmDispatch() {
       
       const effectiveTechId = assignedTechId === "unassigned" ? null : assignedTechId;
       
-      // Only require scheduled date if a technician is assigned
-      if (effectiveTechId && !scheduledDate) {
-        throw new Error("Scheduled date is required when assigning a technician");
+      if (immediateAction === "schedule_later" && !dueDate) {
+        throw new Error("Due date is required for Schedule for Later");
       }
       
       // Validate required checklist questions are answered
@@ -2562,11 +2577,10 @@ export default function CrmDispatch() {
         throw new Error(`Please answer required checklist questions: ${missingQuestions.map(q => q.question).join(", ")}`);
       }
 
-      // Only calculate scheduled times if a tech is assigned
       let scheduledStartUTC: Date | null = null;
       let scheduledEndUTC: Date | null = null;
       
-      if (effectiveTechId && scheduledDate) {
+      if (scheduledDate) {
         const [startHours, startMinutes] = startTime.split(":").map(Number);
         const [endHours, endMinutes] = endTime.split(":").map(Number);
         
@@ -2574,12 +2588,13 @@ export default function CrmDispatch() {
         scheduledStartUTC = createLocalDateTime(scheduledDate, startHours, startMinutes);
         scheduledEndUTC = createLocalDateTime(scheduledDate, endHours, endMinutes);
 
-        // Frontend pre-check for scheduling conflicts
-        const conflict = checkSchedulingConflict(localWorkOrders, effectiveTechId, scheduledStartUTC, scheduledEndUTC);
-        if (conflict) {
-          const techName = technicians.find(t => t.id === effectiveTechId)?.name || "This technician";
-          const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
-          throw new Error(`${techName} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`);
+        if (effectiveTechId) {
+          const conflict = checkSchedulingConflict(localWorkOrders, effectiveTechId, scheduledStartUTC, scheduledEndUTC);
+          if (conflict) {
+            const techName = technicians.find(t => t.id === effectiveTechId)?.name || "This technician";
+            const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+            throw new Error(`${techName} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`);
+          }
         }
       }
 
@@ -2600,7 +2615,9 @@ export default function CrmDispatch() {
         scheduledEnd: scheduledEndUTC ? scheduledEndUTC.toISOString() : null,
         assignedTechId: effectiveTechId,
         priority,
-        status: effectiveTechId ? "scheduled" : "scheduled",
+        status: "scheduled",
+        immediateAction,
+        dueDate: dueDate ? dueDate.toISOString() : null,
       });
       const workOrder = await res.json();
 
@@ -3250,7 +3267,21 @@ export default function CrmDispatch() {
     }
   }, [localWorkOrders, selectedDate, updateWorkOrderMutation, technicians, toast]);
 
-  const unassignedWorkOrders = localWorkOrders.filter(wo => !wo.assignedTechId || !wo.scheduledStart);
+  const unassignedWorkOrders = useMemo(() => {
+    const filtered = localWorkOrders.filter(wo => !wo.assignedTechId || !wo.scheduledStart);
+    return filtered.sort((a, b) => {
+      const aIsImmediate = (a as any).immediateAction === "create_now" && !a.scheduledStart;
+      const bIsImmediate = (b as any).immediateAction === "create_now" && !b.scheduledStart;
+      if (aIsImmediate && !bIsImmediate) return -1;
+      if (!aIsImmediate && bIsImmediate) return 1;
+      const aDue = (a as any).dueDate;
+      const bDue = (b as any).dueDate;
+      if (aDue && bDue) return new Date(aDue).getTime() - new Date(bDue).getTime();
+      if (aDue && !bDue) return -1;
+      if (!aDue && bDue) return 1;
+      return 0;
+    });
+  }, [localWorkOrders]);
 
   const assignedWorkOrders = useMemo(() => {
     return localWorkOrders.filter((wo) => {
@@ -4397,6 +4428,47 @@ export default function CrmDispatch() {
             )}
 
             <div className="space-y-2">
+              <Label>Immediate Action *</Label>
+              <Select value={immediateAction} onValueChange={(v) => setImmediateAction(v as ImmediateAction)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="create_now">Create Work Order Now</SelectItem>
+                  <SelectItem value="schedule_later">Schedule for Later</SelectItem>
+                </SelectContent>
+              </Select>
+              {immediateAction === "create_now" && (
+                <p className="text-xs text-amber-600 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  This work order will appear in the dispatch queue for immediate scheduling
+                </p>
+              )}
+            </div>
+
+            {immediateAction === "schedule_later" && (
+              <div className="space-y-2">
+                <Label>Due Date *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dueDate ? format(dueDate, "PPP") : "Pick a due date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={dueDate}
+                      onSelect={setDueDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
+            <div className="space-y-2">
               <Label>Assign Technician</Label>
               <Select value={assignedTechId} onValueChange={setAssignedTechId}>
                 <SelectTrigger>
@@ -4411,10 +4483,9 @@ export default function CrmDispatch() {
               </Select>
             </div>
 
-            {assignedTechId !== "unassigned" && (
-              <>
+            <>
                 <div className="space-y-2">
-                  <Label>Scheduled Date</Label>
+                  <Label>Scheduled Date (Optional)</Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button variant="outline" className="w-full justify-start text-left">
@@ -4463,7 +4534,6 @@ export default function CrmDispatch() {
                   </div>
                 </div>
               </>
-            )}
 
             <div className="space-y-2">
               <Label>Title *</Label>
@@ -4493,7 +4563,7 @@ export default function CrmDispatch() {
             </Button>
             <Button 
               onClick={() => createWorkOrderMutation.mutate()}
-              disabled={!selectedCustomer || !selectedPropertyId || !woTitle.trim() || !woDescription.trim() || createWorkOrderMutation.isPending || !areRequiredQuestionsAnswered()}
+              disabled={!selectedCustomer || !selectedPropertyId || !woTitle.trim() || !woDescription.trim() || createWorkOrderMutation.isPending || !areRequiredQuestionsAnswered() || (immediateAction === "schedule_later" && !dueDate)}
               className="bg-[#711419] hover:bg-[#5a1014]"
             >
               {createWorkOrderMutation.isPending ? (
