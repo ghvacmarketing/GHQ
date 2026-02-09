@@ -429,7 +429,7 @@ function DraggableQueueCard({ workOrder, onClick }: DraggableQueueCardProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-3 px-3 py-2 border-b border-slate-100 hover:bg-slate-50 transition-colors ${isDragging ? 'z-50 shadow-lg cursor-grabbing bg-white rounded-md ring-2 ring-[#711419]/50' : 'cursor-grab'}`}
+      className={`flex items-center gap-3 px-3 py-2 border-b border-slate-100 hover:bg-slate-50 transition-colors ${isDragging ? 'z-50 shadow-lg cursor-grabbing bg-white rounded-md ring-2 ring-[#711419]/50' : 'cursor-grab'} ${(workOrder as any).immediateAction === "create_now" && !workOrder.scheduledStart ? 'bg-red-50 border-b-red-200' : ''}`}
       data-testid={`queue-card-${workOrder.id}`}
       {...attributes}
       {...listeners}
@@ -438,7 +438,11 @@ function DraggableQueueCard({ workOrder, onClick }: DraggableQueueCardProps) {
         onClick?.(workOrder.id);
       }}
     >
-      <GripVertical className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />
+      {(workOrder as any).immediateAction === "create_now" && !workOrder.scheduledStart ? (
+        <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 animate-pulse" title="Needs scheduling now" />
+      ) : (
+        <GripVertical className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />
+      )}
       <Badge variant="outline" className={`${visitTypeColor.bg} ${visitTypeColor.text} border-0 text-[10px] flex-shrink-0`}>
         {visitTypeLabels[workOrder.visitType || "SERVICE"] || workOrder.visitType}
       </Badge>
