@@ -79,6 +79,7 @@ import {
   Clipboard,
   ClipboardCheck,
   Truck,
+  GripVertical,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { format, formatDistanceToNow } from "date-fns";
@@ -404,34 +405,12 @@ function checkSchedulingConflict(
 interface DraggableQueueCardProps {
   workOrder: DispatchWorkOrder;
   onClick?: (workOrderId: string) => void;
-  technicians?: Technician[];
-  onQuickAssign?: (workOrderId: string, techId: string) => void;
-  onQuickSchedule?: (workOrderId: string, date: Date, startTime: string, endTime: string) => void;
-  onQuickStageChange?: (workOrderId: string, stage: DispatchQueueStage) => void;
-  onQuickNote?: (workOrderId: string, note: string) => void;
-  selectedDate?: Date;
 }
 
-function DraggableQueueCard({ 
-  workOrder, 
-  onClick, 
-  technicians = [],
-  onQuickAssign,
-  onQuickSchedule,
-  onQuickStageChange,
-  onQuickNote,
-  selectedDate = new Date(),
-}: DraggableQueueCardProps) {
+function DraggableQueueCard({ workOrder, onClick }: DraggableQueueCardProps) {
   const priorityStyle = priorityBadgeColors[workOrder.priority || "normal"] || priorityBadgeColors.normal;
   const visitTypeColor = getJobTypeColor(workOrder.visitType || workOrder.jobType);
-  const [scheduleOpen, setScheduleOpen] = useState(false);
-  const [noteOpen, setNoteOpen] = useState(false);
-  const [quickNote, setQuickNote] = useState("");
-  const [scheduleDate, setScheduleDate] = useState<Date | undefined>(selectedDate);
-  const [scheduleStart, setScheduleStart] = useState("08:00");
-  const [scheduleEnd, setScheduleEnd] = useState("09:00");
   
-  // Disable dragging for work orders where tech is on site
   const isLocked = workOrder.status === "on_site";
   
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -440,255 +419,54 @@ function DraggableQueueCard({
     disabled: isLocked,
   });
 
-  const age = workOrder.createdAt ? formatDistanceToNow(new Date(workOrder.createdAt), { addSuffix: false }) : null;
-  
-  const scheduledWindow = workOrder.scheduledStart && workOrder.scheduledEnd
-    ? `${format(new Date(workOrder.scheduledStart), "h:mm a")} - ${format(new Date(workOrder.scheduledEnd), "h:mm a")}`
-    : null;
-
   const style: React.CSSProperties = {
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     opacity: 1,
     zIndex: isDragging ? 1000 : undefined,
   };
-  
-  const handleScheduleSubmit = () => {
-    if (scheduleDate && onQuickSchedule) {
-      onQuickSchedule(workOrder.id, scheduleDate, scheduleStart, scheduleEnd);
-      setScheduleOpen(false);
-    }
-  };
-  
-  const handleNoteSubmit = () => {
-    if (quickNote.trim() && onQuickNote) {
-      onQuickNote(workOrder.id, quickNote.trim());
-      setQuickNote("");
-      setNoteOpen(false);
-    }
-  };
-  
-  const quickTimeOptions = [
-    { value: "08:00", label: "8:00 AM" },
-    { value: "09:00", label: "9:00 AM" },
-    { value: "10:00", label: "10:00 AM" },
-    { value: "11:00", label: "11:00 AM" },
-    { value: "12:00", label: "12:00 PM" },
-    { value: "13:00", label: "1:00 PM" },
-    { value: "14:00", label: "2:00 PM" },
-    { value: "15:00", label: "3:00 PM" },
-    { value: "16:00", label: "4:00 PM" },
-    { value: "17:00", label: "5:00 PM" },
-  ];
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`p-3 border rounded-lg shadow-sm hover:shadow-md transition-all duration-150 ${isDragging ? 'z-50 shadow-xl cursor-grabbing ring-2 ring-[#711419]/50 scale-105' : ''} ${(workOrder as any).immediateAction === "create_now" && !workOrder.scheduledStart ? 'bg-amber-50 border-amber-300 ring-1 ring-amber-200' : 'bg-white'}`}
+      className={`flex items-center gap-3 px-3 py-2 border-b border-slate-100 hover:bg-slate-50 transition-colors ${isDragging ? 'z-50 shadow-lg cursor-grabbing bg-white rounded-md ring-2 ring-[#711419]/50' : 'cursor-grab'}`}
       data-testid={`queue-card-${workOrder.id}`}
+      {...attributes}
+      {...listeners}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.(workOrder.id);
+      }}
     >
-      <div 
-        className="cursor-grab"
-        {...attributes}
-        {...listeners}
-        onClick={(e) => {
-          e.stopPropagation();
-          onClick?.(workOrder.id);
-        }}
-      >
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm text-slate-900 truncate">{workOrder.customerName}</p>
-            {workOrder.propertyAddress && (
-              <p className="text-xs text-slate-500 truncate flex items-center gap-1">
-                <MapPin className="h-3 w-3 flex-shrink-0" />
-                {workOrder.propertyAddress}
-              </p>
-            )}
-          </div>
-          {workOrder.priority && workOrder.priority !== "normal" && (
-            <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${priorityStyle.bg} ${priorityStyle.text}`}>
-              {workOrder.priority.toUpperCase()}
-            </span>
-          )}
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <Badge variant="outline" className={`${visitTypeColor.bg} ${visitTypeColor.text} border-0 text-[10px]`}>
-            {visitTypeLabels[workOrder.visitType || "SERVICE"] || workOrder.visitType}
-          </Badge>
-          
-          {workOrder.bookingSource === "online" && (
-            <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200 text-[10px]">
-              Online
-            </Badge>
-          )}
-          
-          {workOrder.workSubtype && workOrder.workSubtype !== "Other" && (
-            <span className="text-slate-600">{workOrder.workSubtype}</span>
-          )}
-        </div>
-        
-        <div className="flex items-center gap-3 mt-2 text-[11px] text-slate-500">
-          {age && (
-            <span className="flex items-center gap-1">
-              <Timer className="h-3 w-3" />
-              {age} old
-            </span>
-          )}
-          {scheduledWindow && (
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {scheduledWindow}
-            </span>
-          )}
-        </div>
-        {(workOrder as any).dueDate && (
-          <div className="flex items-center gap-1 text-xs text-orange-600 mt-1">
-            <Clock className="h-3 w-3" />
-            Due: {format(new Date((workOrder as any).dueDate), "MMM d")}
-          </div>
-        )}
-        {(workOrder as any).immediateAction === "create_now" && !workOrder.scheduledStart && (
-          <div className="flex items-center gap-1 text-xs text-amber-700 font-medium mt-1">
-            <AlertCircle className="h-3 w-3" />
-            Needs scheduling
-          </div>
-        )}
-      </div>
-      
-      <div className="flex items-center gap-1 mt-2 pt-2 border-t border-slate-100">
-        <Select onValueChange={(techId) => onQuickAssign?.(workOrder.id, techId)}>
-          <SelectTrigger className="h-6 text-[10px] px-2 flex-1 min-w-0" data-testid={`quick-assign-${workOrder.id}`}>
-            <User className="h-3 w-3 mr-1" />
-            <span className="truncate">Assign</span>
-          </SelectTrigger>
-          <SelectContent>
-            {technicians.map((tech) => (
-              <SelectItem key={tech.id} value={tech.id} className="text-xs">{tech.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        
-        <Popover open={scheduleOpen} onOpenChange={setScheduleOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" data-testid={`quick-schedule-${workOrder.id}`}>
-              <CalendarIcon className="h-3 w-3" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-3" align="start">
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Date</Label>
-                <Calendar
-                  mode="single"
-                  selected={scheduleDate}
-                  onSelect={setScheduleDate}
-                  className="rounded-md border"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-xs">Start</Label>
-                  <Select value={scheduleStart} onValueChange={setScheduleStart}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {quickTimeOptions.map((t) => (
-                        <SelectItem key={t.value} value={t.value} className="text-xs">{t.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">End</Label>
-                  <Select value={scheduleEnd} onValueChange={setScheduleEnd}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {quickTimeOptions.map((t) => (
-                        <SelectItem key={t.value} value={t.value} className="text-xs">{t.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <Button size="sm" className="w-full h-7 text-xs" onClick={handleScheduleSubmit}>
-                Schedule
-              </Button>
-            </div>
-          </PopoverContent>
-        </Popover>
-        
-        <Select onValueChange={(stage) => onQuickStageChange?.(workOrder.id, stage as DispatchQueueStage)}>
-          <SelectTrigger className="h-6 text-[10px] px-2 w-auto" data-testid={`quick-status-${workOrder.id}`}>
-            <AlertCircle className="h-3 w-3" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="NeedsScheduling" className="text-xs">Needs Scheduling</SelectItem>
-            <SelectItem value="WaitingOnParts" className="text-xs">Waiting on Parts</SelectItem>
-            <SelectItem value="PartsArrived" className="text-xs">Parts Arrived</SelectItem>
-            <SelectItem value="OnHold" className="text-xs">On Hold</SelectItem>
-          </SelectContent>
-        </Select>
-        
-        <Popover open={noteOpen} onOpenChange={setNoteOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" data-testid={`quick-note-${workOrder.id}`}>
-              <FileText className="h-3 w-3" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-64 p-3" align="end">
-            <div className="space-y-2">
-              <Label className="text-xs">Quick Note</Label>
-              <Textarea
-                value={quickNote}
-                onChange={(e) => setQuickNote(e.target.value)}
-                placeholder="Add a note..."
-                className="min-h-[60px] text-xs"
-              />
-              <Button size="sm" className="w-full h-7 text-xs" onClick={handleNoteSubmit} disabled={!quickNote.trim()}>
-                Add Note
-              </Button>
-            </div>
-          </PopoverContent>
-        </Popover>
-      </div>
+      <GripVertical className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />
+      <Badge variant="outline" className={`${visitTypeColor.bg} ${visitTypeColor.text} border-0 text-[10px] flex-shrink-0`}>
+        {visitTypeLabels[workOrder.visitType || "SERVICE"] || workOrder.visitType}
+      </Badge>
+      <span className="font-medium text-sm text-slate-900 truncate">{workOrder.customerName}</span>
+      {workOrder.propertyAddress && (
+        <span className="text-xs text-slate-400 truncate hidden sm:inline">
+          {workOrder.propertyAddress}
+        </span>
+      )}
+      {workOrder.priority && workOrder.priority !== "normal" && (
+        <span className={`ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded flex-shrink-0 ${priorityStyle.bg} ${priorityStyle.text}`}>
+          {workOrder.priority.toUpperCase()}
+        </span>
+      )}
     </div>
   );
 }
 
 function QueueCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
-  const priorityStyle = priorityBadgeColors[workOrder.priority || "normal"] || priorityBadgeColors.normal;
   const visitTypeColor = getJobTypeColor(workOrder.visitType || workOrder.jobType);
   
   return (
-    <div className="p-3 bg-white border rounded-lg shadow-lg cursor-grabbing w-64">
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="flex-1 min-w-0">
-          <p className="font-medium text-sm text-slate-900 truncate">{workOrder.customerName}</p>
-          {workOrder.propertyAddress && (
-            <p className="text-xs text-slate-500 truncate">{workOrder.propertyAddress}</p>
-          )}
-        </div>
-        {workOrder.priority && workOrder.priority !== "normal" && (
-          <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${priorityStyle.bg} ${priorityStyle.text}`}>
-            {workOrder.priority.toUpperCase()}
-          </span>
-        )}
-      </div>
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <Badge variant="outline" className={`${visitTypeColor.bg} ${visitTypeColor.text} border-0 text-[10px]`}>
-          {visitTypeLabels[workOrder.visitType || "SERVICE"] || workOrder.visitType}
-        </Badge>
-        {workOrder.bookingSource === "online" && (
-          <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200 text-[10px]">
-            Online
-          </Badge>
-        )}
-      </div>
+    <div className="flex items-center gap-3 px-3 py-2 bg-white border rounded-md shadow-lg cursor-grabbing w-72">
+      <GripVertical className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />
+      <Badge variant="outline" className={`${visitTypeColor.bg} ${visitTypeColor.text} border-0 text-[10px] flex-shrink-0`}>
+        {visitTypeLabels[workOrder.visitType || "SERVICE"] || workOrder.visitType}
+      </Badge>
+      <span className="font-medium text-sm text-slate-900 truncate">{workOrder.customerName}</span>
     </div>
   );
 }
@@ -697,24 +475,12 @@ interface QueueStageBoxProps {
   stage: DispatchQueueStage;
   workOrders: DispatchWorkOrder[];
   onWorkOrderClick?: (workOrderId: string) => void;
-  technicians?: Technician[];
-  onQuickAssign?: (workOrderId: string, techId: string) => void;
-  onQuickSchedule?: (workOrderId: string, date: Date, startTime: string, endTime: string) => void;
-  onQuickStageChange?: (workOrderId: string, stage: DispatchQueueStage) => void;
-  onQuickNote?: (workOrderId: string, note: string) => void;
-  selectedDate?: Date;
 }
 
 function QueueStageBox({ 
   stage, 
   workOrders, 
   onWorkOrderClick,
-  technicians,
-  onQuickAssign,
-  onQuickSchedule,
-  onQuickStageChange,
-  onQuickNote,
-  selectedDate,
 }: QueueStageBoxProps) {
   const [isOpen, setIsOpen] = useState(true);
   const colors = queueStageColors[stage];
@@ -738,18 +504,12 @@ function QueueStageBox({
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="pt-0 pb-3 px-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+            <div className="divide-y divide-slate-100">
               {workOrders.map((wo) => (
                 <DraggableQueueCard 
                   key={wo.id} 
                   workOrder={wo}
                   onClick={onWorkOrderClick}
-                  technicians={technicians}
-                  onQuickAssign={onQuickAssign}
-                  onQuickSchedule={onQuickSchedule}
-                  onQuickStageChange={onQuickStageChange}
-                  onQuickNote={onQuickNote}
-                  selectedDate={selectedDate}
                 />
               ))}
             </div>
@@ -1643,12 +1403,6 @@ function UnassignedQueueSection({
               stage={stage}
               workOrders={groupedByStage[stage]}
               onWorkOrderClick={onWorkOrderClick}
-              technicians={technicians}
-              onQuickAssign={onQuickAssign}
-              onQuickSchedule={onQuickSchedule}
-              onQuickStageChange={onQuickStageChange}
-              onQuickNote={onQuickNote}
-              selectedDate={selectedDate}
             />
           ))}
         </div>
