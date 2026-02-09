@@ -82,7 +82,7 @@ import {
   GripVertical,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { format, formatDistanceToNow } from "date-fns";
+import { addDays, endOfMonth, endOfWeek, format, formatDistanceToNow, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
 import { FleetMap } from "@/components/fleet-map";
 import { createLocalDateTime, formatLocal, formatLocalDateTime, getLocalStartOfDay, getLocalEndOfDay, getLocalDateString, getTodayLocalDateString, APP_TIMEZONE } from "@/lib/timezone";
 import { formatInTimeZone } from "date-fns-tz";
@@ -1031,6 +1031,143 @@ function DroppableWeekCell({ techId, date, children, onQuickAssign }: DroppableW
   );
 }
 
+interface DroppableMonthCellProps {
+  date: Date;
+  children: React.ReactNode;
+}
+
+function DroppableMonthCell({ date, children }: DroppableMonthCellProps) {
+  const dateId = getLocalDateString(date);
+  const { setNodeRef, isOver } = useDroppable({ id: `month-${dateId}` });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`relative h-full min-h-[110px] p-2 border border-slate-100 transition-colors ${isOver ? "bg-[#711419]/10 ring-2 ring-[#711419]/30" : ""}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+interface DraggableMonthJobPillProps {
+  workOrder: DispatchWorkOrder;
+  onWorkOrderClick?: (workOrderId: string) => void;
+}
+
+function DraggableMonthJobPill({ workOrder, onWorkOrderClick }: DraggableMonthJobPillProps) {
+  const colors = weekCardColors[workOrder.status] || weekCardColors.scheduled;
+  const isLocked = workOrder.status === "on_site";
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: `month-job-${workOrder.id}`,
+    data: { workOrder, fromMonth: true },
+    disabled: isLocked,
+  });
+
+  const style: React.CSSProperties = {
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onClick={(e) => {
+        e.stopPropagation();
+        onWorkOrderClick?.(workOrder.id);
+      }}
+      className={`${colors.bg} ${colors.border} border-l-2 rounded-r px-1.5 py-0.5 text-[10px] ${isLocked ? "cursor-not-allowed opacity-60" : "cursor-grab hover:opacity-80"} text-slate-700`}
+      data-testid={`month-pill-${workOrder.id}`}
+    >
+      <span className="truncate">{workOrder.customerName}</span>
+    </div>
+  );
+}
+
+interface MonthDispatchBoardProps {
+  workOrders: DispatchWorkOrder[];
+  selectedDate: Date;
+  onWorkOrderClick?: (workOrderId: string) => void;
+  onDayClick?: (date: Date) => void;
+}
+
+function MonthDispatchBoard({ workOrders, selectedDate, onWorkOrderClick, onDayClick }: MonthDispatchBoardProps) {
+  const monthStart = startOfMonth(selectedDate);
+  const monthEnd = endOfMonth(selectedDate);
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+  const today = new Date();
+
+  const days: Date[] = [];
+  let current = calendarStart;
+  while (current <= calendarEnd) {
+    days.push(new Date(current));
+    current = addDays(current, 1);
+  }
+
+  const getWorkOrdersForDay = (date: Date) => {
+    const dateStr = getLocalDateString(date);
+    return workOrders.filter(wo => {
+      if (!wo.scheduledStart) return false;
+      return getLocalDateString(wo.scheduledStart) === dateStr;
+    });
+  };
+
+  const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  return (
+    <Card className="bg-white border overflow-hidden">
+      <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
+        {dayNames.map((day) => (
+          <div key={day} className="py-2 text-center border-r border-slate-200 last:border-r-0">
+            {day}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 auto-rows-fr">
+        {days.map((date) => {
+          const dayWorkOrders = getWorkOrdersForDay(date);
+          const isOutsideMonth = !isSameMonth(date, selectedDate);
+          const isToday = isSameDay(date, today);
+          const visibleWorkOrders = dayWorkOrders.slice(0, 3);
+          const extraCount = dayWorkOrders.length - visibleWorkOrders.length;
+
+          return (
+            <DroppableMonthCell key={date.toISOString()} date={date}>
+              <button
+                type="button"
+                onClick={() => onDayClick?.(date)}
+                className="flex items-center justify-between w-full mb-2 text-xs"
+              >
+                <span
+                  className={`flex h-5 w-5 items-center justify-center rounded-full ${
+                    isToday ? "bg-[#711419] text-white" : isOutsideMonth ? "text-slate-300" : "text-slate-700"
+                  }`}
+                >
+                  {date.getDate()}
+                </span>
+                {dayWorkOrders.length > 0 && (
+                  <span className="text-[10px] text-slate-400">{dayWorkOrders.length}</span>
+                )}
+              </button>
+              <div className="space-y-1">
+                {visibleWorkOrders.map((wo) => (
+                  <DraggableMonthJobPill key={wo.id} workOrder={wo} onWorkOrderClick={onWorkOrderClick} />
+                ))}
+                {extraCount > 0 && (
+                  <div className="text-[10px] text-slate-400">+{extraCount} more</div>
+                )}
+              </div>
+            </DroppableMonthCell>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
 interface DroppableScheduleRowProps {
   techId: string;
   children: (args: { isOver: boolean; setDroppableRef: (node: HTMLDivElement | null) => void }) => React.ReactNode;
@@ -1859,7 +1996,7 @@ function enrichWorkOrder(wo: any): DispatchWorkOrder {
   };
 }
 
-type ViewMode = "day" | "week" | "trucks";
+type ViewMode = "day" | "week" | "month" | "trucks";
 
 function getWeekDates(date: Date): Date[] {
   const d = new Date(date);
@@ -1918,6 +2055,14 @@ export default function CrmDispatch() {
       return {
         startDate: format(dates[0], "yyyy-MM-dd"),
         endDate: format(dates[6], "yyyy-MM-dd")
+      };
+    }
+    if (viewMode === "month") {
+      const monthStart = startOfMonth(selectedDate);
+      const monthEnd = endOfMonth(selectedDate);
+      return {
+        startDate: format(monthStart, "yyyy-MM-dd"),
+        endDate: format(monthEnd, "yyyy-MM-dd"),
       };
     }
     // Day view - use single date
@@ -2838,6 +2983,8 @@ export default function CrmDispatch() {
       setActiveId(id.replace('queue-', ''));
     } else if (id.startsWith('schedule-')) {
       setActiveId(id.replace('schedule-', ''));
+    } else if (id.startsWith('month-job-')) {
+      setActiveId(id.replace('month-job-', ''));
     } else {
       setActiveId(id);
     }
@@ -2849,6 +2996,33 @@ export default function CrmDispatch() {
   const combinedModifiers = useMemo(() => {
     const restrictModifier = createRestrictToContainerModifier(dispatchBoardRef);
     return [snapToGridModifier, restrictModifier];
+  }, []);
+
+  const getDropScheduleTimes = useCallback((workOrder: DispatchWorkOrder, dropDate: Date) => {
+    const defaultDurationMs = 2 * 60 * 60 * 1000;
+    let startHour = SCHEDULE_START_HOUR;
+    let startMinutes = 0;
+    let durationMs = defaultDurationMs;
+
+    if (workOrder.scheduledStart) {
+      const existingStart = new Date(workOrder.scheduledStart);
+      startHour = existingStart.getHours();
+      startMinutes = existingStart.getMinutes();
+    }
+
+    if (workOrder.scheduledStart && workOrder.scheduledEnd) {
+      const existingStart = new Date(workOrder.scheduledStart);
+      const existingEnd = new Date(workOrder.scheduledEnd);
+      const existingDuration = existingEnd.getTime() - existingStart.getTime();
+      if (existingDuration > 0) {
+        durationMs = existingDuration;
+      }
+    }
+
+    const scheduledStartUTC = createLocalDateTime(dropDate, startHour, startMinutes);
+    const scheduledEndUTC = new Date(scheduledStartUTC.getTime() + durationMs);
+
+    return { scheduledStartUTC, scheduledEndUTC };
   }, []);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
@@ -2867,6 +3041,8 @@ export default function CrmDispatch() {
       workOrderId = activeIdStr.replace('queue-', '');
     } else if (isFromSchedule) {
       workOrderId = activeIdStr.replace('schedule-', '');
+    } else if (activeIdStr.startsWith('month-job-')) {
+      workOrderId = activeIdStr.replace('month-job-', '');
     }
     const wo = localWorkOrders.find(w => w.id === workOrderId);
     
@@ -3022,6 +3198,46 @@ export default function CrmDispatch() {
           },
         });
       }
+    } else if (overId.startsWith('month-')) {
+      const dateStr = overId.replace('month-', '');
+      const dropDate = new Date(`${dateStr}T00:00:00`);
+      const { scheduledStartUTC, scheduledEndUTC } = getDropScheduleTimes(wo, dropDate);
+
+      if (wo.assignedTechId) {
+        const conflict = checkSchedulingConflict(localWorkOrders, wo.assignedTechId, scheduledStartUTC, scheduledEndUTC, workOrderId);
+        if (conflict) {
+          const techName = wo.techName || technicians.find(t => t.id === wo.assignedTechId)?.name || "This technician";
+          const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+          toast({
+            title: "Scheduling Conflict",
+            description: `${techName} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      const scheduledStartISO = scheduledStartUTC.toISOString();
+      const scheduledEndISO = scheduledEndUTC.toISOString();
+
+      setLocalWorkOrders(prev => prev.map(w =>
+        w.id === workOrderId
+          ? { ...w, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any }
+          : w
+      ));
+
+      updateWorkOrderMutation.mutate({
+        workOrderId,
+        updates: {
+          scheduledStart: scheduledStartISO,
+          scheduledEnd: scheduledEndISO,
+        },
+      });
+
+      toast({
+        title: "Work order scheduled",
+        description: `Scheduled for ${format(dropDate, "MMM d")}`,
+      });
     } else if (overId.startsWith('week-')) {
       const parts = overId.replace('week-', '').split('-');
       const techId = parts[0];
@@ -3070,7 +3286,7 @@ export default function CrmDispatch() {
         description: `Assigned to ${newTech?.name || 'technician'} on ${format(dropDate, "MMM d")}`,
       });
     }
-  }, [localWorkOrders, selectedDate, updateWorkOrderMutation, technicians, toast]);
+  }, [getDropScheduleTimes, localWorkOrders, selectedDate, updateWorkOrderMutation, technicians, toast]);
 
   const unassignedWorkOrders = useMemo(() => {
     const filtered = localWorkOrders.filter(wo => !wo.assignedTechId || !wo.scheduledStart);
@@ -3184,7 +3400,13 @@ export default function CrmDispatch() {
               <button
                 onClick={() => {
                   const newDate = new Date(selectedDate);
-                  newDate.setDate(newDate.getDate() - (viewMode === "week" ? 7 : 1));
+                  if (viewMode === "week") {
+                    newDate.setDate(newDate.getDate() - 7);
+                  } else if (viewMode === "month") {
+                    newDate.setMonth(newDate.getMonth() - 1);
+                  } else {
+                    newDate.setDate(newDate.getDate() - 1);
+                  }
                   setSelectedDate(newDate);
                 }}
                 className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors"
@@ -3213,16 +3435,26 @@ export default function CrmDispatch() {
                     />
                   </PopoverContent>
                 </Popover>
-              ) : (
+              ) : viewMode === "week" ? (
                 <span className="text-sm font-medium text-slate-700 px-2 min-w-[160px] text-center">
                   {formatWeekRange(weekDates)}
+                </span>
+              ) : (
+                <span className="text-sm font-medium text-slate-700 px-2 min-w-[160px] text-center">
+                  {format(selectedDate, "MMMM yyyy")}
                 </span>
               )}
               
               <button
                 onClick={() => {
                   const newDate = new Date(selectedDate);
-                  newDate.setDate(newDate.getDate() + (viewMode === "week" ? 7 : 1));
+                  if (viewMode === "week") {
+                    newDate.setDate(newDate.getDate() + 7);
+                  } else if (viewMode === "month") {
+                    newDate.setMonth(newDate.getMonth() + 1);
+                  } else {
+                    newDate.setDate(newDate.getDate() + 1);
+                  }
                   setSelectedDate(newDate);
                 }}
                 className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors"
@@ -3240,7 +3472,7 @@ export default function CrmDispatch() {
                 Dispatch Board
               </h1>
               <p className="text-sm text-slate-500">
-                {viewMode === "day" ? "Daily Schedule" : viewMode === "week" ? "Weekly Schedule" : "Fleet Tracking"} {viewMode !== "trucks" && `- ${localWorkOrders.length} work orders`}
+                {viewMode === "day" ? "Daily Schedule" : viewMode === "week" ? "Weekly Schedule" : viewMode === "month" ? "Monthly Schedule" : "Fleet Tracking"} {viewMode !== "trucks" && `- ${localWorkOrders.length} work orders`}
               </p>
             </div>
             
@@ -3266,6 +3498,17 @@ export default function CrmDispatch() {
                 data-testid="button-view-week"
               >
                 Week
+              </button>
+              <button
+                onClick={() => setViewMode("month")}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                  viewMode === "month"
+                    ? "text-[#711419] border-[#711419]"
+                    : "text-slate-500 border-transparent hover:text-slate-700"
+                }`}
+                data-testid="button-view-month"
+              >
+                Month
               </button>
               <button
                 onClick={() => setViewMode("trucks")}
@@ -3448,13 +3691,23 @@ export default function CrmDispatch() {
                   onResizeComplete={handleResizeComplete}
                   activeId={activeId}
                 />
-              ) : (
+              ) : viewMode === "week" ? (
                 <WeekDispatchBoard
                   technicians={technicians}
                   workOrders={localWorkOrders}
                   weekDates={weekDates}
                   onWorkOrderClick={handleWorkOrderClick}
                   onQuickAssign={handleQuickAssign}
+                  onDayClick={(date) => {
+                    setSelectedDate(date);
+                    setViewMode("day");
+                  }}
+                />
+              ) : (
+                <MonthDispatchBoard
+                  workOrders={localWorkOrders}
+                  selectedDate={selectedDate}
+                  onWorkOrderClick={handleWorkOrderClick}
                   onDayClick={(date) => {
                     setSelectedDate(date);
                     setViewMode("day");
