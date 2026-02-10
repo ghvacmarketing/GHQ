@@ -1332,11 +1332,13 @@ function ScheduleRowTimeline({
   isDragActive, 
   isOver,
   droppableRef,
+  onPreviewTimeChange,
 }: { 
   children: React.ReactNode; 
   isDragActive: boolean; 
   isOver: boolean;
   droppableRef?: (node: HTMLDivElement | null) => void;
+  onPreviewTimeChange?: (hourOffset: number | null) => void;
 }) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const [previewLeft, setPreviewLeft] = useState<number | null>(null);
@@ -1350,13 +1352,16 @@ function ScheduleRowTimeline({
     const percent = (x / rect.width) * 100;
     const hourOffset = (percent / 100) * totalHours;
     const snappedHour = Math.round(hourOffset * 2) / 2;
-    const snappedPercent = (snappedHour / totalHours) * 100;
+    const clampedHour = Math.max(0, Math.min(snappedHour, totalHours - 1));
+    const snappedPercent = (clampedHour / totalHours) * 100;
     setPreviewLeft(Math.max(0, Math.min(snappedPercent, ((totalHours - 1) / totalHours) * 100)));
-  }, [isDragActive, totalHours]);
+    onPreviewTimeChange?.(clampedHour);
+  }, [isDragActive, onPreviewTimeChange, totalHours]);
 
   const handleMouseLeave = useCallback(() => {
     setPreviewLeft(null);
-  }, []);
+    onPreviewTimeChange?.(null);
+  }, [onPreviewTimeChange]);
 
   return (
     <div 
@@ -1402,9 +1407,10 @@ interface TechnicianScheduleBoardProps {
   selectedDate: Date;
   onResizeComplete?: (workOrderId: string, deltaStartMinutes: number, deltaEndMinutes: number) => void;
   activeId?: string | null;
+  onPreviewTimeChange?: (techId: string, hourOffset: number | null) => void;
 }
 
-function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId }: TechnicianScheduleBoardProps) {
+function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, onPreviewTimeChange }: TechnicianScheduleBoardProps) {
   const hourLabels = useMemo(() => {
     const labels: string[] = [];
     for (let h = SCHEDULE_START_HOUR; h <= SCHEDULE_END_HOUR; h++) {
@@ -1483,6 +1489,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                       isDragActive={!!activeId && activeId.startsWith('queue-')}
                       isOver={isOver}
                       droppableRef={setDroppableRef}
+                      onPreviewTimeChange={(hourOffset) => onPreviewTimeChange?.(tech.id, hourOffset)}
                     >
                       {techWorkOrders.map((wo) => {
                         if (!wo.scheduledStart) return null;
@@ -2038,6 +2045,7 @@ export default function CrmDispatch() {
   const debouncedSearch = useDebounce(searchInput, 300);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeFromQueue, setActiveFromQueue] = useState(false);
+  const [previewHourByTech, setPreviewHourByTech] = useState<Record<string, number>>({});
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [localWorkOrders, setLocalWorkOrders] = useState<DispatchWorkOrder[]>([]);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
@@ -2988,6 +2996,7 @@ export default function CrmDispatch() {
     const id = event.active.id as string;
     const isFromQueue = id.startsWith('queue-');
     setActiveFromQueue(isFromQueue);
+    setPreviewHourByTech({});
     if (isFromQueue) {
       setActiveId(id.replace('queue-', ''));
     } else if (id.startsWith('schedule-')) {
@@ -3038,6 +3047,7 @@ export default function CrmDispatch() {
     const { active, over, delta } = event;
     setActiveId(null);
     setActiveFromQueue(false);
+    setPreviewHourByTech({});
     
     if (!over) return;
     
@@ -3094,18 +3104,23 @@ export default function CrmDispatch() {
         const defaultDuration = 1;
         
         let newStartHour = SCHEDULE_START_HOUR;
-        const overRect = over.rect;
-        const activatorEvt = event.activatorEvent as MouseEvent | null;
-        if (overRect && activatorEvt) {
-          const cursorX = activatorEvt.clientX + delta.x;
-          const timelineLeft = overRect.left;
-          const timelineWidth = overRect.width;
-          const relativeX = cursorX - timelineLeft;
-          const percent = Math.max(0, relativeX / timelineWidth);
-          const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
-          const hourOffset = percent * totalHours;
-          const snappedHour = Math.round(hourOffset * 2) / 2;
-          newStartHour = SCHEDULE_START_HOUR + Math.max(0, Math.min(snappedHour, totalHours - defaultDuration));
+        const previewHour = previewHourByTech[newTechId];
+        if (previewHour !== undefined) {
+          newStartHour = SCHEDULE_START_HOUR + previewHour;
+        } else {
+          const overRect = over.rect;
+          const activatorEvt = event.activatorEvent as MouseEvent | null;
+          if (overRect && activatorEvt) {
+            const cursorX = activatorEvt.clientX + delta.x;
+            const timelineLeft = overRect.left;
+            const timelineWidth = overRect.width;
+            const relativeX = cursorX - timelineLeft;
+            const percent = Math.max(0, relativeX / timelineWidth);
+            const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
+            const hourOffset = percent * totalHours;
+            const snappedHour = Math.round(hourOffset * 2) / 2;
+            newStartHour = SCHEDULE_START_HOUR + Math.max(0, Math.min(snappedHour, totalHours - defaultDuration));
+          }
         }
         
         const newEndHour = Math.min(newStartHour + defaultDuration, SCHEDULE_END_HOUR);
@@ -3263,7 +3278,21 @@ export default function CrmDispatch() {
       });
       setTimePickerOpen(true);
     }
-  }, [getDropScheduleTimes, localWorkOrders, selectedDate, updateWorkOrderMutation, technicians, toast]);
+  }, [getDropScheduleTimes, localWorkOrders, selectedDate, updateWorkOrderMutation, technicians, toast, previewHourByTech]);
+
+  const handlePreviewTimeChange = useCallback((techId: string, hourOffset: number | null) => {
+    setPreviewHourByTech((prev) => {
+      if (hourOffset === null) {
+        if (prev[techId] === undefined) return prev;
+        const next = { ...prev };
+        delete next[techId];
+        return next;
+      }
+
+      if (prev[techId] === hourOffset) return prev;
+      return { ...prev, [techId]: hourOffset };
+    });
+  }, []);
 
   const confirmTimePickerDrop = useCallback(() => {
     if (!pendingDrop) return;
@@ -3726,6 +3755,7 @@ export default function CrmDispatch() {
                   selectedDate={selectedDate}
                   onResizeComplete={handleResizeComplete}
                   activeId={activeId}
+                  onPreviewTimeChange={handlePreviewTimeChange}
                 />
               ) : viewMode === "week" ? (
                 <WeekDispatchBoard
