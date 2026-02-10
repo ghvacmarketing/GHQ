@@ -295,12 +295,12 @@ const createRestrictToContainerModifier = (containerRef: React.RefObject<HTMLDiv
 };
 
 const statusColors: Record<string, { bg: string; border: string; text: string }> = {
-  scheduled: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
-  dispatched: { bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-700" },
-  en_route: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700" },
-  on_site: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700" },
-  completed: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700" },
-  cancelled: { bg: "bg-red-50", border: "border-red-200", text: "text-red-500" },
+  scheduled: { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700" },
+  dispatched: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
+  en_route: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
+  on_site: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700" },
+  completed: { bg: "bg-gray-50", border: "border-gray-200", text: "text-gray-700" },
+  cancelled: { bg: "bg-gray-50", border: "border-gray-200", text: "text-gray-500" },
 };
 
 const jobTypeColors: Record<string, { bg: string; border: string; text: string }> = {
@@ -311,12 +311,12 @@ const jobTypeColors: Record<string, { bg: string; border: string; text: string }
 };
 
 const statusStripeColors: Record<string, string> = {
-  scheduled: "border-l-blue-500",
-  dispatched: "border-l-purple-500",
-  en_route: "border-l-amber-500",
-  on_site: "border-l-orange-500",
-  completed: "border-l-green-500",
-  cancelled: "border-l-red-500",
+  scheduled: "border-l-yellow-400",
+  dispatched: "border-l-blue-400",
+  en_route: "border-l-blue-400",
+  on_site: "border-l-green-400",
+  completed: "border-l-gray-400",
+  cancelled: "border-l-gray-400",
 };
 
 const priorityBadgeColors: Record<string, { bg: string; text: string; border: string }> = {
@@ -337,12 +337,21 @@ function getJobTypeColor(jobType: string | null | undefined): { bg: string; bord
 }
 
 const statusLabels: Record<string, string> = {
-  scheduled: "Scheduled",
+  scheduled: "Pending",
   dispatched: "Dispatched",
   en_route: "Traveling",
   on_site: "Working",
   completed: "Completed",
   cancelled: "Cancelled",
+};
+
+const statusSquircleColors: Record<string, string> = {
+  scheduled: "bg-yellow-400",
+  dispatched: "bg-blue-400",
+  en_route: "bg-blue-400",
+  on_site: "bg-green-400",
+  completed: "bg-gray-400",
+  cancelled: "bg-gray-400",
 };
 
 function timeToSlotIndex(decimalHour: number): number {
@@ -405,15 +414,17 @@ function checkSchedulingConflict(
 interface DraggableQueueCardProps {
   workOrder: DispatchWorkOrder;
   onClick?: (workOrderId: string) => void;
+  onOpenQuickStatus?: (workOrderId: string, event: React.MouseEvent) => void;
 }
 
-function DraggableQueueCard({ workOrder, onClick }: DraggableQueueCardProps) {
+function DraggableQueueCard({ workOrder, onClick, onOpenQuickStatus }: DraggableQueueCardProps) {
   const priorityStyle = priorityBadgeColors[workOrder.priority || "normal"] || priorityBadgeColors.normal;
   const visitTypeColor = getJobTypeColor(workOrder.visitType || workOrder.jobType);
   const needsSchedulingNow = (workOrder as any).immediateAction === "create_now" && !workOrder.scheduledStart;
-  
+  const squircleColor = statusSquircleColors[workOrder.status] || statusSquircleColors.scheduled;
+
   const isLocked = workOrder.status === "on_site";
-  
+
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `queue-${workOrder.id}`,
     data: { workOrder, fromQueue: true },
@@ -430,7 +441,7 @@ function DraggableQueueCard({ workOrder, onClick }: DraggableQueueCardProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-3 px-3 py-2 border-b border-slate-100 hover:bg-slate-50 transition-colors ${isDragging ? 'z-50 shadow-lg cursor-grabbing bg-white rounded-md ring-2 ring-[#711419]/50' : 'cursor-grab'} ${needsSchedulingNow ? 'bg-red-50 border-b-red-200 border-l-4 border-l-red-500' : ''}`}
+      className={`flex items-stretch gap-0 border-b border-slate-100 hover:bg-slate-50 transition-colors ${isDragging ? 'z-50 shadow-lg cursor-grabbing bg-white rounded-md ring-2 ring-[#711419]/50' : 'cursor-grab'} ${needsSchedulingNow ? 'bg-red-50 border-b-red-200' : ''}`}
       data-testid={`queue-card-${workOrder.id}`}
       {...attributes}
       {...listeners}
@@ -439,25 +450,39 @@ function DraggableQueueCard({ workOrder, onClick }: DraggableQueueCardProps) {
         onClick?.(workOrder.id);
       }}
     >
-      {needsSchedulingNow ? (
-        <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 animate-pulse" title="Needs scheduling now" />
-      ) : (
-        <GripVertical className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />
-      )}
-      <Badge variant="outline" className={`${visitTypeColor.bg} ${visitTypeColor.text} border-0 text-[10px] flex-shrink-0`}>
-        {visitTypeLabels[workOrder.visitType || "SERVICE"] || workOrder.visitType}
-      </Badge>
-      <span className="font-medium text-sm text-slate-900 truncate">{workOrder.customerName}</span>
-      {workOrder.propertyAddress && (
-        <span className="text-xs text-slate-400 truncate hidden sm:inline">
-          {workOrder.propertyAddress}
-        </span>
-      )}
-      {workOrder.priority && workOrder.priority !== "normal" && (
-        <span className={`ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded flex-shrink-0 ${priorityStyle.bg} ${priorityStyle.text}`}>
-          {workOrder.priority.toUpperCase()}
-        </span>
-      )}
+      {/* Status Squircle */}
+      <div
+        className={`${squircleColor} w-[10px] flex-shrink-0 rounded-[5px] my-1 ml-1 cursor-pointer hover:opacity-80 transition-opacity`}
+        title={`Status: ${statusLabels[workOrder.status] || workOrder.status} — Click to change`}
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          onOpenQuickStatus?.(workOrder.id, e);
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+        data-testid={`status-squircle-${workOrder.id}`}
+      />
+      <div className="flex items-center gap-3 px-3 py-2 flex-1 min-w-0">
+        {needsSchedulingNow ? (
+          <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 animate-pulse" title="Needs scheduling now" />
+        ) : (
+          <GripVertical className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />
+        )}
+        <Badge variant="outline" className={`${visitTypeColor.bg} ${visitTypeColor.text} border-0 text-[10px] flex-shrink-0`}>
+          {visitTypeLabels[workOrder.visitType || "SERVICE"] || workOrder.visitType}
+        </Badge>
+        <span className="font-medium text-sm text-slate-900 truncate">{workOrder.customerName}</span>
+        {workOrder.propertyAddress && (
+          <span className="text-xs text-slate-400 truncate hidden sm:inline">
+            {workOrder.propertyAddress}
+          </span>
+        )}
+        {workOrder.priority && workOrder.priority !== "normal" && (
+          <span className={`ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded flex-shrink-0 ${priorityStyle.bg} ${priorityStyle.text}`}>
+            {workOrder.priority.toUpperCase()}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -466,12 +491,14 @@ interface QueueStageBoxProps {
   stage: DispatchQueueStage;
   workOrders: DispatchWorkOrder[];
   onWorkOrderClick?: (workOrderId: string) => void;
+  onOpenQuickStatus?: (workOrderId: string, event: React.MouseEvent) => void;
 }
 
-function QueueStageBox({ 
-  stage, 
-  workOrders, 
+function QueueStageBox({
+  stage,
+  workOrders,
   onWorkOrderClick,
+  onOpenQuickStatus,
 }: QueueStageBoxProps) {
   const [isOpen, setIsOpen] = useState(true);
   const colors = queueStageColors[stage];
@@ -497,10 +524,11 @@ function QueueStageBox({
           <CardContent className="pt-0 pb-3 px-3">
             <div className="divide-y divide-slate-100">
               {workOrders.map((wo) => (
-                <DraggableQueueCard 
-                  key={wo.id} 
+                <DraggableQueueCard
+                  key={wo.id}
                   workOrder={wo}
                   onClick={onWorkOrderClick}
+                  onOpenQuickStatus={onOpenQuickStatus}
                 />
               ))}
             </div>
@@ -539,30 +567,30 @@ const scheduleVisitTypeColors: Record<string, string> = {
 };
 
 const scheduleStatusStripes: Record<string, string> = {
-  scheduled: "border-l-4 border-l-blue-500",
-  dispatched: "border-l-4 border-l-purple-500",
-  en_route: "border-l-4 border-l-amber-500",
-  on_site: "border-l-4 border-l-orange-500",
-  completed: "border-l-4 border-l-green-500",
-  cancelled: "border-l-4 border-l-red-400",
+  scheduled: "border-l-4 border-l-yellow-400",
+  dispatched: "border-l-4 border-l-blue-400",
+  en_route: "border-l-4 border-l-blue-400",
+  on_site: "border-l-4 border-l-green-400",
+  completed: "border-l-4 border-l-gray-400",
+  cancelled: "border-l-4 border-l-gray-400",
 };
 
 const scheduleCardColors: Record<string, string> = {
-  scheduled: "bg-blue-500",
-  dispatched: "bg-purple-500",
-  en_route: "bg-amber-500",
-  on_site: "bg-orange-500",
-  completed: "bg-green-500",
-  cancelled: "bg-red-400",
+  scheduled: "bg-yellow-400",
+  dispatched: "bg-blue-400",
+  en_route: "bg-blue-400",
+  on_site: "bg-green-400",
+  completed: "bg-gray-400",
+  cancelled: "bg-gray-400",
 };
 
 const weekCardColors: Record<string, { bg: string; border: string }> = {
-  scheduled: { bg: "bg-blue-100", border: "border-l-blue-500" },
-  dispatched: { bg: "bg-purple-100", border: "border-l-purple-500" },
-  en_route: { bg: "bg-amber-100", border: "border-l-amber-500" },
-  on_site: { bg: "bg-orange-100", border: "border-l-orange-500" },
-  completed: { bg: "bg-green-100", border: "border-l-green-500" },
-  cancelled: { bg: "bg-red-100", border: "border-l-red-400" },
+  scheduled: { bg: "bg-yellow-100", border: "border-l-yellow-400" },
+  dispatched: { bg: "bg-blue-100", border: "border-l-blue-400" },
+  en_route: { bg: "bg-blue-50", border: "border-l-blue-400" },
+  on_site: { bg: "bg-green-100", border: "border-l-green-400" },
+  completed: { bg: "bg-gray-100", border: "border-l-gray-400" },
+  cancelled: { bg: "bg-gray-100", border: "border-l-gray-400" },
 };
 
 interface BouncieVehicle {
@@ -1541,6 +1569,7 @@ interface UnassignedQueueSectionProps {
   onQuickStageChange?: (workOrderId: string, stage: DispatchQueueStage) => void;
   onQuickNote?: (workOrderId: string, note: string) => void;
   selectedDate?: Date;
+  onOpenQuickStatus?: (workOrderId: string, event: React.MouseEvent) => void;
 }
 
 function UnassignedQueueSection({
@@ -1552,6 +1581,7 @@ function UnassignedQueueSection({
   onQuickStageChange,
   onQuickNote,
   selectedDate,
+  onOpenQuickStatus,
 }: UnassignedQueueSectionProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: "unassigned-queue",
@@ -1618,11 +1648,12 @@ function UnassignedQueueSection({
       ) : (
         <div className="space-y-2">
           {stageOrder.map(stage => (
-            <QueueStageBox 
+            <QueueStageBox
               key={stage}
               stage={stage}
               workOrders={groupedByStage[stage]}
               onWorkOrderClick={onWorkOrderClick}
+              onOpenQuickStatus={onOpenQuickStatus}
             />
           ))}
         </div>
@@ -1800,13 +1831,13 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
         <div className="flex items-center gap-1">
           <p className={`text-xs font-medium truncate flex-1 ${workOrder.isPending ? 'ml-5' : ''}`}>{workOrder.customerName}</p>
           {workOrder.status !== "scheduled" && (
-            <span 
+            <span
               className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm ${
-                workOrder.status === 'dispatched' ? 'bg-purple-600 text-white' :
-                workOrder.status === 'en_route' ? 'bg-amber-500 text-white' :
-                workOrder.status === 'on_site' ? 'bg-orange-500 text-white' :
-                workOrder.status === 'completed' ? 'bg-green-600 text-white' :
-                'bg-gray-600 text-white'
+                workOrder.status === 'dispatched' ? 'bg-blue-500 text-white' :
+                workOrder.status === 'en_route' ? 'bg-blue-400 text-white' :
+                workOrder.status === 'on_site' ? 'bg-green-500 text-white' :
+                workOrder.status === 'completed' ? 'bg-gray-500 text-white' :
+                'bg-gray-500 text-white'
               }`}
               data-testid={`status-badge-${workOrder.id}`}
             >
@@ -2131,6 +2162,9 @@ export default function CrmDispatch() {
   
   // Track source quote ID when creating follow-up work order from quote acceptance
   const [sourceQuoteId, setSourceQuoteId] = useState<string | null>(null);
+
+  // Quick status change popup state
+  const [quickStatusMenu, setQuickStatusMenu] = useState<{ workOrderId: string; x: number; y: number } | null>(null);
 
   const debouncedCustomerSearch = useDebounce(customerSearch, 300);
   
@@ -2683,6 +2717,28 @@ export default function CrmDispatch() {
       }
     });
   }, [selectedWorkOrderId, updateWorkOrderMutation, toast]);
+
+  const handleQuickStatusChange = useCallback((workOrderId: string, newStatus: WorkOrderStatus) => {
+    updateWorkOrderMutation.mutate({
+      workOrderId,
+      updates: { status: newStatus },
+    }, {
+      onSuccess: () => {
+        toast({ title: "Status updated", description: `Status changed to ${statusLabels[newStatus]}` });
+        setLocalWorkOrders(prev => prev.map(wo =>
+          wo.id === workOrderId ? { ...wo, status: newStatus } : wo
+        ));
+      }
+    });
+    setQuickStatusMenu(null);
+  }, [updateWorkOrderMutation, toast]);
+
+  const handleOpenQuickStatus = useCallback((workOrderId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    event.preventDefault();
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    setQuickStatusMenu({ workOrderId, x: rect.right + 8, y: rect.top });
+  }, []);
 
   const handleUnassign = useCallback(() => {
     if (!selectedWorkOrderId) return;
@@ -3434,7 +3490,7 @@ export default function CrmDispatch() {
 
   const filterLabels: Record<FilterStatus, string> = {
     all: "All",
-    scheduled: "Scheduled",
+    scheduled: "Pending",
     dispatched: "Dispatched",
     en_route: "Traveling",
     on_site: "Working",
@@ -3628,27 +3684,27 @@ export default function CrmDispatch() {
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Status (Left Stripe)</p>
                     <div className="grid grid-cols-3 gap-x-3 gap-y-2">
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-                        <span className="text-sm text-slate-700">Scheduled</span>
+                        <span className="w-2 h-2 rounded-full bg-yellow-400 flex-shrink-0" />
+                        <span className="text-sm text-slate-700">Pending</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-purple-500 flex-shrink-0" />
+                        <span className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />
                         <span className="text-sm text-slate-700">Dispatched</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+                        <span className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />
                         <span className="text-sm text-slate-700">Traveling</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
+                        <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
                         <span className="text-sm text-slate-700">Working</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                        <span className="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0" />
                         <span className="text-sm text-slate-700">Completed</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                        <span className="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0" />
                         <span className="text-sm text-slate-700">Cancelled</span>
                       </div>
                     </div>
@@ -3796,6 +3852,7 @@ export default function CrmDispatch() {
                 onQuickStageChange={handleQuickStageChange}
                 onQuickNote={handleQuickNote}
                 selectedDate={selectedDate}
+                onOpenQuickStatus={handleOpenQuickStatus}
               />
             </div>
             )}
@@ -3939,21 +3996,31 @@ export default function CrmDispatch() {
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-slate-900">Update Status</h3>
                   <div className="flex flex-wrap gap-2" data-testid="status-buttons">
-                    {(["scheduled", "dispatched", "en_route", "on_site", "completed"] as WorkOrderStatus[]).map((status) => (
-                      <Button
-                        key={status}
-                        size="sm"
-                        variant={selectedWorkOrder.status === status ? "default" : "outline"}
-                        onClick={() => handleStatusChange(status)}
-                        disabled={updateWorkOrderMutation.isPending}
-                        data-testid={`button-status-${status}`}
-                      >
-                        {updateWorkOrderMutation.isPending && selectedWorkOrder.status !== status ? (
-                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        ) : null}
-                        {statusLabels[status]}
-                      </Button>
-                    ))}
+                    {(["scheduled", "dispatched", "en_route", "on_site", "completed", "cancelled"] as WorkOrderStatus[]).map((status) => {
+                      const icons: Record<string, React.ReactNode> = {
+                        scheduled: <Clock className="h-3 w-3 mr-1" />,
+                        dispatched: <Clipboard className="h-3 w-3 mr-1" />,
+                        en_route: <Truck className="h-3 w-3 mr-1" />,
+                        on_site: <Wrench className="h-3 w-3 mr-1" />,
+                        completed: <CheckSquare className="h-3 w-3 mr-1" />,
+                        cancelled: <XCircle className="h-3 w-3 mr-1" />,
+                      };
+                      return (
+                        <Button
+                          key={status}
+                          size="sm"
+                          variant={selectedWorkOrder.status === status ? "default" : "outline"}
+                          onClick={() => handleStatusChange(status)}
+                          disabled={updateWorkOrderMutation.isPending}
+                          data-testid={`button-status-${status}`}
+                        >
+                          {updateWorkOrderMutation.isPending && selectedWorkOrder.status !== status ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          ) : icons[status]}
+                          {statusLabels[status]}
+                        </Button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -4120,6 +4187,55 @@ export default function CrmDispatch() {
           </div>
         )}
       </div>
+
+      {/* Quick Status Change Popup */}
+      {quickStatusMenu && (() => {
+        const wo = localWorkOrders.find(w => w.id === quickStatusMenu.workOrderId);
+        if (!wo) return null;
+        const statusPopupItems: { status: WorkOrderStatus; icon: React.ReactNode; label: string; bg: string; text: string; hoverBg: string }[] = [
+          { status: "scheduled", icon: <Clock className="h-4 w-4" />, label: "Pending", bg: "bg-yellow-100", text: "text-yellow-800", hoverBg: "hover:bg-yellow-200" },
+          { status: "dispatched", icon: <Clipboard className="h-4 w-4" />, label: "Dispatched", bg: "bg-blue-100", text: "text-blue-800", hoverBg: "hover:bg-blue-200" },
+          { status: "en_route", icon: <Truck className="h-4 w-4" />, label: "Traveling", bg: "bg-blue-100", text: "text-blue-800", hoverBg: "hover:bg-blue-200" },
+          { status: "on_site", icon: <Wrench className="h-4 w-4" />, label: "Working", bg: "bg-green-100", text: "text-green-800", hoverBg: "hover:bg-green-200" },
+          { status: "completed", icon: <CheckSquare className="h-4 w-4" />, label: "Completed", bg: "bg-gray-100", text: "text-gray-800", hoverBg: "hover:bg-gray-200" },
+          { status: "cancelled", icon: <XCircle className="h-4 w-4" />, label: "Cancelled", bg: "bg-gray-100", text: "text-gray-600", hoverBg: "hover:bg-gray-200" },
+        ];
+        return (
+          <>
+            <div
+              className="fixed inset-0 z-[9998]"
+              onClick={() => setQuickStatusMenu(null)}
+            />
+            <div
+              className="fixed z-[9999] bg-white rounded-xl shadow-xl border border-slate-200 p-2 w-[180px]"
+              style={{ top: quickStatusMenu.y, left: quickStatusMenu.x }}
+              data-testid="quick-status-popup"
+            >
+              <p className="text-xs font-semibold text-slate-500 px-2 py-1 uppercase tracking-wider">Change Status</p>
+              <div className="space-y-1">
+                {statusPopupItems.map(({ status, icon, label, bg, text, hoverBg }) => (
+                  <button
+                    key={status}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleQuickStatusChange(quickStatusMenu.workOrderId, status);
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      wo.status === status
+                        ? `${bg} ${text} ring-2 ring-offset-1 ring-current`
+                        : `${bg} ${text} ${hoverBg}`
+                    }`}
+                    data-testid={`quick-status-${status}`}
+                  >
+                    {icon}
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto scrollbar-hide">
