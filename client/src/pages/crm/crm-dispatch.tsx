@@ -3379,7 +3379,7 @@ export default function CrmDispatch() {
     <CrmLayout currentUser={currentUser} disableScroll>
       <div className="flex h-full max-w-full overflow-hidden">
         {/* Main Content - shrinks when panel is open */}
-        <div className={cn("flex flex-col overflow-hidden transition-all duration-200", selectedWorkOrder ? "flex-1 min-w-0" : "w-full")}>
+        <div className={cn("flex flex-col overflow-y-auto overflow-x-hidden transition-all duration-200", selectedWorkOrder ? "flex-1 min-w-0" : "w-full")}>
         {/* Fixed Header Section */}
         <div className="flex-shrink-0 space-y-3 pb-3">
           <div className="flex justify-center">
@@ -3677,9 +3677,9 @@ export default function CrmDispatch() {
           onDragEnd={handleDragEnd}
           modifiers={combinedModifiers}
         >
-          <div ref={dispatchBoardRef} className="flex flex-col flex-1 min-h-0 gap-4 overflow-hidden">
+          <div ref={dispatchBoardRef} className="flex flex-col flex-1 min-h-[520px] gap-4 overflow-hidden">
             {/* Scrollable Technician Schedule - vertical scroll here, horizontal inside component */}
-            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+            <div className="flex-1 min-h-[320px] overflow-y-auto overflow-x-hidden">
               {viewMode === "trucks" ? (
                 <TrucksMapView technicians={technicians} />
               ) : viewMode === "day" ? (
@@ -3718,7 +3718,7 @@ export default function CrmDispatch() {
             
             {/* Fixed Unassigned Queue - hidden in trucks view */}
             {viewMode !== "trucks" && (
-            <div className="flex-shrink-0 max-h-[280px] overflow-y-auto overflow-x-hidden">
+            <div className="flex-shrink-0 max-h-[320px] overflow-y-auto overflow-x-hidden">
               <UnassignedQueueSection
                 workOrders={unassignedWorkOrders}
                 onWorkOrderClick={handleWorkOrderClick}
