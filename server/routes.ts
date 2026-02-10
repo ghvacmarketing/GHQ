@@ -12275,11 +12275,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let workOrders = await storage.getWorkOrdersByDateRange(startOfDay, endOfDay);
       
       const schedulableWorkOrders = await storage.getSchedulableWorkOrders();
+      const unassignedWorkOrders = await storage.getUnassignedWorkOrders();
       
       const allWorkOrderIds = new Set(workOrders.map(wo => wo.id));
       for (const swo of schedulableWorkOrders) {
         if (!allWorkOrderIds.has(swo.id)) {
           workOrders.push(swo);
+          allWorkOrderIds.add(swo.id);
+        }
+      }
+      for (const uwo of unassignedWorkOrders) {
+        if (!allWorkOrderIds.has(uwo.id)) {
+          workOrders.push(uwo);
+          allWorkOrderIds.add(uwo.id);
         }
       }
       

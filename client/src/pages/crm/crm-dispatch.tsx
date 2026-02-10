@@ -2085,6 +2085,15 @@ export default function CrmDispatch() {
   const [assignedTechId, setAssignedTechId] = useState<string>("unassigned");
   const [immediateAction, setImmediateAction] = useState<ImmediateAction>("create_now");
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
+  const [pendingDrop, setPendingDrop] = useState<{
+    workOrderId: string;
+    techId: string | null;
+    dropDate: Date;
+    techName: string | null;
+  } | null>(null);
+  const [dropStartTime, setDropStartTime] = useState("08:00");
+  const [dropEndTime, setDropEndTime] = useState("10:00");
   
   const timeOptions = useMemo(() => {
     const options: { value: string; label: string }[] = [];
@@ -3201,92 +3210,119 @@ export default function CrmDispatch() {
     } else if (overId.startsWith('month-')) {
       const dateStr = overId.replace('month-', '');
       const dropDate = new Date(`${dateStr}T00:00:00`);
-      const { scheduledStartUTC, scheduledEndUTC } = getDropScheduleTimes(wo, dropDate);
 
-      if (wo.assignedTechId) {
-        const conflict = checkSchedulingConflict(localWorkOrders, wo.assignedTechId, scheduledStartUTC, scheduledEndUTC, workOrderId);
-        if (conflict) {
-          const techName = wo.techName || technicians.find(t => t.id === wo.assignedTechId)?.name || "This technician";
-          const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
-          toast({
-            title: "Scheduling Conflict",
-            description: `${techName} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
-            variant: "destructive",
-          });
-          return;
+      if (wo.scheduledStart) {
+        const existingStart = new Date(wo.scheduledStart);
+        setDropStartTime(`${String(existingStart.getHours()).padStart(2,'0')}:${String(existingStart.getMinutes()).padStart(2,'0')}`);
+        if (wo.scheduledEnd) {
+          const existingEnd = new Date(wo.scheduledEnd);
+          setDropEndTime(`${String(existingEnd.getHours()).padStart(2,'0')}:${String(existingEnd.getMinutes()).padStart(2,'0')}`);
+        } else {
+          const endH = existingStart.getHours() + 2;
+          setDropEndTime(`${String(Math.min(endH, 20)).padStart(2,'0')}:${String(existingStart.getMinutes()).padStart(2,'0')}`);
         }
+      } else {
+        setDropStartTime("08:00");
+        setDropEndTime("10:00");
       }
 
-      const scheduledStartISO = scheduledStartUTC.toISOString();
-      const scheduledEndISO = scheduledEndUTC.toISOString();
-
-      setLocalWorkOrders(prev => prev.map(w =>
-        w.id === workOrderId
-          ? { ...w, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any }
-          : w
-      ));
-
-      updateWorkOrderMutation.mutate({
+      setPendingDrop({
         workOrderId,
-        updates: {
-          scheduledStart: scheduledStartISO,
-          scheduledEnd: scheduledEndISO,
-        },
+        techId: wo.assignedTechId || null,
+        dropDate,
+        techName: wo.techName || null,
       });
-
-      toast({
-        title: "Work order scheduled",
-        description: `Scheduled for ${format(dropDate, "MMM d")}`,
-      });
+      setTimePickerOpen(true);
     } else if (overId.startsWith('week-')) {
       const parts = overId.replace('week-', '').split('-');
       const techId = parts[0];
       const dateStr = parts.slice(1).join('-');
-      const dropDate = new Date(dateStr + 'T08:00:00');
-      
-      const startDate = new Date(dropDate);
-      startDate.setHours(8, 0, 0, 0);
-      const endDate = new Date(dropDate);
-      endDate.setHours(10, 0, 0, 0);
-      
+      const dropDate = new Date(dateStr + 'T00:00:00');
       const newTech = technicians.find(t => t.id === techId);
-      
-      // Check for conflict when dropping in week view
+
+      if (wo.scheduledStart) {
+        const existingStart = new Date(wo.scheduledStart);
+        setDropStartTime(`${String(existingStart.getHours()).padStart(2,'0')}:${String(existingStart.getMinutes()).padStart(2,'0')}`);
+        if (wo.scheduledEnd) {
+          const existingEnd = new Date(wo.scheduledEnd);
+          setDropEndTime(`${String(existingEnd.getHours()).padStart(2,'0')}:${String(existingEnd.getMinutes()).padStart(2,'0')}`);
+        } else {
+          const endH = existingStart.getHours() + 2;
+          setDropEndTime(`${String(Math.min(endH, 20)).padStart(2,'0')}:${String(existingStart.getMinutes()).padStart(2,'0')}`);
+        }
+      } else {
+        setDropStartTime("08:00");
+        setDropEndTime("10:00");
+      }
+
+      setPendingDrop({
+        workOrderId,
+        techId,
+        dropDate,
+        techName: newTech?.name || null,
+      });
+      setTimePickerOpen(true);
+    }
+  }, [getDropScheduleTimes, localWorkOrders, selectedDate, updateWorkOrderMutation, technicians, toast]);
+
+  const confirmTimePickerDrop = useCallback(() => {
+    if (!pendingDrop) return;
+
+    const { workOrderId, techId, dropDate, techName } = pendingDrop;
+
+    const [startH, startM] = dropStartTime.split(':').map(Number);
+    const [endH, endM] = dropEndTime.split(':').map(Number);
+
+    const startDate = new Date(dropDate);
+    startDate.setHours(startH, startM, 0, 0);
+    const endDate = new Date(dropDate);
+    endDate.setHours(endH, endM, 0, 0);
+
+    if (endDate <= startDate) {
+      toast({ title: "Invalid time range", description: "End time must be after start time", variant: "destructive" });
+      return;
+    }
+
+    if (techId) {
       const conflict = checkSchedulingConflict(localWorkOrders, techId, startDate, endDate, workOrderId);
       if (conflict) {
         const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
         toast({
           title: "Scheduling Conflict",
-          description: `${newTech?.name || 'This technician'} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
+          description: `${techName || 'This technician'} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}.`,
           variant: "destructive",
         });
         return;
       }
-      
-      const scheduledStartISO = startDate.toISOString();
-      const scheduledEndISO = endDate.toISOString();
-      
-      setLocalWorkOrders(prev => prev.map(w => 
-        w.id === workOrderId 
-          ? { ...w, assignedTechId: techId, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any, techName: newTech?.name || null } 
-          : w
-      ));
-      
-      updateWorkOrderMutation.mutate({
-        workOrderId,
-        updates: {
-          assignedTechId: techId,
-          scheduledStart: scheduledStartISO,
-          scheduledEnd: scheduledEndISO,
-        },
-      });
-      
-      toast({
-        title: "Work order scheduled",
-        description: `Assigned to ${newTech?.name || 'technician'} on ${format(dropDate, "MMM d")}`,
-      });
     }
-  }, [getDropScheduleTimes, localWorkOrders, selectedDate, updateWorkOrderMutation, technicians, toast]);
+
+    const scheduledStartISO = startDate.toISOString();
+    const scheduledEndISO = endDate.toISOString();
+
+    const updates: any = {
+      scheduledStart: scheduledStartISO,
+      scheduledEnd: scheduledEndISO,
+    };
+    if (techId) {
+      updates.assignedTechId = techId;
+    }
+
+    setLocalWorkOrders(prev => prev.map(w =>
+      w.id === workOrderId
+        ? { ...w, ...updates, techName: techId ? techName : w.techName, scheduledStart: scheduledStartISO as any, scheduledEnd: scheduledEndISO as any, assignedTechId: techId || w.assignedTechId }
+        : w
+    ));
+
+    updateWorkOrderMutation.mutate({ workOrderId, updates });
+
+    toast({
+      title: "Work order scheduled",
+      description: `Scheduled for ${format(dropDate, "MMM d")} at ${dropStartTime}${techName ? ` - ${techName}` : ''}`,
+    });
+
+    setTimePickerOpen(false);
+    setPendingDrop(null);
+  }, [pendingDrop, dropStartTime, dropEndTime, localWorkOrders, updateWorkOrderMutation, toast]);
 
   const unassignedWorkOrders = useMemo(() => {
     const filtered = localWorkOrders.filter(wo => !wo.assignedTechId || !wo.scheduledStart);
@@ -4621,6 +4657,41 @@ export default function CrmDispatch() {
               ) : null}
               Create Work Order
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={timePickerOpen} onOpenChange={(open) => { if (!open) { setTimePickerOpen(false); setPendingDrop(null); } }}>
+        <DialogContent className="sm:max-w-[320px]">
+          <DialogHeader>
+            <DialogTitle>Select Time</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              {pendingDrop ? format(pendingDrop.dropDate, "EEEE, MMM d, yyyy") : ""}
+              {pendingDrop?.techName ? ` — ${pendingDrop.techName}` : ""}
+            </p>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Start Time</label>
+              <input
+                type="time"
+                className="w-full border rounded px-2 py-1.5 text-sm"
+                value={dropStartTime}
+                onChange={(e) => setDropStartTime(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">End Time</label>
+              <input
+                type="time"
+                className="w-full border rounded px-2 py-1.5 text-sm"
+                value={dropEndTime}
+                onChange={(e) => setDropEndTime(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setTimePickerOpen(false); setPendingDrop(null); }}>Cancel</Button>
+            <Button onClick={confirmTimePickerDrop}>Schedule</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
