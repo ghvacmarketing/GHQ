@@ -201,7 +201,7 @@ function SidebarContent({
         </div>
       </div>
 
-      <div className="flex-1 px-3 py-4 overflow-y-auto">
+      <div className="flex-1 px-3 py-4 overflow-y-auto scrollbar-hide">
         <div className="space-y-6">
           {navSections.map((section) => (
             <div key={section.title}>

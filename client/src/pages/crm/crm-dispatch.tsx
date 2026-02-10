@@ -899,7 +899,7 @@ function WeekDispatchBoard({ technicians, workOrders, weekDates, onWorkOrderClic
   
   return (
     <Card className="bg-white border overflow-hidden" ref={setNodeRef}>
-      <div className="overflow-x-auto overflow-y-auto max-h-full">
+      <div className="overflow-x-auto overflow-y-auto max-h-full scrollbar-hide">
         <table className="w-full min-w-[900px] border-collapse">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
@@ -1437,7 +1437,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
 
   return (
     <Card className="bg-white border overflow-hidden h-full">
-      <div className="overflow-x-auto overflow-y-auto h-full">
+      <div className="overflow-x-auto overflow-y-auto h-full scrollbar-hide">
         <div style={{ minWidth: SCHEDULE_TIMELINE_WIDTH + 200 }}>
           <div className="flex border-b border-slate-200 sticky top-0 bg-white z-20">
             <div className="w-48 flex-shrink-0 px-4 py-3 border-r border-slate-200 text-sm font-semibold text-slate-700 bg-white sticky left-0 z-30">
@@ -3415,7 +3415,7 @@ export default function CrmDispatch() {
     <CrmLayout currentUser={currentUser} disableScroll>
       <div className="flex h-full max-w-full overflow-hidden">
         {/* Main Content - shrinks when panel is open */}
-        <div className={cn("flex flex-col overflow-y-auto overflow-x-hidden transition-all duration-200", selectedWorkOrder ? "flex-1 min-w-0" : "w-full")}>
+        <div className={cn("flex flex-col overflow-y-auto overflow-x-hidden transition-all duration-200 scrollbar-hide", selectedWorkOrder ? "flex-1 min-w-0" : "w-full")}>
         {/* Fixed Header Section */}
         <div className="flex-shrink-0 space-y-3 pb-3">
           <div className="flex justify-center">
@@ -3715,7 +3715,7 @@ export default function CrmDispatch() {
         >
           <div ref={dispatchBoardRef} className="flex flex-col flex-1 min-h-[520px] gap-4 overflow-hidden">
             {/* Scrollable Technician Schedule - vertical scroll here, horizontal inside component */}
-            <div className="flex-1 min-h-[320px] overflow-y-auto overflow-x-hidden">
+            <div className="flex-1 min-h-[320px] overflow-y-auto overflow-x-hidden scrollbar-hide">
               {viewMode === "trucks" ? (
                 <TrucksMapView technicians={technicians} />
               ) : viewMode === "day" ? (
@@ -3754,7 +3754,7 @@ export default function CrmDispatch() {
             
             {/* Fixed Unassigned Queue - hidden in trucks view */}
             {viewMode !== "trucks" && (
-            <div className="flex-shrink-0 max-h-[320px] overflow-y-auto overflow-x-hidden">
+            <div className="flex-shrink-0 max-h-[320px] overflow-y-auto overflow-x-hidden scrollbar-hide">
               <UnassignedQueueSection
                 workOrders={unassignedWorkOrders}
                 onWorkOrderClick={handleWorkOrderClick}
@@ -3812,7 +3812,7 @@ export default function CrmDispatch() {
             </div>
             
             {/* Panel Content - Scrollable */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide">
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-slate-900">Work Order Information</h3>
                   
@@ -4090,7 +4090,7 @@ export default function CrmDispatch() {
       </div>
 
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto scrollbar-hide">
           <DialogHeader>
             <DialogTitle>Create New Work Order</DialogTitle>
           </DialogHeader>
