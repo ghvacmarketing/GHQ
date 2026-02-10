@@ -1407,10 +1407,11 @@ interface TechnicianScheduleBoardProps {
   selectedDate: Date;
   onResizeComplete?: (workOrderId: string, deltaStartMinutes: number, deltaEndMinutes: number) => void;
   activeId?: string | null;
+  activeFromQueue?: boolean;
   onPreviewTimeChange?: (techId: string, hourOffset: number | null) => void;
 }
 
-function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, onPreviewTimeChange }: TechnicianScheduleBoardProps) {
+function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, activeFromQueue, onPreviewTimeChange }: TechnicianScheduleBoardProps) {
   const hourLabels = useMemo(() => {
     const labels: string[] = [];
     for (let h = SCHEDULE_START_HOUR; h <= SCHEDULE_END_HOUR; h++) {
@@ -1486,7 +1487,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                     </div>
                     
                     <ScheduleRowTimeline
-                      isDragActive={!!activeId && activeId.startsWith('queue-')}
+                      isDragActive={!!activeId && !!activeFromQueue}
                       isOver={isOver}
                       droppableRef={setDroppableRef}
                       onPreviewTimeChange={(hourOffset) => onPreviewTimeChange?.(tech.id, hourOffset)}
@@ -3755,6 +3756,7 @@ export default function CrmDispatch() {
                   selectedDate={selectedDate}
                   onResizeComplete={handleResizeComplete}
                   activeId={activeId}
+                  activeFromQueue={activeFromQueue}
                   onPreviewTimeChange={handlePreviewTimeChange}
                 />
               ) : viewMode === "week" ? (
