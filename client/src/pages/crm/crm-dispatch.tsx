@@ -357,6 +357,15 @@ const statusSquircleColors: Record<string, string> = {
   cancelled: "bg-gray-400",
 };
 
+const statusSegmentColors: Record<string, string> = {
+  scheduled: "bg-yellow-400",
+  dispatched: "bg-blue-500",
+  en_route: "bg-blue-500",
+  on_site: "bg-green-500",
+  completed: "bg-gray-500",
+  cancelled: "bg-gray-500",
+};
+
 const statusIconMap: Record<string, React.ReactNode> = {
   scheduled: <Clock className="h-4 w-4 text-white" />,
   dispatched: <Clipboard className="h-4 w-4 text-white" />,
@@ -1329,6 +1338,7 @@ function DraggableScheduleCard({
   };
 
   const dragListeners = isResizing ? {} : listeners;
+  const segmentColor = statusSegmentColors[workOrder.status] || statusSegmentColors.scheduled;
 
   return (
     <div
@@ -1337,7 +1347,7 @@ function DraggableScheduleCard({
         (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
       }}
       style={style}
-      className={`absolute top-2 bottom-2 ${bgColor} ${statusStripe} text-slate-800 rounded-md px-2 py-1 cursor-grab hover:shadow-md transition-all overflow-hidden shadow-sm group ${isResizing ? 'cursor-ew-resize' : ''}`}
+      className={`absolute top-2 bottom-2 cursor-grab transition-all overflow-hidden group rounded-md border border-slate-300 bg-white shadow-sm hover:shadow-md ${isResizing ? 'cursor-ew-resize' : ''}`}
       data-testid={`schedule-card-${workOrder.id}`}
       {...attributes}
       {...dragListeners}
@@ -1349,22 +1359,21 @@ function DraggableScheduleCard({
       }}
     >
       <div 
-        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-slate-400/30 hover:bg-slate-400/50 transition-opacity z-10"
+        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-slate-400/25 hover:bg-slate-400/45 transition-opacity z-30"
         onMouseDown={(e) => handleMouseDown(e, 'start')}
         onPointerDown={(e) => e.stopPropagation()}
         data-testid={`resize-start-${workOrder.id}`}
       />
       <div 
-        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-slate-400/30 hover:bg-slate-400/50 transition-opacity z-10"
+        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-slate-400/25 hover:bg-slate-400/45 transition-opacity z-30"
         onMouseDown={(e) => handleMouseDown(e, 'end')}
         onPointerDown={(e) => e.stopPropagation()}
         data-testid={`resize-end-${workOrder.id}`}
       />
       
-      <div className="flex items-center gap-1.5 h-full">
-        {/* Status Icon - clickable */}
+      <div className="flex h-full items-stretch">
         <button
-          className={`${statusSquircleColors[workOrder.status] || statusSquircleColors.scheduled} w-6 h-6 flex-shrink-0 rounded flex items-center justify-center hover:opacity-80 transition-opacity z-20`}
+          className={`${segmentColor} w-11 flex-shrink-0 flex items-center justify-center transition-opacity hover:opacity-85 z-20`}
           title={`${statusLabels[workOrder.status]} — Click to change`}
           onClick={(e) => {
             e.stopPropagation();
@@ -1374,11 +1383,13 @@ function DraggableScheduleCard({
           onPointerDown={(e) => e.stopPropagation()}
           data-testid={`status-icon-schedule-${workOrder.id}`}
         >
-          {statusIconMap[workOrder.status] || statusIconMap.scheduled}
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white/20 text-white">
+            {statusIconMap[workOrder.status] || statusIconMap.scheduled}
+          </span>
         </button>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium truncate">{workOrder.customerName}</p>
-          <p className="text-[10px] text-slate-600 truncate">{workOrder.propertyAddress || "No address"}</p>
+        <div className="min-w-0 flex-1 border-l border-slate-200 bg-slate-50/70 px-3 py-1.5">
+          <p className="truncate text-sm font-semibold text-slate-800">{workOrder.customerName}</p>
+          <p className="truncate text-xs text-slate-600">{workOrder.propertyAddress || "No address"}</p>
         </div>
       </div>
     </div>
