@@ -585,6 +585,24 @@ function getScheduleWidthPercent(startDate: Date, endDate: Date | null): number 
   return (snappedDuration / SCHEDULE_TOTAL_MINUTES) * 100;
 }
 
+function snapHourOffsetFromTimeline(
+  relativeX: number,
+  timelineWidth: number,
+  durationHours: number,
+): number {
+  if (timelineWidth <= 0) return 0;
+  const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
+  const rawHourOffset = (relativeX / timelineWidth) * totalHours;
+  const snappedHour = Math.round(rawHourOffset * 2) / 2;
+  const maxStartHour = Math.max(0, totalHours - durationHours);
+  return Math.max(0, Math.min(snappedHour, maxStartHour));
+}
+
+function getWorkOrderDurationHours(workOrder: DispatchWorkOrder): number {
+  const { startHour, endHour } = getWorkOrderDisplayTimes(workOrder);
+  return Math.max(0.5, endHour - startHour);
+}
+
 const scheduleVisitTypeColors: Record<string, string> = {
   SERVICE: "bg-blue-100",
   INSTALL: "bg-yellow-100",
@@ -1343,6 +1361,8 @@ function DraggableScheduleCard({
 
   const dragListeners = isResizing ? {} : listeners;
   const segmentColor = statusSegmentColors[workOrder.status] || statusSegmentColors.scheduled;
+  const isHalfHourCard = widthPercent <= 4.2;
+  const isCompactCard = widthPercent <= 5;
 
   return (
     <div
@@ -1352,7 +1372,7 @@ function DraggableScheduleCard({
       }}
       style={{ ...style, transform: undefined, opacity: isDragging ? 0.2 : 1 }}
       className={`absolute top-2 bottom-2 cursor-grab transition-all group rounded-md border border-slate-300 bg-white shadow-sm hover:shadow-md overflow-hidden ${isResizing ? 'cursor-ew-resize' : ''}`}
-      title={widthPercent <= 5 ? `${workOrder.customerName}\n${workOrder.propertyAddress || "No address"}\n${statusLabels[workOrder.status] || workOrder.status}` : undefined}
+      title={isCompactCard ? `${workOrder.customerName}\n${workOrder.propertyAddress || "No address"}\n${statusLabels[workOrder.status] || workOrder.status}` : undefined}
       data-testid={`schedule-card-${workOrder.id}`}
       {...attributes}
       {...dragListeners}
@@ -1378,7 +1398,7 @@ function DraggableScheduleCard({
       
       <div className="flex h-full items-stretch">
         <button
-          className={`${segmentColor} ${widthPercent <= 5 ? 'w-7' : 'w-11'} flex-shrink-0 flex items-center justify-center transition-opacity hover:opacity-85 z-20`}
+          className={`${segmentColor} ${isHalfHourCard ? 'w-4' : isCompactCard ? 'w-6' : 'w-11'} flex-shrink-0 flex items-center justify-center transition-opacity hover:opacity-85 z-20`}
           title={`${statusLabels[workOrder.status]} — Click to change`}
           onClick={(e) => {
             e.stopPropagation();
@@ -1388,13 +1408,13 @@ function DraggableScheduleCard({
           onPointerDown={(e) => e.stopPropagation()}
           data-testid={`status-icon-schedule-${workOrder.id}`}
         >
-          <span className={`flex ${widthPercent <= 5 ? 'h-4 w-4' : 'h-6 w-6'} items-center justify-center rounded-md bg-white/20 text-white`}>
-            {statusIconMap[workOrder.status] || statusIconMap.scheduled}
+          <span className={`flex ${isHalfHourCard ? 'h-3 w-3 rounded-sm' : isCompactCard ? 'h-4 w-4' : 'h-6 w-6'} items-center justify-center bg-white/20 text-white`}>
+            {isHalfHourCard ? <span className="h-1.5 w-1.5 rounded-full bg-white" /> : (statusIconMap[workOrder.status] || statusIconMap.scheduled)}
           </span>
         </button>
-        <div className="min-w-0 flex-1 border-l border-slate-200 bg-slate-50/70 px-2 py-0.5 flex flex-col justify-center">
-          <p className={`truncate font-semibold text-slate-800 ${widthPercent <= 5 ? 'text-[10px] leading-tight' : 'text-xs'}`}>{workOrder.customerName}</p>
-          {widthPercent > 5 && (
+        <div className={`min-w-0 flex-1 border-l border-slate-200 bg-slate-50/70 ${isHalfHourCard ? 'px-1' : 'px-2'} py-0.5 flex flex-col justify-center`}>
+          <p className={`truncate font-semibold text-slate-800 ${isCompactCard ? 'text-[10px] leading-tight' : 'text-xs'}`}>{workOrder.customerName}</p>
+          {!isCompactCard && (
             <p className="truncate text-[10px] leading-tight text-slate-500">{workOrder.propertyAddress || "No address"}</p>
           )}
         </div>
@@ -1409,6 +1429,7 @@ function ScheduleRowTimeline({
   isOver,
   droppableRef,
   dragOffsetX = 0,
+  previewDurationHours = 1,
   onPreviewTimeChange,
 }: {
   children: React.ReactNode;
@@ -1416,12 +1437,14 @@ function ScheduleRowTimeline({
   isOver: boolean;
   droppableRef?: (node: HTMLDivElement | null) => void;
   dragOffsetX?: number;
+  previewDurationHours?: number;
   onPreviewTimeChange?: (hourOffset: number | null) => void;
 }) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const [previewLeft, setPreviewLeft] = useState<number | null>(null);
   const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
-  const previewWidthPercent = (1 / totalHours) * 100;
+  const previewWidthPercent = (previewDurationHours / totalHours) * 100;
+  const previewLabel = Number.isInteger(previewDurationHours) ? `${previewDurationHours} hr` : `${previewDurationHours.toFixed(1)} hr`;
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isDragActive || !timelineRef.current) return;
@@ -1429,14 +1452,12 @@ function ScheduleRowTimeline({
     // Subtract dragOffsetX so the position aligns with the left edge of the
     // drag overlay card rather than the raw cursor position.
     const x = e.clientX - rect.left - dragOffsetX;
-    const percent = (x / rect.width) * 100;
-    const hourOffset = (percent / 100) * totalHours;
-    const snappedHour = Math.round(hourOffset * 2) / 2;
-    const clampedHour = Math.max(0, Math.min(snappedHour, totalHours - 1));
+    const clampedHour = snapHourOffsetFromTimeline(x, rect.width, previewDurationHours);
     const snappedPercent = (clampedHour / totalHours) * 100;
-    setPreviewLeft(Math.max(0, Math.min(snappedPercent, ((totalHours - 1) / totalHours) * 100)));
+    const maxLeftPercent = ((totalHours - previewDurationHours) / totalHours) * 100;
+    setPreviewLeft(Math.max(0, Math.min(snappedPercent, maxLeftPercent)));
     onPreviewTimeChange?.(clampedHour);
-  }, [isDragActive, onPreviewTimeChange, totalHours, dragOffsetX]);
+  }, [isDragActive, onPreviewTimeChange, totalHours, dragOffsetX, previewDurationHours]);
 
   const handleMouseLeave = useCallback(() => {
     setPreviewLeft(null);
@@ -1473,7 +1494,7 @@ function ScheduleRowTimeline({
           className="absolute top-1 bottom-1 bg-[#711419]/15 border-2 border-dashed border-[#711419]/40 rounded-md pointer-events-none z-[5]"
           style={{ left: `${previewLeft}%`, width: `${previewWidthPercent}%` }}
         >
-          <div className="text-[10px] text-[#711419]/60 font-medium text-center mt-1">1 hr</div>
+          <div className="text-[10px] text-[#711419]/60 font-medium text-center mt-1">{previewLabel}</div>
         </div>
       )}
       
@@ -1489,13 +1510,13 @@ interface TechnicianScheduleBoardProps {
   selectedDate: Date;
   onResizeComplete?: (workOrderId: string, deltaStartMinutes: number, deltaEndMinutes: number) => void;
   activeId?: string | null;
-  activeFromQueue?: boolean;
   dragOffsetX?: number;
   onPreviewTimeChange?: (techId: string, hourOffset: number | null) => void;
   onOpenQuickStatus?: (workOrderId: string, event: React.MouseEvent) => void;
+  activeDragDurationHours?: number;
 }
 
-function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, activeFromQueue, dragOffsetX = 0, onPreviewTimeChange, onOpenQuickStatus }: TechnicianScheduleBoardProps) {
+function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, dragOffsetX = 0, onPreviewTimeChange, onOpenQuickStatus, activeDragDurationHours = 1 }: TechnicianScheduleBoardProps) {
   const hourLabels = useMemo(() => {
     const labels: string[] = [];
     for (let h = SCHEDULE_START_HOUR; h <= SCHEDULE_END_HOUR; h++) {
@@ -1571,10 +1592,11 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                     </div>
                     
                     <ScheduleRowTimeline
-                      isDragActive={!!activeId && !!activeFromQueue}
+                      isDragActive={!!activeId}
                       isOver={isOver}
                       droppableRef={setDroppableRef}
                       dragOffsetX={dragOffsetX}
+                      previewDurationHours={activeDragDurationHours}
                       onPreviewTimeChange={(hourOffset) => onPreviewTimeChange?.(tech.id, hourOffset)}
                     >
                       {techWorkOrders.map((wo) => {
@@ -3385,11 +3407,8 @@ export default function CrmDispatch() {
               cardLeftX = lastPointerXRef.current - dragOffsetXRef.current;
             }
             const relativeX = cardLeftX - timelineRect.left;
-            const percent = Math.max(0, relativeX / timelineWidth);
-            const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
-            const hourOffset = percent * totalHours;
-            const snappedHour = Math.round(hourOffset * 2) / 2;
-            newStartHour = SCHEDULE_START_HOUR + Math.max(0, Math.min(snappedHour, totalHours - defaultDuration));
+            const snappedHourOffset = snapHourOffsetFromTimeline(relativeX, timelineWidth, defaultDuration);
+            newStartHour = SCHEDULE_START_HOUR + snappedHourOffset;
           }
         }
         
@@ -3446,22 +3465,38 @@ export default function CrmDispatch() {
         const previewHour = snapshotPreviewByTech[newTechId];
         if (previewHour !== undefined) {
           newStartHour = SCHEDULE_START_HOUR + previewHour;
-        } else {
-          const overAny = over as any;
-          const droppableNode = overAny.node?.current ?? overAny.node;
-          const timelineRect = droppableNode instanceof HTMLElement
-            ? droppableNode.getBoundingClientRect()
-            : over.rect;
-          const timelineWidth = timelineRect.width;
-          if (timelineWidth > 0) {
-            const cardLeftX = lastPointerXRef.current - dragOffsetXRef.current;
-            const relativeX = cardLeftX - timelineRect.left;
-            const percent = Math.max(0, relativeX / timelineWidth);
-            const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
-            const hourOffset = percent * totalHours;
-            const snappedHour = Math.round(hourOffset * 2) / 2;
-            newStartHour = SCHEDULE_START_HOUR + Math.max(0, Math.min(snappedHour, totalHours - duration));
-          }
+} else {
+  const overAny = over as any;
+  const droppableNode = overAny.node?.current ?? overAny.node;
+
+  const timelineRect =
+    droppableNode instanceof HTMLElement
+      ? droppableNode.getBoundingClientRect()
+      : over.rect;
+
+  const timelineWidth = timelineRect.width;
+
+  if (timelineWidth > 0) {
+    const translatedRect = active.rect.current.translated;
+
+    // Prefer translated card position when available (more accurate during transforms),
+    // otherwise fall back to pointer - offset.
+    const cardLeftX = translatedRect
+      ? translatedRect.left
+      : lastPointerXRef.current - dragOffsetXRef.current;
+
+    const relativeX = cardLeftX - timelineRect.left;
+
+    const snappedHourOffset = snapHourOffsetFromTimeline(
+      relativeX,
+      timelineWidth,
+      duration
+    );
+
+    newStartHour = SCHEDULE_START_HOUR + snappedHourOffset;
+  }
+}
+
         }
         const newEndHour = newStartHour + duration;
 
@@ -3641,6 +3676,13 @@ export default function CrmDispatch() {
     setTimePickerOpen(false);
     setPendingDrop(null);
   }, [pendingDrop, dropStartTime, dropEndTime, localWorkOrders, updateWorkOrderMutation, toast]);
+
+  const activeDragDurationHours = useMemo(() => {
+    if (!activeId) return 1;
+    const draggingWorkOrder = localWorkOrders.find((workOrder) => workOrder.id === activeId);
+    if (!draggingWorkOrder || activeFromQueue) return 1;
+    return getWorkOrderDurationHours(draggingWorkOrder);
+  }, [activeFromQueue, activeId, localWorkOrders]);
 
   const unassignedWorkOrders = useMemo(() => {
     const filtered = localWorkOrders.filter(wo => !wo.assignedTechId || !wo.scheduledStart);
@@ -4045,10 +4087,10 @@ export default function CrmDispatch() {
                   selectedDate={selectedDate}
                   onResizeComplete={handleResizeComplete}
                   activeId={activeId}
-                  activeFromQueue={activeFromQueue}
                   dragOffsetX={dragOffsetXRef.current}
                   onPreviewTimeChange={handlePreviewTimeChange}
                   onOpenQuickStatus={handleOpenQuickStatus}
+                  activeDragDurationHours={activeDragDurationHours}
                 />
               ) : viewMode === "week" ? (
                 <WeekDispatchBoard
