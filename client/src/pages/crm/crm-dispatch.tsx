@@ -1455,10 +1455,16 @@ function ScheduleRowTimeline({
 
   const handleMouseLeave = useCallback(() => {
     setPreviewLeft(null);
-    // Always clear the preview hour when leaving this row so stale values
-    // don't persist in previewHourByTechRef.
-    onPreviewTimeChange?.(null);
-  }, [onPreviewTimeChange]);
+    // During an active drag, keep the preview hour in previewHourByTechRef
+    // so the drop handler can use it even if the cursor briefly exits the
+    // timeline (e.g. moves to the tech-name column or jitters during
+    // pointer-up).  The hour value is keyed by techId, so stale entries
+    // from other rows don't interfere — the drop handler only looks up
+    // the row being dropped on.  Outside of a drag we clear immediately.
+    if (!isDragActive) {
+      onPreviewTimeChange?.(null);
+    }
+  }, [onPreviewTimeChange, isDragActive]);
 
   return (
     <div
@@ -3472,6 +3478,8 @@ export default function CrmDispatch() {
             (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR) - duration,
           ));
         } else {
+          // Fallback: use the same snap helper as the preview so the result
+          // is identical even if the cursor position differs by a few pixels.
           const overAny = over as any;
           const droppableNode = overAny.node?.current ?? overAny.node;
           const timelineRect = droppableNode instanceof HTMLElement
@@ -3481,11 +3489,8 @@ export default function CrmDispatch() {
           if (timelineWidth > 0) {
             const cardLeftX = lastPointerXRef.current - dragOffsetXRef.current;
             const relativeX = cardLeftX - timelineRect.left;
-            const percent = Math.max(0, relativeX / timelineWidth);
-            const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
-            const hourOffset = percent * totalHours;
-            const snappedHour = Math.round(hourOffset * 2) / 2;
-            newStartHour = SCHEDULE_START_HOUR + Math.max(0, Math.min(snappedHour, totalHours - duration));
+            const snappedHour = snapHourOffsetFromTimeline(relativeX, timelineWidth, duration);
+            newStartHour = SCHEDULE_START_HOUR + snappedHour;
           }
         }
         const newEndHour = newStartHour + duration;
