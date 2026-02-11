@@ -2138,6 +2138,7 @@ export default function CrmDispatch() {
   const [previewHourByTech, setPreviewHourByTech] = useState<Record<string, number>>({});
   const previewHourByTechRef = useRef<Record<string, number>>({});
   const dragOffsetXRef = useRef(0);
+  const activeCardWidthRef = useRef(0);
   const lastPointerXRef = useRef(0);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [localWorkOrders, setLocalWorkOrders] = useState<DispatchWorkOrder[]>([]);
@@ -3246,8 +3247,10 @@ export default function CrmDispatch() {
       const activeRect = event.active.rect.current.initial;
       if (activatorEvt && activeRect) {
         dragOffsetXRef.current = activatorEvt.clientX - activeRect.left;
+        activeCardWidthRef.current = activeRect.width;
       } else {
         dragOffsetXRef.current = 0;
+        activeCardWidthRef.current = 120;
       }
       if (id.startsWith('schedule-')) {
         setActiveId(id.replace('schedule-', ''));
@@ -4092,11 +4095,10 @@ export default function CrmDispatch() {
               (() => {
                 const draggingWo = localWorkOrders.find(w => w.id === activeId);
                 if (!draggingWo) return null;
-                const visitType = draggingWo.visitType || "SERVICE";
-                const bgColor = scheduleVisitTypeColors[visitType] || scheduleVisitTypeColors.SERVICE;
-                const statusStripe = scheduleStatusStripes[draggingWo.status] || scheduleStatusStripes.scheduled;
-                const segColor = statusSegmentColors[draggingWo.status] || statusSegmentColors.scheduled;
                 if (activeFromQueue) {
+                  const visitType = draggingWo.visitType || "SERVICE";
+                  const bgColor = scheduleVisitTypeColors[visitType] || scheduleVisitTypeColors.SERVICE;
+                  const statusStripe = scheduleStatusStripes[draggingWo.status] || scheduleStatusStripes.scheduled;
                   return (
                     <div className={`${bgColor} ${statusStripe} text-slate-800 rounded-md px-2 py-1 shadow-lg cursor-grabbing overflow-hidden`} style={{ width: 160, height: 48 }}>
                       <div className="flex items-center gap-1.5">
@@ -4107,19 +4109,10 @@ export default function CrmDispatch() {
                   );
                 }
                 return (
-                  <div className="rounded-md border border-slate-300 bg-white shadow-lg cursor-grabbing overflow-hidden" style={{ width: 180, height: 48 }}>
-                    <div className="flex h-full items-stretch">
-                      <div className={`${segColor} w-9 flex-shrink-0 flex items-center justify-center`}>
-                        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/20 text-white">
-                          {statusIconMap[draggingWo.status] || statusIconMap.scheduled}
-                        </span>
-                      </div>
-                      <div className="min-w-0 flex-1 border-l border-slate-200 bg-slate-50/70 px-2 py-0.5 flex flex-col justify-center">
-                        <p className="truncate text-xs font-semibold text-slate-800">{draggingWo.customerName}</p>
-                        <p className="truncate text-[10px] leading-tight text-slate-500">{draggingWo.propertyAddress || "No address"}</p>
-                      </div>
-                    </div>
-                  </div>
+                  <div
+                    className="rounded-md bg-slate-300/70 border border-slate-400/50 shadow-md cursor-grabbing"
+                    style={{ width: activeCardWidthRef.current || 120, height: 40 }}
+                  />
                 );
               })()
             ) : null}
