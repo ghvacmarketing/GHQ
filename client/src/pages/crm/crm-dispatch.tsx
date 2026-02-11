@@ -271,7 +271,11 @@ const timeSlots = Array.from({ length: TOTAL_SLOTS }, (_, i) => {
 const SLOT_WIDTH = 60;
 const TIMELINE_WIDTH = TOTAL_SLOTS * SLOT_WIDTH;
 
-const snapToGridModifier: Modifier = ({ transform }) => {
+const snapToGridModifier: Modifier = ({ transform, active }) => {
+  const activeId = active?.id as string | undefined;
+  if (activeId?.startsWith('schedule-')) {
+    return transform;
+  }
   return {
     ...transform,
     x: Math.round(transform.x / SLOT_WIDTH) * SLOT_WIDTH,
