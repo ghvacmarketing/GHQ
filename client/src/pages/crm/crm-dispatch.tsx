@@ -4510,7 +4510,14 @@ export default function CrmDispatch() {
                     size="sm"
                     className="h-7 text-xs text-[#711419] hover:text-[#5a1014] hover:bg-red-50"
                     onClick={() => {
+                      // Pre-fill name from search query if present
+                      if (customerSearch.trim()) {
+                        const parts = customerSearch.trim().split(/\s+/);
+                        setNewCustFirstName(parts[0] || "");
+                        setNewCustLastName(parts.slice(1).join(" ") || "");
+                      }
                       setShowNewCustomerForm(true);
+                      setCustomerSearchOpen(false);
                       setSelectedCustomer(null);
                       setSelectedPropertyId("");
                       setSelectedProjectId("");
@@ -4689,7 +4696,31 @@ export default function CrmDispatch() {
                       />
                       <CommandList className="max-h-[300px]">
                         <CommandEmpty>
-                          {customersLoading ? "Searching..." : "No customers found."}
+                          {customersLoading ? (
+                            "Searching..."
+                          ) : (
+                            <div className="py-2 space-y-2">
+                              <p className="text-sm text-slate-500">No customers found.</p>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs text-[#711419] border-[#711419]/30 hover:bg-red-50"
+                                onClick={() => {
+                                  // Parse the search query into first/last name
+                                  const parts = customerSearch.trim().split(/\s+/);
+                                  setNewCustFirstName(parts[0] || "");
+                                  setNewCustLastName(parts.slice(1).join(" ") || "");
+                                  setCustomerSearchOpen(false);
+                                  setShowNewCustomerForm(true);
+                                }}
+                                data-testid="button-new-customer-from-search"
+                              >
+                                <Plus className="h-3.5 w-3.5 mr-1" />
+                                Create "{customerSearch.trim()}" as New Customer
+                              </Button>
+                            </div>
+                          )}
                         </CommandEmpty>
                         <CommandGroup>
                           {customers.map((c) => (
