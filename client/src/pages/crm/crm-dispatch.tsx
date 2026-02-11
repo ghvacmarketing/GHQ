@@ -1355,17 +1355,19 @@ function DraggableScheduleCard({
   );
 }
 
-function ScheduleRowTimeline({ 
-  children, 
-  isDragActive, 
+function ScheduleRowTimeline({
+  children,
+  isDragActive,
   isOver,
   droppableRef,
+  dragOffsetX = 0,
   onPreviewTimeChange,
-}: { 
-  children: React.ReactNode; 
-  isDragActive: boolean; 
+}: {
+  children: React.ReactNode;
+  isDragActive: boolean;
   isOver: boolean;
   droppableRef?: (node: HTMLDivElement | null) => void;
+  dragOffsetX?: number;
   onPreviewTimeChange?: (hourOffset: number | null) => void;
 }) {
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -1376,7 +1378,9 @@ function ScheduleRowTimeline({
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isDragActive || !timelineRef.current) return;
     const rect = timelineRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
+    // Subtract dragOffsetX so the position aligns with the left edge of the
+    // drag overlay card rather than the raw cursor position.
+    const x = e.clientX - rect.left - dragOffsetX;
     const percent = (x / rect.width) * 100;
     const hourOffset = (percent / 100) * totalHours;
     const snappedHour = Math.round(hourOffset * 2) / 2;
@@ -1384,7 +1388,7 @@ function ScheduleRowTimeline({
     const snappedPercent = (clampedHour / totalHours) * 100;
     setPreviewLeft(Math.max(0, Math.min(snappedPercent, ((totalHours - 1) / totalHours) * 100)));
     onPreviewTimeChange?.(clampedHour);
-  }, [isDragActive, onPreviewTimeChange, totalHours]);
+  }, [isDragActive, onPreviewTimeChange, totalHours, dragOffsetX]);
 
   const handleMouseLeave = useCallback(() => {
     setPreviewLeft(null);
@@ -1436,10 +1440,11 @@ interface TechnicianScheduleBoardProps {
   onResizeComplete?: (workOrderId: string, deltaStartMinutes: number, deltaEndMinutes: number) => void;
   activeId?: string | null;
   activeFromQueue?: boolean;
+  dragOffsetX?: number;
   onPreviewTimeChange?: (techId: string, hourOffset: number | null) => void;
 }
 
-function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, activeFromQueue, onPreviewTimeChange }: TechnicianScheduleBoardProps) {
+function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, activeFromQueue, dragOffsetX = 0, onPreviewTimeChange }: TechnicianScheduleBoardProps) {
   const hourLabels = useMemo(() => {
     const labels: string[] = [];
     for (let h = SCHEDULE_START_HOUR; h <= SCHEDULE_END_HOUR; h++) {
@@ -1518,6 +1523,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                       isDragActive={!!activeId && !!activeFromQueue}
                       isOver={isOver}
                       droppableRef={setDroppableRef}
+                      dragOffsetX={dragOffsetX}
                       onPreviewTimeChange={(hourOffset) => onPreviewTimeChange?.(tech.id, hourOffset)}
                     >
                       {techWorkOrders.map((wo) => {
@@ -2078,6 +2084,8 @@ export default function CrmDispatch() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeFromQueue, setActiveFromQueue] = useState(false);
   const [previewHourByTech, setPreviewHourByTech] = useState<Record<string, number>>({});
+  const previewHourByTechRef = useRef<Record<string, number>>({});
+  const dragOffsetXRef = useRef(0);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [localWorkOrders, setLocalWorkOrders] = useState<DispatchWorkOrder[]>([]);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
@@ -3054,14 +3062,28 @@ export default function CrmDispatch() {
     const isFromQueue = id.startsWith('queue-');
     setActiveFromQueue(isFromQueue);
     setPreviewHourByTech({});
+    previewHourByTechRef.current = {};
     if (isFromQueue) {
       setActiveId(id.replace('queue-', ''));
-    } else if (id.startsWith('schedule-')) {
-      setActiveId(id.replace('schedule-', ''));
-    } else if (id.startsWith('month-job-')) {
-      setActiveId(id.replace('month-job-', ''));
+      // Capture cursor offset from the draggable card's left edge so the
+      // preview and drop position align with the card's visible position
+      // rather than the raw cursor position.
+      const activatorEvt = event.activatorEvent as MouseEvent | null;
+      const activeRect = event.active.rect.current.initial;
+      if (activatorEvt && activeRect) {
+        dragOffsetXRef.current = activatorEvt.clientX - activeRect.left;
+      } else {
+        dragOffsetXRef.current = 0;
+      }
     } else {
-      setActiveId(id);
+      dragOffsetXRef.current = 0;
+      if (id.startsWith('schedule-')) {
+        setActiveId(id.replace('schedule-', ''));
+      } else if (id.startsWith('month-job-')) {
+        setActiveId(id.replace('month-job-', ''));
+      } else {
+        setActiveId(id);
+      }
     }
   }, []);
 
@@ -3105,7 +3127,9 @@ export default function CrmDispatch() {
     setActiveId(null);
     setActiveFromQueue(false);
     setPreviewHourByTech({});
-    
+    const snapshotPreviewByTech = { ...previewHourByTechRef.current };
+    previewHourByTechRef.current = {};
+
     if (!over) return;
     
     const overId = over.id as string;
@@ -3161,14 +3185,14 @@ export default function CrmDispatch() {
         const defaultDuration = 1;
         
         let newStartHour = SCHEDULE_START_HOUR;
-        const previewHour = previewHourByTech[newTechId];
+        const previewHour = snapshotPreviewByTech[newTechId];
         if (previewHour !== undefined) {
           newStartHour = SCHEDULE_START_HOUR + previewHour;
         } else {
           const overRect = over.rect;
           const activatorEvt = event.activatorEvent as MouseEvent | null;
           if (overRect && activatorEvt) {
-            const cursorX = activatorEvt.clientX + delta.x;
+            const cursorX = activatorEvt.clientX + delta.x - dragOffsetXRef.current;
             const timelineLeft = overRect.left;
             const timelineWidth = overRect.width;
             const relativeX = cursorX - timelineLeft;
@@ -3335,9 +3359,14 @@ export default function CrmDispatch() {
       });
       setTimePickerOpen(true);
     }
-  }, [getDropScheduleTimes, localWorkOrders, selectedDate, updateWorkOrderMutation, technicians, toast, previewHourByTech]);
+  }, [getDropScheduleTimes, localWorkOrders, selectedDate, updateWorkOrderMutation, technicians, toast]);
 
   const handlePreviewTimeChange = useCallback((techId: string, hourOffset: number | null) => {
+    if (hourOffset === null) {
+      delete previewHourByTechRef.current[techId];
+    } else {
+      previewHourByTechRef.current[techId] = hourOffset;
+    }
     setPreviewHourByTech((prev) => {
       if (hourOffset === null) {
         if (prev[techId] === undefined) return prev;
@@ -3813,6 +3842,7 @@ export default function CrmDispatch() {
                   onResizeComplete={handleResizeComplete}
                   activeId={activeId}
                   activeFromQueue={activeFromQueue}
+                  dragOffsetX={dragOffsetXRef.current}
                   onPreviewTimeChange={handlePreviewTimeChange}
                 />
               ) : viewMode === "week" ? (
