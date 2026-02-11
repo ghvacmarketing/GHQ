@@ -1433,8 +1433,10 @@ function ScheduleRowTimeline({
 
   const handleMouseLeave = useCallback(() => {
     setPreviewLeft(null);
-    onPreviewTimeChange?.(null);
-  }, [onPreviewTimeChange]);
+    if (!isDragActive) {
+      onPreviewTimeChange?.(null);
+    }
+  }, [onPreviewTimeChange, isDragActive]);
 
   return (
     <div 
@@ -2129,6 +2131,7 @@ export default function CrmDispatch() {
   const [previewHourByTech, setPreviewHourByTech] = useState<Record<string, number>>({});
   const previewHourByTechRef = useRef<Record<string, number>>({});
   const dragOffsetXRef = useRef(0);
+  const lastPointerXRef = useRef(0);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [localWorkOrders, setLocalWorkOrders] = useState<DispatchWorkOrder[]>([]);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
@@ -3196,18 +3199,36 @@ export default function CrmDispatch() {
     });
   }, [localWorkOrders, technicians, updateWorkOrderMutation, toast]);
 
+  const pointerTracker = useRef<((e: PointerEvent) => void) | null>(null);
+
+  const cleanupPointerTracker = useCallback(() => {
+    if (pointerTracker.current) {
+      document.removeEventListener('pointermove', pointerTracker.current);
+      pointerTracker.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => { cleanupPointerTracker(); };
+  }, [cleanupPointerTracker]);
+
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const id = event.active.id as string;
     const isFromQueue = id.startsWith('queue-');
     setActiveFromQueue(isFromQueue);
     setPreviewHourByTech({});
     previewHourByTechRef.current = {};
+
+    const activatorEvt = event.activatorEvent as MouseEvent | null;
+    if (activatorEvt) {
+      lastPointerXRef.current = activatorEvt.clientX;
+    }
+    const tracker = (e: PointerEvent) => { lastPointerXRef.current = e.clientX; };
+    pointerTracker.current = tracker;
+    document.addEventListener('pointermove', tracker);
+
     if (isFromQueue) {
       setActiveId(id.replace('queue-', ''));
-      // Capture cursor offset from the draggable card's left edge so the
-      // preview and drop position align with the card's visible position
-      // rather than the raw cursor position.
-      const activatorEvt = event.activatorEvent as MouseEvent | null;
       const activeRect = event.active.rect.current.initial;
       if (activatorEvt && activeRect) {
         dragOffsetXRef.current = activatorEvt.clientX - activeRect.left;
@@ -3261,13 +3282,19 @@ export default function CrmDispatch() {
     return { scheduledStartUTC, scheduledEndUTC };
   }, []);
 
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over, delta } = event;
+  const handleDragCleanup = useCallback(() => {
+    cleanupPointerTracker();
     setActiveId(null);
     setActiveFromQueue(false);
     setPreviewHourByTech({});
-    const snapshotPreviewByTech = { ...previewHourByTechRef.current };
     previewHourByTechRef.current = {};
+  }, [cleanupPointerTracker]);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over, delta } = event;
+    const snapshotPreviewByTech = { ...previewHourByTechRef.current };
+
+    handleDragCleanup();
 
     if (!over) return;
     
@@ -3328,13 +3355,21 @@ export default function CrmDispatch() {
         if (previewHour !== undefined) {
           newStartHour = SCHEDULE_START_HOUR + previewHour;
         } else {
-          const overRect = over.rect;
-          const activatorEvt = event.activatorEvent as MouseEvent | null;
-          if (overRect && activatorEvt) {
-            const cursorX = activatorEvt.clientX + delta.x - dragOffsetXRef.current;
-            const timelineLeft = overRect.left;
-            const timelineWidth = overRect.width;
-            const relativeX = cursorX - timelineLeft;
+          const overAny = over as any;
+          const droppableNode = overAny.node?.current ?? overAny.node;
+          const timelineRect = droppableNode instanceof HTMLElement
+            ? droppableNode.getBoundingClientRect()
+            : over.rect;
+          const timelineWidth = timelineRect.width;
+          if (timelineWidth > 0) {
+            const translatedRect = active.rect.current.translated;
+            let cardLeftX: number;
+            if (translatedRect) {
+              cardLeftX = translatedRect.left;
+            } else {
+              cardLeftX = lastPointerXRef.current - dragOffsetXRef.current;
+            }
+            const relativeX = cardLeftX - timelineRect.left;
             const percent = Math.max(0, relativeX / timelineWidth);
             const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
             const hourOffset = percent * totalHours;
@@ -3965,6 +4000,7 @@ export default function CrmDispatch() {
           collisionDetection={pointerWithin}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCleanup}
           modifiers={combinedModifiers}
         >
           <div ref={dispatchBoardRef} className="flex flex-col flex-1 min-h-[520px] gap-4 overflow-hidden">
