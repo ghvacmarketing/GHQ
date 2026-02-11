@@ -2203,6 +2203,19 @@ export default function CrmDispatch() {
   // Track source quote ID when creating follow-up work order from quote acceptance
   const [sourceQuoteId, setSourceQuoteId] = useState<string | null>(null);
 
+  // New customer inline creation state
+  const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
+  const [newCustFirstName, setNewCustFirstName] = useState("");
+  const [newCustLastName, setNewCustLastName] = useState("");
+  const [newCustPhone, setNewCustPhone] = useState("");
+  const [newCustEmail, setNewCustEmail] = useState("");
+  const [newCustAddress1, setNewCustAddress1] = useState("");
+  const [newCustAddress2, setNewCustAddress2] = useState("");
+  const [newCustCity, setNewCustCity] = useState("");
+  const [newCustState, setNewCustState] = useState("");
+  const [newCustZip, setNewCustZip] = useState("");
+  const [newCustType, setNewCustType] = useState<string>("residential");
+
   // Quick status change popup state
   const [quickStatusMenu, setQuickStatusMenu] = useState<{ workOrderId: string; x: number; y: number } | null>(null);
 
@@ -2268,6 +2281,86 @@ export default function CrmDispatch() {
   });
 
   const properties = propertiesData || [];
+
+  // Auto-select property when properties load (single property = auto-select, otherwise select first)
+  useEffect(() => {
+    if (properties.length > 0 && !selectedPropertyId) {
+      setSelectedPropertyId(properties[0].id);
+    }
+  }, [properties, selectedPropertyId]);
+
+  // New customer creation mutation
+  const createCustomerMutation = useMutation({
+    mutationFn: async () => {
+      const fullName = `${newCustFirstName.trim()} ${newCustLastName.trim()}`.trim();
+      if (!fullName) throw new Error("Customer name is required");
+      if (!newCustAddress1.trim() || !newCustCity.trim() || !newCustState.trim() || !newCustZip.trim()) {
+        throw new Error("Address, city, state, and zip are required");
+      }
+
+      const fullAddress = [newCustAddress1.trim(), newCustAddress2.trim(), `${newCustCity.trim()}, ${newCustState.trim()} ${newCustZip.trim()}`]
+        .filter(Boolean)
+        .join(", ");
+
+      const res = await apiRequest("POST", "/api/crm/customers/create-with-property", {
+        customer: {
+          name: fullName,
+          phone: newCustPhone.trim() || null,
+          email: newCustEmail.trim() || null,
+          customerType: newCustType,
+          customerStatus: "client",
+          fullAddress,
+        },
+        property: {
+          address1: newCustAddress1.trim(),
+          address2: newCustAddress2.trim() || null,
+          city: newCustCity.trim(),
+          state: newCustState.trim(),
+          zip: newCustZip.trim(),
+        },
+      });
+
+      return res.json();
+    },
+    onSuccess: (data: { customer: CrmCustomer; property: CrmProperty | null }) => {
+      const { customer, property } = data;
+      // Set the new customer as selected
+      const customerWithInfo: CustomerWithInfo = {
+        id: customer.id,
+        name: customer.name,
+        customerType: customer.customerType || "residential",
+        fullAddress: customer.fullAddress || null,
+      };
+      setSelectedCustomer(customerWithInfo);
+      // Auto-select the property
+      if (property) {
+        setSelectedPropertyId(property.id);
+      }
+      // Invalidate customers cache so the new customer shows up in searches
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/properties", customer.id] });
+      // Reset the new customer form and hide it
+      resetNewCustomerForm();
+      setShowNewCustomerForm(false);
+      toast({ title: "Customer created", description: `${customer.name} has been added and selected.` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create customer", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const resetNewCustomerForm = () => {
+    setNewCustFirstName("");
+    setNewCustLastName("");
+    setNewCustPhone("");
+    setNewCustEmail("");
+    setNewCustAddress1("");
+    setNewCustAddress2("");
+    setNewCustCity("");
+    setNewCustState("");
+    setNewCustZip("");
+    setNewCustType("residential");
+  };
 
   const { data: projectsResponse } = useQuery<{ projects: CrmProject[]; pagination: any }>({
     queryKey: ["/api/crm/projects", selectedCustomer?.id],
@@ -2474,6 +2567,9 @@ export default function CrmDispatch() {
     setSourceQuoteId(null);
     setImmediateAction("create_now");
     setDueDate(undefined);
+    // Reset new customer form
+    setShowNewCustomerForm(false);
+    resetNewCustomerForm();
   };
 
   // Auto-open work order creation dialog when URL params are present (from quote acceptance flow)
@@ -4318,54 +4414,220 @@ export default function CrmDispatch() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Customer *</Label>
-              <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
-                <PopoverTrigger asChild>
+              <div className="flex items-center justify-between">
+                <Label>Customer *</Label>
+                {!showNewCustomerForm && (
                   <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={customerSearchOpen}
-                    className="w-full justify-between"
-                    data-testid="button-select-customer"
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-[#711419] hover:text-[#5a1014] hover:bg-red-50"
+                    onClick={() => {
+                      setShowNewCustomerForm(true);
+                      setSelectedCustomer(null);
+                      setSelectedPropertyId("");
+                      setSelectedProjectId("");
+                    }}
+                    data-testid="button-new-customer"
                   >
-                    {selectedCustomer ? selectedCustomer.name : "Select customer..."}
-                    <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    New Customer
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0 z-[100]" sideOffset={4}>
-                  <Command shouldFilter={false}>
-                    <CommandInput 
-                      placeholder="Search customers..." 
-                      value={customerSearch}
-                      onValueChange={setCustomerSearch}
+                )}
+              </div>
+
+              {showNewCustomerForm ? (
+                <div className="border border-slate-200 rounded-lg p-4 space-y-3 bg-slate-50">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-medium text-slate-700">Quick Add Customer</p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs text-slate-500"
+                      onClick={() => {
+                        setShowNewCustomerForm(false);
+                        resetNewCustomerForm();
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">First Name *</Label>
+                      <Input
+                        value={newCustFirstName}
+                        onChange={(e) => setNewCustFirstName(e.target.value)}
+                        placeholder="John"
+                        className="h-8 text-sm bg-white"
+                        data-testid="input-new-cust-first-name"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Last Name *</Label>
+                      <Input
+                        value={newCustLastName}
+                        onChange={(e) => setNewCustLastName(e.target.value)}
+                        placeholder="Smith"
+                        className="h-8 text-sm bg-white"
+                        data-testid="input-new-cust-last-name"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Phone</Label>
+                      <Input
+                        value={newCustPhone}
+                        onChange={(e) => setNewCustPhone(e.target.value)}
+                        placeholder="(555) 123-4567"
+                        className="h-8 text-sm bg-white"
+                        data-testid="input-new-cust-phone"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Email</Label>
+                      <Input
+                        value={newCustEmail}
+                        onChange={(e) => setNewCustEmail(e.target.value)}
+                        placeholder="john@example.com"
+                        className="h-8 text-sm bg-white"
+                        data-testid="input-new-cust-email"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Address *</Label>
+                    <Input
+                      value={newCustAddress1}
+                      onChange={(e) => setNewCustAddress1(e.target.value)}
+                      placeholder="123 Main St"
+                      className="h-8 text-sm bg-white"
+                      data-testid="input-new-cust-address1"
                     />
-                    <CommandList className="max-h-[300px]">
-                      <CommandEmpty>
-                        {customersLoading ? "Searching..." : "No customers found."}
-                      </CommandEmpty>
-                      <CommandGroup>
-                        {customers.map((c) => (
-                          <CommandItem
-                            key={c.id}
-                            value={c.id}
-                            onSelect={() => {
-                              setSelectedCustomer(c);
-                              setCustomerSearchOpen(false);
-                              setSelectedPropertyId("");
-                              setSelectedProjectId("");
-                            }}
-                          >
-                            <div>
-                              <p className="font-medium">{c.name}</p>
-                              <p className="text-xs text-slate-500">{c.fullAddress || c.customerType}</p>
-                            </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+                  </div>
+                  <Input
+                    value={newCustAddress2}
+                    onChange={(e) => setNewCustAddress2(e.target.value)}
+                    placeholder="Apt, Suite, Unit (optional)"
+                    className="h-8 text-sm bg-white"
+                    data-testid="input-new-cust-address2"
+                  />
+                  <div className="grid grid-cols-6 gap-2">
+                    <div className="col-span-3 space-y-1">
+                      <Label className="text-xs">City *</Label>
+                      <Input
+                        value={newCustCity}
+                        onChange={(e) => setNewCustCity(e.target.value)}
+                        placeholder="City"
+                        className="h-8 text-sm bg-white"
+                        data-testid="input-new-cust-city"
+                      />
+                    </div>
+                    <div className="col-span-1 space-y-1">
+                      <Label className="text-xs">State *</Label>
+                      <Input
+                        value={newCustState}
+                        onChange={(e) => setNewCustState(e.target.value)}
+                        placeholder="TX"
+                        maxLength={2}
+                        className="h-8 text-sm bg-white"
+                        data-testid="input-new-cust-state"
+                      />
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                      <Label className="text-xs">Zip *</Label>
+                      <Input
+                        value={newCustZip}
+                        onChange={(e) => setNewCustZip(e.target.value)}
+                        placeholder="12345"
+                        className="h-8 text-sm bg-white"
+                        data-testid="input-new-cust-zip"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Customer Type</Label>
+                    <Select value={newCustType} onValueChange={setNewCustType}>
+                      <SelectTrigger className="h-8 text-sm bg-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="residential">Residential</SelectItem>
+                        <SelectItem value="commercial">Commercial</SelectItem>
+                        <SelectItem value="property_manager">Property Manager</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="button"
+                    className="w-full h-8 text-sm bg-[#711419] hover:bg-[#5a1014]"
+                    disabled={
+                      !newCustFirstName.trim() || !newCustLastName.trim() ||
+                      !newCustAddress1.trim() || !newCustCity.trim() || !newCustState.trim() || !newCustZip.trim() ||
+                      createCustomerMutation.isPending
+                    }
+                    onClick={() => createCustomerMutation.mutate()}
+                    data-testid="button-create-customer"
+                  >
+                    {createCustomerMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    )}
+                    Create & Select Customer
+                  </Button>
+                </div>
+              ) : (
+                <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={customerSearchOpen}
+                      className="w-full justify-between"
+                      data-testid="button-select-customer"
+                    >
+                      {selectedCustomer ? selectedCustomer.name : "Select customer..."}
+                      <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[400px] p-0 z-[100]" sideOffset={4}>
+                    <Command shouldFilter={false}>
+                      <CommandInput
+                        placeholder="Search customers..."
+                        value={customerSearch}
+                        onValueChange={setCustomerSearch}
+                      />
+                      <CommandList className="max-h-[300px]">
+                        <CommandEmpty>
+                          {customersLoading ? "Searching..." : "No customers found."}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {customers.map((c) => (
+                            <CommandItem
+                              key={c.id}
+                              value={c.id}
+                              onSelect={() => {
+                                setSelectedCustomer(c);
+                                setCustomerSearchOpen(false);
+                                setSelectedPropertyId("");
+                                setSelectedProjectId("");
+                              }}
+                            >
+                              <div>
+                                <p className="font-medium">{c.name}</p>
+                                <p className="text-xs text-slate-500">{c.fullAddress || c.customerType}</p>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              )}
             </div>
 
             {/* Maintenance Agreement Info Display - Enhanced */}
