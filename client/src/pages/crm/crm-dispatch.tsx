@@ -3465,38 +3465,22 @@ export default function CrmDispatch() {
         const previewHour = snapshotPreviewByTech[newTechId];
         if (previewHour !== undefined) {
           newStartHour = SCHEDULE_START_HOUR + previewHour;
-} else {
-  const overAny = over as any;
-  const droppableNode = overAny.node?.current ?? overAny.node;
-
-  const timelineRect =
-    droppableNode instanceof HTMLElement
-      ? droppableNode.getBoundingClientRect()
-      : over.rect;
-
-  const timelineWidth = timelineRect.width;
-
-  if (timelineWidth > 0) {
-    const translatedRect = active.rect.current.translated;
-
-    // Prefer translated card position when available (more accurate during transforms),
-    // otherwise fall back to pointer - offset.
-    const cardLeftX = translatedRect
-      ? translatedRect.left
-      : lastPointerXRef.current - dragOffsetXRef.current;
-
-    const relativeX = cardLeftX - timelineRect.left;
-
-    const snappedHourOffset = snapHourOffsetFromTimeline(
-      relativeX,
-      timelineWidth,
-      duration
-    );
-
-    newStartHour = SCHEDULE_START_HOUR + snappedHourOffset;
-  }
-}
-
+        } else {
+          const overAny = over as any;
+          const droppableNode = overAny.node?.current ?? overAny.node;
+          const timelineRect = droppableNode instanceof HTMLElement
+            ? droppableNode.getBoundingClientRect()
+            : over.rect;
+          const timelineWidth = timelineRect.width;
+          if (timelineWidth > 0) {
+            const cardLeftX = lastPointerXRef.current - dragOffsetXRef.current;
+            const relativeX = cardLeftX - timelineRect.left;
+            const percent = Math.max(0, relativeX / timelineWidth);
+            const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
+            const hourOffset = percent * totalHours;
+            const snappedHour = Math.round(hourOffset * 2) / 2;
+            newStartHour = SCHEDULE_START_HOUR + Math.max(0, Math.min(snappedHour, totalHours - duration));
+          }
         }
         const newEndHour = newStartHour + duration;
 
