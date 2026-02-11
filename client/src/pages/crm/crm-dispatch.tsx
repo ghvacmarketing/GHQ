@@ -1347,7 +1347,8 @@ function DraggableScheduleCard({
         (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
       }}
       style={style}
-      className={`absolute top-2 bottom-2 cursor-grab transition-all overflow-hidden group rounded-md border border-slate-300 bg-white shadow-sm hover:shadow-md ${isResizing ? 'cursor-ew-resize' : ''}`}
+      className={`absolute top-2 bottom-2 cursor-grab transition-all group rounded-md border border-slate-300 bg-white shadow-sm hover:shadow-md overflow-hidden ${isResizing ? 'cursor-ew-resize' : ''}`}
+      title={widthPercent <= 5 ? `${workOrder.customerName}\n${workOrder.propertyAddress || "No address"}\n${statusLabels[workOrder.status] || workOrder.status}` : undefined}
       data-testid={`schedule-card-${workOrder.id}`}
       {...attributes}
       {...dragListeners}
@@ -1373,7 +1374,7 @@ function DraggableScheduleCard({
       
       <div className="flex h-full items-stretch">
         <button
-          className={`${segmentColor} w-11 flex-shrink-0 flex items-center justify-center transition-opacity hover:opacity-85 z-20`}
+          className={`${segmentColor} ${widthPercent <= 5 ? 'w-7' : 'w-11'} flex-shrink-0 flex items-center justify-center transition-opacity hover:opacity-85 z-20`}
           title={`${statusLabels[workOrder.status]} — Click to change`}
           onClick={(e) => {
             e.stopPropagation();
@@ -1383,13 +1384,15 @@ function DraggableScheduleCard({
           onPointerDown={(e) => e.stopPropagation()}
           data-testid={`status-icon-schedule-${workOrder.id}`}
         >
-          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white/20 text-white">
+          <span className={`flex ${widthPercent <= 5 ? 'h-4 w-4' : 'h-6 w-6'} items-center justify-center rounded-md bg-white/20 text-white`}>
             {statusIconMap[workOrder.status] || statusIconMap.scheduled}
           </span>
         </button>
-        <div className="min-w-0 flex-1 border-l border-slate-200 bg-slate-50/70 px-3 py-1.5">
-          <p className="truncate text-sm font-semibold text-slate-800">{workOrder.customerName}</p>
-          <p className="truncate text-xs text-slate-600">{workOrder.propertyAddress || "No address"}</p>
+        <div className="min-w-0 flex-1 border-l border-slate-200 bg-slate-50/70 px-2 py-0.5 flex flex-col justify-center">
+          <p className={`truncate font-semibold text-slate-800 ${widthPercent <= 5 ? 'text-[10px] leading-tight' : 'text-xs'}`}>{workOrder.customerName}</p>
+          {widthPercent > 5 && (
+            <p className="truncate text-[10px] leading-tight text-slate-500">{workOrder.propertyAddress || "No address"}</p>
+          )}
         </div>
       </div>
     </div>
