@@ -1350,7 +1350,7 @@ function DraggableScheduleCard({
         setNodeRef(node);
         (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
       }}
-      style={style}
+      style={{ ...style, transform: undefined, opacity: isDragging ? 0.2 : 1 }}
       className={`absolute top-2 bottom-2 cursor-grab transition-all group rounded-md border border-slate-300 bg-white shadow-sm hover:shadow-md overflow-hidden ${isResizing ? 'cursor-ew-resize' : ''}`}
       title={widthPercent <= 5 ? `${workOrder.customerName}\n${workOrder.propertyAddress || "No address"}\n${statusLabels[workOrder.status] || workOrder.status}` : undefined}
       data-testid={`schedule-card-${workOrder.id}`}
@@ -3243,7 +3243,12 @@ export default function CrmDispatch() {
         dragOffsetXRef.current = 0;
       }
     } else {
-      dragOffsetXRef.current = 0;
+      const activeRect = event.active.rect.current.initial;
+      if (activatorEvt && activeRect) {
+        dragOffsetXRef.current = activatorEvt.clientX - activeRect.left;
+      } else {
+        dragOffsetXRef.current = 0;
+      }
       if (id.startsWith('schedule-')) {
         setActiveId(id.replace('schedule-', ''));
       } else if (id.startsWith('month-job-')) {
@@ -3431,15 +3436,26 @@ export default function CrmDispatch() {
           description: `Assigned to ${newTech?.name || 'technician'} at ${formatHour(startHourInt)}`,
         });
       } else {
-        const { startHour, endHour } = getWorkOrderDisplayTimes(wo);
-        const duration = endHour - startHour;
+        const { startHour: origStart, endHour: origEnd } = getWorkOrderDisplayTimes(wo);
+        const duration = origEnd - origStart;
         
-        const hoursPerPixel = (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR) / SCHEDULE_TIMELINE_WIDTH;
-        const deltaHours = Math.round((delta.x * hoursPerPixel) * 2) / 2;
+        const overAny = over as any;
+        const droppableNode = overAny.node?.current ?? overAny.node;
+        const timelineRect = droppableNode instanceof HTMLElement
+          ? droppableNode.getBoundingClientRect()
+          : over.rect;
+        const timelineWidth = timelineRect.width;
         
-        let newStartHour = startHour + deltaHours;
-        newStartHour = Math.round(newStartHour * 2) / 2;
-        newStartHour = Math.max(START_HOUR, Math.min(newStartHour, END_HOUR - duration));
+        let newStartHour = origStart;
+        if (timelineWidth > 0) {
+          const cardLeftX = lastPointerXRef.current - dragOffsetXRef.current;
+          const relativeX = cardLeftX - timelineRect.left;
+          const percent = Math.max(0, relativeX / timelineWidth);
+          const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
+          const hourOffset = percent * totalHours;
+          const snappedHour = Math.round(hourOffset * 2) / 2;
+          newStartHour = SCHEDULE_START_HOUR + Math.max(0, Math.min(snappedHour, totalHours - duration));
+        }
         const newEndHour = newStartHour + duration;
 
         const startHourInt = Math.floor(newStartHour);
@@ -3454,7 +3470,6 @@ export default function CrmDispatch() {
         
         const newTech = technicians.find(t => t.id === newTechId);
         
-        // Check for conflict when moving between technicians
         const conflict = checkSchedulingConflict(localWorkOrders, newTechId, startDate, endDate, workOrderId);
         if (conflict) {
           const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
@@ -4073,19 +4088,37 @@ export default function CrmDispatch() {
           
           {/* Drag Overlay - morphs queue items to look like schedule cards */}
           <DragOverlay dropAnimation={null}>
-            {activeId && activeFromQueue ? (
+            {activeId ? (
               (() => {
                 const draggingWo = localWorkOrders.find(w => w.id === activeId);
                 if (!draggingWo) return null;
                 const visitType = draggingWo.visitType || "SERVICE";
                 const bgColor = scheduleVisitTypeColors[visitType] || scheduleVisitTypeColors.SERVICE;
                 const statusStripe = scheduleStatusStripes[draggingWo.status] || scheduleStatusStripes.scheduled;
-                return (
-                  <div className={`${bgColor} ${statusStripe} text-slate-800 rounded-md px-2 py-1 shadow-lg cursor-grabbing overflow-hidden`} style={{ width: 160, height: 48 }}>
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-xs font-medium truncate">{draggingWo.customerName}</p>
+                const segColor = statusSegmentColors[draggingWo.status] || statusSegmentColors.scheduled;
+                if (activeFromQueue) {
+                  return (
+                    <div className={`${bgColor} ${statusStripe} text-slate-800 rounded-md px-2 py-1 shadow-lg cursor-grabbing overflow-hidden`} style={{ width: 160, height: 48 }}>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-xs font-medium truncate">{draggingWo.customerName}</p>
+                      </div>
+                      <p className="text-[10px] text-slate-600 truncate">{draggingWo.propertyAddress || "No address"}</p>
                     </div>
-                    <p className="text-[10px] text-slate-600 truncate">{draggingWo.propertyAddress || "No address"}</p>
+                  );
+                }
+                return (
+                  <div className="rounded-md border border-slate-300 bg-white shadow-lg cursor-grabbing overflow-hidden" style={{ width: 180, height: 48 }}>
+                    <div className="flex h-full items-stretch">
+                      <div className={`${segColor} w-9 flex-shrink-0 flex items-center justify-center`}>
+                        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/20 text-white">
+                          {statusIconMap[draggingWo.status] || statusIconMap.scheduled}
+                        </span>
+                      </div>
+                      <div className="min-w-0 flex-1 border-l border-slate-200 bg-slate-50/70 px-2 py-0.5 flex flex-col justify-center">
+                        <p className="truncate text-xs font-semibold text-slate-800">{draggingWo.customerName}</p>
+                        <p className="truncate text-[10px] leading-tight text-slate-500">{draggingWo.propertyAddress || "No address"}</p>
+                      </div>
+                    </div>
                   </div>
                 );
               })()
