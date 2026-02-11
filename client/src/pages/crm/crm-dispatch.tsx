@@ -3442,22 +3442,26 @@ export default function CrmDispatch() {
         const { startHour: origStart, endHour: origEnd } = getWorkOrderDisplayTimes(wo);
         const duration = origEnd - origStart;
         
-        const overAny = over as any;
-        const droppableNode = overAny.node?.current ?? overAny.node;
-        const timelineRect = droppableNode instanceof HTMLElement
-          ? droppableNode.getBoundingClientRect()
-          : over.rect;
-        const timelineWidth = timelineRect.width;
-        
         let newStartHour = origStart;
-        if (timelineWidth > 0) {
-          const cardLeftX = lastPointerXRef.current - dragOffsetXRef.current;
-          const relativeX = cardLeftX - timelineRect.left;
-          const percent = Math.max(0, relativeX / timelineWidth);
-          const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
-          const hourOffset = percent * totalHours;
-          const snappedHour = Math.round(hourOffset * 2) / 2;
-          newStartHour = SCHEDULE_START_HOUR + Math.max(0, Math.min(snappedHour, totalHours - duration));
+        const previewHour = snapshotPreviewByTech[newTechId];
+        if (previewHour !== undefined) {
+          newStartHour = SCHEDULE_START_HOUR + previewHour;
+        } else {
+          const overAny = over as any;
+          const droppableNode = overAny.node?.current ?? overAny.node;
+          const timelineRect = droppableNode instanceof HTMLElement
+            ? droppableNode.getBoundingClientRect()
+            : over.rect;
+          const timelineWidth = timelineRect.width;
+          if (timelineWidth > 0) {
+            const cardLeftX = lastPointerXRef.current - dragOffsetXRef.current;
+            const relativeX = cardLeftX - timelineRect.left;
+            const percent = Math.max(0, relativeX / timelineWidth);
+            const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
+            const hourOffset = percent * totalHours;
+            const snappedHour = Math.round(hourOffset * 2) / 2;
+            newStartHour = SCHEDULE_START_HOUR + Math.max(0, Math.min(snappedHour, totalHours - duration));
+          }
         }
         const newEndHour = newStartHour + duration;
 
@@ -4092,29 +4096,10 @@ export default function CrmDispatch() {
           {/* Drag Overlay - morphs queue items to look like schedule cards */}
           <DragOverlay dropAnimation={null}>
             {activeId ? (
-              (() => {
-                const draggingWo = localWorkOrders.find(w => w.id === activeId);
-                if (!draggingWo) return null;
-                if (activeFromQueue) {
-                  const visitType = draggingWo.visitType || "SERVICE";
-                  const bgColor = scheduleVisitTypeColors[visitType] || scheduleVisitTypeColors.SERVICE;
-                  const statusStripe = scheduleStatusStripes[draggingWo.status] || scheduleStatusStripes.scheduled;
-                  return (
-                    <div className={`${bgColor} ${statusStripe} text-slate-800 rounded-md px-2 py-1 shadow-lg cursor-grabbing overflow-hidden`} style={{ width: 160, height: 48 }}>
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-xs font-medium truncate">{draggingWo.customerName}</p>
-                      </div>
-                      <p className="text-[10px] text-slate-600 truncate">{draggingWo.propertyAddress || "No address"}</p>
-                    </div>
-                  );
-                }
-                return (
-                  <div
-                    className="rounded-md bg-slate-300/70 border border-slate-400/50 shadow-md cursor-grabbing"
-                    style={{ width: activeCardWidthRef.current || 120, height: 40 }}
-                  />
-                );
-              })()
+              <div
+                className="rounded-md bg-slate-300/70 border border-slate-400/50 shadow-md cursor-grabbing"
+                style={{ width: activeFromQueue ? 120 : (activeCardWidthRef.current || 120), height: 40 }}
+              />
             ) : null}
           </DragOverlay>
         </DndContext>
