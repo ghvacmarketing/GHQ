@@ -1475,7 +1475,7 @@ interface TechnicianScheduleBoardProps {
   onOpenQuickStatus?: (workOrderId: string, event: React.MouseEvent) => void;
 }
 
-function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, activeFromQueue, dragOffsetX = 0, onPreviewTimeChange }: TechnicianScheduleBoardProps) {
+function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, activeFromQueue, dragOffsetX = 0, onPreviewTimeChange, onOpenQuickStatus }: TechnicianScheduleBoardProps) {
   const hourLabels = useMemo(() => {
     const labels: string[] = [];
     for (let h = SCHEDULE_START_HOUR; h <= SCHEDULE_END_HOUR; h++) {
