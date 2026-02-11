@@ -271,17 +271,11 @@ const timeSlots = Array.from({ length: TOTAL_SLOTS }, (_, i) => {
 const SLOT_WIDTH = 60;
 const TIMELINE_WIDTH = TOTAL_SLOTS * SLOT_WIDTH;
 
-const snapToGridModifier: Modifier = ({ transform, active }) => {
-  const activeId = active?.id as string | undefined;
-  if (activeId?.startsWith('schedule-')) {
-    return transform;
-  }
-  return {
-    ...transform,
-    x: Math.round(transform.x / SLOT_WIDTH) * SLOT_WIDTH,
-    y: transform.y,
-  };
-};
+// No grid-snap modifier — the preview rectangle in each timeline row
+// already snaps to half-hour increments and the drop handler reads from
+// previewHourByTechRef, so snapping the DragOverlay to a 60-px grid
+// (which is relative to the drag-start position, not the timeline grid)
+// only causes the overlay to diverge from the actual landing position.
 
 const createRestrictToContainerModifier = (containerRef: React.RefObject<HTMLDivElement | null>): Modifier => {
   return ({ transform, draggingNodeRect }) => {
@@ -1352,7 +1346,7 @@ function DraggableScheduleCard({
       }}
       style={{ ...style, transform: undefined, opacity: isDragging ? 0.2 : 1 }}
       className={`absolute top-2 bottom-2 cursor-grab transition-all group rounded-md border border-slate-300 bg-white shadow-sm hover:shadow-md overflow-hidden ${isResizing ? 'cursor-ew-resize' : ''}`}
-      title={widthPercent <= 5 ? `${workOrder.customerName}\n${workOrder.propertyAddress || "No address"}\n${statusLabels[workOrder.status] || workOrder.status}` : undefined}
+      title={widthPercent <= 7 ? `${workOrder.customerName}\n${workOrder.propertyAddress || "No address"}\n${statusLabels[workOrder.status] || workOrder.status}` : undefined}
       data-testid={`schedule-card-${workOrder.id}`}
       {...attributes}
       {...dragListeners}
@@ -1377,27 +1371,49 @@ function DraggableScheduleCard({
       />
       
       <div className="flex h-full items-stretch">
-        <button
-          className={`${segmentColor} ${widthPercent <= 5 ? 'w-7' : 'w-11'} flex-shrink-0 flex items-center justify-center transition-opacity hover:opacity-85 z-20`}
-          title={`${statusLabels[workOrder.status]} — Click to change`}
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            onOpenQuickStatus?.(workOrder.id, e);
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          data-testid={`status-icon-schedule-${workOrder.id}`}
-        >
-          <span className={`flex ${widthPercent <= 5 ? 'h-4 w-4' : 'h-6 w-6'} items-center justify-center rounded-md bg-white/20 text-white`}>
-            {statusIconMap[workOrder.status] || statusIconMap.scheduled}
-          </span>
-        </button>
-        <div className="min-w-0 flex-1 border-l border-slate-200 bg-slate-50/70 px-2 py-0.5 flex flex-col justify-center">
-          <p className={`truncate font-semibold text-slate-800 ${widthPercent <= 5 ? 'text-[10px] leading-tight' : 'text-xs'}`}>{workOrder.customerName}</p>
-          {widthPercent > 5 && (
-            <p className="truncate text-[10px] leading-tight text-slate-500">{workOrder.propertyAddress || "No address"}</p>
-          )}
-        </div>
+        {widthPercent <= 4.5 ? (
+          /* Ultra-narrow cards (≤ 0.5 hr): thin color stripe + name only */
+          <>
+            <button
+              className={`${segmentColor} w-1.5 flex-shrink-0 transition-opacity hover:opacity-85 z-20`}
+              title={`${statusLabels[workOrder.status]} — Click to change`}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onOpenQuickStatus?.(workOrder.id, e);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              data-testid={`status-icon-schedule-${workOrder.id}`}
+            />
+            <div className="min-w-0 flex-1 bg-slate-50/70 px-1 flex items-center">
+              <p className="truncate font-semibold text-slate-800 text-[10px] leading-tight">{workOrder.customerName}</p>
+            </div>
+          </>
+        ) : (
+          <>
+            <button
+              className={`${segmentColor} ${widthPercent <= 7 ? 'w-7' : 'w-11'} flex-shrink-0 flex items-center justify-center transition-opacity hover:opacity-85 z-20`}
+              title={`${statusLabels[workOrder.status]} — Click to change`}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onOpenQuickStatus?.(workOrder.id, e);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              data-testid={`status-icon-schedule-${workOrder.id}`}
+            >
+              <span className={`flex ${widthPercent <= 7 ? 'h-4 w-4' : 'h-6 w-6'} items-center justify-center rounded-md bg-white/20 text-white`}>
+                {statusIconMap[workOrder.status] || statusIconMap.scheduled}
+              </span>
+            </button>
+            <div className="min-w-0 flex-1 border-l border-slate-200 bg-slate-50/70 px-2 py-0.5 flex flex-col justify-center">
+              <p className={`truncate font-semibold text-slate-800 ${widthPercent <= 7 ? 'text-[10px] leading-tight' : 'text-xs'}`}>{workOrder.customerName}</p>
+              {widthPercent > 7 && (
+                <p className="truncate text-[10px] leading-tight text-slate-500">{workOrder.propertyAddress || "No address"}</p>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -1410,6 +1426,7 @@ function ScheduleRowTimeline({
   droppableRef,
   dragOffsetX = 0,
   onPreviewTimeChange,
+  previewDurationHours = 1,
 }: {
   children: React.ReactNode;
   isDragActive: boolean;
@@ -1417,11 +1434,12 @@ function ScheduleRowTimeline({
   droppableRef?: (node: HTMLDivElement | null) => void;
   dragOffsetX?: number;
   onPreviewTimeChange?: (hourOffset: number | null) => void;
+  previewDurationHours?: number;
 }) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const [previewLeft, setPreviewLeft] = useState<number | null>(null);
   const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
-  const previewWidthPercent = (1 / totalHours) * 100;
+  const previewWidthPercent = (previewDurationHours / totalHours) * 100;
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isDragActive || !timelineRef.current) return;
@@ -1432,26 +1450,27 @@ function ScheduleRowTimeline({
     const percent = (x / rect.width) * 100;
     const hourOffset = (percent / 100) * totalHours;
     const snappedHour = Math.round(hourOffset * 2) / 2;
-    const clampedHour = Math.max(0, Math.min(snappedHour, totalHours - 1));
+    const maxHour = totalHours - previewDurationHours;
+    const clampedHour = Math.max(0, Math.min(snappedHour, maxHour));
     const snappedPercent = (clampedHour / totalHours) * 100;
-    setPreviewLeft(Math.max(0, Math.min(snappedPercent, ((totalHours - 1) / totalHours) * 100)));
+    setPreviewLeft(Math.max(0, Math.min(snappedPercent, (maxHour / totalHours) * 100)));
     onPreviewTimeChange?.(clampedHour);
-  }, [isDragActive, onPreviewTimeChange, totalHours, dragOffsetX]);
+  }, [isDragActive, onPreviewTimeChange, totalHours, dragOffsetX, previewDurationHours]);
 
   const handleMouseLeave = useCallback(() => {
     setPreviewLeft(null);
-    if (!isDragActive) {
-      onPreviewTimeChange?.(null);
-    }
-  }, [onPreviewTimeChange, isDragActive]);
+    // Always clear the preview hour when leaving this row so stale values
+    // don't persist in previewHourByTechRef.
+    onPreviewTimeChange?.(null);
+  }, [onPreviewTimeChange]);
 
   return (
-    <div 
+    <div
       ref={(node) => {
         timelineRef.current = node;
         droppableRef?.(node);
       }}
-      className="flex-1 relative py-2" 
+      className="flex-1 relative py-2"
       style={{ minWidth: SCHEDULE_TIMELINE_WIDTH }}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
@@ -1467,16 +1486,18 @@ function ScheduleRowTimeline({
         );
       })}
       <div className="absolute top-0 bottom-0 border-l border-slate-200" style={{ left: '100%' }} />
-      
+
       {isDragActive && isOver && previewLeft !== null && (
-        <div 
+        <div
           className="absolute top-1 bottom-1 bg-[#711419]/15 border-2 border-dashed border-[#711419]/40 rounded-md pointer-events-none z-[5]"
           style={{ left: `${previewLeft}%`, width: `${previewWidthPercent}%` }}
         >
-          <div className="text-[10px] text-[#711419]/60 font-medium text-center mt-1">1 hr</div>
+          <div className="text-[10px] text-[#711419]/60 font-medium text-center mt-1">
+            {previewDurationHours >= 1 ? `${previewDurationHours} hr` : `${previewDurationHours * 60}m`}
+          </div>
         </div>
       )}
-      
+
       {children}
     </div>
   );
@@ -1493,9 +1514,10 @@ interface TechnicianScheduleBoardProps {
   dragOffsetX?: number;
   onPreviewTimeChange?: (techId: string, hourOffset: number | null) => void;
   onOpenQuickStatus?: (workOrderId: string, event: React.MouseEvent) => void;
+  activeDurationHours?: number;
 }
 
-function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, activeFromQueue, dragOffsetX = 0, onPreviewTimeChange, onOpenQuickStatus }: TechnicianScheduleBoardProps) {
+function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, activeFromQueue, dragOffsetX = 0, onPreviewTimeChange, onOpenQuickStatus, activeDurationHours = 1 }: TechnicianScheduleBoardProps) {
   const hourLabels = useMemo(() => {
     const labels: string[] = [];
     for (let h = SCHEDULE_START_HOUR; h <= SCHEDULE_END_HOUR; h++) {
@@ -1571,23 +1593,24 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                     </div>
                     
                     <ScheduleRowTimeline
-                      isDragActive={!!activeId && !!activeFromQueue}
+                      isDragActive={!!activeId}
                       isOver={isOver}
                       droppableRef={setDroppableRef}
                       dragOffsetX={dragOffsetX}
                       onPreviewTimeChange={(hourOffset) => onPreviewTimeChange?.(tech.id, hourOffset)}
+                      previewDurationHours={activeDurationHours}
                     >
                       {techWorkOrders.map((wo) => {
                         if (!wo.scheduledStart) return null;
                         const startDate = new Date(wo.scheduledStart);
                         const endDate = wo.scheduledEnd ? new Date(wo.scheduledEnd) : null;
-                        
+
                         const leftPercent = getScheduleLeftPercent(startDate);
                         const widthPercent = getScheduleWidthPercent(startDate, endDate);
                         const visitType = wo.visitType || "SERVICE";
                         const bgColor = scheduleVisitTypeColors[visitType] || scheduleVisitTypeColors.SERVICE;
                         const statusStripe = scheduleStatusStripes[wo.status] || scheduleStatusStripes.scheduled;
-                        
+
                         const startMinutesFrom8 = (startDate.getHours() - SCHEDULE_START_HOUR) * 60 + startDate.getMinutes();
                         if (startMinutesFrom8 < 0 || startMinutesFrom8 >= SCHEDULE_TOTAL_MINUTES) return null;
 
@@ -1601,7 +1624,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                             statusStripe={statusStripe}
                             onWorkOrderClick={onWorkOrderClick}
                             onResizeComplete={onResizeComplete}
-                            isDragging={activeId === `schedule-${wo.id}`}
+                            isDragging={activeId === wo.id}
                             onOpenQuickStatus={onOpenQuickStatus}
                           />
                         );
@@ -3264,7 +3287,7 @@ export default function CrmDispatch() {
   
   const combinedModifiers = useMemo(() => {
     const restrictModifier = createRestrictToContainerModifier(dispatchBoardRef);
-    return [snapToGridModifier, restrictModifier];
+    return [restrictModifier];
   }, []);
 
   const getDropScheduleTimes = useCallback((workOrder: DispatchWorkOrder, dropDate: Date) => {
@@ -3438,23 +3461,35 @@ export default function CrmDispatch() {
       } else {
         const { startHour: origStart, endHour: origEnd } = getWorkOrderDisplayTimes(wo);
         const duration = origEnd - origStart;
-        
-        const overAny = over as any;
-        const droppableNode = overAny.node?.current ?? overAny.node;
-        const timelineRect = droppableNode instanceof HTMLElement
-          ? droppableNode.getBoundingClientRect()
-          : over.rect;
-        const timelineWidth = timelineRect.width;
-        
+
+        // Prefer the preview hour tracked during drag — it uses the exact
+        // same snap logic as the visual preview rectangle, guaranteeing the
+        // card lands where the user saw the highlight.
         let newStartHour = origStart;
-        if (timelineWidth > 0) {
-          const cardLeftX = lastPointerXRef.current - dragOffsetXRef.current;
-          const relativeX = cardLeftX - timelineRect.left;
-          const percent = Math.max(0, relativeX / timelineWidth);
-          const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
-          const hourOffset = percent * totalHours;
-          const snappedHour = Math.round(hourOffset * 2) / 2;
-          newStartHour = SCHEDULE_START_HOUR + Math.max(0, Math.min(snappedHour, totalHours - duration));
+        const previewHour = snapshotPreviewByTech[newTechId];
+        if (previewHour !== undefined) {
+          newStartHour = SCHEDULE_START_HOUR + Math.max(0, Math.min(
+            previewHour,
+            (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR) - duration,
+          ));
+        } else {
+          // Fallback: calculate from pointer position
+          const overAny = over as any;
+          const droppableNode = overAny.node?.current ?? overAny.node;
+          const timelineRect = droppableNode instanceof HTMLElement
+            ? droppableNode.getBoundingClientRect()
+            : over.rect;
+          const timelineWidth = timelineRect.width;
+
+          if (timelineWidth > 0) {
+            const cardLeftX = lastPointerXRef.current - dragOffsetXRef.current;
+            const relativeX = cardLeftX - timelineRect.left;
+            const percent = Math.max(0, relativeX / timelineWidth);
+            const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
+            const hourOffset = percent * totalHours;
+            const snappedHour = Math.round(hourOffset * 2) / 2;
+            newStartHour = SCHEDULE_START_HOUR + Math.max(0, Math.min(snappedHour, totalHours - duration));
+          }
         }
         const newEndHour = newStartHour + duration;
 
@@ -4042,6 +4077,13 @@ export default function CrmDispatch() {
                   dragOffsetX={dragOffsetXRef.current}
                   onPreviewTimeChange={handlePreviewTimeChange}
                   onOpenQuickStatus={handleOpenQuickStatus}
+                  activeDurationHours={(() => {
+                    if (!activeId) return 1;
+                    const awo = localWorkOrders.find(w => w.id === activeId);
+                    if (!awo) return 1;
+                    const { startHour, endHour } = getWorkOrderDisplayTimes(awo);
+                    return endHour - startHour;
+                  })()}
                 />
               ) : viewMode === "week" ? (
                 <WeekDispatchBoard
