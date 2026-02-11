@@ -80,6 +80,9 @@ import {
   ClipboardCheck,
   Truck,
   GripVertical,
+  Pause,
+  Ban,
+  Check,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { addDays, endOfMonth, endOfWeek, format, formatDistanceToNow, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
@@ -349,9 +352,18 @@ const statusSquircleColors: Record<string, string> = {
   scheduled: "bg-yellow-400",
   dispatched: "bg-blue-400",
   en_route: "bg-blue-400",
-  on_site: "bg-green-400",
+  on_site: "bg-green-500",
   completed: "bg-gray-400",
   cancelled: "bg-gray-400",
+};
+
+const statusIconMap: Record<string, React.ReactNode> = {
+  scheduled: <Clock className="h-4 w-4 text-white" />,
+  dispatched: <Clipboard className="h-4 w-4 text-white" />,
+  en_route: <Truck className="h-4 w-4 text-white" />,
+  on_site: <Wrench className="h-4 w-4 text-white" />,
+  completed: <Check className="h-4 w-4 text-white" />,
+  cancelled: <Ban className="h-4 w-4 text-white" />,
 };
 
 function timeToSlotIndex(decimalHour: number): number {
@@ -421,7 +433,7 @@ function DraggableQueueCard({ workOrder, onClick, onOpenQuickStatus }: Draggable
   const priorityStyle = priorityBadgeColors[workOrder.priority || "normal"] || priorityBadgeColors.normal;
   const visitTypeColor = getJobTypeColor(workOrder.visitType || workOrder.jobType);
   const needsSchedulingNow = (workOrder as any).immediateAction === "create_now" && !workOrder.scheduledStart;
-  const squircleColor = statusSquircleColors[workOrder.status] || statusSquircleColors.scheduled;
+  const iconColor = statusSquircleColors[workOrder.status] || statusSquircleColors.scheduled;
 
   const isLocked = workOrder.status === "on_site";
 
@@ -437,11 +449,13 @@ function DraggableQueueCard({ workOrder, onClick, onOpenQuickStatus }: Draggable
     zIndex: isDragging ? 1000 : undefined,
   };
 
+  const statusIcon = statusIconMap[workOrder.status] || statusIconMap.scheduled;
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-stretch gap-0 border-b border-slate-100 hover:bg-slate-50 transition-colors ${isDragging ? 'z-50 shadow-lg cursor-grabbing bg-white rounded-md ring-2 ring-[#711419]/50' : 'cursor-grab'} ${needsSchedulingNow ? 'bg-red-50 border-b-red-200' : ''}`}
+      className={`flex items-center gap-2 px-2 py-2 border-b border-slate-100 hover:bg-slate-50 transition-colors ${isDragging ? 'z-50 shadow-lg cursor-grabbing bg-white rounded-md ring-2 ring-[#711419]/50' : 'cursor-grab'} ${needsSchedulingNow ? 'bg-red-50 border-b-red-200' : ''}`}
       data-testid={`queue-card-${workOrder.id}`}
       {...attributes}
       {...listeners}
@@ -450,9 +464,9 @@ function DraggableQueueCard({ workOrder, onClick, onOpenQuickStatus }: Draggable
         onClick?.(workOrder.id);
       }}
     >
-      {/* Status Squircle */}
-      <div
-        className={`${squircleColor} w-[10px] flex-shrink-0 rounded-[5px] my-1 ml-1 cursor-pointer hover:opacity-80 transition-opacity`}
+      {/* Status Icon Button - Field Edge style */}
+      <button
+        className={`${iconColor} w-8 h-8 flex-shrink-0 rounded-md flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity`}
         title={`Status: ${statusLabels[workOrder.status] || workOrder.status} — Click to change`}
         onClick={(e) => {
           e.stopPropagation();
@@ -460,26 +474,25 @@ function DraggableQueueCard({ workOrder, onClick, onOpenQuickStatus }: Draggable
           onOpenQuickStatus?.(workOrder.id, e);
         }}
         onPointerDown={(e) => e.stopPropagation()}
-        data-testid={`status-squircle-${workOrder.id}`}
-      />
-      <div className="flex items-center gap-3 px-3 py-2 flex-1 min-w-0">
-        {needsSchedulingNow ? (
-          <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 animate-pulse" title="Needs scheduling now" />
-        ) : (
-          <GripVertical className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />
-        )}
-        <Badge variant="outline" className={`${visitTypeColor.bg} ${visitTypeColor.text} border-0 text-[10px] flex-shrink-0`}>
-          {visitTypeLabels[workOrder.visitType || "SERVICE"] || workOrder.visitType}
-        </Badge>
-        <span className="font-medium text-sm text-slate-900 truncate">{workOrder.customerName}</span>
+        data-testid={`status-icon-${workOrder.id}`}
+      >
+        {statusIcon}
+      </button>
+      <div className="flex flex-col min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm text-slate-900 truncate">{workOrder.customerName}</span>
+          <Badge variant="outline" className={`${visitTypeColor.bg} ${visitTypeColor.text} border-0 text-[10px] flex-shrink-0`}>
+            {visitTypeLabels[workOrder.visitType || "SERVICE"] || workOrder.visitType}
+          </Badge>
+          {workOrder.priority && workOrder.priority !== "normal" && (
+            <span className={`ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded flex-shrink-0 ${priorityStyle.bg} ${priorityStyle.text}`}>
+              {workOrder.priority.toUpperCase()}
+            </span>
+          )}
+        </div>
         {workOrder.propertyAddress && (
-          <span className="text-xs text-slate-400 truncate hidden sm:inline">
+          <span className="text-xs text-slate-400 truncate">
             {workOrder.propertyAddress}
-          </span>
-        )}
-        {workOrder.priority && workOrder.priority !== "normal" && (
-          <span className={`ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded flex-shrink-0 ${priorityStyle.bg} ${priorityStyle.text}`}>
-            {workOrder.priority.toUpperCase()}
           </span>
         )}
       </div>
@@ -1226,17 +1239,19 @@ interface DraggableScheduleCardProps {
   onWorkOrderClick?: (id: string) => void;
   onResizeComplete?: (workOrderId: string, deltaStartMinutes: number, deltaEndMinutes: number) => void;
   isDragging?: boolean;
+  onOpenQuickStatus?: (workOrderId: string, event: React.MouseEvent) => void;
 }
 
-function DraggableScheduleCard({ 
-  workOrder, 
-  leftPercent, 
-  widthPercent, 
-  bgColor, 
+function DraggableScheduleCard({
+  workOrder,
+  leftPercent,
+  widthPercent,
+  bgColor,
   statusStripe = "",
   onWorkOrderClick,
   onResizeComplete,
   isDragging = false,
+  onOpenQuickStatus,
 }: DraggableScheduleCardProps) {
   const [isResizing, setIsResizing] = useState(false);
   const [resizeOffset, setResizeOffset] = useState({ left: 0, width: 0 });
@@ -1346,11 +1361,26 @@ function DraggableScheduleCard({
         data-testid={`resize-end-${workOrder.id}`}
       />
       
-      <div className="flex items-center gap-1.5">
-        {workOrder.status === "completed" && <CheckSquare className="h-3 w-3 flex-shrink-0 text-green-600" />}
-        <p className="text-xs font-medium truncate">{workOrder.customerName}</p>
+      <div className="flex items-center gap-1.5 h-full">
+        {/* Status Icon - clickable */}
+        <button
+          className={`${statusSquircleColors[workOrder.status] || statusSquircleColors.scheduled} w-6 h-6 flex-shrink-0 rounded flex items-center justify-center hover:opacity-80 transition-opacity z-20`}
+          title={`${statusLabels[workOrder.status]} — Click to change`}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onOpenQuickStatus?.(workOrder.id, e);
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          data-testid={`status-icon-schedule-${workOrder.id}`}
+        >
+          {statusIconMap[workOrder.status] || statusIconMap.scheduled}
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium truncate">{workOrder.customerName}</p>
+          <p className="text-[10px] text-slate-600 truncate">{workOrder.propertyAddress || "No address"}</p>
+        </div>
       </div>
-      <p className="text-[10px] text-slate-600 truncate">{workOrder.propertyAddress || "No address"}</p>
     </div>
   );
 }
@@ -1442,6 +1472,7 @@ interface TechnicianScheduleBoardProps {
   activeFromQueue?: boolean;
   dragOffsetX?: number;
   onPreviewTimeChange?: (techId: string, hourOffset: number | null) => void;
+  onOpenQuickStatus?: (workOrderId: string, event: React.MouseEvent) => void;
 }
 
 function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, activeFromQueue, dragOffsetX = 0, onPreviewTimeChange }: TechnicianScheduleBoardProps) {
@@ -1551,6 +1582,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                             onWorkOrderClick={onWorkOrderClick}
                             onResizeComplete={onResizeComplete}
                             isDragging={activeId === `schedule-${wo.id}`}
+                            onOpenQuickStatus={onOpenQuickStatus}
                           />
                         );
                       })}
@@ -2745,7 +2777,7 @@ export default function CrmDispatch() {
     event.stopPropagation();
     event.preventDefault();
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    setQuickStatusMenu({ workOrderId, x: rect.right + 8, y: rect.top });
+    setQuickStatusMenu({ workOrderId, x: rect.left, y: rect.bottom + 4 });
   }, []);
 
   const handleUnassign = useCallback(() => {
@@ -3844,6 +3876,7 @@ export default function CrmDispatch() {
                   activeFromQueue={activeFromQueue}
                   dragOffsetX={dragOffsetXRef.current}
                   onPreviewTimeChange={handlePreviewTimeChange}
+                  onOpenQuickStatus={handleOpenQuickStatus}
                 />
               ) : viewMode === "week" ? (
                 <WeekDispatchBoard
@@ -4218,18 +4251,29 @@ export default function CrmDispatch() {
         )}
       </div>
 
-      {/* Quick Status Change Popup */}
+      {/* Quick Status Change Dropdown */}
       {quickStatusMenu && (() => {
         const wo = localWorkOrders.find(w => w.id === quickStatusMenu.workOrderId);
         if (!wo) return null;
-        const statusPopupItems: { status: WorkOrderStatus; icon: React.ReactNode; label: string; bg: string; text: string; hoverBg: string }[] = [
-          { status: "scheduled", icon: <Clock className="h-4 w-4" />, label: "Pending", bg: "bg-yellow-100", text: "text-yellow-800", hoverBg: "hover:bg-yellow-200" },
-          { status: "dispatched", icon: <Clipboard className="h-4 w-4" />, label: "Dispatched", bg: "bg-blue-100", text: "text-blue-800", hoverBg: "hover:bg-blue-200" },
-          { status: "en_route", icon: <Truck className="h-4 w-4" />, label: "Traveling", bg: "bg-blue-100", text: "text-blue-800", hoverBg: "hover:bg-blue-200" },
-          { status: "on_site", icon: <Wrench className="h-4 w-4" />, label: "Working", bg: "bg-green-100", text: "text-green-800", hoverBg: "hover:bg-green-200" },
-          { status: "completed", icon: <CheckSquare className="h-4 w-4" />, label: "Completed", bg: "bg-gray-100", text: "text-gray-800", hoverBg: "hover:bg-gray-200" },
-          { status: "cancelled", icon: <XCircle className="h-4 w-4" />, label: "Cancelled", bg: "bg-gray-100", text: "text-gray-600", hoverBg: "hover:bg-gray-200" },
+        const dropdownItems: { status: WorkOrderStatus; icon: React.ReactNode; label: string; color: string }[] = [
+          { status: "scheduled", icon: <Clock className="h-3.5 w-3.5" />, label: "Pending", color: "bg-yellow-400" },
+          { status: "dispatched", icon: <Clipboard className="h-3.5 w-3.5" />, label: "Dispatched", color: "bg-blue-400" },
+          { status: "en_route", icon: <Truck className="h-3.5 w-3.5" />, label: "Traveling", color: "bg-blue-400" },
+          { status: "on_site", icon: <Wrench className="h-3.5 w-3.5" />, label: "Working", color: "bg-green-500" },
+          { status: "completed", icon: <Check className="h-3.5 w-3.5" />, label: "Completed", color: "bg-gray-400" },
+          { status: "cancelled", icon: <Ban className="h-3.5 w-3.5" />, label: "Cancelled", color: "bg-gray-400" },
         ];
+        // Position: prefer below-right of icon, but flip if near viewport edge
+        const menuHeight = 230;
+        const menuWidth = 160;
+        let top = quickStatusMenu.y;
+        let left = quickStatusMenu.x;
+        if (top + menuHeight > window.innerHeight) {
+          top = Math.max(8, quickStatusMenu.y - menuHeight);
+        }
+        if (left + menuWidth > window.innerWidth) {
+          left = Math.max(8, quickStatusMenu.x - menuWidth - 16);
+        }
         return (
           <>
             <div
@@ -4237,31 +4281,31 @@ export default function CrmDispatch() {
               onClick={() => setQuickStatusMenu(null)}
             />
             <div
-              className="fixed z-[9999] bg-white rounded-xl shadow-xl border border-slate-200 p-2 w-[180px]"
-              style={{ top: quickStatusMenu.y, left: quickStatusMenu.x }}
-              data-testid="quick-status-popup"
+              className="fixed z-[9999] bg-white rounded-lg shadow-lg border border-slate-200 py-1 w-[160px]"
+              style={{ top, left }}
+              data-testid="quick-status-dropdown"
             >
-              <p className="text-xs font-semibold text-slate-500 px-2 py-1 uppercase tracking-wider">Change Status</p>
-              <div className="space-y-1">
-                {statusPopupItems.map(({ status, icon, label, bg, text, hoverBg }) => (
-                  <button
-                    key={status}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleQuickStatusChange(quickStatusMenu.workOrderId, status);
-                    }}
-                    className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                      wo.status === status
-                        ? `${bg} ${text} ring-2 ring-offset-1 ring-current`
-                        : `${bg} ${text} ${hoverBg}`
-                    }`}
-                    data-testid={`quick-status-${status}`}
-                  >
-                    {icon}
-                    {label}
-                  </button>
-                ))}
-              </div>
+              {dropdownItems.map(({ status, icon, label, color }) => (
+                <button
+                  key={status}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleQuickStatusChange(quickStatusMenu.workOrderId, status);
+                  }}
+                  className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-sm transition-colors hover:bg-slate-100 ${
+                    wo.status === status ? "bg-slate-100 font-semibold" : "font-medium"
+                  }`}
+                  data-testid={`quick-status-${status}`}
+                >
+                  <span className={`${color} w-5 h-5 rounded flex items-center justify-center flex-shrink-0`}>
+                    <span className="text-white">{icon}</span>
+                  </span>
+                  <span className="text-slate-700">{label}</span>
+                  {wo.status === status && (
+                    <Check className="h-3.5 w-3.5 ml-auto text-slate-500" />
+                  )}
+                </button>
+              ))}
             </div>
           </>
         );
