@@ -1,5 +1,6 @@
 import type { Customer } from "@shared/schema";
 import { createHash } from "crypto";
+import { isAppActive } from "../activity-tracker";
 
 interface SheetRow {
   "Display Name"?: string;
@@ -215,6 +216,10 @@ class FieldEdgeCustomerService {
     });
 
     this.refreshInterval = setInterval(() => {
+      if (!isAppActive()) {
+        console.log('[FieldEdge] App idle, skipping cache refresh');
+        return;
+      }
       this.refreshCache().catch(err => {
         console.error('[FieldEdge] Scheduled cache refresh failed:', err);
       });

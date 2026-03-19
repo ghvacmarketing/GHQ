@@ -1,5 +1,6 @@
 import QuickBooks from "node-quickbooks";
 import { db } from "../db";
+import { isAppActive, onBecomeActive } from "../activity-tracker";
 import { 
   quickbooksConnection, 
   quickbooksCustomerSync, 
@@ -2393,8 +2394,25 @@ export function startBackgroundSyncScheduler(): void {
     console.log("[QuickBooks Background] Scheduler already running");
     return;
   }
-  
+
   const SYNC_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes for faster sync
+
+  const runIfActive = () => {
+    if (!isAppActive()) {
+      console.log("[QuickBooks Background] App idle, skipping sync");
+      onBecomeActive(() => {
+        console.log("[QuickBooks Background] App became active, running immediate sync");
+        runBackgroundSync().catch(err => {
+          console.error("[QuickBooks Background] Resume sync error:", err);
+        });
+        onBecomeActive(runIfActive);
+      });
+      return;
+    }
+    runBackgroundSync().catch(err => {
+      console.error("[QuickBooks Background] Scheduled sync error:", err);
+    });
+  };
   
   // Run immediately on startup
   setTimeout(() => {
@@ -2403,11 +2421,7 @@ export function startBackgroundSyncScheduler(): void {
     });
   }, 10000); // Wait 10 seconds after startup
   
-  backgroundSyncInterval = setInterval(() => {
-    runBackgroundSync().catch(err => {
-      console.error("[QuickBooks Background] Scheduled sync error:", err);
-    });
-  }, SYNC_INTERVAL_MS);
+  backgroundSyncInterval = setInterval(runIfActive, SYNC_INTERVAL_MS);
   
   console.log("[QuickBooks Background] Scheduler started (runs every 3 minutes)");
 }

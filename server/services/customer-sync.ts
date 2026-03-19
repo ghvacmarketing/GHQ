@@ -1,6 +1,7 @@
 import { createHmac } from "crypto";
 import { storage } from "../storage";
 import { InsertCustomer } from "@shared/schema";
+import { isAppActive, onBecomeActive } from "../activity-tracker";
 
 interface SyncResult {
   created: number;
@@ -335,14 +336,25 @@ class CustomerSyncService {
     this.syncCustomersFromSheet().catch(err => {
       console.error('Initial customer sync failed:', err);
     });
-    
-    this.autoSyncInterval = setInterval(async () => {
-      try {
-        await this.syncCustomersFromSheet();
-      } catch (err) {
-        console.error('Scheduled customer sync failed:', err);
+
+    const runIfActive = () => {
+      if (!isAppActive()) {
+        console.log('[CustomerSync] App idle, skipping sync');
+        onBecomeActive(() => {
+          console.log('[CustomerSync] App became active, running immediate sync');
+          this.syncCustomersFromSheet().catch(err => {
+            console.error('Resume customer sync failed:', err);
+          });
+          onBecomeActive(runIfActive);
+        });
+        return;
       }
-    }, intervalMs);
+      this.syncCustomersFromSheet().catch(err => {
+        console.error('Scheduled customer sync failed:', err);
+      });
+    };
+    
+    this.autoSyncInterval = setInterval(runIfActive, intervalMs);
   }
 
   stopAutoSync(): void {

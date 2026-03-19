@@ -41,6 +41,7 @@ import { runFullFieldEdgeImport } from "./services/fieldEdgeImport";
 import { fieldEdgeCustomerService, type FieldEdgeCustomer } from "./services/fieldedge-customers";
 import { sendAutomatedSms, hasNotificationBeenSent, getWorkOrderEnRouteTemplate, getWorkOrderOnSiteTemplate, getInvoiceSmsTemplate } from "./services/smsNotificationService";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
+import { recordUserActivity } from "./activity-tracker";
 import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword, isSupervisor } from "./crm-auth";
 import cookieParser from "cookie-parser";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
@@ -361,6 +362,12 @@ async function hasServiceItems(quoteId: string): Promise<boolean> {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Trust proxy for Replit's infrastructure
   app.set('trust proxy', 1);
+
+  // Record user activity on every API request to drive the activity gate
+  app.use((req, _res, next) => {
+    if (req.path.startsWith('/api/')) recordUserActivity();
+    next();
+  });
 
   // Add compression middleware for better performance
   app.use(compression());

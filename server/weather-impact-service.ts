@@ -1,6 +1,7 @@
 import { storage } from "./storage";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
+import { isAppActive } from "./activity-tracker";
 
 export async function refreshCallDaily(): Promise<void> {
   try {
@@ -80,6 +81,10 @@ export function scheduleWeatherImpactJobs(): void {
   runJobs().catch(console.error);
 
   weatherImpactInterval = setInterval(() => {
+    if (!isAppActive()) {
+      console.log("[WeatherImpact] App idle, skipping jobs");
+      return;
+    }
     runJobs().catch(console.error);
   }, 6 * 60 * 60 * 1000);
 
