@@ -2385,7 +2385,6 @@ export async function runBackgroundSync(): Promise<{
 }
 
 let backgroundSyncInterval: NodeJS.Timeout | null = null;
-let qbWaitingForResume = false;
 
 /**
  * Start the background sync scheduler (runs every 3 minutes for more frequent syncing).
@@ -2398,34 +2397,30 @@ export function startBackgroundSyncScheduler(): void {
 
   const SYNC_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes for faster sync
 
-  const runIfActive = () => {
-    if (!isAppActive()) {
-      console.log("[QuickBooks Background] App idle, skipping sync");
-      if (!qbWaitingForResume) {
-        qbWaitingForResume = true;
-        onBecomeActive(() => {
-          qbWaitingForResume = false;
-          console.log("[QuickBooks Background] App became active, running immediate sync");
-          runBackgroundSync().catch(err => {
-            console.error("[QuickBooks Background] Resume sync error:", err);
-          });
-        });
-      }
-      return;
-    }
+  // Persistent listener: fires an immediate sync on every idle→active transition
+  onBecomeActive(() => {
+    console.log("[QuickBooks Background] App became active, running immediate sync");
     runBackgroundSync().catch(err => {
-      console.error("[QuickBooks Background] Scheduled sync error:", err);
+      console.error("[QuickBooks Background] Resume sync error:", err);
     });
-  };
-  
+  });
+
   // Run immediately on startup
   setTimeout(() => {
     runBackgroundSync().catch(err => {
       console.error("[QuickBooks Background] Initial sync error:", err);
     });
   }, 10000); // Wait 10 seconds after startup
-  
-  backgroundSyncInterval = setInterval(runIfActive, SYNC_INTERVAL_MS);
+
+  backgroundSyncInterval = setInterval(() => {
+    if (!isAppActive()) {
+      console.log("[QuickBooks Background] App idle, skipping sync");
+      return;
+    }
+    runBackgroundSync().catch(err => {
+      console.error("[QuickBooks Background] Scheduled sync error:", err);
+    });
+  }, SYNC_INTERVAL_MS);
   
   console.log("[QuickBooks Background] Scheduler started (runs every 3 minutes)");
 }

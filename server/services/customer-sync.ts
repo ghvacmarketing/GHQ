@@ -330,7 +330,6 @@ class CustomerSyncService {
     }
 
     const intervalMs = intervalMinutes * 60 * 1000;
-    let waitingForResume = false;
     
     console.log(`Starting customer auto-sync every ${intervalMinutes} minutes`);
     
@@ -338,27 +337,23 @@ class CustomerSyncService {
       console.error('Initial customer sync failed:', err);
     });
 
-    const runIfActive = () => {
+    // Persistent listener: fires an immediate sync on every idle→active transition
+    onBecomeActive(() => {
+      console.log('[CustomerSync] App became active, running immediate sync');
+      this.syncCustomersFromSheet().catch(err => {
+        console.error('Resume customer sync failed:', err);
+      });
+    });
+
+    this.autoSyncInterval = setInterval(() => {
       if (!isAppActive()) {
         console.log('[CustomerSync] App idle, skipping sync');
-        if (!waitingForResume) {
-          waitingForResume = true;
-          onBecomeActive(() => {
-            waitingForResume = false;
-            console.log('[CustomerSync] App became active, running immediate sync');
-            this.syncCustomersFromSheet().catch(err => {
-              console.error('Resume customer sync failed:', err);
-            });
-          });
-        }
         return;
       }
       this.syncCustomersFromSheet().catch(err => {
         console.error('Scheduled customer sync failed:', err);
       });
-    };
-    
-    this.autoSyncInterval = setInterval(runIfActive, intervalMs);
+    }, intervalMs);
   }
 
   stopAutoSync(): void {

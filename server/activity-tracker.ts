@@ -1,19 +1,18 @@
 const DEFAULT_IDLE_THRESHOLD_MS = 15 * 60 * 1000;
 
 let lastActivityAt: number = 0;
-let onBecomeActiveCallbacks: Array<() => void> = [];
+const activationListeners: Set<() => void> = new Set();
 
 export function recordUserActivity(): void {
   const wasIdle = !isAppActive();
   lastActivityAt = Date.now();
 
-  if (wasIdle && onBecomeActiveCallbacks.length > 0) {
-    const callbacks = onBecomeActiveCallbacks.splice(0);
-    for (const cb of callbacks) {
+  if (wasIdle) {
+    for (const listener of activationListeners) {
       try {
-        cb();
+        listener();
       } catch (err) {
-        console.error("[ActivityTracker] onBecomeActive callback error:", err);
+        console.error("[ActivityTracker] activation listener error:", err);
       }
     }
   }
@@ -24,6 +23,7 @@ export function isAppActive(thresholdMs: number = DEFAULT_IDLE_THRESHOLD_MS): bo
   return Date.now() - lastActivityAt < thresholdMs;
 }
 
-export function onBecomeActive(callback: () => void): void {
-  onBecomeActiveCallbacks.push(callback);
+export function onBecomeActive(callback: () => void): () => void {
+  activationListeners.add(callback);
+  return () => activationListeners.delete(callback);
 }
