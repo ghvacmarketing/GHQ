@@ -39,6 +39,7 @@ class CustomerSyncService {
   private sheetId: string;
   private baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
   private autoSyncInterval: NodeJS.Timeout | null = null;
+  private unsubscribeResumeListener: (() => void) | null = null;
   private statusLoaded: boolean = false;
   
   private syncStatus: SyncStatus = {
@@ -338,7 +339,7 @@ class CustomerSyncService {
     });
 
     // Persistent listener: fires an immediate sync on every idle→active transition
-    onBecomeActive(() => {
+    this.unsubscribeResumeListener = onBecomeActive(() => {
       console.log('[CustomerSync] App became active, running immediate sync');
       this.syncCustomersFromSheet().catch(err => {
         console.error('Resume customer sync failed:', err);
@@ -361,6 +362,10 @@ class CustomerSyncService {
       clearInterval(this.autoSyncInterval);
       this.autoSyncInterval = null;
       console.log('Customer auto-sync stopped');
+    }
+    if (this.unsubscribeResumeListener) {
+      this.unsubscribeResumeListener();
+      this.unsubscribeResumeListener = null;
     }
   }
 }
