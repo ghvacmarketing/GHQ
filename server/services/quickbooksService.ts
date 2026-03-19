@@ -2385,6 +2385,7 @@ export async function runBackgroundSync(): Promise<{
 }
 
 let backgroundSyncInterval: NodeJS.Timeout | null = null;
+let qbWaitingForResume = false;
 
 /**
  * Start the background sync scheduler (runs every 3 minutes for more frequent syncing).
@@ -2400,13 +2401,16 @@ export function startBackgroundSyncScheduler(): void {
   const runIfActive = () => {
     if (!isAppActive()) {
       console.log("[QuickBooks Background] App idle, skipping sync");
-      onBecomeActive(() => {
-        console.log("[QuickBooks Background] App became active, running immediate sync");
-        runBackgroundSync().catch(err => {
-          console.error("[QuickBooks Background] Resume sync error:", err);
+      if (!qbWaitingForResume) {
+        qbWaitingForResume = true;
+        onBecomeActive(() => {
+          qbWaitingForResume = false;
+          console.log("[QuickBooks Background] App became active, running immediate sync");
+          runBackgroundSync().catch(err => {
+            console.error("[QuickBooks Background] Resume sync error:", err);
+          });
         });
-        onBecomeActive(runIfActive);
-      });
+      }
       return;
     }
     runBackgroundSync().catch(err => {

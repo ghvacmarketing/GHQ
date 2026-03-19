@@ -1,16 +1,14 @@
 const DEFAULT_IDLE_THRESHOLD_MS = 15 * 60 * 1000;
 
 let lastActivityAt: number = 0;
-let wasActive: boolean = false;
 let onBecomeActiveCallbacks: Array<() => void> = [];
 
 export function recordUserActivity(): void {
-  const nowWasActive = isAppActive();
+  const wasIdle = !isAppActive();
   lastActivityAt = Date.now();
 
-  if (!nowWasActive) {
-    const callbacks = onBecomeActiveCallbacks.slice();
-    onBecomeActiveCallbacks = [];
+  if (wasIdle && onBecomeActiveCallbacks.length > 0) {
+    const callbacks = onBecomeActiveCallbacks.splice(0);
     for (const cb of callbacks) {
       try {
         cb();
@@ -27,9 +25,5 @@ export function isAppActive(thresholdMs: number = DEFAULT_IDLE_THRESHOLD_MS): bo
 }
 
 export function onBecomeActive(callback: () => void): void {
-  if (isAppActive()) {
-    callback();
-    return;
-  }
   onBecomeActiveCallbacks.push(callback);
 }
