@@ -4,7 +4,6 @@ import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
 import TextStyle from "@tiptap/extension-text-style";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import {
   Bold,
   Italic,
@@ -16,7 +15,6 @@ import {
   AlignRight,
   Heading1,
   Heading2,
-  FileText,
 } from "lucide-react";
 import { useEffect } from "react";
 
