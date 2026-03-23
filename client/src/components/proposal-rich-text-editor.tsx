@@ -2,7 +2,6 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
-import TextStyle from "@tiptap/extension-text-style";
 import { Button } from "@/components/ui/button";
 import {
   Bold,
@@ -28,7 +27,6 @@ export default function ProposalRichTextEditor({ value, onChange }: ProposalRich
     extensions: [
       StarterKit,
       Underline,
-      TextStyle,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
     ],
     content: value || "",
