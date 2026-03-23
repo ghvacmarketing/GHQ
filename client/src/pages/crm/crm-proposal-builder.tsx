@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Download, Save, X, MapPin, Cog, Shield, Plus, FileEdit, Pencil } from "lucide-react";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, Table, TableRow, TableCell, WidthType } from "docx";
@@ -798,6 +798,7 @@ export default function CrmProposalBuilder() {
   usePageTitle("Proposal Builder");
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const routeParams = useParams<{ customerId?: string }>();
   
   const { data: currentUser, isLoading: isLoadingUser } = useQuery<CrmUser>({
     queryKey: ["/api/crm/auth/me"],
@@ -912,13 +913,12 @@ export default function CrmProposalBuilder() {
   
   // Parse URL parameters on mount and pre-fill customer if provided
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    // Support both path-segment form (/crm/quotes/proposal/:id) and query-string (?customerId=)
-    const pathMatch = window.location.pathname.match(/\/crm\/quotes\/proposal\/([^/?]+)/);
-    const customerId = pathMatch ? pathMatch[1] : params.get("customerId");
-    const projectId = params.get("projectId");
-    const workOrderId = params.get("workOrderId");
-    const propertyId = params.get("propertyId");
+    const queryParams = new URLSearchParams(window.location.search);
+    // Prefer wouter route param (:customerId), fall back to query string (?customerId=)
+    const customerId = routeParams.customerId || queryParams.get("customerId");
+    const projectId = queryParams.get("projectId");
+    const workOrderId = queryParams.get("workOrderId");
+    const propertyId = queryParams.get("propertyId");
     
     if (projectId) setPreloadedProjectId(projectId);
     if (workOrderId) setPreloadedWorkOrderId(workOrderId);
@@ -939,7 +939,7 @@ export default function CrmProposalBuilder() {
         })
         .catch(console.error);
     }
-  }, []);
+  }, [routeParams.customerId]);
 
   // Sync cart image URLs with fresh package data when packages are loaded
   useEffect(() => {
@@ -2377,8 +2377,7 @@ export default function CrmProposalBuilder() {
           spacing: { after: 120 },
         }));
         const notesText = htmlToPlainText(proposalNotes);
-        notesText.split('
-').forEach(line => {
+        notesText.split('\n').forEach(line => {
           paragraphs.push(new Paragraph({
             children: [new TextRun({ text: line })],
             spacing: { after: 40 },
@@ -3105,15 +3104,15 @@ export default function CrmProposalBuilder() {
             </div>
           </div>
           
-          {/* Customer Selection Section - REQUIRED FIRST STEP */}
-          <Card className={`border-2 ${selectedCustomer ? 'bg-green-50 dark:bg-green-950 border-green-300 dark:border-green-700' : 'bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-700'}`}>
+          {/* Customer Selection Section */}
+          <Card className={`border-2 ${selectedCustomer ? 'bg-green-50 dark:bg-green-950 border-green-300 dark:border-green-700' : 'border-muted'}`}>
             <CardContent className="py-4 px-5">
               {selectedCustomer ? (
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-full text-sm font-medium">
                       <CheckCircle2 className="h-4 w-4" />
-                      Step 1 Complete
+                      Customer
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-lg">{selectedCustomer.name}</span>
@@ -3162,16 +3161,8 @@ export default function CrmProposalBuilder() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 bg-amber-600 text-white px-3 py-1.5 rounded-full text-sm font-medium">
-                      <span className="font-bold">1</span>
-                      Step 1: Select Customer
-                    </div>
-                    <span className="text-amber-800 dark:text-amber-200 text-sm font-medium">
-                      Search and select a customer to continue
-                    </span>
-                  </div>
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">Search and attach a customer to this proposal (optional)</p>
                   <div className="max-w-lg">
                     <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
                       <PopoverTrigger asChild>
@@ -5179,6 +5170,15 @@ export default function CrmProposalBuilder() {
                   <FileText className="h-4 w-4 mr-2" />
                 )}
                 Save to CRM
+              </Button>
+              <Button
+                onClick={downloadQuoteAsDoc}
+                variant="outline"
+                className="flex-1 min-h-[44px]"
+                data-testid="button-download-doc"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Download Doc
               </Button>
               <Button
                 onClick={downloadQuoteAsPDF}
