@@ -1991,6 +1991,31 @@ export default function CrmQuoteDetail() {
 
         y += boxHeight + 8;
 
+        // Description/notes section (for proposal and custom_install quotes)
+        if (quote.description) {
+          const plainDescription = quote.description.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+          if (plainDescription) {
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(...textColor);
+            doc.text("Description", margin, y);
+            y += 5;
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(...mutedColor);
+            const descLines = doc.splitTextToSize(plainDescription, pageWidth - margin * 2);
+            descLines.forEach((line: string) => {
+              if (y > pageHeight - 30) {
+                doc.addPage();
+                y = margin;
+              }
+              doc.text(line, margin, y);
+              y += 4;
+            });
+            y += 6;
+          }
+        }
+
         addTableHeader();
 
         // Filter out labor/internal line items from PDF export (client-facing)
@@ -2938,8 +2963,8 @@ export default function CrmQuoteDetail() {
           </DialogContent>
         </Dialog>
 
-        {/* Editable Description for custom install quotes */}
-        {quote.quoteType === "custom_install" && (
+        {/* Editable Description for custom install quotes and proposal quotes */}
+        {(quote.quoteType === "custom_install" || quote.quoteType === "proposal") && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-base">Description</CardTitle>

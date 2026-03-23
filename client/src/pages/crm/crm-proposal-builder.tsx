@@ -1263,7 +1263,9 @@ export default function CrmProposalBuilder() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       setQuoteDialogOpen(false);
       if (data.quote?.id) {
-        setLocation(`/crm/quotes/${data.quote.id}`);
+        setTimeout(() => {
+          setLocation(`/crm/quotes/${data.quote.id}`);
+        }, 100);
       }
     },
     onError: (error) => {
