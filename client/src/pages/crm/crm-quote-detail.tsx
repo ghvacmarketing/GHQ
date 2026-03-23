@@ -1608,8 +1608,6 @@ export default function CrmQuoteDetail() {
         if (y + neededSpace > pageHeight - 45) {
           doc.addPage();
           y = margin;
-          addPageHeader();
-          y += 35;
         }
       };
 
