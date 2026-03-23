@@ -24,6 +24,7 @@ interface ProposalRichTextEditorProps {
 
 export default function ProposalRichTextEditor({ value, onChange }: ProposalRichTextEditorProps) {
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit,
       Underline,

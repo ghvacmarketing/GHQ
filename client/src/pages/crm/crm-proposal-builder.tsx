@@ -659,7 +659,7 @@ function EquipmentImageGrid({
       {imageItems.map(item => (
         <div key={item.key} className="flex flex-col items-center">
           <img 
-            src={`/assets/${item.url}`}
+            src={getAssetUrl(item.url)}
             alt={item.label}
             className={`${imgSize} object-contain rounded bg-gray-50 dark:bg-gray-800`}
             loading="lazy"
@@ -1407,7 +1407,7 @@ export default function CrmProposalBuilder() {
       projectId: preloadedProjectId || undefined,
       workOrderId: preloadedWorkOrderId || undefined,
       title: crmTitle,
-      description: undefined,
+      description: (proposalNotes && proposalNotes !== '<p></p>') ? proposalNotes : undefined,
       notes: customerNotes || undefined,
       lineItems,
       status: "draft",
