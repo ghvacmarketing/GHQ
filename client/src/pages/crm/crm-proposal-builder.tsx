@@ -874,6 +874,7 @@ export default function CrmProposalBuilder() {
   const [customerAddress, setCustomerAddress] = useState(() => loadCustomerFromStorage().address);
   const [customerNotes, setCustomerNotes] = useState(() => loadCustomerFromStorage().notes);
   const [proposalNotes, setProposalNotes] = useState<string>("");
+  const [isNavigatingAway, setIsNavigatingAway] = useState(false);
   
   // Quote mode: "single" = one combined quote, "options" = each package is a separate option
   const [quoteMode, setQuoteMode] = useState<"single" | "options">("options");
@@ -1263,9 +1264,12 @@ export default function CrmProposalBuilder() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       setQuoteDialogOpen(false);
       if (data.quote?.id) {
+        // Unmount TipTap editor first so ProseMirror can clean up DOM references
+        // before React tears down the page, preventing getComputedStyle crash
+        setIsNavigatingAway(true);
         setTimeout(() => {
           setLocation(`/crm/quotes/${data.quote.id}`);
-        }, 100);
+        }, 150);
       }
     },
     onError: (error) => {
@@ -5039,7 +5043,9 @@ export default function CrmProposalBuilder() {
               {/* Proposal Notes */}
               <div className="my-6">
                 <h3 className="text-sm font-semibold mb-3 text-foreground">Proposal Notes</h3>
-                <ProposalRichTextEditor value={proposalNotes} onChange={setProposalNotes} />
+                {!isNavigatingAway && (
+                  <ProposalRichTextEditor value={proposalNotes} onChange={setProposalNotes} />
+                )}
               </div>
 
             <Separator className="my-6" />

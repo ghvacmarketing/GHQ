@@ -59,3 +59,7 @@ FIELDEDGE_CUSTOMER_SHEET_ID = "1lgIiOZ7JiOkzBdY_qXCK0f1LrFi6Bk3TVwy0078O9Ds"
 [userenv.development]
 
 [userenv.production]
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 90000

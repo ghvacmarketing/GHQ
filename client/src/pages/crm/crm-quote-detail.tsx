@@ -1993,25 +1993,101 @@ export default function CrmQuoteDetail() {
 
         // Description/notes section (for proposal and custom_install quotes)
         if (quote.description) {
-          const plainDescription = quote.description.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
-          if (plainDescription) {
-            doc.setFontSize(10);
+          // Parse HTML into structured blocks preserving headings, bullets, paragraphs
+          type PdfBlock = { type: 'h1' | 'h2' | 'h3' | 'p' | 'li'; text: string };
+          const parseHtmlBlocks = (html: string): PdfBlock[] => {
+            const blocks: PdfBlock[] = [];
+            const decode = (s: string) => s.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim();
+            const stripTags = (s: string) => s.replace(/<[^>]*>/g, '');
+            // Use sentinel approach: mark positions then split
+            let marked = html
+              .replace(/<br\s*\/?>/gi, '\n')
+              .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, (_, c) => `\x01H1\x02${decode(stripTags(c))}\x03`)
+              .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, (_, c) => `\x01H2\x02${decode(stripTags(c))}\x03`)
+              .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, (_, c) => `\x01H3\x02${decode(stripTags(c))}\x03`)
+              .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (_, c) => `\x01LI\x02${decode(stripTags(c))}\x03`)
+              .replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, (_, c) => {
+                const text = decode(stripTags(c));
+                return text ? `\x01PP\x02${text}\x03` : '';
+              })
+              .replace(/<[^>]*>/g, '')
+              .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+            const parts = marked.split('\x01').filter(p => p.trim());
+            for (const part of parts) {
+              const typeEnd = part.indexOf('\x02');
+              const textEnd = part.indexOf('\x03');
+              if (typeEnd === -1) {
+                const t = part.replace(/\x03/g, '').trim();
+                if (t) blocks.push({ type: 'p', text: t });
+                continue;
+              }
+              const type = part.slice(0, typeEnd);
+              const text = part.slice(typeEnd + 1, textEnd !== -1 ? textEnd : undefined).trim();
+              if (!text) continue;
+              if (type === 'H1') blocks.push({ type: 'h1', text });
+              else if (type === 'H2') blocks.push({ type: 'h2', text });
+              else if (type === 'H3') blocks.push({ type: 'h3', text });
+              else if (type === 'LI') blocks.push({ type: 'li', text });
+              else if (type === 'PP') blocks.push({ type: 'p', text });
+            }
+            return blocks;
+          };
+
+          const blocks = parseHtmlBlocks(quote.description);
+          if (blocks.length > 0) {
+            // Section heading "Description"
+            doc.setFontSize(11);
             doc.setFont("helvetica", "bold");
             doc.setTextColor(...textColor);
             doc.text("Description", margin, y);
-            y += 5;
-            doc.setFontSize(9);
-            doc.setFont("helvetica", "normal");
-            doc.setTextColor(...mutedColor);
-            const descLines = doc.splitTextToSize(plainDescription, pageWidth - margin * 2);
-            descLines.forEach((line: string) => {
-              if (y > pageHeight - 30) {
-                doc.addPage();
-                y = margin;
+            y += 6;
+
+            for (const block of blocks) {
+              const isHeading = block.type === 'h1' || block.type === 'h2' || block.type === 'h3';
+              const isBullet = block.type === 'li';
+
+              if (isHeading) {
+                checkPageBreak(8);
+                if (y > margin + 10) y += 2; // small gap before headings
+                doc.setFontSize(9);
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(...textColor);
+                const headingLines = doc.splitTextToSize(block.text, contentWidth);
+                headingLines.forEach((line: string) => {
+                  checkPageBreak(5);
+                  doc.text(line, margin, y);
+                  y += 4.5;
+                });
+                y += 1;
+              } else if (isBullet) {
+                checkPageBreak(5);
+                doc.setFontSize(9);
+                doc.setFont("helvetica", "normal");
+                doc.setTextColor(...mutedColor);
+                const bulletText = `• ${block.text}`;
+                const bulletLines = doc.splitTextToSize(bulletText, contentWidth - 4);
+                bulletLines.forEach((line: string, idx: number) => {
+                  checkPageBreak(5);
+                  doc.text(idx === 0 ? line : `  ${line}`, margin + 2, y);
+                  y += 4;
+                });
+              } else {
+                // paragraph
+                const paraLines = doc.splitTextToSize(block.text, contentWidth);
+                if (paraLines.length > 0) {
+                  checkPageBreak(5);
+                  doc.setFontSize(9);
+                  doc.setFont("helvetica", "normal");
+                  doc.setTextColor(...mutedColor);
+                  paraLines.forEach((line: string) => {
+                    checkPageBreak(5);
+                    doc.text(line, margin, y);
+                    y += 4;
+                  });
+                  y += 1;
+                }
               }
-              doc.text(line, margin, y);
-              y += 4;
-            });
+            }
             y += 6;
           }
         }
