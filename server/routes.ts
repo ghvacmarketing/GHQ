@@ -29,7 +29,6 @@ import { randomUUID, createHmac } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import { syncCustomersFromSheet, getCustomerSyncStatus, resetSyncHash, startAutoSync } from "./services/customer-sync";
-import { generateQuoteWithAI, createQuoteConversation, getConversationHistory, type QuoteGenerationInput } from "./services/quote-generation";
 import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorStore, getOrCreateVectorStore, seedVectorStoreWithSalesBook, uploadCRMKnowledgeBase } from "./services/vector-store";
 import { refreshWeather, scheduleWeatherRefresh, getWeatherData } from "./weather-service";
 import { startBouncieBackgroundSync } from "./services/bouncieService";
@@ -1437,75 +1436,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error creating quote:', error);
       res.status(400).json({ message: "Invalid quote data" });
-    }
-  });
-
-  // Generate quote with AI (OpenAI) - with conversation memory support
-  app.post("/api/quotes/generate", async (req, res) => {
-    try {
-      const input: QuoteGenerationInput = req.body;
-      
-      if (!input.cartItems || input.cartItems.length === 0) {
-        return res.status(400).json({ message: "Cart items are required" });
-      }
-      
-      const generatedQuote = await generateQuoteWithAI(input);
-      res.json(generatedQuote);
-    } catch (error) {
-      console.error('Error generating quote with AI:', error);
-      res.status(500).json({ 
-        message: "Failed to generate quote", 
-        error: error instanceof Error ? error.message : "Unknown error" 
-      });
-    }
-  });
-
-  // Create a new quote conversation (AI memory)
-  app.post("/api/quotes/conversations", async (req, res) => {
-    try {
-      const { customerName, customerId, cartSnapshot } = req.body;
-      
-      if (!customerName) {
-        return res.status(400).json({ message: "Customer name is required" });
-      }
-      
-      const conversationId = await createQuoteConversation(
-        customerName, 
-        customerId, 
-        cartSnapshot
-      );
-      
-      res.json({ conversationId });
-    } catch (error) {
-      console.error('Error creating quote conversation:', error);
-      res.status(500).json({ 
-        message: "Failed to create conversation", 
-        error: error instanceof Error ? error.message : "Unknown error" 
-      });
-    }
-  });
-
-  // Get conversation history
-  app.get("/api/quotes/conversations/:id", async (req, res) => {
-    try {
-      const conversation = await storage.getQuoteConversation(req.params.id);
-      
-      if (!conversation) {
-        return res.status(404).json({ message: "Conversation not found" });
-      }
-      
-      const messages = await getConversationHistory(req.params.id);
-      
-      res.json({ 
-        conversation,
-        messages 
-      });
-    } catch (error) {
-      console.error('Error fetching conversation:', error);
-      res.status(500).json({ 
-        message: "Failed to fetch conversation", 
-        error: error instanceof Error ? error.message : "Unknown error" 
-      });
     }
   });
 
