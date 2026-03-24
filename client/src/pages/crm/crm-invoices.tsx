@@ -283,6 +283,16 @@ export default function CrmInvoices() {
         const invoiceNumber = inv.invoiceNumber?.toLowerCase() || "";
         return customerName.includes(searchLower) || invoiceNumber.includes(searchLower);
       });
+      // Exact/starts-with matches first
+      filtered = [...filtered].sort((a, b) => {
+        const aCust = (a.customerName || "").toLowerCase();
+        const bCust = (b.customerName || "").toLowerCase();
+        const aNum = (a.invoiceNumber || "").toLowerCase();
+        const bNum = (b.invoiceNumber || "").toLowerCase();
+        const aScore = aCust === searchLower ? 0 : aNum === searchLower ? 1 : aCust.startsWith(searchLower) ? 2 : aNum.startsWith(searchLower) ? 3 : 4;
+        const bScore = bCust === searchLower ? 0 : bNum === searchLower ? 1 : bCust.startsWith(searchLower) ? 2 : bNum.startsWith(searchLower) ? 3 : 4;
+        return aScore - bScore;
+      });
     }
 
     return filtered;

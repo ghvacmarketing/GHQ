@@ -708,6 +708,16 @@ export default function CrmWorkOrders() {
         const woNumber = wo.workOrderNumber?.toLowerCase().includes(searchLower);
         return titleMatch || descMatch || customerMatch || woNumber;
       });
+      // Exact/starts-with matches first
+      orders = [...orders].sort((a, b) => {
+        const aTitle = (a.title || "").toLowerCase();
+        const bTitle = (b.title || "").toLowerCase();
+        const aCust = (a.customer?.name || "").toLowerCase();
+        const bCust = (b.customer?.name || "").toLowerCase();
+        const aScore = aTitle === searchLower ? 0 : aCust === searchLower ? 1 : aTitle.startsWith(searchLower) ? 2 : aCust.startsWith(searchLower) ? 3 : 4;
+        const bScore = bTitle === searchLower ? 0 : bCust === searchLower ? 1 : bTitle.startsWith(searchLower) ? 2 : bCust.startsWith(searchLower) ? 3 : 4;
+        return aScore - bScore;
+      });
     }
     
     // Apply category filter
@@ -1856,7 +1866,15 @@ export default function CrmWorkOrders() {
                           <CommandEmpty>No customers found.</CommandEmpty>
                         ) : (
                           <CommandGroup>
-                            {customers.map((customer) => (
+                            {[...customers].sort((a, b) => {
+                              const t = debouncedCustomerSearch.trim().toLowerCase();
+                              if (!t) return 0;
+                              const aName = (a.name || "").toLowerCase();
+                              const bName = (b.name || "").toLowerCase();
+                              if ((aName === t) !== (bName === t)) return (aName === t) ? -1 : 1;
+                              if (aName.startsWith(t) !== bName.startsWith(t)) return aName.startsWith(t) ? -1 : 1;
+                              return 0;
+                            }).map((customer) => (
                               <CommandItem
                                 key={customer.id}
                                 value={customer.id}

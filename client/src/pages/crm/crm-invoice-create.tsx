@@ -1469,7 +1469,14 @@ export default function CrmInvoiceCreate() {
                       </div>
                     ) : (
                       <div className="divide-y">
-                        {customerSearchResults?.customers?.map((customer) => (
+                        {[...(customerSearchResults?.customers || [])].sort((a, b) => {
+                          const t = newWOCustomerSearch.trim().toLowerCase();
+                          const aName = (a.name || "").toLowerCase();
+                          const bName = (b.name || "").toLowerCase();
+                          if ((aName === t) !== (bName === t)) return (aName === t) ? -1 : 1;
+                          if (aName.startsWith(t) !== bName.startsWith(t)) return aName.startsWith(t) ? -1 : 1;
+                          return 0;
+                        }).map((customer) => (
                           <button
                             key={customer.id}
                             onClick={() => {

@@ -687,7 +687,14 @@ export default function CrmQuoteCreate() {
                           </div>
                         ) : customerSearchResults && customerSearchResults.length > 0 ? (
                           <div className="divide-y">
-                            {customerSearchResults.map((customer) => (
+                            {[...customerSearchResults].sort((a, b) => {
+                              const t = customerSearch.trim().toLowerCase();
+                              const aName = (a.name || "").toLowerCase();
+                              const bName = (b.name || "").toLowerCase();
+                              if ((aName === t) !== (bName === t)) return (aName === t) ? -1 : 1;
+                              if (aName.startsWith(t) !== bName.startsWith(t)) return aName.startsWith(t) ? -1 : 1;
+                              return 0;
+                            }).map((customer) => (
                               <button
                                 key={customer.id}
                                 type="button"

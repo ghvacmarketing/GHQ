@@ -3220,7 +3220,14 @@ export default function CrmProposalBuilder() {
                               No customers found for "{debouncedCustomerSearch}"
                             </div>
                           )}
-                          {customerSearchResults.map((customer) => (
+                          {[...customerSearchResults].sort((a, b) => {
+                            const t = debouncedCustomerSearch.trim().toLowerCase();
+                            const aName = (a.name || "").toLowerCase();
+                            const bName = (b.name || "").toLowerCase();
+                            if ((aName === t) !== (bName === t)) return (aName === t) ? -1 : 1;
+                            if (aName.startsWith(t) !== bName.startsWith(t)) return aName.startsWith(t) ? -1 : 1;
+                            return 0;
+                          }).map((customer) => (
                             <div
                               key={customer.id}
                               className="p-3 hover:bg-muted cursor-pointer border-b last:border-0"
