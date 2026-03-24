@@ -10844,15 +10844,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Query customer comments (posted via the timeline comment box)
       const comments = await db
-        .select({ comment: crmComments, user: crmUsers })
+        .select({
+          id: crmComments.id,
+          body: crmComments.body,
+          createdAt: crmComments.createdAt,
+          authorName: crmUsers.name,
+        })
         .from(crmComments)
         .leftJoin(crmUsers, eq(crmComments.authorId, crmUsers.id))
         .where(and(eq(crmComments.entityType, 'customer'), eq(crmComments.entityId, customerId)));
-      for (const { comment, user } of comments) {
+      for (const comment of comments) {
         timeline.push({
           id: `comment-${comment.id}`,
           type: 'note',
-          title: user?.displayName || 'Note',
+          title: comment.authorName || 'Note',
           description: (comment.body || '').replace(/@\[[^\]]+\]/g, '').trim().substring(0, 100),
           timestamp: toISOTimestamp(comment.createdAt),
         });

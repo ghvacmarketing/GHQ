@@ -248,7 +248,8 @@ export function CommentComposer({
 
   return (
     <div className="relative">
-      <div className="flex items-end gap-2">
+      {/* Single-row pill: input + send button in one bordered container */}
+      <div className="flex items-center rounded-lg border border-input bg-background focus-within:ring-1 focus-within:ring-ring overflow-hidden">
         <div className="relative flex-1">
           <textarea
             ref={textareaRef}
@@ -257,8 +258,8 @@ export function CommentComposer({
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             rows={1}
-            className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm leading-relaxed placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring overflow-hidden"
-            style={{ minHeight: "36px", maxHeight: "120px" }}
+            className="w-full resize-none bg-transparent px-3 py-2 text-sm leading-relaxed placeholder:text-muted-foreground focus:outline-none overflow-hidden"
+            style={{ minHeight: "38px", maxHeight: "120px" }}
           />
 
           {showMentionPicker && (
@@ -303,19 +304,21 @@ export function CommentComposer({
           )}
         </div>
 
-        <Button
+        {/* Send button — sits flush at the right edge of the pill, vertically centred */}
+        <button
+          type="button"
           onClick={handlePost}
           disabled={isButtonDisabled}
-          size="sm"
-          className="h-9 px-3 bg-[#711419] hover:bg-[#5a1014] text-white flex-shrink-0"
+          className="self-center mr-2 flex-shrink-0 rounded-md p-1.5 text-[#711419] hover:bg-[#711419]/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           {postCommentMutation.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Send className="h-4 w-4" />
           )}
-        </Button>
+        </button>
       </div>
+
       {insertedMentions.size > 0 && (
         <p className="mt-1 text-xs text-muted-foreground">
           Mentioning: {Array.from(insertedMentions.values()).join(", ")}
