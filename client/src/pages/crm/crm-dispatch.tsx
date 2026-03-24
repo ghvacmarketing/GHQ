@@ -3775,9 +3775,9 @@ export default function CrmDispatch() {
 
   return (
     <CrmLayout currentUser={currentUser} disableScroll>
-      <div className="relative h-full max-w-full overflow-hidden">
-        {/* Main Content - always full width; sidebar overlays on top */}
-        <div className="flex flex-col overflow-y-auto overflow-x-hidden scrollbar-hide h-full w-full">
+      <div className="flex flex-row h-full w-full overflow-hidden">
+        {/* Main Content - flex-1 so it genuinely shrinks when sidebar opens */}
+        <div className="flex-1 min-w-0 flex flex-col overflow-y-auto h-full">
         {/* Fixed Header Section */}
         <div className="flex-shrink-0 space-y-3 pb-3">
           <div className="flex justify-center">
@@ -4152,7 +4152,7 @@ export default function CrmDispatch() {
 
         {/* Side Panel - Push Layout */}
         {selectedWorkOrder && (
-          <div className="absolute right-0 top-0 h-full w-[400px] border-l border-slate-200 bg-white flex flex-col overflow-hidden shadow-lg z-20" data-testid="workorder-detail-panel">
+          <div className="w-[400px] flex-shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-hidden shadow-lg" data-testid="workorder-detail-panel">
             {/* Panel Header — color reflects work order status */}
             <div className={`flex items-center justify-between px-4 py-3 flex-shrink-0 ${statusHeaderColors[selectedWorkOrder.status] || "bg-slate-600 text-white"}`}>
               <div>
