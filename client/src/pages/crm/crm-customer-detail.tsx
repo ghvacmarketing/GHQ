@@ -3016,6 +3016,7 @@ export default function CrmCustomerDetail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", { customerId }] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Quote deleted", description: "The quote has been permanently deleted." });
       setSelectedQuoteId(null);

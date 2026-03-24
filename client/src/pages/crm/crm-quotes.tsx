@@ -302,12 +302,15 @@ export default function CrmQuotes() {
   });
 
   const deleteQuoteMutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id }: { id: string; customerId?: string | null }) => {
       await apiRequest("DELETE", `/api/crm/quotes/${id}`);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
+      if (variables.customerId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", { customerId: variables.customerId }] });
+      }
       setSelectedQuote(null);
       toast({ title: "Quote deleted successfully" });
     },
@@ -844,7 +847,7 @@ export default function CrmQuotes() {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => deleteQuoteMutation.mutate(selectedQuote.id)}
+                    onClick={() => deleteQuoteMutation.mutate({ id: selectedQuote.id, customerId: selectedQuote.customerId })}
                     disabled={deleteQuoteMutation.isPending}
                     className="text-red-600 hover:text-red-700"
                     data-testid="button-delete-quote"
