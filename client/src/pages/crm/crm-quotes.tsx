@@ -607,7 +607,7 @@ export default function CrmQuotes() {
 
         {/* Tab Filters with Quote Type dropdown on right */}
         <div className="flex items-center justify-between border-b border-slate-200">
-          <div className="flex overflow-x-auto">
+          <div className="flex overflow-x-auto overflow-y-hidden">
             {tabFilters.map((tab) => {
               const count = tab.key !== "all" ? statusCounts[tab.key as keyof typeof statusCounts] : null;
               
