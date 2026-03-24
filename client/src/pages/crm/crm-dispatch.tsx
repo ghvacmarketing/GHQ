@@ -228,7 +228,7 @@ function getInitials(name: string): string {
 }
 
 const START_HOUR = 6;
-const END_HOUR = 18;
+const END_HOUR = 22;
 const STEP_MINUTES = 30;
 const TOTAL_SLOTS = ((END_HOUR - START_HOUR) * 60) / STEP_MINUTES;
 
