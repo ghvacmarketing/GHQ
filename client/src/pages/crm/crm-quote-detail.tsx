@@ -96,7 +96,7 @@ import type { CrmUser, CrmQuote, CrmQuoteLineItem, QuoteEmailLog, CrmItem } from
 import { PaymentLinkButton } from "@/components/stripe-payment-link-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import RichTextEditor, { RichTextDisplay } from "@/components/rich-text-editor";
-import ghvacLogo from "@assets/image_1774362094907.png";
+import ghvacLogo from "@assets/ghvac-logo.png";
 import {
   BRAND_COLOR,
   COMPANY_INFO,
@@ -1568,26 +1568,43 @@ export default function CrmQuoteDetail() {
   const handleDownloadPDF = async () => {
     if (!quote) return;
 
-    // Pre-load the logo as a data URL and capture natural dimensions
+    // Load logo, recolor every opaque pixel to white (so it sits directly on the
+    // dark-red bar without any background box), and capture the aspect ratio.
     let logoDataUrl: string | null = null;
     let logoAspect = 4; // fallback width:height ratio
     try {
-      const resp = await fetch(ghvacLogo);
-      const blob = await resp.blob();
-      logoDataUrl = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(blob);
+      const whiteLogoDataUrl = await new Promise<string>((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext("2d")!;
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const d = imageData.data;
+          for (let i = 0; i < d.length; i += 4) {
+            if (d[i + 3] > 10) { // non-transparent pixel → make it white
+              d[i] = 255; d[i + 1] = 255; d[i + 2] = 255;
+            }
+          }
+          ctx.putImageData(imageData, 0, 0);
+          resolve(canvas.toDataURL("image/png"));
+        };
+        img.onerror = reject;
+        img.src = ghvacLogo;
       });
+      logoDataUrl = whiteLogoDataUrl;
       // Measure natural dimensions so we don't squish the image
       logoAspect = await new Promise<number>((resolve) => {
         const img = new Image();
         img.onload = () => resolve(img.naturalWidth / img.naturalHeight);
         img.onerror = () => resolve(4);
-        img.src = logoDataUrl!;
+        img.src = ghvacLogo;
       });
     } catch {
-      // Fall back to text if image can't be loaded
+      // Fall back to plain text if canvas recoloring fails
     }
 
     try {
