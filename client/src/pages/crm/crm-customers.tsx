@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { useLocation, Link } from "wouter";
+import { useLocation, useSearch, Link } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn, queryClient as globalQueryClient } from "@/lib/queryClient";
 
@@ -76,8 +76,15 @@ function useDebounce<T>(value: T, delay: number): T {
 export default function CrmCustomers() {
   usePageTitle("Customers");
   const [, navigate] = useLocation();
+  const searchString = useSearch();
   const queryClient = useQueryClient();
-  const [searchInput, setSearchInput] = useState("");
+
+  const initialSearch = useMemo(() => {
+    const p = new URLSearchParams(searchString);
+    return p.get("search") || "";
+  }, []);
+
+  const [searchInput, setSearchInput] = useState(initialSearch);
   const [customerType, setCustomerType] = useState("all");
   const [statusTab, setStatusTab] = useState("all");
   const [hasAgreement, setHasAgreement] = useState(false);
@@ -223,7 +230,23 @@ export default function CrmCustomers() {
 
   // Organize customers with sub-accounts grouped under parents
   const organizedCustomers = useMemo(() => {
-    const customers = customersData?.customers || [];
+    let customers = customersData?.customers || [];
+
+    // Sort exact/starts-with name matches to top when searching
+    if (debouncedSearch.trim()) {
+      const term = debouncedSearch.trim().toLowerCase();
+      customers = [...customers].sort((a, b) => {
+        const aName = (a.name || "").toLowerCase();
+        const bName = (b.name || "").toLowerCase();
+        const aExact = aName === term;
+        const bExact = bName === term;
+        const aStarts = aName.startsWith(term);
+        const bStarts = bName.startsWith(term);
+        if (aExact !== bExact) return aExact ? -1 : 1;
+        if (aStarts !== bStarts) return aStarts ? -1 : 1;
+        return 0;
+      });
+    }
     
     // Separate main accounts (no parent) and sub-accounts (have parent)
     const mainAccounts = customers.filter(c => !c.parentCustomerId);
@@ -544,7 +567,8 @@ export default function CrmCustomers() {
                           onMouseEnter={() => prefetchCustomer(customer.id)}
                           onTouchStart={() => prefetchCustomer(customer.id)}
                           onClick={() => {
-                            navigate(`/crm/customers/${customer.id}`);
+                            const q = debouncedSearch.trim();
+                            navigate(`/crm/customers/${customer.id}${q ? `?from=customers&q=${encodeURIComponent(q)}` : ""}`);
                           }}
                         >
                           <TableCell className="font-medium text-slate-900">

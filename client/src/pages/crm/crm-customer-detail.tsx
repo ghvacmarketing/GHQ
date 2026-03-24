@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { useLocation, useParams, Link } from "wouter";
+import { useLocation, useParams, useSearch, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -2470,8 +2470,18 @@ function CustomerTabbedView({
 export default function CrmCustomerDetail() {
   usePageTitle("Customer Detail");
   const [, navigate] = useLocation();
+  const searchString = useSearch();
   const params = useParams<{ id: string }>();
   const customerId = params.id;
+
+  const backHref = (() => {
+    const p = new URLSearchParams(searchString);
+    const from = p.get("from");
+    const q = p.get("q");
+    if (from === "customers" && q) return `/crm/customers?search=${encodeURIComponent(q)}`;
+    return null;
+  })();
+  const goBack = () => backHref ? navigate(backHref) : window.history.back();
   const [activeTab, setActiveTab] = useState("overview");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [scheduleVisitDialogOpen, setScheduleVisitDialogOpen] = useState(false);
@@ -3862,7 +3872,7 @@ export default function CrmCustomerDetail() {
       const action = data.action === "archived" ? "archived" : "deleted";
       toast({ title: `Customer ${action} successfully` });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
-      navigate("/crm/customers");
+      navigate(backHref ?? "/crm/customers");
     },
     onError: (error: Error) => {
       toast({
@@ -4220,7 +4230,7 @@ export default function CrmCustomerDetail() {
     return (
       <CrmLayout currentUser={currentUser}>
         <div className="space-y-6">
-          <Button variant="ghost" onClick={() => window.history.back()} data-testid="button-back">
+          <Button variant="ghost" onClick={goBack} data-testid="button-back">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
@@ -4242,7 +4252,7 @@ export default function CrmCustomerDetail() {
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={() => window.history.back()} data-testid="button-back">
+          <Button variant="ghost" onClick={goBack} data-testid="button-back">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
