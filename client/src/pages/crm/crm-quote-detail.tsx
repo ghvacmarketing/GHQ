@@ -96,7 +96,7 @@ import type { CrmUser, CrmQuote, CrmQuoteLineItem, QuoteEmailLog, CrmItem } from
 import { PaymentLinkButton } from "@/components/stripe-payment-link-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import RichTextEditor, { RichTextDisplay } from "@/components/rich-text-editor";
-import ghvacLogo from "@assets/ghvac-logo.png";
+import ghvacLogo from "@assets/image_1774362094907.png";
 import {
   BRAND_COLOR,
   COMPANY_INFO,
@@ -1568,8 +1568,9 @@ export default function CrmQuoteDetail() {
   const handleDownloadPDF = async () => {
     if (!quote) return;
 
-    // Pre-load the logo as a data URL so jsPDF can embed it
+    // Pre-load the logo as a data URL and capture natural dimensions
     let logoDataUrl: string | null = null;
+    let logoAspect = 4; // fallback width:height ratio
     try {
       const resp = await fetch(ghvacLogo);
       const blob = await resp.blob();
@@ -1577,6 +1578,13 @@ export default function CrmQuoteDetail() {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
         reader.readAsDataURL(blob);
+      });
+      // Measure natural dimensions so we don't squish the image
+      logoAspect = await new Promise<number>((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img.naturalWidth / img.naturalHeight);
+        img.onerror = () => resolve(4);
+        img.src = logoDataUrl!;
       });
     } catch {
       // Fall back to text if image can't be loaded
@@ -1602,11 +1610,11 @@ export default function CrmQuoteDetail() {
         doc.setFillColor(...brandColor);
         doc.roundedRect(margin, y, contentWidth, 22, 3, 3, 'F');
 
-        // Left side: logo on a small white pill so it's visible against dark background
+        // Left side: logo directly on the dark red bar, sized by natural aspect ratio
         if (logoDataUrl) {
-          doc.setFillColor(255, 255, 255);
-          doc.roundedRect(margin + 4, y + 2.5, 46, 12, 2, 2, 'F');
-          doc.addImage(logoDataUrl, 'PNG', margin + 5, y + 3, 44, 11);
+          const logoH = 14; // mm — fits comfortably in the 22 mm bar
+          const logoW = logoH * logoAspect;
+          doc.addImage(logoDataUrl, 'PNG', margin + 4, y + 4, logoW, logoH);
         } else {
           doc.setFontSize(16);
           doc.setFont("helvetica", "bold");
