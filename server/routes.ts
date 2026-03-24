@@ -5960,6 +5960,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerType,
         customerStatus,
         source,
+        accountRole,
         page = "1",
         limit = "25",
       } = req.query as Record<string, string | undefined>;
@@ -5995,6 +5996,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         crmConditions.push(sql`LOWER(${crmCustomers.customerStatus}) = LOWER(${customerStatus})`);
       }
 
+      // accountRole filter: "parent" = accounts that have sub-accounts, "sub" = accounts with a parent
+      if (accountRole === "sub") {
+        crmConditions.push(isNotNull(crmCustomers.parentCustomerId));
+      } else if (accountRole === "parent") {
+        crmConditions.push(
+          sql`${crmCustomers.id} IN (SELECT DISTINCT parent_customer_id FROM crm_customers WHERE parent_customer_id IS NOT NULL)`
+        );
+      }
+
       const whereClause = crmConditions.length > 0 ? and(...crmConditions) : undefined;
 
       // Get all CRM customers (we'll paginate the merged list)
@@ -6003,6 +6013,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(crmCustomers)
         .where(whereClause)
         .orderBy(desc(crmCustomers.createdAt));
+
+      // When searching, also pull in parent accounts of any matching sub-accounts
+      // so the parent always appears above its child in results
+      if (searchTerm && accountRole !== "sub") {
+        const matchingSubIds = crmResults
+          .filter(c => c.parentCustomerId)
+          .map(c => c.parentCustomerId as string);
+        const existingIds = new Set(crmResults.map(c => c.id));
+        const missingParentIds = matchingSubIds.filter(id => !existingIds.has(id));
+        if (missingParentIds.length > 0) {
+          const parents = await db
+            .select()
+            .from(crmCustomers)
+            .where(sql`${crmCustomers.id} = ANY(ARRAY[${sql.join(missingParentIds.map(id => sql`${id}`), sql`, `)}]::text[])`);
+          crmResults.push(...parents);
+        }
+      }
 
       // Transform CRM customers with source tag
       const crmCustomerList = crmResults.map(c => ({
