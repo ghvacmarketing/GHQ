@@ -738,6 +738,22 @@ function TimelineTabContent({ customerId }: { customerId: string }) {
     });
   };
 
+  const { toast } = useToast();
+  const deleteCommentMutation = useMutation({
+    mutationFn: async (commentId: string) => {
+      const response = await apiRequest("DELETE", `/api/crm/comments/${commentId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/customers', customerId, 'timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/comments', 'customer', customerId] });
+      toast({ title: "Comment deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete comment", variant: "destructive" });
+    },
+  });
+
   const filteredTimeline = timeline?.filter(entry => activeFilters.has(entry.type)) || [];
 
   if (isLoading) {
@@ -908,11 +924,40 @@ function TimelineTabContent({ customerId }: { customerId: string }) {
                             <p className="text-sm text-slate-500 mt-1 line-clamp-2">{entry.description}</p>
                           )}
                         </div>
-                        {entry.amount && (
-                          <div className="text-right flex-shrink-0">
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {entry.amount && (
                             <p className="font-semibold text-slate-900">{entry.amount}</p>
-                          </div>
-                        )}
+                          )}
+                          {entry.type === 'note' && entry.id.startsWith('comment-') && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <button
+                                  className="p-1.5 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete comment?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This comment will be permanently removed from the timeline.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-red-600 hover:bg-red-700"
+                                    onClick={() => deleteCommentMutation.mutate(entry.id.replace('comment-', ''))}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </div>
                       </div>
                       {entry.linkUrl && (
                         <div className="mt-2 flex items-center text-xs text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1422,10 +1467,9 @@ function CustomerTabbedView({
       entries.push({
         id: note.id,
         type: 'note',
-        title: 'Note',
+        title: note.userName || 'Note',
         description: note.body,
         timestamp: new Date(note.createdAt || Date.now()),
-        userName: note.userName || undefined,
       });
     });
     
@@ -1812,7 +1856,7 @@ function CustomerTabbedView({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <span className="font-medium text-sm text-slate-700 truncate">
-                              {entry.type === 'note' ? (entry.userName || 'Unknown User') : entry.title}
+                              {entry.title}
                             </span>
                             <span className="text-xs text-slate-400 flex-shrink-0">
                               {format(entry.timestamp, "MMM d, yyyy 'at' h:mm a")}
