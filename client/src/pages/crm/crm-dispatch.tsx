@@ -1559,8 +1559,11 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
               <div className="relative py-3" style={{ height: 40 }}>
                 {hourLabels.map((label, i) => {
                   const leftPercent = (i / (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR)) * 100;
+                  const isFirst = i === 0;
+                  const isLast = i === hourLabels.length - 1;
+                  const transform = isFirst ? 'translateX(0)' : isLast ? 'translateX(-100%)' : 'translateX(-50%)';
                   return (
-                    <div key={i} className="absolute text-xs font-medium text-slate-500 whitespace-nowrap" style={{ left: `${leftPercent}%`, transform: 'translateX(-50%)' }}>
+                    <div key={i} className="absolute text-xs font-medium text-slate-500 whitespace-nowrap" style={{ left: `${leftPercent}%`, transform }}>
                       {label}
                     </div>
                   );
