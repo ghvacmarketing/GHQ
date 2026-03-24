@@ -1682,9 +1682,7 @@ export default function CrmProjects() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    <button
                       onClick={() => {
                         if (calendarView === "month") {
                           setCalendarMonth(subMonths(calendarMonth, 1));
@@ -1696,9 +1694,10 @@ export default function CrmProjects() {
                           setCalendarMonth(subDays(calendarMonth, 1));
                         }
                       }}
+                      className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors"
                     >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
                     <h2 className="text-lg font-semibold min-w-[180px] text-center">
                       {calendarView === "month" 
                         ? format(calendarMonth, "MMMM yyyy")
@@ -1709,9 +1708,7 @@ export default function CrmProjects() {
                         : format(calendarMonth, "EEEE, MMM d, yyyy")
                       }
                     </h2>
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    <button
                       onClick={() => {
                         if (calendarView === "month") {
                           setCalendarMonth(addMonths(calendarMonth, 1));
@@ -1723,9 +1720,10 @@ export default function CrmProjects() {
                           setCalendarMonth(addDays(calendarMonth, 1));
                         }
                       }}
+                      className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors"
                     >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
                     <Button
                       variant="ghost"
                       size="sm"
