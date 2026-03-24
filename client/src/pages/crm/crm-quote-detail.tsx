@@ -1565,8 +1565,22 @@ export default function CrmQuoteDetail() {
     }
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!quote) return;
+
+    // Pre-load the logo as a data URL so jsPDF can embed it
+    let logoDataUrl: string | null = null;
+    try {
+      const resp = await fetch(ghvacLogo);
+      const blob = await resp.blob();
+      logoDataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      // Fall back to text if image can't be loaded
+    }
 
     try {
       const doc = new jsPDF();
@@ -1586,22 +1600,26 @@ export default function CrmQuoteDetail() {
 
       const addPageHeader = () => {
         doc.setFillColor(...brandColor);
-        doc.roundedRect(margin, y, contentWidth, 28, 3, 3, 'F');
-        
-        doc.setFontSize(20);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(255, 255, 255);
-        doc.text("Giesbrecht HVAC", margin + 8, y + 12);
-        
+        doc.roundedRect(margin, y, contentWidth, 22, 3, 3, 'F');
+
+        // Left side: logo on a small white pill so it's visible against dark background
+        if (logoDataUrl) {
+          doc.setFillColor(255, 255, 255);
+          doc.roundedRect(margin + 4, y + 2.5, 46, 12, 2, 2, 'F');
+          doc.addImage(logoDataUrl, 'PNG', margin + 5, y + 3, 44, 11);
+        } else {
+          doc.setFontSize(16);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(255, 255, 255);
+          doc.text("Giesbrecht HVAC", margin + 6, y + 13);
+        }
+
+        // Right side: phone only (minimal)
         doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(220, 220, 220);
-        doc.text("PO Box 917, Wrens, GA 30833", margin + 8, y + 20);
-
-        doc.setFontSize(9);
-        doc.text("(706) 826-0644", pageWidth - margin - 8, y + 10, { align: 'right' });
-        doc.text("chandler@ghvacinc.com", pageWidth - margin - 8, y + 15, { align: 'right' });
-        doc.text("www.ghvacinc.com", pageWidth - margin - 8, y + 20, { align: 'right' });
+        doc.text("(706) 826-0644", pageWidth - margin - 6, y + 10, { align: 'right' });
+        doc.text("chandler@ghvacinc.com", pageWidth - margin - 6, y + 16, { align: 'right' });
       };
 
       const checkPageBreak = (neededSpace: number) => {
@@ -1612,7 +1630,7 @@ export default function CrmQuoteDetail() {
       };
 
       addPageHeader();
-      y += 35;
+      y += 28;
 
       // Add diagonal APPROVED stamp across all pages if quote is accepted or converted
       const addApprovedStampToAllPages = () => {
