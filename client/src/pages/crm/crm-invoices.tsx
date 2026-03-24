@@ -648,16 +648,6 @@ export default function CrmInvoices() {
             <p className="text-sm text-slate-500">Total: {totalInvoices.toLocaleString()}</p>
           </div>
           <div className="flex items-center gap-3">
-            <Select value={sourceFilter} onValueChange={setSourceFilter}>
-              <SelectTrigger className="w-[160px] h-9">
-                <SelectValue placeholder="Source" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Sources</SelectItem>
-                <SelectItem value="crm">CRM Created</SelectItem>
-                <SelectItem value="imported">Imported</SelectItem>
-              </SelectContent>
-            </Select>
             <Button 
               size="sm" 
               className="bg-[#711419] hover:bg-[#5a1014] text-white" 
@@ -670,22 +660,36 @@ export default function CrmInvoices() {
           </div>
         </div>
 
-        {/* Tabs styled like projects page - underline style */}
-        <div className="flex overflow-x-auto border-b border-slate-200">
-          {statusTabs.map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => setStatusFilter(tab.value)}
-              className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-                statusFilter === tab.value
-                  ? "border-[#711419] text-[#711419]"
-                  : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-              }`}
-              data-testid={`tab-status-${tab.value}`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        {/* Tabs with All Sources filter on the right */}
+        <div className="flex items-center justify-between border-b border-slate-200">
+          <div className="flex overflow-x-auto overflow-y-hidden">
+            {statusTabs.map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => setStatusFilter(tab.value)}
+                className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                  statusFilter === tab.value
+                    ? "border-[#711419] text-[#711419]"
+                    : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+                }`}
+                data-testid={`tab-status-${tab.value}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          <div className="shrink-0 pb-1">
+            <Select value={sourceFilter} onValueChange={setSourceFilter}>
+              <SelectTrigger className="w-[140px] h-8 text-xs border-0 bg-transparent focus:ring-0 focus:ring-offset-0" data-testid="select-source-filter">
+                <SelectValue placeholder="Source" />
+              </SelectTrigger>
+              <SelectContent className="bg-white">
+                <SelectItem value="all" className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">All Sources</SelectItem>
+                <SelectItem value="crm" className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">CRM Created</SelectItem>
+                <SelectItem value="imported" className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">Imported</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <Card className="bg-white border shadow-sm overflow-hidden">
