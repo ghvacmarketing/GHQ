@@ -1652,25 +1652,23 @@ export default function CrmProjects() {
                     {Math.min(page * ITEMS_PER_PAGE, total)} of {total}
                   </p>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    <button
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
                       disabled={page <= 1}
+                      className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
                     <span className="text-sm text-slate-600">
                       Page {page} of {totalPages}
                     </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    <button
                       onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                       disabled={page >= totalPages}
+                      className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
                   </div>
                 </div>
               )}

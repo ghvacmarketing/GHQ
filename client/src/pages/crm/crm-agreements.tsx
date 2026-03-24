@@ -900,29 +900,25 @@ export default function CrmAgreements() {
 
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t bg-slate-50">
-              <Button
-                variant="outline"
-                size="sm"
+              <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
                 data-testid="button-prev-page"
+                className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Previous
-              </Button>
+                <ChevronLeft className="h-5 w-5" />
+              </button>
               <span className="text-sm text-slate-600">
                 Page {page} of {totalPages}
               </span>
-              <Button
-                variant="outline"
-                size="sm"
+              <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
                 data-testid="button-next-page"
+                className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                Next
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
+                <ChevronRight className="h-5 w-5" />
+              </button>
             </div>
           )}
         </Card>
