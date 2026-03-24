@@ -225,6 +225,11 @@ export default function CrmQuoteDetail() {
   const [isAddingNewLineItem, setIsAddingNewLineItem] = useState(false);
   const [newLineItemData, setNewLineItemData] = useState<{ description: string; quantity: string; unitPrice: string }>({ description: "", quantity: "1", unitPrice: "" });
 
+  const [showManualSignatureDialog, setShowManualSignatureDialog] = useState(false);
+  const [manualSignature, setManualSignature] = useState("");
+  const [manualSignerName, setManualSignerName] = useState("");
+  const [pendingManualOption, setPendingManualOption] = useState<string | null>(null);
+
   // Items catalog state
   const [showItemsCatalogDialog, setShowItemsCatalogDialog] = useState(false);
   const [itemSearch, setItemSearch] = useState("");
@@ -1373,8 +1378,20 @@ export default function CrmQuoteDetail() {
     markAsSentMutation.mutate({ note: markSentNote.trim() || undefined });
   };
 
+  const DEPOSIT_QUOTE_TYPES = ["custom_install", "proposal", "custom_service"];
+
   const handleApprove = () => {
-    acceptMutation.mutate({});
+    const isDepositType = DEPOSIT_QUOTE_TYPES.includes(quote?.quoteType?.toLowerCase() || "");
+    if (isDepositType) {
+      if (quote?.quoteMode === "options") {
+        acceptMutation.mutate({});
+      } else {
+        setPendingManualOption(null);
+        setShowManualSignatureDialog(true);
+      }
+    } else {
+      acceptMutation.mutate({});
+    }
   };
 
   const handleConfirmAcceptOption = () => {
@@ -1382,7 +1399,35 @@ export default function CrmQuoteDetail() {
       toast({ title: "Please select an option", variant: "destructive" });
       return;
     }
-    acceptMutation.mutate({ selectedOption });
+    const isDepositType = DEPOSIT_QUOTE_TYPES.includes(quote?.quoteType?.toLowerCase() || "");
+    if (isDepositType) {
+      setPendingManualOption(selectedOption);
+      setSelectedOption("");
+      setShowAcceptOptionSelection(false);
+      setShowManualSignatureDialog(true);
+    } else {
+      acceptMutation.mutate({ selectedOption });
+    }
+  };
+
+  const handleConfirmManualSignature = () => {
+    if (!manualSignature) {
+      toast({ title: "Signature required", description: "Please have the client sign before accepting.", variant: "destructive" });
+      return;
+    }
+    if (!manualSignerName.trim()) {
+      toast({ title: "Name required", description: "Please enter the client's printed name.", variant: "destructive" });
+      return;
+    }
+    acceptInPersonMutation.mutate({
+      signatureImage: manualSignature,
+      signerName: manualSignerName.trim(),
+      selectedOption: pendingManualOption || undefined,
+    });
+    setShowManualSignatureDialog(false);
+    setManualSignature("");
+    setManualSignerName("");
+    setPendingManualOption(null);
   };
 
   const handleDecline = () => {
@@ -3750,6 +3795,75 @@ export default function CrmQuoteDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={showManualSignatureDialog}
+        onOpenChange={(open) => {
+          setShowManualSignatureDialog(open);
+          if (!open) {
+            setManualSignature("");
+            setManualSignerName("");
+            setPendingManualOption(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Client Signature Required</DialogTitle>
+            <DialogDescription>
+              Have the client sign below to confirm they accept this quote.
+              {pendingManualOption && (
+                <span className="block mt-1 font-medium text-slate-700">
+                  Selected option: {pendingManualOption}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <PresentationSignaturePad onSignatureChange={setManualSignature} />
+            <div>
+              <label className="text-sm font-medium text-slate-700 block mb-1">
+                Printed Name
+              </label>
+              <Input
+                placeholder="Client's full name"
+                value={manualSignerName}
+                onChange={(e) => setManualSignerName(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowManualSignatureDialog(false);
+                setManualSignature("");
+                setManualSignerName("");
+                setPendingManualOption(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmManualSignature}
+              disabled={!manualSignature || !manualSignerName.trim() || acceptInPersonMutation.isPending}
+              className="bg-[#711419] hover:bg-[#711419]/90 text-white"
+            >
+              {acceptInPersonMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Accepting...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Accept Quote
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={showAcceptOptionSelection} onOpenChange={setShowAcceptOptionSelection}>
         <AlertDialogContent>
