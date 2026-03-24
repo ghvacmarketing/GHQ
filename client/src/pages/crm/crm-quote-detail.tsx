@@ -997,6 +997,10 @@ export default function CrmQuoteDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId, "email-logs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
+      const customerId = quote?.customerId || quote?.accountId;
+      if (customerId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "timeline"] });
+      }
       setShowPresentation(false);
       setPresentationSignature("");
       setPresentationName("");
@@ -1152,6 +1156,10 @@ export default function CrmQuoteDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
+      const acceptCustomerId = quote?.customerId || quote?.accountId;
+      if (acceptCustomerId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", acceptCustomerId, "timeline"] });
+      }
       toast({ title: "Quote accepted", description: "Quote status updated to accepted." });
 
       if (data.requiresFollowUpChoice && data.followUpContext) {
