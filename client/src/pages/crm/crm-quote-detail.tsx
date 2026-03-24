@@ -276,8 +276,15 @@ export default function CrmQuoteDetail() {
       return res.json();
     },
     enabled: !!quoteId && !!currentUser,
-    staleTime: 2 * 60 * 1000, // Cache for 2 minutes for better performance
-    refetchInterval: 60000, // Only refresh every 60 seconds instead of 10
+    staleTime: 2 * 60 * 1000,
+    refetchInterval: (query) => {
+      const data = query.state.data as QuoteWithLines | undefined;
+      // Poll every 3 seconds when a Stripe payment link is open and deposit hasn't landed yet
+      if (data?.stripePaymentLinkId && !data?.depositPaidAt && data?.status !== "accepted") {
+        return 3000;
+      }
+      return 60000;
+    },
   });
 
   const { data: emailLogs = [], isLoading: emailLogsLoading } = useQuery<QuoteEmailLog[]>({
