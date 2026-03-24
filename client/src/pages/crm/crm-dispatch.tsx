@@ -346,6 +346,15 @@ const statusLabels: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
+const statusHeaderColors: Record<string, string> = {
+  scheduled: "bg-amber-500 text-white",
+  dispatched: "bg-blue-600 text-white",
+  en_route: "bg-blue-700 text-white",
+  on_site: "bg-emerald-600 text-white",
+  completed: "bg-slate-600 text-white",
+  cancelled: "bg-rose-700 text-white",
+};
+
 const statusSquircleColors: Record<string, string> = {
   scheduled: "bg-yellow-400",
   dispatched: "bg-blue-400",
@@ -966,7 +975,7 @@ function WeekDispatchBoard({ technicians, workOrders, weekDates, onWorkOrderClic
   return (
     <Card className="bg-white border overflow-hidden" ref={setNodeRef}>
       <div className="overflow-x-auto overflow-y-auto max-h-full">
-        <table className="w-full min-w-[900px] border-collapse">
+        <table className="min-w-[1640px] border-collapse">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
               <th className="w-40 px-3 py-2 text-left text-xs font-semibold text-slate-600 border-r border-slate-200 bg-slate-50 sticky left-0 z-20">
@@ -4144,15 +4153,15 @@ export default function CrmDispatch() {
         {/* Side Panel - Push Layout */}
         {selectedWorkOrder && (
           <div className="absolute right-0 top-0 h-full w-[400px] border-l border-slate-200 bg-white flex flex-col overflow-hidden shadow-lg z-20" data-testid="workorder-detail-panel">
-            {/* Panel Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white flex-shrink-0">
+            {/* Panel Header — color reflects work order status */}
+            <div className={`flex items-center justify-between px-4 py-3 flex-shrink-0 ${statusHeaderColors[selectedWorkOrder.status] || "bg-slate-600 text-white"}`}>
               <div>
-                <h2 className="text-sm font-semibold text-slate-900" data-testid="panel-workorder-title">Work Order: {selectedWorkOrder.workOrderNumber}</h2>
-                <p className="text-xs text-slate-500">Status: {statusLabels[selectedWorkOrder.status] || selectedWorkOrder.status}</p>
+                <h2 className="text-sm font-semibold" data-testid="panel-workorder-title">Work Order: {selectedWorkOrder.workOrderNumber}</h2>
+                <p className="text-xs opacity-80">{statusLabels[selectedWorkOrder.status] || selectedWorkOrder.status}</p>
               </div>
               <button
                 onClick={() => setSelectedWorkOrderId(null)}
-                className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+                className="p-1.5 hover:bg-white/20 rounded-full transition-colors opacity-80 hover:opacity-100"
                 aria-label="Close panel"
               >
                 <XCircle className="h-4 w-4" />
@@ -4293,15 +4302,14 @@ export default function CrmDispatch() {
                     className="min-h-[80px]"
                     data-testid="textarea-work-order-details"
                   />
-                  <Button 
-                    size="sm"
-                    variant="outline"
+                  <button
                     onClick={handleSaveWorkOrderDetails}
                     disabled={updateWorkOrderMutation.isPending}
                     data-testid="button-save-work-order-details"
+                    className="text-xs text-slate-500 hover:text-[#711419] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     Save Details
-                  </Button>
+                  </button>
                 </div>
 
                 <Separator />
@@ -4324,15 +4332,14 @@ export default function CrmDispatch() {
                     className="min-h-[80px]"
                     data-testid="textarea-dispatch-notes"
                   />
-                  <Button 
-                    size="sm"
-                    variant="outline"
+                  <button
                     onClick={handleSaveDispatchNotes}
                     disabled={!dispatchNote.trim() || updateWorkOrderMutation.isPending}
                     data-testid="button-save-dispatch-notes"
+                    className="text-xs text-slate-500 hover:text-[#711419] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     Save Dispatch Notes
-                  </Button>
+                  </button>
                 </div>
 
                 <Separator />
@@ -4361,15 +4368,14 @@ export default function CrmDispatch() {
                     className="min-h-[80px]"
                     data-testid="textarea-notes"
                   />
-                  <Button 
-                    size="sm"
-                    variant="outline"
+                  <button
                     onClick={handleSaveNotes}
                     disabled={!newNote.trim() || updateWorkOrderMutation.isPending}
                     data-testid="button-save-notes"
+                    className="text-xs text-slate-500 hover:text-[#711419] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     Save Notes
-                  </Button>
+                  </button>
                 </div>
 
                 <Separator />
