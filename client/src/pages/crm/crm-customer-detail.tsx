@@ -3005,13 +3005,26 @@ export default function CrmCustomerDetail() {
       }
       return res.json();
     },
+    onMutate: async () => {
+      const idToUpdate = selectedQuoteId;
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/quotes"] });
+      const snapshots = queryClient.getQueriesData({ queryKey: ["/api/crm/quotes"] });
+      queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+        if (!old?.quotes) return old;
+        return { ...old, quotes: old.quotes.map((q: any) => q.id === idToUpdate ? { ...q, status: "declined" } : q) };
+      });
+      return { snapshots };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", selectedQuoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Quote declined", description: "Quote status updated to declined." });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _vars, context: any) => {
+      context?.snapshots?.forEach(([key, data]: [any, any]) => {
+        queryClient.setQueryData(key, data);
+      });
       toast({ title: "Failed to decline quote", description: error.message, variant: "destructive" });
     },
   });

@@ -289,7 +289,11 @@ export default function CrmQuotes() {
       });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+        if (!old?.quotes) return old;
+        return { ...old, quotes: [data, ...old.quotes] };
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       setShowCreateDialog(false);

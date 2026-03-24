@@ -338,13 +338,24 @@ export default function CrmQuoteDetail() {
       }
       return res.json();
     },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      const prev = queryClient.getQueryData(["/api/crm/quotes", quoteId]);
+      queryClient.setQueryData(["/api/crm/quotes", quoteId], (old: any) => old ? { ...old, status: "sent" } : old);
+      queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+        if (!old?.quotes) return old;
+        return { ...old, quotes: old.quotes.map((q: any) => q.id === quoteId ? { ...q, status: "sent" } : q) };
+      });
+      return { prev };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Quote sent", description: "Quote status updated to sent." });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _vars, context: any) => {
+      if (context?.prev) queryClient.setQueryData(["/api/crm/quotes", quoteId], context.prev);
       toast({ title: "Failed to send quote", description: error.message, variant: "destructive" });
     },
   });
@@ -362,6 +373,16 @@ export default function CrmQuoteDetail() {
         throw new Error(result.error || result.message || "Failed to send quote");
       }
       return result as { success: boolean; successCount: number; totalCount: number; emailSent?: boolean; smsSent?: boolean };
+    },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      const prev = queryClient.getQueryData(["/api/crm/quotes", quoteId]);
+      queryClient.setQueryData(["/api/crm/quotes", quoteId], (old: any) => old ? { ...old, status: "sent" } : old);
+      queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+        if (!old?.quotes) return old;
+        return { ...old, quotes: old.quotes.map((q: any) => q.id === quoteId ? { ...q, status: "sent" } : q) };
+      });
+      return { prev };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
@@ -386,7 +407,8 @@ export default function CrmQuoteDetail() {
       }
       toast({ title: "Quote sent!", description });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _vars, context: any) => {
+      if (context?.prev) queryClient.setQueryData(["/api/crm/quotes", quoteId], context.prev);
       toast({ title: "Failed to send quote", description: error.message, variant: "destructive" });
     },
   });
@@ -405,6 +427,16 @@ export default function CrmQuoteDetail() {
       }
       return result;
     },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      const prev = queryClient.getQueryData(["/api/crm/quotes", quoteId]);
+      queryClient.setQueryData(["/api/crm/quotes", quoteId], (old: any) => old ? { ...old, status: "sent" } : old);
+      queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+        if (!old?.quotes) return old;
+        return { ...old, quotes: old.quotes.map((q: any) => q.id === quoteId ? { ...q, status: "sent" } : q) };
+      });
+      return { prev };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
@@ -414,7 +446,8 @@ export default function CrmQuoteDetail() {
       setMarkSentNote("");
       toast({ title: "Quote marked as sent", description: "The quote status has been updated to sent." });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _vars, context: any) => {
+      if (context?.prev) queryClient.setQueryData(["/api/crm/quotes", quoteId], context.prev);
       toast({ title: "Failed to mark as sent", description: error.message, variant: "destructive" });
     },
   });
@@ -1098,6 +1131,16 @@ export default function CrmQuoteDetail() {
       }
       return data;
     },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      const prev = queryClient.getQueryData(["/api/crm/quotes", quoteId]);
+      queryClient.setQueryData(["/api/crm/quotes", quoteId], (old: any) => old ? { ...old, status: "accepted" } : old);
+      queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+        if (!old?.quotes) return old;
+        return { ...old, quotes: old.quotes.map((q: any) => q.id === quoteId ? { ...q, status: "accepted" } : q) };
+      });
+      return { prev };
+    },
     onSuccess: (data) => {
       setShowAcceptOptionSelection(false);
       setSelectedOption("");
@@ -1137,7 +1180,8 @@ export default function CrmQuoteDetail() {
         setShowCreateProjectPrompt(true);
       }
     },
-    onError: (error: { message?: string; requiresOptionSelection?: boolean; availableOptions?: string[] } | Error) => {
+    onError: (error: { message?: string; requiresOptionSelection?: boolean; availableOptions?: string[] } | Error, _vars: any, context: any) => {
+      if (context?.prev) queryClient.setQueryData(["/api/crm/quotes", quoteId], context.prev);
       if ('requiresOptionSelection' in error && error.requiresOptionSelection && error.availableOptions) {
         setAvailableOptions(error.availableOptions);
         setShowAcceptOptionSelection(true);
@@ -1268,13 +1312,24 @@ export default function CrmQuoteDetail() {
       }
       return res.json();
     },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      const prev = queryClient.getQueryData(["/api/crm/quotes", quoteId]);
+      queryClient.setQueryData(["/api/crm/quotes", quoteId], (old: any) => old ? { ...old, status: "declined" } : old);
+      queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+        if (!old?.quotes) return old;
+        return { ...old, quotes: old.quotes.map((q: any) => q.id === quoteId ? { ...q, status: "declined" } : q) };
+      });
+      return { prev };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Quote declined", description: "Quote status updated to declined." });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _vars, context: any) => {
+      if (context?.prev) queryClient.setQueryData(["/api/crm/quotes", quoteId], context.prev);
       toast({ title: "Failed to decline quote", description: error.message, variant: "destructive" });
     },
   });
