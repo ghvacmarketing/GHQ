@@ -3,7 +3,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Button } from '@/components/ui/button';
 import { Bold, Italic, List, ListOrdered, Undo, Redo } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 type RichTextEditorProps = {
   content: string;
@@ -20,7 +20,14 @@ export default function RichTextEditor({
   minHeight = 'min-h-[200px]',
   editable = true,
 }: RichTextEditorProps) {
+  // Track the last HTML emitted by this editor so the useEffect below
+  // can skip re-syncing when the content prop change originated here
+  // (e.g. after typing or pasting), preventing the editor from resetting
+  // pasted content mid-keystroke.
+  const lastEmittedRef = useRef<string>('');
+
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit,
       Placeholder.configure({ placeholder }),
@@ -28,17 +35,23 @@ export default function RichTextEditor({
     content,
     editable,
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
+      const html = editor.getHTML();
+      lastEmittedRef.current = html;
+      onChange(html);
     },
     editorProps: {
       attributes: {
         class: `prose prose-sm dark:prose-invert max-w-none focus:outline-none ${minHeight} p-4`,
       },
+      handlePaste: () => false,
     },
   });
 
   useEffect(() => {
-    if (editor && content !== editor.getHTML()) {
+    // Only push external content changes into the editor — skip when
+    // the change originated from within this editor (typing / pasting).
+    if (editor && content !== lastEmittedRef.current && content !== editor.getHTML()) {
+      lastEmittedRef.current = content;
       editor.commands.setContent(content);
     }
   }, [content, editor]);
