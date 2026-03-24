@@ -1776,10 +1776,10 @@ function CustomerTabbedView({
                     <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Sub-Accounts</p>
                     <div className="space-y-1">
                       {subAccounts.slice(0, 3).map(sub => (
-                        <Link key={sub.id} href={`/crm/customers/${sub.id}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                        <button key={sub.id} onClick={() => navigate(`/crm/customers/${sub.id}`)} className="text-sm text-blue-600 hover:underline flex items-center gap-1 w-full text-left">
                           <ChevronRight className="h-3 w-3" />
                           {sub.name}
-                        </Link>
+                        </button>
                       ))}
                       {subAccounts.length > 3 && (
                         <p className="text-xs text-slate-400">+{subAccounts.length - 3} more</p>
@@ -2687,7 +2687,7 @@ function CustomerTabbedView({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => navigate(`/crm/customers/new?parentId=${customer.id}`)}
+                onClick={() => navigate(`/crm/accounts/new?parentId=${customer.id}`)}
               >
                 <Plus className="h-3.5 w-3.5 mr-1.5" />
                 Add Sub-Account
@@ -2696,16 +2696,16 @@ function CustomerTabbedView({
             <CardContent>
               <div className="divide-y">
                 {subAccounts.map(sub => (
-                  <div key={sub.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                  <div
+                    key={sub.id}
+                    className="flex items-center justify-between py-3 first:pt-0 last:pb-0 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded transition-colors"
+                    onClick={() => navigate(`/crm/customers/${sub.id}`)}
+                  >
                     <div className="space-y-0.5">
-                      <Link
-                        href={`/crm/customers/${sub.id}`}
-                        className="text-sm font-medium text-blue-600 hover:underline flex items-center gap-1"
-                      >
-                        <ChevronRight className="h-3.5 w-3.5" />
+                      <p className="text-sm font-medium text-blue-600 flex items-center gap-1">
                         {sub.name}
-                      </Link>
-                      <div className="flex items-center gap-3 text-xs text-slate-500 pl-5">
+                      </p>
+                      <div className="flex items-center gap-3 text-xs text-slate-500">
                         {sub.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{sub.phone}</span>}
                         {sub.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{sub.email}</span>}
                       </div>
@@ -2716,11 +2716,6 @@ function CustomerTabbedView({
                       ) : (
                         <Badge variant="outline" className="text-xs border-green-300 text-green-700 bg-green-50">Bills Here</Badge>
                       )}
-                      <Link href={`/crm/customers/${sub.id}`}>
-                        <Button variant="ghost" size="sm">
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </Button>
-                      </Link>
                     </div>
                   </div>
                 ))}
