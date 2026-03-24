@@ -965,7 +965,7 @@ function WeekDispatchBoard({ technicians, workOrders, weekDates, onWorkOrderClic
   
   return (
     <Card className="bg-white border overflow-hidden" ref={setNodeRef}>
-      <div className="overflow-x-auto overflow-y-auto max-h-full scrollbar-hide">
+      <div className="overflow-x-auto overflow-y-auto max-h-full">
         <table className="w-full min-w-[900px] border-collapse">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
@@ -1549,7 +1549,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
 
   return (
     <Card className="bg-white border overflow-hidden h-full">
-      <div className="overflow-x-auto overflow-y-auto h-full scrollbar-hide">
+      <div className="overflow-x-auto overflow-y-auto h-full">
         <div style={{ minWidth: SCHEDULE_TIMELINE_WIDTH + 200 }}>
           <div className="flex border-b border-slate-200 sticky top-0 bg-white z-20">
             <div className="w-48 flex-shrink-0 px-4 py-3 border-r border-slate-200 text-sm font-semibold text-slate-700 bg-white sticky left-0 z-30">
@@ -4252,32 +4252,30 @@ export default function CrmDispatch() {
 
                 <Separator />
 
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <h3 className="text-sm font-semibold text-slate-900">Update Status</h3>
-                  <div className="flex flex-wrap gap-2" data-testid="status-buttons">
+                  <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 overflow-hidden" data-testid="status-buttons">
                     {(["scheduled", "dispatched", "en_route", "on_site", "completed", "cancelled"] as WorkOrderStatus[]).map((status) => {
-                      const icons: Record<string, React.ReactNode> = {
-                        scheduled: <Clock className="h-3 w-3 mr-1" />,
-                        dispatched: <Clipboard className="h-3 w-3 mr-1" />,
-                        en_route: <Truck className="h-3 w-3 mr-1" />,
-                        on_site: <Wrench className="h-3 w-3 mr-1" />,
-                        completed: <CheckSquare className="h-3 w-3 mr-1" />,
-                        cancelled: <XCircle className="h-3 w-3 mr-1" />,
-                      };
+                      const isActive = selectedWorkOrder.status === status;
                       return (
-                        <Button
+                        <button
                           key={status}
-                          size="sm"
-                          variant={selectedWorkOrder.status === status ? "default" : "outline"}
                           onClick={() => handleStatusChange(status)}
                           disabled={updateWorkOrderMutation.isPending}
                           data-testid={`button-status-${status}`}
+                          className={`w-full flex items-center justify-between px-3 py-2.5 text-sm transition-colors ${
+                            isActive
+                              ? "bg-slate-50 text-slate-900 font-medium"
+                              : "bg-white text-slate-600 hover:bg-slate-50"
+                          }`}
                         >
-                          {updateWorkOrderMutation.isPending && selectedWorkOrder.status !== status ? (
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                          ) : icons[status]}
-                          {statusLabels[status]}
-                        </Button>
+                          <span>{statusLabels[status]}</span>
+                          {isActive && (
+                            updateWorkOrderMutation.isPending
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
+                              : <Check className="h-3.5 w-3.5 text-[#711419]" />
+                          )}
+                        </button>
                       );
                     })}
                   </div>
