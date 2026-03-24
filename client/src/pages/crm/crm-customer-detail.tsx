@@ -62,6 +62,10 @@ import {
   Clipboard,
   ClipboardCheck,
   Link2,
+  GitBranch,
+  Search,
+  ChevronRight,
+  Info,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -1453,9 +1457,43 @@ function CustomerTabbedView({
   activeTab,
   setActiveTab,
 }: CustomerTabbedViewProps) {
+  const [, navigate] = useLocation();
   const completedJobs = jobs?.filter(j => ["completed", "invoiced", "paid"].includes(j.status)) || [];
   const customerType = (customer.customerType || "residential").toLowerCase();
-  
+
+  // Sub-accounts of this customer
+  interface SubAccountSummary {
+    id: string;
+    name: string;
+    companyName: string | null;
+    customerType: string | null;
+    customerStatus: string | null;
+    email: string | null;
+    phone: string | null;
+    fullAddress: string | null;
+    parentCustomerId: string | null;
+    billToParent: boolean | null;
+  }
+  const { data: subAccounts = [] } = useQuery<SubAccountSummary[]>({
+    queryKey: ["/api/crm/customers", customer.id, "sub-accounts"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${customer.id}/sub-accounts`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch sub-accounts");
+      return res.json();
+    },
+  });
+
+  // Parent customer data (when this customer IS a sub-account)
+  const { data: parentCustomer } = useQuery<CrmCustomer>({
+    queryKey: ["/api/crm/customers", customer.parentCustomerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${customer.parentCustomerId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch parent customer");
+      return res.json();
+    },
+    enabled: !!customer.parentCustomerId,
+  });
+
   const { data: overviewTimeline, isLoading: timelineLoading } = useQuery<TimelineEntry[]>({
     queryKey: ['/api/crm/customers', customer.id, 'timeline'],
     queryFn: async () => {
@@ -1626,6 +1664,28 @@ function CustomerTabbedView({
           <ClipboardList className="h-4 w-4 mr-2" />
           Settings
         </TabsTrigger>
+        {/* Sub-Account tab — only shown when this customer IS a sub-account */}
+        {customer?.parentCustomerId && (
+          <TabsTrigger
+            value="sub-account"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+            data-testid="tab-sub-account"
+          >
+            <GitBranch className="h-4 w-4 mr-2" />
+            Sub-Account
+          </TabsTrigger>
+        )}
+        {/* Sub-Accounts tab — only shown when this customer HAS sub-accounts */}
+        {subAccounts.length > 0 && (
+          <TabsTrigger
+            value="sub-accounts"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+            data-testid="tab-sub-accounts"
+          >
+            <Users className="h-4 w-4 mr-2" />
+            Sub-Accounts ({subAccounts.length})
+          </TabsTrigger>
+        )}
       </TabsList>
 
       {/* Overview Tab */}
@@ -1664,6 +1724,18 @@ function CustomerTabbedView({
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Status</p>
                   <Badge variant="outline" className="text-xs">{customer.customerStatus || "Active"}</Badge>
                 </div>
+                {customer.parentCustomerId && parentCustomer && (
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Parent Account</p>
+                    <Link href={`/crm/customers/${customer.parentCustomerId}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                      <Building2 className="h-3.5 w-3.5" />
+                      {parentCustomer.name}
+                    </Link>
+                    {customer.billToParent && (
+                      <Badge variant="outline" className="text-xs mt-1 border-amber-300 text-amber-700 bg-amber-50">Bills to Parent</Badge>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="space-y-4">
                 <div>
@@ -1688,6 +1760,22 @@ function CustomerTabbedView({
                     <p className="text-sm text-slate-400">No email</p>
                   )}
                 </div>
+                {subAccounts.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Sub-Accounts</p>
+                    <div className="space-y-1">
+                      {subAccounts.slice(0, 3).map(sub => (
+                        <Link key={sub.id} href={`/crm/customers/${sub.id}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                          <ChevronRight className="h-3 w-3" />
+                          {sub.name}
+                        </Link>
+                      ))}
+                      {subAccounts.length > 3 && (
+                        <p className="text-xs text-slate-400">+{subAccounts.length - 3} more</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
@@ -2478,6 +2566,136 @@ function CustomerTabbedView({
           </CardContent>
         </Card>
       </TabsContent>
+
+      {/* Sub-Account Tab — visible only when this customer is a sub-account */}
+      {customer.parentCustomerId && (
+        <TabsContent value="sub-account" className="space-y-6" data-testid="tab-content-sub-account">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <GitBranch className="h-5 w-5 text-[#711419]" />
+                Sub-Account Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Parent account link */}
+              <div className="flex items-start justify-between gap-4 p-4 bg-slate-50 rounded-lg border">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Parent Account</p>
+                  {parentCustomer ? (
+                    <Link
+                      href={`/crm/customers/${customer.parentCustomerId}`}
+                      className="text-base font-medium text-blue-600 hover:underline flex items-center gap-1.5"
+                    >
+                      <Building2 className="h-4 w-4" />
+                      {parentCustomer.name}
+                    </Link>
+                  ) : (
+                    <p className="text-sm text-slate-400">Loading...</p>
+                  )}
+                  {parentCustomer?.phone && (
+                    <a href={`tel:${parentCustomer.phone}`} className="text-sm text-slate-600 flex items-center gap-1">
+                      <Phone className="h-3.5 w-3.5" />
+                      {parentCustomer.phone}
+                    </a>
+                  )}
+                  {parentCustomer?.email && (
+                    <a href={`mailto:${parentCustomer.email}`} className="text-sm text-slate-600 flex items-center gap-1">
+                      <Mail className="h-3.5 w-3.5" />
+                      {parentCustomer.email}
+                    </a>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onEditCustomer}
+                >
+                  <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                  Change Parent
+                </Button>
+              </div>
+
+              {/* Billing preference */}
+              <div className="flex items-start gap-3 p-4 rounded-lg border">
+                <Info className="h-4 w-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-slate-800">Billing Preference</p>
+                  {customer.billToParent ? (
+                    <p className="text-sm text-slate-600 mt-0.5">
+                      Invoices for this sub-account are billed to{" "}
+                      <span className="font-medium text-amber-700">{parentCustomer?.name ?? "the parent account"}</span>.
+                    </p>
+                  ) : (
+                    <p className="text-sm text-slate-600 mt-0.5">
+                      Invoices are billed directly to this account.
+                    </p>
+                  )}
+                  <button
+                    className="text-xs text-blue-600 hover:underline mt-1"
+                    onClick={onEditCustomer}
+                  >
+                    Change billing preference
+                  </button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      )}
+
+      {/* Sub-Accounts Tab — visible only when this customer has sub-accounts */}
+      {subAccounts.length > 0 && (
+        <TabsContent value="sub-accounts" className="space-y-6" data-testid="tab-content-sub-accounts">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-[#711419]" />
+                Sub-Accounts ({subAccounts.length})
+              </CardTitle>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => navigate(`/crm/customers/new?parentId=${customer.id}`)}
+              >
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Add Sub-Account
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="divide-y">
+                {subAccounts.map(sub => (
+                  <div key={sub.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                    <div className="space-y-0.5">
+                      <Link
+                        href={`/crm/customers/${sub.id}`}
+                        className="text-sm font-medium text-blue-600 hover:underline flex items-center gap-1"
+                      >
+                        <ChevronRight className="h-3.5 w-3.5" />
+                        {sub.name}
+                      </Link>
+                      <div className="flex items-center gap-3 text-xs text-slate-500 pl-5">
+                        {sub.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{sub.phone}</span>}
+                        {sub.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{sub.email}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {sub.billToParent && (
+                        <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50">Bills here</Badge>
+                      )}
+                      <Link href={`/crm/customers/${sub.id}`}>
+                        <Button variant="ghost" size="sm">
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      )}
     </Tabs>
   );
 }
@@ -2525,6 +2743,10 @@ export default function CrmCustomerDetail() {
   const [editEmail, setEditEmail] = useState("");
   const [editFullAddress, setEditFullAddress] = useState("");
   const [editLeadSource, setEditLeadSource] = useState("");
+  const [editParentCustomerId, setEditParentCustomerId] = useState<string | null>(null);
+  const [editBillToParent, setEditBillToParent] = useState(false);
+  const [parentSearch, setParentSearch] = useState("");
+  const [showParentDropdown, setShowParentDropdown] = useState(false);
 
   // Form state for New Job dialog
   const [jobType, setJobType] = useState<string>("SERVICE");
@@ -2877,6 +3099,26 @@ export default function CrmCustomerDetail() {
     enabled: !!currentUser && !!customerId,
   });
   const crmInvoices = crmInvoicesData?.invoices || [];
+
+  // Fetch all customers for the parent account picker (only when edit dialog is open)
+  const { data: allCustomersForPicker = [] } = useQuery<CrmCustomer[]>({
+    queryKey: ["/api/crm/customers", "picker"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers?limit=500`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch customers");
+      const data = await res.json();
+      return data.customers || [];
+    },
+    enabled: editDialogOpen,
+  });
+
+  // Filtered parent candidates: exclude self (backend validates circular refs)
+  const parentPickerOptions = allCustomersForPicker.filter(c =>
+    c.id !== customerId &&
+    (parentSearch.trim() === "" ||
+      c.name.toLowerCase().includes(parentSearch.toLowerCase()) ||
+      (c.companyName || "").toLowerCase().includes(parentSearch.toLowerCase()))
+  );
 
   // Fetch maintenance subtypes (includes custom agreement types) when MAINTENANCE is selected or dialog opens
   useEffect(() => {
@@ -3996,6 +4238,10 @@ export default function CrmCustomerDetail() {
       setEditEmail(customer.email || "");
       setEditFullAddress(customer.fullAddress || "");
       setEditLeadSource((customer as any).leadSource || "");
+      setEditParentCustomerId(customer.parentCustomerId || null);
+      setEditBillToParent(customer.billToParent || false);
+      setParentSearch("");
+      setShowParentDropdown(false);
       setEditDialogOpen(true);
     }
   };
@@ -4009,6 +4255,10 @@ export default function CrmCustomerDetail() {
     setEditEmail("");
     setEditFullAddress("");
     setEditLeadSource("");
+    setEditParentCustomerId(null);
+    setEditBillToParent(false);
+    setParentSearch("");
+    setShowParentDropdown(false);
   };
 
   const canChangeCustomerType = currentUser && ["admin", "owner"].includes(currentUser.role);
@@ -4023,6 +4273,8 @@ export default function CrmCustomerDetail() {
         email: editEmail.trim(),
         fullAddress: editFullAddress.trim(),
         leadSource: editLeadSource.trim(),
+        parentCustomerId: editParentCustomerId || null,
+        billToParent: editBillToParent,
       });
       if (!res.ok) {
         const error = await res.json();
@@ -4033,6 +4285,7 @@ export default function CrmCustomerDetail() {
     onSuccess: () => {
       toast({ title: "Customer updated successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "sub-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
       resetEditForm();
     },
@@ -5284,6 +5537,98 @@ export default function CrmCustomerDetail() {
                   data-testid="input-edit-lead-source"
                 />
               </div>
+
+              {/* Parent Account Selector */}
+              <div className="space-y-2">
+                <Label>Parent Account</Label>
+                <div className="relative">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                      <Input
+                        placeholder={editParentCustomerId
+                          ? (allCustomersForPicker.find(c => c.id === editParentCustomerId)?.name ?? "Parent selected")
+                          : "Search for parent account..."}
+                        value={parentSearch}
+                        onChange={(e) => {
+                          setParentSearch(e.target.value);
+                          setShowParentDropdown(true);
+                        }}
+                        onFocus={() => setShowParentDropdown(true)}
+                        className="pl-8"
+                        data-testid="input-parent-search"
+                      />
+                    </div>
+                    {editParentCustomerId && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-slate-400 hover:text-red-500 px-2"
+                        onClick={() => {
+                          setEditParentCustomerId(null);
+                          setEditBillToParent(false);
+                          setParentSearch("");
+                          setShowParentDropdown(false);
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  {showParentDropdown && parentSearch.trim().length >= 1 && parentPickerOptions.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                      {parentPickerOptions.slice(0, 10).map(c => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
+                          onClick={() => {
+                            setEditParentCustomerId(c.id);
+                            setParentSearch("");
+                            setShowParentDropdown(false);
+                          }}
+                        >
+                          <Building2 className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                          <span>{c.name}</span>
+                          {c.companyName && c.companyName !== c.name && (
+                            <span className="text-slate-400">— {c.companyName}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {editParentCustomerId && (
+                  <div className="flex items-center justify-between rounded-md border px-3 py-2 bg-slate-50">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-3.5 w-3.5 text-slate-500" />
+                      <span className="text-sm text-slate-700">
+                        {allCustomersForPicker.find(c => c.id === editParentCustomerId)?.name ?? "Parent account"}
+                      </span>
+                    </div>
+                    <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">Parent</Badge>
+                  </div>
+                )}
+              </div>
+
+              {/* Bill to Parent toggle (only shown when a parent is selected) */}
+              {editParentCustomerId && (
+                <div className="flex items-center justify-between rounded-md border px-3 py-2.5">
+                  <div>
+                    <Label htmlFor="edit-bill-to-parent" className="text-sm font-medium cursor-pointer">
+                      Bill to Parent Account
+                    </Label>
+                    <p className="text-xs text-slate-500 mt-0.5">Send invoices to the parent instead of this account</p>
+                  </div>
+                  <Switch
+                    id="edit-bill-to-parent"
+                    checked={editBillToParent}
+                    onCheckedChange={setEditBillToParent}
+                    data-testid="switch-edit-bill-to-parent"
+                  />
+                </div>
+              )}
             </div>
 
             <DialogFooter>
