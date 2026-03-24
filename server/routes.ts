@@ -24398,9 +24398,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       const duration = parseInt(durationMinutes) || 60;
       const slotsNeeded = Math.ceil(duration / 30); // How many 30-min slots needed
 
-      // Constants matching dispatch board (8am to 8pm)
-      const START_HOUR = 8;
-      const END_HOUR = 20;
+      // Constants matching dispatch board (6am to 6pm)
+      const START_HOUR = 6;
+      const END_HOUR = 18;
       const STEP_MINUTES = 30;
 
       // Parse the date properly - add T00:00:00 to avoid UTC interpretation

@@ -227,8 +227,8 @@ function getInitials(name: string): string {
   return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
 }
 
-const START_HOUR = 8;
-const END_HOUR = 20;
+const START_HOUR = 6;
+const END_HOUR = 18;
 const STEP_MINUTES = 30;
 const TOTAL_SLOTS = ((END_HOUR - START_HOUR) * 60) / STEP_MINUTES;
 
