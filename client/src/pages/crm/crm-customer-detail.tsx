@@ -3100,6 +3100,17 @@ export default function CrmCustomerDetail() {
   });
   const crmInvoices = crmInvoicesData?.invoices || [];
 
+  // Fetch sub-accounts (also used in CustomerTabbedView — TanStack Query deduplicates the request)
+  const { data: subAccountsForPicker = [] } = useQuery<{ id: string }[]>({
+    queryKey: ["/api/crm/customers", customerId, "sub-accounts"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${customerId}/sub-accounts`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch sub-accounts");
+      return res.json();
+    },
+    enabled: !!currentUser && !!customerId,
+  });
+
   // Fetch all customers for the parent account picker (only when edit dialog is open)
   const { data: allCustomersForPicker = [] } = useQuery<CrmCustomer[]>({
     queryKey: ["/api/crm/customers", "picker"],
@@ -3112,9 +3123,11 @@ export default function CrmCustomerDetail() {
     enabled: editDialogOpen,
   });
 
-  // Filtered parent candidates: exclude self (backend validates circular refs)
+  // Filtered parent candidates: exclude self and own sub-accounts to prevent circular hierarchy
+  const subAccountIdsForPicker = subAccountsForPicker.map(s => s.id);
   const parentPickerOptions = allCustomersForPicker.filter(c =>
     c.id !== customerId &&
+    !subAccountIdsForPicker.includes(c.id) &&
     (parentSearch.trim() === "" ||
       c.name.toLowerCase().includes(parentSearch.toLowerCase()) ||
       (c.companyName || "").toLowerCase().includes(parentSearch.toLowerCase()))

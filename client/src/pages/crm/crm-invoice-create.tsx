@@ -47,6 +47,8 @@ import {
   Zap,
   CalendarIcon,
   Settings2,
+  Info,
+  Building2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
@@ -284,6 +286,18 @@ export default function CrmInvoiceCreate() {
   });
 
   const newWOProjects = projectsResponse?.projects || [];
+
+  // Fetch parent customer for billing-to-parent banner (when selected WO customer bills to parent)
+  const woCustomer = selectedWorkOrder?.customer;
+  const { data: parentCustomerForBanner } = useQuery<CrmCustomer>({
+    queryKey: ["/api/crm/customers", woCustomer?.parentCustomerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${woCustomer!.parentCustomerId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch parent customer");
+      return res.json();
+    },
+    enabled: !!woCustomer?.parentCustomerId && !!woCustomer?.billToParent,
+  });
 
   // Fetch maintenance subtypes (includes custom agreement types) when MAINTENANCE is selected
   useEffect(() => {
@@ -826,6 +840,19 @@ export default function CrmInvoiceCreate() {
                           Linked from Work Order
                         </div>
                       </div>
+                      {/* Billing-to-parent notice */}
+                      {woCustomer?.billToParent && (
+                        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                          <Info className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm text-amber-800">
+                            <span className="font-medium">Billing to parent: </span>
+                            {parentCustomerForBanner
+                              ? parentCustomerForBanner.name
+                              : "parent account"}
+                            {" — invoices for this sub-account go to the parent."}
+                          </p>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <>
