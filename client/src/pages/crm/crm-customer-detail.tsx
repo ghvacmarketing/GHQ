@@ -699,6 +699,8 @@ interface TimelineEntry {
   status?: string;
   amount?: string;
   linkUrl?: string;
+  signatureImage?: string;
+  signerName?: string;
 }
 
 const timelineTypeConfig: Record<TimelineEntry['type'], { icon: any; bgColor: string; textColor: string; borderColor: string; label: string }> = {
@@ -921,6 +923,20 @@ function TimelineTabContent({ customerId }: { customerId: string }) {
                           <h4 className="font-medium text-slate-900">{entry.title}</h4>
                           {entry.type !== 'quote' && (
                             <p className="text-sm text-slate-500 mt-1 line-clamp-2">{entry.description}</p>
+                          )}
+                          {entry.type === 'quote' && entry.signatureImage && (
+                            <div className="mt-2 space-y-1">
+                              {entry.signerName && (
+                                <p className="text-xs text-slate-500">Signed by: <span className="font-medium">{entry.signerName}</span></p>
+                              )}
+                              <div className="border border-slate-200 rounded-md bg-slate-50 p-1 inline-block">
+                                <img
+                                  src={entry.signatureImage}
+                                  alt="Client signature"
+                                  className="h-12 w-auto max-w-[200px] object-contain"
+                                />
+                              </div>
+                            </div>
                           )}
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">

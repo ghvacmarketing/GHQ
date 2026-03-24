@@ -1384,11 +1384,17 @@ export default function CrmQuoteDetail() {
     const isDepositType = DEPOSIT_QUOTE_TYPES.includes(quote?.quoteType?.toLowerCase() || "");
     if (isDepositType) {
       if (quote?.quoteMode === "options") {
-        acceptMutation.mutate({});
+        const opts = [...new Set(
+          (quote?.lineItems || [])
+            .map((li: any) => li.optionTag)
+            .filter((tag: any): tag is string => !!tag)
+        )];
+        setAvailableOptions(opts);
       } else {
-        setPendingManualOption(null);
-        setShowManualSignatureDialog(true);
+        setAvailableOptions([]);
       }
+      setPendingManualOption(null);
+      setShowManualSignatureDialog(true);
     } else {
       acceptMutation.mutate({});
     }
@@ -1399,15 +1405,7 @@ export default function CrmQuoteDetail() {
       toast({ title: "Please select an option", variant: "destructive" });
       return;
     }
-    const isDepositType = DEPOSIT_QUOTE_TYPES.includes(quote?.quoteType?.toLowerCase() || "");
-    if (isDepositType) {
-      setPendingManualOption(selectedOption);
-      setSelectedOption("");
-      setShowAcceptOptionSelection(false);
-      setShowManualSignatureDialog(true);
-    } else {
-      acceptMutation.mutate({ selectedOption });
-    }
+    acceptMutation.mutate({ selectedOption });
   };
 
   const handleConfirmManualSignature = () => {
@@ -3804,22 +3802,44 @@ export default function CrmQuoteDetail() {
             setManualSignature("");
             setManualSignerName("");
             setPendingManualOption(null);
+            setAvailableOptions([]);
           }
         }}
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Client Signature Required</DialogTitle>
+            <DialogTitle>Accept Quote</DialogTitle>
             <DialogDescription>
-              Have the client sign below to confirm they accept this quote.
-              {pendingManualOption && (
-                <span className="block mt-1 font-medium text-slate-700">
-                  Selected option: {pendingManualOption}
-                </span>
-              )}
+              {availableOptions.length > 0
+                ? "Select the customer's choice and capture their signature."
+                : "Have the client sign below to confirm they accept this quote."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {availableOptions.length > 0 && (
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-2">
+                  Customer's Choice
+                </label>
+                <div className="space-y-2">
+                  {availableOptions.map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => setPendingManualOption(option)}
+                      className={`w-full p-3 text-left rounded-lg border-2 transition-colors ${
+                        pendingManualOption === option
+                          ? "border-[#711419] bg-[#711419]/5"
+                          : "border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      <span className={`font-medium ${pendingManualOption === option ? "text-[#711419]" : ""}`}>
+                        {option}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <PresentationSignaturePad onSignatureChange={setManualSignature} />
             <div>
               <label className="text-sm font-medium text-slate-700 block mb-1">
@@ -3840,13 +3860,19 @@ export default function CrmQuoteDetail() {
                 setManualSignature("");
                 setManualSignerName("");
                 setPendingManualOption(null);
+                setAvailableOptions([]);
               }}
             >
               Cancel
             </Button>
             <Button
               onClick={handleConfirmManualSignature}
-              disabled={!manualSignature || !manualSignerName.trim() || acceptInPersonMutation.isPending}
+              disabled={
+                (availableOptions.length > 0 && !pendingManualOption) ||
+                !manualSignature ||
+                !manualSignerName.trim() ||
+                acceptInPersonMutation.isPending
+              }
               className="bg-[#711419] hover:bg-[#711419]/90 text-white"
             >
               {acceptInPersonMutation.isPending ? (

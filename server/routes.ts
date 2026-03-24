@@ -10731,6 +10731,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status?: string;
         amount?: string;
         linkUrl?: string;
+        signatureImage?: string;
+        signerName?: string;
       }
       
       const timeline: TimelineEntry[] = [];
@@ -10798,6 +10800,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: quote.status || undefined,
           amount: quote.total ? `$${parseFloat(quote.total).toLocaleString()}` : undefined,
           linkUrl: `/crm/quotes/${quote.id}`,
+          signatureImage: quote.signatureImage || undefined,
+          signerName: quote.signerName || undefined,
         });
       }
       
