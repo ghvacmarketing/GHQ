@@ -680,7 +680,7 @@ export default function CrmAgreements() {
 
         {/* Tab Filters with Type dropdown on right */}
         <div className="flex items-center justify-between border-b border-slate-200">
-          <div className="flex overflow-x-auto">
+          <div className="flex overflow-x-auto overflow-y-hidden">
             {tabFilters.map((tab) => {
               const count = tab.key === "all" ? statusCounts.all_active
                 : tab.key === "pending" ? statusCounts.pending
