@@ -4298,20 +4298,22 @@ export default function CrmCustomerDetail() {
             Back
           </Button>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1">
             {(customer as any).source !== 'fieldedge' && (
-              <Button 
-                variant="outline"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={openEditDialog}
+                className="text-slate-600 hover:text-slate-900"
                 data-testid="button-edit-customer"
               >
-                <Pencil className="h-4 w-4 mr-2" />
-                Edit Customer
+                <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                Edit
               </Button>
             )}
             {currentUser && ["admin", "owner", "sales"].includes(currentUser.role) && (customer as any).source !== 'fieldedge' && (
-              <div className="flex items-center gap-3 border rounded-lg px-3 py-1.5">
-                <span className="text-sm text-muted-foreground">Customer Portal</span>
+              <div className="flex items-center gap-2 px-2">
+                <span className="text-xs text-slate-400">Portal</span>
                 <Switch
                   checked={customer.portalEnabled}
                   onCheckedChange={(checked) => togglePortalMutation.mutate(checked)}
@@ -4319,33 +4321,32 @@ export default function CrmCustomerDetail() {
                   data-testid="switch-portal-access"
                 />
                 {customer.portalEnabled && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                  <button
                     onClick={() => generatePortalLinkMutation.mutate()}
                     disabled={generatePortalLinkMutation.isPending}
-                    className="h-7 px-2"
+                    className="text-slate-400 hover:text-slate-600 transition-colors"
                     data-testid="button-generate-portal-link"
+                    title="Copy portal link"
                   >
                     {generatePortalLinkMutation.isPending ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <Link2 className="h-3 w-3" />
+                      <Link2 className="h-3.5 w-3.5" />
                     )}
-                    <span className="ml-1 text-xs">Copy Link</span>
-                  </Button>
+                  </button>
                 )}
               </div>
             )}
             {canDeleteCustomer && (customer as any).source !== 'fieldedge' && (
-              <Button 
-                variant="outline"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setDeleteDialogOpen(true)}
-                className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+                className="text-red-400 hover:text-red-600 hover:bg-red-50"
                 data-testid="button-delete-customer"
               >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Customer
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                Delete
               </Button>
             )}
           </div>
