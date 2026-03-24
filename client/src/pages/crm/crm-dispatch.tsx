@@ -4078,7 +4078,7 @@ export default function CrmDispatch() {
         >
           <div ref={dispatchBoardRef} className="flex flex-col flex-1 min-h-0 gap-4 overflow-hidden">
             {/* Scrollable Technician Schedule - vertical scroll here, horizontal inside component */}
-            <div className="flex-1 min-h-[320px] overflow-y-auto overflow-x-hidden">
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
               {viewMode === "trucks" ? (
                 <TrucksMapView technicians={technicians} />
               ) : viewMode === "day" ? (
