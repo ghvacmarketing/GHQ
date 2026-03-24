@@ -2630,10 +2630,6 @@ function CustomerTabbedView({
                     </Link>
                   )}
                 </div>
-                <Button size="sm" variant="outline" onClick={onEditCustomer} className="shrink-0">
-                  <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                  Change
-                </Button>
               </div>
 
               {/* Billing preference — inline toggle */}
