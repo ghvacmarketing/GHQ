@@ -2680,8 +2680,10 @@ function CustomerTabbedView({
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {sub.billToParent && (
-                        <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50">Bills here</Badge>
+                      {sub.billToParent ? (
+                        <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50">Bills to Parent</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs border-green-300 text-green-700 bg-green-50">Bills Here</Badge>
                       )}
                       <Link href={`/crm/customers/${sub.id}`}>
                         <Button variant="ghost" size="sm">
