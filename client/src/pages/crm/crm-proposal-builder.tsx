@@ -5163,20 +5163,19 @@ export default function CrmProposalBuilder() {
             </div>
           </ScrollArea>
           
-          <div className="border-t p-4 bg-card shrink-0 flex-none">
-            <div className="flex flex-col sm:flex-row gap-2">
+          <div className="border-t border-slate-100 bg-white px-6 py-4 shrink-0 flex-none rounded-b-2xl">
+            <div className="flex gap-3">
               <Button
                 variant="outline"
                 onClick={() => setQuoteDialogOpen(false)}
-                className="flex-1 min-h-[44px]"
+                className="flex-1 h-11 rounded-xl border-slate-200 text-slate-700 hover:bg-slate-50"
               >
                 Close
               </Button>
               <Button
-                variant="default"
                 onClick={handleSaveToCrm}
                 disabled={cart.length === 0 || !selectedCustomer || saveToCrmMutation.isPending}
-                className="flex-1 min-h-[44px] bg-blue-600 hover:bg-blue-700"
+                className="flex-1 h-11 rounded-xl bg-[#711419] hover:bg-[#5a1014] text-white"
                 data-testid="button-save-to-crm"
               >
                 {saveToCrmMutation.isPending ? (
@@ -5185,23 +5184,6 @@ export default function CrmProposalBuilder() {
                   <FileText className="h-4 w-4 mr-2" />
                 )}
                 Save to CRM
-              </Button>
-              <Button
-                onClick={downloadQuoteAsDoc}
-                variant="outline"
-                className="flex-1 min-h-[44px]"
-                data-testid="button-download-doc"
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Download Doc
-              </Button>
-              <Button
-                onClick={downloadQuoteAsPDF}
-                className="flex-1 min-h-[44px]"
-                data-testid="button-download-quote"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download PDF
               </Button>
             </div>
           </div>
