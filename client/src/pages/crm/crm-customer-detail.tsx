@@ -904,7 +904,9 @@ function TimelineTabContent({ customerId }: { customerId: string }) {
                             )}
                           </div>
                           <h4 className="font-medium text-slate-900">{entry.title}</h4>
-                          <p className="text-sm text-slate-500 mt-1 line-clamp-2">{entry.description}</p>
+                          {entry.type !== 'quote' && (
+                            <p className="text-sm text-slate-500 mt-1 line-clamp-2">{entry.description}</p>
+                          )}
                         </div>
                         {entry.amount && (
                           <div className="text-right flex-shrink-0">
