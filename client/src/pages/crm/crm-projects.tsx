@@ -1287,7 +1287,7 @@ export default function CrmProjects() {
           </Button>
         </div>
 
-        <div className="flex overflow-x-auto border-b border-slate-200">
+        <div className="flex overflow-x-auto overflow-y-hidden border-b border-slate-200">
           <button
             onClick={() => setMainViewTab("overview")}
             className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-2 ${
@@ -1540,7 +1540,7 @@ export default function CrmProjects() {
                 <p className="text-sm text-slate-500">Total: {total}</p>
               </div>
 
-              <div className="flex overflow-x-auto border-b border-slate-200">
+              <div className="flex overflow-x-auto overflow-y-hidden border-b border-slate-200">
                 {(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => (
                   <button
                     key={tab}

@@ -1647,7 +1647,7 @@ export default function CrmProspectFunnel() {
           </div>
           
           {/* Tabs styled like work orders page - underline style */}
-          <div className="flex overflow-x-auto border-b border-slate-200" data-testid="tabs-main-view">
+          <div className="flex overflow-x-auto overflow-y-hidden border-b border-slate-200" data-testid="tabs-main-view">
             <button
               onClick={() => setMainViewTab("overview")}
               className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-2 ${

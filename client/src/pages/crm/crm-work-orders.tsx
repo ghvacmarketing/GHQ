@@ -1267,7 +1267,7 @@ export default function CrmWorkOrders() {
         </div>
 
         {/* Tabs styled like projects/customers page - underline style */}
-        <div className="flex overflow-x-auto border-b border-slate-200">
+        <div className="flex overflow-x-auto overflow-y-hidden border-b border-slate-200">
           {(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => (
             <button
               key={tab}
