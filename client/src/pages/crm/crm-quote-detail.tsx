@@ -176,7 +176,7 @@ export default function CrmQuoteDetail() {
     if (fromCustomer && customerIdParam) {
       navigate(`/crm/customers/${customerIdParam}?tab=${tabParam || "quotes"}`);
     } else {
-      window.history.back();
+      navigate("/crm/quotes");
     }
   };
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);

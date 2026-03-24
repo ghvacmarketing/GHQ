@@ -1260,6 +1260,12 @@ export default function CrmProposalBuilder() {
         title: "Saved to CRM!",
         description: `Quote ${data.quote?.quoteNumber || ''} created successfully.`,
       });
+      if (data.quote) {
+        queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+          if (!old?.quotes) return old;
+          return { ...old, quotes: [data.quote, ...old.quotes] };
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       setQuoteDialogOpen(false);

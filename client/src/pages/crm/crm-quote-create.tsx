@@ -528,7 +528,13 @@ export default function CrmQuoteCreate() {
 
       const data = await response.json();
       
-      // Invalidate quotes cache for instant sync
+      // Add new quote to cache immediately for instant list appearance
+      if (data.quote) {
+        queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+          if (!old?.quotes) return old;
+          return { ...old, quotes: [data.quote, ...old.quotes] };
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       if (projectIdFromUrl) {
         queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectIdFromUrl, "quotes"] });
