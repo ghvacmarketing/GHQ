@@ -290,22 +290,30 @@ export async function syncPricebookPackages(): Promise<{ updated: number; insert
           // Store sheet prices as base prices, then recompute final prices using
           // the package's stored cumulative adjustment (adjustmentBasisPoints).
           const row = existing[0];
-          const basisPoints = row.adjustmentBasisPoints ?? 0;
-          const multiplier = 1 + basisPoints / 10000;
 
           const newBaseMonthly = pkg.monthlyPayment;
           const newBaseTotal = pkg.totalInvestment;
-          const newMonthly = Math.round(newBaseMonthly * multiplier);
-          const newTotal = Math.round(newBaseTotal * multiplier);
+          const pricesValid = newBaseMonthly > 0 && newBaseTotal > 0 &&
+            !isNaN(newBaseMonthly) && !isNaN(newBaseTotal);
 
-          const updates: Record<string, any> = {
-            // Base prices always come from the sheet
-            baseMonthlyPayment: newBaseMonthly,
-            baseTotalInvestment: newBaseTotal,
-            // Final prices = base × multiplier
-            monthlyPayment: newMonthly,
-            totalInvestment: newTotal,
-          };
+          if (!pricesValid) {
+            errors.push(`Skipping price update for ${pkg.unitType}/${pkg.tonnage}/${pkg.packageLevel}: sheet returned 0 or invalid price`);
+          }
+
+          const basisPoints = row.adjustmentBasisPoints ?? 0;
+          const multiplier = 1 + basisPoints / 10000;
+
+          const updates: Record<string, any> = {};
+
+          if (pricesValid) {
+            // Base prices always come from the sheet; final = base × multiplier
+            const newMonthly = Math.round(newBaseMonthly * multiplier);
+            const newTotal = Math.round(newBaseTotal * multiplier);
+            updates.baseMonthlyPayment = newBaseMonthly;
+            updates.baseTotalInvestment = newBaseTotal;
+            updates.monthlyPayment = newMonthly;
+            updates.totalInvestment = newTotal;
+          }
 
           // Update equipment fields if they have actual values in the sheet
           if (pkg.outdoorBrand) updates.outdoorBrand = pkg.outdoorBrand;

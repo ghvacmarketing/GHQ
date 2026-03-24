@@ -193,9 +193,15 @@ export default function CrmSettingsPackages() {
     });
   }, [packages, priceTableUnitType]);
 
+  // Only show the base-price column when at least one package has a base price
+  // that differs from the final price (i.e. an active adjustment exists).
   const hasBaseData = useMemo(() => {
     if (!packages) return false;
-    return packages.some((pkg: any) => pkg.baseTotalInvestment != null);
+    return packages.some(
+      (pkg: any) =>
+        pkg.baseTotalInvestment != null &&
+        pkg.baseTotalInvestment !== pkg.totalInvestment
+    );
   }, [packages]);
 
   const formatCents = (cents: number | null | undefined) => {
