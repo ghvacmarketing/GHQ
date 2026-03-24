@@ -1343,13 +1343,25 @@ export default function CrmQuoteDetail() {
       }
       return res.json();
     },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/quotes"] });
+      const snapshots = queryClient.getQueriesData({ queryKey: ["/api/crm/quotes"] });
+      queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+        if (!old?.quotes) return old;
+        return { ...old, quotes: old.quotes.filter((q: any) => q.id !== quoteId) };
+      });
+      navigate("/crm/quotes");
+      return { snapshots };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Quote deleted", description: "The quote has been permanently deleted." });
-      navigate("/crm/quotes");
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _vars, context: any) => {
+      context?.snapshots?.forEach(([key, data]: [any, any]) => {
+        queryClient.setQueryData(key, data);
+      });
       toast({ title: "Failed to delete quote", description: error.message, variant: "destructive" });
     },
   });

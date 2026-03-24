@@ -305,16 +305,28 @@ export default function CrmQuotes() {
     mutationFn: async ({ id }: { id: string; customerId?: string | null }) => {
       await apiRequest("DELETE", `/api/crm/quotes/${id}`);
     },
+    onMutate: async ({ id }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/quotes"] });
+      const snapshots = queryClient.getQueriesData({ queryKey: ["/api/crm/quotes"] });
+      queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+        if (!old?.quotes) return old;
+        return { ...old, quotes: old.quotes.filter((q: any) => q.id !== id) };
+      });
+      setSelectedQuote(null);
+      return { snapshots };
+    },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       if (variables.customerId) {
         queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", { customerId: variables.customerId }] });
       }
-      setSelectedQuote(null);
       toast({ title: "Quote deleted successfully" });
     },
-    onError: () => {
+    onError: (_err, _vars, context: any) => {
+      context?.snapshots?.forEach(([key, data]: [any, any]) => {
+        queryClient.setQueryData(key, data);
+      });
       toast({ title: "Failed to delete quote", variant: "destructive" });
     },
   });
