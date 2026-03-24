@@ -568,8 +568,8 @@ function QueueStageBox({
   );
 }
 
-const SCHEDULE_START_HOUR = 8;
-const SCHEDULE_END_HOUR = 20;
+const SCHEDULE_START_HOUR = 6;
+const SCHEDULE_END_HOUR = 22;
 const SCHEDULE_TOTAL_MINUTES = (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR) * 60;
 const SCHEDULE_INTERVAL = 30;
 const SCHEDULE_TIMELINE_WIDTH = TIMELINE_WIDTH;
@@ -2233,9 +2233,9 @@ export default function CrmDispatch() {
   
   const timeOptions = useMemo(() => {
     const options: { value: string; label: string }[] = [];
-    for (let hour = 8; hour <= 20; hour++) {
+    for (let hour = SCHEDULE_START_HOUR; hour <= SCHEDULE_END_HOUR; hour++) {
       for (let minute = 0; minute < 60; minute += 30) {
-        if (hour === 20 && minute > 0) break;
+        if (hour === SCHEDULE_END_HOUR && minute > 0) break;
         const hourStr = hour.toString().padStart(2, "0");
         const minuteStr = minute.toString().padStart(2, "0");
         const value = `${hourStr}:${minuteStr}`;
