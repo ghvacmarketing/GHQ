@@ -1484,7 +1484,7 @@ function CustomerTabbedView({
   });
 
   // Parent customer data (when this customer IS a sub-account)
-  const { data: parentCustomer } = useQuery<CrmCustomer>({
+  const { data: parentCustomer, isLoading: parentCustomerLoading } = useQuery<CrmCustomer>({
     queryKey: ["/api/crm/customers", customer.parentCustomerId],
     queryFn: async () => {
       const res = await fetch(`/api/crm/customers/${customer.parentCustomerId}`, { credentials: "include" });
@@ -1492,6 +1492,17 @@ function CustomerTabbedView({
       return res.json();
     },
     enabled: !!customer.parentCustomerId,
+    retry: 1,
+  });
+
+  // Mutation to directly update billToParent without opening the full edit dialog
+  const updateBillingMutation = useMutation({
+    mutationFn: async (billToParent: boolean) => {
+      return apiRequest("PATCH", `/api/crm/customers/${customer.id}`, { billToParent });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customer.id] });
+    },
   });
 
   const { data: overviewTimeline, isLoading: timelineLoading } = useQuery<TimelineEntry[]>({
@@ -2569,7 +2580,7 @@ function CustomerTabbedView({
 
       {/* Sub-Account Tab — visible only when this customer is a sub-account */}
       {customer.parentCustomerId && (
-        <TabsContent value="sub-account" className="space-y-6" data-testid="tab-content-sub-account">
+        <TabsContent value="sub-account" className="space-y-4" data-testid="tab-content-sub-account">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -2577,67 +2588,87 @@ function CustomerTabbedView({
                 Sub-Account Details
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Parent account link */}
-              <div className="flex items-start justify-between gap-4 p-4 bg-slate-50 rounded-lg border">
-                <div className="space-y-1">
+            <CardContent className="space-y-5">
+              {/* Parent account row */}
+              <div className="flex items-center justify-between gap-4 p-4 bg-slate-50 rounded-lg border">
+                <div className="space-y-1 min-w-0">
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Parent Account</p>
-                  {parentCustomer ? (
+                  {parentCustomerLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-slate-400">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Loading...
+                    </div>
+                  ) : parentCustomer ? (
+                    <>
+                      <Link
+                        href={`/crm/customers/${customer.parentCustomerId}`}
+                        className="text-base font-medium text-blue-600 hover:underline flex items-center gap-1.5"
+                      >
+                        <Building2 className="h-4 w-4" />
+                        {parentCustomer.name}
+                      </Link>
+                      <div className="flex flex-wrap gap-3 mt-1">
+                        {parentCustomer.phone && (
+                          <a href={`tel:${parentCustomer.phone}`} className="text-sm text-slate-500 flex items-center gap-1 hover:text-slate-700">
+                            <Phone className="h-3.5 w-3.5" />{parentCustomer.phone}
+                          </a>
+                        )}
+                        {parentCustomer.email && (
+                          <a href={`mailto:${parentCustomer.email}`} className="text-sm text-slate-500 flex items-center gap-1 hover:text-slate-700">
+                            <Mail className="h-3.5 w-3.5" />{parentCustomer.email}
+                          </a>
+                        )}
+                      </div>
+                    </>
+                  ) : (
                     <Link
                       href={`/crm/customers/${customer.parentCustomerId}`}
-                      className="text-base font-medium text-blue-600 hover:underline flex items-center gap-1.5"
+                      className="text-sm text-blue-600 hover:underline flex items-center gap-1"
                     >
-                      <Building2 className="h-4 w-4" />
-                      {parentCustomer.name}
+                      <Building2 className="h-3.5 w-3.5" />
+                      View parent account
                     </Link>
-                  ) : (
-                    <p className="text-sm text-slate-400">Loading...</p>
-                  )}
-                  {parentCustomer?.phone && (
-                    <a href={`tel:${parentCustomer.phone}`} className="text-sm text-slate-600 flex items-center gap-1">
-                      <Phone className="h-3.5 w-3.5" />
-                      {parentCustomer.phone}
-                    </a>
-                  )}
-                  {parentCustomer?.email && (
-                    <a href={`mailto:${parentCustomer.email}`} className="text-sm text-slate-600 flex items-center gap-1">
-                      <Mail className="h-3.5 w-3.5" />
-                      {parentCustomer.email}
-                    </a>
                   )}
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={onEditCustomer}
-                >
+                <Button size="sm" variant="outline" onClick={onEditCustomer} className="shrink-0">
                   <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                  Change Parent
+                  Change
                 </Button>
               </div>
 
-              {/* Billing preference */}
-              <div className="flex items-start gap-3 p-4 rounded-lg border">
-                <Info className="h-4 w-4 text-slate-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-slate-800">Billing Preference</p>
-                  {customer.billToParent ? (
-                    <p className="text-sm text-slate-600 mt-0.5">
-                      Invoices for this sub-account are billed to{" "}
-                      <span className="font-medium text-amber-700">{parentCustomer?.name ?? "the parent account"}</span>.
-                    </p>
-                  ) : (
-                    <p className="text-sm text-slate-600 mt-0.5">
-                      Invoices are billed directly to this account.
-                    </p>
-                  )}
+              {/* Billing preference — inline toggle */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-slate-700">Billing Preference</p>
+                <div className="flex rounded-lg border overflow-hidden">
                   <button
-                    className="text-xs text-blue-600 hover:underline mt-1"
-                    onClick={onEditCustomer}
+                    className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
+                      !customer.billToParent
+                        ? "bg-[#711419] text-white"
+                        : "bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                    onClick={() => !customer.billToParent ? null : updateBillingMutation.mutate(false)}
+                    disabled={updateBillingMutation.isPending}
                   >
-                    Change billing preference
+                    Bill to this account
+                  </button>
+                  <button
+                    className={`flex-1 px-4 py-2.5 text-sm font-medium border-l transition-colors ${
+                      customer.billToParent
+                        ? "bg-[#711419] text-white"
+                        : "bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                    onClick={() => customer.billToParent ? null : updateBillingMutation.mutate(true)}
+                    disabled={updateBillingMutation.isPending}
+                  >
+                    Bill to parent
+                    {parentCustomer && <span className="ml-1 opacity-75 text-xs">({parentCustomer.name})</span>}
                   </button>
                 </div>
+                {updateBillingMutation.isPending && (
+                  <p className="text-xs text-slate-400 flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Saving...
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
