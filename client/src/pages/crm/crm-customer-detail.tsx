@@ -2680,14 +2680,13 @@ function CustomerTabbedView({
                 <Users className="h-5 w-5 text-[#711419]" />
                 Sub-Accounts ({subAccounts.length})
               </CardTitle>
-              <Button
-                size="sm"
-                variant="outline"
+              <button
                 onClick={() => navigate(`/crm/accounts/new?parentId=${customer.id}`)}
+                className="flex items-center gap-1 text-xs text-slate-500 hover:text-[#711419] transition-colors"
               >
-                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                <Plus className="h-3.5 w-3.5" />
                 Add Sub-Account
-              </Button>
+              </button>
             </CardHeader>
             <CardContent>
               <div className="divide-y">
