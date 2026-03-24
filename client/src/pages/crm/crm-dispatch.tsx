@@ -4121,7 +4121,7 @@ export default function CrmDispatch() {
             
             {/* Fixed Unassigned Queue - hidden in trucks view */}
             {viewMode !== "trucks" && (
-            <div className="flex-shrink-0 max-h-[320px] overflow-y-auto overflow-x-hidden scrollbar-hide">
+            <div className="flex-shrink-0 max-h-[320px] overflow-y-auto overflow-x-hidden">
               <UnassignedQueueSection
                 workOrders={unassignedWorkOrders}
                 onWorkOrderClick={handleWorkOrderClick}

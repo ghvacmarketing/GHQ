@@ -258,3 +258,22 @@ gmp-place-autocomplete::part(input)::placeholder {
     width: 24px;
   }
 }
+
+/* Minimalist maroon scrollbars */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #711419;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #5a1014;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
