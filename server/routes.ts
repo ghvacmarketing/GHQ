@@ -26379,7 +26379,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(400).json({ message: "percentageChange must be a number" });
       }
 
-      const multiplier = 1 + percentageChange / 100;
+      const newBasisPoints = Math.round(percentageChange * 100); // e.g. 5% → 500 bps
       let packagesAffected = 0;
       const crmUser = getCurrentCrmUser(req);
 
@@ -26399,14 +26399,27 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           .from(pricebookPackages)
           .where(and(...conditions));
 
-        // Update each package
+        // Update each package using base prices + cumulative adjustment basis points.
+        // If base prices are not yet set (rows predating this feature), fall back to
+        // treating the current stored price as the base at 0% adjustment.
         for (const pkg of matchingPackages) {
-          const newMonthlyPayment = Math.round(pkg.monthlyPayment * multiplier);
-          const newTotalInvestment = Math.round(pkg.totalInvestment * multiplier);
+          const cumulativeBps = (pkg.adjustmentBasisPoints ?? 0) + newBasisPoints;
+          const multiplier = 1 + cumulativeBps / 10000;
+
+          // Determine base prices: use stored base or fall back to current price
+          const baseMonthly = pkg.baseMonthlyPayment ?? pkg.monthlyPayment;
+          const baseTotal = pkg.baseTotalInvestment ?? pkg.totalInvestment;
+
+          const newMonthlyPayment = Math.round(baseMonthly * multiplier);
+          const newTotalInvestment = Math.round(baseTotal * multiplier);
 
           await db
             .update(pricebookPackages)
             .set({
+              adjustmentBasisPoints: cumulativeBps,
+              // Ensure base prices are set in case this is the first adjustment
+              baseMonthlyPayment: baseMonthly,
+              baseTotalInvestment: baseTotal,
               monthlyPayment: newMonthlyPayment,
               totalInvestment: newTotalInvestment,
               updatedAt: new Date(),

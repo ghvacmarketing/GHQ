@@ -3108,6 +3108,11 @@ export const pricebookPackages = pgTable("pricebook_packages", {
   coilImageUrl: text("coil_image_url"),
   thermostatImageUrl: text("thermostat_image_url"),
   furnaceImageUrl: text("furnace_image_url"),
+  // Base prices from Google Sheets (master source). NULL until first sync after migration.
+  baseMonthlyPayment: integer("base_monthly_payment"),
+  baseTotalInvestment: integer("base_total_investment"),
+  // Cumulative adjustment in basis points (500 = +5%, -200 = -2%). Default 0 = no adjustment.
+  adjustmentBasisPoints: integer("adjustment_basis_points").default(0),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
