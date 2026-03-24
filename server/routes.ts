@@ -10841,6 +10841,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           timestamp: toISOTimestamp(note.createdAt),
         });
       }
+
+      // Query customer comments (posted via the timeline comment box)
+      const comments = await db
+        .select({ comment: crmComments, user: crmUsers })
+        .from(crmComments)
+        .leftJoin(crmUsers, eq(crmComments.authorId, crmUsers.id))
+        .where(and(eq(crmComments.entityType, 'customer'), eq(crmComments.entityId, customerId)));
+      for (const { comment, user } of comments) {
+        timeline.push({
+          id: `comment-${comment.id}`,
+          type: 'note',
+          title: user?.displayName || 'Note',
+          description: (comment.body || '').replace(/@\[[^\]]+\]/g, '').trim().substring(0, 100),
+          timestamp: toISOTimestamp(comment.createdAt),
+        });
+      }
       
       // Sort by timestamp descending (newest first)
       timeline.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());

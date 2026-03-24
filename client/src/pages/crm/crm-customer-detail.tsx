@@ -1634,45 +1634,6 @@ function CustomerTabbedView({
           </CardContent>
         </Card>
 
-        {/* Quick Actions */}
-        <Card className="border shadow-sm" data-testid="card-quick-actions">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium text-slate-800">Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="flex flex-wrap gap-3">
-              <Button 
-                size="sm"
-                onClick={onCreateProject}
-                className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                data-testid="button-quick-create-project"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                New Project
-              </Button>
-              <Button 
-                size="sm"
-                onClick={onScheduleVisit}
-                variant="outline"
-                className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
-                data-testid="button-quick-create-work-order"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                New Work Order
-              </Button>
-              <Button 
-                size="sm"
-                onClick={onCreateLead}
-                variant="outline"
-                className="border-amber-600 text-amber-600 hover:bg-amber-50"
-                data-testid="button-quick-create-lead"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                New Lead
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Setup Checklist Card - Only for Property Managers */}
         {isPropertyManager && (
@@ -1858,7 +1819,7 @@ function CustomerTabbedView({
                             </span>
                           </div>
                           <p className="text-sm text-slate-600 line-clamp-2">
-                            {entry.description}
+                            {entry.description?.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()}
                           </p>
                         </div>
                       </div>
