@@ -3766,9 +3766,9 @@ export default function CrmDispatch() {
 
   return (
     <CrmLayout currentUser={currentUser} disableScroll>
-      <div className="flex h-full max-w-full overflow-hidden">
-        {/* Main Content - shrinks when panel is open */}
-        <div className={cn("flex flex-col overflow-y-auto overflow-x-hidden transition-all duration-200 scrollbar-hide", selectedWorkOrder ? "flex-1 min-w-0" : "w-full")}>
+      <div className="relative h-full max-w-full overflow-hidden">
+        {/* Main Content - always full width; sidebar overlays on top */}
+        <div className="flex flex-col overflow-y-auto overflow-x-hidden scrollbar-hide h-full w-full">
         {/* Fixed Header Section */}
         <div className="flex-shrink-0 space-y-3 pb-3">
           <div className="flex justify-center">
@@ -4143,19 +4143,19 @@ export default function CrmDispatch() {
 
         {/* Side Panel - Push Layout */}
         {selectedWorkOrder && (
-          <div className="w-[400px] border-l border-slate-200 bg-white flex-shrink-0 flex flex-col overflow-hidden" data-testid="workorder-detail-panel">
+          <div className="absolute right-0 top-0 h-full w-[400px] border-l border-slate-200 bg-white flex flex-col overflow-hidden shadow-lg z-20" data-testid="workorder-detail-panel">
             {/* Panel Header */}
-            <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-[#1e7e34] text-white flex-shrink-0">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white flex-shrink-0">
               <div>
-                <h2 className="text-lg font-semibold" data-testid="panel-workorder-title">Work Order: {selectedWorkOrder.workOrderNumber}</h2>
-                <p className="text-sm text-white/80">Status: {statusLabels[selectedWorkOrder.status] || selectedWorkOrder.status}</p>
+                <h2 className="text-sm font-semibold text-slate-900" data-testid="panel-workorder-title">Work Order: {selectedWorkOrder.workOrderNumber}</h2>
+                <p className="text-xs text-slate-500">Status: {statusLabels[selectedWorkOrder.status] || selectedWorkOrder.status}</p>
               </div>
               <button
                 onClick={() => setSelectedWorkOrderId(null)}
-                className="p-1.5 hover:bg-white/20 rounded-full transition-colors"
+                className="p-1.5 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
                 aria-label="Close panel"
               >
-                <XCircle className="h-5 w-5" />
+                <XCircle className="h-4 w-4" />
               </button>
             </div>
             
@@ -4296,7 +4296,8 @@ export default function CrmDispatch() {
                     data-testid="textarea-work-order-details"
                   />
                   <Button 
-                    size="sm" 
+                    size="sm"
+                    variant="outline"
                     onClick={handleSaveWorkOrderDetails}
                     disabled={updateWorkOrderMutation.isPending}
                     data-testid="button-save-work-order-details"
@@ -4326,7 +4327,8 @@ export default function CrmDispatch() {
                     data-testid="textarea-dispatch-notes"
                   />
                   <Button 
-                    size="sm" 
+                    size="sm"
+                    variant="outline"
                     onClick={handleSaveDispatchNotes}
                     disabled={!dispatchNote.trim() || updateWorkOrderMutation.isPending}
                     data-testid="button-save-dispatch-notes"
@@ -4362,7 +4364,8 @@ export default function CrmDispatch() {
                     data-testid="textarea-notes"
                   />
                   <Button 
-                    size="sm" 
+                    size="sm"
+                    variant="outline"
                     onClick={handleSaveNotes}
                     disabled={!newNote.trim() || updateWorkOrderMutation.isPending}
                     data-testid="button-save-notes"
@@ -4394,7 +4397,7 @@ export default function CrmDispatch() {
                     <Link href={`/crm/work-orders/${selectedWorkOrder.id}`}>
                       <Button
                         size="sm"
-                        variant="default"
+                        variant="outline"
                         data-testid="button-view-full-details"
                       >
                         <FileText className="h-4 w-4 mr-1" />
