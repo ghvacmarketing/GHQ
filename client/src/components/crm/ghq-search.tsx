@@ -22,6 +22,7 @@ import {
   HelpCircle,
   MessageCircle,
   Send,
+  RotateCcw,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -167,17 +168,24 @@ interface HelpResponse {
   confidence: "high" | "medium" | "low";
 }
 
+type ConversationMessage = {
+  role: "user" | "assistant";
+  content: string;
+  relatedTopics?: string[];
+};
+
 export function GhqSearch() {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [aiEnabled, setAiEnabled] = useState(true);
   const [mode, setMode] = useState<"search" | "help">("search");
-  const [helpAnswer, setHelpAnswer] = useState<HelpResponse | null>(null);
+  const [conversationMessages, setConversationMessages] = useState<ConversationMessage[]>([]);
   const debouncedQuery = useDebounce(searchQuery, 300);
   const [, navigate] = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading } = useQuery<SearchResponse>({
     queryKey: [`/api/crm/ghq/search?q=${encodeURIComponent(debouncedQuery)}&ai=${aiEnabled}`],
@@ -185,12 +193,16 @@ export function GhqSearch() {
   });
 
   const helpMutation = useMutation({
-    mutationFn: async (question: string) => {
-      const response = await apiRequest("POST", "/api/crm/help", { question });
+    mutationFn: async ({ question, conversationHistory }: { question: string; conversationHistory: Array<{role: string; content: string}> }) => {
+      const response = await apiRequest("POST", "/api/crm/help", { question, conversationHistory });
       return response.json() as Promise<HelpResponse>;
     },
     onSuccess: (data) => {
-      setHelpAnswer(data);
+      setConversationMessages(prev => [...prev, {
+        role: "assistant",
+        content: data.answer,
+        relatedTopics: data.relatedTopics,
+      }]);
     },
   });
 
@@ -226,15 +238,33 @@ export function GhqSearch() {
     if (open) {
       setSearchQuery("");
       setSelectedIndex(0);
-      setHelpAnswer(null);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
 
+  // Auto-scroll to bottom whenever a new message is added
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [conversationMessages]);
+
   const handleAskHelp = () => {
-    if (searchQuery.trim().length >= 3) {
-      helpMutation.mutate(searchQuery.trim());
-    }
+    const question = searchQuery.trim();
+    if (question.length < 3) return;
+
+    // Capture history BEFORE appending the new user message
+    const historyForApi = conversationMessages.map(m => ({ role: m.role, content: m.content }));
+
+    // Optimistically add the user bubble
+    setConversationMessages(prev => [...prev, { role: "user", content: question }]);
+    setSearchQuery("");
+
+    helpMutation.mutate({ question, conversationHistory: historyForApi });
+  };
+
+  const handleNewConversation = () => {
+    setConversationMessages([]);
+    setSearchQuery("");
+    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
   useEffect(() => {
@@ -394,7 +424,7 @@ export function GhqSearch() {
   };
 
   const renderHelpResults = () => {
-    if (searchQuery.length < 3) {
+    if (conversationMessages.length === 0 && !helpMutation.isPending) {
       return (
         <div className="flex flex-col items-center justify-center py-12 text-slate-400">
           <HelpCircle className="h-12 w-12 mb-3 opacity-50" />
@@ -404,53 +434,64 @@ export function GhqSearch() {
       );
     }
 
-    if (helpMutation.isPending) {
-      return (
-        <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-          <Loader2 className="h-8 w-8 animate-spin mb-3" />
-          <p className="text-sm">Thinking...</p>
-        </div>
-      );
-    }
+    return (
+      <div className="p-4 space-y-4">
+        {conversationMessages.map((msg, i) => {
+          if (msg.role === "user") {
+            return (
+              <div key={i} className="flex justify-end">
+                <div className="bg-slate-700 text-slate-200 rounded-2xl rounded-tr-sm px-4 py-2 max-w-[85%] text-sm">
+                  {msg.content}
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div key={i} className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-white" />
+              </div>
+              <div className="flex-1 space-y-2">
+                <div className="bg-slate-800 rounded-2xl rounded-tl-sm p-4 text-slate-200 text-sm leading-relaxed whitespace-pre-wrap">
+                  {msg.content}
+                </div>
+                {msg.relatedTopics && msg.relatedTopics.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pl-1">
+                    <span className="text-xs text-slate-500 self-center">Ask about:</span>
+                    {msg.relatedTopics.map((topic, j) => (
+                      <button
+                        key={j}
+                        onClick={() => {
+                          setSearchQuery(topic);
+                          setTimeout(() => inputRef.current?.focus(), 0);
+                        }}
+                        className="text-xs px-2 py-1 rounded bg-slate-800 text-purple-300 hover:bg-slate-700 transition-colors border border-slate-700"
+                      >
+                        {topic}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
 
-    if (helpAnswer) {
-      return (
-        <div className="p-4 space-y-4">
+        {/* Typing indicator while waiting for response */}
+        {helpMutation.isPending && (
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
               <Sparkles className="h-4 w-4 text-white" />
             </div>
-            <div className="flex-1 space-y-3">
-              <div className="bg-slate-800 rounded-lg p-4 text-slate-200 text-sm leading-relaxed whitespace-pre-wrap">
-                {helpAnswer.answer}
-              </div>
-              {helpAnswer.relatedTopics.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  <span className="text-xs text-slate-500">Related:</span>
-                  {helpAnswer.relatedTopics.map((topic, i) => (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        setSearchQuery(topic);
-                        helpMutation.mutate(topic);
-                      }}
-                      className="text-xs px-2 py-1 rounded bg-slate-800 text-purple-300 hover:bg-slate-700 transition-colors"
-                    >
-                      {topic}
-                    </button>
-                  ))}
-                </div>
-              )}
+            <div className="bg-slate-800 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:0ms]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:150ms]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:300ms]" />
             </div>
           </div>
-        </div>
-      );
-    }
+        )}
 
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-        <MessageCircle className="h-12 w-12 mb-3 opacity-50" />
-        <p className="text-sm">Press Enter to ask your question</p>
+        <div ref={messagesEndRef} />
       </div>
     );
   };
@@ -475,7 +516,7 @@ export function GhqSearch() {
           <div className="border-b border-slate-700">
             <div className="flex">
               <button
-                onClick={() => { setMode("search"); setHelpAnswer(null); }}
+                onClick={() => { setMode("search"); setSearchQuery(""); }}
                 className={`flex-1 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
                   mode === "search"
                     ? "text-white border-b-2 border-[#711419] bg-slate-800/50"
@@ -486,7 +527,7 @@ export function GhqSearch() {
                 Search
               </button>
               <button
-                onClick={() => { setMode("help"); setHelpAnswer(null); }}
+                onClick={() => { setMode("help"); setSearchQuery(""); setTimeout(() => inputRef.current?.focus(), 50); }}
                 className={`flex-1 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
                   mode === "help"
                     ? "text-white border-b-2 border-purple-500 bg-purple-900/20"
@@ -509,7 +550,13 @@ export function GhqSearch() {
               <Input
                 ref={inputRef}
                 type="text"
-                placeholder={mode === "search" ? "Search customers, work orders, invoices..." : "Ask about CRM features..."}
+                placeholder={
+                  mode === "search"
+                    ? "Search customers, work orders, invoices..."
+                    : conversationMessages.length > 0
+                    ? "Ask a follow-up question..."
+                    : "Ask about CRM features..."
+                }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`pl-10 pr-20 h-12 bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 ${
@@ -517,7 +564,7 @@ export function GhqSearch() {
                 }`}
                 data-testid="input-ghq-search"
               />
-              {mode === "help" && searchQuery.length >= 3 && (
+              {mode === "help" && searchQuery.trim().length >= 3 && (
                 <button
                   onClick={handleAskHelp}
                   disabled={helpMutation.isPending}
@@ -568,9 +615,20 @@ export function GhqSearch() {
               </>
             )}
             {mode === "help" && (
-              <div className="flex items-center gap-2 text-purple-300">
-                <Sparkles className="h-3 w-3" />
-                <span>AI-powered CRM help</span>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 text-purple-300">
+                  <Sparkles className="h-3 w-3" />
+                  <span>AI-powered CRM help</span>
+                </div>
+                {conversationMessages.length > 0 && (
+                  <button
+                    onClick={handleNewConversation}
+                    className="flex items-center gap-1.5 text-slate-400 hover:text-slate-200 transition-colors ml-2"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    <span>New conversation</span>
+                  </button>
+                )}
               </div>
             )}
             <div className="flex items-center gap-1 ml-auto">

@@ -658,7 +658,7 @@ const helpCache = new Map<string, { result: CrmHelpResponse; timestamp: number; 
 const CACHE_TTL_STATIC = 1000 * 60 * 60; // 1 hour for static help questions
 const CACHE_TTL_LIVE = 1000 * 60 * 5; // 5 minutes for live data questions
 
-export async function askCrmHelp(question: string): Promise<CrmHelpResponse> {
+export async function askCrmHelp(question: string, conversationHistory?: Array<{role: 'user'|'assistant', content: string}>): Promise<CrmHelpResponse> {
   const normalizedQuestion = question.toLowerCase().trim();
   
   // Detect what live data might be needed
@@ -666,9 +666,13 @@ export async function askCrmHelp(question: string): Promise<CrmHelpResponse> {
   const needsLiveData = dataNeeds.length > 0;
   const cacheTTL = needsLiveData ? CACHE_TTL_LIVE : CACHE_TTL_STATIC;
   
-  const cached = helpCache.get(normalizedQuestion);
-  if (cached && Date.now() - cached.timestamp < cacheTTL) {
-    return cached.result;
+  // Skip cache for follow-up questions (they depend on prior context)
+  const isFollowUp = conversationHistory && conversationHistory.length > 0;
+  if (!isFollowUp) {
+    const cached = helpCache.get(normalizedQuestion);
+    if (cached && Date.now() - cached.timestamp < cacheTTL) {
+      return cached.result;
+    }
   }
 
   try {
@@ -701,17 +705,14 @@ Return JSON with:
 - relatedTopics: Array of 1-3 related feature areas the user might want to know about
 - confidence: "high" if directly from data/knowledge base, "medium" if inferred, "low" if uncertain`;
     
+    // Build message array: system + prior turns + current question
+    const priorTurns: Array<{role: 'user'|'assistant', content: string}> = conversationHistory ?? [];
     const response = await openai.chat.completions.create({
       model: "gpt-5-mini",
       messages: [
-        {
-          role: "system",
-          content: systemPrompt
-        },
-        {
-          role: "user",
-          content: question
-        }
+        { role: "system", content: systemPrompt },
+        ...priorTurns,
+        { role: "user", content: question }
       ],
       response_format: { type: "json_object" },
       max_completion_tokens: 1500,
