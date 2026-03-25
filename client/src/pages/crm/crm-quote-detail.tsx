@@ -4633,7 +4633,7 @@ export default function CrmQuoteDetail() {
                   {/* Description / Contract Template */}
                   {quote.description && (
                     <div
-                      className="contract-description border-t pt-4"
+                      className="contract-description border-t pt-4 bg-white"
                       dangerouslySetInnerHTML={{ __html: quote.description }}
                     />
                   )}

@@ -682,7 +682,7 @@ export default function PublicQuoteView() {
             {/* Description / contract template content */}
             {quoteData.description && (
               <div
-                className="contract-description border-t pt-4"
+                className="contract-description border-t pt-4 bg-white"
                 dangerouslySetInnerHTML={{ __html: quoteData.description }}
               />
             )}

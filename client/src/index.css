@@ -264,6 +264,7 @@ gmp-place-autocomplete::part(input)::placeholder {
   font-size: 0.875rem;
   line-height: 1.6;
   color: #1e293b;
+  background-color: #ffffff;
 }
 .contract-description h1 {
   font-size: 1.2rem;
@@ -292,6 +293,8 @@ gmp-place-autocomplete::part(input)::placeholder {
 .contract-description hr {
   border: none;
   border-top: 1px solid #e2e8f0;
+  background-color: #ffffff;
+  height: 0;
   margin: 0.75rem 0;
 }
 .contract-description ul {
@@ -306,6 +309,7 @@ gmp-place-autocomplete::part(input)::placeholder {
 }
 .contract-description li {
   margin: 0.15rem 0;
+  background-color: #ffffff;
 }
 .contract-description strong,
 .contract-description b {
