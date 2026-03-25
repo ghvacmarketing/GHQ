@@ -679,6 +679,14 @@ export default function PublicQuoteView() {
               )}
             </div>
 
+            {/* Description / contract template content */}
+            {quoteData.description && (
+              <div
+                className="contract-description border-t pt-4"
+                dangerouslySetInnerHTML={{ __html: quoteData.description }}
+              />
+            )}
+
             {/* Option-based quotes: show intro explaining this is a multi-option proposal */}
             {quoteData.quoteMode === "options" ? (
               <>
@@ -803,11 +811,8 @@ export default function PublicQuoteView() {
               </>
             ) : (
               <>
-                {(quoteData.title || quoteData.description) && (
-                  <div>
-                    {quoteData.title && <h3 className="text-lg font-semibold text-slate-900 mb-1">{quoteData.title}</h3>}
-                    {quoteData.description && <p className="text-slate-600">{quoteData.description}</p>}
-                  </div>
+                {quoteData.title && (
+                  <h3 className="text-lg font-semibold text-slate-900">{quoteData.title}</h3>
                 )}
 
                 <div>
