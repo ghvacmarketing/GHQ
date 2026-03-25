@@ -4644,7 +4644,14 @@ export default function CrmQuoteDetail() {
                             placeholder="Enter contract description..."
                             minHeight="min-h-[300px]"
                           />
-                          <div className="flex gap-2 justify-end">
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => updateDescriptionMutation.mutate(presentationDescDraft)}
+                              disabled={updateDescriptionMutation.isPending}
+                            >
+                              {updateDescriptionMutation.isPending ? "Saving..." : "Save"}
+                            </Button>
                             <Button
                               variant="outline"
                               size="sm"
@@ -4653,40 +4660,33 @@ export default function CrmQuoteDetail() {
                             >
                               Cancel
                             </Button>
-                            <Button
-                              size="sm"
-                              style={{ backgroundColor: BRAND_COLOR }}
-                              className="text-white hover:opacity-90"
-                              onClick={() => updateDescriptionMutation.mutate(presentationDescDraft)}
-                              disabled={updateDescriptionMutation.isPending}
-                            >
-                              {updateDescriptionMutation.isPending ? "Saving..." : "Save Description"}
-                            </Button>
                           </div>
                         </div>
                       ) : (
-                        <div className="relative group">
+                        <>
+                          {quote.status === "draft" && (
+                            <div className="flex justify-end mb-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1.5 text-slate-500 hover:text-slate-700"
+                                onClick={() => {
+                                  setPresentationDescDraft(quote.description || "");
+                                  setIsPresentationEditingDesc(true);
+                                }}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                {quote.description ? "Edit" : "Add Description"}
+                              </Button>
+                            </div>
+                          )}
                           {quote.description && (
                             <div
                               className="contract-description"
                               dangerouslySetInnerHTML={{ __html: quote.description }}
                             />
                           )}
-                          {quote.status === "draft" && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="mt-3 gap-2"
-                              onClick={() => {
-                                setPresentationDescDraft(quote.description || "");
-                                setIsPresentationEditingDesc(true);
-                              }}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                              {quote.description ? "Edit Description" : "Add Description"}
-                            </Button>
-                          )}
-                        </div>
+                        </>
                       )}
                     </div>
                   )}
