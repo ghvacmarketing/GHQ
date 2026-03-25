@@ -2173,96 +2173,254 @@ export default function CrmQuoteDetail() {
 
         // Description/notes section (for proposal and custom_install quotes)
         if (quote.description) {
-          // Parse HTML into structured blocks preserving headings, bullets, paragraphs
-          type PdfBlock = { type: 'h1' | 'h2' | 'h3' | 'p' | 'li'; text: string };
+          // Detect contract template so we can render it with styled formatting
+          const isContractTemplate =
+            quote.description.includes("GIESBRECHT HVAC") &&
+            quote.description.includes("INSTALLATION AGREEMENT");
+
+          // ── Helpers ─────────────────────────────────────────────────────────
+          const decodeEntities = (s: string) =>
+            s.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+             .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim();
+          const stripTags = (s: string) => s.replace(/<[^>]*>/g, '');
+          const plainText = (raw: string) => decodeEntities(stripTags(raw));
+
+          // Parse inline HTML into bold/normal text segments
+          type Seg = { text: string; bold: boolean };
+          const parseInline = (html: string): Seg[] => {
+            const dec = (s: string) =>
+              s.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+               .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+               .replace(/\n/g, ' ');
+            const marked = html
+              .replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, '\x01$1\x01')
+              .replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, '\x01$1\x01')
+              .replace(/<[^>]*>/g, '');
+            return marked.split('\x01')
+              .map((part, i) => ({ text: dec(part), bold: i % 2 === 1 }))
+              .filter(s => s.text.length > 0);
+          };
+
+          // Render inline segments using (and modifying) outer y
+          // Handles both uniform and mixed-bold content with word-wrap
+          type PdfRenderOpts = { x: number; maxW: number; fs: number };
+          const renderSegs = (segs: Seg[], opts: PdfRenderOpts): void => {
+            if (segs.length === 0) return;
+            const { x, maxW, fs } = opts;
+            const lh = fs * 0.42 + 1.5;
+            doc.setFontSize(fs);
+            const pb = () => { if (y + lh > pageHeight - 45) { doc.addPage(); y = margin; } };
+            // All same weight → use splitTextToSize for perfect wrapping
+            if (segs.every(s => s.bold === segs[0].bold)) {
+              doc.setFont("helvetica", segs[0].bold ? "bold" : "normal");
+              const txt = segs.map(s => s.text).join('');
+              doc.splitTextToSize(txt, maxW).forEach((ln: string) => {
+                pb(); doc.text(ln, x, y); y += lh;
+              });
+              return;
+            }
+            // Mixed bold → word-by-word tracking
+            let cx = x;
+            for (const seg of segs) {
+              doc.setFont("helvetica", seg.bold ? "bold" : "normal");
+              for (const tok of seg.text.split(/(\s+)/)) {
+                if (!tok) continue;
+                const tw = doc.getTextWidth(tok);
+                const isWS = /^\s+$/.test(tok);
+                if (!isWS && cx + tw > x + maxW && cx > x) {
+                  cx = x; y += lh; pb();
+                }
+                if (!(isWS && cx === x)) { doc.text(tok, cx, y); cx += tw; }
+              }
+            }
+            y += lh;
+          };
+
+          // ── Block parser ─────────────────────────────────────────────────────
+          type PdfBlock = {
+            type: 'h1' | 'h2' | 'h3' | 'p' | 'li' | 'ol_li' | 'hr';
+            text: string; rawHtml: string; number?: number;
+          };
           const parseHtmlBlocks = (html: string): PdfBlock[] => {
             const blocks: PdfBlock[] = [];
-            const decode = (s: string) => s.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim();
-            const stripTags = (s: string) => s.replace(/<[^>]*>/g, '');
-            // Use sentinel approach: mark positions then split
-            let marked = html
-              .replace(/<br\s*\/?>/gi, '\n')
-              .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, (_, c) => `\x01H1\x02${decode(stripTags(c))}\x03`)
-              .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, (_, c) => `\x01H2\x02${decode(stripTags(c))}\x03`)
-              .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, (_, c) => `\x01H3\x02${decode(stripTags(c))}\x03`)
-              .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (_, c) => `\x01LI\x02${decode(stripTags(c))}\x03`)
-              .replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, (_, c) => {
-                const text = decode(stripTags(c));
-                return text ? `\x01PP\x02${text}\x03` : '';
-              })
-              .replace(/<[^>]*>/g, '')
-              .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
-            const parts = marked.split('\x01').filter(p => p.trim());
-            for (const part of parts) {
-              const typeEnd = part.indexOf('\x02');
-              const textEnd = part.indexOf('\x03');
-              if (typeEnd === -1) {
-                const t = part.replace(/\x03/g, '').trim();
-                if (t) blocks.push({ type: 'p', text: t });
-                continue;
+            let olNum = 0, inOl = false;
+            const proc = html
+              .replace(/<hr\s*\/?>/gi, '\x00HR\x00')
+              .replace(/<ol[^>]*>/gi, '\x00OLSTART\x00')
+              .replace(/<\/ol>/gi, '\x00OLEND\x00')
+              .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, (_, c) => `\x00H1:${c}\x00`)
+              .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, (_, c) => `\x00H2:${c}\x00`)
+              .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, (_, c) => `\x00H3:${c}\x00`)
+              .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (_, c) => `\x00LI:${c}\x00`)
+              .replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, (_, c) => `\x00PP:${c}\x00`);
+            for (const part of proc.split('\x00').filter(p => p.trim())) {
+              if (part === 'HR') { blocks.push({ type: 'hr', text: '', rawHtml: '' }); }
+              else if (part === 'OLSTART') { inOl = true; olNum = 0; }
+              else if (part === 'OLEND')   { inOl = false; olNum = 0; }
+              else if (part.startsWith('H1:')) { const r = part.slice(3); blocks.push({ type: 'h1', text: plainText(r), rawHtml: r }); }
+              else if (part.startsWith('H2:')) { const r = part.slice(3); blocks.push({ type: 'h2', text: plainText(r), rawHtml: r }); }
+              else if (part.startsWith('H3:')) { const r = part.slice(3); blocks.push({ type: 'h3', text: plainText(r), rawHtml: r }); }
+              else if (part.startsWith('LI:')) {
+                const r = part.slice(3); const t = plainText(r);
+                if (t) {
+                  if (inOl) { olNum++; blocks.push({ type: 'ol_li', text: t, rawHtml: r, number: olNum }); }
+                  else       { blocks.push({ type: 'li',    text: t, rawHtml: r }); }
+                }
               }
-              const type = part.slice(0, typeEnd);
-              const text = part.slice(typeEnd + 1, textEnd !== -1 ? textEnd : undefined).trim();
-              if (!text) continue;
-              if (type === 'H1') blocks.push({ type: 'h1', text });
-              else if (type === 'H2') blocks.push({ type: 'h2', text });
-              else if (type === 'H3') blocks.push({ type: 'h3', text });
-              else if (type === 'LI') blocks.push({ type: 'li', text });
-              else if (type === 'PP') blocks.push({ type: 'p', text });
+              else if (part.startsWith('PP:')) {
+                const r = part.slice(3);
+                blocks.push({ type: 'p', text: plainText(r), rawHtml: r });
+              }
             }
             return blocks;
           };
 
+          // ── Render ───────────────────────────────────────────────────────────
           const blocks = parseHtmlBlocks(quote.description);
           if (blocks.length > 0) {
-            // Section heading "Description"
-            doc.setFontSize(11);
-            doc.setFont("helvetica", "bold");
-            doc.setTextColor(...textColor);
-            doc.text("Description", margin, y);
-            y += 6;
+            if (!isContractTemplate) {
+              doc.setFontSize(11);
+              doc.setFont("helvetica", "bold");
+              doc.setTextColor(...textColor);
+              doc.text("Description", margin, y);
+              y += 6;
+            }
 
             for (const block of blocks) {
-              const isHeading = block.type === 'h1' || block.type === 'h2' || block.type === 'h3';
-              const isBullet = block.type === 'li';
 
-              if (isHeading) {
-                checkPageBreak(8);
-                if (y > margin + 10) y += 2; // small gap before headings
+              // ── HR ───────────────────────────────────────────────────────────
+              if (block.type === 'hr') {
+                if (isContractTemplate) {
+                  y += 2;
+                  doc.setDrawColor(210, 210, 210);
+                  doc.setLineWidth(0.25);
+                  doc.line(margin, y, pageWidth - margin, y);
+                  y += 4;
+                }
+                continue;
+              }
+
+              // ── H1 ───────────────────────────────────────────────────────────
+              if (block.type === 'h1') {
+                checkPageBreak(12);
+                y += 2;
+                if (isContractTemplate) {
+                  doc.setFontSize(13);
+                  doc.setFont("helvetica", "bold");
+                  doc.setTextColor(...textColor);
+                  doc.splitTextToSize(block.text, contentWidth).forEach((ln: string) => {
+                    checkPageBreak(8); doc.text(ln, pageWidth / 2, y, { align: 'center' }); y += 8;
+                  });
+                } else {
+                  doc.setFontSize(9);
+                  doc.setFont("helvetica", "bold");
+                  doc.setTextColor(...textColor);
+                  doc.splitTextToSize(block.text, contentWidth).forEach((ln: string) => {
+                    checkPageBreak(5); doc.text(ln, margin, y); y += 4.5;
+                  });
+                }
+                y += 2;
+                continue;
+              }
+
+              // ── H2 ───────────────────────────────────────────────────────────
+              if (block.type === 'h2') {
+                checkPageBreak(10);
+                if (isContractTemplate) {
+                  y += 4;
+                  doc.setFontSize(10);
+                  doc.setFont("helvetica", "bold");
+                  doc.setTextColor(...brandColor);
+                  const lines = doc.splitTextToSize(block.text, contentWidth);
+                  lines.forEach((ln: string) => { checkPageBreak(6); doc.text(ln, margin, y); y += 6; });
+                  // Thin brand-color underline
+                  doc.setDrawColor(...brandColor);
+                  doc.setLineWidth(0.4);
+                  doc.line(margin, y - 1.5, margin + Math.min(doc.getTextWidth(lines[0]) + 2, contentWidth * 0.8), y - 1.5);
+                  y += 2;
+                } else {
+                  y += 2;
+                  doc.setFontSize(9);
+                  doc.setFont("helvetica", "bold");
+                  doc.setTextColor(...textColor);
+                  doc.splitTextToSize(block.text, contentWidth).forEach((ln: string) => {
+                    checkPageBreak(5); doc.text(ln, margin, y); y += 4.5;
+                  });
+                  y += 1;
+                }
+                continue;
+              }
+
+              // ── H3 ───────────────────────────────────────────────────────────
+              if (block.type === 'h3') {
+                checkPageBreak(6);
+                y += 1;
                 doc.setFontSize(9);
                 doc.setFont("helvetica", "bold");
                 doc.setTextColor(...textColor);
-                const headingLines = doc.splitTextToSize(block.text, contentWidth);
-                headingLines.forEach((line: string) => {
-                  checkPageBreak(5);
-                  doc.text(line, margin, y);
-                  y += 4.5;
+                doc.splitTextToSize(block.text, contentWidth).forEach((ln: string) => {
+                  checkPageBreak(5); doc.text(ln, margin, y); y += 4.5;
                 });
                 y += 1;
-              } else if (isBullet) {
+                continue;
+              }
+
+              // ── Bullet list item ─────────────────────────────────────────────
+              if (block.type === 'li') {
                 checkPageBreak(5);
                 doc.setFontSize(9);
-                doc.setFont("helvetica", "normal");
-                doc.setTextColor(...mutedColor);
-                const bulletText = `• ${block.text}`;
-                const bulletLines = doc.splitTextToSize(bulletText, contentWidth - 4);
-                bulletLines.forEach((line: string, idx: number) => {
-                  checkPageBreak(5);
-                  doc.text(idx === 0 ? line : `  ${line}`, margin + 2, y);
-                  y += 4;
-                });
-              } else {
-                // paragraph
-                const paraLines = doc.splitTextToSize(block.text, contentWidth);
-                if (paraLines.length > 0) {
-                  checkPageBreak(5);
-                  doc.setFontSize(9);
+                if (isContractTemplate) {
+                  doc.setTextColor(...textColor);
+                  doc.setFont("helvetica", "normal");
+                  doc.text("•", margin + 2, y);
+                  renderSegs(parseInline(block.rawHtml), { x: margin + 7, maxW: contentWidth - 7, fs: 9 });
+                } else {
                   doc.setFont("helvetica", "normal");
                   doc.setTextColor(...mutedColor);
-                  paraLines.forEach((line: string) => {
-                    checkPageBreak(5);
-                    doc.text(line, margin, y);
-                    y += 4;
+                  doc.splitTextToSize(`• ${block.text}`, contentWidth - 4).forEach((ln: string, i: number) => {
+                    checkPageBreak(5); doc.text(i === 0 ? ln : `  ${ln}`, margin + 2, y); y += 4;
+                  });
+                }
+                continue;
+              }
+
+              // ── Ordered list item ────────────────────────────────────────────
+              if (block.type === 'ol_li') {
+                checkPageBreak(5);
+                doc.setFontSize(9);
+                if (isContractTemplate) {
+                  doc.setTextColor(...textColor);
+                  const numStr = `${block.number}.  `;
+                  doc.setFont("helvetica", "bold");
+                  doc.text(numStr, margin + 2, y);
+                  const nw = doc.getTextWidth(numStr);
+                  renderSegs(parseInline(block.rawHtml), { x: margin + 2 + nw, maxW: contentWidth - 2 - nw, fs: 9 });
+                } else {
+                  doc.setFont("helvetica", "normal");
+                  doc.setTextColor(...mutedColor);
+                  doc.splitTextToSize(`${block.number}. ${block.text}`, contentWidth - 4).forEach((ln: string, i: number) => {
+                    checkPageBreak(5); doc.text(i === 0 ? ln : `    ${ln}`, margin + 2, y); y += 4;
+                  });
+                }
+                continue;
+              }
+
+              // ── Paragraph ────────────────────────────────────────────────────
+              if (block.type === 'p') {
+                const isEmpty = !block.rawHtml.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim();
+                if (isEmpty) {
+                  if (isContractTemplate) y += 3;
+                  continue;
+                }
+                doc.setFontSize(9);
+                if (isContractTemplate) {
+                  doc.setTextColor(...textColor);
+                  renderSegs(parseInline(block.rawHtml), { x: margin, maxW: contentWidth, fs: 9 });
+                } else {
+                  doc.setFont("helvetica", "normal");
+                  doc.setTextColor(...mutedColor);
+                  doc.splitTextToSize(block.text, contentWidth).forEach((ln: string) => {
+                    checkPageBreak(5); doc.text(ln, margin, y); y += 4;
                   });
                   y += 1;
                 }
