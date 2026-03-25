@@ -26164,7 +26164,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
         if (!propertyId) {
           if (allProperties.length === 0) {
-            // Customer exists but has no properties at all — create one normally
+            // Customer exists but has no properties at all — create first property
             const [newProperty] = await db.insert(crmProperties).values({
               customerId: customerId,
               address1: address,
@@ -26174,6 +26174,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
               propertyType: "residential",
             }).returning();
             propertyId = newProperty.id;
+            newPropertyCreatedForExisting = true;
             console.log(`[OnlineBooking] Created first property for existing customer (id=${propertyId})`);
           } else {
             // Customer has properties but none match — create new location for them
