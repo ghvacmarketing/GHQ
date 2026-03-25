@@ -213,6 +213,8 @@ export default function CrmQuoteDetail() {
   const [presentationName, setPresentationName] = useState("");
   const [presentationAgreed, setPresentationAgreed] = useState(false);
   const [presentationSelectedOption, setPresentationSelectedOption] = useState<string | null>(null);
+  const [isPresentationEditingDesc, setIsPresentationEditingDesc] = useState(false);
+  const [presentationDescDraft, setPresentationDescDraft] = useState("");
   const [showWhatsIncludedDialog, setShowWhatsIncludedDialog] = useState(false);
   const [editingWhatsIncluded, setEditingWhatsIncluded] = useState<Array<{ category: string; items: string[] }>>([]);
   const [showWarrantiesDialog, setShowWarrantiesDialog] = useState(false);
@@ -513,6 +515,7 @@ export default function CrmQuoteDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       setIsEditingDescription(false);
+      setIsPresentationEditingDesc(false);
       toast({ title: "Description updated", description: "The quote description has been saved." });
     },
     onError: (error: Error) => {
@@ -4631,11 +4634,61 @@ export default function CrmQuoteDetail() {
                   </div>
 
                   {/* Description / Contract Template */}
-                  {quote.description && (
-                    <div
-                      className="contract-description border-t pt-4"
-                      dangerouslySetInnerHTML={{ __html: quote.description }}
-                    />
+                  {(quote.description || quote.status === "draft") && (
+                    <div className="border-t pt-4">
+                      {isPresentationEditingDesc ? (
+                        <div className="space-y-3">
+                          <RichTextEditor
+                            content={presentationDescDraft}
+                            onChange={setPresentationDescDraft}
+                            placeholder="Enter contract description..."
+                            minHeight="min-h-[300px]"
+                          />
+                          <div className="flex gap-2 justify-end">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setIsPresentationEditingDesc(false)}
+                              disabled={updateDescriptionMutation.isPending}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              style={{ backgroundColor: BRAND_COLOR }}
+                              className="text-white hover:opacity-90"
+                              onClick={() => updateDescriptionMutation.mutate(presentationDescDraft)}
+                              disabled={updateDescriptionMutation.isPending}
+                            >
+                              {updateDescriptionMutation.isPending ? "Saving..." : "Save Description"}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="relative group">
+                          {quote.description && (
+                            <div
+                              className="contract-description"
+                              dangerouslySetInnerHTML={{ __html: quote.description }}
+                            />
+                          )}
+                          {quote.status === "draft" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="mt-3 gap-2"
+                              onClick={() => {
+                                setPresentationDescDraft(quote.description || "");
+                                setIsPresentationEditingDesc(true);
+                              }}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              {quote.description ? "Edit Description" : "Add Description"}
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   {/* Quote Content - Options Mode */}
