@@ -25986,8 +25986,40 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           .replace(/\s+/g, ' ')
           .trim();
 
+      // Levenshtein edit distance — handles single-character typos in street names
+      // (e.g., "Main" vs "Mian", "Neal" vs "Neel")
+      const levenshtein = (a: string, b: string): number => {
+        if (a === b) return 0;
+        if (a.length === 0) return b.length;
+        if (b.length === 0) return a.length;
+        const matrix: number[][] = [];
+        for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+        for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+        for (let i = 1; i <= b.length; i++) {
+          for (let j = 1; j <= a.length; j++) {
+            matrix[i][j] = b[i - 1] === a[j - 1]
+              ? matrix[i - 1][j - 1]
+              : 1 + Math.min(matrix[i - 1][j - 1], matrix[i][j - 1], matrix[i - 1][j]);
+          }
+        }
+        return matrix[b.length][a.length];
+      };
+
+      // Returns true if two tokens are "close enough" — exact match OR edit distance
+      // of 1 for tokens longer than 4 chars (avoids false positives on short words).
+      const tokenMatch = (t1: string, t2: string): boolean => {
+        if (t1 === t2) return true;
+        const maxLen = Math.max(t1.length, t2.length);
+        if (maxLen <= 4) return false; // short tokens need exact match
+        return levenshtein(t1, t2) <= 1;
+      };
+
       // Returns true if two address strings refer to the same physical location.
-      // Strategy: house number must match exactly; street name words must overlap ≥ 70%.
+      // Strategy:
+      //   1. House number must match exactly.
+      //   2. Street-name tokens are compared with fuzzy (edit-distance) tolerance:
+      //      each token from the smaller set must have a close match in the larger
+      //      set (≥ 70% of tokens must match with at most 1 edit each).
       const addressesMatch = (a: string, b: string): boolean => {
         const n1 = normalizeAddr(a);
         const n2 = normalizeAddr(b);
@@ -25999,13 +26031,17 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         if (!num1 || !num2) return false;
         // House numbers must match exactly
         if (num1 !== num2) return false;
-        // Compare street-name tokens
-        const words1 = new Set(n1.replace(num1, '').trim().split(/\s+/).filter(Boolean));
-        const words2 = new Set(n2.replace(num2, '').trim().split(/\s+/).filter(Boolean));
-        const minSize = Math.min(words1.size, words2.size);
-        if (minSize === 0) return true; // only house number provided — same number is good enough
-        const common = [...words1].filter(w => words2.has(w)).length;
-        return common / minSize >= 0.7;
+        // Compare street-name tokens with typo tolerance
+        const tokens1 = n1.replace(num1, '').trim().split(/\s+/).filter(Boolean);
+        const tokens2 = n2.replace(num2, '').trim().split(/\s+/).filter(Boolean);
+        if (tokens1.length === 0 && tokens2.length === 0) return true;
+        if (tokens1.length === 0 || tokens2.length === 0) return true; // only house number
+        // For each token in the smaller set, look for a fuzzy match in the larger set
+        const [smaller, larger] = tokens1.length <= tokens2.length
+          ? [tokens1, tokens2]
+          : [tokens2, tokens1];
+        const matched = smaller.filter(t => larger.some(u => tokenMatch(t, u))).length;
+        return matched / smaller.length >= 0.7;
       };
 
       // ---------------------------------------------------------------------------
