@@ -4581,7 +4581,7 @@ export default function CrmQuoteDetail() {
         }}
       >
         <DialogContent className="max-w-full w-full h-full max-h-screen m-0 p-0 rounded-none overflow-auto">
-          <div className="min-h-screen bg-white">
+          <div className="min-h-screen bg-slate-50">
             {/* Exit button */}
             <div className="fixed top-4 right-4 z-50">
               <Button
@@ -4610,7 +4610,7 @@ export default function CrmQuoteDetail() {
               </div>
 
               {/* Quote Header Card */}
-              <Card className="shadow-lg mb-6 bg-white border-0">
+              <Card className="shadow-lg mb-6 bg-slate-50 border-0">
                 <CardHeader className="border-b" style={{ backgroundColor: BRAND_COLOR }}>
                   <div className="flex items-center justify-between text-white">
                     <div className="flex items-center gap-2">
@@ -4620,9 +4620,9 @@ export default function CrmQuoteDetail() {
                     <span className="text-sm opacity-90">{formatPresentationDate(quote.createdAt)}</span>
                   </div>
                 </CardHeader>
-                <CardContent className="py-6 space-y-6 bg-white">
+                <CardContent className="py-6 space-y-6 bg-slate-50">
                   {/* Customer Info */}
-                  <div className="bg-white rounded-lg p-4">
+                  <div className="bg-slate-100 rounded-lg p-4">
                     <h3 className="font-semibold text-slate-700 mb-2">Prepared For</h3>
                     <p className="font-medium text-slate-900">{quote.customerName || quote.customer?.name}</p>
                     {quote.serviceAddress && (
@@ -4633,7 +4633,7 @@ export default function CrmQuoteDetail() {
                   {/* Description / Contract Template */}
                   {quote.description && (
                     <div
-                      className="contract-description border-t pt-4 bg-white"
+                      className="contract-description border-t pt-4"
                       dangerouslySetInnerHTML={{ __html: quote.description }}
                     />
                   )}

@@ -660,7 +660,7 @@ export default function PublicQuoteView() {
           <BrandLogo />
         </div>
 
-        <Card className="shadow-lg mb-6">
+        <Card className="shadow-lg mb-6 bg-slate-50 border-0">
           <CardHeader className="border-b" style={{ backgroundColor: BRAND_COLOR }}>
             <div className="flex items-center justify-between text-white">
               <div className="flex items-center gap-2">
@@ -670,8 +670,8 @@ export default function PublicQuoteView() {
               <span className="text-sm opacity-90">{formatDate(quoteData.createdAt)}</span>
             </div>
           </CardHeader>
-          <CardContent className="py-6 space-y-6">
-            <div className="bg-slate-50 rounded-lg p-4">
+          <CardContent className="py-6 space-y-6 bg-slate-50">
+            <div className="bg-slate-100 rounded-lg p-4">
               <h3 className="font-semibold text-slate-700 mb-2">Prepared For</h3>
               <p className="font-medium text-slate-900" data-testid="text-customer-name">{quoteData.customerName}</p>
               {quoteData.serviceAddress && (
@@ -682,7 +682,7 @@ export default function PublicQuoteView() {
             {/* Description / contract template content */}
             {quoteData.description && (
               <div
-                className="contract-description border-t pt-4 bg-white"
+                className="contract-description border-t pt-4"
                 dangerouslySetInnerHTML={{ __html: quoteData.description }}
               />
             )}
