@@ -825,19 +825,20 @@ Return JSON with:
     // Build message array: system + prior turns + current question
     const priorTurns: Array<{role: 'user'|'assistant', content: string}> = conversationHistory ?? [];
     const response = await openai.chat.completions.create({
-      model: "gpt-5-mini",
+      model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
         ...priorTurns,
         { role: "user", content: question }
       ],
       response_format: { type: "json_object" },
-      max_completion_tokens: 1500,
+      max_tokens: 2000,
     });
     
+    const finishReason = response.choices[0]?.finish_reason;
     const content = response.choices[0]?.message?.content;
     if (!content) {
-      console.log("[CRM Help AI] No content in response - finish_reason:", response.choices[0]?.finish_reason);
+      console.log("[CRM Help AI] No content in response - finish_reason:", finishReason);
       return {
         answer: "I couldn't process your question. Please try rephrasing it.",
         relatedTopics: [],
@@ -845,7 +846,19 @@ Return JSON with:
       };
     }
 
-    const parsed = JSON.parse(content);
+    let parsed: any;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      console.log("[CRM Help AI] JSON parse failed (finish_reason:", finishReason, ") - content length:", content.length);
+      // If JSON was truncated, extract whatever text we got and return it
+      const partial = content.match(/"answer"\s*:\s*"([\s\S]*?)(?:"|$)/)?.[1];
+      return {
+        answer: partial ? partial.replace(/\\n/g, "\n").replace(/\\"/g, '"') : "I ran into a problem formatting my response. Please try asking a more specific question.",
+        relatedTopics: [],
+        confidence: "low"
+      };
+    }
     
     const result: CrmHelpResponse = {
       answer: parsed.answer || "I don't have information about that feature.",
