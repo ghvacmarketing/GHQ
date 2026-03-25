@@ -2225,7 +2225,33 @@ export default function CrmProposalBuilder() {
 
   const openQuoteDialog = () => {
     if (cart.length === 0) return;
-    setQuoteDialogOpen(true);
+    const returnUrl = routeParams.customerId
+      ? `/crm/quotes/proposal/${routeParams.customerId}`
+      : "/crm/quotes/proposal";
+    const previewState = {
+      cart,
+      selectedCustomer,
+      quoteMode,
+      customerNotes,
+      proposalNotes,
+      assignedToId,
+      selectedPropertyId,
+      preloadedPropertyId,
+      preloadedProjectId,
+      preloadedWorkOrderId,
+      customerProperties,
+      assignableUsers: assignableUsers || [],
+      returnUrl,
+      computedTotals: {
+        cartSubtotalPreDiscount,
+        cartEliteDiscountAmount,
+        cartTotalAfterDiscount,
+        cartMonthlyTotalRange,
+        hasEstimatedItems,
+      },
+    };
+    sessionStorage.setItem("ghvac-proposal-preview-state", JSON.stringify(previewState));
+    setLocation("/crm/proposal-preview");
   };
 
   const htmlToPlainText = (html: string): string => {

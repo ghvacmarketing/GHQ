@@ -57,6 +57,7 @@ const CrmMarketing = lazy(() => import("@/pages/crm/crm-marketing"));
 const CrmItems = lazy(() => import("@/pages/crm/crm-items"));
 const CrmInstallWorksheet = lazy(() => import("@/pages/crm/crm-install-worksheet"));
 const CrmProposalBuilder = lazy(() => import("@/pages/crm/crm-proposal-builder"));
+const CrmProposalPreview = lazy(() => import("@/pages/crm/crm-proposal-preview"));
 const CrmPhone = lazy(() => import("@/pages/crm/crm-phone"));
 const CrmChecklists = lazy(() => import("@/pages/crm/crm-checklists"));
 const CrmSettings = lazy(() => import("@/pages/crm/crm-settings"));
@@ -267,6 +268,7 @@ function Router() {
       <Route path="/crm/quotes/install-worksheet/:id">{() => <ProtectedCrmWrapper><CrmInstallWorksheet /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/quotes/proposal/:customerId">{() => <ProtectedCrmWrapper><CrmProposalBuilder /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/quotes/proposal">{() => <ProtectedCrmWrapper><CrmProposalBuilder /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/proposal-preview">{() => <ProtectedCrmWrapper><CrmProposalPreview /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/quotes/new">{() => <ProtectedCrmWrapper><CrmQuoteCreate /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/quotes/:id">{() => <ProtectedCrmWrapper><CrmQuoteDetail /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/quotes">{() => <ProtectedCrmWrapper><CrmQuotes /></ProtectedCrmWrapper>}</Route>
