@@ -616,6 +616,34 @@ export default function CrmSettingsSystemTools() {
                         </div>
                       ))}
                     </div>
+                    <div className="space-y-4">
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Online Booking Emails</p>
+                      <p className="text-xs text-slate-400 -mt-2">Sent automatically when customers book via the public /book page.</p>
+                      {emailTemplates.filter(t => t.key.includes('booking')).map((template) => (
+                        <div key={template.key} className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-medium text-slate-600">{template.description}</label>
+                            <button
+                              onClick={() => handleResetEmailTemplate(template.key)}
+                              disabled={template.value === template.defaultValue}
+                              className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                              data-testid={`button-reset-${template.key}`}
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                              Reset
+                            </button>
+                          </div>
+                          <Textarea
+                            value={template.value}
+                            onChange={(e) => handleEmailTemplateChange(template.key, e.target.value)}
+                            rows={template.key.includes('subject') ? 1 : 3}
+                            className="resize-none text-sm"
+                            data-testid={`textarea-${template.key}`}
+                          />
+                          <p className="text-xs text-slate-400">Placeholders: {template.placeholders}</p>
+                        </div>
+                      ))}
+                    </div>
                     <Button
                       onClick={handleSaveEmailTemplates}
                       disabled={isSavingEmailTemplates}

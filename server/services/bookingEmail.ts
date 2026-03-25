@@ -1,8 +1,8 @@
 import { Resend } from "resend";
 import { db } from "../db";
-import { crmWorkOrders, crmCustomers } from "@shared/schema";
+import { crmWorkOrders, crmCustomers, settings } from "@shared/schema";
 import { eq, and, isNull, gte, lte } from "drizzle-orm";
-import { addMinutes, subMinutes } from "date-fns";
+import { addMinutes } from "date-fns";
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const FROM_EMAIL = process.env.FROM_EMAIL || "quotes@ghvac.work";
@@ -78,6 +78,19 @@ function baseHtml(title: string, preheader: string, body: string): string {
 </html>`;
 }
 
+async function getTemplateSetting(key: string, defaultValue: string): Promise<string> {
+  try {
+    const [row] = await db.select({ value: settings.value }).from(settings).where(eq(settings.key, key));
+    return row?.value || defaultValue;
+  } catch {
+    return defaultValue;
+  }
+}
+
+function applyPlaceholders(template: string, vars: Record<string, string>): string {
+  return Object.entries(vars).reduce((t, [k, v]) => t.replaceAll(`{${k}}`, v), template);
+}
+
 interface BookingEmailParams {
   customerName: string;
   email: string;
@@ -88,16 +101,49 @@ interface BookingEmailParams {
   address?: string;
 }
 
-function buildConfirmationHtml(p: BookingEmailParams): string {
+interface BookingEmailTemplates {
+  confirmSubject: string;
+  confirmIntro: string;
+  confirmNextSteps: string;
+  remindSubject: string;
+  remindIntro: string;
+}
+
+async function fetchBookingEmailTemplates(p: BookingEmailParams): Promise<BookingEmailTemplates> {
+  const firstName = p.customerName.split(" ")[0];
+  const vars: Record<string, string> = {
+    brand_name: BRAND_NAME,
+    customer_name: p.customerName,
+    customer_first_name: firstName,
+    work_order_number: String(p.workOrderNumber),
+    service_type: p.serviceType,
+    time_window: p.preferredTimeSlot,
+  };
+
+  const [confirmSubject, confirmIntro, confirmNextSteps, remindSubject, remindIntro] = await Promise.all([
+    getTemplateSetting("email_template_booking_confirm_subject", `Booking Confirmed — ${BRAND_NAME} #${p.workOrderNumber}`),
+    getTemplateSetting("email_template_booking_confirm_intro", `Thanks for booking with ${BRAND_NAME}. Here's a summary of your appointment request. Our team will reach out shortly to confirm the final time.`),
+    getTemplateSetting("email_template_booking_confirm_next_steps", "Our scheduling team will call or text you within 1 business day to confirm your appointment time. Please have your system make/model handy if possible."),
+    getTemplateSetting("email_template_booking_remind_subject", `Reminder: Your appointment is today — ${BRAND_NAME}`),
+    getTemplateSetting("email_template_booking_remind_intro", `Hi ${firstName}, just a friendly reminder that your ${BRAND_NAME} technician is scheduled to arrive during your time window today.`),
+  ]);
+
+  return {
+    confirmSubject: applyPlaceholders(confirmSubject, vars),
+    confirmIntro: applyPlaceholders(confirmIntro, vars),
+    confirmNextSteps: applyPlaceholders(confirmNextSteps, vars),
+    remindSubject: applyPlaceholders(remindSubject, vars),
+    remindIntro: applyPlaceholders(remindIntro, vars),
+  };
+}
+
+function buildConfirmationHtml(p: BookingEmailParams, tmpl: BookingEmailTemplates): string {
   const body = `
   <!-- Greeting -->
   <tr>
     <td class="px" style="padding:28px 24px 10px;">
       <h2 style="margin:0 0 8px;font-size:22px;color:#111827;font-weight:900;">We got your request, ${esc(p.customerName.split(" ")[0])}!</h2>
-      <p style="margin:0;color:#4b5563;font-size:15px;line-height:1.55;">
-        Thanks for booking with ${esc(BRAND_NAME)}. Here's a summary of your appointment request.
-        Our team will reach out shortly to confirm the final time.
-      </p>
+      <p style="margin:0;color:#4b5563;font-size:15px;line-height:1.55;">${esc(tmpl.confirmIntro)}</p>
     </td>
   </tr>
 
@@ -146,10 +192,7 @@ function buildConfirmationHtml(p: BookingEmailParams): string {
     <td class="px" style="padding:8px 24px 28px;">
       <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:14px 16px;">
         <div style="font-weight:800;color:#92400e;font-size:13px;">What happens next?</div>
-        <div style="margin-top:6px;color:#78350f;font-size:13px;line-height:1.6;">
-          Our scheduling team will call or text you within 1 business day to confirm your appointment time.
-          Please have your system make/model handy if possible.
-        </div>
+        <div style="margin-top:6px;color:#78350f;font-size:13px;line-height:1.6;">${esc(tmpl.confirmNextSteps)}</div>
       </div>
     </td>
   </tr>`;
@@ -161,16 +204,13 @@ function buildConfirmationHtml(p: BookingEmailParams): string {
   );
 }
 
-function buildReminderHtml(p: BookingEmailParams): string {
+function buildReminderHtml(p: BookingEmailParams, tmpl: BookingEmailTemplates): string {
   const body = `
   <!-- Greeting -->
   <tr>
     <td class="px" style="padding:28px 24px 10px;">
       <h2 style="margin:0 0 8px;font-size:22px;color:#111827;font-weight:900;">Your appointment is in ~2 hours</h2>
-      <p style="margin:0;color:#4b5563;font-size:15px;line-height:1.55;">
-        Hi ${esc(p.customerName.split(" ")[0])}, just a friendly reminder that your ${esc(BRAND_NAME)} technician
-        is scheduled to arrive during your time window today.
-      </p>
+      <p style="margin:0;color:#4b5563;font-size:15px;line-height:1.55;">${esc(tmpl.remindIntro)}</p>
     </td>
   </tr>
 
@@ -261,11 +301,11 @@ export async function sendBookingConfirmation(params: {
   const { workOrderId, email, customerName, workOrderNumber, serviceType, preferredDate, preferredTimeSlot, address } = params;
 
   const emailParams: BookingEmailParams = { customerName, email, workOrderNumber, serviceType, preferredDate, preferredTimeSlot, address };
-  const subject = `Booking Confirmed — ${BRAND_NAME} #${workOrderNumber}`;
-  const html = buildConfirmationHtml(emailParams);
-  const text = `Hi ${customerName},\n\nYour ${serviceType} booking is confirmed!\n\nBooking #${workOrderNumber}\nDate: ${preferredDate}\nTime: ${preferredTimeSlot}\n\nOur team will call to confirm the exact time. For questions, contact us directly.\n\n${BRAND_NAME}`;
+  const tmpl = await fetchBookingEmailTemplates(emailParams);
+  const html = buildConfirmationHtml(emailParams, tmpl);
+  const text = `Hi ${customerName},\n\nYour ${serviceType} booking is confirmed!\n\nBooking #${workOrderNumber}\nDate: ${preferredDate}\nTime: ${preferredTimeSlot}\n\n${tmpl.confirmNextSteps}\n\n${BRAND_NAME}`;
 
-  const sent = await sendEmail(email, subject, html, text);
+  const sent = await sendEmail(email, tmpl.confirmSubject, html, text);
   if (sent) {
     await db.update(crmWorkOrders)
       .set({ bookingConfirmationSentAt: new Date() })
@@ -288,11 +328,11 @@ export async function sendBookingReminder(params: {
   const { workOrderId, email, customerName, workOrderNumber, serviceType, preferredDate, preferredTimeSlot, address } = params;
 
   const emailParams: BookingEmailParams = { customerName, email, workOrderNumber, serviceType, preferredDate, preferredTimeSlot, address };
-  const subject = `Reminder: Your appointment is today — ${BRAND_NAME}`;
-  const html = buildReminderHtml(emailParams);
-  const text = `Hi ${customerName},\n\nThis is a reminder that your ${serviceType} appointment is today!\n\nArrival window: ${preferredTimeSlot}\n\nPlease ensure access to your HVAC unit. We look forward to helping you!\n\n${BRAND_NAME}`;
+  const tmpl = await fetchBookingEmailTemplates(emailParams);
+  const html = buildReminderHtml(emailParams, tmpl);
+  const text = `${tmpl.remindIntro}\n\nArrival window: ${preferredTimeSlot}\n\nPlease ensure access to your HVAC unit. We look forward to helping you!\n\n${BRAND_NAME}`;
 
-  const sent = await sendEmail(email, subject, html, text);
+  const sent = await sendEmail(email, tmpl.remindSubject, html, text);
   if (sent) {
     await db.update(crmWorkOrders)
       .set({ bookingReminderSentAt: new Date() })
