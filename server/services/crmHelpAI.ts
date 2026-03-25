@@ -696,13 +696,10 @@ The Dispatch Board is the scheduling hub for all technician work orders. Access 
   - **Green**: On Site / Working
   - **Slate/Gray**: Completed
   - **Rose/Red**: Cancelled
-- Save/update actions in the panel appear as minimal text links (not large buttons)
 
 ### Unassigned Queue details
 - Shows all work orders with no assigned technician
 - Includes online bookings from /book as well as manually created work orders left unassigned
-- Scroll the queue independently from the timeline
-- Max visible height is limited; the queue scrolls if there are many items
 
 ### No auto-dispatch / no auto-assignment
 There is **no** automatic dispatch, auto-assignment, or round-robin routing in the Dispatch Board. All assignment is done manually by dragging cards.
@@ -760,11 +757,7 @@ The Settings page at /crm/settings contains these sub-sections only:
 - ❌ No "Settings → Widgets" page
 - ❌ No "Public booking URL" field or "booking link" field anywhere in Settings
 - ❌ No auto-assignment, round-robin, or auto-dispatch of work orders
-- ❌ No "Settings → Integrations" page (integrations are configured at the system level, not via a settings page)
-- ❌ No customer-facing mobile app (there is a technician PWA, not a customer app)
-- ❌ No "portal settings" or "portal customization" page
-- ❌ No "email templates" settings page
-- ❌ No drag-and-drop calendar for projects (projects appear on calendar by date range, but are not draggable there)
+- ❌ The booking link requires no configuration — it is always {domain}/book
 
 `;
 
@@ -822,7 +815,7 @@ Rules:
 6. Keep answers concise but informative
 7. If live data shows no results, say so clearly
 
-CRITICAL ACCURACY RULE: Only describe features, settings pages, navigation paths, and URLs that are explicitly documented in the knowledge base above. If something is not listed there — especially settings pages, admin panels, or configuration screens — do NOT invent or assume it exists. Respond with: "That feature or settings page doesn't appear to exist in this CRM based on my documentation. You may want to check with your admin." NEVER invent settings pages, URLs, configuration screens, or features that are not documented above. Pay special attention to the "FEATURES THAT DO NOT EXIST" section — if a user asks about one of those items, clearly state it does not exist in this system.
+CRITICAL ACCURACY RULE: Only describe features, settings pages, navigation paths, and URLs that are explicitly documented in the knowledge base above. If something is not listed there — especially settings pages, admin panels, or configuration screens — do NOT invent or assume it exists. Respond with: "I don't have specific information about that in this CRM — it may not exist or may not be documented." NEVER invent settings pages, URLs, configuration screens, or features that are not documented above. Pay special attention to the "FEATURES THAT DO NOT EXIST" section — if a user asks about one of those items, clearly state it does not exist in this system.
 
 Return JSON with:
 - answer: Your helpful response (string) - include specific data when relevant

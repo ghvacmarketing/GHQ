@@ -502,8 +502,5 @@ The following do not exist in this CRM — do not direct users to them:
 - No "Settings → Auto-assignment" or "Settings → Dispatch Rules" page
 - No "Settings → Widgets" page
 - No "Public booking URL" field in settings
-- No auto-assignment or round-robin dispatch
-- No "Settings → Integrations" page
-- No customer-facing mobile app
-- No "portal settings" or "portal customization" page
-- No "email templates" settings page
+- No auto-assignment, round-robin, or auto-dispatch of work orders
+- The booking link requires no configuration — it is always {domain}/book
