@@ -41,7 +41,7 @@ export default function ProposalRichTextEditor({ value, onChange }: ProposalRich
     editorProps: {
       attributes: {
         class:
-          "min-h-[160px] px-4 py-3 text-sm leading-relaxed focus:outline-none prose prose-sm max-w-none dark:prose-invert",
+          "min-h-[400px] px-4 py-3 text-sm leading-relaxed focus:outline-none prose prose-sm max-w-none dark:prose-invert",
       },
     },
   });

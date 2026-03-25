@@ -373,21 +373,13 @@ export default function CrmProposalPreview() {
           </div>
           <Badge variant="outline" className="text-xs ml-2 hidden sm:flex shrink-0">Valid 30 Days</Badge>
         </div>
-        <Button
-          onClick={handleSaveToCrm}
-          disabled={cart.length === 0 || !selectedCustomer || saveToCrmMutation.isPending}
-          className="bg-[#711419] hover:bg-[#5a1014] text-white shrink-0"
-        >
-          {saveToCrmMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-          Save to CRM
-        </Button>
       </div>
 
       {/* Main content */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <div className="w-full px-4 sm:px-6 py-8 space-y-8">
 
         {/* Customer */}
-        <div className="p-4 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+        <div className="p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
           <div className="flex items-center gap-3 flex-wrap">
             <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
             <span className="font-semibold text-lg">{selectedCustomer?.name || "No Customer Selected"}</span>
@@ -426,10 +418,7 @@ export default function CrmProposalPreview() {
 
         {/* Equipment */}
         <div>
-          <h3 className="text-sm font-semibold text-muted-foreground mb-4 flex items-center gap-2">
-            <Package className="h-4 w-4" />
-            EQUIPMENT INCLUDED
-          </h3>
+          <h3 className="text-sm font-semibold text-foreground mb-4">Equipment Included</h3>
           <div className="space-y-4">
             {cart.map((item) => {
               if (isCrawlspaceItem(item)) {
@@ -437,23 +426,23 @@ export default function CrmProposalPreview() {
                 const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
                 const itemPrice = finalPrice * item.quantity;
                 return (
-                  <div key={item.id} className={`rounded-xl border-2 ${item.eliteData ? "border-amber-300 dark:border-amber-700" : "border-teal-200 dark:border-teal-800"} bg-gradient-to-br from-teal-50 to-white dark:from-teal-950 dark:to-gray-900 overflow-hidden shadow-sm`}>
-                    <div className={`${item.eliteData ? "bg-gradient-to-r from-amber-500 to-amber-600" : "bg-teal-500"} text-white px-4 py-2 flex items-center justify-between`}>
+                  <div key={item.id} className={`rounded-xl border overflow-hidden ${item.eliteData ? "border-amber-200 dark:border-amber-800" : "border-border"} bg-card`}>
+                    <div className={`${item.eliteData ? "bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-200" : "bg-muted/50 text-foreground"} px-4 py-2 flex items-center justify-between border-b`}>
                       <div className="flex items-center gap-2">
                         {item.eliteData ? <Crown className="h-4 w-4" /> : <Package className="h-4 w-4" />}
                         <span className="font-semibold">Crawlspace Encapsulation</span>
                         <span className="opacity-70">•</span>
                         <span className="opacity-90">{item.tier.name}</span>
-                        {item.eliteData && <Badge className="bg-white/20 text-white text-xs ml-1">Elite Package</Badge>}
+                        {item.eliteData && <Badge variant="outline" className="text-xs ml-1">Elite Package</Badge>}
                       </div>
-                      {item.quantity > 1 && <Badge className="bg-white/20 text-white">x{item.quantity}</Badge>}
+                      {item.quantity > 1 && <Badge variant="outline" className="text-xs">x{item.quantity}</Badge>}
                     </div>
                     <div className="p-4">
                       <p className="text-sm text-muted-foreground mb-4">{item.tier.milThickness} Mil Vapor Barrier – {item.tier.description}</p>
                       {item.eliteData && (
-                        <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
-                          <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mb-2 flex items-center gap-1">
-                            <Crown className="h-3 w-3" /> ELITE PACKAGE INCLUDES:
+                        <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
+                          <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1">
+                            <Crown className="h-3 w-3" /> Elite Package Includes
                           </p>
                           <div className="space-y-1">
                             {CRAWLSPACE_ELITE_BUNDLES.map(bundle => (
@@ -463,17 +452,17 @@ export default function CrmProposalPreview() {
                               </div>
                             ))}
                           </div>
-                          <div className="mt-2 pt-2 border-t border-amber-200 dark:border-amber-700">
-                            <div className="flex justify-between text-xs text-green-600 dark:text-green-400 font-medium">
+                          <div className="mt-2 pt-2 border-t border-border">
+                            <div className="flex justify-between text-xs text-muted-foreground font-medium">
                               <span>20% Elite Discount</span>
                               <span>–{formatPrice(item.eliteData.discountAmount)}</span>
                             </div>
                           </div>
                         </div>
                       )}
-                      <div className="bg-teal-100 dark:bg-teal-900/50 rounded-lg p-3 flex items-center justify-between">
+                      <div className="bg-muted/40 rounded-lg p-3 flex items-center justify-between">
                         <div className="text-sm text-muted-foreground">{formatPrice(Math.round(itemPrice / 67))}/mo financing</div>
-                        <p className="text-2xl font-bold text-teal-700 dark:text-teal-300">{formatPrice(itemPrice)}</p>
+                        <p className="text-2xl font-bold text-foreground">{formatPrice(itemPrice)}</p>
                       </div>
                     </div>
                   </div>
@@ -491,34 +480,34 @@ export default function CrmProposalPreview() {
                   item.thermostat ? { label: "Thermostat", name: item.thermostat.unitName, image: item.thermostat.imageUrl } : null,
                 ].filter((c): c is NonNullable<typeof c> => c !== null);
                 return (
-                  <div key={item.id} className="rounded-xl border-2 border-green-200 dark:border-green-800 bg-gradient-to-br from-green-50 to-white dark:from-green-950 dark:to-gray-900 overflow-hidden shadow-sm">
-                    <div className="bg-green-500 text-white px-4 py-2 flex items-center justify-between">
+                  <div key={item.id} className="rounded-xl border border-border overflow-hidden bg-card">
+                    <div className="bg-muted/50 text-foreground px-4 py-2 flex items-center justify-between border-b">
                       <div className="flex items-center gap-2">
                         <Wrench className="h-4 w-4" />
                         <span className="font-semibold">Custom Build</span>
-                        <span className="text-green-100">•</span>
-                        <span className="text-green-100">{item.tonnage}</span>
+                        <span className="text-muted-foreground">•</span>
+                        <span className="text-muted-foreground">{item.tonnage}</span>
                       </div>
-                      {item.quantity > 1 && <Badge className="bg-white/20 text-white">x{item.quantity}</Badge>}
+                      {item.quantity > 1 && <Badge variant="outline" className="text-xs">x{item.quantity}</Badge>}
                     </div>
                     <div className="p-4">
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                         {components.map((comp, i) => (
-                          <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center border border-gray-100 dark:border-gray-700">
+                          <div key={i} className="bg-muted/30 rounded-lg p-2 text-center border border-border">
                             {comp.image ? (
                               <img src={getAssetUrl(comp.image)} alt={comp.label} className="w-12 h-12 mx-auto object-contain mb-1" loading="lazy" />
                             ) : (
-                              <div className="w-12 h-12 mx-auto bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center mb-1">
-                                <Package className="h-6 w-6 text-gray-400" />
+                              <div className="w-12 h-12 mx-auto bg-muted rounded flex items-center justify-center mb-1">
+                                <Package className="h-6 w-6 text-muted-foreground" />
                               </div>
                             )}
                             <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{comp.label}</p>
                           </div>
                         ))}
                       </div>
-                      <div className="bg-green-100 dark:bg-green-900/50 rounded-lg p-3 flex items-center justify-between">
-                        <Badge variant="outline" className="text-xs border-green-300 text-green-700 dark:border-green-600 dark:text-green-300">Estimated Price</Badge>
-                        <p className="text-2xl font-bold text-green-700 dark:text-green-300">{formatPriceRange(priceLow, priceHigh)}</p>
+                      <div className="bg-muted/40 rounded-lg p-3 flex items-center justify-between">
+                        <Badge variant="outline" className="text-xs">Estimated Price</Badge>
+                        <p className="text-2xl font-bold text-foreground">{formatPriceRange(priceLow, priceHigh)}</p>
                       </div>
                     </div>
                   </div>
@@ -528,15 +517,15 @@ export default function CrmProposalPreview() {
               if (isCrawlspaceServicesItem(item)) {
                 const itemPrice = item.totalPrice * item.quantity;
                 return (
-                  <div key={item.id} className="rounded-xl border-2 border-orange-200 dark:border-orange-800 bg-gradient-to-br from-orange-50 to-white dark:from-orange-950 dark:to-gray-900 overflow-hidden shadow-sm">
-                    <div className="bg-orange-500 text-white px-4 py-2 flex items-center justify-between">
+                  <div key={item.id} className="rounded-xl border border-border overflow-hidden bg-card">
+                    <div className="bg-muted/50 text-foreground px-4 py-2 flex items-center justify-between border-b">
                       <div className="flex items-center gap-2">
                         <Wrench className="h-4 w-4" />
                         <span className="font-semibold">Crawlspace Services</span>
-                        <span className="opacity-70">•</span>
-                        <span className="opacity-90">{item.selections.sqft.toLocaleString()} sq ft</span>
+                        <span className="text-muted-foreground">•</span>
+                        <span className="text-muted-foreground">{item.selections.sqft.toLocaleString()} sq ft</span>
                       </div>
-                      {item.quantity > 1 && <Badge className="bg-white/20 text-white">x{item.quantity}</Badge>}
+                      {item.quantity > 1 && <Badge variant="outline" className="text-xs">x{item.quantity}</Badge>}
                     </div>
                     <div className="p-4">
                       <div className="space-y-2 mb-4">
@@ -548,7 +537,7 @@ export default function CrmProposalPreview() {
                           return (
                             <div key={serviceId} className="flex justify-between items-center text-sm">
                               <div className="flex items-center gap-2">
-                                <Check className="h-4 w-4 text-orange-500" />
+                                <Check className="h-4 w-4 text-muted-foreground" />
                                 <span>{service.name}</span>
                                 <span className="text-xs text-muted-foreground">({effectiveSqft.toLocaleString()} sq ft)</span>
                               </div>
@@ -562,7 +551,7 @@ export default function CrmProposalPreview() {
                           return (
                             <div className="flex justify-between items-center text-sm">
                               <div className="flex items-center gap-2">
-                                <Check className="h-4 w-4 text-orange-500" />
+                                <Check className="h-4 w-4 text-muted-foreground" />
                                 <span>{door.name}</span>
                               </div>
                               <span className="font-medium">{formatPrice(door.price)}</span>
@@ -570,9 +559,9 @@ export default function CrmProposalPreview() {
                           );
                         })()}
                       </div>
-                      <div className="bg-orange-100 dark:bg-orange-900/50 rounded-lg p-3 flex items-center justify-between">
+                      <div className="bg-muted/40 rounded-lg p-3 flex items-center justify-between">
                         <div className="text-sm text-muted-foreground">{formatPrice(Math.round(itemPrice / 67))}/mo financing</div>
-                        <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">{formatPrice(itemPrice)}</p>
+                        <p className="text-2xl font-bold text-foreground">{formatPrice(itemPrice)}</p>
                       </div>
                     </div>
                   </div>
@@ -587,14 +576,8 @@ export default function CrmProposalPreview() {
               const monthlyPrice = hvac.eliteData
                 ? Math.round(hvac.eliteData.finalTotal / 67) * hvac.quantity
                 : (parseFloat(hvac.monthlyPayment) || 0) * hvac.quantity;
-              const levelColors: Record<string, string> = {
-                Best: "from-amber-50 to-white dark:from-amber-950 dark:to-gray-900 border-amber-200 dark:border-amber-800",
-                Better: "from-purple-50 to-white dark:from-purple-950 dark:to-gray-900 border-purple-200 dark:border-purple-800",
-                Good: "from-blue-50 to-white dark:from-blue-950 dark:to-gray-900 border-blue-200 dark:border-blue-800",
-                Budget: "from-gray-50 to-white dark:from-gray-900 dark:to-gray-900 border-gray-200 dark:border-gray-700",
-              };
               const headerColors: Record<string, string> = {
-                Best: "bg-amber-500", Better: "bg-purple-500", Good: "bg-blue-500", Budget: "bg-gray-500",
+                Best: "bg-amber-500 text-white", Better: "bg-purple-500 text-white", Good: "bg-blue-500 text-white", Budget: "bg-gray-500 text-white",
               };
               const indoorLabel = hvac.unitType === "PHP" ? "Heat Kit" : hvac.unitType === "SHP" ? "Air Handler" : "Indoor Unit";
               const components = [
@@ -604,16 +587,16 @@ export default function CrmProposalPreview() {
                 { label: "Thermostat", name: hvac.thermostatName || hvac.thermostatModel, image: hvac.thermostatImageUrl },
               ].filter(c => c.name);
               return (
-                <div key={hvac.id} className={`rounded-xl border-2 bg-gradient-to-br overflow-hidden shadow-sm ${hvac.eliteData ? "border-amber-300 dark:border-amber-700" : ""} ${levelColors[hvac.packageLevel] || levelColors.Budget}`}>
-                  <div className={`${hvac.eliteData ? "bg-gradient-to-r from-amber-500 to-amber-600" : (headerColors[hvac.packageLevel] || headerColors.Budget)} text-white px-4 py-2 flex items-center justify-between`}>
+                <div key={hvac.id} className={`rounded-xl border overflow-hidden bg-card ${hvac.eliteData ? "border-amber-200 dark:border-amber-800" : "border-border"}`}>
+                  <div className={`${hvac.eliteData ? "bg-amber-500 text-white" : (headerColors[hvac.packageLevel] || headerColors.Budget)} px-4 py-2 flex items-center justify-between border-b`}>
                     <div className="flex items-center gap-2">
                       {hvac.eliteData ? <Crown className="h-4 w-4" /> : <Award className="h-4 w-4" />}
                       <span className="font-semibold">{hvac.unitType}</span>
-                      <span className="opacity-70">•</span>
-                      <span className="opacity-90">{hvac.tier}</span>
+                      <span className="opacity-60">•</span>
+                      <span className="opacity-80">{hvac.tier}</span>
                       {hvac.eliteData && <Badge className="bg-white/20 text-white text-xs ml-1">Elite Package</Badge>}
                     </div>
-                    {hvac.quantity > 1 && <Badge className="bg-white/20 text-white">x{hvac.quantity}</Badge>}
+                    {hvac.quantity > 1 && <Badge className="bg-white/20 text-white text-xs">x{hvac.quantity}</Badge>}
                   </div>
                   <div className="p-4">
                     <div className="flex items-center gap-2 mb-3">
@@ -622,12 +605,12 @@ export default function CrmProposalPreview() {
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                       {components.map((comp, i) => (
-                        <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center border border-gray-100 dark:border-gray-700">
+                        <div key={i} className="bg-muted/30 rounded-lg p-2 text-center border border-border">
                           {comp.image ? (
                             <img src={getAssetUrl(comp.image)} alt={comp.label} className="w-12 h-12 mx-auto object-contain mb-1" loading="lazy" />
                           ) : (
-                            <div className="w-12 h-12 mx-auto bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center mb-1">
-                              <Package className="h-6 w-6 text-gray-400" />
+                            <div className="w-12 h-12 mx-auto bg-muted rounded flex items-center justify-center mb-1">
+                              <Package className="h-6 w-6 text-muted-foreground" />
                             </div>
                           )}
                           <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{comp.label}</p>
@@ -635,9 +618,9 @@ export default function CrmProposalPreview() {
                       ))}
                     </div>
                     {hvac.eliteData && (
-                      <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
-                        <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mb-2 flex items-center gap-1">
-                          <Crown className="h-3 w-3" /> ELITE PACKAGE INCLUDES:
+                      <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
+                        <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1">
+                          <Crown className="h-3 w-3" /> Elite Package Includes
                         </p>
                         <div className="space-y-1">
                           {HVAC_ELITE_CORE_BUNDLES.map(bundle => (
@@ -659,21 +642,21 @@ export default function CrmProposalPreview() {
                             return null;
                           })()}
                         </div>
-                        <div className="mt-2 pt-2 border-t border-amber-200 dark:border-amber-700">
-                          <div className="flex justify-between text-xs text-green-600 dark:text-green-400 font-medium">
+                        <div className="mt-2 pt-2 border-t border-border">
+                          <div className="flex justify-between text-xs text-muted-foreground font-medium">
                             <span>20% Elite Discount</span>
                             <span>–{formatPrice(hvac.eliteData.discountAmount)}</span>
                           </div>
                         </div>
                       </div>
                     )}
-                    <div className="bg-primary/10 rounded-lg p-3 flex items-center justify-between">
+                    <div className="bg-muted/40 rounded-lg p-3 flex items-center justify-between">
                       <div className="text-sm text-muted-foreground">{formatPrice(monthlyPrice)}/mo financing</div>
                       <div className="text-right">
                         {hvac.eliteData && (
                           <p className="text-xs text-muted-foreground line-through">{formatPrice(hvac.eliteData.originalTotal * hvac.quantity)}</p>
                         )}
-                        <p className="text-2xl font-bold text-primary">{formatPrice(itemPrice)}</p>
+                        <p className="text-2xl font-bold text-foreground">{formatPrice(itemPrice)}</p>
                       </div>
                     </div>
                   </div>
