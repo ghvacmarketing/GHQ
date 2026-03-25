@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import {
-  ArrowLeft, Package, Crown, Award, Wrench, Check, Loader2, FileText, CheckCircle2, MapPin
+  ArrowLeft, Package, Crown, Award, Wrench, Check, Loader2, FileText, CheckCircle2, MapPin, ClipboardList
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import ProposalRichTextEditor from "@/components/proposal-rich-text-editor";
 import redlogo from "@assets/redlogo.webp";
+import { generateContractTemplate } from "@/lib/contract-template";
 
 // ─── Types (mirrored from crm-proposal-builder) ──────────────────────────────
 
@@ -684,7 +685,49 @@ export default function CrmProposalPreview() {
 
         {/* Proposal Notes – large editor */}
         <div>
-          <h3 className="text-sm font-semibold mb-3 text-foreground">Proposal Notes</h3>
+          <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+            <h3 className="text-sm font-semibold text-foreground">Proposal Notes</h3>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const hasContent = proposalNotes && proposalNotes !== "<p></p>" && proposalNotes.trim() !== "";
+                if (hasContent && !window.confirm("Replace current notes with the contract template?")) return;
+
+                const equip = cart.map(item => {
+                  if (isHvacPackage(item)) return `${(item as HvacPackageCartItem).packageLevel} Package – ${(item as HvacPackageCartItem).extractedTonnage} – ${(item as HvacPackageCartItem).outdoorBrand} ${(item as HvacPackageCartItem).outdoorName}`;
+                  if (isCrawlspaceItem(item)) return `Crawlspace Encapsulation – ${item.tier.name} (${item.pricingBreakdown.bandSqft.toLocaleString()} sqft)`;
+                  if (isCustomBuild(item)) return `Custom Build – ${item.tonnage} System`;
+                  return "HVAC Equipment";
+                }).join("; ");
+
+                const addrParts: string[] = [];
+                if (selectedCustomer?.fullAddress) addrParts.push(selectedCustomer.fullAddress);
+                else if (previewData.customerProperties.length > 0) {
+                  const prop = previewData.customerProperties[0];
+                  addrParts.push([prop.address1, prop.city, prop.state, prop.zip].filter(Boolean).join(", "));
+                }
+
+                const totalLow = cartTotalAfterDiscount.low;
+                const totalHigh = cartTotalAfterDiscount.high;
+                const totalStr = totalLow === totalHigh
+                  ? "$" + totalLow.toLocaleString()
+                  : "$" + totalLow.toLocaleString() + " – $" + totalHigh.toLocaleString();
+
+                const html = generateContractTemplate({
+                  customerName: selectedCustomer?.name || undefined,
+                  address: addrParts[0] || undefined,
+                  equipmentSummary: equip || undefined,
+                  totalPrice: totalStr || undefined,
+                });
+                setProposalNotes(html);
+              }}
+              className="text-slate-700 shrink-0"
+            >
+              <ClipboardList className="h-4 w-4 mr-1.5" />
+              Load Contract Template
+            </Button>
+          </div>
           <p className="text-xs text-muted-foreground mb-3">
             Add contract terms, scope of work, exclusions, or any other notes for the customer.
           </p>

@@ -97,6 +97,7 @@ import { PaymentLinkButton } from "@/components/stripe-payment-link-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import RichTextEditor, { RichTextDisplay } from "@/components/rich-text-editor";
 import ghvacLogo from "@assets/ghvac-logo.png";
+import { generateContractTemplate } from "@/lib/contract-template";
 import {
   BRAND_COLOR,
   COMPANY_INFO,
@@ -3360,22 +3361,59 @@ export default function CrmQuoteDetail() {
         {/* Editable Description for custom install quotes and proposal quotes */}
         {(quote.quoteType === "custom_install" || quote.quoteType === "proposal") && (
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
               <CardTitle className="text-base">Description</CardTitle>
-              {!isEditingDescription && (
+              <div className="flex items-center gap-2">
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={() => {
-                    setEditedDescription(quote.description || "");
-                    setIsEditingDescription(true);
+                    const buildTemplate = () => {
+                      const lineDescriptions = (quote.lineItems || [])
+                        .map(li => li.description)
+                        .filter(Boolean)
+                        .join("; ");
+                      const totalStr = quote.total
+                        ? "$" + parseFloat(quote.total.toString()).toLocaleString()
+                        : undefined;
+                      return generateContractTemplate({
+                        customerName: quote.customer?.name || quote.customerName || undefined,
+                        address: quote.serviceAddress || undefined,
+                        equipmentSummary: lineDescriptions || undefined,
+                        totalPrice: totalStr,
+                      });
+                    };
+                    if (!isEditingDescription) {
+                      const hasContent = quote.description && quote.description.trim() !== "";
+                      if (hasContent && !window.confirm("Replace current description with the contract template?")) return;
+                      setEditedDescription(buildTemplate());
+                      setIsEditingDescription(true);
+                    } else {
+                      const hasContent = editedDescription && editedDescription !== "<p></p>" && editedDescription.trim() !== "";
+                      if (hasContent && !window.confirm("Replace current description with the contract template?")) return;
+                      setEditedDescription(buildTemplate());
+                    }
                   }}
-                  data-testid="button-edit-description"
+                  className="text-slate-700"
                 >
-                  <Edit className="h-4 w-4 mr-1" />
-                  Edit
+                  <ClipboardList className="h-4 w-4 mr-1" />
+                  Load Template
                 </Button>
-              )}
+                {!isEditingDescription && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setEditedDescription(quote.description || "");
+                      setIsEditingDescription(true);
+                    }}
+                    data-testid="button-edit-description"
+                  >
+                    <Edit className="h-4 w-4 mr-1" />
+                    Edit
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {isEditingDescription ? (

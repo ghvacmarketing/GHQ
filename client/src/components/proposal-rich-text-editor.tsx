@@ -15,7 +15,7 @@ import {
   Heading1,
   Heading2,
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 interface ProposalRichTextEditorProps {
   value: string;
@@ -23,6 +23,8 @@ interface ProposalRichTextEditorProps {
 }
 
 export default function ProposalRichTextEditor({ value, onChange }: ProposalRichTextEditorProps) {
+  const lastEmittedRef = useRef<string>("");
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -32,7 +34,9 @@ export default function ProposalRichTextEditor({ value, onChange }: ProposalRich
     ],
     content: value || "",
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
+      const html = editor.getHTML();
+      lastEmittedRef.current = html;
+      onChange(html);
     },
     editorProps: {
       attributes: {
@@ -43,8 +47,13 @@ export default function ProposalRichTextEditor({ value, onChange }: ProposalRich
   });
 
   useEffect(() => {
-    if (editor && value === "" && editor.getHTML() !== "<p></p>") {
+    if (!editor) return;
+    if (value === "" && editor.getHTML() !== "<p></p>") {
+      lastEmittedRef.current = "";
       editor.commands.clearContent();
+    } else if (value !== "" && value !== lastEmittedRef.current && value !== editor.getHTML()) {
+      lastEmittedRef.current = value;
+      editor.commands.setContent(value);
     }
   }, [value, editor]);
 
