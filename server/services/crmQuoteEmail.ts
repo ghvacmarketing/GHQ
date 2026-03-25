@@ -294,15 +294,6 @@ function buildTextBody(
   lines.push(introText || "Thank you for considering Giesbrecht HVAC for your HVAC needs. We've prepared a detailed quote for you to review.");
   lines.push("");
 
-  if (quote.description) {
-    lines.push("----------------------------------------");
-    lines.push("");
-    lines.push(stripHtmlTags(quote.description));
-    lines.push("");
-    lines.push("----------------------------------------");
-    lines.push("");
-  }
-
   if (personalMessage) {
     lines.push(personalMessage);
     lines.push("");
@@ -467,17 +458,6 @@ function buildHtmlBody(
               </table>
             </td>
           </tr>
-
-          ${quote.description ? `
-          <!-- Description / Contract Content -->
-          <tr>
-            <td class="px-24" style="padding:0 20px 16px 20px;">
-              <div style="border-top:1px solid #e2e8f0;padding-top:16px;">
-                ${descriptionToEmailSafeHtml(quote.description)}
-              </div>
-            </td>
-          </tr>
-          ` : ""}
 
           ${personalMessageHtml}
 
