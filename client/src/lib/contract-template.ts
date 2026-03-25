@@ -115,18 +115,5 @@ export function generateContractTemplate(data: ContractTemplateData = {}): strin
   <li><strong>Governing Law:</strong> This agreement is governed by the laws of the State of California.</li>
   <li><strong>Entire Agreement:</strong> This document constitutes the entire agreement between the parties and supersedes all prior discussions, representations, or agreements, whether written or oral.</li>
 </ol>
-
-<hr />
-
-<h2>ACCEPTANCE AND SIGNATURE</h2>
-<p>By signing below, the customer agrees to all terms and conditions set forth in this Installation Agreement and authorizes Giesbrecht HVAC to proceed with the installation as described.</p>
-<p>&nbsp;</p>
-<p><strong>Customer Signature:</strong> ___________________________________ &nbsp;&nbsp;<strong>Date:</strong> _______________</p>
-<p><strong>Printed Name:</strong> ${customerName}</p>
-<p>&nbsp;</p>
-<p><strong>Giesbrecht HVAC Representative:</strong> ___________________________________ &nbsp;&nbsp;<strong>Date:</strong> _______________</p>
-<p><strong>Title:</strong> ___________________________________</p>
-<p>&nbsp;</p>
-<p><em>Thank you for choosing Giesbrecht HVAC. We look forward to making your home more comfortable!</em></p>
 `.trim();
 }
