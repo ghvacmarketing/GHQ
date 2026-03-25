@@ -18622,6 +18622,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             senderName: sentByName,
             quoteViewUrl,
             replyToEmail,
+            isManual: true,
           });
 
           await db.insert(quoteEmailLogs).values({

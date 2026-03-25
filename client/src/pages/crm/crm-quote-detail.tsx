@@ -4630,6 +4630,14 @@ export default function CrmQuoteDetail() {
                     )}
                   </div>
 
+                  {/* Description / Contract Template */}
+                  {quote.description && (
+                    <div
+                      className="contract-description border-t pt-4"
+                      dangerouslySetInnerHTML={{ __html: quote.description }}
+                    />
+                  )}
+
                   {/* Quote Content - Options Mode */}
                   {quote.quoteMode === "options" && quote.lineItems ? (
                     <>
