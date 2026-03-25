@@ -1284,6 +1284,8 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   fieldEdgeWoNumber: text("field_edge_wo_number"),
   bookingSource: text("booking_source").$type<"phone" | "online" | "walk_in" | "referral">(),
   preferredTimeSlot: text("preferred_time_slot"),
+  bookingConfirmationSentAt: timestamp("booking_confirmation_sent_at"),
+  bookingReminderSentAt: timestamp("booking_reminder_sent_at"),
   immediateAction: text("immediate_action").$type<ImmediateAction>(),
   dueDate: timestamp("due_date"),
   createdAt: timestamp("created_at").defaultNow(),

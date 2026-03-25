@@ -7,6 +7,7 @@ import { getStripeSync } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
 import { startBackgroundSyncScheduler } from "./services/quickbooksService";
 import { fieldEdgeCustomerService } from "./services/fieldedge-customers";
+import { scheduleBookingReminders } from "./services/bookingEmail";
 
 const app = express();
 
@@ -186,6 +187,9 @@ app.use("/assets", express.static(assetsPath));
     
     // Start QuickBooks background sync scheduler
     startBackgroundSyncScheduler();
+
+    // Start booking email reminder scheduler (checks every 30 min for 2-hour reminders)
+    scheduleBookingReminders();
     
     // Start FieldEdge customer cache with 5-minute refresh
     fieldEdgeCustomerService.startAutoRefresh(5);

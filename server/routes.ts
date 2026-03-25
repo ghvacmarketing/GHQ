@@ -26092,6 +26092,24 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         day: 'numeric' 
       });
 
+      // Calculate scheduledStart from selectedDate + time slot start hour
+      // Time slot format: "09:00-11:00" — use start of window
+      let scheduledStart: Date | null = null;
+      try {
+        const slotStart = (selectedTimeSlot || "").split("-")[0]; // e.g. "09:00"
+        const [slotHour, slotMin] = slotStart.split(":").map(Number);
+        const dateBase = new Date(selectedDate);
+        scheduledStart = new Date(
+          dateBase.getFullYear(),
+          dateBase.getMonth(),
+          dateBase.getDate(),
+          isNaN(slotHour) ? 9 : slotHour,
+          isNaN(slotMin) ? 0 : slotMin,
+        );
+      } catch {
+        scheduledStart = null;
+      }
+
       // Create work order with NeedsScheduling status and online booking source
       const [workOrder] = await db.insert(crmWorkOrders).values({
         customerId,
@@ -26107,11 +26125,24 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         bookingSource: "online",
         preferredTimeSlot: `${formattedDate} ${preferredTimeDisplay}`,
         dispatchNotes: `ONLINE BOOKING - Preferred time: ${formattedDate} ${preferredTimeDisplay}`,
+        scheduledStart: scheduledStart ?? undefined,
       }).returning();
 
       console.log(`[OnlineBooking] Created work order #${nextWoNumber} for ${customerName} (${email})`);
 
-      // TODO: Send confirmation email to customer
+      // Send booking confirmation email (non-blocking)
+      import("./services/bookingEmail").then(({ sendBookingConfirmation }) => {
+        sendBookingConfirmation({
+          workOrderId: workOrder.id,
+          workOrderNumber: nextWoNumber,
+          customerName,
+          email,
+          serviceType: serviceType === "consultation" ? "Comfort Consultation" : "HVAC Service Call",
+          preferredDate: formattedDate,
+          preferredTimeSlot: preferredTimeDisplay,
+          address: fullAddress,
+        }).catch(err => console.error("[OnlineBooking] Confirmation email error:", err));
+      }).catch(err => console.error("[OnlineBooking] Failed to import bookingEmail:", err));
 
       res.json({
         success: true,
