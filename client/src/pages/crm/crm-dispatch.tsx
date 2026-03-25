@@ -975,10 +975,14 @@ function WeekDispatchBoard({ technicians, workOrders, weekDates, onWorkOrderClic
   return (
     <Card className="bg-white border overflow-hidden" ref={setNodeRef}>
       <div className="overflow-x-auto overflow-y-auto max-h-full">
-        <table className="min-w-[1640px] border-collapse">
+        <table className="w-full min-w-[1000px] border-collapse table-fixed">
+          <colgroup>
+            <col style={{ width: "160px" }} />
+            {weekDates.map((_, i) => <col key={i} />)}
+          </colgroup>
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="w-40 px-3 py-2 text-left text-xs font-semibold text-slate-600 border-r border-slate-200 bg-slate-50 sticky left-0 z-20">
+              <th className="px-3 py-2 text-left text-xs font-semibold text-slate-600 border-r border-slate-200 bg-slate-50 sticky left-0 z-20">
                 Technicians
               </th>
               {weekDates.map((date, i) => {
