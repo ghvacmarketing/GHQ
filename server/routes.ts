@@ -26015,33 +26015,47 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       };
 
       // Returns true if two address strings refer to the same physical location.
-      // Strategy:
-      //   1. House number must match exactly.
-      //   2. Street-name tokens are compared with fuzzy (edit-distance) tolerance:
-      //      each token from the smaller set must have a close match in the larger
-      //      set (≥ 70% of tokens must match with at most 1 edit each).
+      // Strategy (house number is checked FIRST — no shortcuts that bypass it):
+      //   1. Exact normalized match → true.
+      //   2. Extract house numbers; if either is present they MUST match exactly.
+      //   3. Compare street-name tokens with fuzzy (Levenshtein) tolerance:
+      //      ≥ 70% of the smaller token set must have a close match in the larger.
+      //   4. If neither address has a house number, require all tokens to match
+      //      (stricter because we have less signal).
       const addressesMatch = (a: string, b: string): boolean => {
         const n1 = normalizeAddr(a);
         const n2 = normalizeAddr(b);
         if (n1 === n2) return true;
-        if (n1.includes(n2) || n2.includes(n1)) return true;
+
         const num1 = n1.match(/^\d+/)?.[0];
         const num2 = n2.match(/^\d+/)?.[0];
-        // If one or both have no house number, fall back to string containment only
-        if (!num1 || !num2) return false;
-        // House numbers must match exactly
-        if (num1 !== num2) return false;
-        // Compare street-name tokens with typo tolerance
-        const tokens1 = n1.replace(num1, '').trim().split(/\s+/).filter(Boolean);
-        const tokens2 = n2.replace(num2, '').trim().split(/\s+/).filter(Boolean);
+
+        // If either address has a house number, they must match exactly.
+        // This prevents "123 Main St" from matching "23 Main St" via substring.
+        if (num1 || num2) {
+          if (!num1 || !num2) return false; // one has a number, the other doesn't
+          if (num1 !== num2) return false;  // different house numbers — definite mismatch
+        }
+
+        // Compare street-name tokens (portion after the house number)
+        const street1 = num1 ? n1.slice(num1.length).trim() : n1;
+        const street2 = num2 ? n2.slice(num2.length).trim() : n2;
+
+        // Quick containment check on just the street portion (house numbers already validated)
+        if (street1 === street2) return true;
+        if (street1.includes(street2) || street2.includes(street1)) return true;
+
+        const tokens1 = street1.split(/\s+/).filter(Boolean);
+        const tokens2 = street2.split(/\s+/).filter(Boolean);
         if (tokens1.length === 0 && tokens2.length === 0) return true;
-        if (tokens1.length === 0 || tokens2.length === 0) return true; // only house number
-        // For each token in the smaller set, look for a fuzzy match in the larger set
+        if (tokens1.length === 0 || tokens2.length === 0) return true; // only house number given
+
         const [smaller, larger] = tokens1.length <= tokens2.length
           ? [tokens1, tokens2]
           : [tokens2, tokens1];
         const matched = smaller.filter(t => larger.some(u => tokenMatch(t, u))).length;
-        return matched / smaller.length >= 0.7;
+        const threshold = (num1 && num2) ? 0.7 : 1.0; // stricter when no house number
+        return matched / smaller.length >= threshold;
       };
 
       // ---------------------------------------------------------------------------
