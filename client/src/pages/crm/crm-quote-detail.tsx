@@ -3383,14 +3383,14 @@ export default function CrmQuoteDetail() {
                         totalPrice: totalStr,
                       });
                     };
+                    const isEmpty = (s: string | undefined | null) =>
+                      !s || s.trim() === "" || s.trim() === "<p></p>";
                     if (!isEditingDescription) {
-                      const hasContent = quote.description && quote.description.trim() !== "";
-                      if (hasContent && !window.confirm("Replace current description with the contract template?")) return;
+                      if (!isEmpty(quote.description) && !window.confirm("Replace current description with the contract template?")) return;
                       setEditedDescription(buildTemplate());
                       setIsEditingDescription(true);
                     } else {
-                      const hasContent = editedDescription && editedDescription !== "<p></p>" && editedDescription.trim() !== "";
-                      if (hasContent && !window.confirm("Replace current description with the contract template?")) return;
+                      if (!isEmpty(editedDescription) && !window.confirm("Replace current description with the contract template?")) return;
                       setEditedDescription(buildTemplate());
                     }
                   }}

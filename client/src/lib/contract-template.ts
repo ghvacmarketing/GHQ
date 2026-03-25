@@ -5,19 +5,23 @@ export interface ContractTemplateData {
   equipmentSummary?: string;
   totalPrice?: string;
   preparedFor?: string;
+  projectName?: string;
 }
 
 export function generateContractTemplate(data: ContractTemplateData = {}): string {
   const today = data.date || new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
   const customerName = data.customerName || "[CLIENT NAME]";
+  const preparedFor = data.preparedFor || customerName;
   const address = data.address || "[PROJECT ADDRESS]";
   const totalPrice = data.totalPrice || "[TOTAL INVESTMENT]";
   const equipmentSummary = data.equipmentSummary || "[EQUIPMENT DESCRIPTION]";
+  const projectName = data.projectName || "[PROJECT NAME]";
 
   return `
 <h1>GIESBRECHT HVAC — INSTALLATION AGREEMENT</h1>
+<p><strong>Project:</strong> ${projectName}</p>
 <p><strong>Date:</strong> ${today}</p>
-<p><strong>Prepared For:</strong> ${customerName}</p>
+<p><strong>Prepared For:</strong> ${preparedFor}</p>
 <p><strong>Project Address:</strong> ${address}</p>
 
 <hr />
