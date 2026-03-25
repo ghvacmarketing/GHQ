@@ -555,9 +555,9 @@ export default function CrmWorkOrderDetail() {
     },
     onSuccess: () => {
       toast({ title: "Work order deleted" });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders/list"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch/work-orders"] });
+      queryClient.removeQueries({ queryKey: ["/api/crm/work-orders/list"] });
+      queryClient.removeQueries({ queryKey: ["/api/crm/work-orders"] });
+      queryClient.removeQueries({ queryKey: ["/api/crm/dispatch/work-orders"] });
       navigate("/crm/work-orders");
     },
     onError: (error: Error) => {

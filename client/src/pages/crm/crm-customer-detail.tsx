@@ -4190,7 +4190,9 @@ export default function CrmCustomerDetail() {
     onSuccess: (data) => {
       const action = data.action === "archived" ? "archived" : "deleted";
       toast({ title: `Customer ${action} successfully` });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
+      queryClient.removeQueries({ queryKey: ["/api/crm/customers"] });
+      queryClient.removeQueries({ queryKey: ["/api/crm/customers/merged"] });
+      queryClient.removeQueries({ queryKey: ["/api/crm/customers/stats"] });
       navigate(backHref ?? "/crm/customers");
     },
     onError: (error: Error) => {
