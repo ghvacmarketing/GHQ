@@ -224,6 +224,8 @@ export default function CrmQuoteDetail() {
   const [editingLineItemData, setEditingLineItemData] = useState<{ description: string; quantity: string; unitPrice: string }>({ description: "", quantity: "", unitPrice: "" });
   const [isAddingNewLineItem, setIsAddingNewLineItem] = useState(false);
   const [newLineItemData, setNewLineItemData] = useState<{ description: string; quantity: string; unitPrice: string }>({ description: "", quantity: "1", unitPrice: "" });
+  const [newItemOptionTag, setNewItemOptionTag] = useState<string>("");
+  const [catalogItemOptionTag, setCatalogItemOptionTag] = useState<string>("");
 
   const [showManualSignatureDialog, setShowManualSignatureDialog] = useState(false);
   const [manualSignature, setManualSignature] = useState("");
@@ -741,7 +743,7 @@ export default function CrmQuoteDetail() {
   });
 
   const addLineItemMutation = useMutation({
-    mutationFn: async (data: { description: string; quantity: string; unitPrice: string; lineTotal: string }) => {
+    mutationFn: async (data: { description: string; quantity: string; unitPrice: string; lineTotal: string; optionTag?: string }) => {
       const res = await fetch(`/api/crm/quotes/${quoteId}/line-items`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -751,6 +753,7 @@ export default function CrmQuoteDetail() {
           quantity: data.quantity,
           unitPrice: data.unitPrice,
           lineTotal: data.lineTotal,
+          ...(data.optionTag ? { optionTag: data.optionTag } : {}),
         }),
       });
       const result = await res.json();
@@ -763,6 +766,7 @@ export default function CrmQuoteDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       setIsAddingNewLineItem(false);
       setNewLineItemData({ description: "", quantity: "1", unitPrice: "" });
+      setNewItemOptionTag("");
       toast({ title: "Line item added", description: "The new line item has been added to the quote." });
     },
     onError: (error: Error) => {
@@ -789,7 +793,7 @@ export default function CrmQuoteDetail() {
   });
 
   const addFromCatalogMutation = useMutation({
-    mutationFn: async (item: CrmItem) => {
+    mutationFn: async ({ item, optionTag }: { item: CrmItem; optionTag?: string }) => {
       const price = parseFloat(item.rate || "0");
       const res = await apiRequest("POST", `/api/crm/quotes/${quoteId}/line-items`, {
         description: item.name,
@@ -798,6 +802,7 @@ export default function CrmQuoteDetail() {
         lineTotal: price.toString(),
         lineType: item.category || "install",
         itemId: item.id,
+        ...(optionTag ? { optionTag } : {}),
       });
       return res.json();
     },
@@ -948,12 +953,14 @@ export default function CrmQuoteDetail() {
       quantity: quantity.toString(),
       unitPrice: unitPrice.toString(),
       lineTotal: lineTotal.toString(),
+      optionTag: newItemOptionTag || undefined,
     });
   };
 
   const handleCancelAddLineItem = () => {
     setIsAddingNewLineItem(false);
     setNewLineItemData({ description: "", quantity: "1", unitPrice: "" });
+    setNewItemOptionTag("");
   };
 
   const calculateLineItemsSubtotal = () => {
@@ -2763,6 +2770,7 @@ export default function CrmQuoteDetail() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Description</TableHead>
+                  {quote.quoteMode === "options" && <TableHead className="w-24">Option</TableHead>}
                   <TableHead className="text-right w-24">Qty</TableHead>
                   <TableHead className="text-right w-32">Unit Price</TableHead>
                   <TableHead className="text-right w-32">Total</TableHead>
@@ -2785,6 +2793,15 @@ export default function CrmQuoteDetail() {
                               data-testid={`input-line-item-description-${item.id}`}
                             />
                           </TableCell>
+                          {quote.quoteMode === "options" && (
+                            <TableCell>
+                              {item.optionTag && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#711419]/10 text-[#711419]">
+                                  {item.optionTag}
+                                </span>
+                              )}
+                            </TableCell>
+                          )}
                           <TableCell>
                             <Input
                               type="number"
@@ -2844,6 +2861,19 @@ export default function CrmQuoteDetail() {
                       ) : (
                         <>
                           <TableCell><div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: item.description || "—" }} /></TableCell>
+                          {quote.quoteMode === "options" && (
+                            <TableCell>
+                              {item.optionTag ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#711419]/10 text-[#711419]">
+                                  {item.optionTag}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                                  Untagged
+                                </span>
+                              )}
+                            </TableCell>
+                          )}
                           <TableCell className="text-right">{item.quantity}</TableCell>
                           <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
                           <TableCell className="text-right">{formatCurrency(item.lineTotal)}</TableCell>
@@ -2879,7 +2909,7 @@ export default function CrmQuoteDetail() {
                   ))
                 ) : !isAddingNewLineItem ? (
                   <TableRow>
-                    <TableCell colSpan={canEditLineItems ? 5 : 4} className="text-center text-slate-500 py-8">
+                    <TableCell colSpan={canEditLineItems ? (quote.quoteMode === "options" ? 6 : 5) : (quote.quoteMode === "options" ? 5 : 4)} className="text-center text-slate-500 py-8">
                       No line items
                     </TableCell>
                   </TableRow>
@@ -2898,6 +2928,36 @@ export default function CrmQuoteDetail() {
                         data-testid="input-new-line-item-description"
                       />
                     </TableCell>
+                    {quote.quoteMode === "options" && (
+                      <TableCell>
+                        {(() => {
+                          const existingTags = [...new Set(
+                            (quote.lineItems || [])
+                              .map(li => li.optionTag)
+                              .filter((t): t is string => !!t)
+                          )];
+                          return existingTags.length > 0 ? (
+                            <Select value={newItemOptionTag} onValueChange={setNewItemOptionTag}>
+                              <SelectTrigger className="w-28 h-8 text-xs">
+                                <SelectValue placeholder="Option" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {existingTags.map(tag => (
+                                  <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input
+                              value={newItemOptionTag}
+                              onChange={(e) => setNewItemOptionTag(e.target.value)}
+                              placeholder="e.g. Best"
+                              className="w-24 h-8 text-xs"
+                            />
+                          );
+                        })()}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Input
                         type="number"
@@ -2986,6 +3046,7 @@ export default function CrmQuoteDetail() {
           if (!open) {
             setItemSearch("");
             setCategoryFilter("all");
+            setCatalogItemOptionTag("");
           }
         }}>
           <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col">
@@ -3021,6 +3082,43 @@ export default function CrmQuoteDetail() {
                 </Select>
               </div>
 
+              {/* Option selector — only shown for options-mode quotes */}
+              {quote?.quoteMode === "options" && (() => {
+                const existingTags = [...new Set(
+                  (quote.lineItems || [])
+                    .map(li => li.optionTag)
+                    .filter((t): t is string => !!t)
+                )];
+                return (
+                  <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+                    <Tag className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                    <span className="text-amber-800 font-medium whitespace-nowrap">Add to option:</span>
+                    {existingTags.length > 0 ? (
+                      <Select value={catalogItemOptionTag} onValueChange={setCatalogItemOptionTag}>
+                        <SelectTrigger className="h-7 text-xs flex-1 max-w-[180px]">
+                          <SelectValue placeholder="Select option" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {existingTags.map(tag => (
+                            <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        value={catalogItemOptionTag}
+                        onChange={(e) => setCatalogItemOptionTag(e.target.value)}
+                        placeholder="e.g. Best"
+                        className="h-7 text-xs flex-1 max-w-[180px]"
+                      />
+                    )}
+                    {!catalogItemOptionTag && (
+                      <span className="text-amber-600 text-xs">Items without an option won't appear in the presentation.</span>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div className="border rounded-lg overflow-hidden flex-1 overflow-y-auto min-h-[300px] max-h-[400px]">
                 {isSearchingItems ? (
                   <div className="p-8 text-center text-slate-500">
@@ -3033,7 +3131,7 @@ export default function CrmQuoteDetail() {
                       <button
                         key={item.id}
                         type="button"
-                        onClick={() => addFromCatalogMutation.mutate(item)}
+                        onClick={() => addFromCatalogMutation.mutate({ item, optionTag: catalogItemOptionTag || undefined })}
                         disabled={addFromCatalogMutation.isPending}
                         className="w-full p-4 text-left hover:bg-slate-50 transition-colors disabled:opacity-50"
                       >
