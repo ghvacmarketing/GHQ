@@ -225,7 +225,9 @@ export default function CrmQuoteDetail() {
   const [isAddingNewLineItem, setIsAddingNewLineItem] = useState(false);
   const [newLineItemData, setNewLineItemData] = useState<{ description: string; quantity: string; unitPrice: string }>({ description: "", quantity: "1", unitPrice: "" });
   const [newItemOptionTag, setNewItemOptionTag] = useState<string>("");
+  const [newItemOptionTagCreating, setNewItemOptionTagCreating] = useState(false);
   const [catalogItemOptionTag, setCatalogItemOptionTag] = useState<string>("");
+  const [catalogItemOptionTagCreating, setCatalogItemOptionTagCreating] = useState(false);
 
   const [showManualSignatureDialog, setShowManualSignatureDialog] = useState(false);
   const [manualSignature, setManualSignature] = useState("");
@@ -767,6 +769,7 @@ export default function CrmQuoteDetail() {
       setIsAddingNewLineItem(false);
       setNewLineItemData({ description: "", quantity: "1", unitPrice: "" });
       setNewItemOptionTag("");
+      setNewItemOptionTagCreating(false);
       toast({ title: "Line item added", description: "The new line item has been added to the quote." });
     },
     onError: (error: Error) => {
@@ -811,6 +814,8 @@ export default function CrmQuoteDetail() {
       setShowItemsCatalogDialog(false);
       setItemSearch("");
       setCategoryFilter("all");
+      setCatalogItemOptionTag("");
+      setCatalogItemOptionTagCreating(false);
       toast({ title: "Item added from catalog" });
     },
     onError: (error: any) => {
@@ -961,6 +966,7 @@ export default function CrmQuoteDetail() {
     setIsAddingNewLineItem(false);
     setNewLineItemData({ description: "", quantity: "1", unitPrice: "" });
     setNewItemOptionTag("");
+    setNewItemOptionTagCreating(false);
   };
 
   const calculateLineItemsSubtotal = () => {
@@ -2936,24 +2942,49 @@ export default function CrmQuoteDetail() {
                               .map(li => li.optionTag)
                               .filter((t): t is string => !!t)
                           )];
-                          return existingTags.length > 0 ? (
-                            <Select value={newItemOptionTag} onValueChange={setNewItemOptionTag}>
-                              <SelectTrigger className="w-28 h-8 text-xs">
-                                <SelectValue placeholder="Option" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {existingTags.map(tag => (
-                                  <SelectItem key={tag} value={tag}>{tag}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <Input
-                              value={newItemOptionTag}
-                              onChange={(e) => setNewItemOptionTag(e.target.value)}
-                              placeholder="e.g. Best"
-                              className="w-24 h-8 text-xs"
-                            />
+                          if (existingTags.length > 0 && !newItemOptionTagCreating) {
+                            return (
+                              <Select
+                                value={newItemOptionTag}
+                                onValueChange={(v) => {
+                                  if (v === "__new__") {
+                                    setNewItemOptionTagCreating(true);
+                                    setNewItemOptionTag("");
+                                  } else {
+                                    setNewItemOptionTag(v);
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="w-28 h-8 text-xs">
+                                  <SelectValue placeholder="Option" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {existingTags.map(tag => (
+                                    <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                                  ))}
+                                  <SelectItem value="__new__" className="text-blue-600 font-medium">+ New option…</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            );
+                          }
+                          return (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                value={newItemOptionTag}
+                                onChange={(e) => setNewItemOptionTag(e.target.value)}
+                                placeholder="Option name"
+                                className="w-24 h-8 text-xs"
+                                autoFocus={newItemOptionTagCreating}
+                              />
+                              {newItemOptionTagCreating && existingTags.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => { setNewItemOptionTagCreating(false); setNewItemOptionTag(""); }}
+                                  className="text-slate-400 hover:text-slate-600 text-xs"
+                                  title="Back to list"
+                                >✕</button>
+                              )}
+                            </div>
                           );
                         })()}
                       </TableCell>
@@ -3047,6 +3078,7 @@ export default function CrmQuoteDetail() {
             setItemSearch("");
             setCategoryFilter("all");
             setCatalogItemOptionTag("");
+            setCatalogItemOptionTagCreating(false);
           }
         }}>
           <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col">
@@ -3093,8 +3125,18 @@ export default function CrmQuoteDetail() {
                   <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
                     <Tag className="h-4 w-4 text-amber-600 flex-shrink-0" />
                     <span className="text-amber-800 font-medium whitespace-nowrap">Add to option:</span>
-                    {existingTags.length > 0 ? (
-                      <Select value={catalogItemOptionTag} onValueChange={setCatalogItemOptionTag}>
+                    {existingTags.length > 0 && !catalogItemOptionTagCreating ? (
+                      <Select
+                        value={catalogItemOptionTag}
+                        onValueChange={(v) => {
+                          if (v === "__new__") {
+                            setCatalogItemOptionTagCreating(true);
+                            setCatalogItemOptionTag("");
+                          } else {
+                            setCatalogItemOptionTag(v);
+                          }
+                        }}
+                      >
                         <SelectTrigger className="h-7 text-xs flex-1 max-w-[180px]">
                           <SelectValue placeholder="Select option" />
                         </SelectTrigger>
@@ -3102,15 +3144,27 @@ export default function CrmQuoteDetail() {
                           {existingTags.map(tag => (
                             <SelectItem key={tag} value={tag}>{tag}</SelectItem>
                           ))}
+                          <SelectItem value="__new__" className="text-blue-600 font-medium">+ New option…</SelectItem>
                         </SelectContent>
                       </Select>
                     ) : (
-                      <Input
-                        value={catalogItemOptionTag}
-                        onChange={(e) => setCatalogItemOptionTag(e.target.value)}
-                        placeholder="e.g. Best"
-                        className="h-7 text-xs flex-1 max-w-[180px]"
-                      />
+                      <div className="flex items-center gap-1 flex-1 max-w-[200px]">
+                        <Input
+                          value={catalogItemOptionTag}
+                          onChange={(e) => setCatalogItemOptionTag(e.target.value)}
+                          placeholder="Option name"
+                          className="h-7 text-xs flex-1"
+                          autoFocus={catalogItemOptionTagCreating}
+                        />
+                        {catalogItemOptionTagCreating && existingTags.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => { setCatalogItemOptionTagCreating(false); setCatalogItemOptionTag(""); }}
+                            className="text-slate-400 hover:text-slate-600 text-xs flex-shrink-0"
+                            title="Back to list"
+                          >✕</button>
+                        )}
+                      </div>
                     )}
                     {!catalogItemOptionTag && (
                       <span className="text-amber-600 text-xs">Items without an option won't appear in the presentation.</span>
