@@ -645,7 +645,129 @@ Go to Projects page, click "New Project", fill in the customer, title, project t
 
 ### "What are the project statuses?"
 Projects follow this flow: New → Equipment Ordered → Equipment Arrived → In Progress → Completed → Closed. When you add equipment info to a new project, it automatically moves to "Equipment Ordered".
+
+---
+
+## ONLINE BOOKING
+
+### How customers book online
+The online booking page is available at **{your-domain}/book** — simply append "/book" to the app's domain (e.g., https://yourcompany.ghvactools.com/book). There is NO settings page, admin panel, or configuration required for this URL — it works automatically.
+
+### What the booking form collects
+- Customer name, phone number, email address
+- Service address
+- Service type (service call, maintenance, install inquiry, etc.)
+- Preferred appointment time / scheduling notes
+
+### Where bookings go after submission
+- A new Work Order is automatically created with status **Scheduled**
+- The work order lands in the **Dispatch Board → Unassigned Queue** under "Needs Scheduling"
+- There is **no auto-assignment** or round-robin — all online bookings must be manually assigned by an admin dragging them onto a technician slot
+- An admin will see the new unassigned work order the next time they open the Dispatch Board
+
+### Important: No settings page for booking
+There is **no** "Settings → Online Booking", "Settings → Customer Portal", or "Settings → Booking Link" page. The booking link is always {domain}/book and requires no configuration.
+
+---
+
+## DISPATCH BOARD
+
+### Overview
+The Dispatch Board is the scheduling hub for all technician work orders. Access it via Dispatch Board in the CRM sidebar (URL: /crm/dispatch).
+
+### Views
+- **Day view**: The primary scheduling view — a timeline grid showing all technicians as rows and time slots as columns (6 AM to 10 PM in 30-minute increments)
+- **Week view**: Compact overview of the entire week
+- **Month view**: High-level calendar view
+- **Trucks view**: Vehicle-focused view
+
+### Day View — How scheduling works
+1. The timeline shows one row per technician
+2. **Unassigned Queue** sits below the timeline grid — it lists all work orders that have no technician assigned, grouped by stage (e.g., "Needs Scheduling")
+3. Drag a work order card from the unassigned queue up onto a technician's row at the desired time slot to assign it
+4. Once placed on the timeline, the work order is assigned to that technician for that time
+
+### Side Panel
+- Clicking any work order card (in the queue or on the timeline) opens a **detail side panel** on the right side of the board
+- The board automatically shrinks to make room for the panel — the panel is not an overlay
+- The panel header color indicates the work order status:
+  - **Amber**: Pending / Scheduled
+  - **Blue**: Dispatched / En Route / Traveling
+  - **Green**: On Site / Working
+  - **Slate/Gray**: Completed
+  - **Rose/Red**: Cancelled
+- Save/update actions in the panel appear as minimal text links (not large buttons)
+
+### Unassigned Queue details
+- Shows all work orders with no assigned technician
+- Includes online bookings from /book as well as manually created work orders left unassigned
+- Scroll the queue independently from the timeline
+- Max visible height is limited; the queue scrolls if there are many items
+
+### No auto-dispatch / no auto-assignment
+There is **no** automatic dispatch, auto-assignment, or round-robin routing in the Dispatch Board. All assignment is done manually by dragging cards.
+
+---
+
+## CRM NAVIGATION
+
+### Sidebar pages (what actually exists)
+Every page in the CRM sidebar — these are the only pages that exist:
+
+| Page | URL |
+|------|-----|
+| Dashboard | /crm/dashboard |
+| Dispatch Board | /crm/dispatch |
+| Phone | /crm/phone |
+| Messaging | /crm/messaging |
+| Notifications | /crm/notifications |
+| Customers | /crm/customers |
+| Agreements | /crm/agreements |
+| Quotes | /crm/quotes |
+| Invoices | /crm/invoices |
+| Work Orders | /crm/work-orders |
+| Projects | /crm/projects |
+| Mobile View | /crm/mobile |
+| Settings | /crm/settings |
+
+### Settings sub-sections (what actually exists inside Settings)
+The Settings page at /crm/settings contains these sub-sections only:
+- **Users & Roles** — manage team members, assign roles (Owner/Admin/Supervisor/Sales/Tech)
+- **Time Logs** — view, edit, and export technician time clock entries
+- **Checklists** — configure service call questionnaires by service type
+- **Pricebook** — manage equipment and service pricing from Google Sheets
+- **Packages** — configure maintenance package tiers (e.g., crawlspace tiers)
+- **Materials Catalog** — manage materials and parts pricing
+- **Payment Settings** — configure Stripe, financing link (GreenSky URL), and payment options
+- **Import Data** — import customer or equipment data from CSV
+- **Fleet Tracking** — Bouncie GPS vehicle tracking integration
+- **System** — system-level configuration (QuickBooks sync, AI settings, etc.)
+
+### Public-facing pages (outside the CRM)
+- **Online Booking**: {domain}/book — customer-facing booking form (not in the sidebar, no login needed)
+- **Customer Portal**: {domain}/portal — customers view invoices/agreements (accessed via magic link)
+- **Quote Viewer**: {domain}/quote/{id} — customer views and accepts/declines a quote
+- **Invoice Viewer**: {domain}/invoice/{id} — customer views and pays an invoice
+
+---
+
+## FEATURES THAT DO NOT EXIST IN THIS CRM
+
+**IMPORTANT: The following features do NOT exist. If asked about them, clearly say they are not part of this system.**
+
+- ❌ No "Settings → Online Booking" or "Settings → Customer Portal" page
+- ❌ No "Settings → Auto-assignment" or "Settings → Dispatch Rules" page
+- ❌ No "Settings → Widgets" page
+- ❌ No "Public booking URL" field or "booking link" field anywhere in Settings
+- ❌ No auto-assignment, round-robin, or auto-dispatch of work orders
+- ❌ No "Settings → Integrations" page (integrations are configured at the system level, not via a settings page)
+- ❌ No customer-facing mobile app (there is a technician PWA, not a customer app)
+- ❌ No "portal settings" or "portal customization" page
+- ❌ No "email templates" settings page
+- ❌ No drag-and-drop calendar for projects (projects appear on calendar by date range, but are not draggable there)
+
 `;
+
 
 export interface CrmHelpResponse {
   answer: string;
@@ -699,6 +821,8 @@ Rules:
 5. If asked about specific records, provide the details from live data
 6. Keep answers concise but informative
 7. If live data shows no results, say so clearly
+
+CRITICAL ACCURACY RULE: Only describe features, settings pages, navigation paths, and URLs that are explicitly documented in the knowledge base above. If something is not listed there — especially settings pages, admin panels, or configuration screens — do NOT invent or assume it exists. Respond with: "That feature or settings page doesn't appear to exist in this CRM based on my documentation. You may want to check with your admin." NEVER invent settings pages, URLs, configuration screens, or features that are not documented above. Pay special attention to the "FEATURES THAT DO NOT EXIST" section — if a user asks about one of those items, clearly state it does not exist in this system.
 
 Return JSON with:
 - answer: Your helpful response (string) - include specific data when relevant
