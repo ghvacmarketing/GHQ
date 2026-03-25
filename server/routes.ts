@@ -25965,29 +25965,88 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         ? `${cleanPhone.slice(0,3)}-${cleanPhone.slice(3,6)}-${cleanPhone.slice(6)}`
         : phone;
 
-      // Try to find existing customer by phone or email
+      // ---------------------------------------------------------------------------
+      // Helper: normalize an address string for fuzzy comparison
+      // Lowercases, strips punctuation, and collapses common abbreviations so that
+      // "215 Neal Street" and "215 neal st." both reduce to "215 neal st"
+      // ---------------------------------------------------------------------------
+      const normalizeAddr = (a: string): string =>
+        a.toLowerCase()
+          .replace(/\./g, '')
+          .replace(/,/g, '')
+          .replace(/\bstreet\b/g, 'st')
+          .replace(/\bavenue\b/g, 'ave')
+          .replace(/\bdrive\b/g, 'dr')
+          .replace(/\blane\b/g, 'ln')
+          .replace(/\broad\b/g, 'rd')
+          .replace(/\bboulevard\b/g, 'blvd')
+          .replace(/\bplace\b/g, 'pl')
+          .replace(/\bcourt\b/g, 'ct')
+          .replace(/\bcircle\b/g, 'cir')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+      // Returns true if two address strings refer to the same physical location.
+      // Strategy: house number must match exactly; street name words must overlap ≥ 70%.
+      const addressesMatch = (a: string, b: string): boolean => {
+        const n1 = normalizeAddr(a);
+        const n2 = normalizeAddr(b);
+        if (n1 === n2) return true;
+        if (n1.includes(n2) || n2.includes(n1)) return true;
+        const num1 = n1.match(/^\d+/)?.[0];
+        const num2 = n2.match(/^\d+/)?.[0];
+        // If one or both have no house number, fall back to string containment only
+        if (!num1 || !num2) return false;
+        // House numbers must match exactly
+        if (num1 !== num2) return false;
+        // Compare street-name tokens
+        const words1 = new Set(n1.replace(num1, '').trim().split(/\s+/).filter(Boolean));
+        const words2 = new Set(n2.replace(num2, '').trim().split(/\s+/).filter(Boolean));
+        const minSize = Math.min(words1.size, words2.size);
+        if (minSize === 0) return true; // only house number provided — same number is good enough
+        const common = [...words1].filter(w => words2.has(w)).length;
+        return common / minSize >= 0.7;
+      };
+
+      // ---------------------------------------------------------------------------
+      // Multi-signal customer matching: search phone AND email in parallel, then
+      // pick the best match.
+      //   • Both signals → same record  = strong match (use it)
+      //   • Both signals → diff records = conflict (prefer phone)
+      //   • One signal only             = use that match
+      //   • No signal                   = new customer
+      // ---------------------------------------------------------------------------
       let customerId: string | null = null;
       let propertyId: string | null = null;
       let existingCustomer: typeof crmCustomers.$inferSelect | null = null;
+      let newPropertyCreatedForExisting = false;
 
-      const existingByPhone = await db.select()
-        .from(crmCustomers)
-        .where(ilike(crmCustomers.phone, `%${cleanPhone.slice(-10)}%`))
-        .limit(1);
+      const [byPhoneResults, byEmailResults] = await Promise.all([
+        cleanPhone.length >= 10
+          ? db.select().from(crmCustomers)
+              .where(ilike(crmCustomers.phone, `%${cleanPhone.slice(-10)}%`))
+              .limit(5)
+          : Promise.resolve([] as (typeof crmCustomers.$inferSelect)[]),
+        normalizedEmail
+          ? db.select().from(crmCustomers)
+              .where(ilike(crmCustomers.email, normalizedEmail))
+              .limit(5)
+          : Promise.resolve([] as (typeof crmCustomers.$inferSelect)[]),
+      ]);
 
-      if (existingByPhone.length > 0) {
-        customerId = existingByPhone[0].id;
-        existingCustomer = existingByPhone[0];
-      } else {
-        const existingByEmail = await db.select()
-          .from(crmCustomers)
-          .where(ilike(crmCustomers.email, email))
-          .limit(1);
+      if (byPhoneResults.length > 0 && byEmailResults.length > 0) {
+        // Try to find a record that satisfies both signals
+        const overlap = byPhoneResults.find(p => byEmailResults.some(e => e.id === p.id));
+        existingCustomer = overlap ?? byPhoneResults[0]; // prefer phone on conflict
+      } else if (byPhoneResults.length > 0) {
+        existingCustomer = byPhoneResults[0];
+      } else if (byEmailResults.length > 0) {
+        existingCustomer = byEmailResults[0];
+      }
 
-        if (existingByEmail.length > 0) {
-          customerId = existingByEmail[0].id;
-          existingCustomer = existingByEmail[0];
-        }
+      if (existingCustomer) {
+        customerId = existingCustomer.id;
+        console.log(`[OnlineBooking] Matched existing customer "${existingCustomer.name}" (id=${customerId})`);
       }
 
       // If existing customer found, update their name if it looks like an address
@@ -26018,24 +26077,68 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           leadSource: "Online Booking",
         }).returning();
         customerId = newCustomer.id;
+        console.log(`[OnlineBooking] Created new customer "${customerName}" (id=${customerId})`);
 
-        // Create property for new customer
+        // Create property for new customer using correct separate columns
         const [newProperty] = await db.insert(crmProperties).values({
           customerId: customerId,
-          name: "Primary",
-          address: fullAddress,
+          address1: address,
+          city: city,
+          state: "GA",
+          zip: zipCode || "",
           propertyType: "residential",
         }).returning();
         propertyId = newProperty.id;
+        console.log(`[OnlineBooking] Created new property for new customer (id=${propertyId})`);
       } else {
-        // Get existing property
-        const existingProperty = await db.select()
+        // ---------------------------------------------------------------------------
+        // Fuzzy property matching: fetch ALL properties for this customer and find
+        // the one that best matches the address the customer typed on the booking form.
+        // If none match, create a new property so the work order goes to the right place.
+        // ---------------------------------------------------------------------------
+        const allProperties = await db.select()
           .from(crmProperties)
-          .where(eq(crmProperties.customerId, customerId))
-          .limit(1);
-        
-        if (existingProperty.length > 0) {
-          propertyId = existingProperty[0].id;
+          .where(eq(crmProperties.customerId, customerId));
+
+        // Build a single string from the booking address for comparison
+        const bookingAddrStr = `${address} ${city}`;
+
+        for (const prop of allProperties) {
+          const propAddrStr = `${prop.address1 || ''} ${prop.city || ''}`;
+          if (addressesMatch(bookingAddrStr, propAddrStr)) {
+            propertyId = prop.id;
+            console.log(`[OnlineBooking] Matched existing property "${prop.address1}, ${prop.city}" (id=${propertyId})`);
+            break;
+          }
+        }
+
+        if (!propertyId) {
+          if (allProperties.length === 0) {
+            // Customer exists but has no properties at all — create one normally
+            const [newProperty] = await db.insert(crmProperties).values({
+              customerId: customerId,
+              address1: address,
+              city: city,
+              state: "GA",
+              zip: zipCode || "",
+              propertyType: "residential",
+            }).returning();
+            propertyId = newProperty.id;
+            console.log(`[OnlineBooking] Created first property for existing customer (id=${propertyId})`);
+          } else {
+            // Customer has properties but none match — create new location for them
+            const [newProperty] = await db.insert(crmProperties).values({
+              customerId: customerId,
+              address1: address,
+              city: city,
+              state: "GA",
+              zip: zipCode || "",
+              propertyType: "residential",
+            }).returning();
+            propertyId = newProperty.id;
+            newPropertyCreatedForExisting = true;
+            console.log(`[OnlineBooking] New address "${address}, ${city}" — created new property for existing customer (id=${propertyId})`);
+          }
         }
       }
 
@@ -26129,7 +26232,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         dispatchQueueStage: "NeedsScheduling",
         bookingSource: "online",
         preferredTimeSlot: `${formattedDate} ${preferredTimeDisplay}`,
-        dispatchNotes: `ONLINE BOOKING - Preferred time: ${formattedDate} ${preferredTimeDisplay}`,
+        dispatchNotes: `ONLINE BOOKING - Preferred time: ${formattedDate} ${preferredTimeDisplay}${newPropertyCreatedForExisting ? ` | ⚠ New address added from online booking (${address}, ${city}) — please verify with customer` : ""}`,
         scheduledStart: scheduledStart ?? undefined,
       }).returning();
 
