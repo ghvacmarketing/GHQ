@@ -53,7 +53,6 @@ import {
   LayoutGrid,
   Trash2,
   Inbox,
-  FolderKanban,
   Zap,
   Hourglass,
   UserCheck,
@@ -558,7 +557,6 @@ export default function CrmMyTasks() {
 
   const LISTS = [
     { id: "inbox", label: "Inbox", icon: Inbox },
-    { id: "projects", label: "Projects", icon: FolderKanban },
     { id: "next_actions", label: "Next Actions", icon: Zap },
     { id: "waiting_on", label: "Waiting On", icon: Hourglass },
     { id: "follow_up", label: "Follow Up", icon: UserCheck },
