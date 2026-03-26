@@ -79,7 +79,7 @@ const CrmMessaging = lazy(() => import("@/pages/crm/crm-messaging"));
 const CrmNotifications = lazy(() => import("@/pages/crm/crm-notifications"));
 const CrmMyTasks = lazy(() => import("@/pages/crm/crm-my-tasks"));
 const CrmTaskBoard = lazy(() => import("@/pages/crm/crm-task-board"));
-const CrmSalesbook = lazy(() => import("@/pages/price-book"));
+const CrmSalesbook = lazy(() => import("@/pages/crm/crm-salesbook"));
 
 // Lazy-load Mobile pages to reduce initial bundle size
 const MobileAgenda = lazy(() => import("@/pages/mobile/mobile-agenda"));
