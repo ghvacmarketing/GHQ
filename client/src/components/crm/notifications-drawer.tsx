@@ -72,8 +72,13 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
   queryParams.set("limit", "50");
 
   const { data: notifications, isLoading, refetch } = useQuery<Notification[]>({
-    queryKey: [`/api/crm/notifications?${queryParams.toString()}`],
-    refetchInterval: 10000,
+    queryKey: ["/api/crm/notifications", tab, typeFilter],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/notifications?${queryParams.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    refetchInterval: 5000,
   });
 
   const invalidateAll = () => {

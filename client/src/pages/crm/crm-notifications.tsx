@@ -41,7 +41,7 @@ export default function CrmNotifications() {
       return res.json();
     },
     enabled: !!currentUser,
-    refetchInterval: 10000,
+    refetchInterval: 5000,
   });
 
   const invalidateAll = () => {
