@@ -7719,7 +7719,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       if (type) {
-        conditions.push(eq(crmNotifications.type, type as any));
+        const types = (type as string).split(",").map(t => t.trim()).filter(Boolean);
+        if (types.length === 1) {
+          conditions.push(eq(crmNotifications.type, types[0] as any));
+        } else if (types.length > 1) {
+          conditions.push(inArray(crmNotifications.type, types as any[]));
+        }
       }
 
       const notifications = await db.select({

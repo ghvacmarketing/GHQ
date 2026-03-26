@@ -42,11 +42,11 @@ interface TaggedCommentHistoryItem {
 }
 
 const typeFilters = [
-  { key: "all", label: "All" },
-  { key: "task_assigned", label: "Tasks" },
-  { key: "tagged_comment", label: "Tagged Notes" },
-  { key: "mention", label: "Mentions" },
-  { key: "system", label: "System" },
+  { key: "all", label: "All", queryType: "" },
+  { key: "tasks", label: "Tasks", queryType: "task_assigned,task_due" },
+  { key: "tagged_comment", label: "Tagged Notes", queryType: "tagged_comment" },
+  { key: "mention", label: "Mentions", queryType: "mention" },
+  { key: "system", label: "System", queryType: "system" },
 ] as const;
 
 type TypeFilterKey = typeof typeFilters[number]["key"];
@@ -68,8 +68,8 @@ export default function CrmNotifications() {
     queryFn: async () => {
       const params = new URLSearchParams();
       if (tab === "unread") params.set("unreadOnly", "true");
-      if (typeFilter !== "all" && typeFilter !== "tagged_comment") params.set("type", typeFilter);
-      if (typeFilter === "tagged_comment") params.set("type", "tagged_comment");
+      const activeFilter = typeFilters.find(f => f.key === typeFilter);
+      if (activeFilter && activeFilter.queryType) params.set("type", activeFilter.queryType);
       const url = `/api/crm/notifications?${params.toString()}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
@@ -129,6 +129,11 @@ export default function CrmNotifications() {
   const hasUnread = notifications.some((n) => !n.isRead);
 
   const showTaggedNotesView = typeFilter === "tagged_comment" && tab === "all";
+
+  function buildHighlightUrl(pageRoute: string, commentId: string) {
+    const separator = pageRoute.includes("?") ? "&" : "?";
+    return `${pageRoute}${separator}highlightComment=${commentId}`;
+  }
 
   return (
     <CrmLayout currentUser={currentUser}>
@@ -198,7 +203,7 @@ export default function CrmNotifications() {
             ) : (
               <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 overflow-hidden mb-6">
                 {taggedHistory.map((item) => (
-                  <TaggedNoteHistoryRow key={`${item.id}-${item.role}`} item={item} currentUserId={currentUser.id} />
+                  <TaggedNoteHistoryRow key={`${item.id}-${item.role}`} item={item} currentUserId={currentUser.id} buildUrl={buildHighlightUrl} />
                 ))}
               </div>
             )}
@@ -251,13 +256,13 @@ export default function CrmNotifications() {
   );
 }
 
-function TaggedNoteHistoryRow({ item, currentUserId }: { item: TaggedCommentHistoryItem; currentUserId: string }) {
+function TaggedNoteHistoryRow({ item, currentUserId, buildUrl }: { item: TaggedCommentHistoryItem; currentUserId: string; buildUrl: (route: string, id: string) => string }) {
   const isSent = item.role === "author";
   const pageName = item.pageRoute.split("/").filter(Boolean).pop() || item.pageRoute;
 
   return (
     <a
-      href={`${item.pageRoute}?highlightComment=${item.id}`}
+      href={buildUrl(item.pageRoute, item.id)}
       className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-slate-50 group"
     >
       <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${
