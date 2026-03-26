@@ -181,20 +181,28 @@ function DraggableTaskCard({
     none: "",
   };
 
+  const priorityAccent: Record<string, string> = {
+    urgent: "border-l-red-500",
+    high: "border-l-orange-400",
+    normal: "border-l-slate-200",
+    low: "border-l-slate-200",
+  };
+  const accent = priorityAccent[task.priority ?? "normal"] ?? "border-l-slate-200";
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={`
-        group bg-white border border-slate-200 rounded-lg p-3 mb-2 cursor-pointer
-        hover:shadow-md hover:border-slate-300 transition-all
-        ${isDragging ? "opacity-50 shadow-lg ring-2 ring-[#711419]" : ""}
-        ${isCompleted ? "opacity-60" : ""}
+        group bg-white border border-slate-200 border-l-4 ${accent} rounded-lg p-2.5 mb-1.5 cursor-pointer
+        hover:shadow-sm hover:border-slate-300 transition-all
+        ${isDragging ? "opacity-40 shadow-xl ring-2 ring-[#711419]" : ""}
+        ${isCompleted ? "opacity-50" : ""}
       `}
       {...attributes}
       {...listeners}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2">
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -202,53 +210,50 @@ function DraggableTaskCard({
           }}
           disabled={isUpdating}
           className={`
-            flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center
-            transition-colors hover:bg-slate-100
-            ${isCompleted ? "bg-green-500 border-green-500" : "border-slate-300"}
+            flex-shrink-0 mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center
+            transition-colors hover:bg-slate-50
+            ${isCompleted ? "bg-green-500 border-green-500" : "border-slate-300 hover:border-slate-400"}
           `}
         >
-          {isCompleted && <CheckCircle2 className="h-3 w-3 text-white" />}
-          {isUpdating && <Loader2 className="h-3 w-3 animate-spin text-slate-400" />}
+          {isCompleted && <CheckCircle2 className="h-2.5 w-2.5 text-white" />}
+          {isUpdating && <Loader2 className="h-2.5 w-2.5 animate-spin text-slate-400" />}
         </button>
 
         <div className="flex-1 min-w-0" onClick={onClick}>
-          <p className={`text-sm font-medium text-slate-900 ${isCompleted ? "line-through text-slate-500" : ""}`}>
+          <p className={`text-xs font-medium leading-snug text-slate-800 ${isCompleted ? "line-through text-slate-400" : ""}`}>
             {task.title}
           </p>
 
-          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+          <div className="flex flex-wrap items-center gap-1 mt-1.5">
             {task.dueAt && (
-              <Badge variant="outline" className={`text-xs ${dueDateColors[dueDateStatus]}`}>
-                <Clock className="h-3 w-3 mr-1" />
+              <span className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                dueDateStatus === "overdue" ? "bg-red-50 text-red-600" :
+                dueDateStatus === "today" ? "bg-amber-50 text-amber-600" :
+                "bg-slate-100 text-slate-500"
+              }`}>
+                <Clock className="h-2.5 w-2.5 mr-0.5" />
                 {format(new Date(task.dueAt), "MMM d")}
-              </Badge>
+              </span>
             )}
 
             {task.type && (
-              <Badge variant="secondary" className="text-xs">
+              <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
                 {task.type.name}
-              </Badge>
+              </span>
             )}
 
             {task.customer && (
-              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 max-w-[150px] truncate">
-                <User className="h-3 w-3 mr-1 flex-shrink-0" />
+              <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 max-w-[120px] truncate">
+                <User className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
                 <span className="truncate">{task.customer.name}</span>
-              </Badge>
-            )}
-
-            {task.relatedEntityType && task.relatedEntityType !== "none" && task.relatedEntityType !== "customer" && (
-              <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                <Building className="h-3 w-3 mr-1" />
-                {task.relatedEntityType.replace("_", " ")}
-              </Badge>
+              </span>
             )}
           </div>
         </div>
 
         {task.assignedToUser && (
-          <Avatar className="h-6 w-6 flex-shrink-0">
-            <AvatarFallback className="text-xs bg-slate-200">
+          <Avatar className="h-5 w-5 flex-shrink-0 mt-0.5">
+            <AvatarFallback className="text-[9px] bg-slate-200 text-slate-600">
               {getInitials(task.assignedToUser.name)}
             </AvatarFallback>
           </Avatar>
@@ -295,26 +300,26 @@ function DroppableColumn({
     <div
       ref={setNodeRef}
       className={`
-        flex flex-col bg-slate-50 rounded-lg min-w-0
-        ${isOver ? "ring-2 ring-[#711419] ring-offset-2" : ""}
+        flex flex-col bg-white border border-slate-200 rounded-xl min-w-0 shadow-sm
+        ${isOver ? "ring-2 ring-[#711419]/40 ring-offset-1 bg-red-50/20" : ""}
       `}
     >
-      <div className="flex items-center gap-2 p-3 border-b border-slate-200">
-        <Icon className="h-4 w-4 text-slate-500" />
-        <h3 className="font-medium text-slate-900">{column.label}</h3>
-        <Badge variant="secondary" className="ml-auto text-xs">
+      <div className="flex items-center gap-2 px-3 py-2.5">
+        <Icon className="h-3.5 w-3.5 text-slate-400" />
+        <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{column.label}</h3>
+        <span className="ml-auto text-[10px] font-semibold text-slate-400 bg-slate-100 rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
           {tasks.length}
-        </Badge>
+        </span>
       </div>
 
-      <div className="p-2 border-b border-slate-100">
+      <div className="px-2 pb-2">
         {isAddingTask ? (
           <div className="flex items-center gap-1">
             <Input
               value={quickAddValue}
               onChange={(e) => setQuickAddValue(e.target.value)}
               placeholder="Task title..."
-              className="h-8 text-sm"
+              className="h-7 text-xs border-slate-200 focus-visible:ring-[#711419]/30"
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === "Enter" && quickAddValue.trim()) {
@@ -328,7 +333,7 @@ function DroppableColumn({
             />
             <Button
               size="sm"
-              className="h-8 px-2 bg-[#711419] hover:bg-[#5a1014]"
+              className="h-7 px-2 bg-[#711419] hover:bg-[#5a1014]"
               onClick={handleQuickAdd}
               disabled={!quickAddValue.trim() || isCreating}
             >
@@ -337,7 +342,7 @@ function DroppableColumn({
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 px-2"
+              className="h-7 px-2 text-slate-400 hover:text-slate-600"
               onClick={() => {
                 setIsAddingTask(false);
                 setQuickAddValue("");
@@ -349,19 +354,19 @@ function DroppableColumn({
         ) : (
           <button
             onClick={() => setIsAddingTask(true)}
-            className="w-full flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 py-1 px-2 rounded hover:bg-slate-100 transition-colors"
+            className="w-full flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-slate-600 py-1 px-1.5 rounded-md hover:bg-slate-50 transition-colors"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-3 w-3" />
             <span>Add a task</span>
           </button>
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 min-h-[200px]">
+      <div className="flex-1 overflow-y-auto px-2 pb-2 min-h-[300px]">
         {tasks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-slate-400">
-            <Icon className="h-8 w-8 mb-2 opacity-50" />
-            <p className="text-sm">No tasks</p>
+          <div className="flex flex-col items-center justify-center py-10 text-slate-300">
+            <Icon className="h-6 w-6 mb-1.5 opacity-40" />
+            <p className="text-[11px]">No tasks</p>
           </div>
         ) : (
           tasks.map((task) => (
@@ -822,72 +827,62 @@ export default function CrmTaskBoard() {
         </div>
 
         <div className={`flex-1 min-w-0 transition-all duration-300 ease-in-out ${isDrawerOpen ? 'mr-0' : ''}`}>
-          <div className="space-y-4 p-0 md:pl-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <h1 className="text-2xl font-bold text-slate-900">Master Inbox</h1>
-                <p className="text-slate-500 text-sm mt-1">
-                  Drag tasks between columns to organize your workflow
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <Button variant="outline" className="md:hidden" onClick={() => navigate("/crm/tasks/mine")}>
-                  My Tasks
-                </Button>
-              </div>
+          <div className="space-y-3 p-0 md:pl-4">
+            <div className="flex items-center justify-between gap-4">
+              <h1 className="text-xl font-semibold text-slate-900">Master Inbox</h1>
+              <Button variant="outline" size="sm" className="md:hidden text-xs" onClick={() => navigate("/crm/tasks/mine")}>
+                My Tasks
+              </Button>
             </div>
 
-            <Card className="bg-white border shadow-sm">
-              <CardContent className="p-4">
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="relative flex-1 min-w-[200px] max-w-[300px]">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <Input
-                      placeholder="Search tasks..."
-                      value={searchInput}
-                      onChange={(e) => setSearchInput(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                <Input
+                  placeholder="Search tasks..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="pl-8 h-8 text-sm w-48 bg-white border-slate-200 focus-visible:ring-[#711419]/30"
+                />
+              </div>
 
-                  <Select value={dueDateFilter} onValueChange={setDueDateFilter}>
-                    <SelectTrigger className="w-[160px]">
-                      <SelectValue placeholder="Due Date" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Dates</SelectItem>
-                      <SelectItem value="overdue">Overdue</SelectItem>
-                      <SelectItem value="today">Today</SelectItem>
-                      <SelectItem value="next7days">Next 7 Days</SelectItem>
-                      <SelectItem value="nodate">No Date</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <Select value={dueDateFilter} onValueChange={setDueDateFilter}>
+                <SelectTrigger className="w-[130px] h-8 text-xs bg-white border-slate-200">
+                  <SelectValue placeholder="All Dates" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Dates</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="next7days">Next 7 Days</SelectItem>
+                  <SelectItem value="nodate">No Date</SelectItem>
+                </SelectContent>
+              </Select>
 
-                  <Select value={typeFilter} onValueChange={setTypeFilter}>
-                    <SelectTrigger className="w-[160px]">
-                      <SelectValue placeholder="Task Type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      {taskTypes.map((type) => (
-                        <SelectItem key={type.id} value={type.id}>
-                          {type.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-[130px] h-8 text-xs bg-white border-slate-200">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {taskTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      {type.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="show-completed"
-                      checked={showCompleted}
-                      onCheckedChange={setShowCompleted}
-                    />
-                    <Label htmlFor="show-completed" className="text-sm">Show Completed</Label>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+              <div className="flex items-center gap-1.5 ml-1">
+                <Switch
+                  id="show-completed"
+                  checked={showCompleted}
+                  onCheckedChange={setShowCompleted}
+                  className="scale-75 origin-left"
+                />
+                <Label htmlFor="show-completed" className="text-xs text-slate-500 cursor-pointer select-none">Completed</Label>
+              </div>
+            </div>
 
             {tasksLoading ? (
               <div className="grid grid-cols-5 gap-3 pb-4">
