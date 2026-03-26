@@ -27151,6 +27151,14 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Task not found" });
       }
 
+      // Remove any notifications linked to this task
+      await db.delete(crmNotifications).where(
+        and(
+          eq(crmNotifications.entityType, "task"),
+          eq(crmNotifications.entityId, id)
+        )
+      );
+
       res.json({ message: "Task deleted successfully" });
     } catch (error) {
       console.error("Error deleting task:", error);
