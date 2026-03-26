@@ -235,8 +235,8 @@ export default function PriceBook() {
     }
   }
 
-  pageW = Math.max(Math.floor(pageW * scale), 200);
-  pageH = Math.max(Math.floor(pageH * scale), 260);
+  pageW = Math.max(Math.floor(pageW), 200);
+  pageH = Math.max(Math.floor(pageH), 260);
 
   const renderSection = (section: SalesbookSection) => {
     switch (section.type) {
@@ -436,7 +436,11 @@ export default function PriceBook() {
               <p className="text-sm text-neutral-400">Loading salesbook...</p>
             </div>
           ) : sections.length > 0 ? (
-            <div style={{ transform: `scale(1)`, transformOrigin: 'center center' }}>
+            <div style={{
+              transform: `scale(${scale})${!isMobile && (currentPage === 0 || currentPage >= totalPages - 1) ? ` translateX(${currentPage === 0 ? `-${Math.floor(pageW / 2)}px` : `${Math.floor(pageW / 2)}px`})` : ''}`,
+              transformOrigin: 'center center',
+              transition: 'transform 0.15s ease-out',
+            }}>
               <HTMLFlipBook
                 ref={flipBookRef}
                 style={{}}
