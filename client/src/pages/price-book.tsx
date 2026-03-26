@@ -249,6 +249,7 @@ export default function PriceBook() {
             unitType={section.unitType!}
             tierCount={section.tierCount || 0}
             packageCount={section.packages?.length || 0}
+            heroImageUrl={section.heroImageUrl}
           />
         );
       case "tier-header":
@@ -438,6 +439,7 @@ export default function PriceBook() {
             <div style={{ transform: `scale(1)`, transformOrigin: 'center center' }}>
               <HTMLFlipBook
                 ref={flipBookRef}
+                style={{}}
                 width={pageW}
                 height={pageH}
                 size="fixed"

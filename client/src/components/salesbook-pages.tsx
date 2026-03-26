@@ -76,7 +76,8 @@ export const CategoryDividerPage = forwardRef<HTMLDivElement, {
   unitType: string;
   tierCount: number;
   packageCount: number;
-}>(({ unitType, tierCount, packageCount }, ref) => {
+  heroImageUrl?: string;
+}>(({ unitType, tierCount, packageCount, heroImageUrl }, ref) => {
   const info = UNIT_TYPE_DISPLAY[unitType] || { name: unitType, tagline: "" };
   return (
     <PageWrapper ref={ref}>
@@ -87,14 +88,34 @@ export const CategoryDividerPage = forwardRef<HTMLDivElement, {
         justifyContent: "center",
         alignItems: "center",
         background: `linear-gradient(160deg, ${BRAND_COLOR} 0%, #1a1a1a 60%, #0d0d0d 100%)`,
-        padding: "10%",
+        padding: "8% 10%",
         textAlign: "center",
       }}>
+        {heroImageUrl && (
+          <div style={{
+            width: 120,
+            height: 120,
+            borderRadius: 12,
+            overflow: "hidden",
+            marginBottom: 24,
+            background: "rgba(255,255,255,0.08)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}>
+            <img
+              src={heroImageUrl.startsWith("/") ? heroImageUrl : `/assets/${heroImageUrl}`}
+              alt={info.name}
+              style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+              loading="lazy"
+            />
+          </div>
+        )}
         <div style={{
           width: 80,
           height: 3,
           background: "rgba(255,255,255,0.3)",
-          marginBottom: 32,
+          marginBottom: 24,
         }} />
         <h1 style={{
           color: "#ffffff",
@@ -112,7 +133,7 @@ export const CategoryDividerPage = forwardRef<HTMLDivElement, {
           fontWeight: 400,
           lineHeight: 1.5,
           maxWidth: "80%",
-          marginBottom: 40,
+          marginBottom: 32,
         }}>
           {info.tagline}
         </p>
@@ -132,7 +153,7 @@ export const CategoryDividerPage = forwardRef<HTMLDivElement, {
           width: 80,
           height: 3,
           background: "rgba(255,255,255,0.3)",
-          marginTop: 32,
+          marginTop: 24,
         }} />
       </div>
       <div style={{
@@ -333,7 +354,6 @@ export const ProductDetailPage = forwardRef<HTMLDivElement, {
                   <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                     {[pkg.outdoorImageUrl, pkg.coilImageUrl, pkg.furnaceImageUrl, pkg.thermostatImageUrl]
                       .filter(Boolean)
-                      .slice(0, 3)
                       .map((url, i) => (
                         <img
                           key={i}
@@ -686,6 +706,7 @@ export interface SalesbookSection {
   staticSrc?: string;
   packages?: PricebookPackage[];
   crawlspaceTiers?: CrawlspaceTier[];
+  heroImageUrl?: string;
   eliteCoreBundles?: EliteBundle[];
   eliteAirflowOptions?: EliteAirflowOption[];
   pageIndex: number;
@@ -735,11 +756,14 @@ export function buildSalesbookSections(
     const tierKeys = [...knownTiers, ...extraTiers];
     const unitDisplay = UNIT_TYPE_DISPLAY[unitType]?.name || unitType;
 
+    const heroImg = typePackages.find(p => p.outdoorImageUrl)?.outdoorImageUrl || undefined;
+
     sections.push({
       type: "category-divider",
       unitType,
       tierCount: tierKeys.length,
       packages: typePackages,
+      heroImageUrl: heroImg,
       pageIndex: pageIndex++,
       label: unitDisplay,
     });
