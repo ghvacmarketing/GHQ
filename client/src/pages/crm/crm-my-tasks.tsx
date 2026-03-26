@@ -342,10 +342,11 @@ export default function CrmMyTasks() {
       };
       return apiRequest("POST", "/api/tasks", payload);
     },
-    onSuccess: async (newTask) => {
+    onSuccess: async (res) => {
       await queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       setNewTaskTitle("");
       setIsAddingTask(false);
+      const newTask = await res.json();
       handleOpenEdit(newTask as TaskWithRelations);
     },
     onError: (error: Error) => {

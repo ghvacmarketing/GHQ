@@ -27033,7 +27033,15 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         }
       }
 
-      const updatedTask = await storage.updateTask(id, req.body);
+      console.log("[TaskUpdate] id:", id, "body keys:", Object.keys(req.body));
+      let updatedTask: any;
+      try {
+        updatedTask = await storage.updateTask(id, req.body);
+      } catch (updateErr) {
+        const msg = updateErr instanceof Error ? updateErr.message : String(updateErr);
+        console.error("[TaskUpdate] updateTask failed:", msg);
+        return res.status(500).json({ message: msg || "Error updating task" });
+      }
       if (!updatedTask) {
         return res.status(404).json({ message: "Task not found" });
       }
@@ -27062,8 +27070,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       res.json(updatedTask);
     } catch (error) {
-      console.error("Error updating task:", error);
-      res.status(500).json({ message: "Error updating task" });
+      const errMsg = error instanceof Error ? error.message : String(error);
+      console.error("Error updating task - details:", errMsg, JSON.stringify(error));
+      res.status(500).json({ message: errMsg || "Error updating task" });
     }
   });
 

@@ -2551,6 +2551,16 @@ export class DatabaseStorage implements IStorage {
   async updateTask(id: string, data: Partial<InsertTask>): Promise<Task | null> {
     const updateData: Record<string, any> = { ...data, updatedAt: new Date() };
     
+    // Convert date strings to Date objects (Drizzle requires Date for timestamp columns)
+    const dateFields = ['dueAt', 'startAt', 'endAt', 'remindAt'];
+    for (const field of dateFields) {
+      if (field in updateData && updateData[field] !== null && updateData[field] !== undefined) {
+        if (typeof updateData[field] === 'string') {
+          updateData[field] = new Date(updateData[field]);
+        }
+      }
+    }
+    
     if (data.status === 'completed') {
       updateData.completedAt = new Date();
     }

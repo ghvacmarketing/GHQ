@@ -576,8 +576,9 @@ export default function CrmTaskBoard() {
         createdByUserId: currentUser!.id,
       });
     },
-    onSuccess: async (newTask) => {
+    onSuccess: async (res) => {
       await queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      const newTask = await res.json();
       handleOpenEdit(newTask as TaskWithRelations);
     },
     onError: (error: Error) => {
