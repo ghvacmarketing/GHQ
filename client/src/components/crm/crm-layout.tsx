@@ -147,10 +147,14 @@ function SidebarContent({
 }) {
   const [location] = useLocation();
 
-  // Fetch unread message count with polling
   const { data: unreadData } = useQuery<{ unreadCount: number }>({
     queryKey: ["/api/crm/messaging/unread-count"],
-    refetchInterval: 10000, // Poll every 10 seconds
+    refetchInterval: 10000,
+  });
+
+  const { data: notificationCount } = useQuery<{ count: number }>({
+    queryKey: ["/api/crm/notifications/unread-count"],
+    refetchInterval: 10000,
   });
 
   const logoutMutation = useMutation({
@@ -210,10 +214,12 @@ function SidebarContent({
               </p>
               <div className="space-y-1">
                 {section.items.map((item) => {
-                  // Add unread count badge to Messaging nav item
-                  const itemWithBadge = item.label === "Messaging" && unreadData?.unreadCount
-                    ? { ...item, badgeCount: unreadData.unreadCount }
-                    : item;
+                  let itemWithBadge = item;
+                  if (item.label === "Messaging" && unreadData?.unreadCount) {
+                    itemWithBadge = { ...item, badgeCount: unreadData.unreadCount };
+                  } else if (item.label === "Notifications" && notificationCount?.count && notificationCount.count > 0) {
+                    itemWithBadge = { ...item, badgeCount: notificationCount.count };
+                  }
                   return (
                     <NavItemComponent
                       key={item.href}

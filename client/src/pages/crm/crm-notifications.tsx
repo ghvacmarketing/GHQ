@@ -16,7 +16,6 @@ import {
   Loader2,
   Trash2,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import type { CrmUser, CrmNotification } from "@shared/schema";
 
 type NotificationWithActor = CrmNotification & { actorName?: string | null };
@@ -30,12 +29,6 @@ export default function CrmNotifications() {
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
-  });
-
-  const { data: unreadCount } = useQuery<{ count: number }>({
-    queryKey: ["/api/crm/notifications/unread-count"],
-    enabled: !!currentUser,
-    refetchInterval: 10000,
   });
 
   const qp = tab === "unread" ? "?unreadOnly=true" : "";
@@ -96,16 +89,9 @@ export default function CrmNotifications() {
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
+          <div>
             <h1 className="text-xl font-semibold text-slate-900">Notifications</h1>
-            {(unreadCount?.count ?? 0) > 0 && (
-              <span
-                className="inline-flex items-center justify-center min-w-[22px] h-[22px] rounded-full text-white text-xs font-bold px-1.5"
-                style={{ backgroundColor: "#711419" }}
-              >
-                {unreadCount!.count}
-              </span>
-            )}
+            <p className="text-sm text-slate-500 mt-0.5">Task assignments and updates</p>
           </div>
           {hasUnread && (
             <Button
