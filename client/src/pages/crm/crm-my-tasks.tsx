@@ -8,8 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -26,6 +24,12 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -43,10 +47,11 @@ import {
   CheckCircle2,
   Plus,
   X,
+  Check,
   Building,
   User,
   LayoutGrid,
-  CheckSquare,
+  Trash2,
   Inbox,
   FolderKanban,
   Zap,
@@ -89,16 +94,6 @@ type TaskWithRelations = Task & {
   createdByUser?: CrmUser | null;
   type?: TaskType | null;
   customer?: CrmCustomer | null;
-};
-
-type TaskSubtask = {
-  id: string;
-  taskId: string;
-  title: string;
-  isCompleted: boolean;
-  dueAt: string | null;
-  sortOrder: number;
-  createdAt: string;
 };
 
 type TasksResponse = {
@@ -278,9 +273,6 @@ export default function CrmMyTasks() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isCreateMode, setIsCreateMode] = useState(false);
 
-  const [isAddingSubtask, setIsAddingSubtask] = useState(false);
-  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
-  const [newSubtaskDueAt, setNewSubtaskDueAt] = useState<Date | null>(null);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -322,18 +314,6 @@ export default function CrmMyTasks() {
     enabled: !!currentUser,
   });
 
-  const { data: subtasks = [], isLoading: subtasksLoading } = useQuery<TaskSubtask[]>({
-    queryKey: ["/api/tasks", selectedTask?.id, "subtasks"],
-    queryFn: async () => {
-      const response = await fetch(`/api/tasks/${selectedTask!.id}/subtasks`, {
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("Failed to fetch subtasks");
-      return response.json();
-    },
-    enabled: !!selectedTask?.id && !isCreateMode,
-  });
-
   const form = useForm<TaskFormData>({
     resolver: zodResolver(taskFormSchema),
     defaultValues: {
@@ -362,11 +342,11 @@ export default function CrmMyTasks() {
       };
       return apiRequest("POST", "/api/tasks", payload);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
-      toast({ title: "Task created" });
+    onSuccess: async (newTask) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       setNewTaskTitle("");
       setIsAddingTask(false);
+      handleOpenEdit(newTask as TaskWithRelations);
     },
     onError: (error: Error) => {
       toast({ title: "Failed to create task", description: error.message, variant: "destructive" });
@@ -451,45 +431,6 @@ export default function CrmMyTasks() {
     },
     onSettled: () => {
       setCompletingTaskId(null);
-    },
-  });
-
-  const createSubtaskMutation = useMutation({
-    mutationFn: async (data: { title: string; dueAt?: string | null }) => {
-      return apiRequest("POST", `/api/tasks/${selectedTask!.id}/subtasks`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks", selectedTask?.id, "subtasks"] });
-      setNewSubtaskTitle("");
-      setNewSubtaskDueAt(null);
-      setIsAddingSubtask(false);
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to create subtask", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const updateSubtaskMutation = useMutation({
-    mutationFn: async ({ subtaskId, data }: { subtaskId: string; data: Partial<TaskSubtask> }) => {
-      return apiRequest("PUT", `/api/tasks/${selectedTask!.id}/subtasks/${subtaskId}`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks", selectedTask?.id, "subtasks"] });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to update subtask", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const deleteSubtaskMutation = useMutation({
-    mutationFn: async (subtaskId: string) => {
-      return apiRequest("DELETE", `/api/tasks/${selectedTask!.id}/subtasks/${subtaskId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks", selectedTask?.id, "subtasks"] });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to delete subtask", description: error.message, variant: "destructive" });
     },
   });
 
@@ -658,7 +599,7 @@ export default function CrmMyTasks() {
           </div>
         </div>
 
-        <div className={`flex-1 min-w-0 transition-all duration-300 ease-in-out ${isDrawerOpen ? 'mr-0' : ''}`}>
+        <div className="flex-1 min-w-0">
           <div className="max-w-3xl mx-auto space-y-6 md:pl-4">
             <div className="flex items-center justify-between">
               <div>
@@ -677,57 +618,51 @@ export default function CrmMyTasks() {
               </Button>
             </div>
 
-            <Card className="border shadow-sm">
-              <CardContent className="p-4">
-                {isAddingTask ? (
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={newTaskTitle}
-                      onChange={(e) => setNewTaskTitle(e.target.value)}
-                      placeholder="What needs to be done?"
-                      className="flex-1"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && newTaskTitle.trim()) {
-                          handleQuickAdd();
-                        } else if (e.key === "Escape") {
-                          setIsAddingTask(false);
-                          setNewTaskTitle("");
-                        }
-                      }}
-                    />
-                    <Button
-                      onClick={handleQuickAdd}
-                      disabled={!newTaskTitle.trim() || quickCreateMutation.isPending}
-                      className="bg-[#711419] hover:bg-[#5a1014]"
-                    >
-                      {quickCreateMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        "Add"
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
+            <div className="bg-white border rounded-lg px-3 py-2">
+              {isAddingTask ? (
+                <div className="flex flex-col gap-1.5 bg-slate-50 rounded-lg p-2">
+                  <input
+                    value={newTaskTitle}
+                    onChange={(e) => setNewTaskTitle(e.target.value)}
+                    placeholder="Task name..."
+                    className="w-full bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newTaskTitle.trim()) {
+                        handleQuickAdd();
+                      } else if (e.key === "Escape") {
                         setIsAddingTask(false);
                         setNewTaskTitle("");
-                      }}
+                      }
+                    }}
+                    disabled={quickCreateMutation.isPending}
+                  />
+                  <div className="flex items-center justify-end gap-1">
+                    <button
+                      onClick={() => { setIsAddingTask(false); setNewTaskTitle(""); }}
+                      className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
                     >
-                      Cancel
-                    </Button>
+                      <X className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={handleQuickAdd}
+                      disabled={!newTaskTitle.trim() || quickCreateMutation.isPending}
+                      className="p-1 rounded text-green-600 hover:bg-green-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      {quickCreateMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                    </button>
                   </div>
-                ) : (
-                  <button
-                    onClick={() => setIsAddingTask(true)}
-                    className="w-full flex items-center gap-2 text-slate-500 hover:text-slate-700 py-2 transition-colors"
-                  >
-                    <Plus className="h-5 w-5" />
-                    <span>Add a task</span>
-                  </button>
-                )}
-              </CardContent>
-            </Card>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setIsAddingTask(true)}
+                  className="w-full flex items-center gap-2 text-[12px] text-slate-400 hover:text-slate-600 py-1 transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Add a task</span>
+                </button>
+              )}
+            </div>
 
             {tasksLoading ? (
               <div className="space-y-4">
@@ -780,30 +715,16 @@ export default function CrmMyTasks() {
           </div>
         </div>
 
-        <div
-          className={`
-            flex-shrink-0 bg-white border-l border-slate-200 overflow-y-auto
-            transition-all duration-300 ease-in-out
-            ${isDrawerOpen ? 'w-[500px] opacity-100' : 'w-0 opacity-0 overflow-hidden'}
-          `}
-        >
-          <div className="w-[500px] p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">
-                  {isCreateMode ? "Create Task" : "Edit Task"}
-                </h2>
-                <p className="text-sm text-slate-500">
-                  {isCreateMode ? "Add a new task" : "Update task details"}
-                </p>
-              </div>
-              <Button variant="ghost" size="icon" onClick={handleCloseDrawer}>
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
+        <Dialog open={isDrawerOpen} onOpenChange={(open) => !open && handleCloseDrawer()}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-base font-semibold">
+                {isCreateMode ? "Create Task" : "Edit Task"}
+              </DialogTitle>
+            </DialogHeader>
 
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-6">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
                   name="title"
@@ -836,56 +757,6 @@ export default function CrmMyTasks() {
                     </FormItem>
                   )}
                 />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="in_progress">In Progress</SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="priority"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Priority</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select priority" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="urgent">Urgent</SelectItem>
-                            <SelectItem value="high">High</SelectItem>
-                            <SelectItem value="normal">Normal</SelectItem>
-                            <SelectItem value="low">Low</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
 
                 <FormField
                   control={form.control}
@@ -984,235 +855,36 @@ export default function CrmMyTasks() {
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="relatedEntityType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Related Entity Type</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value || "none"}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            <SelectItem value="customer">Customer</SelectItem>
-                            <SelectItem value="lead">Lead</SelectItem>
-                            <SelectItem value="project">Project</SelectItem>
-                            <SelectItem value="work_order">Work Order</SelectItem>
-                            <SelectItem value="invoice">Invoice</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="relatedEntityId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Related Entity ID</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Entity ID" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                {!isCreateMode && selectedTask && (
-                  <div className="space-y-2 mt-4 border-t pt-4">
-                    <h4 className="text-sm font-medium flex items-center gap-2">
-                      <CheckSquare className="h-4 w-4" />
-                      Subtasks
-                      {subtasks.length > 0 && (
-                        <Badge variant="secondary">
-                          {subtasks.filter(s => s.isCompleted).length}/{subtasks.length}
-                        </Badge>
-                      )}
-                    </h4>
-
-                    {subtasksLoading ? (
-                      <div className="flex items-center gap-2 py-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm text-muted-foreground">Loading subtasks...</span>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {subtasks.map((subtask) => (
-                          <div key={subtask.id} className="flex items-center gap-2 group">
-                            <Checkbox
-                              checked={subtask.isCompleted}
-                              onCheckedChange={(checked) => {
-                                updateSubtaskMutation.mutate({
-                                  subtaskId: subtask.id,
-                                  data: { isCompleted: !!checked }
-                                });
-                              }}
-                            />
-                            <span className={`flex-1 text-sm ${subtask.isCompleted ? "line-through text-muted-foreground" : ""}`}>
-                              {subtask.title}
-                            </span>
-                            {subtask.dueAt && (
-                              <Badge variant="outline" className="text-xs">
-                                {format(new Date(subtask.dueAt), "MMM d")}
-                              </Badge>
-                            )}
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                                >
-                                  <CalendarIcon className="h-3 w-3" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="end">
-                                <Calendar
-                                  mode="single"
-                                  selected={subtask.dueAt ? new Date(subtask.dueAt) : undefined}
-                                  onSelect={(date) => {
-                                    updateSubtaskMutation.mutate({
-                                      subtaskId: subtask.id,
-                                      data: { dueAt: date ? date.toISOString() : null }
-                                    });
-                                  }}
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
-                              onClick={() => deleteSubtaskMutation.mutate(subtask.id)}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ))}
-
-                        {isAddingSubtask ? (
-                          <div className="flex items-center gap-2 pt-2">
-                            <Input
-                              value={newSubtaskTitle}
-                              onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                              placeholder="Subtask title..."
-                              className="flex-1 h-8 text-sm"
-                              autoFocus
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" && newSubtaskTitle.trim()) {
-                                  createSubtaskMutation.mutate({
-                                    title: newSubtaskTitle.trim(),
-                                    dueAt: newSubtaskDueAt ? newSubtaskDueAt.toISOString() : null
-                                  });
-                                } else if (e.key === "Escape") {
-                                  setIsAddingSubtask(false);
-                                  setNewSubtaskTitle("");
-                                  setNewSubtaskDueAt(null);
-                                }
-                              }}
-                            />
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                  <CalendarIcon className="h-4 w-4" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="end">
-                                <Calendar
-                                  mode="single"
-                                  selected={newSubtaskDueAt || undefined}
-                                  onSelect={(date) => setNewSubtaskDueAt(date || null)}
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="h-8"
-                              onClick={() => {
-                                if (newSubtaskTitle.trim()) {
-                                  createSubtaskMutation.mutate({
-                                    title: newSubtaskTitle.trim(),
-                                    dueAt: newSubtaskDueAt ? newSubtaskDueAt.toISOString() : null
-                                  });
-                                }
-                              }}
-                              disabled={!newSubtaskTitle.trim() || createSubtaskMutation.isPending}
-                            >
-                              {createSubtaskMutation.isPending ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                "Add"
-                              )}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-8"
-                              onClick={() => {
-                                setIsAddingSubtask(false);
-                                setNewSubtaskTitle("");
-                                setNewSubtaskDueAt(null);
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="w-full justify-start text-muted-foreground"
-                            onClick={() => setIsAddingSubtask(true)}
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            Add subtask
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex justify-between pt-4 border-t">
+                <div className="flex justify-between pt-2 border-t">
                   {!isCreateMode && (
                     <Button
                       type="button"
-                      variant="destructive"
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 hover:text-red-600 hover:bg-red-50 gap-1.5"
                       onClick={() => deleteMutation.mutate()}
                       disabled={deleteMutation.isPending}
                     >
                       {deleteMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : null}
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
                       Delete
                     </Button>
                   )}
                   <div className="flex gap-2 ml-auto">
-                    <Button type="button" variant="outline" onClick={handleCloseDrawer}>
+                    <Button type="button" variant="outline" size="sm" onClick={handleCloseDrawer}>
                       Cancel
                     </Button>
                     <Button
                       type="submit"
+                      size="sm"
                       className="bg-[#711419] hover:bg-[#5a1014]"
                       disabled={createMutation.isPending || updateMutation.isPending}
                     >
                       {(createMutation.isPending || updateMutation.isPending) && (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
                       )}
                       {isCreateMode ? "Create" : "Save"}
                     </Button>
@@ -1220,8 +892,8 @@ export default function CrmMyTasks() {
                 </div>
               </form>
             </Form>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </CrmLayout>
   );
