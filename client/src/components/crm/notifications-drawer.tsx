@@ -19,6 +19,7 @@ import {
   Settings,
   AlertCircle,
   Inbox,
+  Trash2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -100,6 +101,13 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
     onSuccess: invalidateAll,
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (notificationId: string) => {
+      await apiRequest("DELETE", `/api/crm/notifications/${notificationId}`);
+    },
+    onSuccess: invalidateAll,
+  });
+
   const getIcon = (type: Notification["type"]) => {
     switch (type) {
       case "mention":
@@ -175,7 +183,7 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
             {filteredNotifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`p-4 cursor-pointer transition-colors hover:bg-muted ${
+                className={`p-4 cursor-pointer transition-colors hover:bg-muted group ${
                   !notification.isRead ? "border-l-4 border-l-primary bg-primary/5" : ""
                 }`}
                 onClick={() => handleNotificationClick(notification)}
@@ -204,6 +212,13 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
                       )}
                     </div>
                   </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(notification.id); }}
+                    className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-50 text-muted-foreground hover:text-red-500"
+                    title="Delete notification"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             ))}
