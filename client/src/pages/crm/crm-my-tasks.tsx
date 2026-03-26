@@ -137,12 +137,16 @@ function TaskCard({
   task, 
   onComplete, 
   isCompleting,
-  onTaskClick 
+  onTaskClick,
+  isHighlighted,
+  onClearHighlight,
 }: { 
   task: TaskWithRelations;
   onComplete: (taskId: string) => void;
   isCompleting: boolean;
   onTaskClick: (task: TaskWithRelations) => void;
+  isHighlighted?: boolean;
+  onClearHighlight?: () => void;
 }) {
   const formatDueDate = (dueAt: string | Date | null) => {
     if (!dueAt) return null;
@@ -152,10 +156,14 @@ function TaskCard({
 
   return (
     <div 
+      id={`task-${task.id}`}
       className={`group flex items-start gap-3 p-3 bg-white border rounded-lg hover:shadow-sm transition-all cursor-pointer ${
         isCompleting ? "opacity-50 scale-95" : ""
-      }`}
-      onClick={() => onTaskClick(task)}
+      } ${isHighlighted ? "ring-2 ring-[#711419] bg-red-50/30 border-[#711419]" : ""}`}
+      onClick={() => {
+        if (isHighlighted && onClearHighlight) onClearHighlight();
+        onTaskClick(task);
+      }}
     >
       <div 
         className="pt-0.5"
@@ -220,6 +228,8 @@ function TaskSection({
   completingTaskId,
   onTaskClick,
   defaultOpen = true,
+  highlightedTaskId,
+  onClearHighlight,
 }: {
   config: SectionConfig;
   tasks: TaskWithRelations[];
@@ -227,9 +237,16 @@ function TaskSection({
   completingTaskId: string | null;
   onTaskClick: (task: TaskWithRelations) => void;
   defaultOpen?: boolean;
+  highlightedTaskId?: string | null;
+  onClearHighlight?: () => void;
 }) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const hasHighlight = highlightedTaskId ? tasks.some(t => t.id === highlightedTaskId) : false;
+  const [isOpen, setIsOpen] = useState(defaultOpen || hasHighlight);
   const Icon = config.icon;
+
+  useEffect(() => {
+    if (hasHighlight && !isOpen) setIsOpen(true);
+  }, [hasHighlight]);
 
   if (tasks.length === 0) return null;
 
@@ -262,6 +279,8 @@ function TaskSection({
               onComplete={onComplete}
               isCompleting={completingTaskId === task.id}
               onTaskClick={onTaskClick}
+              isHighlighted={highlightedTaskId === task.id}
+              onClearHighlight={onClearHighlight}
             />
           ))}
         </div>
@@ -282,6 +301,7 @@ export default function CrmMyTasks() {
   const [selectedTask, setSelectedTask] = useState<TaskWithRelations | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isCreateMode, setIsCreateMode] = useState(false);
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
 
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
@@ -317,15 +337,14 @@ export default function CrmMyTasks() {
   useEffect(() => {
     if (!tasksData?.tasks) return;
     const params = new URLSearchParams(window.location.search);
-    const taskId = params.get("task");
+    const taskId = params.get("highlight");
     if (!taskId) return;
-    const found = tasksData.tasks.find((t: TaskWithRelations) => t.id === taskId);
-    if (found) {
-      setSelectedTask(found);
-      setIsDrawerOpen(true);
-      setIsCreateMode(false);
-      window.history.replaceState({}, "", window.location.pathname);
-    }
+    setHighlightedTaskId(taskId);
+    window.history.replaceState({}, "", window.location.pathname);
+    setTimeout(() => {
+      const el = document.getElementById(`task-${taskId}`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 200);
   }, [tasksData?.tasks]);
 
   const { data: taskTypes = [] } = useQuery<TaskType[]>({
@@ -732,6 +751,8 @@ export default function CrmMyTasks() {
                       completingTaskId={completingTaskId}
                       onTaskClick={handleOpenEdit}
                       defaultOpen={config.key === "overdue" || config.key === "today"}
+                      highlightedTaskId={highlightedTaskId}
+                      onClearHighlight={() => setHighlightedTaskId(null)}
                     />
                   );
                 })}

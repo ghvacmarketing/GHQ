@@ -166,7 +166,7 @@ export default function CrmNotifications() {
 function getLink(entityType: string | null, entityId: string | null): string | null {
   if (!entityType || !entityId) return null;
   switch (entityType) {
-    case "task": return `/crm/tasks/mine?task=${entityId}`;
+    case "task": return `/crm/tasks/mine?highlight=${entityId}`;
     case "customer": return `/crm/customers/${entityId}`;
     case "lead": return "/crm/prospect-funnel";
     case "project": return `/crm/projects/${entityId}`;
