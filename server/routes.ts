@@ -5909,27 +5909,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Uses caching (60s) and optimized single query to reduce database load
   app.get("/api/crm/customers/stats", requireCrmAuth, async (req, res) => {
     try {
-      const cacheKey = "crm:customer:stats";
-      const cached = getCachedAnalytics(cacheKey);
-      if (cached) {
-        return res.json(cached);
+      const { search } = req.query as Record<string, string | undefined>;
+      const searchTerm = search?.trim().toLowerCase() || "";
+
+      if (!searchTerm) {
+        const cacheKey = "crm:customer:stats";
+        const cached = getCachedAnalytics(cacheKey);
+        if (cached) {
+          return res.json(cached);
+        }
+
+        const [result] = await db
+          .select({
+            total: sql<number>`count(*)`,
+            prospects: sql<number>`count(*) FILTER (WHERE LOWER(customer_status) = 'prospect')`,
+            customers: sql<number>`count(*) FILTER (WHERE LOWER(customer_status) = 'customer')`,
+          })
+          .from(crmCustomers);
+
+        const [withAgreementsResult] = await db
+          .select({ count: sql<number>`count(DISTINCT ${crmCustomers.id})` })
+          .from(crmCustomers)
+          .innerJoin(crmAgreements, eq(crmAgreements.customerId, crmCustomers.id));
+
+        const stats = {
+          prospects: Number(result?.prospects || 0),
+          customers: Number(result?.customers || 0),
+          total: Number(result?.total || 0),
+          withAgreements: Number(withAgreementsResult?.count || 0),
+        };
+
+        setCachedAnalytics(cacheKey, stats);
+        return res.json(stats);
       }
 
-      // Single optimized query with conditional counting (avoids 4 separate queries)
-      // Using LOWER() to handle mixed-case status values
+      const searchWords = searchTerm.split(/\s+/).filter(w => w.length > 0);
+      let searchCondition;
+      if (searchWords.length > 1) {
+        const wordConditions = searchWords.map(word => {
+          const wordPattern = `%${word}%`;
+          return sql`(LOWER(${crmCustomers.name}) LIKE ${wordPattern} OR LOWER(${crmCustomers.fullAddress}) LIKE ${wordPattern})`;
+        });
+        searchCondition = sql`(${sql.join(wordConditions, sql` AND `)})`;
+      } else {
+        const searchPattern = `%${searchTerm}%`;
+        searchCondition = sql`(LOWER(${crmCustomers.name}) LIKE ${searchPattern} OR LOWER(${crmCustomers.email}) LIKE ${searchPattern} OR ${crmCustomers.phone} LIKE ${searchPattern} OR LOWER(${crmCustomers.fullAddress}) LIKE ${searchPattern})`;
+      }
+
       const [result] = await db
         .select({
           total: sql<number>`count(*)`,
           prospects: sql<number>`count(*) FILTER (WHERE LOWER(customer_status) = 'prospect')`,
           customers: sql<number>`count(*) FILTER (WHERE LOWER(customer_status) = 'customer')`,
         })
-        .from(crmCustomers);
+        .from(crmCustomers)
+        .where(searchCondition);
 
-      // Count customers with at least one agreement (separate query since it needs JOIN)
       const [withAgreementsResult] = await db
         .select({ count: sql<number>`count(DISTINCT ${crmCustomers.id})` })
         .from(crmCustomers)
-        .innerJoin(crmAgreements, eq(crmAgreements.customerId, crmCustomers.id));
+        .innerJoin(crmAgreements, eq(crmAgreements.customerId, crmCustomers.id))
+        .where(searchCondition);
 
       const stats = {
         prospects: Number(result?.prospects || 0),
@@ -5938,7 +5978,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         withAgreements: Number(withAgreementsResult?.count || 0),
       };
 
-      setCachedAnalytics(cacheKey, stats);
       return res.json(stats);
     } catch (error) {
       console.error("Error fetching customer stats:", error);
@@ -5959,6 +5998,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         search,
         customerType,
         customerStatus,
+        hasAgreement,
         source,
         accountRole,
         page = "1",
@@ -5994,6 +6034,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (customerStatus && customerStatus !== "all") {
         crmConditions.push(sql`LOWER(${crmCustomers.customerStatus}) = LOWER(${customerStatus})`);
+      }
+
+      if (hasAgreement === "true") {
+        crmConditions.push(
+          sql`EXISTS (SELECT 1 FROM crm_agreements WHERE crm_agreements.customer_id = ${crmCustomers.id})`
+        );
       }
 
       // accountRole filter: "parent" = accounts that have sub-accounts, "sub" = accounts with a parent

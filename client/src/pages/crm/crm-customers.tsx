@@ -187,9 +187,11 @@ export default function CrmCustomers() {
   });
 
   const { data: statsData } = useQuery<{ prospects: number; customers: number; total: number; withAgreements: number }>({
-    queryKey: ["/api/crm/customers/stats"],
+    queryKey: ["/api/crm/customers/stats", debouncedSearch],
     queryFn: async () => {
-      const res = await fetch("/api/crm/customers/stats", { credentials: "include" });
+      const params = new URLSearchParams();
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      const res = await fetch(`/api/crm/customers/stats?${params.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch stats");
       return res.json();
     },
