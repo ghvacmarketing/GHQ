@@ -211,7 +211,7 @@ export default function CrmSettingsSalesbook() {
   if (!isAdmin) {
     return (
       <CrmLayout currentUser={currentUser}>
-        <div className="min-h-screen bg-slate-50 p-8 flex items-center justify-center">
+        <div className="flex items-center justify-center py-20">
           <p className="text-slate-500">Only admins can manage the salesbook directory.</p>
         </div>
       </CrmLayout>
@@ -220,7 +220,7 @@ export default function CrmSettingsSalesbook() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="min-h-screen bg-slate-50 p-6">
+      <div className="space-y-4">
         <Button
           variant="ghost"
           size="sm"
