@@ -148,7 +148,9 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
             return;
           }
         }
-      } catch {}
+      } catch (err) {
+        console.error("Failed to lookup tagged comment route:", err);
+      }
     }
 
     const url = getEntityUrl(notification.entityType, notification.entityId);

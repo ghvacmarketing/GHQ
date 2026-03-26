@@ -204,7 +204,9 @@ function NotificationRow({
             return;
           }
         }
-      } catch {}
+      } catch (err) {
+        console.error("Failed to lookup tagged comment route:", err);
+      }
       return;
     }
     const link = getLink(n.entityType, n.entityId);
