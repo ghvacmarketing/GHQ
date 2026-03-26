@@ -1055,8 +1055,8 @@ export function buildSalesbookSections(
 
   sections.push({ type: "elite-divider", pageIndex: pageIndex++, label: "HVAC Elite Package" });
   sections.push({ type: "elite-bundles", eliteCoreBundles, pageIndex: pageIndex++, label: "Elite Core Bundles" });
-  sections.push({ type: "elite-discount", pageIndex: pageIndex++, label: "Elite Bundle Savings" });
   sections.push({ type: "elite-airflow", eliteAirflowOptions, pageIndex: pageIndex++, label: "Elite Airflow Options" });
+  sections.push({ type: "elite-discount", pageIndex: pageIndex++, label: "Elite Bundle Savings" });
 
   if (crawlspaceTiers.length > 0) {
     sections.push({ type: "crawlspace-divider", pageIndex: pageIndex++, label: "Crawlspace Services" });
