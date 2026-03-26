@@ -14,6 +14,7 @@ import {
   ClipboardList,
   Inbox,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { CrmUser, CrmNotification } from "@shared/schema";
@@ -62,6 +63,14 @@ export default function CrmNotifications() {
       refetch();
       queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
       toast({ title: "All marked as read" });
+    },
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/crm/notifications/${id}`),
+    onSuccess: () => {
+      refetch();
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
     },
   });
 
@@ -155,6 +164,7 @@ export default function CrmNotifications() {
                 key={n.id}
                 notification={n}
                 onMarkRead={() => markReadMut.mutate(n.id)}
+                onDelete={() => deleteMut.mutate(n.id)}
                 onNavigate={navigate}
               />
             ))}
@@ -183,10 +193,12 @@ function getLink(entityType: string | null, entityId: string | null): string | n
 function NotificationRow({
   notification: n,
   onMarkRead,
+  onDelete,
   onNavigate,
 }: {
   notification: NotificationWithActor;
   onMarkRead: () => void;
+  onDelete: () => void;
   onNavigate: (path: string) => void;
 }) {
   const handleClick = () => {
@@ -198,12 +210,11 @@ function NotificationRow({
   return (
     <div
       onClick={handleClick}
-      className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-slate-50 ${
+      className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-slate-50 group ${
         !n.isRead ? "bg-blue-50/40" : ""
       }`}
     >
-      {/* Icon */}
-      <div className={`flex-shrink-0 mt-0.5 w-9 h-9 rounded-full flex items-center justify-center ${
+      <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${
         n.type === "task_assigned" ? "bg-green-100" : "bg-slate-100"
       }`}>
         {n.type === "task_assigned" || n.type === "task_due"
@@ -211,7 +222,6 @@ function NotificationRow({
           : <Bell className="h-4 w-4 text-slate-400" />}
       </div>
 
-      {/* Content */}
       <div className="flex-1 min-w-0">
         <p className={`text-sm leading-snug ${!n.isRead ? "font-semibold text-slate-900" : "text-slate-700"}`}>
           {n.title}
@@ -227,12 +237,18 @@ function NotificationRow({
         </div>
       </div>
 
-      {/* Unread dot */}
-      {!n.isRead && (
-        <div className="flex-shrink-0 mt-2">
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {!n.isRead && (
           <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "#711419" }} />
-        </div>
-      )}
+        )}
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+          title="Delete notification"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }

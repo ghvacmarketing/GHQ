@@ -7832,6 +7832,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DELETE /api/crm/notifications/:id - Delete a single notification
+  app.delete("/api/crm/notifications/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { id } = req.params;
+      const result = await db.delete(crmNotifications).where(
+        and(
+          eq(crmNotifications.id, id),
+          eq(crmNotifications.userId, currentUser.id)
+        )
+      );
+
+      return res.json({ deleted: result.rowCount || 0 });
+    } catch (error) {
+      console.error("Error deleting notification:", error);
+      return res.status(500).json({ message: "Failed to delete notification" });
+    }
+  });
+
   // ============================================
   // COMMENTS ENDPOINTS
   // ============================================
