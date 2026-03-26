@@ -144,6 +144,24 @@ export default function CrmSettingsSalesbook() {
     return null;
   }
 
+  const isAdmin =
+    currentUser.role === "owner" ||
+    currentUser.role === "admin" ||
+    currentUser.role === "supervisor";
+
+  if (!isAdmin) {
+    return (
+      <CrmLayout currentUser={currentUser}>
+        <div className="min-h-screen bg-white p-8 flex items-center justify-center">
+          <div className="text-center">
+            <BookOpen className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+            <p className="text-slate-500">Only admins can manage salesbook bookmarks.</p>
+          </div>
+        </div>
+      </CrmLayout>
+    );
+  }
+
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="min-h-screen bg-white px-4 sm:px-8 py-6">

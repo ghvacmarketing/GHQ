@@ -1,6 +1,14 @@
 import { useState, useEffect, useRef, useCallback, forwardRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import HTMLFlipBook from "react-pageflip";
+
+interface FlipBookRef {
+  pageFlip(): {
+    flip(page: number): void;
+    getCurrentPageIndex(): number;
+    getPageCount(): number;
+  } | null;
+}
 import {
   Settings,
   ChevronLeft,
@@ -52,7 +60,7 @@ export default function PriceBook() {
   const [containerSize, setContainerSize] = useState({ w: 800, h: 600 });
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
-  const flipBookRef = useRef<any>(null);
+  const flipBookRef = useRef<FlipBookRef>(null);
 
   const { data: pageInfo, isLoading: pagesLoading } = useQuery<SalesbookPageInfo>({
     queryKey: ["/api/salesbook/pages"],
@@ -81,7 +89,7 @@ export default function PriceBook() {
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
 
-  const onFlip = useCallback((e: any) => {
+  const onFlip = useCallback((e: { data: number }) => {
     const page = e.data;
     setCurrentPage(page);
     setPageInput(String(page + 1));
@@ -353,7 +361,6 @@ export default function PriceBook() {
             </div>
           ) : pageInfo && pageInfo.pages.length > 0 ? (
             <div style={{ transform: `scale(1)`, transformOrigin: 'center center' }}>
-              {/* @ts-ignore - react-pageflip types are incomplete */}
               <HTMLFlipBook
                 ref={flipBookRef}
                 width={pageW}

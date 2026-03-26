@@ -38,7 +38,13 @@ export function ensureSalesbookConverted(): SalesbookPageInfo {
     }
   }
 
-  const pages = fs.readdirSync(OUTPUT_DIR).filter((f) => f.startsWith(PAGE_PREFIX) && f.endsWith(".jpg")).sort();
+  const pages = fs.readdirSync(OUTPUT_DIR)
+    .filter((f) => f.startsWith(PAGE_PREFIX) && f.endsWith(".jpg"))
+    .sort((a, b) => {
+      const numA = parseInt(a.replace(/\D/g, ""), 10);
+      const numB = parseInt(b.replace(/\D/g, ""), 10);
+      return numA - numB;
+    });
 
   cachedInfo = {
     totalPages: pages.length,
