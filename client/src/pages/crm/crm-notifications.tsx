@@ -172,7 +172,6 @@ export default function CrmNotifications() {
               {t === "unread" ? "Unread" : "All"}
             </button>
           ))}
-          <div className="w-px h-5 bg-slate-200 self-center" />
           {typeFilters.map((tf) => (
             <button
               key={tf.key}
