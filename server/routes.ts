@@ -27925,9 +27925,14 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       return res.status(500).json({ message: "Failed to load salesbook pages" });
     }
   });
+  let salesbookDataCache: { data: any; timestamp: number } | null = null;
+  const SALESBOOK_CACHE_TTL = 5 * 60 * 1000;
 
   app.get("/api/salesbook/data", async (req, res) => {
     try {
+      if (salesbookDataCache && (Date.now() - salesbookDataCache.timestamp) < SALESBOOK_CACHE_TTL) {
+        return res.json(salesbookDataCache.data);
+      }
       const packages = await db.select().from(pricebookPackages)
         .where(eq(pricebookPackages.isActive, true))
         .orderBy(asc(pricebookPackages.unitType), asc(pricebookPackages.tier), asc(pricebookPackages.tonnage));
@@ -27977,8 +27982,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           priceByTonnage: { "1.5": 2245, "2": 2345, "2.5": 2850, "3": 2995, "3.5": 3450, "4": 3650, "5": 4450 }
         }
       ];
-
-      return res.json({
+      const responseData = {
         staticPages: pageInfo.pages.slice(0, 12),
         pageWidth: pageInfo.pageWidth,
         pageHeight: pageInfo.pageHeight,
@@ -27986,7 +27990,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         crawlspaceTiers: tiers,
         eliteCoreBundles,
         eliteAirflowOptions,
-      });
+      };
+      salesbookDataCache = { data: responseData, timestamp: Date.now() };
+      return res.json(responseData);
     } catch (error) {
       console.error("Error getting salesbook data:", error);
       return res.status(500).json({ message: "Failed to load salesbook data" });

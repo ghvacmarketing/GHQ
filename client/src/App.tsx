@@ -13,7 +13,7 @@ import QuotesHistory from "@/pages/quotes-history";
 import ProcessesSystems from "@/pages/processes-systems";
 import ProcessBuilderManual from "@/pages/process-builder-manual";
 import ProcessBuilderVoice from "@/pages/process-builder-voice";
-import PriceBook from "@/pages/price-book";
+const PriceBook = lazy(() => import("@/pages/price-book"));
 import SalesProspects from "@/pages/sales-prospects";
 import CreateLeadPage from "@/pages/create-lead";
 import Installation from "@/pages/installation";
@@ -80,6 +80,7 @@ const CrmMessaging = lazy(() => import("@/pages/crm/crm-messaging"));
 const CrmNotifications = lazy(() => import("@/pages/crm/crm-notifications"));
 const CrmMyTasks = lazy(() => import("@/pages/crm/crm-my-tasks"));
 const CrmTaskBoard = lazy(() => import("@/pages/crm/crm-task-board"));
+const CrmSalesbook = lazy(() => import("@/pages/price-book"));
 
 // Lazy-load Mobile pages to reduce initial bundle size
 const MobileAgenda = lazy(() => import("@/pages/mobile/mobile-agenda"));
@@ -240,7 +241,7 @@ function Router() {
       <Route path="/quote" component={QuoteGenerator} />
       <Route path="/quote/edit/:id" component={QuoteEdit} />
       <Route path="/history" component={QuotesHistory} />
-      <Route path="/price-book" component={PriceBook} />
+      <Route path="/price-book">{() => <Suspense fallback={<GlobalLoader />}><PriceBook /></Suspense>}</Route>
       <Route path="/processes" component={ProcessesSystems} />
       <Route path="/processes/new" component={ProcessBuilderManual} />
       <Route path="/processes/new/voice" component={ProcessBuilderVoice} />
@@ -301,6 +302,7 @@ function Router() {
       <Route path="/crm/reports">{() => <ProtectedCrmWrapper><CrmGoalsTracker /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/messaging">{() => <ProtectedCrmWrapper><CrmMessaging /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/notifications">{() => <ProtectedCrmWrapper><CrmNotifications /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/salesbook">{() => <ProtectedCrmWrapper><CrmSalesbook /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/tasks/board">{() => <ProtectedCrmWrapper><CrmTaskBoard /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/tasks/mine">{() => <ProtectedCrmWrapper><CrmMyTasks /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm">{() => <ProtectedCrmWrapper><CrmBusinessDashboard /></ProtectedCrmWrapper>}</Route>

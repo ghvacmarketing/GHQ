@@ -62,6 +62,10 @@ const CRM_PREFETCH_ENDPOINTS = [
     queryKey: ["/api/crm/users"], 
     url: "/api/crm/users" 
   },
+  {
+    queryKey: ["/api/salesbook/data"],
+    url: "/api/salesbook/data"
+  },
 ];
 
 async function prefetchEndpoint(queryKey: unknown[], url: string, index: number): Promise<{ success: boolean; duration: number; url: string; error?: string }> {
