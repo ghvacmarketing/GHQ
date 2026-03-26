@@ -4,13 +4,11 @@ import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Select,
@@ -25,7 +23,6 @@ import {
   isToday,
   isYesterday,
   isThisWeek,
-  startOfDay,
 } from "date-fns";
 import {
   Bell,
@@ -82,21 +79,21 @@ function getNotificationIcon(type: string) {
       return <AtSign className="h-4 w-4 text-blue-500" />;
     case "task_assigned":
     case "task_due":
-      return <ClipboardList className="h-4 w-4 text-green-500" />;
+      return <ClipboardList className="h-4 w-4 text-green-600" />;
     case "comment":
       return <MessageCircle className="h-4 w-4 text-purple-500" />;
     case "status_change":
       return <RefreshCw className="h-4 w-4 text-amber-500" />;
     case "system":
-      return <Settings className="h-4 w-4 text-orange-500" />;
+      return <Settings className="h-4 w-4 text-slate-500" />;
     default:
-      return <Bell className="h-4 w-4 text-slate-500" />;
+      return <Bell className="h-4 w-4 text-slate-400" />;
   }
 }
 
 function getEntityLink(entityType: string | null, entityId: string | null): string | null {
   if (!entityType || !entityId) return null;
-  
+
   const entityRoutes: Record<string, string> = {
     lead: "/crm/prospect-funnel",
     project: `/crm/projects/${entityId}`,
@@ -106,7 +103,7 @@ function getEntityLink(entityType: string | null, entityId: string | null): stri
     customer: `/crm/customers/${entityId}`,
     agreement: `/crm/agreements`,
   };
-  
+
   return entityRoutes[entityType] || null;
 }
 
@@ -129,7 +126,7 @@ export default function CrmNotifications() {
   usePageTitle("Notifications");
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  
+
   const [tab, setTab] = useState<"unread" | "all">("unread");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -176,10 +173,10 @@ export default function CrmNotifications() {
       refetch();
       queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
       setSelectedIds(new Set());
-      toast({ title: "Success", description: "All notifications marked as read" });
+      toast({ title: "All notifications marked as read" });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to mark notifications as read", variant: "destructive" });
+      toast({ title: "Failed to mark notifications as read", variant: "destructive" });
     },
   });
 
@@ -193,10 +190,10 @@ export default function CrmNotifications() {
       refetch();
       queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
       setSelectedIds(new Set());
-      toast({ title: "Success", description: "Selected notifications marked as read" });
+      toast({ title: "Selected notifications marked as read" });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to mark notifications as read", variant: "destructive" });
+      toast({ title: "Failed to mark notifications as read", variant: "destructive" });
     },
   });
 
@@ -229,7 +226,6 @@ export default function CrmNotifications() {
     if (!notification.isRead) {
       markAsReadMutation.mutate(notification.id);
     }
-    
     const link = getEntityLink(notification.entityType, notification.entityId);
     if (link) {
       navigate(link);
@@ -264,7 +260,8 @@ export default function CrmNotifications() {
   if (authLoading) {
     return (
       <CrmLayout currentUser={currentUser as unknown as CrmUser}>
-        <div className="space-y-4">
+        <div className="space-y-4 p-6">
+          <Skeleton className="h-8 w-48" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-64 w-full" />
         </div>
@@ -283,133 +280,142 @@ export default function CrmNotifications() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="space-y-6">
+      <div className="space-y-5 max-w-3xl">
+        {/* Page header */}
         <div>
-          <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">
-            Notifications
-          </h1>
-          <p className="text-sm text-slate-500">
-            Stay up to date with mentions, tasks, and system updates
+          <h1 className="text-xl font-semibold text-slate-900">Notifications</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Mentions, task assignments, and system updates
           </p>
         </div>
 
-        <Card>
-          <CardContent className="p-4 space-y-4">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <Tabs value={tab} onValueChange={(v) => setTab(v as "unread" | "all")}>
-                <TabsList>
-                  <TabsTrigger value="unread" data-testid="tab-unread">Unread</TabsTrigger>
-                  <TabsTrigger value="all" data-testid="tab-all">All</TabsTrigger>
-                </TabsList>
-              </Tabs>
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Unread / All pill toggle */}
+          <div className="flex items-center bg-slate-100 rounded-lg p-0.5 gap-0.5">
+            <button
+              onClick={() => setTab("unread")}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                tab === "unread"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Unread
+            </button>
+            <button
+              onClick={() => setTab("all")}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                tab === "all"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              All
+            </button>
+          </div>
 
-              <div className="flex flex-wrap gap-3 items-center">
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="w-[140px]" data-testid="select-type-filter">
-                    <SelectValue placeholder="Filter by type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="mention">Mentions</SelectItem>
-                    <SelectItem value="task_assigned">Tasks</SelectItem>
-                    <SelectItem value="system">System</SelectItem>
-                  </SelectContent>
-                </Select>
+          {/* Type filter */}
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[130px] h-8 text-xs bg-white border-slate-200 focus:ring-[#711419]/30">
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="mention">Mentions</SelectItem>
+              <SelectItem value="task_assigned">Tasks</SelectItem>
+              <SelectItem value="comment">Comments</SelectItem>
+              <SelectItem value="status_change">Status changes</SelectItem>
+              <SelectItem value="system">System</SelectItem>
+            </SelectContent>
+          </Select>
 
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search notifications..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 w-[200px]"
-                    data-testid="input-search"
-                  />
-                </div>
+          {/* Search */}
+          <div className="relative flex-1 min-w-[160px] max-w-xs">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <Input
+              placeholder="Search notifications..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 h-8 text-sm bg-white border-slate-200 focus-visible:ring-[#711419]/30"
+            />
+          </div>
 
-                {selectedIds.size > 0 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleMarkSelectedRead}
-                    disabled={markSelectedReadMutation.isPending}
-                    data-testid="button-mark-selected-read"
-                  >
-                    {markSelectedReadMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                    ) : (
-                      <CheckCheck className="h-4 w-4 mr-1" />
-                    )}
-                    Mark Selected as Read ({selectedIds.size})
-                  </Button>
+          <div className="flex items-center gap-2 ml-auto">
+            {selectedIds.size > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleMarkSelectedRead}
+                disabled={markSelectedReadMutation.isPending}
+                className="h-8 text-xs border-slate-200"
+              >
+                {markSelectedReadMutation.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <CheckCheck className="h-3.5 w-3.5 mr-1.5" />
                 )}
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => markAllReadMutation.mutate()}
-                  disabled={markAllReadMutation.isPending || !hasNotifications}
-                  data-testid="button-mark-all-read"
-                >
-                  {markAllReadMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  ) : (
-                    <CheckCheck className="h-4 w-4 mr-1" />
-                  )}
-                  Mark All Read
-                </Button>
-              </div>
-            </div>
-
-            {hasNotifications && (
-              <div className="flex items-center gap-2 px-4 py-2 border-b">
-                <Checkbox
-                  checked={allSelected}
-                  onCheckedChange={handleSelectAll}
-                  aria-label="Select all"
-                  data-testid="checkbox-select-all"
-                  className={someSelected ? "data-[state=checked]:bg-primary/50" : ""}
-                />
-                <span className="text-sm text-muted-foreground">
-                  {selectedIds.size > 0 
-                    ? `${selectedIds.size} selected` 
-                    : "Select all"}
-                </span>
-              </div>
+                Mark {selectedIds.size} read
+              </Button>
             )}
-          </CardContent>
-        </Card>
 
-        {notificationsLoading ? (
-          <Card>
-            <CardContent className="p-4 space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex gap-4">
-                  <Skeleton className="h-10 w-10 rounded-full" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-3 w-1/2" />
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        ) : !hasNotifications ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <Inbox className="h-16 w-16 text-muted-foreground/50 mb-4" />
-              <p className="text-lg font-medium text-muted-foreground">
-                {tab === "unread"
-                  ? "You're all caught up!"
-                  : "No notifications yet."}
-              </p>
-              {tab === "unread" && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  No unread notifications.
-                </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => markAllReadMutation.mutate()}
+              disabled={markAllReadMutation.isPending || !hasNotifications}
+              className="h-8 text-xs text-slate-500 hover:text-slate-700"
+            >
+              {markAllReadMutation.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <CheckCheck className="h-3.5 w-3.5 mr-1.5" />
               )}
-            </CardContent>
-          </Card>
+              Mark all read
+            </Button>
+          </div>
+        </div>
+
+        {/* Select-all row when there are notifications */}
+        {hasNotifications && (
+          <div className="flex items-center gap-2 px-1">
+            <Checkbox
+              checked={allSelected}
+              onCheckedChange={handleSelectAll}
+              aria-label="Select all"
+              className={someSelected ? "data-[state=checked]:bg-slate-400" : ""}
+            />
+            <span className="text-xs text-slate-400">
+              {selectedIds.size > 0 ? `${selectedIds.size} selected` : "Select all"}
+            </span>
+          </div>
+        )}
+
+        {/* Content */}
+        {notificationsLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex gap-3 p-3 bg-white border border-slate-200 rounded-lg">
+                <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : !hasNotifications ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <Inbox className="h-12 w-12 text-slate-300 mb-3" />
+            <p className="text-base font-medium text-slate-600">
+              {tab === "unread" ? "You're all caught up!" : "No notifications yet"}
+            </p>
+            <p className="text-sm text-slate-400 mt-1">
+              {tab === "unread"
+                ? "No unread notifications."
+                : "Notifications appear here when tasks are assigned or you're mentioned."}
+            </p>
+          </div>
         ) : (
           <div className="space-y-6">
             {dateGroupOrder.map((group) => {
@@ -418,96 +424,99 @@ export default function CrmNotifications() {
 
               return (
                 <div key={group}>
-                  <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-1">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">
                     {group}
-                  </h3>
-                  <Card>
-                    <CardContent className="p-0 divide-y">
-                      {groupNotifs.map((notification) => (
+                  </p>
+
+                  <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
+                    {groupNotifs.map((notification) => (
+                      <div
+                        key={notification.id}
+                        className={`flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors hover:bg-slate-50 ${
+                          !notification.isRead ? "bg-slate-50/70" : ""
+                        }`}
+                      >
+                        <Checkbox
+                          checked={selectedIds.has(notification.id)}
+                          onCheckedChange={(checked) =>
+                            handleSelectNotification(notification.id, !!checked)
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label="Select notification"
+                          className="mt-0.5 flex-shrink-0"
+                        />
+
                         <div
-                          key={notification.id}
-                          className={`flex items-start gap-4 p-4 cursor-pointer transition-colors hover:bg-muted/50 ${
-                            !notification.isRead
-                              ? "border-l-4 border-l-primary bg-primary/5"
-                              : ""
-                          }`}
-                          data-testid={`notification-item-${notification.id}`}
+                          className="flex-1 min-w-0 flex gap-3"
+                          onClick={() => handleNotificationClick(notification)}
                         >
-                          <Checkbox
-                            checked={selectedIds.has(notification.id)}
-                            onCheckedChange={(checked) =>
-                              handleSelectNotification(notification.id, !!checked)
-                            }
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label="Select notification"
-                            data-testid={`checkbox-notification-${notification.id}`}
-                          />
-
-                          <div
-                            className="flex-1 min-w-0 flex gap-3"
-                            onClick={() => handleNotificationClick(notification)}
-                          >
-                            <div className="flex-shrink-0 mt-0.5">
-                              {getNotificationIcon(notification.type)}
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                              <p
-                                className={`text-sm ${
-                                  !notification.isRead ? "font-semibold" : ""
-                                }`}
-                                data-testid={`notification-title-${notification.id}`}
-                              >
-                                {notification.title}
-                              </p>
-                              {notification.preview && (
-                                <p className="text-sm text-muted-foreground line-clamp-2 mt-0.5">
-                                  {notification.preview}
-                                </p>
-                              )}
-                              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                <span className="text-xs text-muted-foreground">
-                                  {notification.createdAt
-                                    ? formatDistanceToNow(new Date(notification.createdAt), {
-                                        addSuffix: true,
-                                      })
-                                    : ""}
-                                </span>
-                                {notification.entityType && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    {getEntityBadgeLabel(notification.entityType)}
-                                  </Badge>
-                                )}
-                                {notification.actorName && (
-                                  <div className="flex items-center gap-1.5">
-                                    <Avatar className="h-5 w-5">
-                                      <AvatarFallback className="text-xs bg-slate-200">
-                                        {notification.actorName
-                                          .split(" ")
-                                          .map((n) => n[0])
-                                          .join("")
-                                          .toUpperCase()
-                                          .slice(0, 2)}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <span className="text-xs text-muted-foreground">
-                                      {notification.actorName}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {!notification.isRead && (
-                              <div className="flex-shrink-0">
-                                <div className="h-2.5 w-2.5 rounded-full bg-primary" />
-                              </div>
-                            )}
+                          <div className="flex-shrink-0 mt-0.5 w-7 h-7 flex items-center justify-center rounded-full bg-slate-100">
+                            {getNotificationIcon(notification.type)}
                           </div>
+
+                          <div className="flex-1 min-w-0">
+                            <p
+                              className={`text-sm leading-snug ${
+                                !notification.isRead
+                                  ? "font-semibold text-slate-900"
+                                  : "text-slate-700"
+                              }`}
+                            >
+                              {notification.title}
+                            </p>
+                            {notification.preview && (
+                              <p className="text-sm text-slate-500 line-clamp-2 mt-0.5">
+                                {notification.preview}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              <span className="text-xs text-slate-400">
+                                {notification.createdAt
+                                  ? formatDistanceToNow(new Date(notification.createdAt), {
+                                      addSuffix: true,
+                                    })
+                                  : ""}
+                              </span>
+                              {notification.entityType && (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px] px-1.5 py-0 h-4 bg-slate-100 text-slate-500 border-0"
+                                >
+                                  {getEntityBadgeLabel(notification.entityType)}
+                                </Badge>
+                              )}
+                              {notification.actorName && (
+                                <div className="flex items-center gap-1">
+                                  <Avatar className="h-4 w-4">
+                                    <AvatarFallback className="text-[9px] bg-slate-200 text-slate-600">
+                                      {notification.actorName
+                                        .split(" ")
+                                        .map((n) => n[0])
+                                        .join("")
+                                        .toUpperCase()
+                                        .slice(0, 2)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span className="text-xs text-slate-400">
+                                    {notification.actorName}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {!notification.isRead && (
+                            <div className="flex-shrink-0 mt-1.5">
+                              <div
+                                className="h-2 w-2 rounded-full"
+                                style={{ backgroundColor: "#711419" }}
+                              />
+                            </div>
+                          )}
                         </div>
-                      ))}
-                    </CardContent>
-                  </Card>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               );
             })}
