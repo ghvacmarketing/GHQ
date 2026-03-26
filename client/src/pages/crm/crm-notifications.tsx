@@ -42,8 +42,6 @@ type NotificationWithActor = CrmNotification & {
   actorName?: string | null;
 };
 
-type NotificationsResponse = NotificationWithActor[];
-
 type DateGroup = "Today" | "Yesterday" | "This Week" | "Earlier";
 
 function getDateGroup(dateStr: string | Date | null): DateGroup {
@@ -64,12 +62,9 @@ function groupNotificationsByDate(
     "This Week": [],
     Earlier: [],
   };
-
-  for (const notification of notifications) {
-    const group = getDateGroup(notification.createdAt);
-    groups[group].push(notification);
+  for (const n of notifications) {
+    groups[getDateGroup(n.createdAt)].push(n);
   }
-
   return groups;
 }
 
@@ -93,8 +88,7 @@ function getNotificationIcon(type: string) {
 
 function getEntityLink(entityType: string | null, entityId: string | null): string | null {
   if (!entityType || !entityId) return null;
-
-  const entityRoutes: Record<string, string> = {
+  const routes: Record<string, string> = {
     lead: "/crm/prospect-funnel",
     project: `/crm/projects/${entityId}`,
     work_order: `/crm/work-orders/${entityId}`,
@@ -103,8 +97,7 @@ function getEntityLink(entityType: string | null, entityId: string | null): stri
     customer: `/crm/customers/${entityId}`,
     agreement: `/crm/agreements`,
   };
-
-  return entityRoutes[entityType] || null;
+  return routes[entityType] || null;
 }
 
 function getEntityBadgeLabel(entityType: string | null): string {
@@ -122,13 +115,15 @@ function getEntityBadgeLabel(entityType: string | null): string {
   return labels[entityType] || entityType;
 }
 
+const DATE_GROUP_ORDER: DateGroup[] = ["Today", "Yesterday", "This Week", "Earlier"];
+
 export default function CrmNotifications() {
   usePageTitle("Notifications");
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
   const [tab, setTab] = useState<"unread" | "all">("unread");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -138,16 +133,22 @@ export default function CrmNotifications() {
   });
 
   const queryParams = useMemo(() => {
-    const params = new URLSearchParams();
-    if (tab === "unread") params.set("unreadOnly", "true");
-    if (typeFilter !== "all") params.set("type", typeFilter);
-    return params.toString();
+    const p = new URLSearchParams();
+    if (tab === "unread") p.set("unreadOnly", "true");
+    if (typeFilter !== "all") p.set("type", typeFilter);
+    return p.toString();
   }, [tab, typeFilter]);
 
-  const { data: notifications = [], isLoading: notificationsLoading, refetch } = useQuery<NotificationsResponse>({
+  const {
+    data: notifications = [],
+    isLoading: notificationsLoading,
+    refetch,
+  } = useQuery<NotificationWithActor[]>({
     queryKey: ["/api/crm/notifications", queryParams],
     queryFn: async () => {
-      const url = queryParams ? `/api/crm/notifications?${queryParams}` : "/api/crm/notifications";
+      const url = queryParams
+        ? `/api/crm/notifications?${queryParams}`
+        : "/api/crm/notifications";
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch notifications");
       return res.json();
@@ -155,112 +156,61 @@ export default function CrmNotifications() {
     enabled: !!currentUser,
   });
 
+  const invalidate = () => {
+    refetch();
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
+  };
+
   const markAsReadMutation = useMutation({
-    mutationFn: async (notificationId: string) => {
-      await apiRequest("PATCH", `/api/crm/notifications/${notificationId}/read`);
-    },
-    onSuccess: () => {
-      refetch();
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
-    },
+    mutationFn: (id: string) => apiRequest("PATCH", `/api/crm/notifications/${id}/read`),
+    onSuccess: invalidate,
   });
 
   const markAllReadMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("POST", "/api/crm/notifications/mark-all-read");
-    },
+    mutationFn: () => apiRequest("POST", "/api/crm/notifications/mark-all-read"),
     onSuccess: () => {
-      refetch();
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
+      invalidate();
       setSelectedIds(new Set());
       toast({ title: "All notifications marked as read" });
     },
-    onError: () => {
-      toast({ title: "Failed to mark notifications as read", variant: "destructive" });
-    },
+    onError: () => toast({ title: "Failed to mark all as read", variant: "destructive" }),
   });
 
   const markSelectedReadMutation = useMutation({
-    mutationFn: async (ids: string[]) => {
-      await Promise.all(
-        ids.map((id) => apiRequest("PATCH", `/api/crm/notifications/${id}/read`))
-      );
-    },
+    mutationFn: (ids: string[]) =>
+      Promise.all(ids.map((id) => apiRequest("PATCH", `/api/crm/notifications/${id}/read`))),
     onSuccess: () => {
-      refetch();
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
+      invalidate();
       setSelectedIds(new Set());
-      toast({ title: "Selected notifications marked as read" });
+      toast({ title: "Marked as read" });
     },
-    onError: () => {
-      toast({ title: "Failed to mark notifications as read", variant: "destructive" });
-    },
+    onError: () => toast({ title: "Failed to mark as read", variant: "destructive" }),
   });
 
   useEffect(() => {
-    if (!authLoading && !currentUser) {
-      navigate("/crm/login");
-    }
+    if (!authLoading && !currentUser) navigate("/crm/login");
   }, [authLoading, currentUser, navigate]);
 
   useEffect(() => {
     setSelectedIds(new Set());
   }, [tab, typeFilter]);
 
-  const filteredNotifications = useMemo(() => {
+  const filtered = useMemo(() => {
     if (!searchQuery.trim()) return notifications;
-    const query = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase();
     return notifications.filter(
       (n) =>
-        n.title.toLowerCase().includes(query) ||
-        (n.preview && n.preview.toLowerCase().includes(query))
+        n.title.toLowerCase().includes(q) ||
+        (n.preview && n.preview.toLowerCase().includes(q))
     );
   }, [notifications, searchQuery]);
 
-  const groupedNotifications = useMemo(
-    () => groupNotificationsByDate(filteredNotifications),
-    [filteredNotifications]
-  );
-
-  const handleNotificationClick = (notification: NotificationWithActor) => {
-    if (!notification.isRead) {
-      markAsReadMutation.mutate(notification.id);
-    }
-    const link = getEntityLink(notification.entityType, notification.entityId);
-    if (link) {
-      navigate(link);
-    }
-  };
-
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedIds(new Set(filteredNotifications.map((n) => n.id)));
-    } else {
-      setSelectedIds(new Set());
-    }
-  };
-
-  const handleSelectNotification = (id: string, checked: boolean) => {
-    const newSelected = new Set(selectedIds);
-    if (checked) {
-      newSelected.add(id);
-    } else {
-      newSelected.delete(id);
-    }
-    setSelectedIds(newSelected);
-  };
-
-  const handleMarkSelectedRead = () => {
-    const ids = Array.from(selectedIds);
-    if (ids.length > 0) {
-      markSelectedReadMutation.mutate(ids);
-    }
-  };
+  const grouped = useMemo(() => groupNotificationsByDate(filtered), [filtered]);
 
   if (authLoading) {
     return (
       <CrmLayout currentUser={currentUser as unknown as CrmUser}>
-        <div className="space-y-4 p-6">
+        <div className="max-w-3xl space-y-4">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-64 w-full" />
@@ -269,22 +219,24 @@ export default function CrmNotifications() {
     );
   }
 
-  if (!currentUser) {
-    return null;
-  }
+  if (!currentUser) return null;
 
-  const dateGroupOrder: DateGroup[] = ["Today", "Yesterday", "This Week", "Earlier"];
-  const hasNotifications = filteredNotifications.length > 0;
-  const allSelected = hasNotifications && selectedIds.size === filteredNotifications.length;
-  const someSelected = selectedIds.size > 0 && selectedIds.size < filteredNotifications.length;
+  const hasNotifications = filtered.length > 0;
+  const allSelected = hasNotifications && selectedIds.size === filtered.length;
+  const someSelected = selectedIds.size > 0 && !allSelected;
 
   return (
-    <CrmLayout currentUser={currentUser} disableScroll>
-      {/* Outer: fill the full allocated height as a flex column */}
-      <div className="h-full flex flex-col gap-3">
+    <CrmLayout currentUser={currentUser}>
+      {/*
+        Use a full-viewport-height container that shrinks only when content
+        overflows (normal page scroll). The bg-white from CrmLayout already
+        covers the whole screen so we just need flex-col + min-h to ensure
+        the empty state can be properly centred in the remaining space.
+      */}
+      <div className="flex flex-col" style={{ minHeight: "calc(100vh - 7rem)" }}>
 
-        {/* ── Fixed header ── */}
-        <div>
+        {/* ── Header ── */}
+        <div className="mb-4">
           <h1 className="text-xl font-semibold text-slate-900">Notifications</h1>
           <p className="text-sm text-slate-500 mt-0.5">
             Mentions, task assignments, and system updates
@@ -292,32 +244,27 @@ export default function CrmNotifications() {
         </div>
 
         {/* ── Toolbar ── */}
-        <div className="flex flex-wrap items-center gap-3 flex-shrink-0">
-          <div className="flex items-center bg-slate-100 rounded-lg p-0.5 gap-0.5">
-            <button
-              onClick={() => setTab("unread")}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                tab === "unread"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              Unread
-            </button>
-            <button
-              onClick={() => setTab("all")}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                tab === "all"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              All
-            </button>
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          {/* Unread / All toggle */}
+          <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
+            {(["unread", "all"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors capitalize ${
+                  tab === t
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                {t === "unread" ? "Unread" : "All"}
+              </button>
+            ))}
           </div>
 
+          {/* Type filter */}
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[130px] h-8 text-xs bg-white border-slate-200 focus:ring-[#711419]/30">
+            <SelectTrigger className="w-[130px] h-8 text-xs bg-white border-slate-200">
               <SelectValue placeholder="All Types" />
             </SelectTrigger>
             <SelectContent>
@@ -330,6 +277,7 @@ export default function CrmNotifications() {
             </SelectContent>
           </Select>
 
+          {/* Search */}
           <div className="relative flex-1 min-w-[160px] max-w-xs">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
             <Input
@@ -345,7 +293,7 @@ export default function CrmNotifications() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleMarkSelectedRead}
+                onClick={() => markSelectedReadMutation.mutate(Array.from(selectedIds))}
                 disabled={markSelectedReadMutation.isPending}
                 className="h-8 text-xs border-slate-200"
               >
@@ -376,10 +324,12 @@ export default function CrmNotifications() {
 
         {/* Select-all row */}
         {hasNotifications && (
-          <div className="flex items-center gap-2 px-1 flex-shrink-0">
+          <div className="flex items-center gap-2 px-1 mb-2">
             <Checkbox
               checked={allSelected}
-              onCheckedChange={handleSelectAll}
+              onCheckedChange={(v) => {
+                setSelectedIds(v ? new Set(filtered.map((n) => n.id)) : new Set());
+              }}
               aria-label="Select all"
               className={someSelected ? "data-[state=checked]:bg-slate-400" : ""}
             />
@@ -389,142 +339,139 @@ export default function CrmNotifications() {
           </div>
         )}
 
-        {/* ── Scrollable content — takes all remaining height ── */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <div className="max-w-3xl pb-6">
-            {notificationsLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex gap-3 p-3 bg-white border border-slate-200 rounded-lg">
-                    <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-3/4" />
-                      <Skeleton className="h-3 w-1/2" />
-                    </div>
-                  </div>
-                ))}
+        {/* ── Content ── */}
+        {notificationsLoading ? (
+          <div className="max-w-3xl space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex gap-3 p-3 bg-white border border-slate-200 rounded-lg">
+                <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
               </div>
-            ) : !hasNotifications ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
-                <Inbox className="h-12 w-12 text-slate-300 mb-3" />
-                <p className="text-base font-medium text-slate-600">
-                  {tab === "unread" ? "You're all caught up!" : "No notifications yet"}
-                </p>
-                <p className="text-sm text-slate-400 mt-1">
-                  {tab === "unread"
-                    ? "No unread notifications."
-                    : "Notifications appear here when tasks are assigned or you're mentioned."}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {dateGroupOrder.map((group) => {
-                  const groupNotifs = groupedNotifications[group];
-                  if (groupNotifs.length === 0) return null;
+            ))}
+          </div>
+        ) : !hasNotifications ? (
+          /* Empty state — centred in remaining vertical space */
+          <div className="flex-1 flex flex-col items-center justify-center text-center py-16">
+            <Inbox className="h-12 w-12 text-slate-300 mb-3" />
+            <p className="text-base font-medium text-slate-600">
+              {tab === "unread" ? "You're all caught up!" : "No notifications yet"}
+            </p>
+            <p className="text-sm text-slate-400 mt-1">
+              {tab === "unread"
+                ? "No unread notifications."
+                : "Notifications appear here when tasks are assigned or you're mentioned."}
+            </p>
+          </div>
+        ) : (
+          <div className="max-w-3xl space-y-6 pb-8">
+            {DATE_GROUP_ORDER.map((group) => {
+              const items = grouped[group];
+              if (!items.length) return null;
+              return (
+                <div key={group}>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">
+                    {group}
+                  </p>
+                  <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
+                    {items.map((n) => (
+                      <div
+                        key={n.id}
+                        className={`flex items-start gap-3 px-3 py-3 transition-colors hover:bg-slate-50 ${
+                          !n.isRead ? "bg-slate-50/70" : ""
+                        }`}
+                      >
+                        <Checkbox
+                          checked={selectedIds.has(n.id)}
+                          onCheckedChange={(v) => {
+                            const next = new Set(selectedIds);
+                            v ? next.add(n.id) : next.delete(n.id);
+                            setSelectedIds(next);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label="Select"
+                          className="mt-0.5 flex-shrink-0"
+                        />
 
-                  return (
-                    <div key={group}>
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">
-                        {group}
-                      </p>
+                        <div
+                          className="flex-1 min-w-0 flex gap-3 cursor-pointer"
+                          onClick={() => {
+                            if (!n.isRead) markAsReadMutation.mutate(n.id);
+                            const link = getEntityLink(n.entityType, n.entityId);
+                            if (link) navigate(link);
+                          }}
+                        >
+                          {/* Icon */}
+                          <div className="flex-shrink-0 mt-0.5 w-7 h-7 flex items-center justify-center rounded-full bg-slate-100">
+                            {getNotificationIcon(n.type)}
+                          </div>
 
-                      <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
-                        {groupNotifs.map((notification) => (
-                          <div
-                            key={notification.id}
-                            className={`flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors hover:bg-slate-50 ${
-                              !notification.isRead ? "bg-slate-50/70" : ""
-                            }`}
-                          >
-                            <Checkbox
-                              checked={selectedIds.has(notification.id)}
-                              onCheckedChange={(checked) =>
-                                handleSelectNotification(notification.id, !!checked)
-                              }
-                              onClick={(e) => e.stopPropagation()}
-                              aria-label="Select notification"
-                              className="mt-0.5 flex-shrink-0"
-                            />
-
-                            <div
-                              className="flex-1 min-w-0 flex gap-3"
-                              onClick={() => handleNotificationClick(notification)}
+                          {/* Body */}
+                          <div className="flex-1 min-w-0">
+                            <p
+                              className={`text-sm leading-snug ${
+                                !n.isRead ? "font-semibold text-slate-900" : "text-slate-700"
+                              }`}
                             >
-                              <div className="flex-shrink-0 mt-0.5 w-7 h-7 flex items-center justify-center rounded-full bg-slate-100">
-                                {getNotificationIcon(notification.type)}
-                              </div>
-
-                              <div className="flex-1 min-w-0">
-                                <p
-                                  className={`text-sm leading-snug ${
-                                    !notification.isRead
-                                      ? "font-semibold text-slate-900"
-                                      : "text-slate-700"
-                                  }`}
+                              {n.title}
+                            </p>
+                            {n.preview && (
+                              <p className="text-sm text-slate-500 line-clamp-2 mt-0.5">
+                                {n.preview}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              <span className="text-xs text-slate-400">
+                                {n.createdAt
+                                  ? formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })
+                                  : ""}
+                              </span>
+                              {n.entityType && (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px] px-1.5 py-0 h-4 bg-slate-100 text-slate-500 border-0"
                                 >
-                                  {notification.title}
-                                </p>
-                                {notification.preview && (
-                                  <p className="text-sm text-slate-500 line-clamp-2 mt-0.5">
-                                    {notification.preview}
-                                  </p>
-                                )}
-                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                  <span className="text-xs text-slate-400">
-                                    {notification.createdAt
-                                      ? formatDistanceToNow(new Date(notification.createdAt), {
-                                          addSuffix: true,
-                                        })
-                                      : ""}
-                                  </span>
-                                  {notification.entityType && (
-                                    <Badge
-                                      variant="secondary"
-                                      className="text-[10px] px-1.5 py-0 h-4 bg-slate-100 text-slate-500 border-0"
-                                    >
-                                      {getEntityBadgeLabel(notification.entityType)}
-                                    </Badge>
-                                  )}
-                                  {notification.actorName && (
-                                    <div className="flex items-center gap-1">
-                                      <Avatar className="h-4 w-4">
-                                        <AvatarFallback className="text-[9px] bg-slate-200 text-slate-600">
-                                          {notification.actorName
-                                            .split(" ")
-                                            .map((n) => n[0])
-                                            .join("")
-                                            .toUpperCase()
-                                            .slice(0, 2)}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                      <span className="text-xs text-slate-400">
-                                        {notification.actorName}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {!notification.isRead && (
-                                <div className="flex-shrink-0 mt-1.5">
-                                  <div
-                                    className="h-2 w-2 rounded-full"
-                                    style={{ backgroundColor: "#711419" }}
-                                  />
+                                  {getEntityBadgeLabel(n.entityType)}
+                                </Badge>
+                              )}
+                              {n.actorName && (
+                                <div className="flex items-center gap-1">
+                                  <Avatar className="h-4 w-4">
+                                    <AvatarFallback className="text-[9px] bg-slate-200 text-slate-600">
+                                      {n.actorName
+                                        .split(" ")
+                                        .map((s) => s[0])
+                                        .join("")
+                                        .toUpperCase()
+                                        .slice(0, 2)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span className="text-xs text-slate-400">{n.actorName}</span>
                                 </div>
                               )}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
 
+                          {/* Unread dot */}
+                          {!n.isRead && (
+                            <div className="flex-shrink-0 mt-2">
+                              <div
+                                className="h-2 w-2 rounded-full"
+                                style={{ backgroundColor: "#711419" }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </CrmLayout>
   );
