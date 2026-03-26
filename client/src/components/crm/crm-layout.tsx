@@ -300,6 +300,7 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
 
   const { data: notificationCount } = useQuery<{ count: number }>({
     queryKey: ["/api/crm/notifications/unread-count"],
+    refetchInterval: 10000,
   });
 
   return (

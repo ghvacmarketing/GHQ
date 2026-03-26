@@ -73,6 +73,7 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
 
   const { data: notifications, isLoading, refetch } = useQuery<Notification[]>({
     queryKey: [`/api/crm/notifications?${queryParams.toString()}`],
+    refetchInterval: 10000,
   });
 
   const markAsReadMutation = useMutation({

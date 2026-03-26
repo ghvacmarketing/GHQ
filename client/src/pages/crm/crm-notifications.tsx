@@ -35,6 +35,7 @@ export default function CrmNotifications() {
   const { data: unreadCount } = useQuery<{ count: number }>({
     queryKey: ["/api/crm/notifications/unread-count"],
     enabled: !!currentUser,
+    refetchInterval: 10000,
   });
 
   const qp = tab === "unread" ? "?unreadOnly=true" : "";
@@ -47,6 +48,7 @@ export default function CrmNotifications() {
       return res.json();
     },
     enabled: !!currentUser,
+    refetchInterval: 10000,
   });
 
   const markReadMut = useMutation({
