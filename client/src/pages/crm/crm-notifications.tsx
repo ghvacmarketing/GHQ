@@ -93,6 +93,7 @@ export default function CrmNotifications() {
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications"] });
     queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/tagged-comments/history"] });
   };
 
   const markReadMut = useMutation({
@@ -110,6 +111,16 @@ export default function CrmNotifications() {
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => apiRequest("DELETE", `/api/crm/notifications/${id}`),
+    onSuccess: invalidateAll,
+  });
+
+  const dismissHistoryMut = useMutation({
+    mutationFn: ({ commentId, role }: { commentId: string; role: string }) => {
+      if (role === "recipient") {
+        return apiRequest("PATCH", `/api/crm/tagged-comments/${commentId}/dismiss-recipient`);
+      }
+      return apiRequest("PATCH", `/api/crm/tagged-comments/${commentId}/dismiss`);
+    },
     onSuccess: invalidateAll,
   });
 
@@ -203,7 +214,7 @@ export default function CrmNotifications() {
             ) : (
               <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 overflow-hidden mb-6">
                 {taggedHistory.map((item) => (
-                  <TaggedNoteHistoryRow key={`${item.id}-${item.role}`} item={item} currentUserId={currentUser.id} buildUrl={buildHighlightUrl} />
+                  <TaggedNoteHistoryRow key={`${item.id}-${item.role}`} item={item} currentUserId={currentUser.id} buildUrl={buildHighlightUrl} onDismiss={() => dismissHistoryMut.mutate({ commentId: item.id, role: item.role })} />
                 ))}
               </div>
             )}
@@ -255,58 +266,64 @@ export default function CrmNotifications() {
   );
 }
 
-function TaggedNoteHistoryRow({ item, currentUserId, buildUrl }: { item: TaggedCommentHistoryItem; currentUserId: string; buildUrl: (route: string, id: string) => string }) {
+function TaggedNoteHistoryRow({ item, currentUserId, buildUrl, onDismiss }: { item: TaggedCommentHistoryItem; currentUserId: string; buildUrl: (route: string, id: string) => string; onDismiss: () => void }) {
   const isSent = item.role === "author";
   const pageName = item.pageRoute.split("/").filter(Boolean).pop() || item.pageRoute;
 
   return (
-    <a
-      href={buildUrl(item.pageRoute, item.id)}
-      className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-slate-50 group"
-    >
-      <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${
-        isSent ? "bg-blue-50" : "bg-amber-50"
-      }`}>
-        {isSent ? (
-          <Send className="h-4 w-4 text-blue-500" />
-        ) : (
-          <ArrowDownLeft className="h-4 w-4 text-amber-500" />
-        )}
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="text-sm text-slate-700 truncate">
-            {isSent ? (
-              <span>You left a note</span>
-            ) : (
-              <span><span className="font-medium">{item.authorName}</span> left you a note</span>
-            )}
-          </p>
-          {item.resolved ? (
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-medium flex-shrink-0">
-              <CheckCircle2 className="h-2.5 w-2.5" />
-              Resolved
-            </span>
+    <div className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-slate-50 group">
+      <a href={buildUrl(item.pageRoute, item.id)} className="flex items-center gap-3 flex-1 min-w-0">
+        <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${
+          isSent ? "bg-blue-50" : "bg-amber-50"
+        }`}>
+          {isSent ? (
+            <Send className="h-4 w-4 text-blue-500" />
           ) : (
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-medium flex-shrink-0">
-              <Circle className="h-2.5 w-2.5" />
-              Open
-            </span>
+            <ArrowDownLeft className="h-4 w-4 text-amber-500" />
           )}
         </div>
-        <p className="text-sm text-slate-500 mt-0.5 truncate">{item.body}</p>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-xs text-slate-400">
-            {item.createdAt ? formatDistanceToNow(new Date(item.createdAt), { addSuffix: true }) : ""}
-          </span>
-          <span className="text-xs text-slate-400 flex items-center gap-0.5">
-            <ArrowUpRight className="h-3 w-3" />
-            {pageName}
-          </span>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-slate-700 truncate">
+              {isSent ? (
+                <span>You left a note</span>
+              ) : (
+                <span><span className="font-medium">{item.authorName}</span> left you a note</span>
+              )}
+            </p>
+            {item.resolved ? (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-medium flex-shrink-0">
+                <CheckCircle2 className="h-2.5 w-2.5" />
+                Resolved
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-medium flex-shrink-0">
+                <Circle className="h-2.5 w-2.5" />
+                Open
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-slate-500 mt-0.5 truncate">{item.body}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs text-slate-400">
+              {item.createdAt ? formatDistanceToNow(new Date(item.createdAt), { addSuffix: true }) : ""}
+            </span>
+            <span className="text-xs text-slate-400 flex items-center gap-0.5">
+              <ArrowUpRight className="h-3 w-3" />
+              {pageName}
+            </span>
+          </div>
         </div>
-      </div>
-    </a>
+      </a>
+      <button
+        onClick={(e) => { e.stopPropagation(); onDismiss(); }}
+        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-all flex-shrink-0"
+        title="Dismiss"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
   );
 }
 

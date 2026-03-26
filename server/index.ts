@@ -152,6 +152,7 @@ async function runTaggedCommentMigrations() {
     const { sql } = await import("drizzle-orm");
     await db.execute(sql`ALTER TABLE crm_tagged_comments ADD COLUMN IF NOT EXISTS author_dismissed boolean NOT NULL DEFAULT false`);
     await db.execute(sql`ALTER TABLE crm_tagged_comment_recipients ADD COLUMN IF NOT EXISTS resolved_by_id varchar`);
+    await db.execute(sql`ALTER TABLE crm_tagged_comment_recipients ADD COLUMN IF NOT EXISTS dismissed boolean NOT NULL DEFAULT false`);
   } catch (err) {
     console.error("Tagged comment migration error (non-fatal):", err);
   }

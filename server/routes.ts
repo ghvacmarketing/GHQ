@@ -7846,12 +7846,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { id } = req.params;
-      const result = await db.delete(crmNotifications).where(
+
+      const [notif] = await db.select({
+        id: crmNotifications.id,
+        type: crmNotifications.type,
+        entityId: crmNotifications.entityId,
+        userId: crmNotifications.userId,
+      }).from(crmNotifications).where(
         and(
           eq(crmNotifications.id, id),
           eq(crmNotifications.userId, currentUser.id)
         )
       );
+
+      if (!notif) {
+        return res.json({ deleted: 0 });
+      }
+
+      if (notif.type === "tagged_comment" && notif.entityId) {
+        await db.update(crmTaggedCommentRecipients).set({ dismissed: true }).where(
+          and(
+            eq(crmTaggedCommentRecipients.commentId, notif.entityId),
+            eq(crmTaggedCommentRecipients.userId, currentUser.id)
+          )
+        );
+      }
+
+      const result = await db.delete(crmNotifications).where(eq(crmNotifications.id, id));
 
       return res.json({ deleted: result.rowCount || 0 });
     } catch (error) {
@@ -8137,6 +8158,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/crm/tagged-comments/:commentId/dismiss-recipient", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) return res.status(401).json({ message: "Unauthorized" });
+
+      const { commentId } = req.params;
+
+      await db.update(crmTaggedCommentRecipients)
+        .set({ dismissed: true })
+        .where(and(
+          eq(crmTaggedCommentRecipients.commentId, commentId),
+          eq(crmTaggedCommentRecipients.userId, currentUser.id)
+        ));
+
+      await db.delete(crmNotifications).where(
+        and(
+          eq(crmNotifications.type, "tagged_comment"),
+          eq(crmNotifications.entityId, commentId),
+          eq(crmNotifications.userId, currentUser.id)
+        )
+      );
+
+      return res.json({ dismissed: true });
+    } catch (error) {
+      console.error("Error dismissing tagged comment recipient:", error);
+      return res.status(500).json({ message: "Failed to dismiss" });
+    }
+  });
+
   app.get("/api/crm/tagged-comments/history", requireCrmAuth, async (req, res) => {
     try {
       const currentUser = await getCurrentCrmUser(req);
@@ -8156,7 +8206,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .from(crmTaggedCommentRecipients)
       .innerJoin(crmTaggedComments, eq(crmTaggedCommentRecipients.commentId, crmTaggedComments.id))
       .innerJoin(crmUsers, eq(crmTaggedComments.authorId, crmUsers.id))
-      .where(eq(crmTaggedCommentRecipients.userId, currentUser.id))
+      .where(and(
+        eq(crmTaggedCommentRecipients.userId, currentUser.id),
+        eq(crmTaggedCommentRecipients.dismissed, false)
+      ))
       .orderBy(desc(crmTaggedComments.createdAt))
       .limit(100);
 

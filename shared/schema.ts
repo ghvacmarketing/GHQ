@@ -3421,6 +3421,7 @@ export const crmTaggedCommentRecipients = pgTable("crm_tagged_comment_recipients
   resolved: boolean("resolved").notNull().default(false),
   resolvedAt: timestamp("resolved_at"),
   resolvedById: varchar("resolved_by_id"),
+  dismissed: boolean("dismissed").notNull().default(false),
   notificationId: varchar("notification_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
