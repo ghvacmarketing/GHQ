@@ -38,6 +38,7 @@ import {
   SingleTierDetailPage,
   EliteDividerPage,
   EliteBundlesPage,
+  EliteDiscountPage,
   EliteAirflowPage,
   CrawlspaceDividerPage,
   CrawlspaceTiersPage,
@@ -295,6 +296,8 @@ export default function PriceBook() {
         return <EliteDividerPage key={section.pageIndex} />;
       case "elite-bundles":
         return <EliteBundlesPage key={section.pageIndex} bundles={section.eliteCoreBundles || []} />;
+      case "elite-discount":
+        return <EliteDiscountPage key={section.pageIndex} />;
       case "elite-airflow":
         return <EliteAirflowPage key={section.pageIndex} options={section.eliteAirflowOptions || []} />;
       case "crawlspace-divider":

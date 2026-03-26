@@ -477,7 +477,7 @@ export const SingleTierDetailPage = forwardRef<HTMLDivElement, {
                   ))}
                 </div>
               )}
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{
                     background: BRAND_COLOR,
@@ -486,14 +486,15 @@ export const SingleTierDetailPage = forwardRef<HTMLDivElement, {
                     fontWeight: 700,
                     padding: "2px 8px",
                     borderRadius: 4,
+                    flexShrink: 0,
                   }}>
                     {pkg.packageLevel}
                   </span>
                 </div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#222", marginTop: 3 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#222", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {pkg.outdoorName || `${pkg.packageLevel} System`}
                 </div>
-                <div style={{ fontSize: 9, color: "#888", marginTop: 1 }}>
+                <div style={{ fontSize: 9, color: "#888", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {pkg.indoorHeatName || pkg.outdoorModel || ""}
                 </div>
               </div>
@@ -623,6 +624,109 @@ export const EliteBundlesPage = forwardRef<HTMLDivElement, { bundles: EliteBundl
   );
 });
 EliteBundlesPage.displayName = "EliteBundlesPage";
+
+export const EliteDiscountPage = forwardRef<HTMLDivElement, object>((_, ref) => (
+  <PageWrapper ref={ref}>
+    <div style={{
+      background: BRAND_COLOR,
+      padding: "12px 20px",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+    }}>
+      <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>Elite Bundle Savings</div>
+      <div style={{ color: "rgba(255,215,0,0.8)", fontSize: 11, fontWeight: 600 }}>How the 20% Discount Works</div>
+    </div>
+
+    <div style={{ flex: 1, padding: "20px 24px", overflow: "hidden" }}>
+      <div style={{
+        background: "linear-gradient(135deg, #fef9e7 0%, #fdf2d1 100%)",
+        border: "2px solid #e8c84a",
+        borderRadius: 10,
+        padding: "16px 20px",
+        marginBottom: 20,
+      }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#7a5c00", marginBottom: 4 }}>
+          20% Off Your Entire System
+        </div>
+        <div style={{ fontSize: 11, color: "#6b5000", lineHeight: 1.6 }}>
+          When you add any Elite bundle to your HVAC system purchase, you receive a <b>20% discount</b> on the total package price. This applies to every system type — Split Gas Air, Heat Pump, Dual Fuel, Package Units, Mini-Splits, and more.
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#111", marginBottom: 10 }}>
+          Example Scenario
+        </div>
+        <div style={{
+          border: "1px solid #e0e0e0",
+          borderRadius: 8,
+          overflow: "hidden",
+        }}>
+          <div style={{ padding: "10px 16px", background: "#f8f8f8", borderBottom: "1px solid #e0e0e0" }}>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Customer selects:</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#222" }}>Split Gas Air — Premium — 3 Ton "Better" Package</div>
+          </div>
+          <div style={{ padding: "12px 16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+              <span style={{ fontSize: 11, color: "#555" }}>System price</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#333" }}>$15,200</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+              <span style={{ fontSize: 11, color: "#555" }}>+ Elite Indoor Air Quality Bundle</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#333" }}>$4,500</span>
+            </div>
+            <div style={{ borderTop: "1px dashed #ddd", paddingTop: 8, display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 11, color: "#555" }}>Subtotal before discount</span>
+              <span style={{ fontSize: 12, color: "#888", textDecoration: "line-through" }}>$19,700</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: "#1a6b3c" }}>20% Elite Bundle Discount</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#1a6b3c" }}>-$3,040</span>
+            </div>
+            <div style={{
+              borderTop: "2px solid #111",
+              paddingTop: 8,
+              display: "flex",
+              justifyContent: "space-between",
+            }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#111" }}>Final Investment</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: BRAND_COLOR }}>$16,660</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{
+        background: "#f0fdf4",
+        border: "1px solid #bbf7d0",
+        borderRadius: 8,
+        padding: "12px 16px",
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#166534", marginBottom: 6 }}>
+          Why Go Elite?
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+          {[
+            "Premium indoor air quality",
+            "Extended equipment life",
+            "Lower energy bills",
+            "20% system discount",
+            "Whole-home comfort",
+            "Priority service status",
+          ].map((item, i) => (
+            <div key={i} style={{ fontSize: 10, color: "#15803d", display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ color: "#22c55e", fontWeight: 700 }}>✓</span> {item}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    <div style={{ height: 3, background: BRAND_COLOR }} />
+  </PageWrapper>
+));
+EliteDiscountPage.displayName = "EliteDiscountPage";
 
 export const EliteAirflowPage = forwardRef<HTMLDivElement, { options: EliteAirflowOption[] }>(({ options }, ref) => {
   const tonnages = ["1.5", "2", "2.5", "3", "3.5", "4", "5"];
@@ -823,7 +927,7 @@ export interface EliteAirflowOption {
 }
 
 export interface SalesbookSection {
-  type: "static" | "category-divider" | "tier-header" | "product-detail" | "ducting-detail" | "elite-divider" | "elite-bundles" | "elite-airflow" | "crawlspace-divider" | "crawlspace-tiers";
+  type: "static" | "category-divider" | "tier-header" | "product-detail" | "ducting-detail" | "elite-divider" | "elite-bundles" | "elite-discount" | "elite-airflow" | "crawlspace-divider" | "crawlspace-tiers";
   label?: string;
   unitType?: string;
   tier?: string;
@@ -951,6 +1055,7 @@ export function buildSalesbookSections(
 
   sections.push({ type: "elite-divider", pageIndex: pageIndex++, label: "HVAC Elite Package" });
   sections.push({ type: "elite-bundles", eliteCoreBundles, pageIndex: pageIndex++, label: "Elite Core Bundles" });
+  sections.push({ type: "elite-discount", pageIndex: pageIndex++, label: "Elite Bundle Savings" });
   sections.push({ type: "elite-airflow", eliteAirflowOptions, pageIndex: pageIndex++, label: "Elite Airflow Options" });
 
   if (crawlspaceTiers.length > 0) {
