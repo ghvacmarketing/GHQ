@@ -8151,6 +8151,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .set({ authorDismissed: true })
         .where(eq(crmTaggedComments.id, commentId));
 
+      await db.delete(crmNotifications).where(
+        and(
+          eq(crmNotifications.type, "tagged_comment"),
+          eq(crmNotifications.entityId, commentId),
+          eq(crmNotifications.userId, currentUser.id)
+        )
+      );
+
       return res.json({ dismissed: true });
     } catch (error) {
       console.error("Error dismissing tagged comment:", error);
@@ -8223,7 +8231,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       })
       .from(crmTaggedComments)
       .innerJoin(crmUsers, eq(crmTaggedComments.authorId, crmUsers.id))
-      .where(eq(crmTaggedComments.authorId, currentUser.id))
+      .where(and(
+        eq(crmTaggedComments.authorId, currentUser.id),
+        eq(crmTaggedComments.authorDismissed, false)
+      ))
       .orderBy(desc(crmTaggedComments.createdAt))
       .limit(100);
 
