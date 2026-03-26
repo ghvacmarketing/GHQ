@@ -510,16 +510,9 @@ export function GhqSearch() {
             <button
               onClick={() => { setMenuOpen(false); setOpen(true); setMode("search"); }}
               className="w-12 h-12 rounded-full bg-slate-800 text-white shadow-lg flex items-center justify-center hover:bg-slate-700 transition-colors"
-              title="Search"
+              title="Search & AI"
             >
               <Search className="h-5 w-5" />
-            </button>
-            <button
-              onClick={() => { setMenuOpen(false); setOpen(true); setMode("help"); setTimeout(() => inputRef.current?.focus(), 50); }}
-              className="w-12 h-12 rounded-full bg-slate-800 text-white shadow-lg flex items-center justify-center hover:bg-slate-700 transition-colors"
-              title="Ask AI"
-            >
-              <HelpCircle className="h-5 w-5" />
             </button>
             <button
               onClick={() => { setMenuOpen(false); setCommentOpen(true); }}
