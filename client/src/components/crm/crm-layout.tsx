@@ -25,6 +25,7 @@ import {
   Target,
   Megaphone,
   Package,
+  BookOpen,
   Phone,
   Smartphone,
   MessageSquare,
@@ -89,6 +90,7 @@ const navSections: NavSection[] = [
     title: "Sales",
     items: [
       { label: "Lead Funnel", href: "/crm/prospect-funnel", icon: FolderKanban },
+      { label: "Salesbook", href: "/price-book", icon: BookOpen },
     ],
   },
   {
