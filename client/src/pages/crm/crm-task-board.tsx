@@ -295,7 +295,7 @@ function DroppableColumn({
     <div
       ref={setNodeRef}
       className={`
-        flex-1 min-w-[280px] max-w-[320px] flex flex-col bg-slate-50 rounded-lg
+        flex flex-col bg-slate-50 rounded-lg min-w-0
         ${isOver ? "ring-2 ring-[#711419] ring-offset-2" : ""}
       `}
     >
@@ -890,9 +890,9 @@ export default function CrmTaskBoard() {
             </Card>
 
             {tasksLoading ? (
-              <div className="flex gap-4 overflow-x-auto pb-4">
+              <div className="grid grid-cols-5 gap-3 pb-4">
                 {COLUMNS.map((col) => (
-                  <div key={col.id} className="flex-1 min-w-[280px] max-w-[320px]">
+                  <div key={col.id}>
                     <Skeleton className="h-[400px] rounded-lg" />
                   </div>
                 ))}
@@ -904,7 +904,7 @@ export default function CrmTaskBoard() {
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
               >
-                <div className="flex gap-4 overflow-x-auto pb-4">
+                <div className="grid grid-cols-5 gap-3 pb-4">
                   {COLUMNS.map((column) => (
                     <DroppableColumn
                       key={column.id}
