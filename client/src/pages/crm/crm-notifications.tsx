@@ -158,29 +158,29 @@ export default function CrmNotifications() {
           )}
         </div>
 
-        <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5 w-fit mb-4">
+        <div className="flex items-center gap-6 border-b border-slate-200 mb-6 overflow-x-auto">
           {(["unread", "all"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                tab === t ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+              className={`pb-2.5 text-sm font-medium transition-colors whitespace-nowrap border-b-2 -mb-px ${
+                tab === t
+                  ? "border-slate-900 text-slate-900"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
               }`}
             >
               {t === "unread" ? "Unread" : "All"}
             </button>
           ))}
-        </div>
-
-        <div className="flex items-center gap-1.5 flex-wrap mb-6">
+          <div className="w-px h-5 bg-slate-200 self-center" />
           {typeFilters.map((tf) => (
             <button
               key={tf.key}
               onClick={() => setTypeFilter(tf.key)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
+              className={`pb-2.5 text-sm font-medium transition-colors whitespace-nowrap border-b-2 -mb-px ${
                 typeFilter === tf.key
-                  ? "bg-slate-800 text-white border-slate-800"
-                  : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                  ? "border-slate-900 text-slate-900"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
               }`}
             >
               {tf.label}
