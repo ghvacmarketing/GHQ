@@ -370,60 +370,6 @@ export const ProductDetailPage = forwardRef<HTMLDivElement, {
 });
 ProductDetailPage.displayName = "ProductDetailPage";
 
-interface EliteBundle {
-  id: string;
-  name: string;
-  description: string;
-  priceByTonnage?: Record<string, number>;
-  fixedPrice?: number;
-  benefits: string[];
-}
-
-interface EliteAirflowOption {
-  id: string;
-  name: string;
-  description: string;
-  priceByTonnage: Record<string, number>;
-}
-
-const ELITE_CORE_BUNDLES: EliteBundle[] = [
-  {
-    id: "10yr-labor",
-    name: "10-Year Labor Warranty",
-    description: "Full labor coverage for repairs and service",
-    fixedPrice: 1000,
-    benefits: ["All labor costs covered", "No service call fees", "Factory-trained technicians", "Peace of mind protection"]
-  },
-  {
-    id: "10yr-maintenance",
-    name: "10-Year Maintenance Plan",
-    description: "Comprehensive annual maintenance for 10 years",
-    fixedPrice: 2290,
-    benefits: ["Annual system tune-ups", "Priority scheduling", "Filter replacements", "Performance optimization"]
-  },
-  {
-    id: "install-upgrade",
-    name: "Install Upgrade Bundle",
-    description: "Premium installation with Lineset + Drain + Low Voltage",
-    priceByTonnage: { "1.5": 1000, "2": 1500, "2.5": 2000, "3": 2500, "3.5": 3000, "4": 4000, "5": 5000 },
-    benefits: ["New copper lineset", "Proper condensate drainage", "Low voltage wiring upgrade", "Professional installation"]
-  }
-];
-
-const ELITE_AIRFLOW_OPTIONS: EliteAirflowOption[] = [
-  {
-    id: "new-ducting",
-    name: "New Ducting System",
-    description: "Complete duct system replacement with 10-year warranty",
-    priceByTonnage: { "1.5": 7527, "2": 9353, "2.5": 11179, "3": 13005, "3.5": 14831, "4": 16657, "5": 20309 }
-  },
-  {
-    id: "cleaning-return-insulation",
-    name: "Duct Cleaning + Return + Insulation",
-    description: "Duct cleaning, new return, and attic re-insulation",
-    priceByTonnage: { "1.5": 2245, "2": 2345, "2.5": 2850, "3": 2995, "3.5": 3450, "4": 3650, "5": 4450 }
-  }
-];
 
 export const EliteDividerPage = forwardRef<HTMLDivElement, object>((_, ref) => (
   <PageWrapper ref={ref}>
@@ -454,7 +400,7 @@ export const EliteDividerPage = forwardRef<HTMLDivElement, object>((_, ref) => (
 ));
 EliteDividerPage.displayName = "EliteDividerPage";
 
-export const EliteBundlesPage = forwardRef<HTMLDivElement, object>((_, ref) => {
+export const EliteBundlesPage = forwardRef<HTMLDivElement, { bundles: EliteBundle[] }>(({ bundles }, ref) => {
   const tonnages = ["1.5", "2", "2.5", "3", "3.5", "4", "5"];
   return (
     <PageWrapper ref={ref}>
@@ -470,11 +416,11 @@ export const EliteBundlesPage = forwardRef<HTMLDivElement, object>((_, ref) => {
       </div>
 
       <div style={{ flex: 1, padding: "12px 20px", overflow: "hidden" }}>
-        {ELITE_CORE_BUNDLES.map((bundle, idx) => (
+        {bundles.map((bundle, idx) => (
           <div key={bundle.id} style={{
             border: "1px solid #e8e8e8",
             borderRadius: 6,
-            marginBottom: idx < ELITE_CORE_BUNDLES.length - 1 ? 10 : 0,
+            marginBottom: idx < bundles.length - 1 ? 10 : 0,
             overflow: "hidden",
           }}>
             <div style={{
@@ -532,7 +478,7 @@ export const EliteBundlesPage = forwardRef<HTMLDivElement, object>((_, ref) => {
 });
 EliteBundlesPage.displayName = "EliteBundlesPage";
 
-export const EliteAirflowPage = forwardRef<HTMLDivElement, object>((_, ref) => {
+export const EliteAirflowPage = forwardRef<HTMLDivElement, { options: EliteAirflowOption[] }>(({ options }, ref) => {
   const tonnages = ["1.5", "2", "2.5", "3", "3.5", "4", "5"];
   return (
     <PageWrapper ref={ref}>
@@ -548,11 +494,11 @@ export const EliteAirflowPage = forwardRef<HTMLDivElement, object>((_, ref) => {
       </div>
 
       <div style={{ flex: 1, padding: "16px 20px", overflow: "hidden" }}>
-        {ELITE_AIRFLOW_OPTIONS.map((opt, idx) => (
+        {options.map((opt, idx) => (
           <div key={opt.id} style={{
             border: "1px solid #e8e8e8",
             borderRadius: 6,
-            marginBottom: idx < ELITE_AIRFLOW_OPTIONS.length - 1 ? 16 : 0,
+            marginBottom: idx < options.length - 1 ? 16 : 0,
             overflow: "hidden",
           }}>
             <div style={{
@@ -714,6 +660,22 @@ export const CrawlspaceTiersPage = forwardRef<HTMLDivElement, { tiers: Crawlspac
 });
 CrawlspaceTiersPage.displayName = "CrawlspaceTiersPage";
 
+export interface EliteBundle {
+  id: string;
+  name: string;
+  description: string;
+  priceByTonnage?: Record<string, number>;
+  fixedPrice?: number;
+  benefits: string[];
+}
+
+export interface EliteAirflowOption {
+  id: string;
+  name: string;
+  description: string;
+  priceByTonnage: Record<string, number>;
+}
+
 export interface SalesbookSection {
   type: "static" | "category-divider" | "tier-header" | "product-detail" | "elite-divider" | "elite-bundles" | "elite-airflow" | "crawlspace-divider" | "crawlspace-tiers";
   label?: string;
@@ -724,6 +686,8 @@ export interface SalesbookSection {
   staticSrc?: string;
   packages?: PricebookPackage[];
   crawlspaceTiers?: CrawlspaceTier[];
+  eliteCoreBundles?: EliteBundle[];
+  eliteAirflowOptions?: EliteAirflowOption[];
   pageIndex: number;
 }
 
@@ -734,6 +698,8 @@ export function buildSalesbookSections(
   staticPages: string[],
   packages: PricebookPackage[],
   crawlspaceTiers: CrawlspaceTier[],
+  eliteCoreBundles: EliteBundle[] = [],
+  eliteAirflowOptions: EliteAirflowOption[] = [],
 ): SalesbookSection[] {
   const sections: SalesbookSection[] = [];
   let pageIndex = 0;
@@ -813,8 +779,8 @@ export function buildSalesbookSections(
   }
 
   sections.push({ type: "elite-divider", pageIndex: pageIndex++, label: "HVAC Elite Package" });
-  sections.push({ type: "elite-bundles", pageIndex: pageIndex++, label: "Elite Core Bundles" });
-  sections.push({ type: "elite-airflow", pageIndex: pageIndex++, label: "Elite Airflow Options" });
+  sections.push({ type: "elite-bundles", eliteCoreBundles, pageIndex: pageIndex++, label: "Elite Core Bundles" });
+  sections.push({ type: "elite-airflow", eliteAirflowOptions, pageIndex: pageIndex++, label: "Elite Airflow Options" });
 
   if (crawlspaceTiers.length > 0) {
     sections.push({ type: "crawlspace-divider", pageIndex: pageIndex++, label: "Crawlspace Services" });

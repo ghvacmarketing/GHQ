@@ -27939,12 +27939,53 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       const { ensureSalesbookConverted } = await import("./services/salesbook-converter");
       const pageInfo = ensureSalesbookConverted();
 
+      const eliteCoreBundles = [
+        {
+          id: "10yr-labor",
+          name: "10-Year Labor Warranty",
+          description: "Full labor coverage for repairs and service",
+          fixedPrice: 1000,
+          benefits: ["All labor costs covered", "No service call fees", "Factory-trained technicians", "Peace of mind protection"]
+        },
+        {
+          id: "10yr-maintenance",
+          name: "10-Year Maintenance Plan",
+          description: "Comprehensive annual maintenance for 10 years",
+          fixedPrice: 2290,
+          benefits: ["Annual system tune-ups", "Priority scheduling", "Filter replacements", "Performance optimization"]
+        },
+        {
+          id: "install-upgrade",
+          name: "Install Upgrade Bundle",
+          description: "Premium installation with Lineset + Drain + Low Voltage",
+          priceByTonnage: { "1.5": 1000, "2": 1500, "2.5": 2000, "3": 2500, "3.5": 3000, "4": 4000, "5": 5000 },
+          benefits: ["New copper lineset", "Proper condensate drainage", "Low voltage wiring upgrade", "Professional installation"]
+        }
+      ];
+
+      const eliteAirflowOptions = [
+        {
+          id: "new-ducting",
+          name: "New Ducting System",
+          description: "Complete duct system replacement with 10-year warranty",
+          priceByTonnage: { "1.5": 7527, "2": 9353, "2.5": 11179, "3": 13005, "3.5": 14831, "4": 16657, "5": 20309 }
+        },
+        {
+          id: "cleaning-return-insulation",
+          name: "Duct Cleaning + Return + Insulation",
+          description: "Duct cleaning, new return, and attic re-insulation",
+          priceByTonnage: { "1.5": 2245, "2": 2345, "2.5": 2850, "3": 2995, "3.5": 3450, "4": 3650, "5": 4450 }
+        }
+      ];
+
       return res.json({
         staticPages: pageInfo.pages.slice(0, 12),
         pageWidth: pageInfo.pageWidth,
         pageHeight: pageInfo.pageHeight,
         packages,
         crawlspaceTiers: tiers,
+        eliteCoreBundles,
+        eliteAirflowOptions,
       });
     } catch (error) {
       console.error("Error getting salesbook data:", error);

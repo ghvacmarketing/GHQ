@@ -43,6 +43,8 @@ import {
   buildSalesbookSections,
   getSalesbookTOC,
   type SalesbookSection,
+  type EliteBundle,
+  type EliteAirflowOption,
 } from "@/components/salesbook-pages";
 
 interface SalesbookData {
@@ -51,6 +53,8 @@ interface SalesbookData {
   pageHeight: number;
   packages: PricebookPackage[];
   crawlspaceTiers: CrawlspaceTier[];
+  eliteCoreBundles: EliteBundle[];
+  eliteAirflowOptions: EliteAirflowOption[];
 }
 
 export default function PriceBook() {
@@ -74,6 +78,8 @@ export default function PriceBook() {
       salesbookData.staticPages,
       salesbookData.packages,
       salesbookData.crawlspaceTiers,
+      salesbookData.eliteCoreBundles,
+      salesbookData.eliteAirflowOptions,
     );
   }, [salesbookData]);
 
@@ -267,9 +273,9 @@ export default function PriceBook() {
       case "elite-divider":
         return <EliteDividerPage key={section.pageIndex} />;
       case "elite-bundles":
-        return <EliteBundlesPage key={section.pageIndex} />;
+        return <EliteBundlesPage key={section.pageIndex} bundles={section.eliteCoreBundles || []} />;
       case "elite-airflow":
-        return <EliteAirflowPage key={section.pageIndex} />;
+        return <EliteAirflowPage key={section.pageIndex} options={section.eliteAirflowOptions || []} />;
       case "crawlspace-divider":
         return <CrawlspaceDividerPage key={section.pageIndex} />;
       case "crawlspace-tiers":
