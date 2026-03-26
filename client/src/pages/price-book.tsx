@@ -467,7 +467,7 @@ export default function PriceBook() {
                 swipeDistance={30}
                 clickEventForward={true}
                 useMouseEvents={true}
-                renderOnlyPageLengthChange={true}
+                renderOnlyPageLengthChange={false}
               >
                 {sections.map(renderSection)}
               </HTMLFlipBook>

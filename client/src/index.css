@@ -337,10 +337,3 @@ gmp-place-autocomplete::part(input)::placeholder {
   background: transparent;
 }
 
-.flipbook-container {
-  display: flex;
-  justify-content: center;
-}
-.flipbook-container .stf__wrapper {
-  margin: 0 auto !important;
-}
