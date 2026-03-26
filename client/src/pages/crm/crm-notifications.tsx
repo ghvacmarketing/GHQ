@@ -31,12 +31,14 @@ export default function CrmNotifications() {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
-  const qp = tab === "unread" ? "?unreadOnly=true" : "";
-
   const { data: notifications = [], isLoading, refetch } = useQuery<NotificationWithActor[]>({
     queryKey: ["/api/crm/notifications", tab],
-    queryFn: async () => {
-      const res = await fetch(`/api/crm/notifications${qp}`, { credentials: "include" });
+    queryFn: async ({ queryKey }) => {
+      const currentTab = queryKey[1] as string;
+      const url = currentTab === "unread"
+        ? "/api/crm/notifications?unreadOnly=true"
+        : "/api/crm/notifications";
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
