@@ -35,7 +35,7 @@ import {
   CategoryDividerPage,
   TierHeaderPage,
   ProductDetailPage,
-  DuctingDetailPage,
+  SingleTierDetailPage,
   EliteDividerPage,
   EliteBundlesPage,
   EliteAirflowPage,
@@ -285,8 +285,9 @@ export default function PriceBook() {
         );
       case "ducting-detail":
         return (
-          <DuctingDetailPage
+          <SingleTierDetailPage
             key={section.pageIndex}
+            unitType={section.unitType!}
             packages={section.packages || []}
           />
         );

@@ -391,9 +391,29 @@ export const ProductDetailPage = forwardRef<HTMLDivElement, {
 ProductDetailPage.displayName = "ProductDetailPage";
 
 
-export const DuctingDetailPage = forwardRef<HTMLDivElement, {
+const SINGLE_TIER_CONFIG: Record<string, { title: string; subtitle: string; description: string }> = {
+  Ducting: {
+    title: "Select Duct System Size",
+    subtitle: "Choose your system size based on your home's tonnage",
+    description: "Complete duct system replacement includes removal of existing ducts, new ductwork installation, and system balancing with a 10-year workmanship guarantee.",
+  },
+  "Mini-Split": {
+    title: "Select Mini-Split Size",
+    subtitle: "Choose the right BTU capacity for your space",
+    description: "Single-zone ductless mini-split system includes outdoor condenser, indoor wall-mount unit, line set, and professional installation with a 10-year workmanship guarantee.",
+  },
+};
+
+export const SingleTierDetailPage = forwardRef<HTMLDivElement, {
+  unitType: string;
   packages: PricebookPackage[];
-}>(({ packages }, ref) => {
+}>(({ unitType, packages }, ref) => {
+  const config = SINGLE_TIER_CONFIG[unitType] || {
+    title: `Select ${UNIT_TYPE_DISPLAY[unitType]?.name || unitType} Size`,
+    subtitle: "Choose the right size for your needs",
+    description: "",
+  };
+
   const sorted = [...packages].sort((a, b) => {
     const aNum = parseFloat(a.packageLevel.replace(/[^\d.]/g, "")) || 0;
     const bNum = parseFloat(b.packageLevel.replace(/[^\d.]/g, "")) || 0;
@@ -404,87 +424,97 @@ export const DuctingDetailPage = forwardRef<HTMLDivElement, {
     <PageWrapper ref={ref}>
       <div style={{ padding: "20px 24px 8px" }}>
         <div style={{ fontSize: 16, fontWeight: 700, color: "#111" }}>
-          Select Duct System Size
+          {config.title}
         </div>
         <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>
-          Choose your system size based on your home's tonnage
+          {config.subtitle}
         </div>
       </div>
 
-      <div style={{
-        margin: "8px 20px",
-        padding: "8px 14px",
-        background: "#faf5f0",
-        border: "1px solid #e8ddd4",
-        borderRadius: 6,
-        fontSize: 9.5,
-        color: "#666",
-        lineHeight: 1.5,
-      }}>
-        Complete duct system replacement includes removal of existing ducts, new ductwork installation, and system balancing with a 10-year workmanship guarantee.
-      </div>
+      {config.description && (
+        <div style={{
+          margin: "8px 20px",
+          padding: "8px 14px",
+          background: "#faf5f0",
+          border: "1px solid #e8ddd4",
+          borderRadius: 6,
+          fontSize: 9.5,
+          color: "#666",
+          lineHeight: 1.5,
+        }}>
+          {config.description}
+        </div>
+      )}
 
       <div style={{ flex: 1, padding: "0 20px", overflow: "hidden" }}>
-        {sorted.map((pkg, idx) => (
-          <div key={pkg.id} style={{
-            display: "flex",
-            alignItems: "center",
-            padding: "10px 14px",
-            borderBottom: idx < sorted.length - 1 ? "1px solid #f0f0f0" : "none",
-            gap: 12,
-          }}>
-            {pkg.outdoorImageUrl && (
-              <img
-                src={pkg.outdoorImageUrl.startsWith("/") ? pkg.outdoorImageUrl : `/assets/${pkg.outdoorImageUrl}`}
-                alt=""
-                style={{
-                  width: 48,
-                  height: 48,
-                  objectFit: "contain",
-                  borderRadius: 6,
-                  background: "#f9f9f9",
-                  flexShrink: 0,
-                }}
-                loading="lazy"
-              />
-            )}
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{
-                  background: BRAND_COLOR,
-                  color: "#fff",
-                  fontSize: 9,
-                  fontWeight: 700,
-                  padding: "2px 8px",
-                  borderRadius: 4,
-                }}>
-                  {pkg.packageLevel}
-                </span>
+        {sorted.map((pkg, idx) => {
+          const images = [pkg.outdoorImageUrl, pkg.furnaceImageUrl].filter(Boolean);
+          return (
+            <div key={pkg.id} style={{
+              display: "flex",
+              alignItems: "center",
+              padding: "10px 14px",
+              borderBottom: idx < sorted.length - 1 ? "1px solid #f0f0f0" : "none",
+              gap: 12,
+            }}>
+              {images.length > 0 && (
+                <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                  {images.map((url, i) => (
+                    <img
+                      key={i}
+                      src={url!.startsWith("/") ? url! : `/assets/${url}`}
+                      alt=""
+                      style={{
+                        width: 44,
+                        height: 44,
+                        objectFit: "contain",
+                        borderRadius: 6,
+                        background: "#f9f9f9",
+                        border: "1px solid #eee",
+                      }}
+                      loading="lazy"
+                    />
+                  ))}
+                </div>
+              )}
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{
+                    background: BRAND_COLOR,
+                    color: "#fff",
+                    fontSize: 9,
+                    fontWeight: 700,
+                    padding: "2px 8px",
+                    borderRadius: 4,
+                  }}>
+                    {pkg.packageLevel}
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#222", marginTop: 3 }}>
+                  {pkg.outdoorName || `${pkg.packageLevel} System`}
+                </div>
+                <div style={{ fontSize: 9, color: "#888", marginTop: 1 }}>
+                  {pkg.indoorHeatName || pkg.outdoorModel || ""}
+                </div>
               </div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#222", marginTop: 3 }}>
-                {pkg.outdoorName || `Complete ${pkg.packageLevel} Duct System Replacement`}
-              </div>
-              <div style={{ fontSize: 9, color: "#888", marginTop: 1 }}>
-                New insulated ducts, registers, test & balance, 10-year guarantee
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#111" }}>
+                  {formatCents(pkg.totalInvestment)}
+                </div>
+                <div style={{ fontSize: 10, color: "#888" }}>
+                  {formatCentsMonthly(pkg.monthlyPayment)}/mo
+                </div>
               </div>
             </div>
-            <div style={{ textAlign: "right", flexShrink: 0 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#111" }}>
-                {formatCents(pkg.totalInvestment)}
-              </div>
-              <div style={{ fontSize: 10, color: "#888" }}>
-                {formatCentsMonthly(pkg.monthlyPayment)}/mo
-              </div>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div style={{ height: 3, background: BRAND_COLOR }} />
     </PageWrapper>
   );
 });
-DuctingDetailPage.displayName = "DuctingDetailPage";
+SingleTierDetailPage.displayName = "SingleTierDetailPage";
 
 
 export const EliteDividerPage = forwardRef<HTMLDivElement, object>((_, ref) => (
@@ -843,7 +873,8 @@ export function buildSalesbookSections(
     const unitDisplay = UNIT_TYPE_DISPLAY[unitType]?.name || unitType;
     const heroImg = typePackages.find(p => p.outdoorImageUrl)?.outdoorImageUrl || undefined;
 
-    if (unitType === "Ducting") {
+    const isSingleTier = unitType === "Ducting" || unitType === "Mini-Split";
+    if (isSingleTier) {
       sections.push({
         type: "category-divider",
         unitType,
@@ -858,7 +889,7 @@ export function buildSalesbookSections(
         unitType,
         packages: typePackages,
         pageIndex: pageIndex++,
-        label: "Duct System Sizing",
+        label: `${unitDisplay} Sizing`,
       });
       continue;
     }
