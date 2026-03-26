@@ -680,9 +680,11 @@ The Salesbook (URL: /price-book) is a digital, interactive flipbook that sales r
 - Zoom controls for in-home presentations on tablets
 - Page flip animation for natural book-like feel
 
-### Salesbook Bookmarks
-- Admins can manage bookmarks in Settings > Salesbook Bookmarks
-- Bookmarks allow quick jumps to specific sections
+### Salesbook Directory
+- Admins manage the table of contents in Settings > Salesbook Directory
+- Each entry has a section name and page number
+- Entries can be reordered by dragging, edited inline, or removed
+- The directory entries appear as the "Contents" panel in the salesbook viewer
 
 ### Important
 - The salesbook is public-facing (no login required) — designed for sales reps to show customers
@@ -991,7 +993,7 @@ The Settings page at /crm/settings contains these sub-sections:
 **Data & System**
 - **Import Data** — import customer or equipment data from CSV
 - **Fleet Tracking** — Bouncie GPS vehicle tracking integration
-- **Salesbook Bookmarks** — manage quick-jump bookmarks for the digital salesbook
+- **Salesbook Directory** — manage the table of contents entries for the digital salesbook
 - **System Tools** — system-level configuration and utilities
 
 ### Public-facing pages (outside the CRM)

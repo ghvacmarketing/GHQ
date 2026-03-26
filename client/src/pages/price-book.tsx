@@ -29,7 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import MobileNav from "@/components/mobile-nav";
 import redlogo from "@assets/redlogo.webp";
-import type { PricebookPackage, CrawlspaceTier } from "@shared/schema";
+import type { PricebookPackage, CrawlspaceTier, SalesbookBookmark } from "@shared/schema";
 import {
   StaticPageImage,
   CategoryDividerPage,
@@ -72,6 +72,10 @@ export default function PriceBook() {
     queryKey: ["/api/salesbook/data"],
   });
 
+  const { data: bookmarks = [] } = useQuery<SalesbookBookmark[]>({
+    queryKey: ["/api/salesbook/bookmarks"],
+  });
+
   const sections = useMemo(() => {
     if (!salesbookData) return [];
     return buildSalesbookSections(
@@ -83,7 +87,14 @@ export default function PriceBook() {
     );
   }, [salesbookData]);
 
-  const toc = useMemo(() => getSalesbookTOC(sections), [sections]);
+  const toc = useMemo(() => {
+    if (bookmarks.length > 0) {
+      return bookmarks
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((b) => ({ label: b.label, page: b.pageNumber }));
+    }
+    return getSalesbookTOC(sections);
+  }, [bookmarks, sections]);
   const totalPages = sections.length;
 
   useEffect(() => {
@@ -366,61 +377,45 @@ export default function PriceBook() {
 
       <div className="flex-1 flex overflow-hidden relative">
         {showBookmarks && (
-          <div className="w-64 bg-neutral-800 border-r border-neutral-700 flex flex-col flex-shrink-0 absolute sm:relative z-20 h-full">
-            <div className="flex items-center justify-between p-3 border-b border-neutral-700">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-4 w-4 text-amber-400" />
-                <span className="text-sm font-semibold">Contents</span>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
+          <div className="w-56 bg-neutral-900/95 backdrop-blur-sm border-r border-neutral-800 flex flex-col flex-shrink-0 absolute sm:relative z-20 h-full">
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-xs font-medium tracking-widest uppercase text-neutral-500">Contents</span>
+              <button
                 onClick={() => setShowBookmarks(false)}
-                className="text-neutral-400 hover:text-white hover:bg-neutral-700 h-6 w-6"
+                className="text-neutral-600 hover:text-neutral-300 transition-colors"
               >
-                <X className="h-3 w-3" />
-              </Button>
+                <X className="h-3.5 w-3.5" />
+              </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-2">
+            <div className="flex-1 overflow-y-auto px-2 pb-4">
               {toc.length === 0 ? (
-                <p className="text-xs text-neutral-500 p-2">Loading contents...</p>
+                <p className="text-xs text-neutral-600 px-2 py-4">Loading...</p>
               ) : (
-                <ul className="space-y-0.5">
-                  <li>
-                    <button
-                      className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                        currentPage < (salesbookData?.staticPages.length || 12)
-                          ? "bg-amber-600/20 text-amber-400"
-                          : "text-neutral-300 hover:bg-neutral-700 hover:text-white"
-                      }`}
-                      onClick={() => {
-                        goToPage(0);
-                        if (isMobile) setShowBookmarks(false);
-                      }}
-                    >
-                      <span className="block truncate">Introduction</span>
-                      <span className="text-xs text-neutral-500">Page 1</span>
-                    </button>
-                  </li>
-                  {toc.map((entry, idx) => (
-                    <li key={idx}>
+                <div className="space-y-px">
+                  {toc.map((entry, idx) => {
+                    const isActive = currentPage + 1 >= entry.page &&
+                      (idx === toc.length - 1 || currentPage + 1 < toc[idx + 1].page);
+                    return (
                       <button
-                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                          currentPage + 1 === entry.page
-                            ? "bg-amber-600/20 text-amber-400"
-                            : "text-neutral-300 hover:bg-neutral-700 hover:text-white"
+                        key={idx}
+                        className={`w-full text-left px-3 py-2.5 rounded transition-all ${
+                          isActive
+                            ? "text-white bg-neutral-800"
+                            : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50"
                         }`}
                         onClick={() => {
                           goToPage(entry.page - 1);
                           if (isMobile) setShowBookmarks(false);
                         }}
                       >
-                        <span className="block truncate">{entry.label}</span>
-                        <span className="text-xs text-neutral-500">Page {entry.page}</span>
+                        <span className="block text-sm truncate">{entry.label}</span>
+                        <span className="text-[10px] text-neutral-600 mt-0.5 block">
+                          {entry.page}
+                        </span>
                       </button>
-                    </li>
-                  ))}
-                </ul>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>

@@ -64,7 +64,7 @@ const sections: SettingsSection[] = [
     items: [
       { name: "Import Data", href: "/crm/settings/import", icon: Upload },
       { name: "Fleet Tracking", href: "/crm/settings/fleet", icon: Truck },
-      { name: "Salesbook Bookmarks", href: "/crm/settings/salesbook", icon: BookOpen },
+      { name: "Salesbook Directory", href: "/crm/settings/salesbook", icon: BookOpen },
       { name: "System Tools", href: "/crm/settings/system-tools", icon: Wrench },
     ],
   },
