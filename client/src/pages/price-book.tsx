@@ -1,14 +1,17 @@
-import { useState, useEffect, useRef, useCallback, forwardRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import HTMLFlipBook from "react-pageflip";
 
 interface FlipBookRef {
   pageFlip(): {
     flip(page: number): void;
+    flipNext(): void;
+    flipPrev(): void;
     getCurrentPageIndex(): number;
     getPageCount(): number;
   } | null;
 }
+
 import {
   Settings,
   ChevronLeft,
@@ -26,30 +29,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import MobileNav from "@/components/mobile-nav";
 import redlogo from "@assets/redlogo.webp";
-import type { SalesbookBookmark } from "@shared/schema";
+import type { PricebookPackage, CrawlspaceTier } from "@shared/schema";
+import {
+  StaticPageImage,
+  CategoryDividerPage,
+  TierHeaderPage,
+  ProductDetailPage,
+  EliteDividerPage,
+  EliteBundlesPage,
+  EliteAirflowPage,
+  CrawlspaceDividerPage,
+  CrawlspaceTiersPage,
+  buildSalesbookSections,
+  getSalesbookTOC,
+  type SalesbookSection,
+} from "@/components/salesbook-pages";
 
-interface SalesbookPageInfo {
-  totalPages: number;
+interface SalesbookData {
+  staticPages: string[];
   pageWidth: number;
   pageHeight: number;
-  pages: string[];
+  packages: PricebookPackage[];
+  crawlspaceTiers: CrawlspaceTier[];
 }
-
-const PageImage = forwardRef<HTMLDivElement, { src: string; pageNum: number }>(
-  ({ src, pageNum }, ref) => {
-    return (
-      <div ref={ref} className="page-content">
-        <img
-          src={src}
-          alt={`Page ${pageNum}`}
-          style={{ width: "100%", height: "100%", objectFit: "contain" }}
-          loading="lazy"
-        />
-      </div>
-    );
-  }
-);
-PageImage.displayName = "PageImage";
 
 export default function PriceBook() {
   const [currentPage, setCurrentPage] = useState(0);
@@ -62,13 +64,21 @@ export default function PriceBook() {
   const viewerRef = useRef<HTMLDivElement>(null);
   const flipBookRef = useRef<FlipBookRef>(null);
 
-  const { data: pageInfo, isLoading: pagesLoading } = useQuery<SalesbookPageInfo>({
-    queryKey: ["/api/salesbook/pages"],
+  const { data: salesbookData, isLoading } = useQuery<SalesbookData>({
+    queryKey: ["/api/salesbook/data"],
   });
 
-  const { data: bookmarks = [] } = useQuery<SalesbookBookmark[]>({
-    queryKey: ["/api/salesbook/bookmarks"],
-  });
+  const sections = useMemo(() => {
+    if (!salesbookData) return [];
+    return buildSalesbookSections(
+      salesbookData.staticPages,
+      salesbookData.packages,
+      salesbookData.crawlspaceTiers,
+    );
+  }, [salesbookData]);
+
+  const toc = useMemo(() => getSalesbookTOC(sections), [sections]);
+  const totalPages = sections.length;
 
   useEffect(() => {
     const updateSize = () => {
@@ -97,15 +107,15 @@ export default function PriceBook() {
 
   const goToPage = useCallback(
     (pageNum: number) => {
-      if (!pageInfo) return;
-      const p = Math.max(0, Math.min(pageNum, pageInfo.totalPages - 1));
+      if (totalPages === 0) return;
+      const p = Math.max(0, Math.min(pageNum, totalPages - 1));
       if (flipBookRef.current) {
-        flipBookRef.current.pageFlip().flip(p);
+        flipBookRef.current.pageFlip()?.flip(p);
       }
       setCurrentPage(p);
       setPageInput(String(p + 1));
     },
-    [pageInfo]
+    [totalPages]
   );
 
   const handlePageInputSubmit = () => {
@@ -130,10 +140,10 @@ export default function PriceBook() {
       if (e.target instanceof HTMLInputElement) return;
       if (e.key === "ArrowRight" || e.key === "ArrowDown") {
         e.preventDefault();
-        if (flipBookRef.current) flipBookRef.current.pageFlip().flipNext();
+        flipBookRef.current?.pageFlip()?.flipNext();
       } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
         e.preventDefault();
-        if (flipBookRef.current) flipBookRef.current.pageFlip().flipPrev();
+        flipBookRef.current?.pageFlip()?.flipPrev();
       } else if (e.key === "+" || e.key === "=") {
         zoomIn();
       } else if (e.key === "-") {
@@ -194,12 +204,12 @@ export default function PriceBook() {
     };
   }, [scale]);
 
-  const bookPanelWidth = showBookmarks ? 256 : 0;
-  const availWidth = containerSize.w - bookPanelWidth - 32;
-  const availHeight = containerSize.h - 16;
   const isMobile = containerSize.w < 640;
+  const bookPanelWidth = showBookmarks && !isMobile ? 256 : 0;
+  const availWidth = Math.max(containerSize.w - bookPanelWidth - 32, 200);
+  const availHeight = containerSize.h - 16;
 
-  const aspectRatio = pageInfo ? pageInfo.pageHeight / pageInfo.pageWidth : 1.294;
+  const aspectRatio = salesbookData ? salesbookData.pageHeight / salesbookData.pageWidth : 1.294;
   let pageW: number;
   let pageH: number;
 
@@ -219,8 +229,55 @@ export default function PriceBook() {
     }
   }
 
-  pageW = Math.floor(pageW * scale);
-  pageH = Math.floor(pageH * scale);
+  pageW = Math.max(Math.floor(pageW * scale), 200);
+  pageH = Math.max(Math.floor(pageH * scale), 260);
+
+  const renderSection = (section: SalesbookSection) => {
+    switch (section.type) {
+      case "static":
+        return <StaticPageImage key={section.pageIndex} src={section.staticSrc!} pageNum={section.pageIndex + 1} />;
+      case "category-divider":
+        return (
+          <CategoryDividerPage
+            key={section.pageIndex}
+            unitType={section.unitType!}
+            tierCount={section.tierCount || 0}
+            packageCount={section.packages?.length || 0}
+          />
+        );
+      case "tier-header":
+        return (
+          <TierHeaderPage
+            key={section.pageIndex}
+            unitType={section.unitType!}
+            tier={section.tier!}
+            packages={section.packages || []}
+          />
+        );
+      case "product-detail":
+        return (
+          <ProductDetailPage
+            key={section.pageIndex}
+            unitType={section.unitType!}
+            tier={section.tier!}
+            tonnage={section.tonnage!}
+            packages={section.packages || []}
+          />
+        );
+      case "elite-divider":
+        return <EliteDividerPage key={section.pageIndex} />;
+      case "elite-bundles":
+        return <EliteBundlesPage key={section.pageIndex} />;
+      case "elite-airflow":
+        return <EliteAirflowPage key={section.pageIndex} />;
+      case "crawlspace-divider":
+        return <CrawlspaceDividerPage key={section.pageIndex} />;
+      case "crawlspace-tiers":
+        return <CrawlspaceTiersPage key={section.pageIndex} tiers={section.crawlspaceTiers || []} />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <div
@@ -318,29 +375,41 @@ export default function PriceBook() {
               </Button>
             </div>
             <div className="flex-1 overflow-y-auto p-2">
-              {bookmarks.length === 0 ? (
-                <p className="text-xs text-neutral-500 p-2">
-                  No bookmarks yet. Add them from CRM Settings.
-                </p>
+              {toc.length === 0 ? (
+                <p className="text-xs text-neutral-500 p-2">Loading contents...</p>
               ) : (
                 <ul className="space-y-0.5">
-                  {bookmarks.map((bm) => (
-                    <li key={bm.id}>
+                  <li>
+                    <button
+                      className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                        currentPage < (salesbookData?.staticPages.length || 12)
+                          ? "bg-amber-600/20 text-amber-400"
+                          : "text-neutral-300 hover:bg-neutral-700 hover:text-white"
+                      }`}
+                      onClick={() => {
+                        goToPage(0);
+                        if (isMobile) setShowBookmarks(false);
+                      }}
+                    >
+                      <span className="block truncate">Introduction</span>
+                      <span className="text-xs text-neutral-500">Page 1</span>
+                    </button>
+                  </li>
+                  {toc.map((entry, idx) => (
+                    <li key={idx}>
                       <button
                         className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                          currentPage + 1 === bm.pageNumber
+                          currentPage + 1 === entry.page
                             ? "bg-amber-600/20 text-amber-400"
                             : "text-neutral-300 hover:bg-neutral-700 hover:text-white"
                         }`}
                         onClick={() => {
-                          goToPage(bm.pageNumber - 1);
+                          goToPage(entry.page - 1);
                           if (isMobile) setShowBookmarks(false);
                         }}
                       >
-                        <span className="block truncate">{bm.label}</span>
-                        <span className="text-xs text-neutral-500">
-                          Page {bm.pageNumber}
-                        </span>
+                        <span className="block truncate">{entry.label}</span>
+                        <span className="text-xs text-neutral-500">Page {entry.page}</span>
                       </button>
                     </li>
                   ))}
@@ -354,12 +423,12 @@ export default function PriceBook() {
           ref={containerRef}
           className="flex-1 overflow-auto flex justify-center items-center"
         >
-          {pagesLoading ? (
+          {isLoading ? (
             <div className="flex flex-col items-center justify-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
               <p className="text-sm text-neutral-400">Loading salesbook...</p>
             </div>
-          ) : pageInfo && pageInfo.pages.length > 0 ? (
+          ) : sections.length > 0 ? (
             <div style={{ transform: `scale(1)`, transformOrigin: 'center center' }}>
               <HTMLFlipBook
                 ref={flipBookRef}
@@ -388,9 +457,7 @@ export default function PriceBook() {
                 useMouseEvents={true}
                 renderOnlyPageLengthChange={false}
               >
-                {pageInfo.pages.map((src, idx) => (
-                  <PageImage key={idx} src={src} pageNum={idx + 1} />
-                ))}
+                {sections.map(renderSection)}
               </HTMLFlipBook>
             </div>
           ) : (
@@ -424,14 +491,14 @@ export default function PriceBook() {
               onKeyDown={(e) => e.key === "Enter" && handlePageInputSubmit()}
               className="w-12 h-7 text-center bg-neutral-700 border-neutral-600 text-white text-sm p-0"
             />
-            <span className="text-neutral-400">of {pageInfo?.totalPages || "..."}</span>
+            <span className="text-neutral-400">of {totalPages || "..."}</span>
           </div>
 
           <Button
             variant="ghost"
             size="icon"
             onClick={() => flipBookRef.current?.pageFlip()?.flipNext()}
-            disabled={pageInfo ? currentPage >= pageInfo.totalPages - 1 : true}
+            disabled={totalPages > 0 ? currentPage >= totalPages - 1 : true}
             className="text-white hover:bg-neutral-700 h-8 w-8 disabled:opacity-30"
           >
             <ChevronRight className="h-5 w-5" />

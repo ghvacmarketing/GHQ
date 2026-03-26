@@ -27926,6 +27926,32 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  app.get("/api/salesbook/data", async (req, res) => {
+    try {
+      const packages = await db.select().from(pricebookPackages)
+        .where(eq(pricebookPackages.isActive, true))
+        .orderBy(asc(pricebookPackages.unitType), asc(pricebookPackages.tier), asc(pricebookPackages.tonnage));
+
+      const tiers = await db.select().from(crawlspaceTiers)
+        .where(eq(crawlspaceTiers.isActive, true))
+        .orderBy(asc(crawlspaceTiers.milThickness));
+
+      const { ensureSalesbookConverted } = await import("./services/salesbook-converter");
+      const pageInfo = ensureSalesbookConverted();
+
+      return res.json({
+        staticPages: pageInfo.pages.slice(0, 12),
+        pageWidth: pageInfo.pageWidth,
+        pageHeight: pageInfo.pageHeight,
+        packages,
+        crawlspaceTiers: tiers,
+      });
+    } catch (error) {
+      console.error("Error getting salesbook data:", error);
+      return res.status(500).json({ message: "Failed to load salesbook data" });
+    }
+  });
+
   const httpServer = createServer(app);
   // Defer expensive startup operations to run after server is ready (allows health checks to pass)
   setTimeout(() => {

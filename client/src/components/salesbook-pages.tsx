@@ -1,0 +1,835 @@
+import { forwardRef } from "react";
+import type { PricebookPackage, CrawlspaceTier } from "@shared/schema";
+
+const BRAND_COLOR = "#711419";
+const BRAND_COLOR_LIGHT = "#8a1a20";
+
+interface PageProps {
+  children?: React.ReactNode;
+}
+
+const PageWrapper = forwardRef<HTMLDivElement, PageProps>(({ children }, ref) => (
+  <div ref={ref} className="page-content" style={{ width: "100%", height: "100%", overflow: "hidden" }}>
+    <div style={{
+      width: "100%",
+      height: "100%",
+      background: "#ffffff",
+      display: "flex",
+      flexDirection: "column",
+      fontFamily: "'Inter', 'Helvetica Neue', Arial, sans-serif",
+      position: "relative",
+    }}>
+      {children}
+    </div>
+  </div>
+));
+PageWrapper.displayName = "PageWrapper";
+
+export const StaticPageImage = forwardRef<HTMLDivElement, { src: string; pageNum: number }>(
+  ({ src, pageNum }, ref) => (
+    <div ref={ref} className="page-content">
+      <img
+        src={src}
+        alt={`Page ${pageNum}`}
+        style={{ width: "100%", height: "100%", objectFit: "contain" }}
+        loading="lazy"
+      />
+    </div>
+  )
+);
+StaticPageImage.displayName = "StaticPageImage";
+
+function formatCents(cents: number): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(cents / 100);
+}
+
+function formatCentsMonthly(cents: number): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(cents / 100);
+}
+
+const UNIT_TYPE_DISPLAY: Record<string, { name: string; tagline: string }> = {
+  SGA: { name: "Split Gas Air", tagline: "Reliable heating & cooling for year-round comfort" },
+  SHP: { name: "Split Heat Pump", tagline: "All-electric efficiency with smart climate control" },
+  STA: { name: "Dual Fuel System", tagline: "Heat pump + gas furnace for maximum efficiency" },
+  GP: { name: "Gas Package Unit", tagline: "All-in-one gas/electric packaged solution" },
+  PHP: { name: "Package Heat Pump", tagline: "All-in-one packaged heat pump unit" },
+  "Mini-Split": { name: "Mini-Split", tagline: "Ductless single-zone heating & cooling" },
+  Ducting: { name: "Duct System", tagline: "Complete duct system replacement" },
+};
+
+const TIER_DISPLAY: Record<string, string> = {
+  Essential: "Standard efficiency, reliable performance",
+  Premium: "High efficiency, enhanced comfort features",
+  Ultimate: "Top-tier efficiency, maximum comfort",
+  Packaged: "All-in-one packaged unit solution",
+  Standard: "Single-zone ductless system",
+};
+
+const LEVEL_COLORS: Record<string, string> = {
+  Best: "#1a6b3c",
+  Better: "#1a5a8a",
+  Good: "#6b5a1a",
+  Budget: "#5a5a5a",
+};
+
+export const CategoryDividerPage = forwardRef<HTMLDivElement, {
+  unitType: string;
+  tierCount: number;
+  packageCount: number;
+}>(({ unitType, tierCount, packageCount }, ref) => {
+  const info = UNIT_TYPE_DISPLAY[unitType] || { name: unitType, tagline: "" };
+  return (
+    <PageWrapper ref={ref}>
+      <div style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        background: `linear-gradient(160deg, ${BRAND_COLOR} 0%, #1a1a1a 60%, #0d0d0d 100%)`,
+        padding: "10%",
+        textAlign: "center",
+      }}>
+        <div style={{
+          width: 80,
+          height: 3,
+          background: "rgba(255,255,255,0.3)",
+          marginBottom: 32,
+        }} />
+        <h1 style={{
+          color: "#ffffff",
+          fontSize: "clamp(24px, 4vw, 42px)",
+          fontWeight: 700,
+          letterSpacing: "-0.02em",
+          lineHeight: 1.1,
+          marginBottom: 16,
+        }}>
+          {info.name}
+        </h1>
+        <p style={{
+          color: "rgba(255,255,255,0.65)",
+          fontSize: "clamp(12px, 1.8vw, 16px)",
+          fontWeight: 400,
+          lineHeight: 1.5,
+          maxWidth: "80%",
+          marginBottom: 40,
+        }}>
+          {info.tagline}
+        </p>
+        <div style={{
+          display: "flex",
+          gap: 32,
+          color: "rgba(255,255,255,0.5)",
+          fontSize: "clamp(10px, 1.4vw, 13px)",
+          textTransform: "uppercase",
+          letterSpacing: "0.1em",
+        }}>
+          <span>{tierCount} {tierCount === 1 ? "Tier" : "Tiers"}</span>
+          <span>•</span>
+          <span>{packageCount} {packageCount === 1 ? "Package" : "Packages"}</span>
+        </div>
+        <div style={{
+          width: 80,
+          height: 3,
+          background: "rgba(255,255,255,0.3)",
+          marginTop: 32,
+        }} />
+      </div>
+      <div style={{
+        height: 4,
+        background: BRAND_COLOR,
+      }} />
+    </PageWrapper>
+  );
+});
+CategoryDividerPage.displayName = "CategoryDividerPage";
+
+export const TierHeaderPage = forwardRef<HTMLDivElement, {
+  unitType: string;
+  tier: string;
+  packages: PricebookPackage[];
+}>(({ unitType, tier, packages }, ref) => {
+  const unitInfo = UNIT_TYPE_DISPLAY[unitType] || { name: unitType };
+  const tierDesc = TIER_DISPLAY[tier] || "";
+  const tonnages = Array.from(new Set(packages.map(p => p.tonnage))).sort((a, b) => parseFloat(a) - parseFloat(b));
+  const levels = Array.from(new Set(packages.map(p => p.packageLevel)));
+  const sortedLevels = ["Best", "Better", "Good", "Budget"].filter(l => levels.includes(l));
+
+  return (
+    <PageWrapper ref={ref}>
+      <div style={{
+        background: BRAND_COLOR,
+        padding: "20px 28px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}>
+        <div>
+          <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            {unitInfo.name}
+          </div>
+          <div style={{ color: "#fff", fontSize: 22, fontWeight: 700 }}>{tier}</div>
+        </div>
+        <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 11, textAlign: "right" }}>
+          {tierDesc}
+        </div>
+      </div>
+
+      <div style={{ flex: 1, padding: "16px 24px", display: "flex", flexDirection: "column" }}>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+            Available Configurations
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+            {sortedLevels.map(level => (
+              <span key={level} style={{
+                padding: "4px 12px",
+                borderRadius: 4,
+                background: `${LEVEL_COLORS[level] || "#555"}18`,
+                color: LEVEL_COLORS[level] || "#555",
+                fontSize: 12,
+                fontWeight: 600,
+              }}>
+                {level}
+              </span>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {tonnages.map(t => (
+              <span key={t} style={{
+                padding: "3px 10px",
+                borderRadius: 4,
+                background: "#f3f4f6",
+                color: "#555",
+                fontSize: 11,
+              }}>
+                {t} Ton
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+          <thead>
+            <tr style={{ borderBottom: "2px solid #e5e7eb" }}>
+              <th style={{ textAlign: "left", padding: "6px 8px", color: "#888", fontWeight: 600 }}>Tonnage</th>
+              {sortedLevels.map(l => (
+                <th key={l} style={{ textAlign: "center", padding: "6px 4px", color: LEVEL_COLORS[l] || "#555", fontWeight: 600 }}>{l}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {tonnages.map(t => {
+              const row = sortedLevels.map(l => packages.find(p => p.tonnage === t && p.packageLevel === l));
+              return (
+                <tr key={t} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                  <td style={{ padding: "6px 8px", fontWeight: 600, color: "#333" }}>{t} Ton</td>
+                  {row.map((pkg, i) => (
+                    <td key={i} style={{ textAlign: "center", padding: "5px 4px" }}>
+                      {pkg ? (
+                        <div>
+                          <div style={{ fontWeight: 700, color: "#111", fontSize: 12 }}>
+                            {formatCents(pkg.totalInvestment)}
+                          </div>
+                          <div style={{ color: "#888", fontSize: 10 }}>
+                            {formatCentsMonthly(pkg.monthlyPayment)}/mo
+                          </div>
+                        </div>
+                      ) : (
+                        <span style={{ color: "#ccc" }}>—</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ height: 3, background: BRAND_COLOR }} />
+    </PageWrapper>
+  );
+});
+TierHeaderPage.displayName = "TierHeaderPage";
+
+export const ProductDetailPage = forwardRef<HTMLDivElement, {
+  unitType: string;
+  tier: string;
+  tonnage: string;
+  packages: PricebookPackage[];
+}>(({ unitType, tier, tonnage, packages }, ref) => {
+  const unitInfo = UNIT_TYPE_DISPLAY[unitType] || { name: unitType };
+  const sortedPackages = ["Best", "Better", "Good", "Budget"]
+    .map(level => packages.find(p => p.packageLevel === level))
+    .filter((p): p is PricebookPackage => !!p);
+
+  return (
+    <PageWrapper ref={ref}>
+      <div style={{
+        background: BRAND_COLOR,
+        padding: "10px 20px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}>
+        <div style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>
+          {unitInfo.name} — {tier}
+        </div>
+        <div style={{
+          background: "rgba(255,255,255,0.2)",
+          borderRadius: 4,
+          padding: "3px 12px",
+          color: "#fff",
+          fontSize: 13,
+          fontWeight: 600,
+        }}>
+          {tonnage} Ton
+        </div>
+      </div>
+
+      <div style={{ flex: 1, padding: "10px 16px", overflow: "hidden" }}>
+        {sortedPackages.map((pkg, idx) => {
+          const hasImages = pkg.outdoorImageUrl || pkg.furnaceImageUrl || pkg.coilImageUrl || pkg.thermostatImageUrl;
+          return (
+            <div key={pkg.id} style={{
+              border: "1px solid #e8e8e8",
+              borderRadius: 6,
+              marginBottom: idx < sortedPackages.length - 1 ? 8 : 0,
+              overflow: "hidden",
+            }}>
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "6px 12px",
+                background: `${LEVEL_COLORS[pkg.packageLevel] || "#555"}0d`,
+                borderBottom: "1px solid #f0f0f0",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{
+                    fontWeight: 700,
+                    fontSize: 12,
+                    color: LEVEL_COLORS[pkg.packageLevel] || "#555",
+                  }}>
+                    {pkg.packageLevel}
+                  </span>
+                  {pkg.outdoorBrand && (
+                    <span style={{ fontSize: 10, color: "#999" }}>{pkg.outdoorBrand}</span>
+                  )}
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <span style={{ fontWeight: 700, fontSize: 15, color: BRAND_COLOR }}>
+                    {formatCents(pkg.totalInvestment)}
+                  </span>
+                  <span style={{ fontSize: 10, color: "#888", marginLeft: 6 }}>
+                    {formatCentsMonthly(pkg.monthlyPayment)}/mo
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ padding: "6px 12px", display: "flex", gap: 8 }}>
+                {hasImages && (
+                  <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                    {[pkg.outdoorImageUrl, pkg.coilImageUrl, pkg.furnaceImageUrl, pkg.thermostatImageUrl]
+                      .filter(Boolean)
+                      .slice(0, 3)
+                      .map((url, i) => (
+                        <img
+                          key={i}
+                          src={url!.startsWith("/") ? url! : `/assets/${url}`}
+                          alt=""
+                          style={{
+                            width: 44,
+                            height: 44,
+                            objectFit: "contain",
+                            borderRadius: 4,
+                            background: "#f9f9f9",
+                            border: "1px solid #eee",
+                          }}
+                          loading="lazy"
+                        />
+                      ))}
+                  </div>
+                )}
+                <div style={{ flex: 1, fontSize: 9.5, color: "#555", lineHeight: 1.5 }}>
+                  {pkg.outdoorName && <div><b style={{ color: "#333" }}>Outdoor:</b> {pkg.outdoorModel || ""} {pkg.outdoorName}</div>}
+                  {pkg.coilName && <div><b style={{ color: "#333" }}>Coil:</b> {pkg.coilModel || ""}</div>}
+                  {pkg.indoorHeatName && <div><b style={{ color: "#333" }}>Indoor:</b> {pkg.indoorHeatModel || ""} {pkg.indoorHeatName}</div>}
+                  {pkg.thermostatName && <div><b style={{ color: "#333" }}>Thermostat:</b> {pkg.thermostatModel || ""}</div>}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ height: 3, background: BRAND_COLOR }} />
+    </PageWrapper>
+  );
+});
+ProductDetailPage.displayName = "ProductDetailPage";
+
+interface EliteBundle {
+  id: string;
+  name: string;
+  description: string;
+  priceByTonnage?: Record<string, number>;
+  fixedPrice?: number;
+  benefits: string[];
+}
+
+interface EliteAirflowOption {
+  id: string;
+  name: string;
+  description: string;
+  priceByTonnage: Record<string, number>;
+}
+
+const ELITE_CORE_BUNDLES: EliteBundle[] = [
+  {
+    id: "10yr-labor",
+    name: "10-Year Labor Warranty",
+    description: "Full labor coverage for repairs and service",
+    fixedPrice: 1000,
+    benefits: ["All labor costs covered", "No service call fees", "Factory-trained technicians", "Peace of mind protection"]
+  },
+  {
+    id: "10yr-maintenance",
+    name: "10-Year Maintenance Plan",
+    description: "Comprehensive annual maintenance for 10 years",
+    fixedPrice: 2290,
+    benefits: ["Annual system tune-ups", "Priority scheduling", "Filter replacements", "Performance optimization"]
+  },
+  {
+    id: "install-upgrade",
+    name: "Install Upgrade Bundle",
+    description: "Premium installation with Lineset + Drain + Low Voltage",
+    priceByTonnage: { "1.5": 1000, "2": 1500, "2.5": 2000, "3": 2500, "3.5": 3000, "4": 4000, "5": 5000 },
+    benefits: ["New copper lineset", "Proper condensate drainage", "Low voltage wiring upgrade", "Professional installation"]
+  }
+];
+
+const ELITE_AIRFLOW_OPTIONS: EliteAirflowOption[] = [
+  {
+    id: "new-ducting",
+    name: "New Ducting System",
+    description: "Complete duct system replacement with 10-year warranty",
+    priceByTonnage: { "1.5": 7527, "2": 9353, "2.5": 11179, "3": 13005, "3.5": 14831, "4": 16657, "5": 20309 }
+  },
+  {
+    id: "cleaning-return-insulation",
+    name: "Duct Cleaning + Return + Insulation",
+    description: "Duct cleaning, new return, and attic re-insulation",
+    priceByTonnage: { "1.5": 2245, "2": 2345, "2.5": 2850, "3": 2995, "3.5": 3450, "4": 3650, "5": 4450 }
+  }
+];
+
+export const EliteDividerPage = forwardRef<HTMLDivElement, object>((_, ref) => (
+  <PageWrapper ref={ref}>
+    <div style={{
+      flex: 1,
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+      alignItems: "center",
+      background: "linear-gradient(160deg, #0d0d0d 0%, #1a1a1a 40%, #711419 100%)",
+      padding: "10%",
+      textAlign: "center",
+    }}>
+      <div style={{ width: 80, height: 3, background: "rgba(255,255,255,0.3)", marginBottom: 32 }} />
+      <div style={{ color: "rgba(255,215,0,0.9)", fontSize: 13, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 12 }}>
+        Premium Upgrade
+      </div>
+      <h1 style={{ color: "#fff", fontSize: "clamp(26px, 4vw, 44px)", fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 16 }}>
+        HVAC Elite Package
+      </h1>
+      <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "clamp(11px, 1.6vw, 14px)", maxWidth: "85%", lineHeight: 1.6 }}>
+        Bundled upgrades with a 20% discount on the total package. Includes extended warranty, maintenance plan, install upgrades, and airflow options.
+      </p>
+      <div style={{ width: 80, height: 3, background: "rgba(255,255,255,0.3)", marginTop: 32 }} />
+    </div>
+    <div style={{ height: 4, background: "#d4a500" }} />
+  </PageWrapper>
+));
+EliteDividerPage.displayName = "EliteDividerPage";
+
+export const EliteBundlesPage = forwardRef<HTMLDivElement, object>((_, ref) => {
+  const tonnages = ["1.5", "2", "2.5", "3", "3.5", "4", "5"];
+  return (
+    <PageWrapper ref={ref}>
+      <div style={{
+        background: BRAND_COLOR,
+        padding: "12px 20px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}>
+        <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>Elite Core Bundles</div>
+        <div style={{ color: "rgba(255,215,0,0.8)", fontSize: 11, fontWeight: 600 }}>20% Bundle Discount</div>
+      </div>
+
+      <div style={{ flex: 1, padding: "12px 20px", overflow: "hidden" }}>
+        {ELITE_CORE_BUNDLES.map((bundle, idx) => (
+          <div key={bundle.id} style={{
+            border: "1px solid #e8e8e8",
+            borderRadius: 6,
+            marginBottom: idx < ELITE_CORE_BUNDLES.length - 1 ? 10 : 0,
+            overflow: "hidden",
+          }}>
+            <div style={{
+              padding: "8px 14px",
+              background: "#fafafa",
+              borderBottom: "1px solid #eee",
+            }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "#111" }}>{bundle.name}</div>
+              <div style={{ fontSize: 10, color: "#888" }}>{bundle.description}</div>
+            </div>
+            <div style={{ padding: "8px 14px" }}>
+              {bundle.fixedPrice ? (
+                <div style={{ fontWeight: 700, fontSize: 18, color: BRAND_COLOR }}>
+                  ${bundle.fixedPrice.toLocaleString()}
+                </div>
+              ) : bundle.priceByTonnage ? (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {tonnages.filter(t => bundle.priceByTonnage?.[t]).map(t => (
+                    <div key={t} style={{
+                      background: "#f9f9f9",
+                      borderRadius: 4,
+                      padding: "3px 8px",
+                      textAlign: "center",
+                      border: "1px solid #eee",
+                    }}>
+                      <div style={{ fontSize: 9, color: "#999" }}>{t}T</div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: "#333" }}>
+                        ${bundle.priceByTonnage?.[t]?.toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
+                {bundle.benefits.map((b, i) => (
+                  <span key={i} style={{
+                    fontSize: 9,
+                    color: "#1a6b3c",
+                    background: "#f0fdf4",
+                    padding: "2px 6px",
+                    borderRadius: 3,
+                  }}>
+                    ✓ {b}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ height: 3, background: BRAND_COLOR }} />
+    </PageWrapper>
+  );
+});
+EliteBundlesPage.displayName = "EliteBundlesPage";
+
+export const EliteAirflowPage = forwardRef<HTMLDivElement, object>((_, ref) => {
+  const tonnages = ["1.5", "2", "2.5", "3", "3.5", "4", "5"];
+  return (
+    <PageWrapper ref={ref}>
+      <div style={{
+        background: BRAND_COLOR,
+        padding: "12px 20px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}>
+        <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>Elite Airflow Options</div>
+        <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 10 }}>Choose one option</div>
+      </div>
+
+      <div style={{ flex: 1, padding: "16px 20px", overflow: "hidden" }}>
+        {ELITE_AIRFLOW_OPTIONS.map((opt, idx) => (
+          <div key={opt.id} style={{
+            border: "1px solid #e8e8e8",
+            borderRadius: 6,
+            marginBottom: idx < ELITE_AIRFLOW_OPTIONS.length - 1 ? 16 : 0,
+            overflow: "hidden",
+          }}>
+            <div style={{
+              padding: "10px 14px",
+              background: "#fafafa",
+              borderBottom: "1px solid #eee",
+            }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "#111" }}>{opt.name}</div>
+              <div style={{ fontSize: 11, color: "#888" }}>{opt.description}</div>
+            </div>
+            <div style={{ padding: "10px 14px" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid #eee" }}>
+                    {tonnages.map(t => (
+                      <th key={t} style={{ padding: "4px 4px", color: "#999", fontWeight: 500, textAlign: "center", fontSize: 10 }}>
+                        {t}T
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    {tonnages.map(t => (
+                      <td key={t} style={{ padding: "6px 4px", textAlign: "center", fontWeight: 600, color: BRAND_COLOR }}>
+                        ${opt.priceByTonnage[t]?.toLocaleString() || "—"}
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ height: 3, background: BRAND_COLOR }} />
+    </PageWrapper>
+  );
+});
+EliteAirflowPage.displayName = "EliteAirflowPage";
+
+export const CrawlspaceDividerPage = forwardRef<HTMLDivElement, object>((_, ref) => (
+  <PageWrapper ref={ref}>
+    <div style={{
+      flex: 1,
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+      alignItems: "center",
+      background: "linear-gradient(160deg, #1a3a1a 0%, #1a1a1a 60%, #0d0d0d 100%)",
+      padding: "10%",
+      textAlign: "center",
+    }}>
+      <div style={{ width: 80, height: 3, background: "rgba(255,255,255,0.3)", marginBottom: 32 }} />
+      <h1 style={{ color: "#fff", fontSize: "clamp(24px, 4vw, 42px)", fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 16 }}>
+        Crawlspace Services
+      </h1>
+      <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "clamp(11px, 1.6vw, 14px)", maxWidth: "85%", lineHeight: 1.6 }}>
+        Encapsulation, vapor barriers, dehumidifiers, joist cleaning, mold treatment, and excavation
+      </p>
+      <div style={{ width: 80, height: 3, background: "rgba(255,255,255,0.3)", marginTop: 32 }} />
+    </div>
+    <div style={{ height: 4, background: "#1a6b3c" }} />
+  </PageWrapper>
+));
+CrawlspaceDividerPage.displayName = "CrawlspaceDividerPage";
+
+export const CrawlspaceTiersPage = forwardRef<HTMLDivElement, { tiers: CrawlspaceTier[] }>((
+  { tiers }, ref
+) => {
+  const dehumidifiers = [
+    { model: "Aprilaire E070", baseCost: 1649.99, tiers: ["Premium", "Ultimate"] },
+    { model: "Aprilaire E100", baseCost: 2149.99, tiers: ["Essential"] },
+  ];
+
+  return (
+    <PageWrapper ref={ref}>
+      <div style={{
+        background: "#1a6b3c",
+        padding: "12px 20px",
+      }}>
+        <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>Crawlspace Encapsulation Tiers</div>
+        <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 10 }}>Vapor barrier + encapsulation pricing</div>
+      </div>
+
+      <div style={{ flex: 1, padding: "16px 20px", overflow: "hidden" }}>
+        <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+          {tiers.map(tier => (
+            <div key={tier.id} style={{
+              flex: 1,
+              border: "1px solid #e8e8e8",
+              borderRadius: 8,
+              overflow: "hidden",
+            }}>
+              <div style={{
+                padding: "10px 12px",
+                background: tier.name === "Ultimate" ? BRAND_COLOR : tier.name === "Premium" ? "#1a5a8a" : "#555",
+                color: "#fff",
+                textAlign: "center",
+              }}>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{tier.name}</div>
+                <div style={{ fontSize: 10, opacity: 0.8 }}>{tier.milThickness} mil</div>
+              </div>
+              <div style={{ padding: "10px 12px", textAlign: "center" }}>
+                <div style={{ fontWeight: 700, fontSize: 18, color: "#111" }}>
+                  {formatCents(tier.rollPrice)}
+                </div>
+                <div style={{ fontSize: 10, color: "#888" }}>per roll</div>
+                {tier.description && (
+                  <div style={{ fontSize: 9, color: "#888", marginTop: 6, lineHeight: 1.4 }}>
+                    {tier.description}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ borderTop: "1px solid #eee", paddingTop: 14, marginTop: 4 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#333", marginBottom: 10 }}>
+            Dehumidifier Options
+          </div>
+          {dehumidifiers.map((d, i) => (
+            <div key={i} style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "8px 12px",
+              background: "#f9f9f9",
+              borderRadius: 6,
+              marginBottom: 6,
+              border: "1px solid #eee",
+            }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 12, color: "#111" }}>{d.model}</div>
+                <div style={{ fontSize: 10, color: "#888" }}>For: {d.tiers.join(", ")} tier</div>
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: BRAND_COLOR }}>
+                ${d.baseCost.toLocaleString()}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ borderTop: "1px solid #eee", paddingTop: 12, marginTop: 12 }}>
+          <div style={{ fontSize: 10, color: "#888", lineHeight: 1.5 }}>
+            <strong>Pricing formula:</strong> Labor ($1.50/sqft) + Liner (50% gross margin) + Dehumidifier (50% markup) + Receptacle ($150)
+          </div>
+          <div style={{ fontSize: 10, color: "#888", marginTop: 4, lineHeight: 1.5 }}>
+            Includes 10% waste factor. Wall height: 3ft. Pillar wrapping: 16" sides × 3ft height.
+          </div>
+        </div>
+      </div>
+
+      <div style={{ height: 3, background: "#1a6b3c" }} />
+    </PageWrapper>
+  );
+});
+CrawlspaceTiersPage.displayName = "CrawlspaceTiersPage";
+
+export interface SalesbookSection {
+  type: "static" | "category-divider" | "tier-header" | "product-detail" | "elite-divider" | "elite-bundles" | "elite-airflow" | "crawlspace-divider" | "crawlspace-tiers";
+  label?: string;
+  unitType?: string;
+  tier?: string;
+  tonnage?: string;
+  tierCount?: number;
+  staticSrc?: string;
+  packages?: PricebookPackage[];
+  crawlspaceTiers?: CrawlspaceTier[];
+  pageIndex: number;
+}
+
+const UNIT_TYPE_ORDER = ["SGA", "SHP", "STA", "GP", "PHP", "Mini-Split", "Ducting"];
+const TIER_ORDER = ["Essential", "Premium", "Ultimate", "Packaged", "Standard"];
+
+export function buildSalesbookSections(
+  staticPages: string[],
+  packages: PricebookPackage[],
+  crawlspaceTiers: CrawlspaceTier[],
+): SalesbookSection[] {
+  const sections: SalesbookSection[] = [];
+  let pageIndex = 0;
+
+  for (const src of staticPages) {
+    sections.push({ type: "static", staticSrc: src, pageIndex: pageIndex++, label: `Intro Page ${pageIndex}` });
+  }
+
+  const byType = new Map<string, PricebookPackage[]>();
+  for (const pkg of packages) {
+    const arr = byType.get(pkg.unitType) || [];
+    arr.push(pkg);
+    byType.set(pkg.unitType, arr);
+  }
+
+  const allUnitTypes = UNIT_TYPE_ORDER.filter(ut => byType.has(ut));
+  const extraUnitTypes = Array.from(byType.keys()).filter(ut => !UNIT_TYPE_ORDER.includes(ut)).sort();
+  const orderedUnitTypes = [...allUnitTypes, ...extraUnitTypes];
+
+  for (const unitType of orderedUnitTypes) {
+    const typePackages = byType.get(unitType);
+    if (!typePackages || typePackages.length === 0) continue;
+
+    const byTier = new Map<string, PricebookPackage[]>();
+    for (const pkg of typePackages) {
+      const arr = byTier.get(pkg.tier) || [];
+      arr.push(pkg);
+      byTier.set(pkg.tier, arr);
+    }
+
+    const knownTiers = TIER_ORDER.filter(t => byTier.has(t));
+    const extraTiers = Array.from(byTier.keys()).filter(t => !TIER_ORDER.includes(t)).sort();
+    const tierKeys = [...knownTiers, ...extraTiers];
+    const unitDisplay = UNIT_TYPE_DISPLAY[unitType]?.name || unitType;
+
+    sections.push({
+      type: "category-divider",
+      unitType,
+      tierCount: tierKeys.length,
+      packages: typePackages,
+      pageIndex: pageIndex++,
+      label: unitDisplay,
+    });
+
+    for (const tier of tierKeys) {
+      const tierPackages = byTier.get(tier)!;
+
+      sections.push({
+        type: "tier-header",
+        unitType,
+        tier,
+        packages: tierPackages,
+        pageIndex: pageIndex++,
+        label: `${unitDisplay} — ${tier} Overview`,
+      });
+
+      const byTonnage = new Map<string, PricebookPackage[]>();
+      for (const pkg of tierPackages) {
+        const arr = byTonnage.get(pkg.tonnage) || [];
+        arr.push(pkg);
+        byTonnage.set(pkg.tonnage, arr);
+      }
+
+      const sortedTonnages = Array.from(byTonnage.keys()).sort((a, b) => parseFloat(a) - parseFloat(b));
+      for (const tonnage of sortedTonnages) {
+        sections.push({
+          type: "product-detail",
+          unitType,
+          tier,
+          tonnage,
+          packages: byTonnage.get(tonnage)!,
+          pageIndex: pageIndex++,
+          label: `${unitDisplay} ${tier} ${tonnage}T`,
+        });
+      }
+    }
+  }
+
+  sections.push({ type: "elite-divider", pageIndex: pageIndex++, label: "HVAC Elite Package" });
+  sections.push({ type: "elite-bundles", pageIndex: pageIndex++, label: "Elite Core Bundles" });
+  sections.push({ type: "elite-airflow", pageIndex: pageIndex++, label: "Elite Airflow Options" });
+
+  if (crawlspaceTiers.length > 0) {
+    sections.push({ type: "crawlspace-divider", pageIndex: pageIndex++, label: "Crawlspace Services" });
+    sections.push({ type: "crawlspace-tiers", crawlspaceTiers, pageIndex: pageIndex++, label: "Crawlspace Tiers & Pricing" });
+  }
+
+  return sections;
+}
+
+export function getSalesbookTOC(sections: SalesbookSection[]): { label: string; page: number }[] {
+  const toc: { label: string; page: number }[] = [];
+  for (const s of sections) {
+    if (s.type === "category-divider" || s.type === "elite-divider" || s.type === "crawlspace-divider") {
+      toc.push({ label: s.label || "Section", page: s.pageIndex + 1 });
+    }
+  }
+  return toc;
+}
