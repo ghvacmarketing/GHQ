@@ -380,13 +380,12 @@ export default function CrmSettingsSalesbook() {
               ))}
 
               {showAddRow && (
-                <div className="grid grid-cols-[40px_1fr_80px_72px] gap-0 items-center px-4 bg-slate-50/50">
-                  <Plus className="h-4 w-4 text-slate-300" />
+                <div className="flex items-center gap-2 px-4 py-2 border-t border-dashed border-slate-200">
                   <Input
                     value={newLabel}
                     onChange={(e) => setNewLabel(e.target.value)}
                     placeholder="Section name"
-                    className="h-9 text-sm border-slate-200 my-1.5"
+                    className="h-8 text-sm border-slate-200 flex-1"
                     autoFocus
                     onKeyDown={(e) => {
                       if (e.key === "Enter") handleAdd();
@@ -399,35 +398,29 @@ export default function CrmSettingsSalesbook() {
                     value={newPage}
                     onChange={(e) => setNewPage(e.target.value)}
                     placeholder="Page"
-                    className="h-9 text-sm text-center border-slate-200 mx-2"
+                    className="h-8 w-16 text-sm text-center border-slate-200"
                     onKeyDown={(e) => {
                       if (e.key === "Enter") handleAdd();
                       if (e.key === "Escape") { setShowAddRow(false); setNewLabel(""); setNewPage(""); }
                     }}
                   />
-                  <div className="flex items-center gap-1 justify-center">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleAdd}
-                      disabled={createMutation.isPending}
-                      className="h-7 w-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                    >
-                      {createMutation.isPending ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Check className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => { setShowAddRow(false); setNewLabel(""); setNewPage(""); }}
-                      className="h-7 w-7 text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+                  <button
+                    onClick={handleAdd}
+                    disabled={createMutation.isPending}
+                    className="text-slate-400 hover:text-emerald-600 transition-colors p-1"
+                  >
+                    {createMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Check className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => { setShowAddRow(false); setNewLabel(""); setNewPage(""); }}
+                    className="text-slate-400 hover:text-slate-600 transition-colors p-1"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               )}
             </div>
@@ -435,15 +428,13 @@ export default function CrmSettingsSalesbook() {
         </div>
 
         {!showAddRow && (
-          <Button
-            variant="outline"
-            size="sm"
+          <button
             onClick={() => setShowAddRow(true)}
-            className="mt-4"
+            className="mt-3 flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 transition-colors"
           >
-            <Plus className="h-4 w-4 mr-1.5" />
-            Add Section
-          </Button>
+            <Plus className="h-3.5 w-3.5" />
+            Add section
+          </button>
         )}
       </div>
 

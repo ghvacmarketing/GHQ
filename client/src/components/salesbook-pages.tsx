@@ -391,6 +391,102 @@ export const ProductDetailPage = forwardRef<HTMLDivElement, {
 ProductDetailPage.displayName = "ProductDetailPage";
 
 
+export const DuctingDetailPage = forwardRef<HTMLDivElement, {
+  packages: PricebookPackage[];
+}>(({ packages }, ref) => {
+  const sorted = [...packages].sort((a, b) => {
+    const aNum = parseFloat(a.packageLevel.replace(/[^\d.]/g, "")) || 0;
+    const bNum = parseFloat(b.packageLevel.replace(/[^\d.]/g, "")) || 0;
+    return aNum - bNum;
+  });
+
+  return (
+    <PageWrapper ref={ref}>
+      <div style={{ padding: "20px 24px 8px" }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: "#111" }}>
+          Select Duct System Size
+        </div>
+        <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>
+          Choose your system size based on your home's tonnage
+        </div>
+      </div>
+
+      <div style={{
+        margin: "8px 20px",
+        padding: "8px 14px",
+        background: "#faf5f0",
+        border: "1px solid #e8ddd4",
+        borderRadius: 6,
+        fontSize: 9.5,
+        color: "#666",
+        lineHeight: 1.5,
+      }}>
+        Complete duct system replacement includes removal of existing ducts, new ductwork installation, and system balancing with a 10-year workmanship guarantee.
+      </div>
+
+      <div style={{ flex: 1, padding: "0 20px", overflow: "hidden" }}>
+        {sorted.map((pkg, idx) => (
+          <div key={pkg.id} style={{
+            display: "flex",
+            alignItems: "center",
+            padding: "10px 14px",
+            borderBottom: idx < sorted.length - 1 ? "1px solid #f0f0f0" : "none",
+            gap: 12,
+          }}>
+            {pkg.outdoorImageUrl && (
+              <img
+                src={pkg.outdoorImageUrl.startsWith("/") ? pkg.outdoorImageUrl : `/assets/${pkg.outdoorImageUrl}`}
+                alt=""
+                style={{
+                  width: 48,
+                  height: 48,
+                  objectFit: "contain",
+                  borderRadius: 6,
+                  background: "#f9f9f9",
+                  flexShrink: 0,
+                }}
+                loading="lazy"
+              />
+            )}
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{
+                  background: BRAND_COLOR,
+                  color: "#fff",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                }}>
+                  {pkg.packageLevel}
+                </span>
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#222", marginTop: 3 }}>
+                {pkg.outdoorName || `Complete ${pkg.packageLevel} Duct System Replacement`}
+              </div>
+              <div style={{ fontSize: 9, color: "#888", marginTop: 1 }}>
+                New insulated ducts, registers, test & balance, 10-year guarantee
+              </div>
+            </div>
+            <div style={{ textAlign: "right", flexShrink: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#111" }}>
+                {formatCents(pkg.totalInvestment)}
+              </div>
+              <div style={{ fontSize: 10, color: "#888" }}>
+                {formatCentsMonthly(pkg.monthlyPayment)}/mo
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ height: 3, background: BRAND_COLOR }} />
+    </PageWrapper>
+  );
+});
+DuctingDetailPage.displayName = "DuctingDetailPage";
+
+
 export const EliteDividerPage = forwardRef<HTMLDivElement, object>((_, ref) => (
   <PageWrapper ref={ref}>
     <div style={{
@@ -697,7 +793,7 @@ export interface EliteAirflowOption {
 }
 
 export interface SalesbookSection {
-  type: "static" | "category-divider" | "tier-header" | "product-detail" | "elite-divider" | "elite-bundles" | "elite-airflow" | "crawlspace-divider" | "crawlspace-tiers";
+  type: "static" | "category-divider" | "tier-header" | "product-detail" | "ducting-detail" | "elite-divider" | "elite-bundles" | "elite-airflow" | "crawlspace-divider" | "crawlspace-tiers";
   label?: string;
   unitType?: string;
   tier?: string;
@@ -744,6 +840,29 @@ export function buildSalesbookSections(
     const typePackages = byType.get(unitType);
     if (!typePackages || typePackages.length === 0) continue;
 
+    const unitDisplay = UNIT_TYPE_DISPLAY[unitType]?.name || unitType;
+    const heroImg = typePackages.find(p => p.outdoorImageUrl)?.outdoorImageUrl || undefined;
+
+    if (unitType === "Ducting") {
+      sections.push({
+        type: "category-divider",
+        unitType,
+        tierCount: 1,
+        packages: typePackages,
+        heroImageUrl: heroImg,
+        pageIndex: pageIndex++,
+        label: unitDisplay,
+      });
+      sections.push({
+        type: "ducting-detail",
+        unitType,
+        packages: typePackages,
+        pageIndex: pageIndex++,
+        label: "Duct System Sizing",
+      });
+      continue;
+    }
+
     const byTier = new Map<string, PricebookPackage[]>();
     for (const pkg of typePackages) {
       const arr = byTier.get(pkg.tier) || [];
@@ -754,9 +873,6 @@ export function buildSalesbookSections(
     const knownTiers = TIER_ORDER.filter(t => byTier.has(t));
     const extraTiers = Array.from(byTier.keys()).filter(t => !TIER_ORDER.includes(t)).sort();
     const tierKeys = [...knownTiers, ...extraTiers];
-    const unitDisplay = UNIT_TYPE_DISPLAY[unitType]?.name || unitType;
-
-    const heroImg = typePackages.find(p => p.outdoorImageUrl)?.outdoorImageUrl || undefined;
 
     sections.push({
       type: "category-divider",
