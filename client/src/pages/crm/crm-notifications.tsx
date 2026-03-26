@@ -76,7 +76,7 @@ export default function CrmNotifications() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="max-w-2xl">
+      <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
