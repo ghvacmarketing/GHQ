@@ -453,7 +453,7 @@ export default function PriceBook() {
                 className="flipbook-container"
                 startPage={0}
                 drawShadow={false}
-                flippingTime={300}
+                flippingTime={150}
                 usePortrait={isMobile}
                 startZIndex={0}
                 autoSize={false}
