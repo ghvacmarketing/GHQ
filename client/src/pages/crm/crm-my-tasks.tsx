@@ -581,12 +581,6 @@ export default function CrmMyTasks() {
 
   const totalActiveTasks = overdueTasks.length + todayTasks.length + upcomingTasks.length + noDateTasks.length;
 
-  const LISTS = [
-    { id: "inbox", label: "Inbox", icon: Inbox },
-    { id: "next_actions", label: "Next Actions", icon: Zap },
-    { id: "waiting_on", label: "Waiting On", icon: Hourglass },
-    { id: "follow_up", label: "Follow Up", icon: UserCheck },
-  ];
 
   return (
     <CrmLayout currentUser={currentUser} disableScroll>
@@ -628,43 +622,6 @@ export default function CrmMyTasks() {
               {!sidebarCollapsed && "My Tasks"}
             </Button>
           </div>
-          {!sidebarCollapsed && (
-            <div className="p-2 border-t border-slate-200">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-2">Lists</p>
-              <div className="space-y-1">
-                {LISTS.map((list) => {
-                  const Icon = list.icon;
-                  return (
-                    <div
-                      key={list.id}
-                      className="flex items-center gap-2 px-2 py-1.5 text-sm text-slate-600 rounded hover:bg-slate-100 cursor-pointer"
-                      onClick={() => navigate("/crm/tasks/board")}
-                    >
-                      <Icon className="h-4 w-4" />
-                      <span>{list.label}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          {sidebarCollapsed && (
-            <div className="p-2 border-t border-slate-200 space-y-1">
-              {LISTS.map((list) => {
-                const Icon = list.icon;
-                return (
-                  <div
-                    key={list.id}
-                    className="flex items-center justify-center py-1.5 text-slate-600 rounded hover:bg-slate-100 cursor-pointer"
-                    title={list.label}
-                    onClick={() => navigate("/crm/tasks/board")}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
 
         <div className="flex-1 min-w-0 flex flex-col min-h-0 overflow-y-auto">
