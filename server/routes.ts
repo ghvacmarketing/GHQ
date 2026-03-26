@@ -7875,7 +7875,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "taggedUserIds must be a non-empty array" });
       }
 
-      const uniqueUserIds = [...new Set(taggedUserIds.filter((id: any) => typeof id === "string" && id.length > 0))];
+      const uniqueUserIds = [...new Set((taggedUserIds as unknown[]).filter((id): id is string => typeof id === "string" && id.length > 0))];
       if (uniqueUserIds.length === 0) {
         return res.status(400).json({ message: "At least one valid user ID is required" });
       }
@@ -7944,7 +7944,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conditions.push(eq(crmTaggedCommentRecipients.resolved, false));
       }
 
-      const results = await db.select({
+      const recipientResults = await db.select({
         id: crmTaggedComments.id,
         body: crmTaggedComments.body,
         pageRoute: crmTaggedComments.pageRoute,
@@ -7954,6 +7954,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recipientId: crmTaggedCommentRecipients.id,
         resolved: crmTaggedCommentRecipients.resolved,
         resolvedAt: crmTaggedCommentRecipients.resolvedAt,
+        isAuthor: sql<boolean>`false`.as("is_author"),
       })
       .from(crmTaggedCommentRecipients)
       .innerJoin(crmTaggedComments, eq(crmTaggedCommentRecipients.commentId, crmTaggedComments.id))
@@ -7961,7 +7962,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .where(and(...conditions))
       .orderBy(desc(crmTaggedComments.createdAt));
 
-      return res.json(results);
+      const authorConditions = [
+        eq(crmTaggedComments.authorId, currentUser.id),
+        eq(crmTaggedComments.pageRoute, pageRoute as string),
+      ];
+
+      const authorResults = await db.select({
+        id: crmTaggedComments.id,
+        body: crmTaggedComments.body,
+        pageRoute: crmTaggedComments.pageRoute,
+        authorId: crmTaggedComments.authorId,
+        authorName: crmUsers.name,
+        createdAt: crmTaggedComments.createdAt,
+      })
+      .from(crmTaggedComments)
+      .innerJoin(crmUsers, eq(crmTaggedComments.authorId, crmUsers.id))
+      .where(and(...authorConditions))
+      .orderBy(desc(crmTaggedComments.createdAt));
+
+      const seenIds = new Set(recipientResults.map(r => r.id));
+      const merged: Array<typeof recipientResults[number]> = [...recipientResults];
+      for (const ac of authorResults) {
+        if (!seenIds.has(ac.id)) {
+          merged.push({
+            ...ac,
+            recipientId: null,
+            resolved: true,
+            resolvedAt: null,
+            isAuthor: true,
+          });
+        }
+      }
+      merged.sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
+
+      return res.json(merged);
     } catch (error) {
       console.error("Error fetching tagged comments:", error);
       return res.status(500).json({ message: "Failed to fetch tagged comments" });

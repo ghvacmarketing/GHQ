@@ -143,7 +143,8 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
           const data = await res.json();
           if (data.pageRoute) {
             onClose();
-            window.location.href = data.pageRoute;
+            const separator = data.pageRoute.includes("?") ? "&" : "?";
+            window.location.href = `${data.pageRoute}${separator}highlightComment=${notification.entityId}`;
             return;
           }
         }

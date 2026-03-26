@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
 import { MessageSquare, Check, ChevronDown, ChevronUp } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface TaggedComment {
   id: string;
@@ -15,16 +15,25 @@ interface TaggedComment {
   recipientId: string | null;
   resolved: boolean;
   resolvedAt: string | null;
+  isAuthor: boolean;
 }
 
 export function TaggedCommentsDisplay() {
   const [location] = useLocation();
   const [expanded, setExpanded] = useState(true);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const hid = params.get("highlightComment");
+    if (hid) setHighlightId(hid);
+  }, [location]);
 
   const { data: comments = [] } = useQuery<TaggedComment[]>({
     queryKey: ["/api/crm/tagged-comments", location],
     queryFn: async () => {
-      const res = await fetch(`/api/crm/tagged-comments?pageRoute=${encodeURIComponent(location)}`, { credentials: "include" });
+      const cleanRoute = location.split("?")[0];
+      const res = await fetch(`/api/crm/tagged-comments?pageRoute=${encodeURIComponent(cleanRoute)}`, { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
@@ -42,9 +51,9 @@ export function TaggedCommentsDisplay() {
     },
   });
 
-  const unresolvedComments = comments.filter(c => !c.resolved);
+  const visibleComments = comments.filter(c => !c.resolved || c.isAuthor);
 
-  if (unresolvedComments.length === 0) return null;
+  if (visibleComments.length === 0) return null;
 
   return (
     <div className="fixed top-20 lg:top-[72px] right-4 z-30 w-80 max-h-[calc(100vh-100px)]">
@@ -54,7 +63,7 @@ export function TaggedCommentsDisplay() {
       >
         <MessageSquare className="h-4 w-4 text-amber-600 flex-shrink-0" />
         <span className="text-sm font-medium text-amber-800 flex-1">
-          {unresolvedComments.length} note{unresolvedComments.length !== 1 ? "s" : ""} for you
+          {visibleComments.length} note{visibleComments.length !== 1 ? "s" : ""} on this page
         </span>
         {expanded ? (
           <ChevronUp className="h-4 w-4 text-amber-500" />
@@ -65,19 +74,26 @@ export function TaggedCommentsDisplay() {
 
       {expanded && (
         <div className="bg-white border border-t-0 border-amber-200 rounded-b-lg shadow-lg overflow-y-auto max-h-72 divide-y divide-amber-100">
-          {unresolvedComments.map(comment => (
-            <div key={comment.id} className="p-3">
+          {visibleComments.map(comment => (
+            <div
+              key={comment.id}
+              className={`p-3 transition-colors ${highlightId === comment.id ? "bg-amber-100 ring-2 ring-amber-400" : ""}`}
+              data-comment-id={comment.id}
+            >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 mb-1">
                     <span className="text-xs font-semibold text-slate-700">{comment.authorName}</span>
+                    {comment.isAuthor && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">you</span>
+                    )}
                     <span className="text-xs text-slate-400">
                       {comment.createdAt ? formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true }) : ""}
                     </span>
                   </div>
                   <p className="text-sm text-slate-600 whitespace-pre-wrap">{comment.body}</p>
                 </div>
-                {comment.recipientId && (
+                {comment.recipientId && !comment.resolved && (
                   <button
                     onClick={() => resolveMutation.mutate(comment.id)}
                     disabled={resolveMutation.isPending}

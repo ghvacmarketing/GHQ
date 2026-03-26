@@ -199,7 +199,8 @@ function NotificationRow({
         if (res.ok) {
           const data = await res.json();
           if (data.pageRoute) {
-            window.location.href = data.pageRoute;
+            const separator = data.pageRoute.includes("?") ? "&" : "?";
+            window.location.href = `${data.pageRoute}${separator}highlightComment=${n.entityId}`;
             return;
           }
         }
