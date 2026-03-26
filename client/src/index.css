@@ -337,3 +337,19 @@ gmp-place-autocomplete::part(input)::placeholder {
   background: transparent;
 }
 
+.flipbook-container .stf__parent {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.flipbook-container .stf__item {
+  will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.page-content {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}

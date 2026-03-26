@@ -480,16 +480,16 @@ export default function PriceBook() {
                 onFlip={onFlip}
                 className="flipbook-container"
                 startPage={0}
-                drawShadow={false}
-                flippingTime={150}
+                drawShadow={true}
+                flippingTime={600}
                 usePortrait={isMobile}
                 startZIndex={0}
                 autoSize={false}
-                maxShadowOpacity={0}
-                showPageCorners={false}
-                disableFlipByClick={false}
-                swipeDistance={30}
-                clickEventForward={true}
+                maxShadowOpacity={0.3}
+                showPageCorners={true}
+                disableFlipByClick={true}
+                swipeDistance={50}
+                clickEventForward={false}
                 useMouseEvents={true}
                 renderOnlyPageLengthChange={false}
               >
