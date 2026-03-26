@@ -279,7 +279,9 @@ export default function CrmNotifications() {
   const someSelected = selectedIds.size > 0 && selectedIds.size < filteredNotifications.length;
 
   return (
-    <CrmLayout currentUser={currentUser}>
+    <CrmLayout currentUser={currentUser} disableScroll>
+      <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto">
       <div className="space-y-5 max-w-3xl">
         {/* Page header */}
         <div>
@@ -522,6 +524,8 @@ export default function CrmNotifications() {
             })}
           </div>
         )}
+      </div>
+      </div>
       </div>
     </CrmLayout>
   );
