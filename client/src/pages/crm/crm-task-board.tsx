@@ -250,6 +250,9 @@ function DroppableColumn({
   onQuickAdd,
   isUpdating,
   isCreating,
+  isAddingTask,
+  onStartAdding,
+  onStopAdding,
 }: {
   column: typeof COLUMNS[number];
   tasks: TaskWithRelations[];
@@ -258,12 +261,14 @@ function DroppableColumn({
   onQuickAdd: (title: string, taskList: TaskList) => void;
   isUpdating: string | null;
   isCreating: boolean;
+  isAddingTask: boolean;
+  onStartAdding: () => void;
+  onStopAdding: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
   });
   const [quickAddValue, setQuickAddValue] = useState("");
-  const [isAddingTask, setIsAddingTask] = useState(false);
 
   const Icon = column.icon;
 
@@ -271,7 +276,7 @@ function DroppableColumn({
     if (quickAddValue.trim()) {
       onQuickAdd(quickAddValue.trim(), column.id);
       setQuickAddValue("");
-      setIsAddingTask(false);
+      onStopAdding();
     }
   };
 
@@ -304,7 +309,7 @@ function DroppableColumn({
                 if (e.key === "Enter" && quickAddValue.trim()) {
                   handleQuickAdd();
                 } else if (e.key === "Escape") {
-                  setIsAddingTask(false);
+                  onStopAdding();
                   setQuickAddValue("");
                 }
               }}
@@ -323,7 +328,7 @@ function DroppableColumn({
               variant="ghost"
               className="h-7 px-2 text-slate-400 hover:text-slate-600"
               onClick={() => {
-                setIsAddingTask(false);
+                onStopAdding();
                 setQuickAddValue("");
               }}
             >
@@ -332,7 +337,7 @@ function DroppableColumn({
           </div>
         ) : (
           <button
-            onClick={() => setIsAddingTask(true)}
+            onClick={onStartAdding}
             className="w-full flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-slate-600 py-1 px-1.5 rounded-md hover:bg-slate-50 transition-colors"
           >
             <Plus className="h-3 w-3" />
@@ -376,6 +381,7 @@ export default function CrmTaskBoard() {
 
   const [selectedTask, setSelectedTask] = useState<TaskWithRelations | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [activeAddingColumn, setActiveAddingColumn] = useState<TaskList | null>(null);
   const [isCreateMode, setIsCreateMode] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [activeTask, setActiveTask] = useState<TaskWithRelations | null>(null);
@@ -893,6 +899,9 @@ export default function CrmTaskBoard() {
                       }
                       isUpdating={updatingTaskId}
                       isCreating={quickAddMutation.isPending}
+                      isAddingTask={activeAddingColumn === column.id}
+                      onStartAdding={() => setActiveAddingColumn(column.id)}
+                      onStopAdding={() => setActiveAddingColumn(null)}
                     />
                   ))}
                 </div>
