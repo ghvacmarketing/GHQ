@@ -1216,12 +1216,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllVoicemails(): Promise<Voicemail[]> {
-    const allVoicemails = await db.select().from(voicemails).orderBy(voicemails.createdAt);
-    return allVoicemails.reverse();
+    return await db.select().from(voicemails).orderBy(desc(voicemails.receivedAt));
   }
 
   async getVoicemailsByStatus(status: string): Promise<Voicemail[]> {
-    return await db.select().from(voicemails).where(eq(voicemails.status, status)).orderBy(voicemails.createdAt);
+    return await db.select().from(voicemails).where(eq(voicemails.status, status)).orderBy(desc(voicemails.receivedAt));
   }
 
   async getVoicemailByTrelloCardId(trelloCardId: string): Promise<Voicemail | undefined> {
