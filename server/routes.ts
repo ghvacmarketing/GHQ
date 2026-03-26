@@ -27005,6 +27005,20 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         afterJson: JSON.stringify(task),
       });
 
+      // Notify the assignee if different from the creator
+      if (task.assignedToUserId && task.assignedToUserId !== user.id) {
+        await db.insert(crmNotifications).values({
+          userId: task.assignedToUserId,
+          type: "task_assigned" as any,
+          title: `${user.name} assigned you a task`,
+          preview: task.title || null,
+          entityType: "task",
+          entityId: task.id,
+          actorId: user.id,
+          isRead: false,
+        });
+      }
+
       res.status(201).json(task);
     } catch (error) {
       console.error("Error creating task:", error);
@@ -27067,6 +27081,21 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         beforeJson: JSON.stringify(existingTask),
         afterJson: JSON.stringify(updatedTask),
       });
+
+      // Notify the new assignee when the task is reassigned
+      const newAssigneeId = req.body.assignedToUserId;
+      if (newAssigneeId && newAssigneeId !== existingTask.assignedToUserId && newAssigneeId !== user.id) {
+        await db.insert(crmNotifications).values({
+          userId: newAssigneeId,
+          type: "task_assigned" as any,
+          title: `${user.name} assigned you a task`,
+          preview: updatedTask.title || existingTask.title || null,
+          entityType: "task",
+          entityId: id,
+          actorId: user.id,
+          isRead: false,
+        });
+      }
 
       res.json(updatedTask);
     } catch (error) {

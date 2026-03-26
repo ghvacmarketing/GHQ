@@ -385,8 +385,8 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
 
       <main className="flex-1 lg:ml-60 overflow-x-hidden">
         {disableScroll ? (
-          <div className="h-screen pt-16 lg:pt-14 overflow-hidden">
-            <div className="h-full p-4 lg:p-6 overflow-hidden">{children}</div>
+          <div className="h-screen pt-16 lg:pt-14 overflow-hidden flex flex-col">
+            <div className="flex-1 min-h-0 p-4 lg:p-6 flex flex-col">{children}</div>
           </div>
         ) : (
           <div className="h-screen pt-16 lg:pt-14 overflow-y-auto overflow-x-hidden">

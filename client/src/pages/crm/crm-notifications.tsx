@@ -53,7 +53,7 @@ function getDateGroup(dateStr: string | Date | null): DateGroup {
   return "Earlier";
 }
 
-function groupNotificationsByDate(
+function groupByDate(
   notifications: NotificationWithActor[]
 ): Record<DateGroup, NotificationWithActor[]> {
   const groups: Record<DateGroup, NotificationWithActor[]> = {
@@ -62,13 +62,11 @@ function groupNotificationsByDate(
     "This Week": [],
     Earlier: [],
   };
-  for (const n of notifications) {
-    groups[getDateGroup(n.createdAt)].push(n);
-  }
+  for (const n of notifications) groups[getDateGroup(n.createdAt)].push(n);
   return groups;
 }
 
-function getNotificationIcon(type: string) {
+function NotifIcon({ type }: { type: string }) {
   switch (type) {
     case "mention":
       return <AtSign className="h-4 w-4 text-blue-500" />;
@@ -100,17 +98,12 @@ function getEntityLink(entityType: string | null, entityId: string | null): stri
   return routes[entityType] || null;
 }
 
-function getEntityBadgeLabel(entityType: string | null): string {
+function getEntityLabel(entityType: string | null): string {
   if (!entityType) return "";
   const labels: Record<string, string> = {
-    lead: "Lead",
-    project: "Project",
-    work_order: "Work Order",
-    quote: "Quote",
-    invoice: "Invoice",
-    customer: "Customer",
-    agreement: "Agreement",
-    task: "Task",
+    lead: "Lead", project: "Project", work_order: "Work Order",
+    quote: "Quote", invoice: "Invoice", customer: "Customer",
+    agreement: "Agreement", task: "Task",
   };
   return labels[entityType] || entityType;
 }
@@ -139,18 +132,12 @@ export default function CrmNotifications() {
     return p.toString();
   }, [tab, typeFilter]);
 
-  const {
-    data: notifications = [],
-    isLoading: notificationsLoading,
-    refetch,
-  } = useQuery<NotificationWithActor[]>({
+  const { data: notifications = [], isLoading: nLoading, refetch } = useQuery<NotificationWithActor[]>({
     queryKey: ["/api/crm/notifications", queryParams],
     queryFn: async () => {
-      const url = queryParams
-        ? `/api/crm/notifications?${queryParams}`
-        : "/api/crm/notifications";
+      const url = queryParams ? `/api/crm/notifications?${queryParams}` : "/api/crm/notifications";
       const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch notifications");
+      if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
     enabled: !!currentUser,
@@ -161,51 +148,39 @@ export default function CrmNotifications() {
     queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
   };
 
-  const markAsReadMutation = useMutation({
+  const markOneMutation = useMutation({
     mutationFn: (id: string) => apiRequest("PATCH", `/api/crm/notifications/${id}/read`),
     onSuccess: invalidate,
   });
 
-  const markAllReadMutation = useMutation({
+  const markAllMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/crm/notifications/mark-all-read"),
-    onSuccess: () => {
-      invalidate();
-      setSelectedIds(new Set());
-      toast({ title: "All notifications marked as read" });
-    },
+    onSuccess: () => { invalidate(); setSelectedIds(new Set()); toast({ title: "All marked as read" }); },
     onError: () => toast({ title: "Failed to mark all as read", variant: "destructive" }),
   });
 
-  const markSelectedReadMutation = useMutation({
+  const markSelectedMutation = useMutation({
     mutationFn: (ids: string[]) =>
       Promise.all(ids.map((id) => apiRequest("PATCH", `/api/crm/notifications/${id}/read`))),
-    onSuccess: () => {
-      invalidate();
-      setSelectedIds(new Set());
-      toast({ title: "Marked as read" });
-    },
-    onError: () => toast({ title: "Failed to mark as read", variant: "destructive" }),
+    onSuccess: () => { invalidate(); setSelectedIds(new Set()); toast({ title: "Marked as read" }); },
+    onError: () => toast({ title: "Failed", variant: "destructive" }),
   });
 
   useEffect(() => {
     if (!authLoading && !currentUser) navigate("/crm/login");
   }, [authLoading, currentUser, navigate]);
 
-  useEffect(() => {
-    setSelectedIds(new Set());
-  }, [tab, typeFilter]);
+  useEffect(() => { setSelectedIds(new Set()); }, [tab, typeFilter]);
 
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return notifications;
     const q = searchQuery.toLowerCase();
     return notifications.filter(
-      (n) =>
-        n.title.toLowerCase().includes(q) ||
-        (n.preview && n.preview.toLowerCase().includes(q))
+      (n) => n.title.toLowerCase().includes(q) || (n.preview?.toLowerCase().includes(q) ?? false)
     );
   }, [notifications, searchQuery]);
 
-  const grouped = useMemo(() => groupNotificationsByDate(filtered), [filtered]);
+  const grouped = useMemo(() => groupByDate(filtered), [filtered]);
 
   if (authLoading) {
     return (
@@ -226,17 +201,18 @@ export default function CrmNotifications() {
   const someSelected = selectedIds.size > 0 && !allSelected;
 
   return (
-    <CrmLayout currentUser={currentUser}>
+    <CrmLayout currentUser={currentUser} disableScroll>
       {/*
-        Use a full-viewport-height container that shrinks only when content
-        overflows (normal page scroll). The bg-white from CrmLayout already
-        covers the whole screen so we just need flex-col + min-h to ensure
-        the empty state can be properly centred in the remaining space.
+        CrmLayout disableScroll now renders:
+          outer: h-screen pt-16 lg:pt-14 overflow-hidden flex flex-col
+          inner: flex-1 min-h-0 p-4 lg:p-6 flex flex-col   ← our direct flex parent
+
+        So our root div just needs flex-1 min-h-0 to fill the remaining space.
       */}
-      <div className="flex flex-col" style={{ minHeight: "calc(100vh - 7rem)" }}>
+      <div className="flex-1 min-h-0 flex flex-col gap-4">
 
         {/* ── Header ── */}
-        <div className="mb-4">
+        <div className="flex-shrink-0">
           <h1 className="text-xl font-semibold text-slate-900">Notifications</h1>
           <p className="text-sm text-slate-500 mt-0.5">
             Mentions, task assignments, and system updates
@@ -244,14 +220,13 @@ export default function CrmNotifications() {
         </div>
 
         {/* ── Toolbar ── */}
-        <div className="flex flex-wrap items-center gap-3 mb-4">
-          {/* Unread / All toggle */}
+        <div className="flex-shrink-0 flex flex-wrap items-center gap-3">
           <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
             {(["unread", "all"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors capitalize ${
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   tab === t
                     ? "bg-white text-slate-900 shadow-sm"
                     : "text-slate-500 hover:text-slate-700"
@@ -262,7 +237,6 @@ export default function CrmNotifications() {
             ))}
           </div>
 
-          {/* Type filter */}
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-[130px] h-8 text-xs bg-white border-slate-200">
               <SelectValue placeholder="All Types" />
@@ -277,7 +251,6 @@ export default function CrmNotifications() {
             </SelectContent>
           </Select>
 
-          {/* Search */}
           <div className="relative flex-1 min-w-[160px] max-w-xs">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
             <Input
@@ -291,32 +264,26 @@ export default function CrmNotifications() {
           <div className="flex items-center gap-2 ml-auto">
             {selectedIds.size > 0 && (
               <Button
-                variant="outline"
-                size="sm"
-                onClick={() => markSelectedReadMutation.mutate(Array.from(selectedIds))}
-                disabled={markSelectedReadMutation.isPending}
+                variant="outline" size="sm"
+                onClick={() => markSelectedMutation.mutate(Array.from(selectedIds))}
+                disabled={markSelectedMutation.isPending}
                 className="h-8 text-xs border-slate-200"
               >
-                {markSelectedReadMutation.isPending ? (
-                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                ) : (
-                  <CheckCheck className="h-3.5 w-3.5 mr-1.5" />
-                )}
+                {markSelectedMutation.isPending
+                  ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  : <CheckCheck className="h-3.5 w-3.5 mr-1.5" />}
                 Mark {selectedIds.size} read
               </Button>
             )}
             <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => markAllReadMutation.mutate()}
-              disabled={markAllReadMutation.isPending || !hasNotifications}
+              variant="ghost" size="sm"
+              onClick={() => markAllMutation.mutate()}
+              disabled={markAllMutation.isPending || !hasNotifications}
               className="h-8 text-xs text-slate-500 hover:text-slate-700"
             >
-              {markAllReadMutation.isPending ? (
-                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-              ) : (
-                <CheckCheck className="h-3.5 w-3.5 mr-1.5" />
-              )}
+              {markAllMutation.isPending
+                ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                : <CheckCheck className="h-3.5 w-3.5 mr-1.5" />}
               Mark all read
             </Button>
           </div>
@@ -324,12 +291,12 @@ export default function CrmNotifications() {
 
         {/* Select-all row */}
         {hasNotifications && (
-          <div className="flex items-center gap-2 px-1 mb-2">
+          <div className="flex-shrink-0 flex items-center gap-2 px-1">
             <Checkbox
               checked={allSelected}
-              onCheckedChange={(v) => {
-                setSelectedIds(v ? new Set(filtered.map((n) => n.id)) : new Set());
-              }}
+              onCheckedChange={(v) =>
+                setSelectedIds(v ? new Set(filtered.map((n) => n.id)) : new Set())
+              }
               aria-label="Select all"
               className={someSelected ? "data-[state=checked]:bg-slate-400" : ""}
             />
@@ -339,139 +306,121 @@ export default function CrmNotifications() {
           </div>
         )}
 
-        {/* ── Content ── */}
-        {notificationsLoading ? (
-          <div className="max-w-3xl space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex gap-3 p-3 bg-white border border-slate-200 rounded-lg">
-                <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-1/2" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : !hasNotifications ? (
-          /* Empty state — centred in remaining vertical space */
-          <div className="flex-1 flex flex-col items-center justify-center text-center py-16">
-            <Inbox className="h-12 w-12 text-slate-300 mb-3" />
-            <p className="text-base font-medium text-slate-600">
-              {tab === "unread" ? "You're all caught up!" : "No notifications yet"}
-            </p>
-            <p className="text-sm text-slate-400 mt-1">
-              {tab === "unread"
-                ? "No unread notifications."
-                : "Notifications appear here when tasks are assigned or you're mentioned."}
-            </p>
-          </div>
-        ) : (
-          <div className="max-w-3xl space-y-6 pb-8">
-            {DATE_GROUP_ORDER.map((group) => {
-              const items = grouped[group];
-              if (!items.length) return null;
-              return (
-                <div key={group}>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">
-                    {group}
-                  </p>
-                  <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
-                    {items.map((n) => (
-                      <div
-                        key={n.id}
-                        className={`flex items-start gap-3 px-3 py-3 transition-colors hover:bg-slate-50 ${
-                          !n.isRead ? "bg-slate-50/70" : ""
-                        }`}
-                      >
-                        <Checkbox
-                          checked={selectedIds.has(n.id)}
-                          onCheckedChange={(v) => {
-                            const next = new Set(selectedIds);
-                            v ? next.add(n.id) : next.delete(n.id);
-                            setSelectedIds(next);
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          aria-label="Select"
-                          className="mt-0.5 flex-shrink-0"
-                        />
-
-                        <div
-                          className="flex-1 min-w-0 flex gap-3 cursor-pointer"
-                          onClick={() => {
-                            if (!n.isRead) markAsReadMutation.mutate(n.id);
-                            const link = getEntityLink(n.entityType, n.entityId);
-                            if (link) navigate(link);
-                          }}
-                        >
-                          {/* Icon */}
-                          <div className="flex-shrink-0 mt-0.5 w-7 h-7 flex items-center justify-center rounded-full bg-slate-100">
-                            {getNotificationIcon(n.type)}
-                          </div>
-
-                          {/* Body */}
-                          <div className="flex-1 min-w-0">
-                            <p
-                              className={`text-sm leading-snug ${
-                                !n.isRead ? "font-semibold text-slate-900" : "text-slate-700"
-                              }`}
-                            >
-                              {n.title}
-                            </p>
-                            {n.preview && (
-                              <p className="text-sm text-slate-500 line-clamp-2 mt-0.5">
-                                {n.preview}
-                              </p>
-                            )}
-                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                              <span className="text-xs text-slate-400">
-                                {n.createdAt
-                                  ? formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })
-                                  : ""}
-                              </span>
-                              {n.entityType && (
-                                <Badge
-                                  variant="secondary"
-                                  className="text-[10px] px-1.5 py-0 h-4 bg-slate-100 text-slate-500 border-0"
-                                >
-                                  {getEntityBadgeLabel(n.entityType)}
-                                </Badge>
-                              )}
-                              {n.actorName && (
-                                <div className="flex items-center gap-1">
-                                  <Avatar className="h-4 w-4">
-                                    <AvatarFallback className="text-[9px] bg-slate-200 text-slate-600">
-                                      {n.actorName
-                                        .split(" ")
-                                        .map((s) => s[0])
-                                        .join("")
-                                        .toUpperCase()
-                                        .slice(0, 2)}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <span className="text-xs text-slate-400">{n.actorName}</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Unread dot */}
-                          {!n.isRead && (
-                            <div className="flex-shrink-0 mt-2">
-                              <div
-                                className="h-2 w-2 rounded-full"
-                                style={{ backgroundColor: "#711419" }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+        {/* ── Scrollable content — fills all remaining height ── */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {nLoading ? (
+            <div className="max-w-3xl space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex gap-3 p-3 bg-white border border-slate-200 rounded-lg">
+                  <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              ))}
+            </div>
+          ) : !hasNotifications ? (
+            /* Empty state vertically centred in the full remaining height */
+            <div className="h-full flex flex-col items-center justify-center text-center py-8">
+              <Inbox className="h-12 w-12 text-slate-300 mb-3" />
+              <p className="text-base font-medium text-slate-600">
+                {tab === "unread" ? "You're all caught up!" : "No notifications yet"}
+              </p>
+              <p className="text-sm text-slate-400 mt-1">
+                {tab === "unread"
+                  ? "No unread notifications."
+                  : "Notifications appear here when tasks are assigned or you're mentioned."}
+              </p>
+            </div>
+          ) : (
+            <div className="max-w-3xl space-y-6 pb-8">
+              {DATE_GROUP_ORDER.map((group) => {
+                const items = grouped[group];
+                if (!items.length) return null;
+                return (
+                  <div key={group}>
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">
+                      {group}
+                    </p>
+                    <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
+                      {items.map((n) => (
+                        <div
+                          key={n.id}
+                          className={`flex items-start gap-3 px-3 py-3 transition-colors hover:bg-slate-50 ${
+                            !n.isRead ? "bg-slate-50/70" : ""
+                          }`}
+                        >
+                          <Checkbox
+                            checked={selectedIds.has(n.id)}
+                            onCheckedChange={(v) => {
+                              const next = new Set(selectedIds);
+                              v ? next.add(n.id) : next.delete(n.id);
+                              setSelectedIds(next);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label="Select"
+                            className="mt-0.5 flex-shrink-0"
+                          />
+
+                          <div
+                            className="flex-1 min-w-0 flex gap-3 cursor-pointer"
+                            onClick={() => {
+                              if (!n.isRead) markOneMutation.mutate(n.id);
+                              const link = getEntityLink(n.entityType, n.entityId);
+                              if (link) navigate(link);
+                            }}
+                          >
+                            <div className="flex-shrink-0 mt-0.5 w-7 h-7 flex items-center justify-center rounded-full bg-slate-100">
+                              <NotifIcon type={n.type} />
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm leading-snug ${!n.isRead ? "font-semibold text-slate-900" : "text-slate-700"}`}>
+                                {n.title}
+                              </p>
+                              {n.preview && (
+                                <p className="text-sm text-slate-500 line-clamp-2 mt-0.5">{n.preview}</p>
+                              )}
+                              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                <span className="text-xs text-slate-400">
+                                  {n.createdAt
+                                    ? formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })
+                                    : ""}
+                                </span>
+                                {n.entityType && (
+                                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-slate-100 text-slate-500 border-0">
+                                    {getEntityLabel(n.entityType)}
+                                  </Badge>
+                                )}
+                                {n.actorName && (
+                                  <div className="flex items-center gap-1">
+                                    <Avatar className="h-4 w-4">
+                                      <AvatarFallback className="text-[9px] bg-slate-200 text-slate-600">
+                                        {n.actorName.split(" ").map((s) => s[0]).join("").toUpperCase().slice(0, 2)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <span className="text-xs text-slate-400">{n.actorName}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {!n.isRead && (
+                              <div className="flex-shrink-0 mt-2">
+                                <div className="h-2 w-2 rounded-full" style={{ backgroundColor: "#711419" }} />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </CrmLayout>
   );
