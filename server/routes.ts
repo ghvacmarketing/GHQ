@@ -7864,12 +7864,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (notif.type === "tagged_comment" && notif.entityId) {
-        await db.update(crmTaggedCommentRecipients).set({ dismissed: true }).where(
+        await db.delete(crmNotifications).where(
           and(
-            eq(crmTaggedCommentRecipients.commentId, notif.entityId),
-            eq(crmTaggedCommentRecipients.userId, currentUser.id)
+            eq(crmNotifications.type, "tagged_comment"),
+            eq(crmNotifications.entityId, notif.entityId)
           )
         );
+
+        await db.delete(crmTaggedCommentRecipients).where(
+          eq(crmTaggedCommentRecipients.commentId, notif.entityId)
+        );
+
+        await db.delete(crmTaggedComments).where(
+          eq(crmTaggedComments.id, notif.entityId)
+        );
+
+        return res.json({ deleted: 1 });
       }
 
       const result = await db.delete(crmNotifications).where(eq(crmNotifications.id, id));
@@ -8129,7 +8139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/crm/tagged-comments/:commentId/dismiss", requireCrmAuth, async (req, res) => {
+  app.delete("/api/crm/tagged-comments/:commentId", requireCrmAuth, async (req, res) => {
     try {
       const currentUser = await getCurrentCrmUser(req);
       if (!currentUser) return res.status(401).json({ message: "Unauthorized" });
@@ -8138,60 +8148,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [comment] = await db.select()
         .from(crmTaggedComments)
-        .where(and(
-          eq(crmTaggedComments.id, commentId),
-          eq(crmTaggedComments.authorId, currentUser.id),
-        ));
-
-      if (!comment) {
-        return res.status(404).json({ message: "Comment not found or you are not the author" });
-      }
-
-      await db.update(crmTaggedComments)
-        .set({ authorDismissed: true })
         .where(eq(crmTaggedComments.id, commentId));
 
-      await db.delete(crmNotifications).where(
-        and(
-          eq(crmNotifications.type, "tagged_comment"),
-          eq(crmNotifications.entityId, commentId),
-          eq(crmNotifications.userId, currentUser.id)
-        )
-      );
+      if (!comment) {
+        return res.status(404).json({ message: "Comment not found" });
+      }
 
-      return res.json({ dismissed: true });
-    } catch (error) {
-      console.error("Error dismissing tagged comment:", error);
-      return res.status(500).json({ message: "Failed to dismiss tagged comment" });
-    }
-  });
-
-  app.patch("/api/crm/tagged-comments/:commentId/dismiss-recipient", requireCrmAuth, async (req, res) => {
-    try {
-      const currentUser = await getCurrentCrmUser(req);
-      if (!currentUser) return res.status(401).json({ message: "Unauthorized" });
-
-      const { commentId } = req.params;
-
-      await db.update(crmTaggedCommentRecipients)
-        .set({ dismissed: true })
+      const isAuthor = comment.authorId === currentUser.id;
+      const [isRecipient] = await db.select({ id: crmTaggedCommentRecipients.id })
+        .from(crmTaggedCommentRecipients)
         .where(and(
           eq(crmTaggedCommentRecipients.commentId, commentId),
           eq(crmTaggedCommentRecipients.userId, currentUser.id)
         ));
 
+      if (!isAuthor && !isRecipient) {
+        return res.status(403).json({ message: "Not authorized to delete this comment" });
+      }
+
       await db.delete(crmNotifications).where(
         and(
           eq(crmNotifications.type, "tagged_comment"),
-          eq(crmNotifications.entityId, commentId),
-          eq(crmNotifications.userId, currentUser.id)
+          eq(crmNotifications.entityId, commentId)
         )
       );
 
-      return res.json({ dismissed: true });
+      await db.delete(crmTaggedCommentRecipients).where(
+        eq(crmTaggedCommentRecipients.commentId, commentId)
+      );
+
+      await db.delete(crmTaggedComments).where(
+        eq(crmTaggedComments.id, commentId)
+      );
+
+      return res.json({ deleted: true });
     } catch (error) {
-      console.error("Error dismissing tagged comment recipient:", error);
-      return res.status(500).json({ message: "Failed to dismiss" });
+      console.error("Error deleting tagged comment:", error);
+      return res.status(500).json({ message: "Failed to delete tagged comment" });
     }
   });
 

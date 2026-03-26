@@ -54,10 +54,13 @@ export function TaggedCommentsDisplay() {
 
   const dismissMutation = useMutation({
     mutationFn: async (commentId: string) => {
-      await apiRequest("PATCH", `/api/crm/tagged-comments/${commentId}/dismiss`);
+      await apiRequest("DELETE", `/api/crm/tagged-comments/${commentId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/tagged-comments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/tagged-comments/history"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
     },
   });
 

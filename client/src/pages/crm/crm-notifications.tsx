@@ -94,6 +94,7 @@ export default function CrmNotifications() {
     queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications"] });
     queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
     queryClient.invalidateQueries({ queryKey: ["/api/crm/tagged-comments/history"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/tagged-comments"] });
   };
 
   const markReadMut = useMutation({
@@ -115,11 +116,8 @@ export default function CrmNotifications() {
   });
 
   const dismissHistoryMut = useMutation({
-    mutationFn: ({ commentId, role }: { commentId: string; role: string }) => {
-      if (role === "recipient") {
-        return apiRequest("PATCH", `/api/crm/tagged-comments/${commentId}/dismiss-recipient`);
-      }
-      return apiRequest("PATCH", `/api/crm/tagged-comments/${commentId}/dismiss`);
+    mutationFn: ({ commentId }: { commentId: string }) => {
+      return apiRequest("DELETE", `/api/crm/tagged-comments/${commentId}`);
     },
     onSuccess: invalidateAll,
   });
@@ -214,7 +212,7 @@ export default function CrmNotifications() {
             ) : (
               <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 overflow-hidden mb-6">
                 {taggedHistory.map((item) => (
-                  <TaggedNoteHistoryRow key={`${item.id}-${item.role}`} item={item} currentUserId={currentUser.id} buildUrl={buildHighlightUrl} onDismiss={() => dismissHistoryMut.mutate({ commentId: item.id, role: item.role })} />
+                  <TaggedNoteHistoryRow key={`${item.id}-${item.role}`} item={item} currentUserId={currentUser.id} buildUrl={buildHighlightUrl} onDismiss={() => dismissHistoryMut.mutate({ commentId: item.id })} />
                 ))}
               </div>
             )}
