@@ -47,6 +47,7 @@ import {
   CalendarIcon,
   Clock,
   CheckCircle2,
+  Check,
   Circle,
   User,
   Building,
@@ -298,12 +299,12 @@ function DroppableColumn({
 
       <div className="px-2 pb-2">
         {isAddingTask ? (
-          <div className="flex items-center gap-1">
-            <Input
+          <div className="flex flex-col gap-1.5 bg-slate-50 rounded-lg p-2">
+            <input
               value={quickAddValue}
               onChange={(e) => setQuickAddValue(e.target.value)}
-              placeholder="Task title..."
-              className="h-7 text-xs border-slate-200 focus-visible:ring-[#711419]/30"
+              placeholder="Task name..."
+              className="w-full bg-transparent text-xs text-slate-700 placeholder:text-slate-400 outline-none"
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === "Enter" && quickAddValue.trim()) {
@@ -315,25 +316,21 @@ function DroppableColumn({
               }}
               disabled={isCreating}
             />
-            <Button
-              size="sm"
-              className="h-7 px-2 bg-[#711419] hover:bg-[#5a1014]"
-              onClick={handleQuickAdd}
-              disabled={!quickAddValue.trim() || isCreating}
-            >
-              {isCreating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2 text-slate-400 hover:text-slate-600"
-              onClick={() => {
-                onStopAdding();
-                setQuickAddValue("");
-              }}
-            >
-              <X className="h-3 w-3" />
-            </Button>
+            <div className="flex items-center justify-end gap-1">
+              <button
+                onClick={() => { onStopAdding(); setQuickAddValue(""); }}
+                className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
+              >
+                <X className="h-3 w-3" />
+              </button>
+              <button
+                onClick={handleQuickAdd}
+                disabled={!quickAddValue.trim() || isCreating}
+                className="p-1 rounded text-green-600 hover:bg-green-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                {isCreating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+              </button>
+            </div>
           </div>
         ) : (
           <button
