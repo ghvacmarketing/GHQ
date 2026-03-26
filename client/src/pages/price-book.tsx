@@ -1,8 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, forwardRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Document, Page, pdfjs } from "react-pdf";
-import "react-pdf/dist/Page/AnnotationLayer.css";
-import "react-pdf/dist/Page/TextLayer.css";
+import HTMLFlipBook from "react-pageflip";
 import {
   Settings,
   ChevronLeft,
@@ -22,38 +20,57 @@ import MobileNav from "@/components/mobile-nav";
 import redlogo from "@assets/redlogo.webp";
 import type { SalesbookBookmark } from "@shared/schema";
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url
-).toString();
+interface SalesbookPageInfo {
+  totalPages: number;
+  pageWidth: number;
+  pageHeight: number;
+  pages: string[];
+}
 
-const PDF_URL = "/assets/Chandler_Sales_Book_1766587153181.pdf";
+const PageImage = forwardRef<HTMLDivElement, { src: string; pageNum: number }>(
+  ({ src, pageNum }, ref) => {
+    return (
+      <div ref={ref} className="page-content">
+        <img
+          src={src}
+          alt={`Page ${pageNum}`}
+          style={{ width: "100%", height: "100%", objectFit: "contain" }}
+          loading="lazy"
+        />
+      </div>
+    );
+  }
+);
+PageImage.displayName = "PageImage";
 
 export default function PriceBook() {
-  const [numPages, setNumPages] = useState<number>(0);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(0);
   const [scale, setScale] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [pageInput, setPageInput] = useState("1");
-  const [pdfLoading, setPdfLoading] = useState(true);
-  const [containerWidth, setContainerWidth] = useState(800);
+  const [containerSize, setContainerSize] = useState({ w: 800, h: 600 });
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
+  const flipBookRef = useRef<any>(null);
+
+  const { data: pageInfo, isLoading: pagesLoading } = useQuery<SalesbookPageInfo>({
+    queryKey: ["/api/salesbook/pages"],
+  });
 
   const { data: bookmarks = [] } = useQuery<SalesbookBookmark[]>({
     queryKey: ["/api/salesbook/bookmarks"],
   });
 
   useEffect(() => {
-    const updateWidth = () => {
+    const updateSize = () => {
       if (containerRef.current) {
-        const w = containerRef.current.clientWidth;
-        setContainerWidth(w > 0 ? w : 800);
+        const rect = containerRef.current.getBoundingClientRect();
+        setContainerSize({ w: rect.width > 0 ? rect.width : 800, h: rect.height > 0 ? rect.height : 600 });
       }
     };
-    updateWidth();
-    const observer = new ResizeObserver(updateWidth);
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
     if (containerRef.current) observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, []);
@@ -64,23 +81,28 @@ export default function PriceBook() {
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
 
-  const onDocumentLoadSuccess = useCallback(({ numPages: total }: { numPages: number }) => {
-    setNumPages(total);
-    setPdfLoading(false);
+  const onFlip = useCallback((e: any) => {
+    const page = e.data;
+    setCurrentPage(page);
+    setPageInput(String(page + 1));
   }, []);
 
   const goToPage = useCallback(
-    (page: number) => {
-      const p = Math.max(1, Math.min(page, numPages));
+    (pageNum: number) => {
+      if (!pageInfo) return;
+      const p = Math.max(0, Math.min(pageNum, pageInfo.totalPages - 1));
+      if (flipBookRef.current) {
+        flipBookRef.current.pageFlip().flip(p);
+      }
       setCurrentPage(p);
-      setPageInput(String(p));
+      setPageInput(String(p + 1));
     },
-    [numPages]
+    [pageInfo]
   );
 
   const handlePageInputSubmit = () => {
     const p = parseInt(pageInput, 10);
-    if (!isNaN(p)) goToPage(p);
+    if (!isNaN(p)) goToPage(p - 1);
   };
 
   const toggleFullscreen = async () => {
@@ -92,18 +114,18 @@ export default function PriceBook() {
     }
   };
 
-  const zoomIn = () => setScale((s) => Math.min(s + 0.25, 3));
-  const zoomOut = () => setScale((s) => Math.max(s - 0.25, 0.5));
+  const zoomIn = () => setScale((s) => Math.min(s + 0.2, 2.5));
+  const zoomOut = () => setScale((s) => Math.max(s - 0.2, 0.5));
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return;
       if (e.key === "ArrowRight" || e.key === "ArrowDown") {
         e.preventDefault();
-        goToPage(currentPage + 1);
+        if (flipBookRef.current) flipBookRef.current.pageFlip().flipNext();
       } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
         e.preventDefault();
-        goToPage(currentPage - 1);
+        if (flipBookRef.current) flipBookRef.current.pageFlip().flipPrev();
       } else if (e.key === "+" || e.key === "=") {
         zoomIn();
       } else if (e.key === "-") {
@@ -112,38 +134,85 @@ export default function PriceBook() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [currentPage, goToPage]);
+  }, []);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    let startX = 0;
-    let startY = 0;
-    const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 1) {
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        if (e.deltaY < 0) zoomIn();
+        else zoomOut();
       }
     };
-    const onTouchEnd = (e: TouchEvent) => {
-      if (e.changedTouches.length === 1) {
-        const dx = e.changedTouches[0].clientX - startX;
-        const dy = e.changedTouches[0].clientY - startY;
-        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
-          if (dx < 0) goToPage(currentPage + 1);
-          else goToPage(currentPage - 1);
-        }
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    let initialDistance = 0;
+    let initialScale = 1;
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        initialDistance = Math.hypot(dx, dy);
+        initialScale = scale;
       }
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && initialDistance > 0) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const currentDistance = Math.hypot(dx, dy);
+        const newScale = Math.max(0.5, Math.min(2.5, initialScale * (currentDistance / initialDistance)));
+        setScale(newScale);
+      }
+    };
+    const onTouchEnd = () => {
+      initialDistance = 0;
     };
     el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
     el.addEventListener("touchend", onTouchEnd, { passive: true });
     return () => {
       el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
       el.removeEventListener("touchend", onTouchEnd);
     };
-  }, [currentPage, goToPage]);
+  }, [scale]);
 
-  const pageWidth = Math.min(containerWidth - 32, 900) * scale;
+  const bookPanelWidth = showBookmarks ? 256 : 0;
+  const availWidth = containerSize.w - bookPanelWidth - 32;
+  const availHeight = containerSize.h - 16;
+  const isMobile = containerSize.w < 640;
+
+  const aspectRatio = pageInfo ? pageInfo.pageHeight / pageInfo.pageWidth : 1.294;
+  let pageW: number;
+  let pageH: number;
+
+  if (isMobile) {
+    pageW = Math.min(availWidth - 8, 500);
+    pageH = pageW * aspectRatio;
+    if (pageH > availHeight - 8) {
+      pageH = availHeight - 8;
+      pageW = pageH / aspectRatio;
+    }
+  } else {
+    pageH = Math.min(availHeight - 8, 800);
+    pageW = pageH / aspectRatio;
+    if (pageW * 2 > availWidth) {
+      pageW = (availWidth) / 2;
+      pageH = pageW * aspectRatio;
+    }
+  }
+
+  pageW = Math.floor(pageW * scale);
+  pageH = Math.floor(pageH * scale);
 
   return (
     <div
@@ -181,7 +250,7 @@ export default function PriceBook() {
               size="icon"
               onClick={zoomOut}
               className="text-white hover:bg-neutral-700 h-8 w-8"
-              title="Zoom Out"
+              title="Zoom Out (or Ctrl+Scroll)"
             >
               <ZoomOut className="h-4 w-4" />
             </Button>
@@ -193,7 +262,7 @@ export default function PriceBook() {
               size="icon"
               onClick={zoomIn}
               className="text-white hover:bg-neutral-700 h-8 w-8"
-              title="Zoom In"
+              title="Zoom In (or Ctrl+Scroll)"
             >
               <ZoomIn className="h-4 w-4" />
             </Button>
@@ -251,13 +320,13 @@ export default function PriceBook() {
                     <li key={bm.id}>
                       <button
                         className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                          currentPage === bm.pageNumber
+                          currentPage + 1 === bm.pageNumber
                             ? "bg-amber-600/20 text-amber-400"
                             : "text-neutral-300 hover:bg-neutral-700 hover:text-white"
                         }`}
                         onClick={() => {
-                          goToPage(bm.pageNumber);
-                          if (window.innerWidth < 640) setShowBookmarks(false);
+                          goToPage(bm.pageNumber - 1);
+                          if (isMobile) setShowBookmarks(false);
                         }}
                       >
                         <span className="block truncate">{bm.label}</span>
@@ -275,35 +344,54 @@ export default function PriceBook() {
 
         <div
           ref={containerRef}
-          className="flex-1 overflow-auto flex justify-center items-start"
-          onClick={(e) => {
-            if (showBookmarks && window.innerWidth < 640) setShowBookmarks(false);
-          }}
+          className="flex-1 overflow-auto flex justify-center items-center"
         >
-          {pdfLoading && (
-            <div className="flex flex-col items-center justify-center h-full gap-3">
+          {pagesLoading ? (
+            <div className="flex flex-col items-center justify-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
               <p className="text-sm text-neutral-400">Loading salesbook...</p>
             </div>
+          ) : pageInfo && pageInfo.pages.length > 0 ? (
+            <div style={{ transform: `scale(1)`, transformOrigin: 'center center' }}>
+              {/* @ts-ignore - react-pageflip types are incomplete */}
+              <HTMLFlipBook
+                ref={flipBookRef}
+                width={pageW}
+                height={pageH}
+                size="fixed"
+                minWidth={200}
+                maxWidth={1200}
+                minHeight={260}
+                maxHeight={1600}
+                showCover={true}
+                mobileScrollSupport={false}
+                onFlip={onFlip}
+                className="flipbook-container"
+                startPage={0}
+                drawShadow={true}
+                flippingTime={600}
+                usePortrait={isMobile}
+                startZIndex={0}
+                autoSize={false}
+                maxShadowOpacity={0.5}
+                showPageCorners={true}
+                disableFlipByClick={false}
+                swipeDistance={30}
+                clickEventForward={true}
+                useMouseEvents={true}
+                renderOnlyPageLengthChange={false}
+              >
+                {pageInfo.pages.map((src, idx) => (
+                  <PageImage key={idx} src={src} pageNum={idx + 1} />
+                ))}
+              </HTMLFlipBook>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-3">
+              <BookOpen className="h-8 w-8 text-neutral-500" />
+              <p className="text-sm text-neutral-400">No salesbook pages available</p>
+            </div>
           )}
-          <Document
-            file={PDF_URL}
-            onLoadSuccess={onDocumentLoadSuccess}
-            loading=""
-            className="py-4"
-          >
-            <Page
-              pageNumber={currentPage}
-              width={pageWidth}
-              renderTextLayer={false}
-              renderAnnotationLayer={false}
-              loading={
-                <div className="flex items-center justify-center" style={{ width: pageWidth, height: pageWidth * 1.4 }}>
-                  <Loader2 className="h-6 w-6 animate-spin text-amber-400" />
-                </div>
-              }
-            />
-          </Document>
         </div>
       </div>
 
@@ -312,8 +400,8 @@ export default function PriceBook() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => goToPage(currentPage - 1)}
-            disabled={currentPage <= 1}
+            onClick={() => flipBookRef.current?.pageFlip()?.flipPrev()}
+            disabled={currentPage <= 0}
             className="text-white hover:bg-neutral-700 h-8 w-8 disabled:opacity-30"
           >
             <ChevronLeft className="h-5 w-5" />
@@ -329,14 +417,14 @@ export default function PriceBook() {
               onKeyDown={(e) => e.key === "Enter" && handlePageInputSubmit()}
               className="w-12 h-7 text-center bg-neutral-700 border-neutral-600 text-white text-sm p-0"
             />
-            <span className="text-neutral-400">of {numPages || "..."}</span>
+            <span className="text-neutral-400">of {pageInfo?.totalPages || "..."}</span>
           </div>
 
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => goToPage(currentPage + 1)}
-            disabled={currentPage >= numPages}
+            onClick={() => flipBookRef.current?.pageFlip()?.flipNext()}
+            disabled={pageInfo ? currentPage >= pageInfo.totalPages - 1 : true}
             className="text-white hover:bg-neutral-700 h-8 w-8 disabled:opacity-30"
           >
             <ChevronRight className="h-5 w-5" />

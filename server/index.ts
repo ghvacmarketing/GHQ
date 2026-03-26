@@ -146,6 +146,10 @@ import path from "path";
 const assetsPath = path.resolve(import.meta.dirname, "..", "attached_assets");
 app.use("/assets", express.static(assetsPath));
 
+// Serve converted salesbook page images
+const salesbookPagesPath = path.resolve(import.meta.dirname, "..", "public", "salesbook-pages");
+app.use("/salesbook-pages", express.static(salesbookPagesPath, { maxAge: '30d' }));
+
 async function runTaggedCommentMigrations() {
   try {
     const { db } = await import("./db");
@@ -179,6 +183,12 @@ async function runSalesbookMigrations() {
 (async () => {
   await runTaggedCommentMigrations();
   await runSalesbookMigrations();
+  try {
+    const { ensureSalesbookConverted } = await import("./services/salesbook-converter");
+    ensureSalesbookConverted();
+  } catch (err) {
+    console.error("Salesbook conversion error (non-fatal):", err);
+  }
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

@@ -27848,12 +27848,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
-  app.post("/api/salesbook/bookmarks", requireCrmAuth, async (req, res) => {
+  app.post("/api/salesbook/bookmarks", requireCrmAdmin, async (req, res) => {
     try {
-      const user = (req as any).crmUser;
-      if (!isSalesOrAbove(user)) {
-        return res.status(403).json({ message: "Insufficient permissions" });
-      }
       const result = insertSalesbookBookmarkSchema.safeParse(req.body);
       if (!result.success) {
         return res.status(400).json({ message: "Invalid bookmark data", errors: result.error.flatten().fieldErrors });
@@ -27872,12 +27868,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     sortOrder: z.number().int().min(0).optional(),
   }).refine(data => Object.keys(data).length > 0, { message: "At least one field must be provided" });
 
-  app.patch("/api/salesbook/bookmarks/:id", requireCrmAuth, async (req, res) => {
+  app.patch("/api/salesbook/bookmarks/:id", requireCrmAdmin, async (req, res) => {
     try {
-      const user = (req as any).crmUser;
-      if (!isSalesOrAbove(user)) {
-        return res.status(403).json({ message: "Insufficient permissions" });
-      }
       const { id } = req.params;
       const result = bookmarkUpdateSchema.safeParse(req.body);
       if (!result.success) {
@@ -27894,12 +27886,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
   const reorderSchema = z.object({ order: z.array(z.string().min(1)) });
 
-  app.put("/api/salesbook/bookmarks/reorder", requireCrmAuth, async (req, res) => {
+  app.put("/api/salesbook/bookmarks/reorder", requireCrmAdmin, async (req, res) => {
     try {
-      const user = (req as any).crmUser;
-      if (!isSalesOrAbove(user)) {
-        return res.status(403).json({ message: "Insufficient permissions" });
-      }
       const result = reorderSchema.safeParse(req.body);
       if (!result.success) {
         return res.status(400).json({ message: "order must be an array of bookmark ids" });
@@ -27916,12 +27904,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
-  app.delete("/api/salesbook/bookmarks/:id", requireCrmAuth, async (req, res) => {
+  app.delete("/api/salesbook/bookmarks/:id", requireCrmAdmin, async (req, res) => {
     try {
-      const user = (req as any).crmUser;
-      if (!isSalesOrAbove(user)) {
-        return res.status(403).json({ message: "Insufficient permissions" });
-      }
       const { id } = req.params;
       await db.delete(salesbookBookmarks).where(eq(salesbookBookmarks.id, id));
       return res.json({ success: true });
@@ -27931,15 +27915,15 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
-  app.get("/api/salesbook/info", (req, res) => {
-    const pdfPath = path.join(process.cwd(), 'attached_assets', 'Chandler_Sales_Book_1766587153181.pdf');
-    const exists = fs.existsSync(pdfPath);
-    const stats = exists ? fs.statSync(pdfPath) : null;
-    return res.json({
-      pdfUrl: '/assets/Chandler_Sales_Book_1766587153181.pdf',
-      fileSize: stats?.size || 0,
-      title: "Chandler's Sales Book",
-    });
+  app.get("/api/salesbook/pages", async (req, res) => {
+    try {
+      const { ensureSalesbookConverted } = await import("./services/salesbook-converter");
+      const info = ensureSalesbookConverted();
+      return res.json(info);
+    } catch (error) {
+      console.error("Error getting salesbook pages:", error);
+      return res.status(500).json({ message: "Failed to load salesbook pages" });
+    }
   });
 
   const httpServer = createServer(app);
