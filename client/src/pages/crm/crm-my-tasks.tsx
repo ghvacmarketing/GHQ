@@ -314,6 +314,20 @@ export default function CrmMyTasks() {
     staleTime: 0,
   });
 
+  useEffect(() => {
+    if (!tasksData?.tasks) return;
+    const params = new URLSearchParams(window.location.search);
+    const taskId = params.get("task");
+    if (!taskId) return;
+    const found = tasksData.tasks.find((t: TaskWithRelations) => t.id === taskId);
+    if (found) {
+      setSelectedTask(found);
+      setIsDrawerOpen(true);
+      setIsCreateMode(false);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [tasksData?.tasks]);
+
   const { data: taskTypes = [] } = useQuery<TaskType[]>({
     queryKey: ["/api/tasks/types"],
     enabled: !!currentUser,

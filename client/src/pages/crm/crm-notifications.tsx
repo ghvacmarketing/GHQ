@@ -165,6 +165,21 @@ export default function CrmNotifications() {
   );
 }
 
+function getLink(entityType: string | null, entityId: string | null): string | null {
+  if (!entityType || !entityId) return null;
+  switch (entityType) {
+    case "task": return `/crm/my-tasks?task=${entityId}`;
+    case "customer": return `/crm/customers/${entityId}`;
+    case "lead": return "/crm/prospect-funnel";
+    case "project": return `/crm/projects/${entityId}`;
+    case "work_order": return `/crm/work-orders/${entityId}`;
+    case "quote": return `/crm/quotes/${entityId}`;
+    case "invoice": return `/crm/invoices/${entityId}`;
+    case "agreement": return "/crm/agreements";
+    default: return null;
+  }
+}
+
 function NotificationRow({
   notification: n,
   onMarkRead,
@@ -176,9 +191,8 @@ function NotificationRow({
 }) {
   const handleClick = () => {
     if (!n.isRead) onMarkRead();
-    if (n.entityType === "task" && n.entityId) {
-      onNavigate("/crm/my-tasks");
-    }
+    const link = getLink(n.entityType, n.entityId);
+    if (link) onNavigate(link);
   };
 
   return (
