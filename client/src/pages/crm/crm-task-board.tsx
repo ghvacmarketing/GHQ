@@ -65,7 +65,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CommentComposer } from "@/components/crm/comment-composer";
 import { CommentThread } from "@/components/crm/comment-thread";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import { format, isBefore, startOfDay, isToday as dateFnsIsToday, addDays, parseISO } from "date-fns";
+import { format, isBefore, startOfDay, isToday as dateFnsIsToday, isTomorrow as dateFnsIsTomorrow, addDays, parseISO } from "date-fns";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useDraggable, useDroppable, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -179,21 +179,24 @@ function DraggableTaskCard({
     none: "",
   };
 
-  const priorityAccent: Record<string, string> = {
-    urgent: "border-l-red-500",
-    high: "border-l-orange-400",
-    normal: "border-l-slate-200",
-    low: "border-l-slate-200",
+  const formatDueDate = (dueAt: string | Date | null) => {
+    if (!dueAt) return null;
+    const d = typeof dueAt === "string" ? new Date(dueAt) : dueAt;
+    if (dateFnsIsToday(d)) return { label: "Today", color: "text-amber-600" };
+    if (dateFnsIsTomorrow(d)) return { label: "Tomorrow", color: "text-blue-600" };
+    if (dueDateStatus === "overdue") return { label: format(d, "EEE, MMM d"), color: "text-red-500" };
+    return { label: format(d, "EEE, MMM d"), color: "text-slate-400" };
   };
-  const accent = priorityAccent[task.priority ?? "normal"] ?? "border-l-slate-200";
+
+  const dateInfo = formatDueDate(task.dueAt);
 
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={`
-        group bg-white border border-slate-200 border-l-4 ${accent} rounded-lg p-2.5 mb-1.5 cursor-pointer
-        hover:shadow-sm hover:border-slate-300 transition-all
+        group bg-white border border-slate-100 rounded-lg p-2.5 mb-1.5 cursor-pointer
+        hover:border-slate-200 hover:shadow-sm transition-all
         ${isDragging ? "opacity-40 shadow-xl ring-2 ring-[#711419]" : ""}
         ${isCompleted ? "opacity-50" : ""}
       `}
@@ -222,40 +225,18 @@ function DraggableTaskCard({
             {task.title}
           </p>
 
-          <div className="flex flex-wrap items-center gap-1 mt-1.5">
-            {task.dueAt && (
-              <span className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-                dueDateStatus === "overdue" ? "bg-red-50 text-red-600" :
-                dueDateStatus === "today" ? "bg-amber-50 text-amber-600" :
-                "bg-slate-100 text-slate-500"
-              }`}>
-                <Clock className="h-2.5 w-2.5 mr-0.5" />
-                {format(new Date(task.dueAt), "MMM d")}
-              </span>
-            )}
+          {task.description && (
+            <p className="text-[11px] text-slate-400 mt-0.5 leading-snug line-clamp-1">
+              {task.description}
+            </p>
+          )}
 
-            {task.type && (
-              <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                {task.type.name}
-              </span>
-            )}
-
-            {task.customer && (
-              <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 max-w-[120px] truncate">
-                <User className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
-                <span className="truncate">{task.customer.name}</span>
-              </span>
-            )}
-          </div>
+          {dateInfo && (
+            <p className={`text-[10px] font-medium mt-1.5 ${dateInfo.color}`}>
+              {dateInfo.label}
+            </p>
+          )}
         </div>
-
-        {task.assignedToUser && (
-          <Avatar className="h-5 w-5 flex-shrink-0 mt-0.5">
-            <AvatarFallback className="text-[9px] bg-slate-200 text-slate-600">
-              {getInitials(task.assignedToUser.name)}
-            </AvatarFallback>
-          </Avatar>
-        )}
       </div>
     </div>
   );
@@ -939,38 +920,24 @@ export default function CrmTaskBoard() {
           </div>
         </div>
 
-        <div
-          className={`
-            flex-shrink-0 bg-white border-l border-slate-200 overflow-y-auto
-            transition-all duration-300 ease-in-out
-            ${isDrawerOpen ? 'w-[500px] opacity-100' : 'w-0 opacity-0 overflow-hidden'}
-          `}
-        >
-          <div className="w-[500px] p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">
-                  {isCreateMode ? "Create Task" : "Edit Task"}
-                </h2>
-                <p className="text-sm text-slate-500">
-                  {isCreateMode ? "Add a new task to your board" : "Update task details"}
-                </p>
-              </div>
-              <Button variant="ghost" size="icon" onClick={handleCloseDrawer}>
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
+        <Dialog open={isDrawerOpen} onOpenChange={(open) => { if (!open) handleCloseDrawer(); }}>
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle className="text-base font-semibold">
+                {isCreateMode ? "New Task" : "Edit Task"}
+              </DialogTitle>
+            </DialogHeader>
 
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-6">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
                   name="title"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Title *</FormLabel>
+                      <FormLabel className="text-xs font-medium text-slate-600">Title</FormLabel>
                       <FormControl>
-                        <Input placeholder="Task title" {...field} />
+                        <Input placeholder="Task title" className="h-9" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -982,91 +949,15 @@ export default function CrmTaskBoard() {
                   name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Description</FormLabel>
+                      <FormLabel className="text-xs font-medium text-slate-600">Description</FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="Task description..."
-                          className="resize-none"
+                          placeholder="Add a description..."
+                          className="resize-none text-sm"
                           rows={3}
                           {...field}
                         />
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="in_progress">In Progress</SelectItem>
-                            <SelectItem value="completed">Completed</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="priority"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Priority</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select priority" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="urgent">Urgent</SelectItem>
-                            <SelectItem value="high">High</SelectItem>
-                            <SelectItem value="normal">Normal</SelectItem>
-                            <SelectItem value="low">Low</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="typeId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Task Type</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || "none"}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">No Type</SelectItem>
-                          {taskTypes.map((type) => (
-                            <SelectItem key={type.id} value={type.id}>
-                              {type.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -1077,11 +968,11 @@ export default function CrmTaskBoard() {
                   name="assignedToUserId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Assigned To</FormLabel>
+                      <FormLabel className="text-xs font-medium text-slate-600">Assigned To</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value || "none"}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select user" />
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Unassigned" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -1103,17 +994,15 @@ export default function CrmTaskBoard() {
                   name="dueAt"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Due Date</FormLabel>
+                      <FormLabel className="text-xs font-medium text-slate-600">Due Date</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
                             <Button
                               variant="outline"
-                              className={`w-full pl-3 text-left font-normal ${
-                                !field.value && "text-muted-foreground"
-                              }`}
+                              className={`w-full h-9 pl-3 text-left text-sm font-normal ${!field.value && "text-muted-foreground"}`}
                             >
-                              {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                              {field.value ? format(field.value, "EEE, MMM d, yyyy") : <span>Pick a date</span>}
                               <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
                           </FormControl>
@@ -1127,12 +1016,8 @@ export default function CrmTaskBoard() {
                           />
                           {field.value && (
                             <div className="p-2 border-t">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => field.onChange(null)}
-                              >
-                                Clear
+                              <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => field.onChange(null)}>
+                                Clear date
                               </Button>
                             </div>
                           )}
@@ -1143,305 +1028,44 @@ export default function CrmTaskBoard() {
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="relatedEntityType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Related Entity Type</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value || "none"}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            <SelectItem value="customer">Customer</SelectItem>
-                            <SelectItem value="lead">Lead</SelectItem>
-                            <SelectItem value="project">Project</SelectItem>
-                            <SelectItem value="work_order">Work Order</SelectItem>
-                            <SelectItem value="invoice">Invoice</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="relatedEntityId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Related Entity ID</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Entity ID" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                {selectedTask?.customer && (
-                  <div className="bg-slate-50 rounded-lg p-4 space-y-3">
-                    <h4 className="font-medium text-slate-900">Quick Actions</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedTask.customer.phone && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.location.href = `tel:${selectedTask.customer!.phone}`}
-                        >
-                          <Phone className="h-4 w-4 mr-1" />
-                          Call
-                        </Button>
-                      )}
-                      {selectedTask.customer.email && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.location.href = `mailto:${selectedTask.customer!.email}`}
-                        >
-                          <Mail className="h-4 w-4 mr-1" />
-                          Email
-                        </Button>
-                      )}
-                      {selectedTask.customer.phone && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.location.href = `sms:${selectedTask.customer!.phone}`}
-                        >
-                          <MessageSquare className="h-4 w-4 mr-1" />
-                          Text
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {!isCreateMode && selectedTask && (
-                  <div className="space-y-2 mt-4 border-t pt-4">
-                    <h4 className="text-sm font-medium flex items-center gap-2">
-                      <CheckSquare className="h-4 w-4" />
-                      Subtasks
-                      {subtasks.length > 0 && (
-                        <Badge variant="secondary">
-                          {subtasks.filter(s => s.isCompleted).length}/{subtasks.length}
-                        </Badge>
-                      )}
-                    </h4>
-
-                    {subtasksLoading ? (
-                      <div className="flex items-center gap-2 py-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm text-muted-foreground">Loading subtasks...</span>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {subtasks.map((subtask) => (
-                          <div key={subtask.id} className="flex items-center gap-2 group">
-                            <Checkbox
-                              checked={subtask.isCompleted}
-                              onCheckedChange={(checked) => {
-                                updateSubtaskMutation.mutate({
-                                  subtaskId: subtask.id,
-                                  data: { isCompleted: !!checked }
-                                });
-                              }}
-                            />
-                            <span className={`flex-1 text-sm ${subtask.isCompleted ? "line-through text-muted-foreground" : ""}`}>
-                              {subtask.title}
-                            </span>
-                            {subtask.dueAt && (
-                              <Badge variant="outline" className="text-xs">
-                                {format(new Date(subtask.dueAt), "MMM d")}
-                              </Badge>
-                            )}
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                                >
-                                  <CalendarIcon className="h-3 w-3" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="end">
-                                <Calendar
-                                  mode="single"
-                                  selected={subtask.dueAt ? new Date(subtask.dueAt) : undefined}
-                                  onSelect={(date) => {
-                                    updateSubtaskMutation.mutate({
-                                      subtaskId: subtask.id,
-                                      data: { dueAt: date ? date.toISOString() : null }
-                                    });
-                                  }}
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
-                              onClick={() => deleteSubtaskMutation.mutate(subtask.id)}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ))}
-
-                        {isAddingSubtask ? (
-                          <div className="flex items-center gap-2 pt-2">
-                            <Input
-                              value={newSubtaskTitle}
-                              onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                              placeholder="Subtask title..."
-                              className="flex-1 h-8 text-sm"
-                              autoFocus
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" && newSubtaskTitle.trim()) {
-                                  createSubtaskMutation.mutate({
-                                    title: newSubtaskTitle.trim(),
-                                    dueAt: newSubtaskDueAt ? newSubtaskDueAt.toISOString() : null
-                                  });
-                                } else if (e.key === "Escape") {
-                                  setIsAddingSubtask(false);
-                                  setNewSubtaskTitle("");
-                                  setNewSubtaskDueAt(null);
-                                }
-                              }}
-                            />
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                  <CalendarIcon className="h-4 w-4" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0" align="end">
-                                <Calendar
-                                  mode="single"
-                                  selected={newSubtaskDueAt || undefined}
-                                  onSelect={(date) => setNewSubtaskDueAt(date || null)}
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="h-8"
-                              onClick={() => {
-                                if (newSubtaskTitle.trim()) {
-                                  createSubtaskMutation.mutate({
-                                    title: newSubtaskTitle.trim(),
-                                    dueAt: newSubtaskDueAt ? newSubtaskDueAt.toISOString() : null
-                                  });
-                                }
-                              }}
-                              disabled={!newSubtaskTitle.trim() || createSubtaskMutation.isPending}
-                            >
-                              {createSubtaskMutation.isPending ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                "Add"
-                              )}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-8"
-                              onClick={() => {
-                                setIsAddingSubtask(false);
-                                setNewSubtaskTitle("");
-                                setNewSubtaskDueAt(null);
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="text-sm"
-                            onClick={() => setIsAddingSubtask(true)}
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            Add Subtask
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {!isCreateMode && selectedTask && (
-                  <div className="space-y-3 mt-4 border-t pt-4">
-                    <h4 className="text-sm font-medium flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4" />
-                      Comments
-                    </h4>
-                    <CommentComposer
-                      entityType="task"
-                      entityId={selectedTask.id}
-                      placeholder="Add a comment about this task..."
-                      onCommentPosted={() => {
-                        queryClient.invalidateQueries({ queryKey: ["/api/crm/comments", "task", selectedTask.id] });
-                      }}
-                    />
-                    <div className="mt-4 max-h-[300px] overflow-y-auto">
-                      <CommentThread entityType="task" entityId={selectedTask.id} />
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between pt-4 border-t">
+                <div className="flex items-center justify-between pt-2">
                   <div>
                     {!isCreateMode && (
                       <Button
                         type="button"
-                        variant="destructive"
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50 text-xs"
                         onClick={() => setShowDeleteDialog(true)}
                       >
-                        <Trash2 className="h-4 w-4 mr-2" />
+                        <Trash2 className="h-3.5 w-3.5 mr-1" />
                         Delete
                       </Button>
                     )}
                   </div>
                   <div className="flex gap-2">
-                    <Button type="button" variant="outline" onClick={handleCloseDrawer}>
+                    <Button type="button" variant="outline" size="sm" onClick={handleCloseDrawer}>
                       Cancel
                     </Button>
                     <Button
                       type="submit"
+                      size="sm"
                       className="bg-[#711419] hover:bg-[#5a1014]"
                       disabled={createMutation.isPending || updateMutation.isPending}
                     >
                       {(createMutation.isPending || updateMutation.isPending) && (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
                       )}
-                      {isCreateMode ? "Create Task" : "Save Changes"}
+                      {isCreateMode ? "Create" : "Save"}
                     </Button>
                   </div>
                 </div>
               </form>
             </Form>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       </div>
+
 
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
