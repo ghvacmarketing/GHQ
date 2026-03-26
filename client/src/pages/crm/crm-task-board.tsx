@@ -495,6 +495,8 @@ export default function CrmTaskBoard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
       toast({ title: "Task created successfully" });
       handleCloseDrawer();
     },
@@ -519,6 +521,8 @@ export default function CrmTaskBoard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
       toast({ title: "Task updated successfully" });
       handleCloseDrawer();
     },

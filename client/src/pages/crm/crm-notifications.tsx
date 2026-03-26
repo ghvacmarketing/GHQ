@@ -44,29 +44,27 @@ export default function CrmNotifications() {
     refetchInterval: 10000,
   });
 
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
+  };
+
   const markReadMut = useMutation({
     mutationFn: (id: string) => apiRequest("PATCH", `/api/crm/notifications/${id}/read`),
-    onSuccess: () => {
-      refetch();
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
-    },
+    onSuccess: invalidateAll,
   });
 
   const markAllMut = useMutation({
     mutationFn: () => apiRequest("POST", "/api/crm/notifications/mark-all-read"),
     onSuccess: () => {
-      refetch();
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
+      invalidateAll();
       toast({ title: "All marked as read" });
     },
   });
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => apiRequest("DELETE", `/api/crm/notifications/${id}`),
-    onSuccess: () => {
-      refetch();
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
-    },
+    onSuccess: invalidateAll,
   });
 
   useEffect(() => {

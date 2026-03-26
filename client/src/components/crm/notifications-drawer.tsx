@@ -76,24 +76,23 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
     refetchInterval: 10000,
   });
 
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
+  };
+
   const markAsReadMutation = useMutation({
     mutationFn: async (notificationId: string) => {
       await apiRequest("PATCH", `/api/crm/notifications/${notificationId}/read`);
     },
-    onSuccess: () => {
-      refetch();
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
-    },
+    onSuccess: invalidateAll,
   });
 
   const markAllReadMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", "/api/crm/notifications/mark-all-read");
     },
-    onSuccess: () => {
-      refetch();
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
-    },
+    onSuccess: invalidateAll,
   });
 
   const getIcon = (type: Notification["type"]) => {
