@@ -207,49 +207,48 @@ export default function CrmNotifications() {
                 ))}
               </div>
             )}
-            {notifications.length > 0 && (
-              <h2 className="text-sm font-semibold text-slate-700 mb-3">
-                Tagged Note Notifications
-              </h2>
-            )}
           </div>
         )}
 
-        {isLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex gap-3 p-4 rounded-lg border border-slate-200">
-                <Skeleton className="h-9 w-9 rounded-full" />
-                <div className="flex-1 space-y-2"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/2" /></div>
+        {!showTaggedNotesView && (
+          <>
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex gap-3 p-4 rounded-lg border border-slate-200">
+                    <Skeleton className="h-9 w-9 rounded-full" />
+                    <div className="flex-1 space-y-2"><Skeleton className="h-4 w-3/4" /><Skeleton className="h-3 w-1/2" /></div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        ) : notifications.length === 0 && !showTaggedNotesView ? (
-          <div className="text-center py-20">
-            <Inbox className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-base font-medium text-slate-600">
-              {tab === "unread" ? "You're all caught up!" : "No notifications yet"}
-            </p>
-            <p className="text-sm text-slate-400 mt-1">
-              {tab === "unread"
-                ? "No unread notifications."
-                : typeFilter !== "all"
-                ? `No ${typeFilters.find(f => f.key === typeFilter)?.label.toLowerCase()} notifications.`
-                : "Notifications will appear here when tasks are assigned to you."}
-            </p>
-          </div>
-        ) : notifications.length === 0 && showTaggedNotesView ? null : (
-          <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 overflow-hidden">
-            {notifications.map((n) => (
-              <NotificationRow
-                key={n.id}
-                notification={n}
-                onMarkRead={() => markReadMut.mutate(n.id)}
-                onDelete={() => deleteMut.mutate(n.id)}
-                onNavigate={navigate}
-              />
-            ))}
-          </div>
+            ) : notifications.length === 0 ? (
+              <div className="text-center py-20">
+                <Inbox className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                <p className="text-base font-medium text-slate-600">
+                  {tab === "unread" ? "You're all caught up!" : "No notifications yet"}
+                </p>
+                <p className="text-sm text-slate-400 mt-1">
+                  {tab === "unread"
+                    ? "No unread notifications."
+                    : typeFilter !== "all"
+                    ? `No ${typeFilters.find(f => f.key === typeFilter)?.label.toLowerCase()} notifications.`
+                    : "Notifications will appear here when tasks are assigned to you."}
+                </p>
+              </div>
+            ) : (
+              <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 overflow-hidden">
+                {notifications.map((n) => (
+                  <NotificationRow
+                    key={n.id}
+                    notification={n}
+                    onMarkRead={() => markReadMut.mutate(n.id)}
+                    onDelete={() => deleteMut.mutate(n.id)}
+                    onNavigate={navigate}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </CrmLayout>
