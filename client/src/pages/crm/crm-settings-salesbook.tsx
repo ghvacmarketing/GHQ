@@ -239,7 +239,7 @@ export default function CrmSettingsSalesbook() {
           </div>
           <div className="flex items-center gap-3">
             <a
-              href="/price-book"
+              href="/crm/salesbook"
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-slate-500 hover:text-[#711419] flex items-center gap-1.5"

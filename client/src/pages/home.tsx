@@ -99,10 +99,10 @@ export default function Home() {
 
   const referenceActions = [
     {
-      title: "Price Book",
+      title: "Salesbook",
       description: "View current pricing and parts catalog",
       icon: Book,
-      href: "/price-book",
+      href: "/crm/salesbook",
       testId: "link-price-book"
     },
     {

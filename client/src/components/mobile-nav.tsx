@@ -25,7 +25,7 @@ const navSections = [
   {
     title: "Reference",
     items: [
-      { label: "Price Book", href: "/price-book", icon: Book },
+      { label: "Salesbook", href: "/crm/salesbook", icon: Book },
       { label: "Processes & Systems", href: "/processes", icon: BookOpen },
       { label: "Quote History", href: "/history", icon: History },
       { label: "Proposal History", href: "/proposal-history", icon: FolderOpen },
