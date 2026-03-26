@@ -27005,8 +27005,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         afterJson: JSON.stringify(task),
       });
 
-      // Notify the assignee if different from the creator
-      if (task.assignedToUserId && task.assignedToUserId !== user.id) {
+      // Notify the assignee (including self-assignment)
+      if (task.assignedToUserId) {
         await db.insert(crmNotifications).values({
           userId: task.assignedToUserId,
           type: "task_assigned" as any,
@@ -27084,7 +27084,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       // Notify the new assignee when the task is reassigned
       const newAssigneeId = req.body.assignedToUserId;
-      if (newAssigneeId && newAssigneeId !== existingTask.assignedToUserId && newAssigneeId !== user.id) {
+      if (newAssigneeId && newAssigneeId !== existingTask.assignedToUserId) {
         await db.insert(crmNotifications).values({
           userId: newAssigneeId,
           type: "task_assigned" as any,

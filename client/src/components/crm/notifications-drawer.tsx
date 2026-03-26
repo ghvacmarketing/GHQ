@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/select";
 import {
   Bell,
-  X,
   CheckCheck,
   AtSign,
   ClipboardList,
@@ -143,9 +142,6 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
           >
             <CheckCheck className="h-4 w-4 mr-1" />
             Mark all read
-          </Button>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-4 w-4" />
           </Button>
         </div>
       </div>
