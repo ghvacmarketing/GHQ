@@ -280,10 +280,10 @@ export default function CrmNotifications() {
 
   return (
     <CrmLayout currentUser={currentUser} disableScroll>
-      <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto">
-      <div className="space-y-5 max-w-3xl">
-        {/* Page header */}
+      {/* Outer: fill the full allocated height as a flex column */}
+      <div className="h-full flex flex-col gap-3">
+
+        {/* ── Fixed header ── */}
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Notifications</h1>
           <p className="text-sm text-slate-500 mt-0.5">
@@ -291,9 +291,8 @@ export default function CrmNotifications() {
           </p>
         </div>
 
-        {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Unread / All pill toggle */}
+        {/* ── Toolbar ── */}
+        <div className="flex flex-wrap items-center gap-3 flex-shrink-0">
           <div className="flex items-center bg-slate-100 rounded-lg p-0.5 gap-0.5">
             <button
               onClick={() => setTab("unread")}
@@ -317,7 +316,6 @@ export default function CrmNotifications() {
             </button>
           </div>
 
-          {/* Type filter */}
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-[130px] h-8 text-xs bg-white border-slate-200 focus:ring-[#711419]/30">
               <SelectValue placeholder="All Types" />
@@ -332,7 +330,6 @@ export default function CrmNotifications() {
             </SelectContent>
           </Select>
 
-          {/* Search */}
           <div className="relative flex-1 min-w-[160px] max-w-xs">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
             <Input
@@ -360,7 +357,6 @@ export default function CrmNotifications() {
                 Mark {selectedIds.size} read
               </Button>
             )}
-
             <Button
               variant="ghost"
               size="sm"
@@ -378,9 +374,9 @@ export default function CrmNotifications() {
           </div>
         </div>
 
-        {/* Select-all row when there are notifications */}
+        {/* Select-all row */}
         {hasNotifications && (
-          <div className="flex items-center gap-2 px-1">
+          <div className="flex items-center gap-2 px-1 flex-shrink-0">
             <Checkbox
               checked={allSelected}
               onCheckedChange={handleSelectAll}
@@ -393,139 +389,142 @@ export default function CrmNotifications() {
           </div>
         )}
 
-        {/* Content */}
-        {notificationsLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex gap-3 p-3 bg-white border border-slate-200 rounded-lg">
-                <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-1/2" />
-                </div>
+        {/* ── Scrollable content — takes all remaining height ── */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="max-w-3xl pb-6">
+            {notificationsLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex gap-3 p-3 bg-white border border-slate-200 rounded-lg">
+                    <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        ) : !hasNotifications ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <Inbox className="h-12 w-12 text-slate-300 mb-3" />
-            <p className="text-base font-medium text-slate-600">
-              {tab === "unread" ? "You're all caught up!" : "No notifications yet"}
-            </p>
-            <p className="text-sm text-slate-400 mt-1">
-              {tab === "unread"
-                ? "No unread notifications."
-                : "Notifications appear here when tasks are assigned or you're mentioned."}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {dateGroupOrder.map((group) => {
-              const groupNotifs = groupedNotifications[group];
-              if (groupNotifs.length === 0) return null;
+            ) : !hasNotifications ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <Inbox className="h-12 w-12 text-slate-300 mb-3" />
+                <p className="text-base font-medium text-slate-600">
+                  {tab === "unread" ? "You're all caught up!" : "No notifications yet"}
+                </p>
+                <p className="text-sm text-slate-400 mt-1">
+                  {tab === "unread"
+                    ? "No unread notifications."
+                    : "Notifications appear here when tasks are assigned or you're mentioned."}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {dateGroupOrder.map((group) => {
+                  const groupNotifs = groupedNotifications[group];
+                  if (groupNotifs.length === 0) return null;
 
-              return (
-                <div key={group}>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">
-                    {group}
-                  </p>
+                  return (
+                    <div key={group}>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">
+                        {group}
+                      </p>
 
-                  <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
-                    {groupNotifs.map((notification) => (
-                      <div
-                        key={notification.id}
-                        className={`flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors hover:bg-slate-50 ${
-                          !notification.isRead ? "bg-slate-50/70" : ""
-                        }`}
-                      >
-                        <Checkbox
-                          checked={selectedIds.has(notification.id)}
-                          onCheckedChange={(checked) =>
-                            handleSelectNotification(notification.id, !!checked)
-                          }
-                          onClick={(e) => e.stopPropagation()}
-                          aria-label="Select notification"
-                          className="mt-0.5 flex-shrink-0"
-                        />
+                      <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
+                        {groupNotifs.map((notification) => (
+                          <div
+                            key={notification.id}
+                            className={`flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors hover:bg-slate-50 ${
+                              !notification.isRead ? "bg-slate-50/70" : ""
+                            }`}
+                          >
+                            <Checkbox
+                              checked={selectedIds.has(notification.id)}
+                              onCheckedChange={(checked) =>
+                                handleSelectNotification(notification.id, !!checked)
+                              }
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label="Select notification"
+                              className="mt-0.5 flex-shrink-0"
+                            />
 
-                        <div
-                          className="flex-1 min-w-0 flex gap-3"
-                          onClick={() => handleNotificationClick(notification)}
-                        >
-                          <div className="flex-shrink-0 mt-0.5 w-7 h-7 flex items-center justify-center rounded-full bg-slate-100">
-                            {getNotificationIcon(notification.type)}
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <p
-                              className={`text-sm leading-snug ${
-                                !notification.isRead
-                                  ? "font-semibold text-slate-900"
-                                  : "text-slate-700"
-                              }`}
+                            <div
+                              className="flex-1 min-w-0 flex gap-3"
+                              onClick={() => handleNotificationClick(notification)}
                             >
-                              {notification.title}
-                            </p>
-                            {notification.preview && (
-                              <p className="text-sm text-slate-500 line-clamp-2 mt-0.5">
-                                {notification.preview}
-                              </p>
-                            )}
-                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                              <span className="text-xs text-slate-400">
-                                {notification.createdAt
-                                  ? formatDistanceToNow(new Date(notification.createdAt), {
-                                      addSuffix: true,
-                                    })
-                                  : ""}
-                              </span>
-                              {notification.entityType && (
-                                <Badge
-                                  variant="secondary"
-                                  className="text-[10px] px-1.5 py-0 h-4 bg-slate-100 text-slate-500 border-0"
+                              <div className="flex-shrink-0 mt-0.5 w-7 h-7 flex items-center justify-center rounded-full bg-slate-100">
+                                {getNotificationIcon(notification.type)}
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <p
+                                  className={`text-sm leading-snug ${
+                                    !notification.isRead
+                                      ? "font-semibold text-slate-900"
+                                      : "text-slate-700"
+                                  }`}
                                 >
-                                  {getEntityBadgeLabel(notification.entityType)}
-                                </Badge>
-                              )}
-                              {notification.actorName && (
-                                <div className="flex items-center gap-1">
-                                  <Avatar className="h-4 w-4">
-                                    <AvatarFallback className="text-[9px] bg-slate-200 text-slate-600">
-                                      {notification.actorName
-                                        .split(" ")
-                                        .map((n) => n[0])
-                                        .join("")
-                                        .toUpperCase()
-                                        .slice(0, 2)}
-                                    </AvatarFallback>
-                                  </Avatar>
+                                  {notification.title}
+                                </p>
+                                {notification.preview && (
+                                  <p className="text-sm text-slate-500 line-clamp-2 mt-0.5">
+                                    {notification.preview}
+                                  </p>
+                                )}
+                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                                   <span className="text-xs text-slate-400">
-                                    {notification.actorName}
+                                    {notification.createdAt
+                                      ? formatDistanceToNow(new Date(notification.createdAt), {
+                                          addSuffix: true,
+                                        })
+                                      : ""}
                                   </span>
+                                  {notification.entityType && (
+                                    <Badge
+                                      variant="secondary"
+                                      className="text-[10px] px-1.5 py-0 h-4 bg-slate-100 text-slate-500 border-0"
+                                    >
+                                      {getEntityBadgeLabel(notification.entityType)}
+                                    </Badge>
+                                  )}
+                                  {notification.actorName && (
+                                    <div className="flex items-center gap-1">
+                                      <Avatar className="h-4 w-4">
+                                        <AvatarFallback className="text-[9px] bg-slate-200 text-slate-600">
+                                          {notification.actorName
+                                            .split(" ")
+                                            .map((n) => n[0])
+                                            .join("")
+                                            .toUpperCase()
+                                            .slice(0, 2)}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <span className="text-xs text-slate-400">
+                                        {notification.actorName}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {!notification.isRead && (
+                                <div className="flex-shrink-0 mt-1.5">
+                                  <div
+                                    className="h-2 w-2 rounded-full"
+                                    style={{ backgroundColor: "#711419" }}
+                                  />
                                 </div>
                               )}
                             </div>
                           </div>
-
-                          {!notification.isRead && (
-                            <div className="flex-shrink-0 mt-1.5">
-                              <div
-                                className="h-2 w-2 rounded-full"
-                                style={{ backgroundColor: "#711419" }}
-                              />
-                            </div>
-                          )}
-                        </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        )}
-      </div>
-      </div>
+        </div>
+
       </div>
     </CrmLayout>
   );
