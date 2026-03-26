@@ -158,8 +158,27 @@ async function runTaggedCommentMigrations() {
   }
 }
 
+async function runSalesbookMigrations() {
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS salesbook_bookmarks (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        label text NOT NULL,
+        page_number integer NOT NULL,
+        sort_order integer NOT NULL DEFAULT 0,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+  } catch (err) {
+    console.error("Salesbook migration error (non-fatal):", err);
+  }
+}
+
 (async () => {
   await runTaggedCommentMigrations();
+  await runSalesbookMigrations();
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

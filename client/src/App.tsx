@@ -63,6 +63,7 @@ const CrmChecklists = lazy(() => import("@/pages/crm/crm-checklists"));
 const CrmSettings = lazy(() => import("@/pages/crm/crm-settings"));
 const CrmSettingsUsers = lazy(() => import("@/pages/crm/crm-settings-users"));
 const CrmSettingsSubtypes = lazy(() => import("@/pages/crm/crm-settings-subtypes"));
+const CrmSettingsSalesbook = lazy(() => import("@/pages/crm/crm-settings-salesbook"));
 const CrmSettingsLeadTypes = lazy(() => import("@/pages/crm/crm-settings-lead-types"));
 const CrmSettingsLeadClassification = lazy(() => import("@/pages/crm/crm-settings-lead-classification"));
 const CrmSettingsTime = lazy(() => import("@/pages/crm/crm-settings-time"));
@@ -284,6 +285,7 @@ function Router() {
       <Route path="/crm/checklists">{() => <ProtectedCrmWrapper><CrmChecklists /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/users">{() => <ProtectedCrmWrapper><CrmSettingsUsers /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/subtypes">{() => <ProtectedCrmWrapper><CrmSettingsSubtypes /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/settings/salesbook">{() => <ProtectedCrmWrapper><CrmSettingsSalesbook /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/lead-types">{() => <ProtectedCrmWrapper><CrmSettingsLeadTypes /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/lead-classification">{() => <ProtectedCrmWrapper><CrmSettingsLeadClassification /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/time-logs">{() => <ProtectedCrmWrapper><CrmSettingsTime /></ProtectedCrmWrapper>}</Route>

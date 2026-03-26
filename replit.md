@@ -43,6 +43,10 @@ Preferred communication style: Simple, everyday language.
 -   **Tagged Comments System**: Directed internal notes that can be left on any CRM page. Users tag one or more team members; only tagged users and the author see the comment. Comments appear as floating bubbles on the relevant page with a resolve flow. Integrates with the notification system (type: "tagged_comment"). Accessed via the floating tool menu (wrench icon) in bottom-right corner, which also provides access to Search and Ask AI.
     -   Tables: `crm_tagged_comments`, `crm_tagged_comment_recipients`
     -   API: `/api/crm/tagged-comments` (POST, GET), `/api/crm/tagged-comments/count`, `/api/crm/tagged-comments/:commentId/resolve`, `/api/crm/tagged-comments/lookup/:commentId`
+-   **Self-Hosted Salesbook Flipbook**: Replaced FlipHTML5 iframe with a self-hosted PDF viewer using `react-pdf` and `pdfjs-dist`. Chandler's Sales Book PDF (`attached_assets/Chandler_Sales_Book_1766587153181.pdf`, 21MB) served statically via `/assets/`. Features: page-by-page rendering, keyboard/swipe navigation, zoom, fullscreen, bookmarks/table of contents panel. Bookmarks are stored in the `salesbook_bookmarks` DB table and manageable from CRM Settings → Salesbook Bookmarks.
+    -   Table: `salesbook_bookmarks` (id, label, page_number, sort_order, created_at)
+    -   API: `/api/salesbook/bookmarks` (GET, POST), `/api/salesbook/bookmarks/:id` (PATCH, DELETE), `/api/salesbook/bookmarks/reorder` (PUT), `/api/salesbook/info` (GET)
+    -   Pages: `client/src/pages/price-book.tsx` (viewer), `client/src/pages/crm/crm-settings-salesbook.tsx` (admin)
 
 ## External Dependencies
 -   **Google Sheets API**: Parts pricing, application settings, customer data sync.

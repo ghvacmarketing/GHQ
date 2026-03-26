@@ -3441,3 +3441,19 @@ export type InsertCrmTaggedComment = z.infer<typeof insertCrmTaggedCommentSchema
 export type CrmTaggedComment = typeof crmTaggedComments.$inferSelect;
 export type InsertCrmTaggedCommentRecipient = z.infer<typeof insertCrmTaggedCommentRecipientSchema>;
 export type CrmTaggedCommentRecipient = typeof crmTaggedCommentRecipients.$inferSelect;
+
+export const salesbookBookmarks = pgTable("salesbook_bookmarks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  label: text("label").notNull(),
+  pageNumber: integer("page_number").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSalesbookBookmarkSchema = createInsertSchema(salesbookBookmarks).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSalesbookBookmark = z.infer<typeof insertSalesbookBookmarkSchema>;
+export type SalesbookBookmark = typeof salesbookBookmarks.$inferSelect;
