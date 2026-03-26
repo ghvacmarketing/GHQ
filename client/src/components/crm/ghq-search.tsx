@@ -505,24 +505,6 @@ export function GhqSearch() {
   return (
     <>
       <div className="fixed bottom-6 right-6 z-50 flex flex-col-reverse items-center gap-3">
-        {menuOpen && (
-          <div className="flex flex-col gap-2 mb-1 animate-in fade-in slide-in-from-bottom-2 duration-200">
-            <button
-              onClick={() => { setMenuOpen(false); setOpen(true); setMode("search"); }}
-              className="w-12 h-12 rounded-full bg-slate-800 text-white shadow-lg flex items-center justify-center hover:bg-slate-700 transition-colors"
-              title="Search & AI"
-            >
-              <Search className="h-5 w-5" />
-            </button>
-            <button
-              onClick={() => { setMenuOpen(false); setCommentOpen(true); }}
-              className="w-12 h-12 rounded-full bg-slate-800 text-white shadow-lg flex items-center justify-center hover:bg-slate-700 transition-colors"
-              title="Leave a Comment"
-            >
-              <MessageSquarePlus className="h-5 w-5" />
-            </button>
-          </div>
-        )}
         <button
           onClick={() => setMenuOpen(!menuOpen)}
           className={`w-14 h-14 rounded-full bg-[#711419] text-white shadow-lg flex items-center justify-center transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[#711419] focus:ring-offset-2 ${menuOpen ? "rotate-90" : ""}`}
@@ -531,6 +513,24 @@ export function GhqSearch() {
         >
           {menuOpen ? <X className="h-6 w-6" /> : <Wrench className="h-6 w-6" />}
         </button>
+        {menuOpen && (
+          <div className="flex flex-col gap-2 mb-1 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <button
+              onClick={() => { setMenuOpen(false); setCommentOpen(true); }}
+              className="w-12 h-12 rounded-full bg-slate-800 text-white shadow-lg flex items-center justify-center hover:bg-slate-700 transition-colors"
+              title="Leave a Comment"
+            >
+              <MessageSquarePlus className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => { setMenuOpen(false); setOpen(true); setMode("search"); }}
+              className="w-12 h-12 rounded-full bg-slate-800 text-white shadow-lg flex items-center justify-center hover:bg-slate-700 transition-colors"
+              title="Search & AI"
+            >
+              <Search className="h-5 w-5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {commentOpen && <TaggedCommentComposer onClose={() => setCommentOpen(false)} />}
