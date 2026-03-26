@@ -360,7 +360,9 @@ const CRM_FUNCTIONALITY_KNOWLEDGE = `
 ### Invoice Statuses
 - **Draft**: Invoice is being prepared, not visible to customer
 - **Sent**: Invoice has been emailed/texted to customer, awaiting payment
-- **Paid**: Payment has been received and recorded
+- **Viewed**: Customer has opened/viewed the invoice but not yet paid
+- **Paid**: Payment has been received and recorded in full
+- **Partial**: Partial payment has been received, balance still due
 - **Void**: Invoice cancelled, no longer valid
 
 ### Auto Pay / Auto Invoice
@@ -438,23 +440,33 @@ When creating a new maintenance agreement, you must choose a billing preference:
 ## WORK ORDERS
 
 ### Work Order Statuses
+- **New**: Newly created, not yet scheduled
 - **Scheduled**: Appointment is booked, waiting for dispatch
 - **Dispatched**: Assigned to a technician
 - **En Route**: Technician is traveling to the job site (auto-SMS sent to customer)
 - **On Site**: Technician has arrived (auto-SMS sent to customer)
 - **Completed**: Work is finished
+- **Invoiced**: Work order has been invoiced
+- **Paid**: Invoice for work order has been paid
+- **Cancelled**: Work order was cancelled
 
-### Work Order Types
+### Work Order Types (Visit Types)
 - **Service**: Repair, diagnostic, troubleshooting visit
-- **Install**: Equipment installation
+- **Install**: Equipment installation (includes crawlspace encapsulation as a subtype)
 - **Maintenance**: Scheduled tune-up or preventive maintenance
-- **Crawlspace**: Encapsulation or moisture control work
+- **Sales**: Sales-related visit or consultation
+
+### Work Order Subtypes
+- Configurable via Settings > Work Order Subtypes
+- Allows further categorization within each work order type (e.g., "Diagnostic", "Repair", "Tune-Up" under Service)
+- Subtypes help with reporting and filtering
 
 ### Service Call Checklists
 - Dynamic questionnaires based on service type
 - Technicians complete checklists during the visit
 - AI summarizes checklist responses for customer records
 - Required questions must be answered before completing
+- Checklists are configured in Settings > Service Checklists
 
 ### Linking to Projects
 - Work orders can be standalone or linked to a project
@@ -502,6 +514,7 @@ Projects follow this simplified flow: New → Equipment Ordered → Equipment Ar
 - **Accepted**: Customer approved the quote
 - **Declined**: Customer rejected the quote
 - **Expired**: Quote validity period passed
+- **Converted**: Quote has been converted into an invoice or project
 
 ### Quote Types
 - **Custom Install**: High-value installation proposals ($5k+), deposit required
@@ -545,6 +558,192 @@ Projects follow this simplified flow: New → Equipment Ordered → Equipment Ar
 
 ---
 
+## TAGGED COMMENTS & PAGE NOTES
+
+### What are Tagged Comments?
+Tagged comments (also called "page notes") let any CRM user leave context-specific notes or comments on ANY page in the CRM. Think of them like sticky notes attached to a specific page.
+
+### How to Use
+- Look for the **comment icon** (speech bubble) in the bottom-right corner of any CRM page
+- Click it to open the comments panel for that specific page
+- Type a note and optionally **tag/mention** another user by selecting them
+- Tagged users receive a **notification** alerting them to the comment
+
+### Key Features
+- Comments are page-specific — a comment on the Invoices page stays on that page
+- Tagged users see the comment in their **Notifications** panel
+- Comments can be **resolved** (marked as handled) or **dismissed**
+- Great for team collaboration: "Hey @John, check this customer's agreement" or "Reminder: follow up on this quote"
+
+### Where to Find Tagged Comments
+- The **Notifications** page (/crm/notifications) shows all comments where you were tagged
+- Each page shows its own comments when you open the comments panel
+
+---
+
+## LEAD FUNNEL (PROSPECT MANAGEMENT)
+
+### What is the Lead Funnel?
+The Lead Funnel (sidebar: "Lead Funnel", URL: /crm/prospect-funnel) is a Kanban-style sales pipeline for managing prospects and leads through the sales process.
+
+### Lead Classification
+Leads are classified on two dimensions:
+- **Lead Temperature**: Hot, Warm, Cold — indicates urgency/likelihood of closing
+- **Customer Driver**: What motivated the customer (e.g., equipment failure, upgrade, new construction)
+
+### Lead Types
+- Configurable in Settings > Lead Types
+- Define custom categories for incoming leads (e.g., "Website Inquiry", "Referral", "Repeat Customer")
+
+### Prospect Lifecycle
+1. New prospect enters the funnel (manually created or from online booking)
+2. Classified by temperature and driver
+3. Follow-ups are scheduled and tracked
+4. Prospect converts to a quote/project or is marked as lost
+
+### Follow-up System
+- Each prospect can have scheduled follow-ups with due dates
+- Follow-up types: Call, Text, Email, Visit
+- Follow-ups appear in the prospect detail and can include notes
+- Overdue follow-ups are highlighted for attention
+
+### Prospect Metrics
+- Active prospects count
+- Pending actions / overdue follow-ups
+- Potential revenue in pipeline
+- Conversion rates and sales leaderboard
+
+---
+
+## ITEMS (LINE ITEMS)
+
+### What is the Items Page?
+The Items page (sidebar: "Items", URL: /crm/items) is a centralized catalog of all line items used across quotes, invoices, and work orders.
+
+### Purpose
+- Manage reusable line items with descriptions and default pricing
+- When creating a quote or invoice, you can pull items from this catalog
+- Keeps pricing consistent across the team
+- Items can be equipment, labor, materials, or services
+
+---
+
+## GOALS & REVENUE TRACKING
+
+### What is the Goals Page?
+The Goals page (sidebar: "Goals", URL: /crm/reports) tracks daily and month-to-date (MTD) revenue performance against targets.
+
+### Revenue Categories Tracked
+- **Service Revenue**: Income from service/repair work orders
+- **Install Revenue**: Income from equipment installations
+- **Maintenance Revenue**: Income from maintenance agreements
+
+### Features
+- Set monthly revenue goals per category
+- Track daily progress toward monthly targets
+- View team-wide and individual technician performance
+- Visual progress bars and charts showing MTD vs. goal
+- Goals are pre-populated for all 12 months of the year
+
+---
+
+## MARKETING
+
+### What is the Marketing Page?
+The Marketing page (sidebar: "Marketing", URL: /crm/marketing) provides tools for customer outreach and marketing campaigns.
+
+### Features
+- Manage marketing campaigns and customer communications
+- Track campaign performance and customer engagement
+
+---
+
+## SALESBOOK (DIGITAL PRICE BOOK)
+
+### What is the Salesbook?
+The Salesbook (URL: /price-book) is a digital, interactive flipbook that sales reps use during in-home consultations. It replaces the old printed/PDF sales binder.
+
+### How It Works
+- Pages 1-12 are static introductory pages (company info, certifications, warranties, etc.)
+- After page 12, the book dynamically generates product pages from the live pricebook database
+- Products are organized by unit type (Air Conditioner, Heat Pump, Gas Furnace, etc.) with tier groupings (Best, Better, Good, Budget)
+
+### Product Pages Show
+- Equipment model numbers and images
+- Pricing by tonnage/size
+- Monthly payment options
+- Tier-specific features and benefits
+- Elite bundle options and crawlspace encapsulation tiers
+
+### Navigation
+- Table of Contents panel on the left for quick navigation
+- Zoom controls for in-home presentations on tablets
+- Page flip animation for natural book-like feel
+
+### Salesbook Bookmarks
+- Admins can manage bookmarks in Settings > Salesbook Bookmarks
+- Bookmarks allow quick jumps to specific sections
+
+### Important
+- The salesbook is public-facing (no login required) — designed for sales reps to show customers
+- Product data comes from the pricebook database and updates automatically when prices change
+
+---
+
+## ANNOUNCEMENTS
+
+### What are Announcements?
+Announcements are company-wide messages that appear as modals/banners for all CRM users when they log in.
+
+### How They Work
+- Admins create announcements with a title and message
+- Announcements appear as a modal or banner when users access the CRM
+- Useful for company updates, policy changes, or important notices
+
+---
+
+## REVIEW REQUESTS (AUTOMATED)
+
+### What are Review Requests?
+The system automatically sends Google review requests to customers after service is completed.
+
+### How It Works
+- A background scheduler runs every 15 minutes checking for recently completed work orders
+- When a qualifying work order is found, the system sends a review request via SMS to the customer
+- The message includes a link to leave a Google review
+- Customers are not asked for a review more than once every 6 months (cooldown period)
+- This is automated — no manual action required
+- Can be enabled/disabled globally in system settings
+
+---
+
+## WEATHER IMPACT TRACKING
+
+### What is Weather Impact?
+A background system that correlates local weather data with inbound call volume to help predict demand.
+
+### Features
+- Tracks daily high/low/average temperatures
+- Correlates with call volume and work order creation
+- Helps anticipate busy periods (e.g., first hot day of summer = AC service spike)
+- Data refreshes automatically every 6 hours
+
+---
+
+## FLEET TRACKING (BOUNCIE GPS)
+
+### What is Fleet Tracking?
+Integration with Bouncie GPS devices for real-time vehicle tracking of company trucks.
+
+### Features
+- See live location of all company vehicles on a map
+- Assign vehicles to specific technicians
+- Track vehicle movement and trip history
+- Configure in Settings > Fleet Tracking
+- Syncs automatically every 5 minutes
+
+---
+
 ## QUICKBOOKS INTEGRATION
 
 ### What Syncs
@@ -569,6 +768,10 @@ Classes route revenue to proper income accounts for P&L reporting:
 - Parent accounts: Service, Install, Maintenance, Discount
 - Sub-accounts under each: Residential, Commercial
 - Revenue routes to appropriate sub-account based on class
+
+### QuickBooks Settings
+- Managed in Settings > QuickBooks Integration
+- Control sync frequency, class mapping, and account assignments
 
 ---
 
@@ -600,6 +803,28 @@ Classes route revenue to proper income accounts for P&L reporting:
 - Maintenance reminders (10-day and 5-day before visit)
 - Invoice payment links when auto-invoice is sent
 - Work order status updates (en route, on site)
+- Review requests after work order completion
+
+---
+
+## PHONE
+
+### What is the Phone Page?
+The Phone page (sidebar: "Phone", URL: /crm/phone) provides integrated calling features for the CRM.
+
+---
+
+## NOTIFICATIONS
+
+### What is the Notifications Page?
+The Notifications page (sidebar: "Notifications", URL: /crm/notifications) shows all alerts and notifications for the current user.
+
+### Notification Types
+- Tagged comments where you were mentioned
+- Work order status changes
+- Quote acceptance/decline alerts
+- Agreement renewal reminders
+- System alerts and announcements
 
 ---
 
@@ -626,7 +851,7 @@ When creating a maintenance agreement, you choose how payments are collected:
 - **Pay on Visit (pay per visit)**: The technician collects payment in person during the maintenance appointment. No automatic invoices are sent. Use this for customers who prefer to pay cash or check on-site.
 
 ### "What happens when I mark a work order as complete?"
-The work order status changes to "Completed". If linked to a maintenance agreement, the visit is marked complete. No automatic invoice is created - you create invoices separately.
+The work order status changes to "Completed". If linked to a maintenance agreement, the visit is marked complete. No automatic invoice is created - you create invoices separately. An automated Google review request may be sent to the customer via SMS shortly after completion (if not already requested in the past 6 months).
 
 ### "Why isn't my agreement sending automatic invoices?"
 Check: 1) Status must be "Active" (not Pending), 2) isInitialCycle must be false, 3) Billing preference must be "Auto Invoice" not "Pay on Visit", 4) nextInvoiceDate must be reached.
@@ -645,6 +870,18 @@ Go to Projects page, click "New Project", fill in the customer, title, project t
 
 ### "What are the project statuses?"
 Projects follow this flow: New → Equipment Ordered → Equipment Arrived → In Progress → Completed → Closed. When you add equipment info to a new project, it automatically moves to "Equipment Ordered".
+
+### "How do the commenting/tasks on any page work?"
+These are **Tagged Comments** (page notes). Click the comment icon (speech bubble) in the bottom-right corner of any CRM page. You can leave notes specific to that page and tag/mention other users. Tagged users get a notification. Comments can be resolved when handled. It's like leaving a sticky note on any page for your team.
+
+### "How do I track my sales goals?"
+Go to the Goals page (sidebar: "Goals"). It shows daily and month-to-date revenue for Service, Install, and Maintenance categories. You can set monthly targets and track progress. The page shows both team-wide and individual performance.
+
+### "How do I manage prospects/leads?"
+Use the Lead Funnel page (sidebar: "Lead Funnel"). It's a Kanban board where you can track prospects through your sales pipeline. Classify leads by temperature (Hot/Warm/Cold) and driver. Schedule follow-ups with due dates to stay on top of each prospect.
+
+### "Where is the salesbook / price book?"
+The Salesbook is at /price-book (or click "Price Book" from the main app). It's a digital flipbook for in-home sales presentations. Pages 1-12 are intro/company pages, then it shows live product pricing from the database. Use the table of contents to jump to specific sections.
 
 ---
 
@@ -711,40 +948,58 @@ There is **no** automatic dispatch, auto-assignment, or round-robin routing in t
 ### Sidebar pages (what actually exists)
 Every page in the CRM sidebar — these are the only pages that exist:
 
-| Page | URL |
-|------|-----|
-| Dashboard | /crm/dashboard |
-| Dispatch Board | /crm/dispatch |
-| Phone | /crm/phone |
-| Messaging | /crm/messaging |
-| Notifications | /crm/notifications |
-| Customers | /crm/customers |
-| Agreements | /crm/agreements |
-| Quotes | /crm/quotes |
-| Invoices | /crm/invoices |
-| Work Orders | /crm/work-orders |
-| Projects | /crm/projects |
-| Mobile View | /crm/mobile |
-| Settings | /crm/settings |
+| Section | Page | URL |
+|---------|------|-----|
+| Main | Dashboard | /crm/dashboard |
+| Main | Dispatch Board | /crm/dispatch |
+| Main | Phone | /crm/phone |
+| Main | Messaging | /crm/messaging |
+| Main | Notifications | /crm/notifications |
+| Admin | Customers | /crm/customers |
+| Admin | Agreements | /crm/agreements |
+| Admin | Quotes | /crm/quotes |
+| Admin | Invoices | /crm/invoices |
+| Operations | Work Orders | /crm/work-orders |
+| Operations | Projects | /crm/projects |
+| Operations | Tasks | /crm/tasks/board |
+| Operations | Items | /crm/items |
+| Sales | Lead Funnel | /crm/prospect-funnel |
+| Other | Goals | /crm/reports |
+| Other | Marketing | /crm/marketing |
+| Other | Settings | /crm/settings |
+| Footer | Mobile View | /mobile |
 
 ### Settings sub-sections (what actually exists inside Settings)
-The Settings page at /crm/settings contains these sub-sections only:
+The Settings page at /crm/settings contains these sub-sections:
+
+**Team**
 - **Users & Roles** — manage team members, assign roles (Owner/Admin/Supervisor/Sales/Tech)
 - **Time Logs** — view, edit, and export technician time clock entries
-- **Checklists** — configure service call questionnaires by service type
-- **Pricebook** — manage equipment and service pricing from Google Sheets
-- **Packages** — configure maintenance package tiers (e.g., crawlspace tiers)
-- **Materials Catalog** — manage materials and parts pricing
+
+**Sales & Operations**
+- **Lead Types** — configure lead categories for the sales funnel
+- **Lead Classification** — set up lead temperature and driver classifications
+- **Work Order Subtypes** — customize work order sub-categories
+- **Service Checklists** — configure service call questionnaires by service type
+- **Package Pricing** — configure maintenance package tiers and pricing
+
+**Financial**
 - **Payment Settings** — configure Stripe, financing link (GreenSky URL), and payment options
+- **Materials Catalog** — manage materials and parts pricing
+- **QuickBooks Integration** — QuickBooks Online sync settings and class mapping
+
+**Data & System**
 - **Import Data** — import customer or equipment data from CSV
 - **Fleet Tracking** — Bouncie GPS vehicle tracking integration
-- **System** — system-level configuration (QuickBooks sync, AI settings, etc.)
+- **Salesbook Bookmarks** — manage quick-jump bookmarks for the digital salesbook
+- **System Tools** — system-level configuration and utilities
 
 ### Public-facing pages (outside the CRM)
 - **Online Booking**: {domain}/book — customer-facing booking form (not in the sidebar, no login needed)
 - **Customer Portal**: {domain}/portal — customers view invoices/agreements (accessed via magic link)
 - **Quote Viewer**: {domain}/quote/{id} — customer views and accepts/declines a quote
 - **Invoice Viewer**: {domain}/invoice/{id} — customer views and pays an invoice
+- **Salesbook**: {domain}/price-book — digital flipbook for sales presentations (no login needed)
 
 ---
 
