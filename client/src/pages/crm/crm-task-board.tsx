@@ -834,10 +834,6 @@ export default function CrmTaskBoard() {
                 <Button variant="outline" className="md:hidden" onClick={() => navigate("/crm/tasks/mine")}>
                   My Tasks
                 </Button>
-                <Button onClick={handleOpenCreate} className="bg-[#711419] hover:bg-[#5a1014]">
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Task
-                </Button>
               </div>
             </div>
 
