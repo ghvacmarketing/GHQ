@@ -377,45 +377,62 @@ export default function PriceBook() {
 
       <div className="flex-1 flex overflow-hidden relative">
         {showBookmarks && (
-          <div className="w-56 bg-neutral-900/95 backdrop-blur-sm border-r border-neutral-800 flex flex-col flex-shrink-0 absolute sm:relative z-20 h-full">
-            <div className="flex items-center justify-between px-4 py-3">
-              <span className="text-xs font-medium tracking-widest uppercase text-neutral-500">Contents</span>
-              <button
+          <div className="w-64 bg-neutral-800 border-r border-neutral-700 flex flex-col flex-shrink-0 absolute sm:relative z-20 h-full">
+            <div className="flex items-center justify-between p-3 border-b border-neutral-700">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-amber-400" />
+                <span className="text-sm font-semibold">Contents</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setShowBookmarks(false)}
-                className="text-neutral-600 hover:text-neutral-300 transition-colors"
+                className="text-neutral-400 hover:text-white hover:bg-neutral-700 h-6 w-6"
               >
-                <X className="h-3.5 w-3.5" />
-              </button>
+                <X className="h-3 w-3" />
+              </Button>
             </div>
-            <div className="flex-1 overflow-y-auto px-2 pb-4">
+            <div className="flex-1 overflow-y-auto p-2">
               {toc.length === 0 ? (
-                <p className="text-xs text-neutral-600 px-2 py-4">Loading...</p>
+                <p className="text-xs text-neutral-500 p-2">Loading contents...</p>
               ) : (
-                <div className="space-y-px">
-                  {toc.map((entry, idx) => {
-                    const isActive = currentPage + 1 >= entry.page &&
-                      (idx === toc.length - 1 || currentPage + 1 < toc[idx + 1].page);
-                    return (
+                <ul className="space-y-0.5">
+                  <li>
+                    <button
+                      className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                        currentPage < (toc.length > 0 ? toc[0].page - 1 : 12)
+                          ? "bg-amber-600/20 text-amber-400"
+                          : "text-neutral-300 hover:bg-neutral-700 hover:text-white"
+                      }`}
+                      onClick={() => {
+                        goToPage(0);
+                        if (isMobile) setShowBookmarks(false);
+                      }}
+                    >
+                      <span className="block truncate">Introduction</span>
+                      <span className="text-xs text-neutral-500">Page 1</span>
+                    </button>
+                  </li>
+                  {toc.map((entry, idx) => (
+                    <li key={idx}>
                       <button
-                        key={idx}
-                        className={`w-full text-left px-3 py-2.5 rounded transition-all ${
-                          isActive
-                            ? "text-white bg-neutral-800"
-                            : "text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50"
+                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                          currentPage + 1 >= entry.page &&
+                          (idx === toc.length - 1 || currentPage + 1 < toc[idx + 1].page)
+                            ? "bg-amber-600/20 text-amber-400"
+                            : "text-neutral-300 hover:bg-neutral-700 hover:text-white"
                         }`}
                         onClick={() => {
                           goToPage(entry.page - 1);
                           if (isMobile) setShowBookmarks(false);
                         }}
                       >
-                        <span className="block text-sm truncate">{entry.label}</span>
-                        <span className="text-[10px] text-neutral-600 mt-0.5 block">
-                          {entry.page}
-                        </span>
+                        <span className="block truncate">{entry.label}</span>
+                        <span className="text-xs text-neutral-500">Page {entry.page}</span>
                       </button>
-                    );
-                  })}
-                </div>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
           </div>
