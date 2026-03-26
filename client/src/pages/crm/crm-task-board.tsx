@@ -279,7 +279,7 @@ function DroppableColumn({
     <div
       ref={setNodeRef}
       className={`
-        flex flex-col bg-white border border-slate-200 rounded-xl min-w-0 shadow-sm
+        flex flex-col bg-white border border-slate-200 rounded-xl min-w-0 shadow-sm h-full
         ${isOver ? "ring-2 ring-[#711419]/40 ring-offset-1 bg-red-50/20" : ""}
       `}
     >
@@ -341,7 +341,7 @@ function DroppableColumn({
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 pb-2 min-h-[300px]">
+      <div className="flex-1 overflow-y-auto px-2 pb-2 min-h-0">
         {tasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-slate-300">
             <Icon className="h-6 w-6 mb-1.5 opacity-40" />
@@ -728,7 +728,7 @@ export default function CrmTaskBoard() {
   }
 
   return (
-    <CrmLayout currentUser={currentUser}>
+    <CrmLayout currentUser={currentUser} disableScroll>
       <div className="flex h-full">
         {/* Left Sidebar Navigation - Collapsible */}
         <div className={`
@@ -805,8 +805,8 @@ export default function CrmTaskBoard() {
           )}
         </div>
 
-        <div className={`flex-1 min-w-0 transition-all duration-300 ease-in-out ${isDrawerOpen ? 'mr-0' : ''}`}>
-          <div className="space-y-3 p-0 md:pl-4">
+        <div className={`flex-1 min-w-0 flex flex-col min-h-0 transition-all duration-300 ease-in-out ${isDrawerOpen ? 'mr-0' : ''}`}>
+          <div className="flex flex-col flex-1 min-h-0 gap-3 p-0 md:pl-4">
             <div className="flex items-center justify-between gap-4">
               <h1 className="text-xl font-semibold text-slate-900">Master Inbox</h1>
               <Button variant="outline" size="sm" className="md:hidden text-xs" onClick={() => navigate("/crm/tasks/mine")}>
@@ -864,10 +864,10 @@ export default function CrmTaskBoard() {
             </div>
 
             {tasksLoading ? (
-              <div className="grid grid-cols-4 gap-3 pb-4">
+              <div className="flex-1 min-h-0 grid grid-cols-4 gap-3">
                 {COLUMNS.map((col) => (
                   <div key={col.id}>
-                    <Skeleton className="h-[400px] rounded-lg" />
+                    <Skeleton className="h-full rounded-lg" />
                   </div>
                 ))}
               </div>
@@ -878,7 +878,7 @@ export default function CrmTaskBoard() {
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
               >
-                <div className="grid grid-cols-4 gap-3 pb-4">
+                <div className="flex-1 min-h-0 grid grid-cols-4 gap-3">
                   {COLUMNS.map((column) => (
                     <DroppableColumn
                       key={column.id}
