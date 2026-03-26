@@ -27456,13 +27456,10 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       if (limit) filters.limit = parseInt(limit as string);
       if (offset) filters.offset = parseInt(offset as string);
       
-      // Role-based filtering: Techs/Sales can only see tasks assigned to them or created by them
-      if (!isSupervisor(user.role)) {
-        // If assignedTo filter is not set, show tasks assigned to user OR created by user
-        if (!filters.assignedToUserId) {
-          filters.assignedToUserId = user.id;
-          filters.createdByUserId = user.id;
-        }
+      // Role-based filtering: Only desktop CRM users (sales+) see all tasks; techs see only their own
+      if (!isSalesOrAbove(user.role)) {
+        filters.assignedToUserId = user.id;
+        filters.createdByUserId = user.id;
       }
       
       const fetchedTasks = await storage.getTasks(filters);
@@ -27487,8 +27484,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Task not found" });
       }
 
-      // Role-based access: Non-supervisors can only view tasks assigned to them or created by them
-      if (!isSupervisor(user.role)) {
+      // Role-based access: Only desktop CRM users (sales+) can view all tasks
+      if (!isSalesOrAbove(user.role)) {
         if (task.assignedToUserId !== user.id && task.createdByUserId !== user.id) {
           return res.status(403).json({ message: "Access denied" });
         }
@@ -27575,8 +27572,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Task not found" });
       }
 
-      // Role-based access: Non-supervisors can only update tasks assigned to them or created by them
-      if (!isSupervisor(user.role)) {
+      // Role-based access: Only desktop CRM users (sales+) can update all tasks
+      if (!isSalesOrAbove(user.role)) {
         if (existingTask.assignedToUserId !== user.id && existingTask.createdByUserId !== user.id) {
           return res.status(403).json({ message: "Access denied" });
         }
@@ -27664,8 +27661,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Task not found" });
       }
 
-      // Role-based access: Non-supervisors can only delete tasks they created
-      if (!isSupervisor(user.role)) {
+      // Role-based access: Only desktop CRM users (sales+) can delete all tasks
+      if (!isSalesOrAbove(user.role)) {
         if (existingTask.createdByUserId !== user.id) {
           return res.status(403).json({ message: "Access denied - only task creator or admin can delete" });
         }
@@ -27705,8 +27702,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Task not found" });
       }
 
-      // Role-based access: Non-supervisors can only view activity for tasks assigned to them or created by them
-      if (!isSupervisor(user.role)) {
+      // Role-based access: Only desktop CRM users (sales+) can view all task activity
+      if (!isSalesOrAbove(user.role)) {
         if (task.assignedToUserId !== user.id && task.createdByUserId !== user.id) {
           return res.status(403).json({ message: "Access denied" });
         }
