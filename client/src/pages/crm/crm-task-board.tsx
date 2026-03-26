@@ -51,7 +51,6 @@ import {
   User,
   Building,
   Inbox,
-  FolderKanban,
   Zap,
   Hourglass,
   UserCheck,
@@ -122,7 +121,6 @@ type TasksResponse = {
 
 const COLUMNS: { id: TaskList; label: string; icon: typeof Inbox }[] = [
   { id: "inbox", label: "Inbox", icon: Inbox },
-  { id: "projects", label: "Projects", icon: FolderKanban },
   { id: "next_actions", label: "Next Actions", icon: Zap },
   { id: "waiting_on", label: "Waiting On", icon: Hourglass },
   { id: "follow_up", label: "Follow Up", icon: UserCheck },
@@ -885,7 +883,7 @@ export default function CrmTaskBoard() {
             </div>
 
             {tasksLoading ? (
-              <div className="grid grid-cols-5 gap-3 pb-4">
+              <div className="grid grid-cols-4 gap-3 pb-4">
                 {COLUMNS.map((col) => (
                   <div key={col.id}>
                     <Skeleton className="h-[400px] rounded-lg" />
@@ -899,7 +897,7 @@ export default function CrmTaskBoard() {
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
               >
-                <div className="grid grid-cols-5 gap-3 pb-4">
+                <div className="grid grid-cols-4 gap-3 pb-4">
                   {COLUMNS.map((column) => (
                     <DroppableColumn
                       key={column.id}
