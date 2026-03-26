@@ -190,7 +190,9 @@ function NotificationRow({
   const handleClick = () => {
     if (!n.isRead) onMarkRead();
     const link = getLink(n.entityType, n.entityId);
-    if (link) onNavigate(link);
+    if (link) {
+      window.location.href = link;
+    }
   };
 
   return (
