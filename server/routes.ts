@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, crmNotifications, crmComments, crmCommentMentions, insertCrmNotificationSchema, insertCrmCommentSchema, insertCrmCommentMentionSchema, type CrmNotification, type InsertCrmNotification, type CrmComment, type InsertCrmComment, type CrmCommentMention, type InsertCrmCommentMention, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry, crmLeads, crmLeadTypes, insertCrmLeadSchema, insertCrmLeadTypeSchema, type CrmLead, type CrmLeadType, type InsertCrmLead, type InsertCrmLeadType, crmLeadTempOptions, crmLeadDriverOptions, insertCrmLeadTempOptionSchema, insertCrmLeadDriverOptionSchema, type CrmLeadTempOption, type CrmLeadDriverOption, type InsertCrmLeadTempOption, type InsertCrmLeadDriverOption, tasks, taskTypes, taskActivity, insertTaskSchema, insertTaskTypeSchema, insertTaskActivitySchema, type Task, type TaskType, type TaskActivity, type InsertTask, type InsertTaskType, type InsertTaskActivity } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, crmNotifications, crmComments, crmCommentMentions, insertCrmNotificationSchema, insertCrmCommentSchema, insertCrmCommentMentionSchema, type CrmNotification, type InsertCrmNotification, type CrmComment, type InsertCrmComment, type CrmCommentMention, type InsertCrmCommentMention, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry, crmLeads, crmLeadTypes, insertCrmLeadSchema, insertCrmLeadTypeSchema, type CrmLead, type CrmLeadType, type InsertCrmLead, type InsertCrmLeadType, crmLeadTempOptions, crmLeadDriverOptions, insertCrmLeadTempOptionSchema, insertCrmLeadDriverOptionSchema, type CrmLeadTempOption, type CrmLeadDriverOption, type InsertCrmLeadTempOption, type InsertCrmLeadDriverOption, tasks, taskTypes, taskActivity, insertTaskSchema, insertTaskTypeSchema, insertTaskActivitySchema, type Task, type TaskType, type TaskActivity, type InsertTask, type InsertTaskType, type InsertTaskActivity, crmTaggedComments, crmTaggedCommentRecipients } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
@@ -7852,6 +7852,214 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting notification:", error);
       return res.status(500).json({ message: "Failed to delete notification" });
+    }
+  });
+
+  // ============================================
+  // TAGGED COMMENTS ENDPOINTS
+  // ============================================
+
+  app.post("/api/crm/tagged-comments", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) return res.status(401).json({ message: "Unauthorized" });
+
+      const { body, pageRoute, taggedUserIds } = req.body;
+      if (!body || typeof body !== "string" || !body.trim()) {
+        return res.status(400).json({ message: "body is required" });
+      }
+      if (!pageRoute || typeof pageRoute !== "string" || !pageRoute.startsWith("/crm")) {
+        return res.status(400).json({ message: "pageRoute must be a valid CRM route" });
+      }
+      if (!Array.isArray(taggedUserIds) || taggedUserIds.length === 0) {
+        return res.status(400).json({ message: "taggedUserIds must be a non-empty array" });
+      }
+
+      const uniqueUserIds = [...new Set(taggedUserIds.filter((id: any) => typeof id === "string" && id.length > 0))];
+      if (uniqueUserIds.length === 0) {
+        return res.status(400).json({ message: "At least one valid user ID is required" });
+      }
+
+      const validUsers = await db.select({ id: crmUsers.id })
+        .from(crmUsers)
+        .where(inArray(crmUsers.id, uniqueUserIds));
+      const validUserIds = validUsers.map(u => u.id);
+      if (validUserIds.length === 0) {
+        return res.status(400).json({ message: "No valid users found in taggedUserIds" });
+      }
+
+      const trimmedBody = body.trim();
+      const previewText = trimmedBody.length > 100 ? trimmedBody.slice(0, 100) + "…" : trimmedBody;
+
+      const result = await db.transaction(async (tx) => {
+        const [comment] = await tx.insert(crmTaggedComments).values({
+          authorId: currentUser.id,
+          pageRoute,
+          body: trimmedBody,
+        }).returning();
+
+        for (const userId of validUserIds) {
+          const [notification] = await tx.insert(crmNotifications).values({
+            userId,
+            type: "tagged_comment",
+            title: `${currentUser.name} left you a note`,
+            preview: previewText,
+            entityType: "tagged_comment",
+            entityId: comment.id,
+            actorId: currentUser.id,
+            isRead: false,
+          }).returning();
+
+          await tx.insert(crmTaggedCommentRecipients).values({
+            commentId: comment.id,
+            userId,
+            resolved: false,
+            notificationId: notification.id,
+          });
+        }
+
+        return comment;
+      });
+
+      return res.json(result);
+    } catch (error) {
+      console.error("Error creating tagged comment:", error);
+      return res.status(500).json({ message: "Failed to create tagged comment" });
+    }
+  });
+
+  app.get("/api/crm/tagged-comments", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) return res.status(401).json({ message: "Unauthorized" });
+
+      const { pageRoute, includeResolved } = req.query;
+      if (!pageRoute) return res.status(400).json({ message: "pageRoute is required" });
+
+      const conditions = [
+        eq(crmTaggedCommentRecipients.userId, currentUser.id),
+        eq(crmTaggedComments.pageRoute, pageRoute as string),
+      ];
+      if (includeResolved !== "true") {
+        conditions.push(eq(crmTaggedCommentRecipients.resolved, false));
+      }
+
+      const results = await db.select({
+        id: crmTaggedComments.id,
+        body: crmTaggedComments.body,
+        pageRoute: crmTaggedComments.pageRoute,
+        authorId: crmTaggedComments.authorId,
+        authorName: crmUsers.name,
+        createdAt: crmTaggedComments.createdAt,
+        recipientId: crmTaggedCommentRecipients.id,
+        resolved: crmTaggedCommentRecipients.resolved,
+        resolvedAt: crmTaggedCommentRecipients.resolvedAt,
+      })
+      .from(crmTaggedCommentRecipients)
+      .innerJoin(crmTaggedComments, eq(crmTaggedCommentRecipients.commentId, crmTaggedComments.id))
+      .innerJoin(crmUsers, eq(crmTaggedComments.authorId, crmUsers.id))
+      .where(and(...conditions))
+      .orderBy(desc(crmTaggedComments.createdAt));
+
+      return res.json(results);
+    } catch (error) {
+      console.error("Error fetching tagged comments:", error);
+      return res.status(500).json({ message: "Failed to fetch tagged comments" });
+    }
+  });
+
+  app.get("/api/crm/tagged-comments/count", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) return res.status(401).json({ message: "Unauthorized" });
+
+      const { pageRoute } = req.query;
+      const conditions = [
+        eq(crmTaggedCommentRecipients.userId, currentUser.id),
+        eq(crmTaggedCommentRecipients.resolved, false),
+      ];
+      if (pageRoute) {
+        conditions.push(eq(crmTaggedComments.pageRoute, pageRoute as string));
+      }
+
+      const [result] = await db.select({ count: count() })
+        .from(crmTaggedCommentRecipients)
+        .innerJoin(crmTaggedComments, eq(crmTaggedCommentRecipients.commentId, crmTaggedComments.id))
+        .where(and(...conditions));
+
+      return res.json({ count: result?.count || 0 });
+    } catch (error) {
+      console.error("Error counting tagged comments:", error);
+      return res.status(500).json({ message: "Failed to count tagged comments" });
+    }
+  });
+
+  app.patch("/api/crm/tagged-comments/:commentId/resolve", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) return res.status(401).json({ message: "Unauthorized" });
+
+      const { commentId } = req.params;
+
+      const [recipient] = await db.select()
+        .from(crmTaggedCommentRecipients)
+        .where(and(
+          eq(crmTaggedCommentRecipients.commentId, commentId),
+          eq(crmTaggedCommentRecipients.userId, currentUser.id),
+        ));
+
+      if (!recipient) {
+        return res.status(404).json({ message: "Comment not found for this user" });
+      }
+
+      await db.update(crmTaggedCommentRecipients)
+        .set({ resolved: true, resolvedAt: new Date() })
+        .where(eq(crmTaggedCommentRecipients.id, recipient.id));
+
+      if (recipient.notificationId) {
+        await db.update(crmNotifications)
+          .set({ isRead: true, readAt: new Date() })
+          .where(eq(crmNotifications.id, recipient.notificationId));
+      }
+
+      return res.json({ resolved: true });
+    } catch (error) {
+      console.error("Error resolving tagged comment:", error);
+      return res.status(500).json({ message: "Failed to resolve tagged comment" });
+    }
+  });
+
+  app.get("/api/crm/tagged-comments/lookup/:commentId", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) return res.status(401).json({ message: "Unauthorized" });
+
+      const { commentId } = req.params;
+      const [comment] = await db.select({
+        pageRoute: crmTaggedComments.pageRoute,
+        authorId: crmTaggedComments.authorId,
+      })
+        .from(crmTaggedComments)
+        .where(eq(crmTaggedComments.id, commentId))
+        .limit(1);
+
+      if (!comment) return res.status(404).json({ message: "Comment not found" });
+
+      if (comment.authorId !== currentUser.id) {
+        const [recipient] = await db.select({ id: crmTaggedCommentRecipients.id })
+          .from(crmTaggedCommentRecipients)
+          .where(and(
+            eq(crmTaggedCommentRecipients.commentId, commentId),
+            eq(crmTaggedCommentRecipients.userId, currentUser.id),
+          ))
+          .limit(1);
+        if (!recipient) return res.status(403).json({ message: "Access denied" });
+      }
+
+      return res.json({ pageRoute: comment.pageRoute });
+    } catch (error) {
+      console.error("Error looking up tagged comment:", error);
+      return res.status(500).json({ message: "Failed to lookup tagged comment" });
     }
   });
 

@@ -23,8 +23,11 @@ import {
   MessageCircle,
   Send,
   RotateCcw,
+  Wrench,
+  X,
+  MessageSquarePlus,
 } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface SearchResultItem {
   id: number;
@@ -496,16 +499,48 @@ export function GhqSearch() {
     );
   };
 
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [commentOpen, setCommentOpen] = useState(false);
+
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-[#711419] text-white shadow-lg flex items-center justify-center transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[#711419] focus:ring-offset-2"
-        data-testid="button-ghq-search"
-        aria-label="Open search"
-      >
-        <Search className="h-6 w-6" />
-      </button>
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col-reverse items-center gap-3">
+        {menuOpen && (
+          <div className="flex flex-col gap-2 mb-1 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <button
+              onClick={() => { setMenuOpen(false); setOpen(true); setMode("search"); }}
+              className="w-12 h-12 rounded-full bg-slate-800 text-white shadow-lg flex items-center justify-center hover:bg-slate-700 transition-colors"
+              title="Search"
+            >
+              <Search className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => { setMenuOpen(false); setOpen(true); setMode("help"); setTimeout(() => inputRef.current?.focus(), 50); }}
+              className="w-12 h-12 rounded-full bg-slate-800 text-white shadow-lg flex items-center justify-center hover:bg-slate-700 transition-colors"
+              title="Ask AI"
+            >
+              <HelpCircle className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => { setMenuOpen(false); setCommentOpen(true); }}
+              className="w-12 h-12 rounded-full bg-slate-800 text-white shadow-lg flex items-center justify-center hover:bg-slate-700 transition-colors"
+              title="Leave a Comment"
+            >
+              <MessageSquarePlus className="h-5 w-5" />
+            </button>
+          </div>
+        )}
+        <button
+          onClick={() => setMenuOpen(!menuOpen)}
+          className={`w-14 h-14 rounded-full bg-[#711419] text-white shadow-lg flex items-center justify-center transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[#711419] focus:ring-offset-2 ${menuOpen ? "rotate-90" : ""}`}
+          data-testid="button-ghq-tools"
+          aria-label="Open tools menu"
+        >
+          {menuOpen ? <X className="h-6 w-6" /> : <Wrench className="h-6 w-6" />}
+        </button>
+      </div>
+
+      {commentOpen && <TaggedCommentComposer onClose={() => setCommentOpen(false)} />}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
@@ -639,6 +674,118 @@ export function GhqSearch() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function TaggedCommentComposer({ onClose }: { onClose: () => void }) {
+  const [body, setBody] = useState("");
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [location] = useLocation();
+
+  const { data: users = [] } = useQuery<Array<{ id: string; name: string; role: string }>>({
+    queryKey: ["/api/crm/users"],
+  });
+
+  const { data: currentUser } = useQuery<{ id: string } | null>({
+    queryKey: ["/api/crm/auth/me"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/crm/tagged-comments", {
+        body,
+        pageRoute: location,
+        taggedUserIds: selectedUsers,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/tagged-comments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
+      onClose();
+    },
+  });
+
+  const toggleUser = (userId: string) => {
+    setSelectedUsers(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const availableUsers = users.filter(u => u.id !== currentUser?.id);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" onClick={onClose}>
+      <div
+        className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between p-4 border-b">
+          <h3 className="text-base font-semibold text-slate-900">Leave a Tagged Comment</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          <div>
+            <label className="text-sm font-medium text-slate-700 block mb-1.5">Page</label>
+            <div className="text-sm text-slate-500 bg-slate-50 rounded-lg px-3 py-2 truncate">
+              {location}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-slate-700 block mb-1.5">Comment</label>
+            <textarea
+              value={body}
+              onChange={e => setBody(e.target.value)}
+              placeholder="Write your note..."
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#711419] focus:border-transparent resize-none"
+              rows={3}
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-slate-700 block mb-1.5">
+              Tag team members ({selectedUsers.length} selected)
+            </label>
+            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+              {availableUsers.map(user => (
+                <button
+                  key={user.id}
+                  onClick={() => toggleUser(user.id)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    selectedUsers.includes(user.id)
+                      ? "bg-[#711419] text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {user.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 p-4 border-t bg-slate-50">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => createMutation.mutate()}
+            disabled={!body.trim() || selectedUsers.length === 0 || createMutation.isPending}
+            className="px-4 py-2 text-sm font-medium text-white bg-[#711419] rounded-lg hover:bg-[#5a1014] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {createMutation.isPending ? "Sending..." : "Send Comment"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

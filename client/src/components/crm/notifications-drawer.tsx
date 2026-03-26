@@ -20,12 +20,13 @@ import {
   AlertCircle,
   Inbox,
   Trash2,
+  MessageSquare,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 interface Notification {
   id: string;
-  type: "mention" | "task_assigned" | "task_due" | "comment" | "status_change" | "system";
+  type: "mention" | "task_assigned" | "task_due" | "comment" | "status_change" | "system" | "tagged_comment";
   title: string;
   preview: string | null;
   entityType: string | null;
@@ -57,6 +58,8 @@ function getEntityUrl(entityType: string | null, entityId: string | null): strin
       return `/crm/phone?log=${entityId}`;
     case "call_log_task":
       return `/crm/phone?task=${entityId}`;
+    case "tagged_comment":
+      return null;
     default:
       return null;
   }
@@ -117,6 +120,8 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
         return <ClipboardList className="h-4 w-4 text-green-500" />;
       case "comment":
         return <Bell className="h-4 w-4 text-purple-500" />;
+      case "tagged_comment":
+        return <MessageSquare className="h-4 w-4 text-amber-500" />;
       case "status_change":
         return <AlertCircle className="h-4 w-4 text-yellow-500" />;
       case "system":
@@ -126,11 +131,25 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
     }
   };
 
-  const handleNotificationClick = (notification: Notification) => {
+  const handleNotificationClick = async (notification: Notification) => {
     if (!notification.isRead) {
       markAsReadMutation.mutate(notification.id);
     }
     
+    if (notification.entityType === "tagged_comment" && notification.entityId) {
+      try {
+        const res = await fetch(`/api/crm/tagged-comments/lookup/${notification.entityId}`, { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.pageRoute) {
+            onClose();
+            window.location.href = data.pageRoute;
+            return;
+          }
+        }
+      } catch {}
+    }
+
     const url = getEntityUrl(notification.entityType, notification.entityId);
     if (url) {
       onClose();
@@ -162,6 +181,7 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
             <SelectItem value="all">All Types</SelectItem>
             <SelectItem value="mention">Mentions</SelectItem>
             <SelectItem value="task_assigned">Tasks Assigned</SelectItem>
+            <SelectItem value="tagged_comment">Tagged Notes</SelectItem>
             <SelectItem value="comment">Comments</SelectItem>
             <SelectItem value="system">System</SelectItem>
           </SelectContent>

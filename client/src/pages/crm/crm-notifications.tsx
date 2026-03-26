@@ -15,6 +15,7 @@ import {
   Inbox,
   Loader2,
   Trash2,
+  MessageSquare,
 } from "lucide-react";
 import type { CrmUser, CrmNotification } from "@shared/schema";
 
@@ -174,6 +175,7 @@ function getLink(entityType: string | null, entityId: string | null): string | n
     case "quote": return `/crm/quotes/${entityId}`;
     case "invoice": return `/crm/invoices/${entityId}`;
     case "agreement": return "/crm/agreements";
+    case "tagged_comment": return null;
     default: return null;
   }
 }
@@ -189,8 +191,21 @@ function NotificationRow({
   onDelete: () => void;
   onNavigate: (path: string) => void;
 }) {
-  const handleClick = () => {
+  const handleClick = async () => {
     if (!n.isRead) onMarkRead();
+    if (n.entityType === "tagged_comment" && n.entityId) {
+      try {
+        const res = await fetch(`/api/crm/tagged-comments/lookup/${n.entityId}`, { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.pageRoute) {
+            window.location.href = data.pageRoute;
+            return;
+          }
+        }
+      } catch {}
+      return;
+    }
     const link = getLink(n.entityType, n.entityId);
     if (link) {
       window.location.href = link;
@@ -205,10 +220,12 @@ function NotificationRow({
       }`}
     >
       <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${
-        n.type === "task_assigned" ? "bg-green-100" : "bg-slate-100"
+        n.type === "task_assigned" ? "bg-green-100" : n.type === "tagged_comment" ? "bg-amber-100" : "bg-slate-100"
       }`}>
         {n.type === "task_assigned" || n.type === "task_due"
           ? <ClipboardList className="h-4 w-4 text-green-600" />
+          : n.type === "tagged_comment"
+          ? <MessageSquare className="h-4 w-4 text-amber-600" />
           : <Bell className="h-4 w-4 text-slate-400" />}
       </div>
 

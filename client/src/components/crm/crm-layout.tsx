@@ -35,6 +35,7 @@ import type { CrmUser } from "@shared/schema";
 import ghqLogo from "@assets/redlogo.webp";
 import GhqSearch from "./ghq-search";
 import NotificationsDrawerContent from "./notifications-drawer";
+import TaggedCommentsDisplay from "./tagged-comments-display";
 
 interface CrmLayoutProps {
   children: React.ReactNode;
@@ -402,6 +403,7 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
         )}
       </main>
       {!hideGlobalSearch && <GhqSearch />}
+      <TaggedCommentsDisplay />
       <Sheet open={notificationsOpen} onOpenChange={setNotificationsOpen}>
         <SheetContent side="right" className="w-full sm:w-96 p-0">
           <NotificationsDrawerContent onClose={() => setNotificationsOpen(false)} />

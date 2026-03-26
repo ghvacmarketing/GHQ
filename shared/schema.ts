@@ -3227,7 +3227,7 @@ export type InsertProjectLaborEntry = z.infer<typeof insertProjectLaborEntrySche
 export type ProjectLaborEntry = typeof projectLaborEntries.$inferSelect;
 
 // CRM Notifications - User notifications for mentions, assignments, etc.
-export const notificationTypeEnum = ["mention", "task_assigned", "task_due", "comment", "status_change", "system"] as const;
+export const notificationTypeEnum = ["mention", "task_assigned", "task_due", "comment", "status_change", "system", "tagged_comment"] as const;
 export type NotificationType = typeof notificationTypeEnum[number];
 
 export const crmNotifications = pgTable("crm_notifications", {
@@ -3404,3 +3404,37 @@ export const insertCrmCommentMentionSchema = createInsertSchema(crmCommentMentio
 
 export type InsertCrmCommentMention = z.infer<typeof insertCrmCommentMentionSchema>;
 export type CrmCommentMention = typeof crmCommentMentions.$inferSelect;
+
+export const crmTaggedComments = pgTable("crm_tagged_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  authorId: varchar("author_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  pageRoute: text("page_route").notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const crmTaggedCommentRecipients = pgTable("crm_tagged_comment_recipients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  commentId: varchar("comment_id").notNull().references(() => crmTaggedComments.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  resolved: boolean("resolved").notNull().default(false),
+  resolvedAt: timestamp("resolved_at"),
+  notificationId: varchar("notification_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCrmTaggedCommentSchema = createInsertSchema(crmTaggedComments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCrmTaggedCommentRecipientSchema = createInsertSchema(crmTaggedCommentRecipients).omit({
+  id: true,
+  createdAt: true,
+  resolvedAt: true,
+});
+
+export type InsertCrmTaggedComment = z.infer<typeof insertCrmTaggedCommentSchema>;
+export type CrmTaggedComment = typeof crmTaggedComments.$inferSelect;
+export type InsertCrmTaggedCommentRecipient = z.infer<typeof insertCrmTaggedCommentRecipientSchema>;
+export type CrmTaggedCommentRecipient = typeof crmTaggedCommentRecipients.$inferSelect;

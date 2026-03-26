@@ -40,6 +40,9 @@ Preferred communication style: Simple, everyday language.
 -   **Automated SMS Notifications**: System for sending automated SMS alerts to customers via Textline for maintenance reminders, invoice payments, and work order status updates.
 -   **Time Tracking System**: Technicians clock in/out from the mobile app, with entries stored and editable by Admins.
 -   **QuickBooks Online Integration**: Full bidirectional OAuth 2.0 sync for customers, invoices, and payments, featuring a hierarchical class assignment system based on customer and property types, and an admin UI for managing classes and chart of accounts.
+-   **Tagged Comments System**: Directed internal notes that can be left on any CRM page. Users tag one or more team members; only tagged users and the author see the comment. Comments appear as floating bubbles on the relevant page with a resolve flow. Integrates with the notification system (type: "tagged_comment"). Accessed via the floating tool menu (wrench icon) in bottom-right corner, which also provides access to Search and Ask AI.
+    -   Tables: `crm_tagged_comments`, `crm_tagged_comment_recipients`
+    -   API: `/api/crm/tagged-comments` (POST, GET), `/api/crm/tagged-comments/count`, `/api/crm/tagged-comments/:commentId/resolve`, `/api/crm/tagged-comments/lookup/:commentId`
 
 ## External Dependencies
 -   **Google Sheets API**: Parts pricing, application settings, customer data sync.
