@@ -224,6 +224,7 @@ export default function CrmSalesbook() {
     };
   }, [scale]);
 
+  const containerReady = containerSize.w > 100 && containerSize.h > 100;
   const isMobile = containerSize.w < 640;
   const bookPanelWidth = showBookmarks && !isMobile ? 256 : 0;
   const availWidth = Math.max(containerSize.w - bookPanelWidth - 32, 200);
@@ -432,7 +433,7 @@ export default function CrmSalesbook() {
             ref={containerRef}
             className="flex-1 overflow-auto flex justify-center items-center"
           >
-            {isLoading ? (
+            {isLoading || !containerReady ? (
               <div className="flex flex-col items-center justify-center gap-3">
                 <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
                 <p className="text-sm text-neutral-400">Loading salesbook...</p>
