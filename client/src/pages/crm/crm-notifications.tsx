@@ -25,6 +25,7 @@ export default function CrmNotifications() {
   const { toast } = useToast();
   const [tab, setTab] = useState<"unread" | "all">("all");
 
+
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),

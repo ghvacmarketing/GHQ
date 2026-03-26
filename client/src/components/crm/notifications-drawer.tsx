@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/select";
 import {
   Bell,
-  CheckCheck,
   AtSign,
   ClipboardList,
   Settings,
@@ -132,18 +131,6 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between p-4 border-b">
         <h2 className="text-lg font-semibold">Notifications</h2>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-xs"
-            onClick={() => markAllReadMutation.mutate()}
-            disabled={markAllReadMutation.isPending}
-          >
-            <CheckCheck className="h-4 w-4 mr-1" />
-            Mark all read
-          </Button>
-        </div>
       </div>
 
       <div className="p-4 border-b space-y-3">

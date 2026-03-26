@@ -316,9 +316,9 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
           onClick={() => setNotificationsOpen(true)}
         >
           <Bell className="h-5 w-5 text-slate-600" />
-          {notificationCount?.count && notificationCount.count > 0 && (
-            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
-              {notificationCount.count > 99 ? "99+" : notificationCount.count}
+          {(notificationCount?.count ?? 0) > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full text-white text-[10px] font-bold flex items-center justify-center px-1" style={{ backgroundColor: "#711419" }}>
+              {notificationCount!.count > 99 ? "99+" : notificationCount!.count}
             </span>
           )}
         </Button>
@@ -365,9 +365,9 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
               onClick={() => setNotificationsOpen(true)}
             >
               <Bell className="h-5 w-5" />
-              {notificationCount?.count && notificationCount.count > 0 && (
-                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
-                  {notificationCount.count > 99 ? "99+" : notificationCount.count}
+              {(notificationCount?.count ?? 0) > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full text-white text-[10px] font-bold flex items-center justify-center px-1" style={{ backgroundColor: "#711419" }}>
+                  {notificationCount!.count > 99 ? "99+" : notificationCount!.count}
                 </span>
               )}
             </Button>
