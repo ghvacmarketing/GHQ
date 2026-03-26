@@ -8132,6 +8132,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/crm/tagged-comments/history", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) return res.status(401).json({ message: "Unauthorized" });
+
+      const receivedRows = await db.select({
+        id: crmTaggedComments.id,
+        body: crmTaggedComments.body,
+        pageRoute: crmTaggedComments.pageRoute,
+        authorId: crmTaggedComments.authorId,
+        authorName: crmUsers.name,
+        createdAt: crmTaggedComments.createdAt,
+        resolved: crmTaggedCommentRecipients.resolved,
+        resolvedAt: crmTaggedCommentRecipients.resolvedAt,
+        role: sql<string>`'recipient'`.as("role"),
+      })
+      .from(crmTaggedCommentRecipients)
+      .innerJoin(crmTaggedComments, eq(crmTaggedCommentRecipients.commentId, crmTaggedComments.id))
+      .innerJoin(crmUsers, eq(crmTaggedComments.authorId, crmUsers.id))
+      .where(eq(crmTaggedCommentRecipients.userId, currentUser.id))
+      .orderBy(desc(crmTaggedComments.createdAt))
+      .limit(100);
+
+      const sentRows = await db.select({
+        id: crmTaggedComments.id,
+        body: crmTaggedComments.body,
+        pageRoute: crmTaggedComments.pageRoute,
+        authorId: crmTaggedComments.authorId,
+        authorName: crmUsers.name,
+        createdAt: crmTaggedComments.createdAt,
+      })
+      .from(crmTaggedComments)
+      .innerJoin(crmUsers, eq(crmTaggedComments.authorId, crmUsers.id))
+      .where(eq(crmTaggedComments.authorId, currentUser.id))
+      .orderBy(desc(crmTaggedComments.createdAt))
+      .limit(100);
+
+      const seenIds = new Set(receivedRows.map(r => r.id));
+      const results: Array<{
+        id: string;
+        body: string;
+        pageRoute: string;
+        authorId: string;
+        authorName: string | null;
+        createdAt: Date | null;
+        resolved: boolean;
+        resolvedAt: Date | null;
+        role: string;
+      }> = receivedRows.map(r => ({
+        ...r,
+        authorName: r.authorName,
+      }));
+
+      for (const s of sentRows) {
+        if (!seenIds.has(s.id)) {
+          const recipientStatuses = await db.select({
+            resolved: crmTaggedCommentRecipients.resolved,
+            resolvedAt: crmTaggedCommentRecipients.resolvedAt,
+          })
+          .from(crmTaggedCommentRecipients)
+          .where(eq(crmTaggedCommentRecipients.commentId, s.id));
+
+          const allResolved = recipientStatuses.length > 0 && recipientStatuses.every(r => r.resolved);
+          const firstResolved = recipientStatuses.find(r => r.resolved);
+
+          results.push({
+            ...s,
+            authorName: s.authorName,
+            resolved: allResolved,
+            resolvedAt: firstResolved?.resolvedAt ?? null,
+            role: "author",
+          });
+        }
+      }
+
+      results.sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
+      return res.json(results);
+    } catch (error) {
+      console.error("Error fetching tagged comment history:", error);
+      return res.status(500).json({ message: "Failed to fetch tagged comment history" });
+    }
+  });
+
   app.get("/api/crm/tagged-comments/lookup/:commentId", requireCrmAuth, async (req, res) => {
     try {
       const currentUser = await getCurrentCrmUser(req);

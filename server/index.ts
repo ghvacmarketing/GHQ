@@ -146,7 +146,19 @@ import path from "path";
 const assetsPath = path.resolve(import.meta.dirname, "..", "attached_assets");
 app.use("/assets", express.static(assetsPath));
 
+async function runTaggedCommentMigrations() {
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`ALTER TABLE crm_tagged_comments ADD COLUMN IF NOT EXISTS author_dismissed boolean NOT NULL DEFAULT false`);
+    await db.execute(sql`ALTER TABLE crm_tagged_comment_recipients ADD COLUMN IF NOT EXISTS resolved_by_id varchar`);
+  } catch (err) {
+    console.error("Tagged comment migration error (non-fatal):", err);
+  }
+}
+
 (async () => {
+  await runTaggedCommentMigrations();
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

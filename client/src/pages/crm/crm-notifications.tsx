@@ -20,10 +20,26 @@ import {
   AlertCircle,
   Settings,
   AtSign,
+  Circle,
+  ArrowUpRight,
+  Send,
+  ArrowDownLeft,
 } from "lucide-react";
 import type { CrmUser, CrmNotification } from "@shared/schema";
 
 type NotificationWithActor = CrmNotification & { actorName?: string | null };
+
+interface TaggedCommentHistoryItem {
+  id: string;
+  body: string;
+  pageRoute: string;
+  authorId: string;
+  authorName: string;
+  createdAt: string;
+  resolved: boolean;
+  resolvedAt: string | null;
+  role: "author" | "recipient";
+}
 
 const typeFilters = [
   { key: "all", label: "All" },
@@ -52,7 +68,8 @@ export default function CrmNotifications() {
     queryFn: async () => {
       const params = new URLSearchParams();
       if (tab === "unread") params.set("unreadOnly", "true");
-      if (typeFilter !== "all") params.set("type", typeFilter);
+      if (typeFilter !== "all" && typeFilter !== "tagged_comment") params.set("type", typeFilter);
+      if (typeFilter === "tagged_comment") params.set("type", "tagged_comment");
       const url = `/api/crm/notifications?${params.toString()}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
@@ -60,6 +77,17 @@ export default function CrmNotifications() {
     },
     enabled: !!currentUser,
     refetchInterval: 5000,
+  });
+
+  const { data: taggedHistory = [] } = useQuery<TaggedCommentHistoryItem[]>({
+    queryKey: ["/api/crm/tagged-comments/history"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/tagged-comments/history", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!currentUser && typeFilter === "tagged_comment",
+    refetchInterval: 10000,
   });
 
   const invalidateAll = () => {
@@ -99,6 +127,8 @@ export default function CrmNotifications() {
   if (!currentUser) return null;
 
   const hasUnread = notifications.some((n) => !n.isRead);
+
+  const showTaggedNotesView = typeFilter === "tagged_comment" && tab === "all";
 
   return (
     <CrmLayout currentUser={currentUser}>
@@ -153,6 +183,33 @@ export default function CrmNotifications() {
           ))}
         </div>
 
+        {showTaggedNotesView && (
+          <div className="mb-6">
+            <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-amber-500" />
+              All Tagged Notes
+              <span className="text-xs font-normal text-slate-400">({taggedHistory.length})</span>
+            </h2>
+            {taggedHistory.length === 0 ? (
+              <div className="text-center py-10 border border-slate-200 rounded-lg">
+                <MessageSquare className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                <p className="text-sm text-slate-500">No tagged notes yet</p>
+              </div>
+            ) : (
+              <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 overflow-hidden mb-6">
+                {taggedHistory.map((item) => (
+                  <TaggedNoteHistoryRow key={`${item.id}-${item.role}`} item={item} currentUserId={currentUser.id} />
+                ))}
+              </div>
+            )}
+            {notifications.length > 0 && (
+              <h2 className="text-sm font-semibold text-slate-700 mb-3">
+                Tagged Note Notifications
+              </h2>
+            )}
+          </div>
+        )}
+
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
@@ -162,7 +219,7 @@ export default function CrmNotifications() {
               </div>
             ))}
           </div>
-        ) : notifications.length === 0 ? (
+        ) : notifications.length === 0 && !showTaggedNotesView ? (
           <div className="text-center py-20">
             <Inbox className="h-12 w-12 text-slate-300 mx-auto mb-3" />
             <p className="text-base font-medium text-slate-600">
@@ -176,7 +233,7 @@ export default function CrmNotifications() {
                 : "Notifications will appear here when tasks are assigned to you."}
             </p>
           </div>
-        ) : (
+        ) : notifications.length === 0 && showTaggedNotesView ? null : (
           <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 overflow-hidden">
             {notifications.map((n) => (
               <NotificationRow
@@ -185,13 +242,67 @@ export default function CrmNotifications() {
                 onMarkRead={() => markReadMut.mutate(n.id)}
                 onDelete={() => deleteMut.mutate(n.id)}
                 onNavigate={navigate}
-                showResolvedBadge={typeFilter === "tagged_comment"}
               />
             ))}
           </div>
         )}
       </div>
     </CrmLayout>
+  );
+}
+
+function TaggedNoteHistoryRow({ item, currentUserId }: { item: TaggedCommentHistoryItem; currentUserId: string }) {
+  const isSent = item.role === "author";
+  const pageName = item.pageRoute.split("/").filter(Boolean).pop() || item.pageRoute;
+
+  return (
+    <a
+      href={`${item.pageRoute}?highlightComment=${item.id}`}
+      className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-slate-50 group"
+    >
+      <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${
+        isSent ? "bg-blue-50" : "bg-amber-50"
+      }`}>
+        {isSent ? (
+          <Send className="h-4 w-4 text-blue-500" />
+        ) : (
+          <ArrowDownLeft className="h-4 w-4 text-amber-500" />
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-slate-700 truncate">
+            {isSent ? (
+              <span>You left a note</span>
+            ) : (
+              <span><span className="font-medium">{item.authorName}</span> left you a note</span>
+            )}
+          </p>
+          {item.resolved ? (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-medium flex-shrink-0">
+              <CheckCircle2 className="h-2.5 w-2.5" />
+              Resolved
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-medium flex-shrink-0">
+              <Circle className="h-2.5 w-2.5" />
+              Open
+            </span>
+          )}
+        </div>
+        <p className="text-sm text-slate-500 mt-0.5 truncate">{item.body}</p>
+        <div className="flex items-center gap-2 mt-1">
+          <span className="text-xs text-slate-400">
+            {item.createdAt ? formatDistanceToNow(new Date(item.createdAt), { addSuffix: true }) : ""}
+          </span>
+          <span className="text-xs text-slate-400 flex items-center gap-0.5">
+            <ArrowUpRight className="h-3 w-3" />
+            {pageName}
+          </span>
+        </div>
+      </div>
+    </a>
   );
 }
 
@@ -252,16 +363,12 @@ function NotificationRow({
   onMarkRead,
   onDelete,
   onNavigate,
-  showResolvedBadge,
 }: {
   notification: NotificationWithActor;
   onMarkRead: () => void;
   onDelete: () => void;
   onNavigate: (path: string) => void;
-  showResolvedBadge?: boolean;
 }) {
-  const isResolved = n.title?.toLowerCase().includes("resolved");
-
   const handleClick = async () => {
     if (!n.isRead) onMarkRead();
     if (n.entityType === "tagged_comment" && n.entityId) {
@@ -298,17 +405,9 @@ function NotificationRow({
       </div>
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className={`text-sm leading-snug ${!n.isRead ? "font-semibold text-slate-900" : "text-slate-700"}`}>
-            {n.title}
-          </p>
-          {showResolvedBadge && isResolved && (
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-medium flex-shrink-0">
-              <CheckCircle2 className="h-2.5 w-2.5" />
-              Resolved
-            </span>
-          )}
-        </div>
+        <p className={`text-sm leading-snug ${!n.isRead ? "font-semibold text-slate-900" : "text-slate-700"}`}>
+          {n.title}
+        </p>
         {n.preview && (
           <p className="text-sm text-slate-500 mt-0.5 truncate">{n.preview}</p>
         )}
