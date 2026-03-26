@@ -7340,7 +7340,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: crmUsers.role,
         isActive: crmUsers.isActive,
         createdAt: crmUsers.createdAt,
-      }).from(crmUsers).orderBy(desc(crmUsers.createdAt));
+      }).from(crmUsers).where(eq(crmUsers.isActive, true)).orderBy(crmUsers.name);
       return res.json(users);
     } catch (error) {
       console.error("Error fetching CRM users:", error);
