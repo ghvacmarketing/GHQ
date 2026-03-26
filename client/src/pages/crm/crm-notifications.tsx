@@ -158,7 +158,7 @@ export default function CrmNotifications() {
           )}
         </div>
 
-        <div className="flex items-center gap-6 border-b border-slate-200 mb-6 overflow-x-auto">
+        <div className="flex items-center gap-6 border-b border-slate-200 mb-6">
           {(["unread", "all"] as const).map((t) => (
             <button
               key={t}
@@ -172,6 +172,7 @@ export default function CrmNotifications() {
               {t === "unread" ? "Unread" : "All"}
             </button>
           ))}
+          <div className="w-px h-5 bg-slate-200 self-center" />
           {typeFilters.map((tf) => (
             <button
               key={tf.key}
