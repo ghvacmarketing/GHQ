@@ -57,6 +57,8 @@ import {
   Zap,
   Hourglass,
   UserCheck,
+  PanelLeft,
+  PanelLeftClose,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { 
@@ -268,6 +270,7 @@ export default function CrmMyTasks() {
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [isAddingTask, setIsAddingTask] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const [selectedTask, setSelectedTask] = useState<TaskWithRelations | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -562,46 +565,86 @@ export default function CrmMyTasks() {
   ];
 
   return (
-    <CrmLayout currentUser={currentUser}>
+    <CrmLayout currentUser={currentUser} disableScroll>
       <div className="flex h-full">
-        {/* Left Sidebar Navigation */}
-        <div className="w-56 flex-shrink-0 bg-slate-50 border-r border-slate-200 p-4 hidden md:block">
-          <div className="space-y-1">
+        {/* Left Sidebar Navigation - Collapsible */}
+        <div className={`
+          flex-shrink-0 bg-slate-50 border-r border-slate-200 hidden md:flex flex-col
+          transition-all duration-300 ease-in-out
+          ${sidebarCollapsed ? 'w-14' : 'w-56'}
+        `}>
+          <div className="p-2 border-b border-slate-200">
             <Button
               variant="ghost"
-              className="w-full justify-start text-slate-600 hover:bg-slate-100"
-              onClick={() => navigate("/crm/tasks/board")}
+              size="icon"
+              className="w-full h-8"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              <Inbox className="h-4 w-4 mr-2" />
-              Master Inbox
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start bg-slate-200 text-slate-900 font-medium"
-              onClick={() => navigate("/crm/tasks/mine")}
-            >
-              <User className="h-4 w-4 mr-2" />
-              My Tasks
+              {sidebarCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </Button>
           </div>
-          <div className="mt-6 border-t border-slate-200 pt-4">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Lists</p>
-            <div className="space-y-1">
+          <div className="flex-1 p-2 space-y-1">
+            <Button
+              variant="ghost"
+              className={`w-full text-slate-600 hover:bg-slate-100 ${sidebarCollapsed ? 'justify-center px-2' : 'justify-start'}`}
+              onClick={() => navigate("/crm/tasks/board")}
+              title="Master Inbox"
+            >
+              <Inbox className={`h-4 w-4 ${sidebarCollapsed ? '' : 'mr-2'}`} />
+              {!sidebarCollapsed && "Master Inbox"}
+            </Button>
+            <Button
+              variant="ghost"
+              className={`w-full bg-slate-200 text-slate-900 font-medium ${sidebarCollapsed ? 'justify-center px-2' : 'justify-start'}`}
+              onClick={() => navigate("/crm/tasks/mine")}
+              title="My Tasks"
+            >
+              <User className={`h-4 w-4 ${sidebarCollapsed ? '' : 'mr-2'}`} />
+              {!sidebarCollapsed && "My Tasks"}
+            </Button>
+          </div>
+          {!sidebarCollapsed && (
+            <div className="p-2 border-t border-slate-200">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-2">Lists</p>
+              <div className="space-y-1">
+                {LISTS.map((list) => {
+                  const Icon = list.icon;
+                  return (
+                    <div
+                      key={list.id}
+                      className="flex items-center gap-2 px-2 py-1.5 text-sm text-slate-600 rounded hover:bg-slate-100 cursor-pointer"
+                      onClick={() => navigate("/crm/tasks/board")}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{list.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {sidebarCollapsed && (
+            <div className="p-2 border-t border-slate-200 space-y-1">
               {LISTS.map((list) => {
                 const Icon = list.icon;
                 return (
-                  <div key={list.id} className="flex items-center gap-2 px-2 py-1.5 text-sm text-slate-600 rounded hover:bg-slate-100 cursor-pointer" onClick={() => navigate("/crm/tasks/board")}>
+                  <div
+                    key={list.id}
+                    className="flex items-center justify-center py-1.5 text-slate-600 rounded hover:bg-slate-100 cursor-pointer"
+                    title={list.label}
+                    onClick={() => navigate("/crm/tasks/board")}
+                  >
                     <Icon className="h-4 w-4" />
-                    <span>{list.label}</span>
                   </div>
                 );
               })}
             </div>
-          </div>
+          )}
         </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="max-w-3xl mx-auto space-y-6 md:pl-4">
+        <div className="flex-1 min-w-0 flex flex-col min-h-0 overflow-y-auto">
+          <div className="max-w-3xl mx-auto space-y-6 md:pl-4 pb-8 pt-0 w-full">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">My Tasks</h1>
