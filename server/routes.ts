@@ -26995,6 +26995,16 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(400).json({ message: "Invalid task data", errors: parsed.error.errors });
       }
 
+      // Reject past due dates
+      if (parsed.data.dueAt) {
+        const due = new Date(parsed.data.dueAt);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (due < today) {
+          return res.status(400).json({ message: "Due date cannot be in the past" });
+        }
+      }
+
       const task = await storage.createTask(parsed.data);
 
       // Log activity
@@ -27044,6 +27054,16 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       if (!isSupervisor(user.role)) {
         if (existingTask.assignedToUserId !== user.id && existingTask.createdByUserId !== user.id) {
           return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      // Reject past due dates on update
+      if (req.body.dueAt) {
+        const due = new Date(req.body.dueAt);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (due < today) {
+          return res.status(400).json({ message: "Due date cannot be in the past" });
         }
       }
 

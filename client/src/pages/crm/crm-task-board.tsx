@@ -81,7 +81,15 @@ const taskFormSchema = z.object({
   priority: z.enum(["low", "normal", "high", "urgent"]),
   typeId: z.string().optional(),
   assignedToUserId: z.string().optional(),
-  dueAt: z.date().optional().nullable(),
+  dueAt: z.date().optional().nullable().refine(
+    (val) => {
+      if (!val) return true;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return val >= today;
+    },
+    { message: "Due date cannot be in the past" }
+  ),
   relatedEntityType: z.enum(["customer", "lead", "project", "work_order", "invoice", "none"]).optional(),
   relatedEntityId: z.string().optional(),
   customerId: z.string().optional(),
