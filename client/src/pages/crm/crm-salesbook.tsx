@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import HTMLFlipBook from "react-pageflip";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import { useAuth } from "@/hooks/use-auth";
 
 interface FlipBookRef {
   pageFlip(): {
@@ -59,7 +58,9 @@ interface SalesbookData {
 }
 
 export default function CrmSalesbook() {
-  const { user: currentUser } = useAuth();
+  const { data: currentUser } = useQuery<any>({
+    queryKey: ["/api/crm/auth/me"],
+  });
   const [currentPage, setCurrentPage] = useState(0);
   const [scale, setScale] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
