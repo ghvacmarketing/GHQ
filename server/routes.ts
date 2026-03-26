@@ -7955,6 +7955,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resolved: crmTaggedCommentRecipients.resolved,
         resolvedAt: crmTaggedCommentRecipients.resolvedAt,
         isAuthor: sql<boolean>`false`.as("is_author"),
+        resolvedByName: sql<string | null>`null`.as("resolved_by_name"),
       })
       .from(crmTaggedCommentRecipients)
       .innerJoin(crmTaggedComments, eq(crmTaggedCommentRecipients.commentId, crmTaggedComments.id))
@@ -7965,6 +7966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const authorConditions = [
         eq(crmTaggedComments.authorId, currentUser.id),
         eq(crmTaggedComments.pageRoute, pageRoute as string),
+        eq(crmTaggedComments.authorDismissed, false),
       ];
 
       const authorResults = await db.select({
@@ -7981,15 +7983,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .orderBy(desc(crmTaggedComments.createdAt));
 
       const seenIds = new Set(recipientResults.map(r => r.id));
-      const merged: Array<typeof recipientResults[number]> = [...recipientResults];
+      type MergedComment = typeof recipientResults[number];
+      const merged: MergedComment[] = [...recipientResults];
+
       for (const ac of authorResults) {
         if (!seenIds.has(ac.id)) {
+          const recipientRows = await db.select({
+            resolved: crmTaggedCommentRecipients.resolved,
+            resolvedAt: crmTaggedCommentRecipients.resolvedAt,
+            resolvedByName: crmUsers.name,
+          })
+          .from(crmTaggedCommentRecipients)
+          .leftJoin(crmUsers, eq(crmTaggedCommentRecipients.resolvedById, crmUsers.id))
+          .where(eq(crmTaggedCommentRecipients.commentId, ac.id));
+
+          const allResolved = recipientRows.length > 0 && recipientRows.every(r => r.resolved);
+          const firstResolved = recipientRows.find(r => r.resolved);
+
           merged.push({
             ...ac,
             recipientId: null,
-            resolved: true,
-            resolvedAt: null,
+            resolved: allResolved,
+            resolvedAt: firstResolved?.resolvedAt ?? null,
             isAuthor: true,
+            resolvedByName: firstResolved?.resolvedByName ?? null,
           });
         }
       }
@@ -8047,7 +8064,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await db.update(crmTaggedCommentRecipients)
-        .set({ resolved: true, resolvedAt: new Date() })
+        .set({ resolved: true, resolvedAt: new Date(), resolvedById: currentUser.id })
         .where(eq(crmTaggedCommentRecipients.id, recipient.id));
 
       if (recipient.notificationId) {
@@ -8056,10 +8073,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(eq(crmNotifications.id, recipient.notificationId));
       }
 
+      const [comment] = await db.select({
+        authorId: crmTaggedComments.authorId,
+        body: crmTaggedComments.body,
+        pageRoute: crmTaggedComments.pageRoute,
+      })
+        .from(crmTaggedComments)
+        .where(eq(crmTaggedComments.id, commentId))
+        .limit(1);
+
+      if (comment && comment.authorId !== currentUser.id) {
+        const previewText = comment.body.length > 80 ? comment.body.slice(0, 80) + "…" : comment.body;
+        await db.insert(crmNotifications).values({
+          userId: comment.authorId,
+          type: "tagged_comment",
+          title: `${currentUser.name} resolved your note`,
+          preview: previewText,
+          entityType: "tagged_comment",
+          entityId: commentId,
+          actorId: currentUser.id,
+          isRead: false,
+        });
+      }
+
       return res.json({ resolved: true });
     } catch (error) {
       console.error("Error resolving tagged comment:", error);
       return res.status(500).json({ message: "Failed to resolve tagged comment" });
+    }
+  });
+
+  app.patch("/api/crm/tagged-comments/:commentId/dismiss", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) return res.status(401).json({ message: "Unauthorized" });
+
+      const { commentId } = req.params;
+
+      const [comment] = await db.select()
+        .from(crmTaggedComments)
+        .where(and(
+          eq(crmTaggedComments.id, commentId),
+          eq(crmTaggedComments.authorId, currentUser.id),
+        ));
+
+      if (!comment) {
+        return res.status(404).json({ message: "Comment not found or you are not the author" });
+      }
+
+      await db.update(crmTaggedComments)
+        .set({ authorDismissed: true })
+        .where(eq(crmTaggedComments.id, commentId));
+
+      return res.json({ dismissed: true });
+    } catch (error) {
+      console.error("Error dismissing tagged comment:", error);
+      return res.status(500).json({ message: "Failed to dismiss tagged comment" });
     }
   });
 

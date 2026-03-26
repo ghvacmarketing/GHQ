@@ -3410,6 +3410,7 @@ export const crmTaggedComments = pgTable("crm_tagged_comments", {
   authorId: varchar("author_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
   pageRoute: text("page_route").notNull(),
   body: text("body").notNull(),
+  authorDismissed: boolean("author_dismissed").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -3419,6 +3420,7 @@ export const crmTaggedCommentRecipients = pgTable("crm_tagged_comment_recipients
   userId: varchar("user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
   resolved: boolean("resolved").notNull().default(false),
   resolvedAt: timestamp("resolved_at"),
+  resolvedById: varchar("resolved_by_id"),
   notificationId: varchar("notification_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });

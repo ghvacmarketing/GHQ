@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -16,29 +16,44 @@ import {
   Loader2,
   Trash2,
   MessageSquare,
+  CheckCircle2,
+  AlertCircle,
+  Settings,
+  AtSign,
 } from "lucide-react";
 import type { CrmUser, CrmNotification } from "@shared/schema";
 
 type NotificationWithActor = CrmNotification & { actorName?: string | null };
+
+const typeFilters = [
+  { key: "all", label: "All" },
+  { key: "task_assigned", label: "Tasks" },
+  { key: "tagged_comment", label: "Tagged Notes" },
+  { key: "mention", label: "Mentions" },
+  { key: "system", label: "System" },
+] as const;
+
+type TypeFilterKey = typeof typeFilters[number]["key"];
 
 export default function CrmNotifications() {
   usePageTitle("Notifications");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [tab, setTab] = useState<"unread" | "all">("unread");
+  const [typeFilter, setTypeFilter] = useState<TypeFilterKey>("all");
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
-  const { data: notifications = [], isLoading, refetch } = useQuery<NotificationWithActor[]>({
-    queryKey: ["/api/crm/notifications", tab],
-    queryFn: async ({ queryKey }) => {
-      const currentTab = queryKey[1] as string;
-      const url = currentTab === "unread"
-        ? "/api/crm/notifications?unreadOnly=true"
-        : "/api/crm/notifications";
+  const { data: notifications = [], isLoading } = useQuery<NotificationWithActor[]>({
+    queryKey: ["/api/crm/notifications", tab, typeFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (tab === "unread") params.set("unreadOnly", "true");
+      if (typeFilter !== "all") params.set("type", typeFilter);
+      const url = `/api/crm/notifications?${params.toString()}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
@@ -88,11 +103,10 @@ export default function CrmNotifications() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-xl font-semibold text-slate-900">Notifications</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Task assignments and updates</p>
+            <p className="text-sm text-slate-500 mt-0.5">Task assignments, tagged notes, and updates</p>
           </div>
           {hasUnread && (
             <Button
@@ -109,8 +123,7 @@ export default function CrmNotifications() {
           )}
         </div>
 
-        {/* Tabs */}
-        <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5 w-fit mb-6">
+        <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5 w-fit mb-4">
           {(["unread", "all"] as const).map((t) => (
             <button
               key={t}
@@ -124,7 +137,22 @@ export default function CrmNotifications() {
           ))}
         </div>
 
-        {/* List */}
+        <div className="flex items-center gap-1.5 flex-wrap mb-6">
+          {typeFilters.map((tf) => (
+            <button
+              key={tf.key}
+              onClick={() => setTypeFilter(tf.key)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
+                typeFilter === tf.key
+                  ? "bg-slate-800 text-white border-slate-800"
+                  : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              {tf.label}
+            </button>
+          ))}
+        </div>
+
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
@@ -143,6 +171,8 @@ export default function CrmNotifications() {
             <p className="text-sm text-slate-400 mt-1">
               {tab === "unread"
                 ? "No unread notifications."
+                : typeFilter !== "all"
+                ? `No ${typeFilters.find(f => f.key === typeFilter)?.label.toLowerCase()} notifications.`
                 : "Notifications will appear here when tasks are assigned to you."}
             </p>
           </div>
@@ -155,6 +185,7 @@ export default function CrmNotifications() {
                 onMarkRead={() => markReadMut.mutate(n.id)}
                 onDelete={() => deleteMut.mutate(n.id)}
                 onNavigate={navigate}
+                showResolvedBadge={typeFilter === "tagged_comment"}
               />
             ))}
           </div>
@@ -180,17 +211,57 @@ function getLink(entityType: string | null, entityId: string | null): string | n
   }
 }
 
+function getIcon(type: string) {
+  switch (type) {
+    case "task_assigned":
+    case "task_due":
+      return <ClipboardList className="h-4 w-4 text-green-600" />;
+    case "tagged_comment":
+      return <MessageSquare className="h-4 w-4 text-amber-600" />;
+    case "mention":
+      return <AtSign className="h-4 w-4 text-blue-500" />;
+    case "status_change":
+      return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+    case "system":
+      return <Settings className="h-4 w-4 text-orange-500" />;
+    default:
+      return <Bell className="h-4 w-4 text-slate-400" />;
+  }
+}
+
+function getIconBg(type: string) {
+  switch (type) {
+    case "task_assigned":
+    case "task_due":
+      return "bg-green-100";
+    case "tagged_comment":
+      return "bg-amber-100";
+    case "mention":
+      return "bg-blue-100";
+    case "status_change":
+      return "bg-yellow-100";
+    case "system":
+      return "bg-orange-100";
+    default:
+      return "bg-slate-100";
+  }
+}
+
 function NotificationRow({
   notification: n,
   onMarkRead,
   onDelete,
   onNavigate,
+  showResolvedBadge,
 }: {
   notification: NotificationWithActor;
   onMarkRead: () => void;
   onDelete: () => void;
   onNavigate: (path: string) => void;
+  showResolvedBadge?: boolean;
 }) {
+  const isResolved = n.title?.toLowerCase().includes("resolved");
+
   const handleClick = async () => {
     if (!n.isRead) onMarkRead();
     if (n.entityType === "tagged_comment" && n.entityId) {
@@ -222,20 +293,22 @@ function NotificationRow({
         !n.isRead ? "bg-blue-50/40" : ""
       }`}
     >
-      <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${
-        n.type === "task_assigned" ? "bg-green-100" : n.type === "tagged_comment" ? "bg-amber-100" : "bg-slate-100"
-      }`}>
-        {n.type === "task_assigned" || n.type === "task_due"
-          ? <ClipboardList className="h-4 w-4 text-green-600" />
-          : n.type === "tagged_comment"
-          ? <MessageSquare className="h-4 w-4 text-amber-600" />
-          : <Bell className="h-4 w-4 text-slate-400" />}
+      <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${getIconBg(n.type)}`}>
+        {getIcon(n.type)}
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className={`text-sm leading-snug ${!n.isRead ? "font-semibold text-slate-900" : "text-slate-700"}`}>
-          {n.title}
-        </p>
+        <div className="flex items-center gap-2">
+          <p className={`text-sm leading-snug ${!n.isRead ? "font-semibold text-slate-900" : "text-slate-700"}`}>
+            {n.title}
+          </p>
+          {showResolvedBadge && isResolved && (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-medium flex-shrink-0">
+              <CheckCircle2 className="h-2.5 w-2.5" />
+              Resolved
+            </span>
+          )}
+        </div>
         {n.preview && (
           <p className="text-sm text-slate-500 mt-0.5 truncate">{n.preview}</p>
         )}
