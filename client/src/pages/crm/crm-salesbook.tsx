@@ -40,6 +40,7 @@ import {
   EliteAirflowPage,
   CrawlspaceDividerPage,
   CrawlspaceTiersPage,
+  CrawlspaceExamplePage,
   buildSalesbookSections,
   getSalesbookTOC,
   type SalesbookSection,
@@ -306,6 +307,8 @@ export default function CrmSalesbook() {
         return <CrawlspaceDividerPage key={section.pageIndex} />;
       case "crawlspace-tiers":
         return <CrawlspaceTiersPage key={section.pageIndex} tiers={section.crawlspaceTiers || []} />;
+      case "crawlspace-example":
+        return <CrawlspaceExamplePage key={section.pageIndex} />;
       default:
         return null;
     }

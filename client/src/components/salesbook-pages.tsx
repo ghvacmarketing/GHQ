@@ -910,6 +910,112 @@ export const CrawlspaceTiersPage = forwardRef<HTMLDivElement, { tiers: Crawlspac
 });
 CrawlspaceTiersPage.displayName = "CrawlspaceTiersPage";
 
+export const CrawlspaceExamplePage = forwardRef<HTMLDivElement, object>((_, ref) => (
+  <PageWrapper ref={ref}>
+    <div style={{
+      background: "#1a6b3c",
+      padding: "12px 20px",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+    }}>
+      <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>Crawlspace Pricing Example</div>
+      <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: 600 }}>How Pricing Works</div>
+    </div>
+
+    <div style={{ flex: 1, padding: "20px 24px", overflow: "hidden" }}>
+      <div style={{
+        background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
+        border: "2px solid #86efac",
+        borderRadius: 10,
+        padding: "14px 18px",
+        marginBottom: 16,
+      }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#14532d", marginBottom: 4 }}>
+          Complete Crawlspace Protection
+        </div>
+        <div style={{ fontSize: 11, color: "#166534", lineHeight: 1.6 }}>
+          Pricing is calculated based on your crawlspace square footage, chosen liner tier, and dehumidifier selection. Below is a typical 1,200 sqft crawlspace example.
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#111", marginBottom: 8 }}>
+          Example: 1,200 sqft — Premium Tier
+        </div>
+        <div style={{
+          border: "1px solid #e0e0e0",
+          borderRadius: 8,
+          overflow: "hidden",
+        }}>
+          <div style={{ padding: "10px 16px", background: "#f8f8f8", borderBottom: "1px solid #e0e0e0" }}>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Customer selects:</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#222" }}>Premium 20-mil Vapor Barrier + Aprilaire E070 Dehumidifier</div>
+          </div>
+          <div style={{ padding: "12px 16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 11, color: "#555" }}>Labor (1,200 sqft × $1.50)</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#333" }}>$1,800</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 11, color: "#555" }}>Premium Liner (with 10% waste + 50% margin)</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#333" }}>$2,640</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 11, color: "#555" }}>Aprilaire E070 Dehumidifier (50% markup)</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#333" }}>$2,475</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 11, color: "#555" }}>Electrical receptacle</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#333" }}>$150</span>
+            </div>
+            <div style={{
+              borderTop: "2px solid #111",
+              paddingTop: 8,
+              marginTop: 4,
+              display: "flex",
+              justifyContent: "space-between",
+            }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#111" }}>Total Investment</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: "#1a6b3c" }}>$7,065</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{
+        background: "#f0fdf4",
+        border: "1px solid #bbf7d0",
+        borderRadius: 8,
+        padding: "12px 16px",
+      }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#166534", marginBottom: 6 }}>
+          What's Included
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
+          {[
+            "Full vapor barrier install",
+            "Joist-to-joist coverage",
+            "Pillar wrapping included",
+            "Dehumidifier + drainage",
+            "Mold prevention",
+            "10-year liner warranty",
+            "Moisture control",
+            "Improved air quality",
+          ].map((item, i) => (
+            <div key={i} style={{ fontSize: 10, color: "#15803d", display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ color: "#22c55e", fontWeight: 700 }}>✓</span> {item}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    <div style={{ height: 3, background: "#1a6b3c" }} />
+  </PageWrapper>
+));
+CrawlspaceExamplePage.displayName = "CrawlspaceExamplePage";
+
 export interface EliteBundle {
   id: string;
   name: string;
@@ -927,7 +1033,7 @@ export interface EliteAirflowOption {
 }
 
 export interface SalesbookSection {
-  type: "static" | "category-divider" | "tier-header" | "product-detail" | "ducting-detail" | "elite-divider" | "elite-bundles" | "elite-discount" | "elite-airflow" | "crawlspace-divider" | "crawlspace-tiers";
+  type: "static" | "category-divider" | "tier-header" | "product-detail" | "ducting-detail" | "elite-divider" | "elite-bundles" | "elite-discount" | "elite-airflow" | "crawlspace-divider" | "crawlspace-tiers" | "crawlspace-example";
   label?: string;
   unitType?: string;
   tier?: string;
@@ -1061,6 +1167,7 @@ export function buildSalesbookSections(
   if (crawlspaceTiers.length > 0) {
     sections.push({ type: "crawlspace-divider", pageIndex: pageIndex++, label: "Crawlspace Services" });
     sections.push({ type: "crawlspace-tiers", crawlspaceTiers, pageIndex: pageIndex++, label: "Crawlspace Tiers & Pricing" });
+    sections.push({ type: "crawlspace-example", pageIndex: pageIndex++, label: "Crawlspace Pricing Example" });
   }
 
   return sections;
