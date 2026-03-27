@@ -7,7 +7,6 @@ import { useToast } from "@/hooks/use-toast";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -35,10 +34,71 @@ import {
   FileText,
   Loader2,
   Copy,
+  Braces,
+  Check,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Link } from "wouter";
 import type { CrmUser, ProposalTemplate } from "@shared/schema";
 import RichTextEditor from "@/components/rich-text-editor";
+
+const SYSTEM_VARIABLES = [
+  { key: "customerName", label: "Customer Name", description: "The customer's full name" },
+  { key: "address", label: "Address", description: "Project/service address" },
+  { key: "equipmentSummary", label: "Equipment Summary", description: "Selected equipment description" },
+  { key: "totalPrice", label: "Total Price", description: "Quoted total price" },
+  { key: "date", label: "Date", description: "Current date (auto-filled)" },
+  { key: "projectName", label: "Project Name", description: "Name of the project" },
+  { key: "preparedFor", label: "Prepared For", description: "Recipient name (defaults to customer name)" },
+];
+
+function VariableBank({ onInsert }: { onInsert?: (variable: string) => void }) {
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const handleCopy = (key: string) => {
+    const variable = `{{${key}}}`;
+    navigator.clipboard.writeText(variable);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 1500);
+    onInsert?.(variable);
+  };
+
+  return (
+    <div className="border rounded-lg bg-slate-50 p-3">
+      <div className="flex items-center gap-2 mb-3">
+        <Braces className="h-4 w-4 text-slate-500" />
+        <span className="text-sm font-medium text-slate-700">Variable Bank</span>
+      </div>
+      <p className="text-xs text-slate-400 mb-3">Click to copy. Paste into your template — these get auto-filled when generating proposals.</p>
+      <div className="flex flex-wrap gap-1.5">
+        {SYSTEM_VARIABLES.map((v) => (
+          <button
+            key={v.key}
+            onClick={() => handleCopy(v.key)}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-mono bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 hover:border-slate-300 transition-colors cursor-pointer"
+            title={v.description}
+          >
+            {copiedKey === v.key ? (
+              <>
+                <Check className="h-3 w-3 text-green-500" />
+                Copied
+              </>
+            ) : (
+              <>
+                <Copy className="h-2.5 w-2.5 text-slate-400" />
+                {`{{${v.key}}}`}
+              </>
+            )}
+          </button>
+        ))}
+      </div>
+      <p className="text-[10px] text-slate-400 mt-2">
+        You can also type custom variables like {"{{anyName}}"} — they'll appear as-is if no matching data is found.
+      </p>
+    </div>
+  );
+}
 
 export default function CrmSettingsProposalTemplates() {
   usePageTitle("Proposal Templates");
@@ -60,6 +120,7 @@ export default function CrmSettingsProposalTemplates() {
   const [templateBody, setTemplateBody] = useState("");
   const [templateIsDefault, setTemplateIsDefault] = useState(false);
   const [deletingTemplate, setDeletingTemplate] = useState<ProposalTemplate | null>(null);
+  const [variableBankOpen, setVariableBankOpen] = useState(true);
 
   const seedMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/crm/proposal-templates/seed-default"),
@@ -152,120 +213,109 @@ export default function CrmSettingsProposalTemplates() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="space-y-4">
+      <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Link href="/crm/settings">
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" className="h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold text-slate-800">Proposal Templates</h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Create and manage templates for proposals and quotes. Use variables like {"{{customerName}}"}, {"{{address}}"}, {"{{equipmentSummary}}"}, {"{{totalPrice}}"}, {"{{date}}"}, {"{{projectName}}"} for auto-fill.
-            </p>
+            <h1 className="text-xl font-semibold text-slate-800">Proposal Templates</h1>
           </div>
-          <Button onClick={openCreateDialog} className="bg-[#711419] hover:bg-[#5a1014]">
-            <Plus className="h-4 w-4 mr-2" />
+          <Button onClick={openCreateDialog} size="sm" className="bg-[#711419] hover:bg-[#5a1014]">
+            <Plus className="h-4 w-4 mr-1.5" />
             New Template
           </Button>
         </div>
 
+        <VariableBank />
+
         {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
           </div>
         ) : templates.length === 0 ? (
-          <Card>
-            <CardContent className="py-16 text-center">
-              <FileText className="h-12 w-12 mx-auto text-slate-300 mb-4" />
-              <h3 className="text-lg font-semibold text-slate-700 mb-2">No templates yet</h3>
-              <p className="text-sm text-slate-500 mb-6">Get started by loading the default Installation Agreement template or create your own.</p>
-              <div className="flex items-center gap-3 justify-center">
-                <Button
-                  variant="outline"
-                  onClick={() => seedMutation.mutate()}
-                  disabled={seedMutation.isPending}
-                >
-                  {seedMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Load Default Template
-                </Button>
-                <Button onClick={openCreateDialog} className="bg-[#711419] hover:bg-[#5a1014]">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create New
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="text-center py-16 border border-dashed rounded-lg">
+            <FileText className="h-10 w-10 mx-auto text-slate-300 mb-3" />
+            <p className="text-sm text-slate-500 mb-4">No templates yet</p>
+            <div className="flex items-center gap-2 justify-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => seedMutation.mutate()}
+                disabled={seedMutation.isPending}
+              >
+                {seedMutation.isPending && <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />}
+                Load Default
+              </Button>
+              <Button onClick={openCreateDialog} size="sm" className="bg-[#711419] hover:bg-[#5a1014]">
+                <Plus className="h-3 w-3 mr-1.5" />
+                Create New
+              </Button>
+            </div>
+          </div>
         ) : (
-          <div className="grid gap-4">
+          <div className="space-y-2">
             {templates.map((template) => (
-              <Card key={template.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <FileText className="h-5 w-5 text-slate-400 flex-shrink-0" />
-                    <div className="min-w-0">
-                      <CardTitle className="text-base truncate">{template.name}</CardTitle>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Created {new Date(template.createdAt!).toLocaleDateString()}
-                      </p>
-                    </div>
-                    {template.isDefault && (
-                      <Badge className="bg-amber-100 text-amber-700 border-amber-200 flex-shrink-0">
-                        <Star className="h-3 w-3 mr-1" />
-                        Default
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    {!template.isDefault && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDefaultMutation.mutate(template.id)}
-                        disabled={setDefaultMutation.isPending}
-                        title="Set as default"
-                      >
-                        <Star className="h-4 w-4" />
-                      </Button>
-                    )}
+              <div
+                key={template.id}
+                className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg border bg-white hover:bg-slate-50 transition-colors group"
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <FileText className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                  <span className="text-sm font-medium text-slate-800 truncate">{template.name}</span>
+                  {template.isDefault && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-300 text-amber-600 bg-amber-50 flex-shrink-0">
+                      Default
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                  {!template.isDefault && (
                     <Button
                       variant="ghost"
-                      size="sm"
-                      onClick={() => openDuplicateDialog(template)}
-                      title="Duplicate"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => setDefaultMutation.mutate(template.id)}
+                      disabled={setDefaultMutation.isPending}
+                      title="Set as default"
                     >
-                      <Copy className="h-4 w-4" />
+                      <Star className="h-3.5 w-3.5" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openEditDialog(template)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setDeletingTemplate(template);
-                        setDeleteDialogOpen(true);
-                      }}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div
-                    className="text-sm text-slate-500 line-clamp-3 prose prose-sm max-w-none"
-                    dangerouslySetInnerHTML={{
-                      __html: template.body.replace(/<[^>]*>/g, " ").slice(0, 300) + (template.body.length > 300 ? "..." : ""),
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => openDuplicateDialog(template)}
+                    title="Duplicate"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => openEditDialog(template)}
+                    title="Edit"
+                  >
+                    <Edit className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-red-400 hover:text-red-600"
+                    onClick={() => {
+                      setDeletingTemplate(template);
+                      setDeleteDialogOpen(true);
                     }}
-                  />
-                </CardContent>
-              </Card>
+                    title="Delete"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -279,34 +329,40 @@ export default function CrmSettingsProposalTemplates() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-slate-700 mb-1 block">Template Name</label>
-              <Input
-                value={templateName}
-                onChange={(e) => setTemplateName(e.target.value)}
-                placeholder="e.g., Installation Agreement, Service Contract..."
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="isDefault"
-                checked={templateIsDefault}
-                onChange={(e) => setTemplateIsDefault(e.target.checked)}
-                className="rounded border-slate-300"
-              />
-              <label htmlFor="isDefault" className="text-sm text-slate-600">Set as default template</label>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700 mb-1 block">
-                Template Body
-              </label>
-              <p className="text-xs text-slate-400 mb-2">
-                Available variables: {"{{customerName}}"}, {"{{address}}"}, {"{{equipmentSummary}}"}, {"{{totalPrice}}"}, {"{{date}}"}, {"{{projectName}}"}
-              </p>
-              <div className="min-h-[400px] border rounded-md">
-                <RichTextEditor value={templateBody} onChange={setTemplateBody} />
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <Input
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  placeholder="Template name..."
+                  className="text-sm"
+                />
               </div>
+              <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={templateIsDefault}
+                  onChange={(e) => setTemplateIsDefault(e.target.checked)}
+                  className="rounded border-slate-300"
+                />
+                Default
+              </label>
+            </div>
+
+            <div>
+              <button
+                onClick={() => setVariableBankOpen(!variableBankOpen)}
+                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 mb-2"
+              >
+                <Braces className="h-3 w-3" />
+                Variables
+                {variableBankOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </button>
+              {variableBankOpen && <VariableBank />}
+            </div>
+
+            <div className="min-h-[400px] border rounded-md">
+              <RichTextEditor value={templateBody} onChange={setTemplateBody} />
             </div>
           </div>
           <DialogFooter>
@@ -319,7 +375,7 @@ export default function CrmSettingsProposalTemplates() {
               {(createMutation.isPending || updateMutation.isPending) && (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               )}
-              {editingTemplate ? "Save Changes" : "Create Template"}
+              {editingTemplate ? "Save" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
