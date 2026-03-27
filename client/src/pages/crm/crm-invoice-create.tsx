@@ -184,6 +184,7 @@ export default function CrmInvoiceCreate() {
 
   const urlParams = new URLSearchParams(window.location.search);
   const workOrderIdFromUrl = urlParams.get("workOrderId");
+  const customerIdFromUrl = urlParams.get("customerId");
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -218,13 +219,25 @@ export default function CrmInvoiceCreate() {
   });
 
   const { data: quotes, isLoading: quotesLoading } = useQuery<{ quotes: QuoteWithItems[] }>({
-    queryKey: ["/api/crm/quotes", "accepted"],
+    queryKey: ["/api/crm/quotes", "accepted", customerIdFromUrl],
     queryFn: async () => {
-      const res = await fetch("/api/crm/quotes?status=accepted", { credentials: "include" });
+      const params = new URLSearchParams({ status: "accepted" });
+      if (customerIdFromUrl) params.set("customerId", customerIdFromUrl);
+      const res = await fetch(`/api/crm/quotes?${params.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch quotes");
       return res.json();
     },
     enabled: !!currentUser && formData.mode === "from-quote",
+  });
+
+  const { data: allCustomerQuotes } = useQuery<{ quotes: QuoteWithItems[] }>({
+    queryKey: ["/api/crm/quotes", "all-for-customer", customerIdFromUrl],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/quotes?customerId=${customerIdFromUrl}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch quotes");
+      return res.json();
+    },
+    enabled: !!currentUser && formData.mode === "from-quote" && !!customerIdFromUrl,
   });
 
   const { data: crmItems } = useQuery<CrmItem[]>({
@@ -634,6 +647,10 @@ export default function CrmInvoiceCreate() {
   };
 
   const filteredWorkOrders = workOrders?.workOrders?.filter(wo => {
+    if (customerIdFromUrl) {
+      const woCustomerId = wo.customerId || wo.customer?.id;
+      if (woCustomerId !== customerIdFromUrl) return false;
+    }
     if (!workOrderSearch) return true;
     const search = workOrderSearch.toLowerCase();
     return (
@@ -645,6 +662,9 @@ export default function CrmInvoiceCreate() {
   }) || [];
 
   const filteredQuotes = quotes?.quotes?.filter(q => {
+    if (customerIdFromUrl) {
+      if (q.customerId !== customerIdFromUrl) return false;
+    }
     if (!quoteSearch) return true;
     const search = quoteSearch.toLowerCase();
     return (
@@ -696,7 +716,13 @@ export default function CrmInvoiceCreate() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => window.history.back()}
+            onClick={() => {
+              if (customerIdFromUrl) {
+                navigate(`/crm/customers/${customerIdFromUrl}?tab=invoices`);
+              } else {
+                navigate("/crm/invoices");
+              }
+            }}
             data-testid="button-back"
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
@@ -895,7 +921,9 @@ export default function CrmInvoiceCreate() {
                         ) : filteredWorkOrders.length === 0 ? (
                           <div className="p-8 text-center text-slate-500">
                             <ClipboardList className="h-8 w-8 mx-auto mb-2 text-slate-400" />
-                            No work orders found
+                            {customerIdFromUrl
+                              ? "This customer has no work orders. Create a work order first before creating an invoice."
+                              : "No work orders found"}
                           </div>
                         ) : (
                           <div className="divide-y">
@@ -997,7 +1025,11 @@ export default function CrmInvoiceCreate() {
                     ) : filteredQuotes.length === 0 ? (
                       <div className="p-8 text-center text-slate-500">
                         <FileText className="h-8 w-8 mx-auto mb-2 text-slate-400" />
-                        No accepted quotes found
+                        {customerIdFromUrl
+                          ? (allCustomerQuotes?.quotes && allCustomerQuotes.quotes.length > 0
+                            ? "This customer has no accepted quotes. A quote must be in \"Accepted\" status before you can create an invoice from it."
+                            : "This customer has no quotes. Create a quote for this customer first.")
+                          : "No accepted quotes found"}
                       </div>
                     ) : (
                       <div className="divide-y">

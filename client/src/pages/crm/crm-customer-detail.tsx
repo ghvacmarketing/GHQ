@@ -2712,6 +2712,12 @@ function CustomerTabbedView({
               <Receipt className="h-5 w-5 text-[#711419]" />
               Invoices ({crmInvoices?.length || 0})
             </CardTitle>
+            <Link href={`/crm/invoices/new?customerId=${customer.id}`}>
+              <Button size="sm" className="bg-[#711419] hover:bg-[#5a1014] text-white">
+                <Plus className="h-4 w-4 mr-1" />
+                Create Invoice
+              </Button>
+            </Link>
           </CardHeader>
           <CardContent>
             {invoicesLoading ? (
@@ -3012,7 +3018,11 @@ export default function CrmCustomerDetail() {
     return null;
   })();
   const goBack = () => backHref ? navigate(backHref) : window.history.back();
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(() => {
+    const tabParam = new URLSearchParams(window.location.search).get("tab");
+    const validTabs = ["overview", "locations", "work-orders", "projects", "quotes", "invoices", "files", "tasks", "agreements", "timeline", "settings", "sub-accounts"];
+    return tabParam && validTabs.includes(tabParam) ? tabParam : "overview";
+  });
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [scheduleVisitDialogOpen, setScheduleVisitDialogOpen] = useState(false);
   const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
