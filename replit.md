@@ -47,7 +47,8 @@ Preferred communication style: Simple, everyday language.
     -   Tables: `salesbook_bookmarks`, `pricebook_packages`, `crawlspace_tiers`
     -   API: `/api/salesbook/data` (GET — returns static pages + live packages + crawlspace tiers), `/api/salesbook/bookmarks` (GET/POST/PATCH/DELETE), `/api/salesbook/pages`
     -   Components: `client/src/components/salesbook-pages.tsx` (all dynamic page components + section builder)
-    -   Pages: `client/src/pages/price-book.tsx` (flipbook viewer), `client/src/pages/crm/crm-settings-salesbook.tsx` (bookmark admin)
+    -   Pages: `client/src/pages/price-book.tsx` (public flipbook viewer at `/salesbook`), `client/src/pages/crm/crm-salesbook.tsx` (CRM-embedded viewer at `/crm/salesbook`), `client/src/pages/crm/crm-settings-salesbook.tsx` (bookmark admin)
+    -   Public link: `/salesbook` — no login required, full flipbook with TOC, zoom, fullscreen. Changes in the CRM auto-update here since it uses the same data API.
 
 ## External Dependencies
 -   **Google Sheets API**: Parts pricing, application settings, customer data sync.

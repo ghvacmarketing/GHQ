@@ -13,7 +13,6 @@ interface FlipBookRef {
 }
 
 import {
-  Settings,
   ChevronLeft,
   ChevronRight,
   ZoomIn,
@@ -27,7 +26,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import MobileNav from "@/components/mobile-nav";
 import redlogo from "@assets/redlogo.webp";
 import type { PricebookPackage, CrawlspaceTier, SalesbookBookmark } from "@shared/schema";
 import {
@@ -320,15 +318,13 @@ export default function PriceBook() {
       <header className="flex-shrink-0 bg-neutral-800 border-b border-neutral-700 shadow-sm">
         <div className="flex items-center justify-between p-2 sm:p-3">
           <div className="flex items-center space-x-2 min-w-0 flex-1">
-            <MobileNav />
             <img
               src={redlogo}
               alt="Giesbrecht HVAC"
               className="h-7 sm:h-9 w-auto object-contain flex-shrink-0"
-              data-testid="img-company-logo"
             />
             <span className="text-sm sm:text-base font-semibold truncate hidden sm:inline">
-              Sales Pricebook
+              2025 Sales Pricebook
             </span>
           </div>
 
@@ -339,7 +335,6 @@ export default function PriceBook() {
               onClick={() => setShowBookmarks(!showBookmarks)}
               className="text-white hover:bg-neutral-700 h-8 w-8"
               title="Table of Contents"
-              data-testid="button-bookmarks"
             >
               <List className="h-4 w-4" />
             </Button>
@@ -348,7 +343,7 @@ export default function PriceBook() {
               size="icon"
               onClick={zoomOut}
               className="text-white hover:bg-neutral-700 h-8 w-8"
-              title="Zoom Out (or Ctrl+Scroll)"
+              title="Zoom Out"
             >
               <ZoomOut className="h-4 w-4" />
             </Button>
@@ -360,7 +355,7 @@ export default function PriceBook() {
               size="icon"
               onClick={zoomIn}
               className="text-white hover:bg-neutral-700 h-8 w-8"
-              title="Zoom In (or Ctrl+Scroll)"
+              title="Zoom In"
             >
               <ZoomIn className="h-4 w-4" />
             </Button>
@@ -376,15 +371,6 @@ export default function PriceBook() {
               ) : (
                 <Maximize className="h-4 w-4" />
               )}
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => (window.location.href = "/admin")}
-              className="text-white hover:bg-neutral-700 h-8 w-8"
-              data-testid="button-settings"
-            >
-              <Settings className="h-4 w-4" />
             </Button>
           </div>
         </div>

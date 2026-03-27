@@ -11,6 +11,7 @@ import QuoteGenerator from "@/pages/quote-generator";
 import QuoteEdit from "@/pages/quote-edit";
 import QuotesHistory from "@/pages/quotes-history";
 import ProcessesSystems from "@/pages/processes-systems";
+const PublicSalesbook = lazy(() => import("@/pages/price-book"));
 import ProcessBuilderManual from "@/pages/process-builder-manual";
 import ProcessBuilderVoice from "@/pages/process-builder-voice";
 import SalesProspects from "@/pages/sales-prospects";
@@ -240,7 +241,8 @@ function Router() {
       <Route path="/quote" component={QuoteGenerator} />
       <Route path="/quote/edit/:id" component={QuoteEdit} />
       <Route path="/history" component={QuotesHistory} />
-      <Route path="/price-book">{() => { window.location.replace("/crm/salesbook"); return <GlobalLoader />; }}</Route>
+      <Route path="/salesbook">{() => <Suspense fallback={<GlobalLoader />}><PublicSalesbook /></Suspense>}</Route>
+      <Route path="/price-book">{() => { window.location.replace("/salesbook"); return <GlobalLoader />; }}</Route>
       <Route path="/processes" component={ProcessesSystems} />
       <Route path="/processes/new" component={ProcessBuilderManual} />
       <Route path="/processes/new/voice" component={ProcessBuilderVoice} />
