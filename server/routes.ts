@@ -28067,6 +28067,36 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  app.get("/api/crm/proposal-template-images", requireCrmAuth, async (req, res) => {
+    try {
+      const images = await storage.getAllProposalTemplateImages();
+      res.json(images);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/crm/proposal-template-images", requireCrmAuth, async (req, res) => {
+    try {
+      const { name, url } = req.body;
+      if (!name || !url) return res.status(400).json({ message: "name and url are required" });
+      const image = await storage.createProposalTemplateImage({ name, url });
+      res.json(image);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/crm/proposal-template-images/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const deleted = await storage.deleteProposalTemplateImage(req.params.id);
+      if (!deleted) return res.status(404).json({ message: "Image not found" });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   // Defer expensive startup operations to run after server is ready (allows health checks to pass)
   setTimeout(() => {

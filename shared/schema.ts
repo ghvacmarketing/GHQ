@@ -3473,3 +3473,18 @@ export const insertProposalTemplateSchema = createInsertSchema(proposalTemplates
 
 export type InsertProposalTemplate = z.infer<typeof insertProposalTemplateSchema>;
 export type ProposalTemplate = typeof proposalTemplates.$inferSelect;
+
+export const proposalTemplateImages = pgTable("proposal_template_images", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertProposalTemplateImageSchema = createInsertSchema(proposalTemplateImages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertProposalTemplateImage = z.infer<typeof insertProposalTemplateImageSchema>;
+export type ProposalTemplateImage = typeof proposalTemplateImages.$inferSelect;

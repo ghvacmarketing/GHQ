@@ -11,6 +11,7 @@ import {
   Bold, Italic, Underline as UnderlineIcon, List, ListOrdered,
   Undo, Redo, ImageIcon, Link as LinkIcon, AlignLeft, AlignCenter,
   AlignRight, Heading1, Heading2, Heading3, Type, Minus, Loader2,
+  FolderOpen,
 } from 'lucide-react';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -174,16 +175,20 @@ const ResizableImage = Image.extend({
   },
 });
 
+type LibraryImage = { id: string; name: string; url: string };
+
 type ProposalEditorProps = {
   value: string;
   onChange: (content: string) => void;
   placeholder?: string;
+  imageLibrary?: LibraryImage[];
 };
 
 export default function ProposalEditor({
   value,
   onChange,
   placeholder = 'Start building your proposal template...',
+  imageLibrary,
 }: ProposalEditorProps) {
   const { toast } = useToast();
   const lastEmittedRef = useRef<string>('');
@@ -191,6 +196,7 @@ export default function ProposalEditor({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkPopoverOpen, setLinkPopoverOpen] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -489,6 +495,40 @@ export default function ProposalEditor({
         >
           {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
         </ToolbarButton>
+
+        {imageLibrary && imageLibrary.length > 0 && (
+          <Popover open={libraryOpen} onOpenChange={setLibraryOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                title="Insert from image library"
+                className="h-8 w-8 p-0 text-slate-500 hover:text-slate-700"
+              >
+                <FolderOpen className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72 p-2" align="start">
+              <p className="text-xs font-medium text-slate-500 px-1 mb-2">Image Library</p>
+              <div className="max-h-48 overflow-y-auto space-y-1">
+                {imageLibrary.map((img) => (
+                  <button
+                    key={img.id}
+                    className="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-slate-100 text-left"
+                    onClick={() => {
+                      editor.chain().focus().setImage({ src: img.url }).run();
+                      setLibraryOpen(false);
+                    }}
+                  >
+                    <img src={img.url} alt={img.name} className="w-8 h-8 rounded object-cover flex-shrink-0 border" />
+                    <span className="text-xs text-slate-700 truncate">{img.name}</span>
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
 
         <Divider />
 

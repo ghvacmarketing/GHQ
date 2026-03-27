@@ -26,7 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { Skeleton } from "@/components/ui/skeleton";
-import ProposalRichTextEditor from "@/components/proposal-rich-text-editor";
+import ProposalEditor from "@/components/proposal-editor";
 import redlogo from "@assets/redlogo.webp";
 import componentsData from "@assets/pricebook-components.json";
 import type { Customer, CrmUser, CrmCustomer, QuotePart } from "@shared/schema";
@@ -5083,7 +5083,7 @@ export default function CrmProposalBuilder() {
               <div className="my-6">
                 <h3 className="text-sm font-semibold mb-3 text-foreground">Proposal Notes</h3>
                 {!isNavigatingAway && (
-                  <ProposalRichTextEditor value={proposalNotes} onChange={setProposalNotes} />
+                  <ProposalEditor value={proposalNotes} onChange={setProposalNotes} placeholder="Add proposal notes..." />
                 )}
               </div>
 

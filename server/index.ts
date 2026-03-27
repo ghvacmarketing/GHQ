@@ -204,6 +204,15 @@ async function runProposalTemplateMigrations() {
       `);
       console.log("[ProposalTemplates] Seeded default Installation Agreement template");
     }
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS proposal_template_images (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        name text NOT NULL,
+        url text NOT NULL,
+        created_at timestamp DEFAULT now()
+      )
+    `);
   } catch (err) {
     console.error("Proposal template migration error (non-fatal):", err);
   }

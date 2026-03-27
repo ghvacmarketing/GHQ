@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getQueryFn } from "@/lib/queryClient";
@@ -32,9 +32,11 @@ import {
   ChevronUp,
   X,
   Save,
+  ImageIcon,
+  Upload,
 } from "lucide-react";
 import { Link } from "wouter";
-import type { CrmUser, ProposalTemplate } from "@shared/schema";
+import type { CrmUser, ProposalTemplate, ProposalTemplateImage } from "@shared/schema";
 import ProposalEditor from "@/components/proposal-editor";
 
 const SYSTEM_VARIABLES = [
@@ -94,6 +96,171 @@ function VariableBank({ onInsert }: { onInsert?: (variable: string) => void }) {
   );
 }
 
+function ImageLibrarySection() {
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [imageName, setImageName] = useState("");
+  const [deletingImage, setDeletingImage] = useState<ProposalTemplateImage | null>(null);
+  const [imageLibraryOpen, setImageLibraryOpen] = useState(true);
+
+  const { data: images = [] } = useQuery<ProposalTemplateImage[]>({
+    queryKey: ["/api/crm/proposal-template-images"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: { name: string; url: string }) =>
+      apiRequest("POST", "/api/crm/proposal-template-images", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/proposal-template-images"] });
+      toast({ title: "Image saved to library" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/crm/proposal-template-images/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/proposal-template-images"] });
+      setDeletingImage(null);
+      toast({ title: "Image removed from library" });
+    },
+  });
+
+  const handleUpload = useCallback(async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast({ title: "Only image files are supported", variant: "destructive" });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "Image must be under 10MB", variant: "destructive" });
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const res = await apiRequest("POST", "/api/uploads/request-url", {
+        name: file.name,
+        size: file.size,
+        contentType: file.type,
+      });
+      const { uploadURL, objectPath } = await res.json();
+
+      await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+
+      const name = imageName.trim() || file.name.replace(/\.[^.]+$/, '');
+      createMutation.mutate({ name, url: objectPath });
+      setImageName("");
+    } catch (err) {
+      toast({ title: "Failed to upload image", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  }, [imageName, createMutation, toast]);
+
+  return (
+    <>
+      <div className="border rounded-lg bg-white">
+        <button
+          onClick={() => setImageLibraryOpen(!imageLibraryOpen)}
+          className="w-full flex items-center gap-2 px-4 py-3 text-left"
+        >
+          <ImageIcon className="h-4 w-4 text-slate-500" />
+          <span className="text-sm font-medium text-slate-700 flex-1">Image Library</span>
+          <span className="text-xs text-slate-400">{images.length} image{images.length !== 1 ? 's' : ''}</span>
+          {imageLibraryOpen ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+        </button>
+
+        {imageLibraryOpen && (
+          <div className="px-4 pb-4 border-t">
+            <p className="text-xs text-slate-400 mt-3 mb-3">
+              Store frequently used images here. They'll be available in the editor toolbar when building proposals.
+            </p>
+
+            <div className="flex items-center gap-2 mb-3">
+              <Input
+                value={imageName}
+                onChange={(e) => setImageName(e.target.value)}
+                placeholder="Image name (optional)"
+                className="text-sm h-8 flex-1"
+              />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleUpload(file);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 whitespace-nowrap"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : <Upload className="h-3 w-3 mr-1.5" />}
+                Upload
+              </Button>
+            </div>
+
+            {images.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-4">No images saved yet</p>
+            ) : (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                {images.map((img) => (
+                  <div key={img.id} className="group relative">
+                    <div className="aspect-square rounded border overflow-hidden bg-slate-50">
+                      <img
+                        src={img.url}
+                        alt={img.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 truncate mt-0.5">{img.name}</p>
+                    <button
+                      onClick={() => setDeletingImage(img)}
+                      className="absolute top-1 right-1 bg-white/90 rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
+                    >
+                      <Trash2 className="h-3 w-3 text-red-400" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <AlertDialog open={!!deletingImage} onOpenChange={(open) => !open && setDeletingImage(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Image</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remove "{deletingImage?.name}" from the library? This won't affect images already used in templates.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingImage && deleteMutation.mutate(deletingImage.id)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
 export default function CrmSettingsProposalTemplates() {
   usePageTitle("Proposal Templates");
   const { toast } = useToast();
@@ -105,6 +272,10 @@ export default function CrmSettingsProposalTemplates() {
 
   const { data: templates = [], isLoading } = useQuery<ProposalTemplate[]>({
     queryKey: ["/api/crm/proposal-templates"],
+  });
+
+  const { data: libraryImages = [] } = useQuery<ProposalTemplateImage[]>({
+    queryKey: ["/api/crm/proposal-template-images"],
   });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -265,7 +436,12 @@ export default function CrmSettingsProposalTemplates() {
               {variableBankOpen && <VariableBank />}
             </div>
 
-            <ProposalEditor value={templateBody} onChange={setTemplateBody} />
+            <ProposalEditor
+              value={templateBody}
+              onChange={setTemplateBody}
+              imageLibrary={libraryImages}
+
+            />
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t">
               <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
@@ -289,6 +465,7 @@ export default function CrmSettingsProposalTemplates() {
         ) : (
           <>
             <VariableBank />
+            <ImageLibrarySection />
 
             {isLoading ? (
               <div className="flex items-center justify-center py-16">
