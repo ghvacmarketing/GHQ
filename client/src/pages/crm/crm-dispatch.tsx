@@ -1458,6 +1458,7 @@ function ScheduleRowTimeline({
   onPreviewTimeChange,
   previewDurationHours = 1,
   onNodeRef,
+  activeDragLabel,
 }: {
   children: React.ReactNode;
   isDragActive: boolean;
@@ -1467,12 +1468,20 @@ function ScheduleRowTimeline({
   onPreviewTimeChange?: (hourOffset: number | null) => void;
   previewDurationHours?: number;
   onNodeRef?: (node: HTMLDivElement | null) => void;
+  activeDragLabel?: string;
 }) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const [previewLeft, setPreviewLeft] = useState<number | null>(null);
   const [previewStartHour, setPreviewStartHour] = useState<number>(0);
   const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
   const previewWidthPercent = (previewDurationHours / totalHours) * 100;
+
+  useEffect(() => {
+    if (!isDragActive) {
+      setPreviewLeft(null);
+      onPreviewTimeChange?.(null);
+    }
+  }, [isDragActive]);
 
   const formatPreviewTime = (absHour: number) => {
     const h = Math.floor(absHour);
@@ -1522,18 +1531,17 @@ function ScheduleRowTimeline({
       })}
       <div className="absolute top-0 bottom-0 border-l border-slate-200" style={{ left: '100%' }} />
 
-      {/* previewLeft is only non-null when the cursor is physically over
-          this row's timeline div (set by handleMouseMove, cleared by
-          handleMouseLeave).  We intentionally omit `isOver` from dnd-kit
-          here because pointerWithin collision detection can lose track of
-          the droppable when the timeline is partially clipped by a scroll
-          container. */}
       {isDragActive && previewLeft !== null && (
         <div
-          className="absolute top-1 bottom-1 bg-[#711419]/20 border-2 border-solid border-[#711419]/60 rounded-md pointer-events-none z-[5] shadow-sm"
+          className="absolute top-1 bottom-1 bg-[#711419]/15 border-2 border-solid border-[#711419]/50 rounded-md pointer-events-none z-[5] shadow-sm"
           style={{ left: `${previewLeft}%`, width: `${previewWidthPercent}%` }}
         >
-          <div className="text-[11px] text-[#711419] font-bold text-center mt-1">
+          {activeDragLabel && (
+            <div className="text-[10px] text-[#711419]/80 font-semibold text-center mt-0.5 truncate px-1">
+              {activeDragLabel}
+            </div>
+          )}
+          <div className="text-[11px] text-[#711419] font-bold text-center">
             {formatPreviewTime(previewStartHour)}
           </div>
           <div className="text-[10px] text-[#711419]/70 font-medium text-center">
@@ -1559,9 +1567,10 @@ interface TechnicianScheduleBoardProps {
   onOpenQuickStatus?: (workOrderId: string, event: React.MouseEvent) => void;
   activeDragDurationHours?: number;
   onRegisterTimelineNode?: (techId: string, node: HTMLElement | null) => void;
+  activeDragLabel?: string;
 }
 
-function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, dragClickHourOffset = 0, onPreviewTimeChange, onOpenQuickStatus, activeDragDurationHours = 1, onRegisterTimelineNode }: TechnicianScheduleBoardProps) {
+function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, dragClickHourOffset = 0, onPreviewTimeChange, onOpenQuickStatus, activeDragDurationHours = 1, onRegisterTimelineNode, activeDragLabel }: TechnicianScheduleBoardProps) {
   const hourLabels = useMemo(() => {
     const labels: string[] = [];
     for (let h = SCHEDULE_START_HOUR; h <= SCHEDULE_END_HOUR; h++) {
@@ -1647,6 +1656,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                       previewDurationHours={activeDragDurationHours}
                       onPreviewTimeChange={(hourOffset) => onPreviewTimeChange?.(tech.id, hourOffset)}
                       onNodeRef={(node) => onRegisterTimelineNode?.(tech.id, node)}
+                      activeDragLabel={activeDragLabel}
                     >
                       {techWorkOrders.map((wo) => {
                         if (!wo.scheduledStart) return null;
@@ -3727,6 +3737,12 @@ export default function CrmDispatch() {
     return getWorkOrderDurationHours(draggingWorkOrder);
   }, [activeFromQueue, activeId, localWorkOrders]);
 
+  const activeDragLabel = useMemo(() => {
+    if (!activeId) return '';
+    const wo = localWorkOrders.find(w => w.id === activeId);
+    return wo?.customerName || wo?.title || 'Work Order';
+  }, [activeId, localWorkOrders]);
+
   const combinedModifiers = useMemo(() => {
     const restrictModifier = createRestrictToContainerModifier(dispatchBoardRef);
     return [restrictModifier];
@@ -4150,6 +4166,7 @@ export default function CrmDispatch() {
                   onPreviewTimeChange={handlePreviewTimeChange}
                   onOpenQuickStatus={handleOpenQuickStatus}
                   activeDragDurationHours={activeDragDurationHours}
+                  activeDragLabel={activeDragLabel}
                   onRegisterTimelineNode={(techId, node) => {
                     if (node) {
                       techTimelineNodesRef.current[techId] = node;
@@ -4201,21 +4218,10 @@ export default function CrmDispatch() {
             )}
           </div>
           
-          {/* Drag Overlay - small cursor indicator; pointer-events:none so mouse events reach the timeline for accurate preview tracking */}
           <DragOverlay dropAnimation={null}>
-            {activeId ? (() => {
-              const wo = localWorkOrders.find(w => w.id === activeId);
-              const title = wo?.title || wo?.customerName || 'Work Order';
-              return (
-                <div
-                  className="rounded-md bg-slate-200/90 border border-slate-400/60 shadow-lg cursor-grabbing px-2 py-1 flex items-center gap-1.5"
-                  style={{ width: activeFromQueue ? 140 : Math.min(activeCardWidthRef.current || 140, 200), height: 36, pointerEvents: 'none' }}
-                >
-                  <div className="w-1.5 h-5 rounded-full bg-slate-400/70 flex-shrink-0" />
-                  <span className="text-[10px] font-medium text-slate-600 truncate">{title}</span>
-                </div>
-              );
-            })() : null}
+            {activeId ? (
+              <div style={{ width: 1, height: 1, opacity: 0, pointerEvents: 'none' }} />
+            ) : null}
           </DragOverlay>
         </DndContext>
 
