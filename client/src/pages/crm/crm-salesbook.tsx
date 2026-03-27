@@ -101,17 +101,27 @@ export default function CrmSalesbook() {
   }, [bookmarks, sections]);
   const totalPages = sections.length;
 
+  const [layoutReady, setLayoutReady] = useState(false);
+
   useEffect(() => {
     const updateSize = () => {
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
-        setContainerSize({ w: rect.width > 0 ? rect.width : 800, h: rect.height > 0 ? rect.height : 600 });
+        if (rect.width > 100 && rect.height > 100) {
+          setContainerSize({ w: rect.width, h: rect.height });
+          setLayoutReady(true);
+        }
       }
     };
-    updateSize();
+
+    const retryInterval = setInterval(updateSize, 100);
     const observer = new ResizeObserver(updateSize);
     if (containerRef.current) observer.observe(containerRef.current);
-    return () => observer.disconnect();
+
+    return () => {
+      clearInterval(retryInterval);
+      observer.disconnect();
+    };
   }, []);
 
   useEffect(() => {
@@ -225,7 +235,6 @@ export default function CrmSalesbook() {
     };
   }, [scale]);
 
-  const containerReady = containerSize.w > 100 && containerSize.h > 100;
   const isMobile = containerSize.w < 640;
   const bookPanelWidth = showBookmarks && !isMobile ? 256 : 0;
   const availWidth = Math.max(containerSize.w - bookPanelWidth - 32, 200);
@@ -436,7 +445,7 @@ export default function CrmSalesbook() {
             ref={containerRef}
             className="flex-1 overflow-auto flex justify-center items-center"
           >
-            {isLoading || !containerReady ? (
+            {isLoading || !layoutReady ? (
               <div className="flex flex-col items-center justify-center gap-3">
                 <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
                 <p className="text-sm text-neutral-400">Loading salesbook...</p>
@@ -448,6 +457,7 @@ export default function CrmSalesbook() {
                 transition: 'transform 0.15s ease-out',
               }}>
                 <HTMLFlipBook
+                  key={`${pageW}-${pageH}`}
                   ref={flipBookRef}
                   style={{}}
                   width={pageW}
@@ -463,7 +473,7 @@ export default function CrmSalesbook() {
                   className="flipbook-container"
                   startPage={0}
                   drawShadow={true}
-                  flippingTime={600}
+                  flippingTime={400}
                   usePortrait={isMobile}
                   startZIndex={0}
                   autoSize={false}
