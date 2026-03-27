@@ -250,7 +250,7 @@ function formatDecimalHour(decimalHour: number): string {
   return `${displayHour}:${minutes.toString().padStart(2, "0")}${ampm}`;
 }
 
-// Create hour labels for 8am through 8pm (13 labels total)
+// Create hour labels for 6am through 10pm
 const hourLabels = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => ({
   hour: START_HOUR + i,
   label: formatHour(START_HOUR + i),
@@ -1321,7 +1321,7 @@ function DraggableScheduleCard({
   });
 
   const handleMouseDown = (e: React.MouseEvent, edge: 'start' | 'end') => {
-    if (isLocked) return; // Don't allow resizing for on_site work orders
+    if (isLocked) return;
     e.stopPropagation();
     e.preventDefault();
     setIsResizing(true);
@@ -1330,21 +1330,34 @@ function DraggableScheduleCard({
     accumulatedStartDeltaRef.current = 0;
     accumulatedEndDeltaRef.current = 0;
     setResizeOffset({ left: 0, width: 0 });
+
+    const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
+    const origStartHour = SCHEDULE_START_HOUR + (leftPercent / 100) * totalHours;
+    const origEndHour = SCHEDULE_START_HOUR + ((leftPercent + widthPercent) / 100) * totalHours;
     
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!containerRef.current) return;
-      const parentWidth = containerRef.current.parentElement?.offsetWidth || SCHEDULE_TIMELINE_WIDTH;
-      const deltaX = moveEvent.clientX - startXRef.current;
-      const deltaPercent = (deltaX / parentWidth) * 100;
-      const deltaMinutes = Math.round((deltaPercent / 100) * SCHEDULE_TOTAL_MINUTES / 30) * 30;
-      const deltaPercentSnapped = (deltaMinutes / SCHEDULE_TOTAL_MINUTES) * 100;
-      
+      const timelineEl = containerRef.current.parentElement;
+      if (!timelineEl) return;
+      const timelineRect = timelineEl.getBoundingClientRect();
+      if (timelineRect.width <= 0) return;
+
+      const pointerFraction = (moveEvent.clientX - timelineRect.left) / timelineRect.width;
+      const pointerHour = SCHEDULE_START_HOUR + pointerFraction * totalHours;
+      const snappedHour = Math.round(pointerHour * 2) / 2;
+
       if (edge === 'start') {
-        setResizeOffset({ left: deltaPercentSnapped, width: -deltaPercentSnapped });
-        accumulatedStartDeltaRef.current = deltaMinutes;
+        const clampedHour = Math.max(SCHEDULE_START_HOUR, Math.min(SCHEDULE_END_HOUR - 0.5, origEndHour - 0.5, snappedHour));
+        const newLeftPercent = ((clampedHour - SCHEDULE_START_HOUR) / totalHours) * 100;
+        const deltaPercent = newLeftPercent - leftPercent;
+        setResizeOffset({ left: deltaPercent, width: -deltaPercent });
+        accumulatedStartDeltaRef.current = Math.round((clampedHour - origStartHour) * 60);
       } else {
-        setResizeOffset({ left: 0, width: deltaPercentSnapped });
-        accumulatedEndDeltaRef.current = deltaMinutes;
+        const clampedHour = Math.max(origStartHour + 0.5, Math.min(SCHEDULE_END_HOUR, snappedHour));
+        const newEndPercent = ((clampedHour - SCHEDULE_START_HOUR) / totalHours) * 100;
+        const deltaPercent = newEndPercent - (leftPercent + widthPercent);
+        setResizeOffset({ left: 0, width: deltaPercent });
+        accumulatedEndDeltaRef.current = Math.round((clampedHour - origEndHour) * 60);
       }
     };
     
@@ -3267,6 +3280,8 @@ export default function CrmDispatch() {
     if (localEnd.getHours() > SCHEDULE_END_HOUR || (localEnd.getHours() === SCHEDULE_END_HOUR && localEnd.getMinutes() > 0)) {
       newEnd = createLocalDateTime(selectedDate, SCHEDULE_END_HOUR, 0);
     }
+
+    if (newStart >= newEnd) return;
     
     // Check for scheduling conflict when resizing
     if (wo.assignedTechId) {
