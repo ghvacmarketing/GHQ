@@ -8,6 +8,7 @@ interface FlipBookRef {
     flip(page: number): void;
     flipNext(): void;
     flipPrev(): void;
+    turnToPage(page: number): void;
     getCurrentPageIndex(): number;
     getPageCount(): number;
   } | null;
@@ -161,8 +162,9 @@ export default function CrmSalesbook() {
       if (totalPages === 0) return;
       const p = Math.max(0, Math.min(pageNum, totalPages - 1));
       if (flipBookRef.current) {
-        flipBookRef.current.pageFlip()?.flip(p);
+        flipBookRef.current.pageFlip()?.turnToPage(p);
       }
+      currentPageRef.current = p;
       setCurrentPage(p);
       setPageInput(String(p + 1));
     },
