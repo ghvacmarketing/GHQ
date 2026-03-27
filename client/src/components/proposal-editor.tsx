@@ -1,4 +1,4 @@
-import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
+import { useEditor, EditorContent, NodeViewWrapper, NodeViewProps, ReactNodeViewRenderer } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Image from '@tiptap/extension-image';
@@ -11,7 +11,6 @@ import {
   Bold, Italic, Underline as UnderlineIcon, List, ListOrdered,
   Undo, Redo, ImageIcon, Link as LinkIcon, AlignLeft, AlignCenter,
   AlignRight, Heading1, Heading2, Heading3, Type, Minus, Loader2,
-  Trash2, MoveVertical,
 } from 'lucide-react';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +20,159 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+
+const DRAG_THRESHOLD = 8;
+
+function ResizableImageView({ node, updateAttributes, selected }: NodeViewProps) {
+  const [resizing, setResizing] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const imgRef = useRef<HTMLDivElement>(null);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(0);
+
+  const width = node.attrs.width || null;
+  const align = node.attrs.align || 'center';
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setResizing(true);
+    startXRef.current = e.clientX;
+    startWidthRef.current = imgRef.current?.offsetWidth || 300;
+
+    const onMouseMove = (ev: MouseEvent) => {
+      const diff = ev.clientX - startXRef.current;
+      const newWidth = Math.max(100, startWidthRef.current + diff);
+      updateAttributes({ width: newWidth });
+    };
+
+    const onMouseUp = () => {
+      setResizing(false);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [updateAttributes]);
+
+  const handleImageMouseDown = useCallback((e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('.resize-handle') || (e.target as HTMLElement).closest('.align-btn')) return;
+    const originX = e.clientX;
+    let activated = false;
+
+    const onMouseMove = (ev: MouseEvent) => {
+      const diffX = Math.abs(ev.clientX - originX);
+      if (!activated && diffX > DRAG_THRESHOLD) {
+        activated = true;
+        setDragging(true);
+      }
+      if (activated) {
+        const containerWidth = imgRef.current?.parentElement?.offsetWidth || 600;
+        const moveX = ev.clientX - originX;
+        const zone = containerWidth / 4;
+        if (moveX < -zone) {
+          updateAttributes({ align: 'left' });
+        } else if (moveX > zone) {
+          updateAttributes({ align: 'right' });
+        } else {
+          updateAttributes({ align: 'center' });
+        }
+      }
+    };
+
+    const onMouseUp = () => {
+      setDragging(false);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [updateAttributes]);
+
+  const justifyClass = align === 'left' ? 'justify-start' : align === 'right' ? 'justify-end' : 'justify-center';
+
+  return (
+    <NodeViewWrapper className={`flex ${justifyClass} my-3`}>
+      <div
+        ref={imgRef}
+        className={`relative inline-block group ${selected ? 'ring-2 ring-[#711419] ring-offset-2 rounded' : ''} ${dragging ? 'opacity-75 cursor-grabbing' : ''}`}
+        style={{ width: width ? `${width}px` : 'auto', maxWidth: '100%' }}
+        onMouseDown={handleImageMouseDown}
+      >
+        <img
+          src={node.attrs.src}
+          alt={node.attrs.alt || ''}
+          className="block w-full h-auto rounded"
+          draggable={false}
+        />
+        <div
+          className="resize-handle absolute top-0 right-0 w-3 h-full cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity"
+          onMouseDown={handleResizeStart}
+          style={{ background: 'linear-gradient(to left, rgba(113,20,25,0.3), transparent)' }}
+        />
+        <div
+          className="resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize opacity-0 group-hover:opacity-100 transition-opacity bg-[#711419] rounded-tl"
+          onMouseDown={handleResizeStart}
+        />
+        {selected && (
+          <div className="absolute -bottom-7 left-1/2 -translate-x-1/2 flex gap-1 z-10">
+            {(['left', 'center', 'right'] as const).map((a) => (
+              <button
+                key={a}
+                className={`align-btn px-2 py-0.5 text-[10px] rounded ${align === a ? 'bg-[#711419] text-white' : 'bg-white border text-slate-500 hover:bg-slate-100'}`}
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); updateAttributes({ align: a }); }}
+              >
+                {a.charAt(0).toUpperCase() + a.slice(1)}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </NodeViewWrapper>
+  );
+}
+
+const alignStyles: Record<string, string> = {
+  left: 'display: block; margin-left: 0; margin-right: auto;',
+  center: 'display: block; margin-left: auto; margin-right: auto;',
+  right: 'display: block; margin-left: auto; margin-right: 0;',
+};
+
+const ResizableImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: null,
+        parseHTML: (el) => {
+          const dw = el.getAttribute('data-width');
+          if (dw) return parseInt(dw);
+          const sw = el.style?.width;
+          if (sw && sw.endsWith('px')) return parseInt(sw);
+          return null;
+        },
+        renderHTML: (attrs) => attrs.width ? { 'data-width': attrs.width } : {},
+      },
+      align: {
+        default: 'center',
+        parseHTML: (el) => el.getAttribute('data-align') || 'center',
+        renderHTML: (attrs) => ({ 'data-align': attrs.align || 'center' }),
+      },
+    };
+  },
+  renderHTML({ HTMLAttributes }) {
+    const w = HTMLAttributes['data-width'];
+    const a = HTMLAttributes['data-align'] || 'center';
+    const widthStyle = w ? `width: ${w}px; max-width: 100%;` : 'max-width: 100%;';
+    const style = `${widthStyle} ${alignStyles[a] || alignStyles.center}`;
+    return ['img', { ...HTMLAttributes, style, class: 'proposal-image' }];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(ResizableImageView);
+  },
+});
 
 type ProposalEditorProps = {
   value: string;
@@ -47,10 +199,7 @@ export default function ProposalEditor({
         heading: { levels: [1, 2, 3] },
       }),
       Placeholder.configure({ placeholder }),
-      Image.configure({
-        HTMLAttributes: {
-          class: 'proposal-image',
-        },
+      ResizableImage.configure({
         allowBase64: true,
       }),
       Link.configure({
@@ -380,18 +529,6 @@ export default function ProposalEditor({
           float: left;
           height: 0;
           pointer-events: none;
-        }
-        .proposal-editor-content .ProseMirror img.proposal-image {
-          max-width: 100%;
-          height: auto;
-          border-radius: 4px;
-          margin: 12px 0;
-          cursor: default;
-        }
-        .proposal-editor-content .ProseMirror img.ProseMirror-selectednode {
-          outline: 2px solid #711419;
-          outline-offset: 2px;
-          border-radius: 4px;
         }
         .proposal-editor-content .ProseMirror hr {
           border: none;

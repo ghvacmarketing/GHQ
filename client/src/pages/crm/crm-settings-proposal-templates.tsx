@@ -9,13 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -27,7 +20,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Plus,
-  Edit,
   Trash2,
   Star,
   ArrowLeft,
@@ -38,6 +30,8 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  X,
+  Save,
 } from "lucide-react";
 import { Link } from "wouter";
 import type { CrmUser, ProposalTemplate } from "@shared/schema";
@@ -113,14 +107,14 @@ export default function CrmSettingsProposalTemplates() {
     queryKey: ["/api/crm/proposal-templates"],
   });
 
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<ProposalTemplate | null>(null);
+  const [deletingTemplate, setDeletingTemplate] = useState<ProposalTemplate | null>(null);
+  const [variableBankOpen, setVariableBankOpen] = useState(true);
+
+  const [editingId, setEditingId] = useState<string | "new" | null>(null);
   const [templateName, setTemplateName] = useState("");
   const [templateBody, setTemplateBody] = useState("");
   const [templateIsDefault, setTemplateIsDefault] = useState(false);
-  const [deletingTemplate, setDeletingTemplate] = useState<ProposalTemplate | null>(null);
-  const [variableBankOpen, setVariableBankOpen] = useState(true);
 
   const seedMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/crm/proposal-templates/seed-default"),
@@ -135,7 +129,7 @@ export default function CrmSettingsProposalTemplates() {
       apiRequest("POST", "/api/crm/proposal-templates", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/proposal-templates"] });
-      setEditDialogOpen(false);
+      setEditingId(null);
       toast({ title: "Template created" });
     },
   });
@@ -145,7 +139,7 @@ export default function CrmSettingsProposalTemplates() {
       apiRequest("PATCH", `/api/crm/proposal-templates/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/proposal-templates"] });
-      setEditDialogOpen(false);
+      setEditingId(null);
       toast({ title: "Template updated" });
     },
   });
@@ -155,6 +149,7 @@ export default function CrmSettingsProposalTemplates() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/proposal-templates"] });
       setDeleteDialogOpen(false);
+      if (editingId === deletingTemplate?.id) setEditingId(null);
       toast({ title: "Template deleted" });
     },
   });
@@ -168,28 +163,25 @@ export default function CrmSettingsProposalTemplates() {
     },
   });
 
-  const openCreateDialog = () => {
-    setEditingTemplate(null);
+  const startCreate = () => {
+    setEditingId("new");
     setTemplateName("");
     setTemplateBody("");
     setTemplateIsDefault(templates.length === 0);
-    setEditDialogOpen(true);
   };
 
-  const openEditDialog = (template: ProposalTemplate) => {
-    setEditingTemplate(template);
+  const startEdit = (template: ProposalTemplate) => {
+    setEditingId(template.id);
     setTemplateName(template.name);
     setTemplateBody(template.body);
     setTemplateIsDefault(template.isDefault);
-    setEditDialogOpen(true);
   };
 
-  const openDuplicateDialog = (template: ProposalTemplate) => {
-    setEditingTemplate(null);
+  const startDuplicate = (template: ProposalTemplate) => {
+    setEditingId("new");
     setTemplateName(template.name + " (Copy)");
     setTemplateBody(template.body);
     setTemplateIsDefault(false);
-    setEditDialogOpen(true);
   };
 
   const handleSave = () => {
@@ -201,19 +193,26 @@ export default function CrmSettingsProposalTemplates() {
       toast({ title: "Template body is required", variant: "destructive" });
       return;
     }
-    if (editingTemplate) {
-      updateMutation.mutate({ id: editingTemplate.id, name: templateName, body: templateBody, isDefault: templateIsDefault });
-    } else {
+    if (editingId === "new") {
       createMutation.mutate({ name: templateName, body: templateBody, isDefault: templateIsDefault });
+    } else if (editingId) {
+      updateMutation.mutate({ id: editingId, name: templateName, body: templateBody, isDefault: templateIsDefault });
     }
+  };
+
+  const handleCancel = () => {
+    setEditingId(null);
   };
 
   if (authLoading) return null;
   if (!currentUser) return null;
 
+  const isEditing = editingId !== null;
+  const isSaving = createMutation.isPending || updateMutation.isPending;
+
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Link href="/crm/settings">
             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -223,114 +222,24 @@ export default function CrmSettingsProposalTemplates() {
           <div className="flex-1">
             <h1 className="text-xl font-semibold text-slate-800">Proposal Templates</h1>
           </div>
-          <Button onClick={openCreateDialog} size="sm" className="bg-[#711419] hover:bg-[#5a1014]">
-            <Plus className="h-4 w-4 mr-1.5" />
-            New Template
-          </Button>
+          {!isEditing && (
+            <Button onClick={startCreate} size="sm" className="bg-[#711419] hover:bg-[#5a1014]">
+              <Plus className="h-4 w-4 mr-1.5" />
+              New Template
+            </Button>
+          )}
         </div>
 
-        <VariableBank />
-
-        {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-          </div>
-        ) : templates.length === 0 ? (
-          <div className="text-center py-16 border border-dashed rounded-lg">
-            <FileText className="h-10 w-10 mx-auto text-slate-300 mb-3" />
-            <p className="text-sm text-slate-500 mb-4">No templates yet</p>
-            <div className="flex items-center gap-2 justify-center">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => seedMutation.mutate()}
-                disabled={seedMutation.isPending}
-              >
-                {seedMutation.isPending && <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />}
-                Load Default
-              </Button>
-              <Button onClick={openCreateDialog} size="sm" className="bg-[#711419] hover:bg-[#5a1014]">
-                <Plus className="h-3 w-3 mr-1.5" />
-                Create New
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {templates.map((template) => (
-              <div
-                key={template.id}
-                className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg border bg-white hover:bg-slate-50 transition-colors group"
-              >
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <FileText className="h-4 w-4 text-slate-400 flex-shrink-0" />
-                  <span className="text-sm font-medium text-slate-800 truncate">{template.name}</span>
-                  {template.isDefault && (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-300 text-amber-600 bg-amber-50 flex-shrink-0">
-                      Default
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                  {!template.isDefault && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => setDefaultMutation.mutate(template.id)}
-                      disabled={setDefaultMutation.isPending}
-                      title="Set as default"
-                    >
-                      <Star className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => openDuplicateDialog(template)}
-                    title="Duplicate"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => openEditDialog(template)}
-                    title="Edit"
-                  >
-                    <Edit className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-red-400 hover:text-red-600"
-                    onClick={() => {
-                      setDeletingTemplate(template);
-                      setDeleteDialogOpen(true);
-                    }}
-                    title="Delete"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
-          <DialogHeader className="flex-shrink-0 pb-0">
+        {isEditing ? (
+          <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="flex-1">
                 <Input
                   value={templateName}
                   onChange={(e) => setTemplateName(e.target.value)}
                   placeholder="Template name..."
-                  className="text-sm border-0 border-b rounded-none px-0 font-medium focus-visible:ring-0 focus-visible:border-slate-400"
+                  className="text-base font-medium"
+                  autoFocus
                 />
               </div>
               <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer whitespace-nowrap">
@@ -343,39 +252,128 @@ export default function CrmSettingsProposalTemplates() {
                 Default
               </label>
             </div>
-          </DialogHeader>
-          <div className="flex-1 overflow-hidden flex flex-col gap-3 min-h-0">
-            <div className="flex-shrink-0">
+
+            <div>
               <button
                 onClick={() => setVariableBankOpen(!variableBankOpen)}
-                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700"
+                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 mb-2"
               >
                 <Braces className="h-3 w-3" />
                 Variables
                 {variableBankOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
               </button>
-              {variableBankOpen && <div className="mt-2"><VariableBank /></div>}
+              {variableBankOpen && <VariableBank />}
             </div>
 
-            <div className="flex-1 overflow-y-auto min-h-0">
-              <ProposalEditor value={templateBody} onChange={setTemplateBody} />
+            <ProposalEditor value={templateBody} onChange={setTemplateBody} />
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t">
+              <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
+                <X className="h-4 w-4 mr-1.5" />
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="bg-[#711419] hover:bg-[#5a1014]"
+              >
+                {isSaving ? (
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-1.5" />
+                )}
+                {editingId === "new" ? "Create Template" : "Save Changes"}
+              </Button>
             </div>
           </div>
-          <DialogFooter className="flex-shrink-0 pt-3 border-t">
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-            <Button
-              onClick={handleSave}
-              disabled={createMutation.isPending || updateMutation.isPending}
-              className="bg-[#711419] hover:bg-[#5a1014]"
-            >
-              {(createMutation.isPending || updateMutation.isPending) && (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              )}
-              {editingTemplate ? "Save" : "Create"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        ) : (
+          <>
+            <VariableBank />
+
+            {isLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+              </div>
+            ) : templates.length === 0 ? (
+              <div className="text-center py-16 border border-dashed rounded-lg">
+                <FileText className="h-10 w-10 mx-auto text-slate-300 mb-3" />
+                <p className="text-sm text-slate-500 mb-4">No templates yet</p>
+                <div className="flex items-center gap-2 justify-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => seedMutation.mutate()}
+                    disabled={seedMutation.isPending}
+                  >
+                    {seedMutation.isPending && <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />}
+                    Load Default
+                  </Button>
+                  <Button onClick={startCreate} size="sm" className="bg-[#711419] hover:bg-[#5a1014]">
+                    <Plus className="h-3 w-3 mr-1.5" />
+                    Create New
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {templates.map((template) => (
+                  <div
+                    key={template.id}
+                    className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg border bg-white hover:bg-slate-50 transition-colors group cursor-pointer"
+                    onClick={() => startEdit(template)}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <FileText className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                      <span className="text-sm font-medium text-slate-800 truncate">{template.name}</span>
+                      {template.isDefault && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-300 text-amber-600 bg-amber-50 flex-shrink-0">
+                          Default
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      {!template.isDefault && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => { e.stopPropagation(); setDefaultMutation.mutate(template.id); }}
+                          disabled={setDefaultMutation.isPending}
+                          title="Set as default"
+                        >
+                          <Star className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={(e) => { e.stopPropagation(); startDuplicate(template); }}
+                        title="Duplicate"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-red-400 hover:text-red-600"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeletingTemplate(template);
+                          setDeleteDialogOpen(true);
+                        }}
+                        title="Delete"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
