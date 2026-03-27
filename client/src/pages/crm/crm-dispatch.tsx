@@ -3413,17 +3413,6 @@ export default function CrmDispatch() {
   const timelineRef = useRef<HTMLDivElement>(null);
   const dispatchBoardRef = useRef<HTMLDivElement>(null);
   
-  const combinedModifiers = useMemo(() => {
-    const restrictModifier = createRestrictToContainerModifier(dispatchBoardRef);
-    const snapModifier = createTimelineSnapModifier(
-      techTimelineNodesRef,
-      dragClickHourOffsetRef,
-      lastPointerXRef,
-      () => activeDragDurationHours,
-    );
-    return [restrictModifier, snapModifier];
-  }, [activeDragDurationHours]);
-
   const getDropScheduleTimes = useCallback((workOrder: DispatchWorkOrder, dropDate: Date) => {
     const defaultDurationMs = 2 * 60 * 60 * 1000;
     let startHour = SCHEDULE_START_HOUR;
@@ -3778,6 +3767,17 @@ export default function CrmDispatch() {
     if (!draggingWorkOrder || activeFromQueue) return 1;
     return getWorkOrderDurationHours(draggingWorkOrder);
   }, [activeFromQueue, activeId, localWorkOrders]);
+
+  const combinedModifiers = useMemo(() => {
+    const restrictModifier = createRestrictToContainerModifier(dispatchBoardRef);
+    const snapModifier = createTimelineSnapModifier(
+      techTimelineNodesRef,
+      dragClickHourOffsetRef,
+      lastPointerXRef,
+      () => activeDragDurationHours,
+    );
+    return [restrictModifier, snapModifier];
+  }, [activeDragDurationHours]);
 
   const unassignedWorkOrders = useMemo(() => {
     const filtered = localWorkOrders.filter(wo => !wo.assignedTechId || !wo.scheduledStart);
