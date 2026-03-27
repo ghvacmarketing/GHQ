@@ -272,12 +272,6 @@ const timeSlots = Array.from({ length: TOTAL_SLOTS }, (_, i) => {
 const SLOT_WIDTH = 60;
 const TIMELINE_WIDTH = TOTAL_SLOTS * SLOT_WIDTH;
 
-// No grid-snap modifier — the preview rectangle in each timeline row
-// already snaps to half-hour increments and the drop handler reads from
-// previewHourByTechRef, so snapping the DragOverlay to a 60-px grid
-// (which is relative to the drag-start position, not the timeline grid)
-// only causes the overlay to diverge from the actual landing position.
-
 const createRestrictToContainerModifier = (containerRef: React.RefObject<HTMLDivElement | null>): Modifier => {
   return ({ transform, draggingNodeRect }) => {
     if (!containerRef.current || !draggingNodeRect) {
@@ -292,6 +286,47 @@ const createRestrictToContainerModifier = (containerRef: React.RefObject<HTMLDiv
     return {
       ...transform,
       y: Math.min(Math.max(transform.y, minY), maxY),
+    };
+  };
+};
+
+const createTimelineSnapModifier = (
+  techTimelineNodesRef: React.MutableRefObject<Record<string, HTMLElement>>,
+  dragClickHourOffsetRef: React.MutableRefObject<number>,
+  lastPointerXRef: React.MutableRefObject<number>,
+  getDurationHours: () => number,
+): Modifier => {
+  return ({ transform, draggingNodeRect }) => {
+    if (!draggingNodeRect) return transform;
+
+    const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
+    const cardCenterY = draggingNodeRect.top + transform.y + draggingNodeRect.height / 2;
+
+    let closestTimeline: HTMLElement | null = null;
+    let closestDist = Infinity;
+    for (const node of Object.values(techTimelineNodesRef.current)) {
+      const rect = node.getBoundingClientRect();
+      const dist = Math.abs(cardCenterY - (rect.top + rect.height / 2));
+      if (dist < closestDist) {
+        closestDist = dist;
+        closestTimeline = node;
+      }
+    }
+
+    if (!closestTimeline || closestDist > 120) return transform;
+
+    const tlRect = closestTimeline.getBoundingClientRect();
+    if (tlRect.width <= 0) return transform;
+
+    const duration = getDurationHours();
+    const snappedHourOffset = computeDropHourOffset(
+      lastPointerXRef.current, tlRect, dragClickHourOffsetRef.current, duration,
+    );
+    const snappedX = tlRect.left + (snappedHourOffset / totalHours) * tlRect.width;
+
+    return {
+      ...transform,
+      x: snappedX - draggingNodeRect.left,
     };
   };
 };
@@ -3380,8 +3415,14 @@ export default function CrmDispatch() {
   
   const combinedModifiers = useMemo(() => {
     const restrictModifier = createRestrictToContainerModifier(dispatchBoardRef);
-    return [restrictModifier];
-  }, []);
+    const snapModifier = createTimelineSnapModifier(
+      techTimelineNodesRef,
+      dragClickHourOffsetRef,
+      lastPointerXRef,
+      () => activeDragDurationHours,
+    );
+    return [restrictModifier, snapModifier];
+  }, [activeDragDurationHours]);
 
   const getDropScheduleTimes = useCallback((workOrder: DispatchWorkOrder, dropDate: Date) => {
     const defaultDurationMs = 2 * 60 * 60 * 1000;
