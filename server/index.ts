@@ -193,6 +193,48 @@ async function runProposalTemplateMigrations() {
         created_at timestamp DEFAULT now()
       )
     `);
+    const countResult = await db.execute(sql`SELECT count(*)::int as cnt FROM proposal_templates`);
+    const count = (countResult as any).rows?.[0]?.cnt ?? (countResult as any)[0]?.cnt ?? 0;
+    if (Number(count) === 0) {
+      const defaultBody = `<h1>GIESBRECHT HVAC — INSTALLATION AGREEMENT</h1>
+<p><strong>Project:</strong> {{projectName}}</p>
+<p><strong>Date:</strong> {{date}}</p>
+<p><strong>Prepared For:</strong> {{customerName}}</p>
+<p><strong>Project Address:</strong> {{address}}</p>
+<hr />
+<h2>ABOUT GIESBRECHT HVAC</h2>
+<p>Giesbrecht HVAC is a fully licensed, bonded, and insured heating and cooling contractor serving the Fresno and Central Valley area.</p>
+<hr />
+<h2>SCOPE OF WORK</h2>
+<p>Giesbrecht HVAC agrees to furnish all labor, materials, and equipment necessary to complete the following installation:</p>
+<ul>
+  <li>{{equipmentSummary}}</li>
+  <li>Complete system start-up, commissioning, and performance verification</li>
+  <li>Removal and disposal of existing equipment (if applicable)</li>
+  <li>All necessary electrical connections and refrigerant line work</li>
+  <li>Programming and demonstration of thermostat/controls to homeowner</li>
+</ul>
+<hr />
+<h2>TOTAL INVESTMENT</h2>
+<p><strong>Total: {{totalPrice}}</strong></p>
+<hr />
+<h2>WARRANTY COVERAGE</h2>
+<ul>
+  <li><strong>Manufacturer Parts Warranty:</strong> As specified by equipment manufacturer</li>
+  <li><strong>Labor Warranty:</strong> 1 year from date of installation</li>
+  <li><strong>Refrigerant:</strong> Leaks discovered within 30 days repaired at no charge</li>
+</ul>
+<hr />
+<h2>TERMS AND CONDITIONS</h2>
+<p>By signing below, customer acknowledges acceptance of the scope of work, pricing, and terms described in this agreement.</p>
+<p><strong>Customer Signature:</strong> _________________________ <strong>Date:</strong> __________</p>
+<p><strong>Giesbrecht HVAC Representative:</strong> _________________________ <strong>Date:</strong> __________</p>`;
+      await db.execute(sql`
+        INSERT INTO proposal_templates (id, name, body, is_default)
+        VALUES (gen_random_uuid(), 'Installation Agreement', ${defaultBody}, true)
+      `);
+      console.log("[ProposalTemplates] Seeded default Installation Agreement template");
+    }
   } catch (err) {
     console.error("Proposal template migration error (non-fatal):", err);
   }
