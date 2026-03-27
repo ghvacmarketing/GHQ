@@ -28056,7 +28056,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     try {
       const existing = await storage.getAllProposalTemplates();
       if (existing.length > 0) return res.json({ message: "Templates already exist", seeded: false });
-      const defaultBody = `<h1>GIESBRECHT HVAC — INSTALLATION AGREEMENT</h1>
+      const { DEFAULT_TEMPLATE_BODY } = await import("@shared/default-template");
+      const _inlineBodyUnused = `<h1>GIESBRECHT HVAC — INSTALLATION AGREEMENT</h1>
 <p><strong>Project:</strong> {{projectName}}</p>
 <p><strong>Date:</strong> {{date}}</p>
 <p><strong>Prepared For:</strong> {{customerName}}</p>
@@ -28140,7 +28141,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 </ol>`;
       const template = await storage.createProposalTemplate({
         name: "Installation Agreement",
-        body: defaultBody,
+        body: DEFAULT_TEMPLATE_BODY,
         isDefault: true,
       });
       res.json({ message: "Default template seeded", seeded: true, template });
