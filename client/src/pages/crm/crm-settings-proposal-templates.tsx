@@ -464,7 +464,6 @@ export default function CrmSettingsProposalTemplates() {
           </div>
         ) : (
           <>
-            <VariableBank />
             <ImageLibrarySection />
 
             {isLoading ? (
