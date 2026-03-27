@@ -340,12 +340,17 @@ gmp-place-autocomplete::part(input)::placeholder {
 .flipbook-container .stf__parent {
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
+  background-color: #ffffff !important;
 }
 
 .flipbook-container .stf__item {
   will-change: transform;
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
+  background-color: #ffffff !important;
+}
+
+.flipbook-container {
   background-color: #ffffff !important;
 }
 
