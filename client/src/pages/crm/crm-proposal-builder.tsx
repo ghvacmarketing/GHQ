@@ -2772,7 +2772,18 @@ export default function CrmProposalBuilder() {
         <div className="flex flex-col gap-4 pb-4 mb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => window.history.back()} data-testid="button-back-to-quotes">
+              <Button variant="ghost" size="sm" onClick={() => {
+                const queryParams = new URLSearchParams(window.location.search);
+                const projectId = queryParams.get("projectId");
+                const customerId = routeParams.customerId;
+                if (projectId) {
+                  setLocation(`/crm/projects/${projectId}`);
+                } else if (customerId) {
+                  setLocation(`/crm/customers/${customerId}`);
+                } else {
+                  setLocation("/crm/quotes");
+                }
+              }} data-testid="button-back-to-quotes">
                 <ArrowLeft className="h-4 w-4 mr-1" />
                 Back
               </Button>
