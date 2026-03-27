@@ -1447,6 +1447,7 @@ function ScheduleRowTimeline({
   dragOffsetX = 0,
   onPreviewTimeChange,
   previewDurationHours = 1,
+  onNodeRef,
 }: {
   children: React.ReactNode;
   isDragActive: boolean;
@@ -1455,6 +1456,7 @@ function ScheduleRowTimeline({
   dragOffsetX?: number;
   onPreviewTimeChange?: (hourOffset: number | null) => void;
   previewDurationHours?: number;
+  onNodeRef?: (node: HTMLDivElement | null) => void;
 }) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const [previewLeft, setPreviewLeft] = useState<number | null>(null);
@@ -1470,7 +1472,7 @@ function ScheduleRowTimeline({
     return m === 0 ? `${displayH} ${ampm}` : `${displayH}:${String(m).padStart(2, '0')} ${ampm}`;
   };
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDragActive || !timelineRef.current) return;
     const rect = timelineRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left - dragOffsetX;
@@ -1482,10 +1484,8 @@ function ScheduleRowTimeline({
     onPreviewTimeChange?.(clampedHour);
   }, [isDragActive, onPreviewTimeChange, totalHours, dragOffsetX, previewDurationHours]);
 
-  const handleMouseLeave = useCallback(() => {
+  const handlePointerLeave = useCallback(() => {
     setPreviewLeft(null);
-    // Always clear the preview hour when leaving this row so stale values
-    // don't persist in previewHourByTechRef.
     onPreviewTimeChange?.(null);
   }, [onPreviewTimeChange]);
 
@@ -1494,11 +1494,12 @@ function ScheduleRowTimeline({
       ref={(node) => {
         timelineRef.current = node;
         droppableRef?.(node);
+        onNodeRef?.(node);
       }}
       className="flex-1 relative py-2"
       style={{ minWidth: SCHEDULE_TIMELINE_WIDTH }}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
     >
       {Array.from({ length: totalHours }, (_, i) => {
         const hourPercent = (i / totalHours) * 100;
@@ -1548,9 +1549,10 @@ interface TechnicianScheduleBoardProps {
   onPreviewTimeChange?: (techId: string, hourOffset: number | null) => void;
   onOpenQuickStatus?: (workOrderId: string, event: React.MouseEvent) => void;
   activeDragDurationHours?: number;
+  onRegisterTimelineNode?: (techId: string, node: HTMLElement | null) => void;
 }
 
-function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, dragOffsetX = 0, onPreviewTimeChange, onOpenQuickStatus, activeDragDurationHours = 1 }: TechnicianScheduleBoardProps) {
+function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, dragOffsetX = 0, onPreviewTimeChange, onOpenQuickStatus, activeDragDurationHours = 1, onRegisterTimelineNode }: TechnicianScheduleBoardProps) {
   const hourLabels = useMemo(() => {
     const labels: string[] = [];
     for (let h = SCHEDULE_START_HOUR; h <= SCHEDULE_END_HOUR; h++) {
@@ -1635,6 +1637,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                       dragOffsetX={dragOffsetX}
                       previewDurationHours={activeDragDurationHours}
                       onPreviewTimeChange={(hourOffset) => onPreviewTimeChange?.(tech.id, hourOffset)}
+                      onNodeRef={(node) => onRegisterTimelineNode?.(tech.id, node)}
                     >
                       {techWorkOrders.map((wo) => {
                         if (!wo.scheduledStart) return null;
@@ -2199,6 +2202,7 @@ export default function CrmDispatch() {
   const [activeFromQueue, setActiveFromQueue] = useState(false);
   const [previewHourByTech, setPreviewHourByTech] = useState<Record<string, number>>({});
   const previewHourByTechRef = useRef<Record<string, number>>({});
+  const techTimelineNodesRef = useRef<Record<string, HTMLElement>>({});
   const dragOffsetXRef = useRef(0);
   const activeCardWidthRef = useRef(0);
   const lastPointerXRef = useRef(0);
@@ -3456,15 +3460,11 @@ export default function CrmDispatch() {
         if (previewHour !== undefined) {
           newStartHour = SCHEDULE_START_HOUR + previewHour;
         } else {
-          const overAny = over as any;
-          const droppableNode = overAny.node?.current ?? overAny.node;
-          const timelineRect = droppableNode instanceof HTMLElement
-            ? droppableNode.getBoundingClientRect()
-            : over.rect;
-          const timelineWidth = timelineRect.width;
-          if (timelineWidth > 0) {
+          const timelineNode = techTimelineNodesRef.current[newTechId];
+          if (timelineNode) {
+            const timelineRect = timelineNode.getBoundingClientRect();
             const relativeX = lastPointerXRef.current - timelineRect.left - dragOffsetXRef.current;
-            const snappedHourOffset = snapHourOffsetFromTimeline(relativeX, timelineWidth, defaultDuration);
+            const snappedHourOffset = snapHourOffsetFromTimeline(relativeX, timelineRect.width, defaultDuration);
             newStartHour = SCHEDULE_START_HOUR + snappedHourOffset;
           }
         }
@@ -3527,15 +3527,11 @@ export default function CrmDispatch() {
             (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR) - duration,
           ));
         } else {
-          const overAny = over as any;
-          const droppableNode = overAny.node?.current ?? overAny.node;
-          const timelineRect = droppableNode instanceof HTMLElement
-            ? droppableNode.getBoundingClientRect()
-            : over.rect;
-          const timelineWidth = timelineRect.width;
-          if (timelineWidth > 0) {
+          const timelineNode = techTimelineNodesRef.current[newTechId];
+          if (timelineNode) {
+            const timelineRect = timelineNode.getBoundingClientRect();
             const relativeX = lastPointerXRef.current - timelineRect.left - dragOffsetXRef.current;
-            const snappedHourOffset = snapHourOffsetFromTimeline(relativeX, timelineWidth, duration);
+            const snappedHourOffset = snapHourOffsetFromTimeline(relativeX, timelineRect.width, duration);
             newStartHour = SCHEDULE_START_HOUR + snappedHourOffset;
           }
         }
@@ -4139,6 +4135,13 @@ export default function CrmDispatch() {
                   onPreviewTimeChange={handlePreviewTimeChange}
                   onOpenQuickStatus={handleOpenQuickStatus}
                   activeDragDurationHours={activeDragDurationHours}
+                  onRegisterTimelineNode={(techId, node) => {
+                    if (node) {
+                      techTimelineNodesRef.current[techId] = node;
+                    } else {
+                      delete techTimelineNodesRef.current[techId];
+                    }
+                  }}
                 />
               ) : viewMode === "week" ? (
                 <WeekDispatchBoard
