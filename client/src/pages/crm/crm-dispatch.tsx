@@ -61,6 +61,7 @@ import {
   ExternalLink,
   UserX,
   XCircle,
+  Trash2,
   Loader2,
   Info,
   FileText,
@@ -3001,6 +3002,20 @@ export default function CrmDispatch() {
     });
   }, [selectedWorkOrderId, updateWorkOrderMutation, toast]);
 
+  const handleDeleteWorkOrder = useCallback(async () => {
+    if (!selectedWorkOrderId) return;
+    try {
+      await apiRequest("DELETE", `/api/crm/work-orders/${selectedWorkOrderId}`);
+      setLocalWorkOrders(prev => prev.filter(wo => wo.id !== selectedWorkOrderId));
+      setSelectedWorkOrderId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch/work-orders"] });
+      toast({ title: "Work order deleted" });
+    } catch {
+      toast({ title: "Failed to delete work order", variant: "destructive" });
+    }
+  }, [selectedWorkOrderId, toast]);
+
   const handleSaveNotes = useCallback(() => {
     if (!selectedWorkOrderId || !newNote.trim()) return;
     const currentWO = localWorkOrders.find(wo => wo.id === selectedWorkOrderId);
@@ -4448,41 +4463,41 @@ export default function CrmDispatch() {
 
                 <Separator />
 
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-900">Actions</h3>
-                  <div className="flex flex-wrap gap-2">
+                <div className="space-y-2">
+                  <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</h3>
+                  <div className="grid grid-cols-2 gap-1.5">
                     <Link href={`/crm/work-orders/${selectedWorkOrder.id}`}>
                       <Button
-                        size="sm"
-                        variant="outline"
+                        variant="ghost"
+                        className="w-full h-7 justify-start text-xs text-slate-600 hover:text-slate-900 px-2"
                         data-testid="button-view-full-details"
                       >
-                        <FileText className="h-4 w-4 mr-1" />
-                        View Full Details
+                        <FileText className="h-3 w-3 mr-1.5 flex-shrink-0" />
+                        View Details
                       </Button>
                     </Link>
                     {selectedWorkOrder.assignedTechId && (
                       <Button
-                        size="sm"
-                        variant="outline"
+                        variant="ghost"
+                        className="w-full h-7 justify-start text-xs text-slate-600 hover:text-slate-900 px-2"
                         onClick={handleUnassign}
                         disabled={updateWorkOrderMutation.isPending}
                         data-testid="button-unassign"
                       >
-                        <UserX className="h-4 w-4 mr-1" />
-                        Unassign Tech
+                        <UserX className="h-3 w-3 mr-1.5 flex-shrink-0" />
+                        Unassign
                       </Button>
                     )}
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button
-                          size="sm"
-                          variant="destructive"
+                          variant="ghost"
+                          className="w-full h-7 justify-start text-xs text-slate-500 hover:text-orange-600 px-2"
                           disabled={updateWorkOrderMutation.isPending || selectedWorkOrder.status === "cancelled"}
                           data-testid="button-cancel-wo"
                         >
-                          <XCircle className="h-4 w-4 mr-1" />
-                          Cancel Work Order
+                          <XCircle className="h-3 w-3 mr-1.5 flex-shrink-0" />
+                          Cancel
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
@@ -4496,6 +4511,32 @@ export default function CrmDispatch() {
                           <AlertDialogCancel>Keep Work Order</AlertDialogCancel>
                           <AlertDialogAction onClick={handleCancelWorkOrder}>
                             Yes, Cancel It
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          className="w-full h-7 justify-start text-xs text-slate-500 hover:text-red-600 px-2"
+                          data-testid="button-delete-wo"
+                        >
+                          <Trash2 className="h-3 w-3 mr-1.5 flex-shrink-0" />
+                          Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Work Order?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently delete the work order. This cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Keep It</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleDeleteWorkOrder} className="bg-red-600 hover:bg-red-700">
+                            Delete Permanently
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
