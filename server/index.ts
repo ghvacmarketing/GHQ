@@ -180,9 +180,28 @@ async function runSalesbookMigrations() {
   }
 }
 
+async function runProposalTemplateMigrations() {
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS proposal_templates (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        name text NOT NULL,
+        body text NOT NULL,
+        is_default boolean NOT NULL DEFAULT false,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+  } catch (err) {
+    console.error("Proposal template migration error (non-fatal):", err);
+  }
+}
+
 (async () => {
   await runTaggedCommentMigrations();
   await runSalesbookMigrations();
+  await runProposalTemplateMigrations();
   try {
     const { ensureSalesbookConverted } = await import("./services/salesbook-converter");
     ensureSalesbookConverted();

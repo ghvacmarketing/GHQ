@@ -18,6 +18,7 @@ import {
   Package,
   Boxes,
   Target,
+  FileText,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser } from "@shared/schema";
@@ -49,6 +50,7 @@ const sections: SettingsSection[] = [
       { name: "Work Order Subtypes", href: "/crm/settings/subtypes", icon: Tags },
       { name: "Service Checklists", href: "/crm/checklists", icon: ClipboardList },
       { name: "Package Pricing", href: "/crm/settings/packages", icon: Package },
+      { name: "Proposal Templates", href: "/crm/settings/proposal-templates", icon: FileText },
     ],
   },
   {

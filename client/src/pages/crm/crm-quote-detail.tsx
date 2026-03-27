@@ -69,6 +69,7 @@ import {
   Package,
   Search,
   Tag,
+  Star,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -97,7 +98,8 @@ import { PaymentLinkButton } from "@/components/stripe-payment-link-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import RichTextEditor, { RichTextDisplay } from "@/components/rich-text-editor";
 import ghvacLogo from "@assets/ghvac-logo.png";
-import { generateContractTemplate } from "@/lib/contract-template";
+import { generateContractTemplate, applyTemplateVariables } from "@/lib/contract-template";
+import type { ProposalTemplate } from "@shared/schema";
 import {
   BRAND_COLOR,
   COMPANY_INFO,
@@ -236,6 +238,11 @@ export default function CrmQuoteDetail() {
   const [manualSignature, setManualSignature] = useState("");
   const [manualSignerName, setManualSignerName] = useState("");
   const [pendingManualOption, setPendingManualOption] = useState<string | null>(null);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+
+  const { data: proposalTemplates = [], isLoading: templatesLoading } = useQuery<ProposalTemplate[]>({
+    queryKey: ["/api/crm/proposal-templates"],
+  });
 
   // Items catalog state
   const [showItemsCatalogDialog, setShowItemsCatalogDialog] = useState(false);
@@ -3528,31 +3535,38 @@ export default function CrmQuoteDetail() {
                 <Button
                   variant="outline"
                   size="sm"
+                  disabled={templatesLoading}
                   onClick={() => {
-                    const buildTemplate = () => {
-                      const lineDescriptions = (quote.lineItems || [])
-                        .map(li => li.description)
-                        .filter(Boolean)
-                        .join("; ");
-                      const totalStr = quote.total
-                        ? "$" + parseFloat(quote.total.toString()).toLocaleString()
-                        : undefined;
-                      return generateContractTemplate({
-                        customerName: quote.customer?.name || quote.customerName || undefined,
-                        address: quote.serviceAddress || undefined,
-                        equipmentSummary: lineDescriptions || undefined,
-                        totalPrice: totalStr,
-                      });
-                    };
                     const isEmpty = (s: string | undefined | null) =>
                       !s || s.trim() === "" || s.trim() === "<p></p>";
-                    if (!isEditingDescription) {
-                      if (!isEmpty(quote.description) && !window.confirm("Replace current description with the contract template?")) return;
-                      setEditedDescription(buildTemplate());
-                      setIsEditingDescription(true);
+                    if (proposalTemplates.length > 0) {
+                      const currentContent = isEditingDescription ? editedDescription : quote.description;
+                      if (!isEmpty(currentContent) && !window.confirm("Replace current description with a template?")) return;
+                      setTemplatePickerOpen(true);
                     } else {
-                      if (!isEmpty(editedDescription) && !window.confirm("Replace current description with the contract template?")) return;
-                      setEditedDescription(buildTemplate());
+                      const buildTemplate = () => {
+                        const lineDescriptions = (quote.lineItems || [])
+                          .map(li => li.description)
+                          .filter(Boolean)
+                          .join("; ");
+                        const totalStr = quote.total
+                          ? "$" + parseFloat(quote.total.toString()).toLocaleString()
+                          : undefined;
+                        return generateContractTemplate({
+                          customerName: quote.customer?.name || quote.customerName || undefined,
+                          address: quote.serviceAddress || undefined,
+                          equipmentSummary: lineDescriptions || undefined,
+                          totalPrice: totalStr,
+                        });
+                      };
+                      if (!isEditingDescription) {
+                        if (!isEmpty(quote.description) && !window.confirm("Replace current description with the contract template?")) return;
+                        setEditedDescription(buildTemplate());
+                        setIsEditingDescription(true);
+                      } else {
+                        if (!isEmpty(editedDescription) && !window.confirm("Replace current description with the contract template?")) return;
+                        setEditedDescription(buildTemplate());
+                      }
                     }
                   }}
                   className="text-slate-700"
@@ -5324,6 +5338,54 @@ export default function CrmQuoteDetail() {
               Skip for now
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={templatePickerOpen} onOpenChange={setTemplatePickerOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Choose a Template</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+            {[...proposalTemplates].sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0)).map((tmpl) => (
+              <button
+                key={tmpl.id}
+                className="w-full text-left p-3 rounded-lg border hover:bg-slate-50 transition-colors flex items-center gap-3"
+                onClick={() => {
+                  const lineDescriptions = (quote.lineItems || [])
+                    .map(li => li.description)
+                    .filter(Boolean)
+                    .join("; ");
+                  const totalStr = quote.total
+                    ? "$" + parseFloat(quote.total.toString()).toLocaleString()
+                    : undefined;
+                  const html = applyTemplateVariables(tmpl.body, {
+                    customerName: quote.customer?.name || quote.customerName || undefined,
+                    address: quote.serviceAddress || undefined,
+                    equipmentSummary: lineDescriptions || undefined,
+                    totalPrice: totalStr,
+                  });
+                  setEditedDescription(html);
+                  if (!isEditingDescription) setIsEditingDescription(true);
+                  setTemplatePickerOpen(false);
+                }}
+              >
+                <FileText className="h-5 w-5 text-slate-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm">{tmpl.name}</div>
+                  <div className="text-xs text-slate-400 truncate">
+                    {tmpl.body.replace(/<[^>]*>/g, " ").slice(0, 100)}...
+                  </div>
+                </div>
+                {tmpl.isDefault && (
+                  <Badge className="bg-amber-100 text-amber-700 border-amber-200 flex-shrink-0 text-xs">
+                    <Star className="h-3 w-3 mr-1" />
+                    Default
+                  </Badge>
+                )}
+              </button>
+            ))}
+          </div>
         </DialogContent>
       </Dialog>
     </CrmLayout>

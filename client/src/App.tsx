@@ -74,6 +74,7 @@ const CrmSettingsImport = lazy(() => import("@/pages/crm/crm-settings-import"));
 const CrmSettingsFleet = lazy(() => import("@/pages/crm/crm-settings-fleet"));
 const CrmSettingsPackages = lazy(() => import("@/pages/crm/crm-settings-packages"));
 const CrmSettingsMaterialsCatalog = lazy(() => import("@/pages/crm/crm-settings-materials-catalog"));
+const CrmSettingsProposalTemplates = lazy(() => import("@/pages/crm/crm-settings-proposal-templates"));
 const CrmBusinessDashboard = lazy(() => import("@/pages/crm/crm-business-dashboard"));
 const CrmGoalsTracker = lazy(() => import("@/pages/crm/crm-goals-tracker"));
 const CrmMessaging = lazy(() => import("@/pages/crm/crm-messaging"));
@@ -298,6 +299,7 @@ function Router() {
       <Route path="/crm/settings/fleet">{() => <ProtectedCrmWrapper><CrmSettingsFleet /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/packages">{() => <ProtectedCrmWrapper><CrmSettingsPackages /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/materials-catalog">{() => <ProtectedCrmWrapper><CrmSettingsMaterialsCatalog /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/settings/proposal-templates">{() => <ProtectedCrmWrapper><CrmSettingsProposalTemplates /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings">{() => <ProtectedCrmWrapper><CrmSettings /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/dashboard">{() => <ProtectedCrmWrapper><CrmBusinessDashboard /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/reports">{() => <ProtectedCrmWrapper><CrmGoalsTracker /></ProtectedCrmWrapper>}</Route>

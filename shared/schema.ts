@@ -3457,3 +3457,19 @@ export const insertSalesbookBookmarkSchema = createInsertSchema(salesbookBookmar
 
 export type InsertSalesbookBookmark = z.infer<typeof insertSalesbookBookmarkSchema>;
 export type SalesbookBookmark = typeof salesbookBookmarks.$inferSelect;
+
+export const proposalTemplates = pgTable("proposal_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  body: text("body").notNull(),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertProposalTemplateSchema = createInsertSchema(proposalTemplates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertProposalTemplate = z.infer<typeof insertProposalTemplateSchema>;
+export type ProposalTemplate = typeof proposalTemplates.$inferSelect;

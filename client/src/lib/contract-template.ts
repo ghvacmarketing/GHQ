@@ -8,6 +8,25 @@ export interface ContractTemplateData {
   projectName?: string;
 }
 
+export function applyTemplateVariables(templateBody: string, data: ContractTemplateData = {}): string {
+  const today = data.date || new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const customerName = data.customerName || "[CLIENT NAME]";
+  const preparedFor = data.preparedFor || customerName;
+  const address = data.address || "[PROJECT ADDRESS]";
+  const totalPrice = data.totalPrice || "[TOTAL INVESTMENT]";
+  const equipmentSummary = data.equipmentSummary || "[EQUIPMENT DESCRIPTION]";
+  const projectName = data.projectName || "[PROJECT NAME]";
+
+  return templateBody
+    .replace(/\{\{customerName\}\}/g, customerName)
+    .replace(/\{\{preparedFor\}\}/g, preparedFor)
+    .replace(/\{\{address\}\}/g, address)
+    .replace(/\{\{totalPrice\}\}/g, totalPrice)
+    .replace(/\{\{equipmentSummary\}\}/g, equipmentSummary)
+    .replace(/\{\{projectName\}\}/g, projectName)
+    .replace(/\{\{date\}\}/g, today);
+}
+
 export function generateContractTemplate(data: ContractTemplateData = {}): string {
   const today = data.date || new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
   const customerName = data.customerName || "[CLIENT NAME]";

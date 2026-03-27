@@ -1,20 +1,27 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  ArrowLeft, Package, Crown, Award, Wrench, Check, Loader2, FileText, CheckCircle2, MapPin, ClipboardList
+  ArrowLeft, Package, Crown, Award, Wrench, Check, Loader2, FileText, CheckCircle2, MapPin, ClipboardList, Star
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import ProposalRichTextEditor from "@/components/proposal-rich-text-editor";
 import redlogo from "@assets/redlogo.webp";
-import { generateContractTemplate } from "@/lib/contract-template";
+import { generateContractTemplate, applyTemplateVariables } from "@/lib/contract-template";
+import type { ProposalTemplate } from "@shared/schema";
 
 // ─── Types (mirrored from crm-proposal-builder) ──────────────────────────────
 
@@ -212,6 +219,11 @@ export default function CrmProposalPreview() {
   const [proposalNotes, setProposalNotes] = useState<string>("");
   const [assignedToId, setAssignedToId] = useState<string | null>(null);
   const [isNavigatingAway, setIsNavigatingAway] = useState(false);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+
+  const { data: proposalTemplates = [], isLoading: templatesLoading } = useQuery<ProposalTemplate[]>({
+    queryKey: ["/api/crm/proposal-templates"],
+  });
 
   useEffect(() => {
     const raw = sessionStorage.getItem(PREVIEW_STATE_KEY);
@@ -673,42 +685,48 @@ export default function CrmProposalPreview() {
             <Button
               variant="outline"
               size="sm"
+              disabled={templatesLoading}
               onClick={() => {
                 const hasContent = proposalNotes && proposalNotes !== "<p></p>" && proposalNotes.trim() !== "";
-                if (hasContent && !window.confirm("Replace current notes with the contract template?")) return;
+                if (proposalTemplates.length > 0) {
+                  if (hasContent && !window.confirm("Replace current notes with a template?")) return;
+                  setTemplatePickerOpen(true);
+                } else {
+                  if (hasContent && !window.confirm("Replace current notes with the contract template?")) return;
 
-                const equip = cart.map(item => {
-                  if (isHvacPackage(item)) return `${(item as HvacPackageCartItem).packageLevel} Package – ${(item as HvacPackageCartItem).extractedTonnage} – ${(item as HvacPackageCartItem).outdoorBrand} ${(item as HvacPackageCartItem).outdoorName}`;
-                  if (isCrawlspaceItem(item)) return `Crawlspace Encapsulation – ${item.tier.name} (${item.pricingBreakdown.bandSqft.toLocaleString()} sqft)`;
-                  if (isCustomBuild(item)) return `Custom Build – ${item.tonnage} System`;
-                  return "HVAC Equipment";
-                }).join("; ");
+                  const equip = cart.map(item => {
+                    if (isHvacPackage(item)) return `${(item as HvacPackageCartItem).packageLevel} Package – ${(item as HvacPackageCartItem).extractedTonnage} – ${(item as HvacPackageCartItem).outdoorBrand} ${(item as HvacPackageCartItem).outdoorName}`;
+                    if (isCrawlspaceItem(item)) return `Crawlspace Encapsulation – ${item.tier.name} (${item.pricingBreakdown.bandSqft.toLocaleString()} sqft)`;
+                    if (isCustomBuild(item)) return `Custom Build – ${item.tonnage} System`;
+                    return "HVAC Equipment";
+                  }).join("; ");
 
-                const addrParts: string[] = [];
-                if (selectedCustomer?.fullAddress) addrParts.push(selectedCustomer.fullAddress);
-                else if (previewData.customerProperties.length > 0) {
-                  const prop = previewData.customerProperties[0];
-                  addrParts.push([prop.address1, prop.city, prop.state, prop.zip].filter(Boolean).join(", "));
+                  const addrParts: string[] = [];
+                  if (selectedCustomer?.fullAddress) addrParts.push(selectedCustomer.fullAddress);
+                  else if (previewData.customerProperties.length > 0) {
+                    const prop = previewData.customerProperties[0];
+                    addrParts.push([prop.address1, prop.city, prop.state, prop.zip].filter(Boolean).join(", "));
+                  }
+
+                  const totalLow = cartTotalAfterDiscount.low;
+                  const totalHigh = cartTotalAfterDiscount.high;
+                  const totalStr = totalLow === totalHigh
+                    ? "$" + totalLow.toLocaleString()
+                    : "$" + totalLow.toLocaleString() + " – $" + totalHigh.toLocaleString();
+
+                  const html = generateContractTemplate({
+                    customerName: selectedCustomer?.name || undefined,
+                    address: addrParts[0] || undefined,
+                    equipmentSummary: equip || undefined,
+                    totalPrice: totalStr || undefined,
+                  });
+                  setProposalNotes(html);
                 }
-
-                const totalLow = cartTotalAfterDiscount.low;
-                const totalHigh = cartTotalAfterDiscount.high;
-                const totalStr = totalLow === totalHigh
-                  ? "$" + totalLow.toLocaleString()
-                  : "$" + totalLow.toLocaleString() + " – $" + totalHigh.toLocaleString();
-
-                const html = generateContractTemplate({
-                  customerName: selectedCustomer?.name || undefined,
-                  address: addrParts[0] || undefined,
-                  equipmentSummary: equip || undefined,
-                  totalPrice: totalStr || undefined,
-                });
-                setProposalNotes(html);
               }}
               className="text-slate-700 shrink-0"
             >
               <ClipboardList className="h-4 w-4 mr-1.5" />
-              Load Contract Template
+              Load Template
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mb-3">
@@ -841,6 +859,62 @@ export default function CrmProposalPreview() {
           </Button>
         </div>
       </div>
+      <Dialog open={templatePickerOpen} onOpenChange={setTemplatePickerOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Choose a Template</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+            {[...proposalTemplates].sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0)).map((tmpl) => (
+              <button
+                key={tmpl.id}
+                className="w-full text-left p-3 rounded-lg border hover:bg-slate-50 transition-colors flex items-center gap-3"
+                onClick={() => {
+                  const equip = cart.map(item => {
+                    if (isHvacPackage(item)) return `${(item as HvacPackageCartItem).packageLevel} Package – ${(item as HvacPackageCartItem).extractedTonnage} – ${(item as HvacPackageCartItem).outdoorBrand} ${(item as HvacPackageCartItem).outdoorName}`;
+                    if (isCrawlspaceItem(item)) return `Crawlspace Encapsulation – ${item.tier.name} (${item.pricingBreakdown.bandSqft.toLocaleString()} sqft)`;
+                    if (isCustomBuild(item)) return `Custom Build – ${item.tonnage} System`;
+                    return "HVAC Equipment";
+                  }).join("; ");
+                  const addrParts: string[] = [];
+                  if (selectedCustomer?.fullAddress) addrParts.push(selectedCustomer.fullAddress);
+                  else if (previewData && previewData.customerProperties.length > 0) {
+                    const prop = previewData.customerProperties[0];
+                    addrParts.push([prop.address1, prop.city, prop.state, prop.zip].filter(Boolean).join(", "));
+                  }
+                  const totalLow = cartTotalAfterDiscount.low;
+                  const totalHigh = cartTotalAfterDiscount.high;
+                  const totalStr = totalLow === totalHigh
+                    ? "$" + totalLow.toLocaleString()
+                    : "$" + totalLow.toLocaleString() + " – $" + totalHigh.toLocaleString();
+                  const html = applyTemplateVariables(tmpl.body, {
+                    customerName: selectedCustomer?.name || undefined,
+                    address: addrParts[0] || undefined,
+                    equipmentSummary: equip || undefined,
+                    totalPrice: totalStr || undefined,
+                  });
+                  setProposalNotes(html);
+                  setTemplatePickerOpen(false);
+                }}
+              >
+                <FileText className="h-5 w-5 text-slate-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm">{tmpl.name}</div>
+                  <div className="text-xs text-slate-400 truncate">
+                    {tmpl.body.replace(/<[^>]*>/g, " ").slice(0, 100)}...
+                  </div>
+                </div>
+                {tmpl.isDefault && (
+                  <Badge className="bg-amber-100 text-amber-700 border-amber-200 flex-shrink-0 text-xs">
+                    <Star className="h-3 w-3 mr-1" />
+                    Default
+                  </Badge>
+                )}
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </CrmLayout>
   );
 }
