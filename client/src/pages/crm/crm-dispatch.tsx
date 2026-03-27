@@ -87,7 +87,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { addDays, endOfMonth, endOfWeek, format, formatDistanceToNow, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
 import { FleetMap } from "@/components/fleet-map";
-import { createLocalDateTime, formatLocal, formatLocalDateTime, getLocalStartOfDay, getLocalEndOfDay, getLocalDateString, getTodayLocalDateString, APP_TIMEZONE } from "@/lib/timezone";
+import { createLocalDateTime, formatLocal, formatLocalDateTime, getLocalStartOfDay, getLocalEndOfDay, getLocalDateString, getTodayLocalDateString, APP_TIMEZONE, toLocalTime } from "@/lib/timezone";
 import { formatInTimeZone } from "date-fns-tz";
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -401,8 +401,8 @@ function getWorkOrderDisplayTimes(workOrder: DispatchWorkOrder): { startHour: nu
   if (!workOrder.scheduledStart || !workOrder.scheduledEnd) {
     return { startHour: START_HOUR, endHour: START_HOUR + 1, startSlot: 0, endSlot: 2 };
   }
-  const start = new Date(workOrder.scheduledStart);
-  const end = new Date(workOrder.scheduledEnd);
+  const start = toLocalTime(new Date(workOrder.scheduledStart));
+  const end = toLocalTime(new Date(workOrder.scheduledEnd));
   const startHour = Math.max(START_HOUR, Math.min(END_HOUR, start.getHours() + start.getMinutes() / 60));
   const endHour = Math.max(START_HOUR, Math.min(END_HOUR, end.getHours() + end.getMinutes() / 60));
   const startSlot = timeToSlotIndex(startHour);
@@ -581,8 +581,9 @@ const SCHEDULE_INTERVAL = 30;
 const SCHEDULE_TIMELINE_WIDTH = TIMELINE_WIDTH;
 
 function getScheduleLeftPercent(date: Date): number {
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
+  const local = toLocalTime(date);
+  const hours = local.getHours();
+  const minutes = local.getMinutes();
   const totalMinutes = (hours - SCHEDULE_START_HOUR) * 60 + minutes;
   return Math.max(0, Math.min(100, (totalMinutes / SCHEDULE_TOTAL_MINUTES) * 100));
 }
@@ -1048,7 +1049,7 @@ function WeekDispatchBoard({ technicians, workOrders, weekDates, onWorkOrderClic
                           <div className="space-y-1">
                             {dayWOs.slice(0, 3).map((wo) => {
                               const colors = weekCardColors[wo.status] || weekCardColors.scheduled;
-                              const startTime = wo.scheduledStart ? format(new Date(wo.scheduledStart), "h:mma").toLowerCase() : "";
+                              const startTime = wo.scheduledStart ? formatLocal(wo.scheduledStart, "h:mma").toLowerCase() : "";
                               return (
                                 <div
                                   key={wo.id}
@@ -1634,7 +1635,8 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                           : (scheduleVisitTypeColors[visitType] || scheduleVisitTypeColors.SERVICE);
                         const statusStripe = scheduleStatusStripes[wo.status] || scheduleStatusStripes.scheduled;
 
-                        const startMinutesFrom8 = (startDate.getHours() - SCHEDULE_START_HOUR) * 60 + startDate.getMinutes();
+                        const localStartDate = toLocalTime(startDate);
+                        const startMinutesFrom8 = (localStartDate.getHours() - SCHEDULE_START_HOUR) * 60 + localStartDate.getMinutes();
                         if (startMinutesFrom8 < 0 || startMinutesFrom8 >= SCHEDULE_TOTAL_MINUTES) return null;
 
                         return (
@@ -2601,7 +2603,7 @@ export default function CrmDispatch() {
       if (error?.error === 'SCHEDULING_CONFLICT' || error?.message === 'Scheduling conflict') {
         const conflictInfo = error?.conflictingOrder;
         const startTime = conflictInfo?.scheduledStart 
-          ? format(new Date(conflictInfo.scheduledStart), "h:mm a")
+          ? formatLocal(conflictInfo.scheduledStart, "h:mm a")
           : 'unknown time';
         toast({
           title: "Scheduling Conflict",
@@ -2833,7 +2835,7 @@ export default function CrmDispatch() {
           const conflict = checkSchedulingConflict(localWorkOrders, effectiveTechId, scheduledStartUTC, scheduledEndUTC);
           if (conflict) {
             const techName = technicians.find(t => t.id === effectiveTechId)?.name || "This technician";
-            const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+            const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "h:mm a") : "unknown time";
             throw new Error(`${techName} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`);
           }
         }
@@ -2899,7 +2901,7 @@ export default function CrmDispatch() {
       if (error?.error === 'SCHEDULING_CONFLICT' || error?.message === 'Scheduling conflict') {
         const conflictInfo = error?.conflictingOrder;
         const startTime = conflictInfo?.scheduledStart 
-          ? format(new Date(conflictInfo.scheduledStart), "h:mm a")
+          ? formatLocal(conflictInfo.scheduledStart, "h:mm a")
           : "unknown time";
         toast({ 
           title: "Scheduling Conflict",
@@ -3053,7 +3055,7 @@ export default function CrmDispatch() {
     // Check for scheduling conflict before assigning
     const conflict = checkSchedulingConflict(localWorkOrders, techId, startDateUTC, endDateUTC, workOrderId);
     if (conflict) {
-      const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+      const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "h:mm a") : "unknown time";
       toast({
         title: "Scheduling Conflict",
         description: `${newTech?.name || 'This technician'} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
@@ -3096,7 +3098,7 @@ export default function CrmDispatch() {
       const conflict = checkSchedulingConflict(localWorkOrders, wo.assignedTechId, startDateUTC, endDateUTC, workOrderId);
       if (conflict) {
         const techName = wo.techName || technicians.find(t => t.id === wo.assignedTechId)?.name || "This technician";
-        const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+        const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "h:mm a") : "unknown time";
         toast({
           title: "Scheduling Conflict",
           description: `${techName} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
@@ -3179,17 +3181,14 @@ export default function CrmDispatch() {
     const endHourInt = Math.floor(newEnd);
     const endMinutes = Math.round((newEnd % 1) * 60);
     
-    const startDate = new Date(selectedDate);
-    startDate.setHours(startHourInt, startMinutes, 0, 0);
-    const endDate = new Date(selectedDate);
-    endDate.setHours(endHourInt, endMinutes, 0, 0);
+    const startDate = createLocalDateTime(selectedDate, startHourInt, startMinutes);
+    const endDate = createLocalDateTime(selectedDate, endHourInt, endMinutes);
     
-    // Check for scheduling conflict when resizing
     if (wo.assignedTechId) {
       const conflict = checkSchedulingConflict(localWorkOrders, wo.assignedTechId, startDate, endDate, workOrderId);
       if (conflict) {
         const techName = wo.techName || technicians.find(t => t.id === wo.assignedTechId)?.name || "This technician";
-        const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+        const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "h:mm a") : "unknown time";
         toast({
           title: "Scheduling Conflict",
           description: `${techName} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
@@ -3226,11 +3225,13 @@ export default function CrmDispatch() {
     let newEnd = new Date(currentEnd.getTime() + deltaEndMinutes * 60 * 1000);
     
     if (newStart >= newEnd) return;
-    if (newStart.getHours() < SCHEDULE_START_HOUR) {
-      newStart.setHours(SCHEDULE_START_HOUR, 0, 0, 0);
+    const localStart = toLocalTime(newStart);
+    const localEnd = toLocalTime(newEnd);
+    if (localStart.getHours() < SCHEDULE_START_HOUR) {
+      newStart = createLocalDateTime(selectedDate, SCHEDULE_START_HOUR, 0);
     }
-    if (newEnd.getHours() > SCHEDULE_END_HOUR || (newEnd.getHours() === SCHEDULE_END_HOUR && newEnd.getMinutes() > 0)) {
-      newEnd.setHours(SCHEDULE_END_HOUR, 0, 0, 0);
+    if (localEnd.getHours() > SCHEDULE_END_HOUR || (localEnd.getHours() === SCHEDULE_END_HOUR && localEnd.getMinutes() > 0)) {
+      newEnd = createLocalDateTime(selectedDate, SCHEDULE_END_HOUR, 0);
     }
     
     // Check for scheduling conflict when resizing
@@ -3238,7 +3239,7 @@ export default function CrmDispatch() {
       const conflict = checkSchedulingConflict(localWorkOrders, wo.assignedTechId, newStart, newEnd, workOrderId);
       if (conflict) {
         const techName = wo.techName || technicians.find(t => t.id === wo.assignedTechId)?.name || "This technician";
-        const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+        const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "h:mm a") : "unknown time";
         toast({
           title: "Scheduling Conflict",
           description: `${techName} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
@@ -3334,7 +3335,7 @@ export default function CrmDispatch() {
     let durationMs = defaultDurationMs;
 
     if (workOrder.scheduledStart) {
-      const existingStart = new Date(workOrder.scheduledStart);
+      const existingStart = toLocalTime(new Date(workOrder.scheduledStart));
       startHour = existingStart.getHours();
       startMinutes = existingStart.getMinutes();
     }
@@ -3454,14 +3455,12 @@ export default function CrmDispatch() {
         const endHourInt = Math.floor(newEndHour);
         const endMinutes = Math.round((newEndHour % 1) * 60);
         
-        const startDate = new Date(selectedDate);
-        startDate.setHours(startHourInt, startMinutes, 0, 0);
-        const endDate = new Date(selectedDate);
-        endDate.setHours(endHourInt, endMinutes, 0, 0);
+        const startDate = createLocalDateTime(selectedDate, startHourInt, startMinutes);
+        const endDate = createLocalDateTime(selectedDate, endHourInt, endMinutes);
         
         const conflict = checkSchedulingConflict(localWorkOrders, newTechId, startDate, endDate, workOrderId);
         if (conflict) {
-          const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+          const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "h:mm a") : "unknown time";
           toast({
             title: "Scheduling Conflict",
             description: `${newTech?.name || 'This technician'} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
@@ -3530,16 +3529,14 @@ export default function CrmDispatch() {
         const endHourInt = Math.floor(newEndHour);
         const endMinutes = Math.round((newEndHour % 1) * 60);
         
-        const startDate = new Date(selectedDate);
-        startDate.setHours(startHourInt, startMinutes, 0, 0);
-        const endDate = new Date(selectedDate);
-        endDate.setHours(endHourInt, endMinutes, 0, 0);
+        const startDate = createLocalDateTime(selectedDate, startHourInt, startMinutes);
+        const endDate = createLocalDateTime(selectedDate, endHourInt, endMinutes);
         
         const newTech = technicians.find(t => t.id === newTechId);
         
         const conflict = checkSchedulingConflict(localWorkOrders, newTechId, startDate, endDate, workOrderId);
         if (conflict) {
-          const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+          const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "h:mm a") : "unknown time";
           toast({
             title: "Scheduling Conflict",
             description: `${newTech?.name || 'This technician'} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
@@ -3571,10 +3568,10 @@ export default function CrmDispatch() {
       const dropDate = new Date(`${dateStr}T00:00:00`);
 
       if (wo.scheduledStart) {
-        const existingStart = new Date(wo.scheduledStart);
+        const existingStart = toLocalTime(new Date(wo.scheduledStart));
         setDropStartTime(`${String(existingStart.getHours()).padStart(2,'0')}:${String(existingStart.getMinutes()).padStart(2,'0')}`);
         if (wo.scheduledEnd) {
-          const existingEnd = new Date(wo.scheduledEnd);
+          const existingEnd = toLocalTime(new Date(wo.scheduledEnd));
           setDropEndTime(`${String(existingEnd.getHours()).padStart(2,'0')}:${String(existingEnd.getMinutes()).padStart(2,'0')}`);
         } else {
           const endH = existingStart.getHours() + 2;
@@ -3600,10 +3597,10 @@ export default function CrmDispatch() {
       const newTech = technicians.find(t => t.id === techId);
 
       if (wo.scheduledStart) {
-        const existingStart = new Date(wo.scheduledStart);
+        const existingStart = toLocalTime(new Date(wo.scheduledStart));
         setDropStartTime(`${String(existingStart.getHours()).padStart(2,'0')}:${String(existingStart.getMinutes()).padStart(2,'0')}`);
         if (wo.scheduledEnd) {
-          const existingEnd = new Date(wo.scheduledEnd);
+          const existingEnd = toLocalTime(new Date(wo.scheduledEnd));
           setDropEndTime(`${String(existingEnd.getHours()).padStart(2,'0')}:${String(existingEnd.getMinutes()).padStart(2,'0')}`);
         } else {
           const endH = existingStart.getHours() + 2;
@@ -3651,10 +3648,8 @@ export default function CrmDispatch() {
     const [startH, startM] = dropStartTime.split(':').map(Number);
     const [endH, endM] = dropEndTime.split(':').map(Number);
 
-    const startDate = new Date(dropDate);
-    startDate.setHours(startH, startM, 0, 0);
-    const endDate = new Date(dropDate);
-    endDate.setHours(endH, endM, 0, 0);
+    const startDate = createLocalDateTime(dropDate, startH, startM);
+    const endDate = createLocalDateTime(dropDate, endH, endM);
 
     if (endDate <= startDate) {
       toast({ title: "Invalid time range", description: "End time must be after start time", variant: "destructive" });
@@ -3664,7 +3659,7 @@ export default function CrmDispatch() {
     if (techId) {
       const conflict = checkSchedulingConflict(localWorkOrders, techId, startDate, endDate, workOrderId);
       if (conflict) {
-        const conflictStart = conflict.scheduledStart ? format(new Date(conflict.scheduledStart), "h:mm a") : "unknown time";
+        const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "h:mm a") : "unknown time";
         toast({
           title: "Scheduling Conflict",
           description: `${techName || 'This technician'} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}.`,
