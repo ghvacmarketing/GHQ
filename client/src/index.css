@@ -355,3 +355,22 @@ gmp-place-autocomplete::part(input)::placeholder {
   transform: translateZ(0);
   background-color: #ffffff;
 }
+
+.dispatch-timeline-scroll::-webkit-scrollbar {
+  height: 14px;
+}
+.dispatch-timeline-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 7px;
+}
+.dispatch-timeline-scroll::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 7px;
+  border: 2px solid #f1f5f9;
+}
+.dispatch-timeline-scroll::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+.dispatch-timeline-scroll {
+  scrollbar-width: auto;
+}

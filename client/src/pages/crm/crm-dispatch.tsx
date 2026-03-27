@@ -1635,7 +1635,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
 
   return (
     <Card className="bg-white border overflow-hidden h-full">
-      <div className="overflow-x-auto overflow-y-auto h-full">
+      <div className="overflow-x-auto overflow-y-auto h-full dispatch-timeline-scroll">
         <div style={{ minWidth: SCHEDULE_TIMELINE_WIDTH + 200 }}>
           <div className="flex border-b border-slate-200 sticky top-0 bg-white z-20">
             <div className="w-48 flex-shrink-0 px-4 py-3 border-r border-slate-200 text-sm font-semibold text-slate-700 bg-white sticky left-0 z-30">
