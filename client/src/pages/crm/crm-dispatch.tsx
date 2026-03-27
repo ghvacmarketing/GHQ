@@ -2334,7 +2334,18 @@ export default function CrmDispatch() {
     enabled: !!currentUser && createDialogOpen && customerSearchOpen,
   });
 
-  const customers = customersData?.customers || [];
+  const customers = (() => {
+    const raw = customersData?.customers || [];
+    if (!debouncedCustomerSearch.trim()) return raw;
+    const searchLower = debouncedCustomerSearch.trim().toLowerCase();
+    return [...raw].sort((a, b) => {
+      const aName = (a.name || "").toLowerCase();
+      const bName = (b.name || "").toLowerCase();
+      const aExact = aName === searchLower ? 0 : aName.startsWith(searchLower) ? 1 : 2;
+      const bExact = bName === searchLower ? 0 : bName.startsWith(searchLower) ? 1 : 2;
+      return aExact - bExact;
+    });
+  })();
 
   const { data: propertiesData } = useQuery<CrmProperty[]>({
     queryKey: ["/api/crm/properties", selectedCustomer?.id],
