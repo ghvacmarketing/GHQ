@@ -22,8 +22,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-function ResizableImageView({ node, updateAttributes, selected }: NodeViewProps) {
+function ResizableImageView({ node, updateAttributes, selected, editor, getPos }: NodeViewProps) {
   const [resizing, setResizing] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const imgRef = useRef<HTMLDivElement>(null);
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
@@ -54,14 +55,158 @@ function ResizableImageView({ node, updateAttributes, selected }: NodeViewProps)
     document.addEventListener('mouseup', onMouseUp);
   }, [updateAttributes]);
 
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('.resize-handle')) return;
+    if (!editor || typeof getPos !== 'function') return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDragging(true);
+
+    const editorEl = editor.view.dom;
+    const startY = e.clientY;
+    let indicator: HTMLDivElement | null = null;
+    let dropPos: number | null = null;
+    const DRAG_THRESHOLD = 6;
+    let activated = false;
+
+    let prevPosition = '';
+    const createIndicator = () => {
+      indicator = document.createElement('div');
+      indicator.className = 'proposal-drag-indicator';
+      indicator.style.cssText = 'position:absolute;left:12px;right:12px;height:4px;background:#711419;border-radius:4px;z-index:50;pointer-events:none;transition:top 0.1s ease;box-shadow:0 0 0 3px rgba(113,20,25,0.15);';
+      const arrowLeft = document.createElement('div');
+      arrowLeft.style.cssText = 'position:absolute;left:-6px;top:-4px;width:0;height:0;border-top:6px solid transparent;border-bottom:6px solid transparent;border-left:6px solid #711419;';
+      const arrowRight = document.createElement('div');
+      arrowRight.style.cssText = 'position:absolute;right:-6px;top:-4px;width:0;height:0;border-top:6px solid transparent;border-bottom:6px solid transparent;border-right:6px solid #711419;';
+      indicator.appendChild(arrowLeft);
+      indicator.appendChild(arrowRight);
+      prevPosition = editorEl.style.position;
+      editorEl.style.position = 'relative';
+      editorEl.appendChild(indicator);
+    };
+
+    const findDropPosition = (clientY: number): { pos: number; topPx: number } | null => {
+      const editorRect = editorEl.getBoundingClientRect();
+      const centerX = editorRect.left + editorRect.width / 2;
+      const posInfo = editor.view.posAtCoords({ left: centerX, top: clientY });
+      const myPos = getPos();
+      const myEnd = myPos + node.nodeSize;
+
+      if (posInfo) {
+        const resolvedPos = editor.state.doc.resolve(posInfo.pos);
+        let blockPos: number;
+        if (resolvedPos.depth === 0) {
+          blockPos = posInfo.pos;
+        } else {
+          const parentOffset = resolvedPos.before(1);
+          const parentNode = editor.state.doc.nodeAt(parentOffset);
+          if (!parentNode) {
+            blockPos = posInfo.pos;
+          } else {
+            const parentDom = editor.view.nodeDOM(parentOffset) as HTMLElement | null;
+            if (parentDom && parentDom instanceof HTMLElement) {
+              const parentRect = parentDom.getBoundingClientRect();
+              const midY = parentRect.top + parentRect.height / 2;
+              blockPos = clientY < midY ? parentOffset : parentOffset + parentNode.nodeSize;
+            } else {
+              blockPos = parentOffset;
+            }
+          }
+        }
+
+        if (blockPos >= myPos && blockPos <= myEnd) return null;
+
+        let indicatorY: number;
+        const domAtPos = editor.view.domAtPos(blockPos);
+        if (domAtPos && domAtPos.node instanceof HTMLElement) {
+          const targetEl = domAtPos.node.nodeType === 1 ? domAtPos.node : domAtPos.node.parentElement;
+          if (targetEl) {
+            const targetRect = (targetEl as HTMLElement).getBoundingClientRect();
+            indicatorY = targetRect.top - editorRect.top + editorEl.scrollTop;
+          } else {
+            indicatorY = clientY - editorRect.top + editorEl.scrollTop;
+          }
+        } else {
+          indicatorY = clientY - editorRect.top + editorEl.scrollTop;
+        }
+
+        indicatorY = Math.max(0, Math.min(indicatorY, editorEl.scrollHeight));
+        return { pos: blockPos, topPx: indicatorY };
+      }
+
+      let bestGap: { pos: number; topPx: number; dist: number } | null = null;
+      editor.state.doc.forEach((child, offset) => {
+        if (offset >= myPos && offset < myEnd) return;
+        const domNode = editor.view.nodeDOM(offset) as HTMLElement | null;
+        if (!domNode || !(domNode instanceof HTMLElement)) return;
+        const rect = domNode.getBoundingClientRect();
+
+        const distTop = Math.abs(clientY - rect.top);
+        if (!bestGap || distTop < bestGap.dist) {
+          bestGap = { pos: offset, topPx: rect.top - editorRect.top + editorEl.scrollTop, dist: distTop };
+        }
+        const distBottom = Math.abs(clientY - rect.bottom);
+        if (!bestGap || distBottom < bestGap.dist) {
+          bestGap = { pos: offset + child.nodeSize, topPx: rect.bottom - editorRect.top + editorEl.scrollTop, dist: distBottom };
+        }
+      });
+      return bestGap;
+    };
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!activated && Math.abs(ev.clientY - startY) < DRAG_THRESHOLD) return;
+      if (!activated) {
+        activated = true;
+        createIndicator();
+        document.body.style.cursor = 'grabbing';
+      }
+      const result = findDropPosition(ev.clientY);
+      if (result && indicator) {
+        dropPos = result.pos;
+        indicator.style.top = `${result.topPx - 2}px`;
+        indicator.style.display = 'block';
+      }
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      setDragging(false);
+
+      if (indicator) {
+        indicator.remove();
+        editorEl.style.position = prevPosition;
+      }
+
+      if (!activated || dropPos === null || !editor || typeof getPos !== 'function') return;
+
+      const currentPos = getPos();
+      const nodeSize = node.nodeSize;
+      const { tr } = editor.state;
+
+      if (dropPos === currentPos || dropPos === currentPos + nodeSize) return;
+
+      const nodeSlice = editor.state.doc.slice(currentPos, currentPos + nodeSize);
+      tr.delete(currentPos, currentPos + nodeSize);
+      const adjustedPos = dropPos > currentPos ? dropPos - nodeSize : dropPos;
+      tr.insert(adjustedPos, nodeSlice.content);
+      editor.view.dispatch(tr);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [editor, getPos, node]);
+
   const justifyClass = align === 'left' ? 'justify-start' : align === 'right' ? 'justify-end' : 'justify-center';
 
   return (
-    <NodeViewWrapper className={`flex ${justifyClass} my-3`} data-drag-handle>
+    <NodeViewWrapper className={`flex ${justifyClass} my-3`}>
       <div
         ref={imgRef}
-        className={`relative inline-block group ${selected ? 'ring-2 ring-[#711419] ring-offset-2 rounded' : ''}`}
-        style={{ width: width ? `${width}px` : 'auto', maxWidth: '100%', cursor: 'grab' }}
+        className={`relative inline-block group ${selected ? 'ring-2 ring-[#711419] ring-offset-2 rounded' : ''} ${dragging ? 'opacity-40' : ''}`}
+        style={{ width: width ? `${width}px` : 'auto', maxWidth: '100%', cursor: dragging ? 'grabbing' : 'grab' }}
+        onMouseDown={handleDragStart}
       >
         <img
           src={node.attrs.src}
@@ -90,7 +235,7 @@ const alignStyles: Record<string, string> = {
 };
 
 const ResizableImage = Image.extend({
-  draggable: true,
+  draggable: false,
   addAttributes() {
     return {
       ...this.parent?.(),
@@ -120,7 +265,7 @@ const ResizableImage = Image.extend({
     return ['img', { ...HTMLAttributes, style, class: 'proposal-image' }];
   },
   addNodeView() {
-    return ReactNodeViewRenderer(ResizableImageView, { draggable: true });
+    return ReactNodeViewRenderer(ResizableImageView, { draggable: false });
   },
 });
 
@@ -152,6 +297,10 @@ export default function ProposalEditor({
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
+        dropcursor: {
+          color: '#711419',
+          width: 4,
+        },
       }),
       Placeholder.configure({ placeholder }),
       ResizableImage.configure({
