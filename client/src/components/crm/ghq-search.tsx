@@ -685,9 +685,11 @@ function TaggedCommentComposer({ onClose }: { onClose: () => void }) {
 
   const createMutation = useMutation({
     mutationFn: async () => {
+      const searchParams = window.location.search;
+      const fullRoute = searchParams ? `${location}${searchParams}` : location;
       await apiRequest("POST", "/api/crm/tagged-comments", {
         body,
-        pageRoute: location,
+        pageRoute: fullRoute,
         taggedUserIds: selectedUsers,
       });
     },

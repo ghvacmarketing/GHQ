@@ -282,7 +282,8 @@ export default function CrmNotifications() {
 
 function TaggedNoteHistoryRow({ item, currentUserId, buildUrl, onDismiss }: { item: TaggedCommentHistoryItem; currentUserId: string; buildUrl: (route: string, id: string) => string; onDismiss: () => void }) {
   const isSent = item.role === "author";
-  const pageName = item.pageRoute.split("/").filter(Boolean).pop() || item.pageRoute;
+  const baseRoute = item.pageRoute.split("?")[0];
+  const pageName = baseRoute.split("/").filter(Boolean).pop() || baseRoute;
 
   return (
     <div className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-slate-50 group">

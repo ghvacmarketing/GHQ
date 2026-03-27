@@ -8018,9 +8018,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { pageRoute, includeResolved } = req.query;
       if (!pageRoute) return res.status(400).json({ message: "pageRoute is required" });
 
+      const baseRoute = (pageRoute as string).split("?")[0];
+      const pageRouteMatch = sql`split_part(${crmTaggedComments.pageRoute}, '?', 1) = ${baseRoute}`;
+
       const conditions = [
         eq(crmTaggedCommentRecipients.userId, currentUser.id),
-        eq(crmTaggedComments.pageRoute, pageRoute as string),
+        pageRouteMatch,
       ];
       if (includeResolved !== "true") {
         conditions.push(eq(crmTaggedCommentRecipients.resolved, false));
@@ -8047,7 +8050,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const authorConditions = [
         eq(crmTaggedComments.authorId, currentUser.id),
-        eq(crmTaggedComments.pageRoute, pageRoute as string),
+        pageRouteMatch,
         eq(crmTaggedComments.authorDismissed, false),
       ];
 
@@ -8112,7 +8115,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         eq(crmTaggedCommentRecipients.resolved, false),
       ];
       if (pageRoute) {
-        conditions.push(eq(crmTaggedComments.pageRoute, pageRoute as string));
+        const baseRoute = (pageRoute as string).split("?")[0];
+        conditions.push(sql`split_part(${crmTaggedComments.pageRoute}, '?', 1) = ${baseRoute}`);
       }
 
       const [result] = await db.select({ count: count() })
