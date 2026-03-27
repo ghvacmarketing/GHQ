@@ -1384,7 +1384,7 @@ function DraggableScheduleCard({
         (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
       }}
       style={{ ...style, transform: undefined, opacity: isDragging ? 0.2 : 1 }}
-      className={`absolute top-2 bottom-2 cursor-grab transition-all group rounded-md border border-slate-300 bg-white shadow-sm hover:shadow-md overflow-hidden ${isResizing ? 'cursor-ew-resize' : ''}`}
+      className={`absolute top-2 bottom-2 cursor-grab transition-all group rounded-md border border-slate-300 ${bgColor} shadow-sm hover:shadow-md overflow-hidden ${isResizing ? 'cursor-ew-resize' : ''}`}
       title={isCompactCard ? `${workOrder.customerName}\n${workOrder.propertyAddress || "No address"}\n${statusLabels[workOrder.status] || workOrder.status}` : undefined}
       data-testid={`schedule-card-${workOrder.id}`}
       {...attributes}
@@ -1425,7 +1425,7 @@ function DraggableScheduleCard({
             {isHalfHourCard ? <span className="h-1.5 w-1.5 rounded-full bg-white" /> : (statusIconMap[workOrder.status] || statusIconMap.scheduled)}
           </span>
         </button>
-        <div className={`min-w-0 flex-1 border-l border-slate-200 bg-slate-50/70 ${isHalfHourCard ? 'px-1' : 'px-2'} py-0.5 flex flex-col justify-center`}>
+        <div className={`min-w-0 flex-1 border-l border-slate-200/50 ${isHalfHourCard ? 'px-1' : 'px-2'} py-0.5 flex flex-col justify-center`}>
           <p className={`truncate font-semibold text-slate-800 ${isCompactCard ? 'text-[10px] leading-tight' : 'text-xs'}`}>{workOrder.customerName}</p>
           {!isCompactCard && (
             <p className="truncate text-[10px] leading-tight text-slate-500">{workOrder.propertyAddress || "No address"}</p>
@@ -3961,20 +3961,31 @@ export default function CrmDispatch() {
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Visit Type (Background)</p>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                       <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded bg-sky-100 border border-sky-200" />
-                        <span className="text-sm text-slate-700">Service</span>
+                        <div className="w-4 h-4 rounded bg-blue-100 border border-blue-200" />
+                        <span className="text-sm text-slate-700">Install</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="w-4 h-4 rounded bg-emerald-100 border border-emerald-200" />
                         <span className="text-sm text-slate-700">Maintenance</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded bg-amber-100 border border-amber-200" />
-                        <span className="text-sm text-slate-700">Install</span>
+                        <div className="w-4 h-4 rounded bg-indigo-100 border border-indigo-200" />
+                        <span className="text-sm text-slate-700">Sales</span>
+                      </div>
+                    </div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-4 mb-3">Service (By Priority)</p>
+                    <div className="grid grid-cols-3 gap-x-3 gap-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded bg-green-100 border border-green-200" />
+                        <span className="text-sm text-slate-700">Low</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded bg-rose-100 border border-rose-200" />
-                        <span className="text-sm text-slate-700">Sales</span>
+                        <div className="w-4 h-4 rounded bg-yellow-100 border border-yellow-200" />
+                        <span className="text-sm text-slate-700">Normal</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded bg-red-100 border border-red-200" />
+                        <span className="text-sm text-slate-700">High</span>
                       </div>
                     </div>
                   </div>
