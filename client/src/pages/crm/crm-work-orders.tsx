@@ -759,10 +759,16 @@ export default function CrmWorkOrders() {
       );
     }
     
+    const now = Date.now();
     return orders.sort((a, b) => {
       const dateA = a.scheduledStart ? new Date(a.scheduledStart).getTime() : 0;
       const dateB = b.scheduledStart ? new Date(b.scheduledStart).getTime() : 0;
-      return dateA - dateB;
+      const aUpcoming = dateA >= now;
+      const bUpcoming = dateB >= now;
+      if (aUpcoming && !bUpcoming) return -1;
+      if (!aUpcoming && bUpcoming) return 1;
+      if (aUpcoming && bUpcoming) return dateA - dateB;
+      return dateB - dateA;
     });
   }, [workOrdersData, activeTab, debouncedSearch, visitTypeFilter]);
 
