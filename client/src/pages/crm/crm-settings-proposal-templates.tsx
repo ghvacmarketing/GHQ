@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import type { CrmUser, ProposalTemplate } from "@shared/schema";
-import RichTextEditor from "@/components/rich-text-editor";
+import ProposalEditor from "@/components/proposal-editor";
 
 const SYSTEM_VARIABLES = [
   { key: "customerName", label: "Customer Name", description: "The customer's full name" },
@@ -322,20 +322,15 @@ export default function CrmSettingsProposalTemplates() {
       </div>
 
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {editingTemplate ? "Edit Template" : "New Template"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
+        <DialogContent className="max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
+          <DialogHeader className="flex-shrink-0 pb-0">
             <div className="flex items-center gap-3">
               <div className="flex-1">
                 <Input
                   value={templateName}
                   onChange={(e) => setTemplateName(e.target.value)}
                   placeholder="Template name..."
-                  className="text-sm"
+                  className="text-sm border-0 border-b rounded-none px-0 font-medium focus-visible:ring-0 focus-visible:border-slate-400"
                 />
               </div>
               <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer whitespace-nowrap">
@@ -348,24 +343,25 @@ export default function CrmSettingsProposalTemplates() {
                 Default
               </label>
             </div>
-
-            <div>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden flex flex-col gap-3 min-h-0">
+            <div className="flex-shrink-0">
               <button
                 onClick={() => setVariableBankOpen(!variableBankOpen)}
-                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700 mb-2"
+                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700"
               >
                 <Braces className="h-3 w-3" />
                 Variables
                 {variableBankOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
               </button>
-              {variableBankOpen && <VariableBank />}
+              {variableBankOpen && <div className="mt-2"><VariableBank /></div>}
             </div>
 
-            <div className="min-h-[400px] border rounded-md">
-              <RichTextEditor value={templateBody} onChange={setTemplateBody} />
+            <div className="flex-1 overflow-y-auto min-h-0">
+              <ProposalEditor value={templateBody} onChange={setTemplateBody} />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0 pt-3 border-t">
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
             <Button
               onClick={handleSave}
