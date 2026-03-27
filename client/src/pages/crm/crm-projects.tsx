@@ -366,7 +366,7 @@ function ProjectCard({ project, onClick, isDragging: isDraggingProp }: ProjectCa
   };
 
   const statusStyle = statusColors[project.status] || statusColors.lead;
-  const priorityStyle = priorityColors[project.priority || "normal"];
+  const priorityStyle = priorityColors[project.priority || "normal"] || priorityColors.normal;
   const showPriority = project.priority === "high";
 
   return (
@@ -1588,7 +1588,7 @@ export default function CrmProjects() {
                       {projects.map((project) => {
                         const status = project.status || "lead";
                         const statusStyle = statusColors[status] || statusColors.lead;
-                        const priorityStyle = priorityColors[project.priority || "normal"];
+                        const priorityStyle = priorityColors[project.priority || "normal"] || priorityColors.normal;
 
                         return (
                           <TableRow
