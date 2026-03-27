@@ -1479,7 +1479,6 @@ function ScheduleRowTimeline({
   useEffect(() => {
     if (!isDragActive) {
       setPreviewLeft(null);
-      onPreviewTimeChange?.(null);
     }
   }, [isDragActive]);
 
