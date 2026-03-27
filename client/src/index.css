@@ -340,7 +340,6 @@ gmp-place-autocomplete::part(input)::placeholder {
 .flipbook-container .stf__parent {
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
-  background-color: #ffffff !important;
 }
 
 .flipbook-container .stf__item {
@@ -350,8 +349,11 @@ gmp-place-autocomplete::part(input)::placeholder {
   background-color: #ffffff !important;
 }
 
-.flipbook-container {
-  background-color: #ffffff !important;
+.flipbook-container .stf__outerShadow,
+.flipbook-container .stf__innerShadow,
+.flipbook-container .stf__hardShadow,
+.flipbook-container .stf__hardInnerShadow {
+  pointer-events: none;
 }
 
 .page-content {

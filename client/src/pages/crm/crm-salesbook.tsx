@@ -471,7 +471,7 @@ export default function CrmSalesbook() {
 
           <div
             ref={containerRef}
-            className="flex-1 overflow-auto flex justify-center items-center"
+            className="flex-1 overflow-auto flex justify-center items-center bg-neutral-600"
           >
             {isLoading || !layoutReady ? (
               <div className="flex flex-col items-center justify-center gap-3">
@@ -506,7 +506,7 @@ export default function CrmSalesbook() {
                   usePortrait={isMobile}
                   startZIndex={0}
                   autoSize={false}
-                  maxShadowOpacity={0.3}
+                  maxShadowOpacity={0.15}
                   showPageCorners={true}
                   disableFlipByClick={true}
                   swipeDistance={50}
