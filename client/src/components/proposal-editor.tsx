@@ -58,9 +58,6 @@ function ResizableImageView({ node, updateAttributes, selected, editor, getPos }
   const handleDragStart = useCallback((e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('.resize-handle')) return;
     if (!editor || typeof getPos !== 'function') return;
-    e.preventDefault();
-    e.stopPropagation();
-    setDragging(true);
 
     const editorEl = editor.view.dom;
     const startY = e.clientY;
@@ -157,6 +154,7 @@ function ResizableImageView({ node, updateAttributes, selected, editor, getPos }
       if (!activated && Math.abs(ev.clientY - startY) < DRAG_THRESHOLD) return;
       if (!activated) {
         activated = true;
+        setDragging(true);
         createIndicator();
         document.body.style.cursor = 'grabbing';
       }
@@ -205,7 +203,7 @@ function ResizableImageView({ node, updateAttributes, selected, editor, getPos }
       <div
         ref={imgRef}
         className={`relative inline-block group ${selected ? 'ring-2 ring-[#711419] ring-offset-2 rounded' : ''} ${dragging ? 'opacity-40' : ''}`}
-        style={{ width: width ? `${width}px` : 'auto', maxWidth: '100%', cursor: dragging ? 'grabbing' : 'grab' }}
+        style={{ width: width ? `${width}px` : 'auto', maxWidth: '100%', cursor: dragging ? 'grabbing' : 'default' }}
         onMouseDown={handleDragStart}
       >
         <img
