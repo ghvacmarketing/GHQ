@@ -86,7 +86,7 @@ export default function CrmNotifications() {
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: !!currentUser && typeFilter === "tagged_comment",
+    enabled: !!currentUser && (typeFilter === "tagged_comment" || typeFilter === "all"),
     refetchInterval: 10000,
   });
 
@@ -138,6 +138,7 @@ export default function CrmNotifications() {
   const hasUnread = notifications.some((n) => !n.isRead);
 
   const showTaggedNotesView = typeFilter === "tagged_comment" && tab === "all";
+  const showTaggedInAll = typeFilter === "all" && tab === "all" && taggedHistory.length > 0;
 
   function buildHighlightUrl(pageRoute: string, commentId: string) {
     const separator = pageRoute.includes("?") ? "&" : "?";
@@ -219,6 +220,21 @@ export default function CrmNotifications() {
           </div>
         )}
 
+        {showTaggedInAll && (
+          <div className="mb-6">
+            <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-amber-500" />
+              Tagged Notes
+              <span className="text-xs font-normal text-slate-400">({taggedHistory.length})</span>
+            </h2>
+            <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 overflow-hidden">
+              {taggedHistory.map((item) => (
+                <TaggedNoteHistoryRow key={`${item.id}-${item.role}`} item={item} currentUserId={currentUser.id} buildUrl={buildHighlightUrl} onDismiss={() => dismissHistoryMut.mutate({ commentId: item.id })} />
+              ))}
+            </div>
+          </div>
+        )}
+
         {!showTaggedNotesView && (
           <>
             {isLoading ? (
@@ -230,7 +246,7 @@ export default function CrmNotifications() {
                   </div>
                 ))}
               </div>
-            ) : notifications.length === 0 ? (
+            ) : notifications.length === 0 && !showTaggedInAll ? (
               <div className="text-center py-20">
                 <Inbox className="h-12 w-12 text-slate-300 mx-auto mb-3" />
                 <p className="text-base font-medium text-slate-600">
@@ -244,7 +260,7 @@ export default function CrmNotifications() {
                     : "Notifications will appear here when tasks are assigned to you."}
                 </p>
               </div>
-            ) : (
+            ) : notifications.length > 0 ? (
               <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 overflow-hidden">
                 {notifications.map((n) => (
                   <NotificationRow
@@ -256,7 +272,7 @@ export default function CrmNotifications() {
                   />
                 ))}
               </div>
-            )}
+            ) : null}
           </>
         )}
       </div>
