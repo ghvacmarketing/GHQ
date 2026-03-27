@@ -99,10 +99,12 @@ function VariableBank({ onInsert }: { onInsert?: (variable: string) => void }) {
 function ImageLibrarySection() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [imageName, setImageName] = useState("");
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [deletingImage, setDeletingImage] = useState<ProposalTemplateImage | null>(null);
-  const [imageLibraryOpen, setImageLibraryOpen] = useState(true);
+  const [showImages, setShowImages] = useState(false);
 
   const { data: images = [] } = useQuery<ProposalTemplateImage[]>({
     queryKey: ["/api/crm/proposal-template-images"],
@@ -126,16 +128,7 @@ function ImageLibrarySection() {
     },
   });
 
-  const handleUpload = useCallback(async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      toast({ title: "Only image files are supported", variant: "destructive" });
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      toast({ title: "Image must be under 10MB", variant: "destructive" });
-      return;
-    }
-
+  const doUpload = useCallback(async (file: File, name: string) => {
     setUploading(true);
     try {
       const res = await apiRequest("POST", "/api/uploads/request-url", {
@@ -144,49 +137,88 @@ function ImageLibrarySection() {
         contentType: file.type,
       });
       const { uploadURL, objectPath } = await res.json();
-
       await fetch(uploadURL, {
         method: "PUT",
         body: file,
         headers: { "Content-Type": file.type },
       });
-
-      const name = imageName.trim() || file.name.replace(/\.[^.]+$/, '');
-      createMutation.mutate({ name, url: objectPath });
+      const finalName = name.trim() || file.name.replace(/\.[^.]+$/, '');
+      createMutation.mutate({ name: finalName, url: objectPath });
       setImageName("");
+      setPendingFile(null);
+      setTimeout(() => fileInputRef.current?.click(), 150);
     } catch (err) {
       toast({ title: "Failed to upload image", variant: "destructive" });
     } finally {
       setUploading(false);
     }
-  }, [imageName, createMutation, toast]);
+  }, [createMutation, toast]);
+
+  const handleFileSelect = useCallback((file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast({ title: "Only image files are supported", variant: "destructive" });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "Image must be under 10MB", variant: "destructive" });
+      return;
+    }
+    setPendingFile(file);
+    setImageName(file.name.replace(/\.[^.]+$/, ''));
+    setTimeout(() => nameInputRef.current?.select(), 50);
+  }, [toast]);
+
+  const handleSave = useCallback(() => {
+    if (!pendingFile) return;
+    doUpload(pendingFile, imageName);
+  }, [pendingFile, imageName, doUpload]);
 
   return (
     <>
       <div className="border rounded-lg bg-white">
-        <button
-          onClick={() => setImageLibraryOpen(!imageLibraryOpen)}
-          className="w-full flex items-center gap-2 px-4 py-3 text-left"
-        >
+        <div className="flex items-center gap-2 px-4 py-3">
           <ImageIcon className="h-4 w-4 text-slate-500" />
           <span className="text-sm font-medium text-slate-700 flex-1">Image Library</span>
-          <span className="text-xs text-slate-400">{images.length} image{images.length !== 1 ? 's' : ''}</span>
-          {imageLibraryOpen ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
-        </button>
 
-        {imageLibraryOpen && (
-          <div className="px-4 pb-4 border-t">
-            <p className="text-xs text-slate-400 mt-3 mb-3">
-              Store frequently used images here. They'll be available in the editor toolbar when building proposals.
-            </p>
-
-            <div className="flex items-center gap-2 mb-3">
+          {pendingFile ? (
+            <div className="flex items-center gap-2">
               <Input
+                ref={nameInputRef}
                 value={imageName}
                 onChange={(e) => setImageName(e.target.value)}
-                placeholder="Image name (optional)"
-                className="text-sm h-8 flex-1"
+                placeholder="Name this image"
+                className="text-sm h-7 w-44"
+                onKeyDown={(e) => e.key === 'Enter' && handleSave()}
               />
+              <Button
+                size="sm"
+                variant="default"
+                className="h-7 text-xs px-3"
+                onClick={handleSave}
+                disabled={uploading}
+              >
+                {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs px-2 text-slate-400"
+                onClick={() => { setPendingFile(null); setImageName(""); }}
+              >
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              {images.length > 0 && (
+                <button
+                  onClick={() => setShowImages(!showImages)}
+                  className="text-xs text-slate-400 hover:text-slate-600 transition-colors flex items-center gap-1"
+                >
+                  {images.length} image{images.length !== 1 ? 's' : ''}
+                  {showImages ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
+              )}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -194,46 +226,41 @@ function ImageLibrarySection() {
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) handleUpload(file);
+                  if (file) handleFileSelect(file);
                   if (fileInputRef.current) fileInputRef.current.value = '';
                 }}
               />
               <Button
                 size="sm"
                 variant="outline"
-                className="h-8 whitespace-nowrap"
+                className="h-7 text-xs"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
               >
-                {uploading ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : <Upload className="h-3 w-3 mr-1.5" />}
-                Upload
+                <Plus className="h-3 w-3 mr-1" />
+                Add Image
               </Button>
             </div>
+          )}
+        </div>
 
-            {images.length === 0 ? (
-              <p className="text-xs text-slate-400 text-center py-4">No images saved yet</p>
-            ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                {images.map((img) => (
-                  <div key={img.id} className="group relative">
-                    <div className="aspect-square rounded border overflow-hidden bg-slate-50">
-                      <img
-                        src={img.url}
-                        alt={img.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <p className="text-[10px] text-slate-500 truncate mt-0.5">{img.name}</p>
-                    <button
-                      onClick={() => setDeletingImage(img)}
-                      className="absolute top-1 right-1 bg-white/90 rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
-                    >
-                      <Trash2 className="h-3 w-3 text-red-400" />
-                    </button>
+        {showImages && images.length > 0 && (
+          <div className="px-4 pb-3 border-t pt-3">
+            <div className="space-y-1">
+              {images.map((img) => (
+                <div key={img.id} className="group flex items-center gap-3 py-1.5 px-2 rounded hover:bg-slate-50 transition-colors">
+                  <div className="w-8 h-8 rounded border overflow-hidden bg-slate-50 flex-shrink-0">
+                    <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
                   </div>
-                ))}
-              </div>
-            )}
+                  <span className="text-sm text-slate-600 flex-1 truncate">{img.name}</span>
+                  <button
+                    onClick={() => setDeletingImage(img)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
