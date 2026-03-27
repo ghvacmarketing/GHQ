@@ -63,11 +63,14 @@ export default function CrmSalesbook() {
     queryKey: ["/api/crm/auth/me"],
   });
   const [currentPage, setCurrentPage] = useState(0);
+  const currentPageRef = useRef(0);
   const [scale, setScale] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [pageInput, setPageInput] = useState("1");
   const [containerSize, setContainerSize] = useState({ w: 800, h: 600 });
+  const [resizing, setResizing] = useState(false);
+  const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
   const flipBookRef = useRef<FlipBookRef>(null);
@@ -114,15 +117,31 @@ export default function CrmSalesbook() {
       }
     };
 
+    const debouncedUpdate = () => {
+      setResizing(true);
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+      resizeTimerRef.current = setTimeout(() => {
+        updateSize();
+        setResizing(false);
+      }, 200);
+    };
+
     const retryInterval = setInterval(updateSize, 100);
-    const observer = new ResizeObserver(updateSize);
+    const observer = new ResizeObserver((entries) => {
+      if (!layoutReady) {
+        updateSize();
+      } else {
+        debouncedUpdate();
+      }
+    });
     if (containerRef.current) observer.observe(containerRef.current);
 
     return () => {
       clearInterval(retryInterval);
       observer.disconnect();
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
     };
-  }, []);
+  }, [layoutReady]);
 
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement);
@@ -132,6 +151,7 @@ export default function CrmSalesbook() {
 
   const onFlip = useCallback((e: { data: number }) => {
     const page = e.data;
+    currentPageRef.current = page;
     setCurrentPage(page);
     setPageInput(String(page + 1));
   }, []);
@@ -328,7 +348,7 @@ export default function CrmSalesbook() {
       <div
         ref={viewerRef}
         className="flex flex-col bg-neutral-900 text-white overflow-hidden rounded-lg"
-        style={{ height: "calc(100vh - 80px)" }}
+        style={{ height: isFullscreen ? "100vh" : "calc(100vh - 80px)" }}
       >
         <div className="flex-shrink-0 bg-neutral-800 border-b border-neutral-700 px-3 py-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -454,7 +474,8 @@ export default function CrmSalesbook() {
               <div style={{
                 transform: `scale(${scale})${!isMobile && (currentPage === 0 || currentPage >= totalPages - 1) ? ` translateX(${currentPage === 0 ? `-${Math.floor(pageW / 2)}px` : `${Math.floor(pageW / 2)}px`})` : ''}`,
                 transformOrigin: 'center center',
-                transition: 'transform 0.15s ease-out',
+                transition: 'transform 0.3s ease-out, opacity 0.2s ease-out',
+                opacity: resizing ? 0 : 1,
               }}>
                 <HTMLFlipBook
                   key={`${pageW}-${pageH}`}
@@ -471,7 +492,7 @@ export default function CrmSalesbook() {
                   mobileScrollSupport={false}
                   onFlip={onFlip}
                   className="flipbook-container"
-                  startPage={0}
+                  startPage={currentPageRef.current}
                   drawShadow={true}
                   flippingTime={400}
                   usePortrait={isMobile}
