@@ -18,10 +18,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import ProposalRichTextEditor from "@/components/proposal-rich-text-editor";
+import ProposalEditor from "@/components/proposal-editor";
 import redlogo from "@assets/redlogo.webp";
 import { generateContractTemplate, applyTemplateVariables } from "@/lib/contract-template";
-import type { ProposalTemplate } from "@shared/schema";
+import type { ProposalTemplate, ProposalTemplateImage } from "@shared/schema";
 
 // ─── Types (mirrored from crm-proposal-builder) ──────────────────────────────
 
@@ -223,6 +223,10 @@ export default function CrmProposalPreview() {
 
   const { data: proposalTemplates = [], isLoading: templatesLoading } = useQuery<ProposalTemplate[]>({
     queryKey: ["/api/crm/proposal-templates"],
+  });
+
+  const { data: libraryImages = [] } = useQuery<ProposalTemplateImage[]>({
+    queryKey: ["/api/crm/proposal-template-images"],
   });
 
   useEffect(() => {
@@ -734,7 +738,7 @@ export default function CrmProposalPreview() {
           </p>
           {!isNavigatingAway && (
             <div className="min-h-[400px]">
-              <ProposalRichTextEditor value={proposalNotes} onChange={setProposalNotes} />
+              <ProposalEditor value={proposalNotes} onChange={setProposalNotes} imageLibrary={libraryImages} />
             </div>
           )}
         </div>
