@@ -1075,7 +1075,7 @@ export const crmJobs = pgTable("crm_jobs", {
   siteId: varchar("site_id").references(() => crmSites.id),
   jobType: text("job_type").notNull(),
   status: text("status").$type<CrmJobStatus>().notNull().default("new"),
-  priority: text("priority").$type<"low" | "normal" | "high" | "urgent">().default("normal"),
+  priority: text("priority").$type<"low" | "normal" | "high">().default("normal"),
   description: text("description"),
   scheduledStart: timestamp("scheduled_start"),
   scheduledEnd: timestamp("scheduled_end"),
@@ -1113,7 +1113,7 @@ export const crmProjects = pgTable("crm_projects", {
   description: text("description"),
   expectedValue: decimal("expected_value", { precision: 10, scale: 2 }),
   actualValue: decimal("actual_value", { precision: 10, scale: 2 }),
-  priority: text("priority").$type<"low" | "normal" | "high" | "urgent">().default("normal"),
+  priority: text("priority").$type<"low" | "normal" | "high">().default("normal"),
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
   equipmentInfo: text("equipment_info"),
@@ -1258,7 +1258,7 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   scheduledStart: timestamp("scheduled_start"),
   scheduledEnd: timestamp("scheduled_end"),
   status: text("status").$type<WorkOrderStatus>().notNull().default("scheduled"),
-  priority: text("priority").$type<"low" | "normal" | "high" | "urgent">().default("normal"),
+  priority: text("priority").$type<"low" | "normal" | "high">().default("normal"),
   dispatchQueueStage: text("dispatch_queue_stage").$type<DispatchQueueStage>(),
   checklist: json("checklist").$type<{ item: string; completed: boolean }[]>(),
   partsUsed: json("parts_used").$type<{ partId: string; name: string; qty: number; price: number }[]>(),
@@ -3262,7 +3262,7 @@ export const taskStatusEnum = ["pending", "in_progress", "completed", "cancelled
 export type TaskStatus = typeof taskStatusEnum[number];
 
 // Task Priority Enum
-export const taskPriorityEnum = ["low", "normal", "high", "urgent"] as const;
+export const taskPriorityEnum = ["low", "normal", "high"] as const;
 export type TaskPriority = typeof taskPriorityEnum[number];
 
 // Task Related Entity Type Enum
@@ -3279,7 +3279,7 @@ export const taskTypes = pgTable("task_types", {
   name: text("name").notNull(),
   icon: text("icon"),
   defaultDurationMinutes: integer("default_duration_minutes"),
-  defaultPriority: text("default_priority").$type<"low" | "normal" | "high" | "urgent">(),
+  defaultPriority: text("default_priority").$type<"low" | "normal" | "high">(),
   isCustomerActionable: boolean("is_customer_actionable").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

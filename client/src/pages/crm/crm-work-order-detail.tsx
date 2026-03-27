@@ -219,8 +219,7 @@ const visitTypeLabels: Record<string, string> = {
 const priorityColors: Record<string, { bg: string; text: string }> = {
   low: { bg: "bg-slate-100", text: "text-slate-600" },
   normal: { bg: "bg-blue-100", text: "text-blue-700" },
-  high: { bg: "bg-orange-100", text: "text-orange-700" },
-  urgent: { bg: "bg-red-100", text: "text-red-700" },
+  high: { bg: "bg-red-100", text: "text-red-700" },
 };
 
 // Generate 30-minute interval time options from 8:00 AM to 8:00 PM

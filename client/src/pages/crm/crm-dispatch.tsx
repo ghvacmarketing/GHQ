@@ -103,7 +103,7 @@ import { CommentComposer } from "@/components/crm/comment-composer";
 import type { CrmUser, CrmWorkOrder, CrmJob, CrmCustomer, CrmProperty, CrmProject, WorkOrderStatus, ChecklistQuestion, ImmediateAction } from "@shared/schema";
 import { workOrderVisitTypeEnum, type WorkOrderVisitType, type WorkSubtype, dispatchQueueStageEnum, type DispatchQueueStage, type WorkOrderSubtype } from "@shared/schema";
 
-const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+const PRIORITIES = ["low", "normal", "high"] as const;
 
 const WORK_SUBTYPE_TO_SERVICE_TYPE: Record<string, string> = {
   "No Heat": "NO_HEAT",
@@ -307,8 +307,8 @@ const statusColors: Record<string, { bg: string; border: string; text: string }>
 const jobTypeColors: Record<string, { bg: string; border: string; text: string }> = {
   SERVICE: { bg: "bg-sky-100", border: "border-sky-200", text: "text-sky-900" },
   MAINTENANCE: { bg: "bg-emerald-100", border: "border-emerald-200", text: "text-emerald-900" },
-  INSTALL: { bg: "bg-amber-100", border: "border-amber-200", text: "text-amber-900" },
-  SALES: { bg: "bg-rose-100", border: "border-rose-200", text: "text-rose-900" },
+  INSTALL: { bg: "bg-blue-100", border: "border-blue-200", text: "text-blue-900" },
+  SALES: { bg: "bg-indigo-100", border: "border-indigo-200", text: "text-indigo-900" },
 };
 
 const statusStripeColors: Record<string, string> = {
@@ -321,8 +321,7 @@ const statusStripeColors: Record<string, string> = {
 };
 
 const priorityBadgeColors: Record<string, { bg: string; text: string; border: string }> = {
-  urgent: { bg: "bg-red-500", text: "text-white", border: "border-red-600" },
-  high: { bg: "bg-orange-500", text: "text-white", border: "border-orange-600" },
+  high: { bg: "bg-red-500", text: "text-white", border: "border-red-600" },
   normal: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
   low: { bg: "bg-gray-100", text: "text-gray-600", border: "border-gray-300" },
 };
@@ -353,6 +352,13 @@ const statusHeaderColors: Record<string, string> = {
   on_site: "bg-emerald-600 text-white",
   completed: "bg-slate-600 text-white",
   cancelled: "bg-rose-700 text-white",
+};
+
+const visitTypeHeaderColors: Record<string, string> = {
+  SERVICE: "bg-sky-600 text-white",
+  INSTALL: "bg-blue-700 text-white",
+  MAINTENANCE: "bg-emerald-700 text-white",
+  SALES: "bg-indigo-600 text-white",
 };
 
 const statusSquircleColors: Record<string, string> = {
@@ -607,10 +613,10 @@ function getWorkOrderDurationHours(workOrder: DispatchWorkOrder): number {
 }
 
 const scheduleVisitTypeColors: Record<string, string> = {
-  SERVICE: "bg-blue-100",
-  INSTALL: "bg-yellow-100",
-  MAINTENANCE: "bg-green-100",
-  SALES: "bg-pink-100",
+  SERVICE: "bg-sky-100",
+  INSTALL: "bg-blue-100",
+  MAINTENANCE: "bg-emerald-100",
+  SALES: "bg-indigo-100",
 };
 
 const scheduleStatusStripes: Record<string, string> = {
@@ -1623,7 +1629,9 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                         const leftPercent = getScheduleLeftPercent(startDate);
                         const widthPercent = getScheduleWidthPercent(startDate, endDate);
                         const visitType = wo.visitType || "SERVICE";
-                        const bgColor = scheduleVisitTypeColors[visitType] || scheduleVisitTypeColors.SERVICE;
+                        const bgColor = visitType === "SERVICE"
+                          ? (wo.priority === "high" ? "bg-red-100" : wo.priority === "low" ? "bg-green-100" : "bg-yellow-100")
+                          : (scheduleVisitTypeColors[visitType] || scheduleVisitTypeColors.SERVICE);
                         const statusStripe = scheduleStatusStripes[wo.status] || scheduleStatusStripes.scheduled;
 
                         const startMinutesFrom8 = (startDate.getHours() - SCHEDULE_START_HOUR) * 60 + startDate.getMinutes();
@@ -4157,11 +4165,15 @@ export default function CrmDispatch() {
         {/* Side Panel - Push Layout */}
         {selectedWorkOrder && (
           <div className="w-[400px] flex-shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-hidden shadow-lg" data-testid="workorder-detail-panel">
-            {/* Panel Header — color reflects work order status */}
-            <div className={`flex items-center justify-between px-4 py-3 flex-shrink-0 ${statusHeaderColors[selectedWorkOrder.status] || "bg-slate-600 text-white"}`}>
+            {/* Panel Header — color reflects visit type */}
+            <div className={`flex items-center justify-between px-4 py-3 flex-shrink-0 ${
+              (selectedWorkOrder.visitType || "SERVICE") === "SERVICE"
+                ? (selectedWorkOrder.priority === "high" ? "bg-red-600 text-white" : selectedWorkOrder.priority === "low" ? "bg-green-600 text-white" : "bg-yellow-500 text-white")
+                : (visitTypeHeaderColors[selectedWorkOrder.visitType || "SERVICE"] || "bg-slate-600 text-white")
+            }`}>
               <div>
                 <h2 className="text-sm font-semibold" data-testid="panel-workorder-title">Work Order: {selectedWorkOrder.workOrderNumber}</h2>
-                <p className="text-xs opacity-80">{statusLabels[selectedWorkOrder.status] || selectedWorkOrder.status}</p>
+                <p className="text-xs opacity-80">{visitTypeLabels[selectedWorkOrder.visitType || "SERVICE"] || selectedWorkOrder.visitType}</p>
               </div>
               <button
                 onClick={() => setSelectedWorkOrderId(null)}
@@ -4202,7 +4214,7 @@ export default function CrmDispatch() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-500">Priority</span>
                       <Badge 
-                        variant={selectedWorkOrder.priority === "urgent" ? "destructive" : selectedWorkOrder.priority === "high" ? "default" : "secondary"}
+                        variant={selectedWorkOrder.priority === "high" ? "destructive" : "secondary"}
                         data-testid="badge-priority"
                       >
                         {selectedWorkOrder.priority || "normal"}

@@ -200,11 +200,10 @@ const priorityColors: Record<string, { bg: string; text: string; border: string 
   low: { bg: "bg-slate-100", text: "text-slate-600", border: "border-slate-200" },
   normal: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
   high: { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-200" },
-  urgent: { bg: "bg-red-100", text: "text-red-700", border: "border-red-200" },
 };
 
 const PROJECT_TYPES = ["INSTALL", "DUCT", "COMMERCIAL", "CRAWLSPACE", "MAJOR_REPAIR"] as const;
-const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+const PRIORITIES = ["low", "normal", "high"] as const;
 
 type ProjectStatus = "lead" | "proposal_sent" | "approved" | "in_progress" | "completed";
 const KANBAN_STAGES: ProjectStatus[] = ["lead", "proposal_sent", "approved", "in_progress", "completed"];
@@ -368,7 +367,7 @@ function ProjectCard({ project, onClick, isDragging: isDraggingProp }: ProjectCa
 
   const statusStyle = statusColors[project.status] || statusColors.lead;
   const priorityStyle = priorityColors[project.priority || "normal"];
-  const showPriority = project.priority === "high" || project.priority === "urgent";
+  const showPriority = project.priority === "high";
 
   return (
     <Card

@@ -5226,7 +5226,6 @@ export default function CrmQuoteDetail() {
                     <SelectItem value="low">Low</SelectItem>
                     <SelectItem value="normal">Normal</SelectItem>
                     <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -5315,7 +5314,7 @@ export default function CrmQuoteDetail() {
               <div className="flex flex-col items-start text-left">
                 <span className="font-semibold">Parts Needed</span>
                 <span className="text-sm text-muted-foreground font-normal">
-                  Create urgent work order in the Parts Needed queue
+                  Create high-priority work order in the Parts Needed queue
                 </span>
               </div>
             </Button>

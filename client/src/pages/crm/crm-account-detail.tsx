@@ -69,7 +69,7 @@ const CONTACT_ROLES: ContactRole[] = [
 ];
 
 const JOB_TYPES = ["SERVICE", "INSTALL", "MAINTENANCE", "SALES"] as const;
-const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+const PRIORITIES = ["low", "normal", "high"] as const;
 
 const statusColors: Record<string, { bg: string; text: string }> = {
   new: { bg: "bg-slate-100", text: "text-slate-700" },

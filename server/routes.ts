@@ -308,7 +308,7 @@ async function createFollowUpWorkOrder(
     title: `Follow-up: ${quote.title || quote.quoteNumber}`,
     description: quote.description || `Follow-up work order for accepted quote ${quote.quoteNumber}`,
     status: "scheduled",
-    priority: "urgent",
+    priority: "high",
     dispatchQueueStage: options.dispatchQueueStage,
   }).returning();
 

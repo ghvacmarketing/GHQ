@@ -79,7 +79,7 @@ const taskFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   status: z.enum(["pending", "in_progress", "completed", "cancelled"]),
-  priority: z.enum(["low", "normal", "high", "urgent"]),
+  priority: z.enum(["low", "normal", "high"]),
   typeId: z.string().optional(),
   assignedToUserId: z.string().optional(),
   dueAt: z.date().optional().nullable().refine(
@@ -111,8 +111,7 @@ type TasksResponse = {
 };
 
 const priorityIndicatorColors: Record<TaskPriority, string> = {
-  urgent: "bg-red-500",
-  high: "bg-orange-500",
+  high: "bg-red-500",
   normal: "bg-gray-400",
   low: "bg-blue-500",
 };
@@ -559,7 +558,7 @@ export default function CrmMyTasks() {
     };
 
     const sortByPriority = (a: TaskWithRelations, b: TaskWithRelations) => {
-      const priorityOrder: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
+      const priorityOrder: Record<string, number> = { high: 0, normal: 1, low: 2 };
       return (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2);
     };
 

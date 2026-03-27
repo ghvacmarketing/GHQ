@@ -78,7 +78,7 @@ type TasksResponse = {
 const taskFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
-  priority: z.enum(["low", "normal", "high", "urgent"]),
+  priority: z.enum(["low", "normal", "high"]),
   typeId: z.string().optional(),
   assignedToUserId: z.string().optional(),
   dueAt: z.date().optional().nullable().refine(
@@ -109,15 +109,13 @@ const statusColors: Record<TaskStatus, string> = {
 };
 
 const priorityLabels: Record<TaskPriority, string> = {
-  urgent: "Urgent",
   high: "High",
   normal: "Normal",
   low: "Low",
 };
 
 const priorityColors: Record<TaskPriority, string> = {
-  urgent: "bg-red-100 text-red-700 border-red-200",
-  high: "bg-orange-100 text-orange-700 border-orange-200",
+  high: "bg-red-100 text-red-700 border-red-200",
   normal: "bg-gray-100 text-gray-600 border-gray-200",
   low: "bg-blue-100 text-blue-700 border-blue-200",
 };
@@ -485,7 +483,6 @@ export function EntityTasksTab({ entityType, entityId, customerId, customerName 
                           <SelectItem value="low">Low</SelectItem>
                           <SelectItem value="normal">Normal</SelectItem>
                           <SelectItem value="high">High</SelectItem>
-                          <SelectItem value="urgent">Urgent</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />

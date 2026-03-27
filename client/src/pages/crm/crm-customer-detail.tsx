@@ -91,7 +91,7 @@ import { format, formatDistanceToNow, differenceInCalendarDays } from "date-fns"
 import { cn } from "@/lib/utils";
 
 const JOB_TYPES = ["SERVICE", "INSTALL", "MAINTENANCE", "SALES"] as const;
-const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+const PRIORITIES = ["low", "normal", "high"] as const;
 
 type DispatchResponse = {
   technicians: Array<{
@@ -122,7 +122,6 @@ const priorityColors: Record<string, { bg: string; text: string }> = {
   low: { bg: "bg-slate-100", text: "text-slate-600" },
   normal: { bg: "bg-blue-100", text: "text-blue-600" },
   high: { bg: "bg-amber-100", text: "text-amber-600" },
-  urgent: { bg: "bg-red-100", text: "text-red-600" },
 };
 
 const workOrderStatusColors: Record<string, { bg: string; text: string; border: string }> = {

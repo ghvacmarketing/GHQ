@@ -80,7 +80,7 @@ import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, isToday, isThisWe
 import { createLocalDateTime, formatLocalDateTime } from "@/lib/timezone";
 import type { CrmUser, CrmWorkOrder, CrmJob, CrmCustomer, CrmProperty, CrmProject } from "@shared/schema";
 
-const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+const PRIORITIES = ["low", "normal", "high"] as const;
 
 const WORK_SUBTYPE_TO_SERVICE_TYPE: Record<string, string> = {
   "No Heat": "NO_HEAT",
@@ -177,17 +177,16 @@ const visitTypeLabels: Record<string, string> = {
 };
 
 const visitTypeColors: Record<string, { bg: string; text: string }> = {
-  SERVICE: { bg: "bg-blue-50", text: "text-blue-700" },
-  INSTALL: { bg: "bg-green-50", text: "text-green-700" },
-  MAINTENANCE: { bg: "bg-amber-50", text: "text-amber-700" },
-  SALES: { bg: "bg-purple-50", text: "text-purple-700" },
+  SERVICE: { bg: "bg-sky-50", text: "text-sky-700" },
+  INSTALL: { bg: "bg-blue-50", text: "text-blue-700" },
+  MAINTENANCE: { bg: "bg-emerald-50", text: "text-emerald-700" },
+  SALES: { bg: "bg-indigo-50", text: "text-indigo-700" },
 };
 
 const priorityColors: Record<string, { bg: string; text: string }> = {
   low: { bg: "bg-slate-100", text: "text-slate-600" },
   normal: { bg: "bg-blue-100", text: "text-blue-700" },
   high: { bg: "bg-orange-100", text: "text-orange-700" },
-  urgent: { bg: "bg-red-100", text: "text-red-700" },
 };
 
 type FilterTab = "all" | "scheduled" | "in_progress" | "completed" | "ready_to_invoice" | "invoiced" | "closed" | "cancelled" | "unassigned";

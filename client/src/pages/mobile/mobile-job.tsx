@@ -45,8 +45,8 @@ const statusLabels: Record<string, string> = {
 const jobTypeColors: Record<string, { bg: string; border: string; text: string }> = {
   SERVICE: { bg: "bg-sky-100", border: "border-sky-200", text: "text-sky-900" },
   MAINTENANCE: { bg: "bg-emerald-100", border: "border-emerald-200", text: "text-emerald-900" },
-  INSTALL: { bg: "bg-amber-100", border: "border-amber-200", text: "text-amber-900" },
-  SALES: { bg: "bg-rose-100", border: "border-rose-200", text: "text-rose-900" },
+  INSTALL: { bg: "bg-blue-100", border: "border-blue-200", text: "text-blue-900" },
+  SALES: { bg: "bg-indigo-100", border: "border-indigo-200", text: "text-indigo-900" },
 };
 
 function getJobTypeColor(jobType: string | null | undefined): { bg: string; border: string; text: string } {
@@ -529,13 +529,8 @@ export default function MobileJob() {
                                     {job.workSubtype && ` - ${formatSubtype(job.workSubtype)}`}
                                   </span>
                                 )}
-                                {job.priority === "urgent" && (
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500 text-white border border-red-600">
-                                    Urgent
-                                  </span>
-                                )}
                                 {job.priority === "high" && (
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-500 text-white border border-orange-600">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500 text-white border border-red-600">
                                     High Priority
                                   </span>
                                 )}
@@ -614,13 +609,8 @@ export default function MobileJob() {
                               {job.workSubtype && ` - ${formatSubtype(job.workSubtype)}`}
                             </span>
                           )}
-                          {job.priority === "urgent" && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500 text-white border border-red-600">
-                              Urgent
-                            </span>
-                          )}
                           {job.priority === "high" && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-500 text-white border border-orange-600">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500 text-white border border-red-600">
                               High Priority
                             </span>
                           )}
@@ -811,9 +801,9 @@ export default function MobileJob() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
                   <SelectItem value="normal">Normal</SelectItem>
                   <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
                 </SelectContent>
               </Select>
             </div>
