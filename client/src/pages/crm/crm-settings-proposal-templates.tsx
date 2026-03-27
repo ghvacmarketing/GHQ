@@ -412,11 +412,17 @@ export default function CrmSettingsProposalTemplates() {
     <CrmLayout currentUser={currentUser}>
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
-          <Link href="/crm/settings">
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+          {isEditing ? (
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleCancel}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
-          </Link>
+          ) : (
+            <Link href="/crm/settings">
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+          )}
           <div className="flex-1">
             <h1 className="text-xl font-semibold text-slate-800">Proposal Templates</h1>
           </div>
