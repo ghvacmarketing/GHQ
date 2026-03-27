@@ -27,12 +27,12 @@ PageWrapper.displayName = "PageWrapper";
 
 export const StaticPageImage = forwardRef<HTMLDivElement, { src: string; pageNum: number }>(
   ({ src, pageNum }, ref) => (
-    <div ref={ref} className="page-content">
+    <div ref={ref} className="page-content" style={{ background: "#ffffff" }}>
       <img
         src={src}
         alt={`Page ${pageNum}`}
-        style={{ width: "100%", height: "100%", objectFit: "contain" }}
-        loading="lazy"
+        style={{ width: "100%", height: "100%", objectFit: "contain", background: "#ffffff" }}
+        loading="eager"
       />
     </div>
   )

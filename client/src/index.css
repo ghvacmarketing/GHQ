@@ -346,10 +346,12 @@ gmp-place-autocomplete::part(input)::placeholder {
   will-change: transform;
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
+  background-color: #ffffff !important;
 }
 
 .page-content {
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
   transform: translateZ(0);
+  background-color: #ffffff;
 }
