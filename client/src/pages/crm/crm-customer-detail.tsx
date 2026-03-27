@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, useParams, useSearch, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -66,6 +66,8 @@ import {
   Search,
   ChevronRight,
   Info,
+  Upload,
+  ImageIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -693,9 +695,280 @@ const visitStatusColors: Record<string, { bg: string; text: string }> = {
   cancelled: { bg: "bg-red-100", text: "text-red-700" },
 };
 
+interface CustomerFileData {
+  id: string;
+  customerId: string;
+  name: string;
+  url: string;
+  objectPath?: string | null;
+  contentType?: string | null;
+  size?: number | null;
+  uploadedBy?: string | null;
+  createdAt?: string | null;
+}
+
+function CustomerFilesTab({ customerId }: { customerId: string }) {
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [viewImage, setViewImage] = useState<string | null>(null);
+  const [deleteFileId, setDeleteFileId] = useState<string | null>(null);
+
+  const { data: files = [], isLoading } = useQuery<CustomerFileData[]>({
+    queryKey: ['/api/crm/customers', customerId, 'files'],
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (fileId: string) => {
+      await apiRequest("DELETE", `/api/crm/customers/${customerId}/files/${fileId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/customers', customerId, 'files'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/customers', customerId, 'timeline'] });
+      setDeleteFileId(null);
+      toast({ title: "File deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete file", variant: "destructive" });
+    },
+  });
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files;
+    if (!selectedFiles || selectedFiles.length === 0) return;
+
+    setUploading(true);
+    try {
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+
+        const presignRes = await apiRequest("POST", "/api/uploads/request-url", {
+          name: file.name,
+          size: file.size,
+          contentType: file.type,
+        });
+        const { uploadURL, objectPath } = await presignRes.json();
+
+        await fetch(uploadURL, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type },
+        });
+
+        const fileUrl = `/objects/${objectPath}`;
+        await apiRequest("POST", `/api/crm/customers/${customerId}/files`, {
+          name: file.name,
+          url: fileUrl,
+          objectPath,
+          contentType: file.type,
+          size: file.size,
+        });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/customers', customerId, 'files'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/customers', customerId, 'timeline'] });
+      toast({ title: `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} uploaded` });
+    } catch (err) {
+      console.error("Upload error:", err);
+      toast({ title: "Upload failed", variant: "destructive" });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const images = files.filter(f => f.contentType?.startsWith('image/'));
+  const docs = files.filter(f => !f.contentType?.startsWith('image/'));
+
+  const formatSize = (bytes?: number | null) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  return (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={handleUpload}
+        accept="image/jpeg,image/png,image/gif,image/webp,.pdf,.doc,.docx,.xlsx"
+      />
+
+      <Card data-testid="card-files">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-[#711419]" />
+            Files & Photos
+            {files.length > 0 && (
+              <Badge variant="secondary" className="ml-1">{files.length}</Badge>
+            )}
+          </CardTitle>
+          <Button
+            size="sm"
+            className="bg-[#711419] hover:bg-[#5a1014] text-white"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            data-testid="button-upload-file"
+          >
+            {uploading ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Upload className="h-4 w-4 mr-1" />
+            )}
+            {uploading ? "Uploading..." : "Upload File"}
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map(i => (
+                <Skeleton key={i} className="h-32 rounded-lg" />
+              ))}
+            </div>
+          ) : files.length === 0 ? (
+            <div className="text-center py-8">
+              <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 mb-2">No files or photos yet</p>
+              <p className="text-sm text-slate-400">
+                Upload documents, photos, and other files related to this customer.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {images.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-1.5">
+                    <ImageIcon className="h-4 w-4" />
+                    Photos ({images.length})
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {images.map(file => (
+                      <div key={file.id} className="group relative rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                        <img
+                          src={file.url}
+                          alt={file.name}
+                          className="w-full h-32 object-cover cursor-pointer"
+                          onClick={() => setViewImage(file.url)}
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                          <button
+                            className="p-1.5 bg-white rounded-full shadow"
+                            onClick={() => setViewImage(file.url)}
+                          >
+                            <Eye className="h-4 w-4 text-slate-700" />
+                          </button>
+                          <a
+                            href={file.url}
+                            download={file.name}
+                            className="p-1.5 bg-white rounded-full shadow"
+                          >
+                            <Download className="h-4 w-4 text-slate-700" />
+                          </a>
+                          <button
+                            className="p-1.5 bg-white rounded-full shadow"
+                            onClick={() => setDeleteFileId(file.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </button>
+                        </div>
+                        <div className="p-2">
+                          <p className="text-xs text-slate-600 truncate">{file.name}</p>
+                          {file.size && (
+                            <p className="text-xs text-slate-400">{formatSize(file.size)}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {docs.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-1.5">
+                    <FileText className="h-4 w-4" />
+                    Documents ({docs.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {docs.map(file => (
+                      <div key={file.id} className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 group">
+                        <div className="p-2 bg-slate-100 rounded">
+                          <FileText className="h-5 w-5 text-slate-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-700 truncate">{file.name}</p>
+                          <p className="text-xs text-slate-400">
+                            {formatSize(file.size)}
+                            {file.createdAt && ` · ${new Date(file.createdAt).toLocaleDateString()}`}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <a
+                            href={file.url}
+                            download={file.name}
+                            className="p-1.5 hover:bg-slate-100 rounded"
+                          >
+                            <Download className="h-4 w-4 text-slate-500" />
+                          </a>
+                          <button
+                            className="p-1.5 hover:bg-red-50 rounded"
+                            onClick={() => setDeleteFileId(file.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {viewImage && (
+        <Dialog open={!!viewImage} onOpenChange={() => setViewImage(null)}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Photo Preview</DialogTitle>
+            </DialogHeader>
+            <img src={viewImage} alt="Preview" className="w-full h-auto rounded-lg" />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      <Dialog open={!!deleteFileId} onOpenChange={() => setDeleteFileId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete File</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this file? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteFileId(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={() => deleteFileId && deleteMutation.mutate(deleteFileId)}
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 interface TimelineEntry {
   id: string;
-  type: 'work_order' | 'project' | 'agreement' | 'quote' | 'invoice' | 'note' | 'payment';
+  type: 'work_order' | 'project' | 'agreement' | 'quote' | 'invoice' | 'note' | 'payment' | 'file';
   title: string;
   description: string;
   timestamp: string;
@@ -704,6 +977,8 @@ interface TimelineEntry {
   linkUrl?: string;
   signatureImage?: string;
   signerName?: string;
+  fileUrl?: string;
+  contentType?: string;
 }
 
 const timelineTypeConfig: Record<TimelineEntry['type'], { icon: any; bgColor: string; textColor: string; borderColor: string; label: string }> = {
@@ -714,11 +989,12 @@ const timelineTypeConfig: Record<TimelineEntry['type'], { icon: any; bgColor: st
   invoice: { icon: Receipt, bgColor: "bg-slate-100", textColor: "text-slate-700", borderColor: "border-slate-200", label: "Invoice" },
   note: { icon: MessageSquare, bgColor: "bg-gray-100", textColor: "text-gray-700", borderColor: "border-gray-200", label: "Note" },
   payment: { icon: DollarSign, bgColor: "bg-emerald-100", textColor: "text-emerald-700", borderColor: "border-emerald-200", label: "Payment" },
+  file: { icon: Upload, bgColor: "bg-teal-100", textColor: "text-teal-700", borderColor: "border-teal-200", label: "File" },
 };
 
 function TimelineTabContent({ customerId }: { customerId: string }) {
   const [, navigate] = useLocation();
-  const allTypes: TimelineEntry['type'][] = ['work_order', 'project', 'agreement', 'quote', 'invoice', 'note', 'payment'];
+  const allTypes: TimelineEntry['type'][] = ['work_order', 'project', 'agreement', 'quote', 'invoice', 'note', 'payment', 'file'];
   const [activeFilters, setActiveFilters] = useState<Set<TimelineEntry['type']>>(() => new Set(allTypes));
   
   const { data: timeline, isLoading, isError, error } = useQuery<TimelineEntry[]>({
@@ -939,6 +1215,29 @@ function TimelineTabContent({ customerId }: { customerId: string }) {
                                   className="h-12 w-auto max-w-[200px] object-contain"
                                 />
                               </div>
+                            </div>
+                          )}
+                          {entry.type === 'file' && entry.fileUrl && (
+                            <div className="mt-2">
+                              {entry.contentType?.startsWith('image/') ? (
+                                <a href={entry.fileUrl} target="_blank" rel="noopener noreferrer">
+                                  <img
+                                    src={entry.fileUrl}
+                                    alt={entry.description}
+                                    className="h-20 w-auto max-w-[200px] object-cover rounded-md border border-slate-200"
+                                  />
+                                </a>
+                              ) : (
+                                <a
+                                  href={entry.fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-sm text-[#711419] hover:underline"
+                                >
+                                  <Download className="h-3 w-3" />
+                                  Download
+                                </a>
+                              )}
                             </div>
                           )}
                         </div>
@@ -2507,33 +2806,9 @@ function CustomerTabbedView({
         </Card>
       </TabsContent>
 
-      {/* Files / Photos Tab - Placeholder */}
+      {/* Files / Photos Tab */}
       <TabsContent value="files" className="space-y-6" data-testid="tab-content-files">
-        <Card data-testid="card-files">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-[#711419]" />
-              Files & Photos
-            </CardTitle>
-            <Button 
-              size="sm"
-              className="bg-[#711419] hover:bg-[#5a1014] text-white"
-              data-testid="button-upload-file"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Upload File
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-8">
-              <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 mb-2">No files or photos yet</p>
-              <p className="text-sm text-slate-400">
-                Upload documents, photos, and other files related to this customer.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <CustomerFilesTab customerId={customer.id} />
       </TabsContent>
 
       {/* Tasks Tab */}

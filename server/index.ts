@@ -213,6 +213,20 @@ async function runProposalTemplateMigrations() {
         created_at timestamp DEFAULT now()
       )
     `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS customer_files (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        customer_id varchar NOT NULL,
+        name text NOT NULL,
+        url text NOT NULL,
+        object_path text,
+        content_type text,
+        size integer,
+        uploaded_by varchar,
+        created_at timestamp DEFAULT now()
+      )
+    `);
   } catch (err) {
     console.error("Proposal template migration error (non-fatal):", err);
   }
