@@ -290,47 +290,6 @@ const createRestrictToContainerModifier = (containerRef: React.RefObject<HTMLDiv
   };
 };
 
-const createTimelineSnapModifier = (
-  techTimelineNodesRef: React.MutableRefObject<Record<string, HTMLElement>>,
-  dragClickHourOffsetRef: React.MutableRefObject<number>,
-  lastPointerXRef: React.MutableRefObject<number>,
-  getDurationHours: () => number,
-): Modifier => {
-  return ({ transform, draggingNodeRect }) => {
-    if (!draggingNodeRect) return transform;
-
-    const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
-    const cardCenterY = draggingNodeRect.top + transform.y + draggingNodeRect.height / 2;
-
-    let closestTimeline: HTMLElement | null = null;
-    let closestDist = Infinity;
-    for (const node of Object.values(techTimelineNodesRef.current)) {
-      const rect = node.getBoundingClientRect();
-      const dist = Math.abs(cardCenterY - (rect.top + rect.height / 2));
-      if (dist < closestDist) {
-        closestDist = dist;
-        closestTimeline = node;
-      }
-    }
-
-    if (!closestTimeline || closestDist > 120) return transform;
-
-    const tlRect = closestTimeline.getBoundingClientRect();
-    if (tlRect.width <= 0) return transform;
-
-    const duration = getDurationHours();
-    const snappedHourOffset = computeDropHourOffset(
-      lastPointerXRef.current, tlRect, dragClickHourOffsetRef.current, duration,
-    );
-    const snappedX = tlRect.left + (snappedHourOffset / totalHours) * tlRect.width;
-
-    return {
-      ...transform,
-      x: snappedX - draggingNodeRect.left,
-    };
-  };
-};
-
 const statusColors: Record<string, { bg: string; border: string; text: string }> = {
   scheduled: { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700" },
   dispatched: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" },
@@ -1571,13 +1530,13 @@ function ScheduleRowTimeline({
           container. */}
       {isDragActive && previewLeft !== null && (
         <div
-          className="absolute top-1 bottom-1 bg-[#711419]/15 border-2 border-dashed border-[#711419]/40 rounded-md pointer-events-none z-[5]"
+          className="absolute top-1 bottom-1 bg-[#711419]/20 border-2 border-solid border-[#711419]/60 rounded-md pointer-events-none z-[5] shadow-sm"
           style={{ left: `${previewLeft}%`, width: `${previewWidthPercent}%` }}
         >
-          <div className="text-[10px] text-[#711419]/80 font-semibold text-center mt-1">
+          <div className="text-[11px] text-[#711419] font-bold text-center mt-1">
             {formatPreviewTime(previewStartHour)}
           </div>
-          <div className="text-[9px] text-[#711419]/50 text-center">
+          <div className="text-[10px] text-[#711419]/70 font-medium text-center">
             {formatPreviewTime(previewStartHour + previewDurationHours)}
           </div>
         </div>
@@ -3770,14 +3729,8 @@ export default function CrmDispatch() {
 
   const combinedModifiers = useMemo(() => {
     const restrictModifier = createRestrictToContainerModifier(dispatchBoardRef);
-    const snapModifier = createTimelineSnapModifier(
-      techTimelineNodesRef,
-      dragClickHourOffsetRef,
-      lastPointerXRef,
-      () => activeDragDurationHours,
-    );
-    return [restrictModifier, snapModifier];
-  }, [activeDragDurationHours]);
+    return [restrictModifier];
+  }, []);
 
   const unassignedWorkOrders = useMemo(() => {
     const filtered = localWorkOrders.filter(wo => !wo.assignedTechId || !wo.scheduledStart);
