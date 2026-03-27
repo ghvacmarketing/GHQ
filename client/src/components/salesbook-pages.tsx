@@ -1016,6 +1016,265 @@ export const CrawlspaceExamplePage = forwardRef<HTMLDivElement, object>((_, ref)
 ));
 CrawlspaceExamplePage.displayName = "CrawlspaceExamplePage";
 
+interface CrawlspaceEliteBundle {
+  name: string;
+  price: number;
+  description: string;
+  benefits: string[];
+  notCovered?: string[];
+}
+
+const CRAWLSPACE_ELITE_BUNDLES: CrawlspaceEliteBundle[] = [
+  {
+    name: "10-Year Maintenance & Inspection",
+    price: 2290,
+    description: "1 visit per year for 10 years",
+    benefits: [
+      "Full crawlspace visual inspection (liner, seams, walls, pillars)",
+      "Check dehumidifier operation + clean/replace filter",
+      "Measure humidity/temperature and log readings",
+      "Inspect sump/drainage + discharge line (if present)",
+      "Check for standing water, leaks, or new moisture intrusion",
+      "Minor reseal/tape touch-ups (as needed)",
+    ],
+  },
+  {
+    name: "10-Year Dehumidifier Warranty",
+    price: 800,
+    description: "Parts + labor coverage for dehumidifier",
+    benefits: [
+      "Parts coverage follows manufacturer terms",
+      "Labor coverage included for 10 years",
+      "Drain line clogs/maintenance issues covered on yearly plan",
+    ],
+    notCovered: [
+      "Flooding, plumbing leaks left unresolved",
+      "Pest damage, homeowner/third-party damage",
+      "Structural movement beyond normal settling",
+    ],
+  },
+];
+
+const CRAWLSPACE_ELITE_TOTAL = CRAWLSPACE_ELITE_BUNDLES.reduce((s, b) => s + b.price, 0);
+
+export const CrawlspaceElitePage = forwardRef<HTMLDivElement, object>((_, ref) => (
+  <PageWrapper ref={ref}>
+    <div style={{
+      background: BRAND_COLOR,
+      padding: "12px 20px",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+    }}>
+      <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>Crawlspace Elite Package</div>
+      <div style={{ color: "rgba(255,215,0,0.8)", fontSize: 11, fontWeight: 600 }}>20% Bundle Discount</div>
+    </div>
+
+    <div style={{ flex: 1, padding: "14px 20px", overflow: "hidden" }}>
+      <div style={{
+        background: "linear-gradient(135deg, #fef9e7 0%, #fdf2d1 100%)",
+        border: "2px solid #e8c84a",
+        borderRadius: 10,
+        padding: "12px 16px",
+        marginBottom: 14,
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#7a5c00", marginBottom: 2 }}>
+          Protect Your Crawlspace Investment
+        </div>
+        <div style={{ fontSize: 10, color: "#6b5000", lineHeight: 1.5 }}>
+          Add the Elite Package to any crawlspace encapsulation and receive a <b>20% discount</b> on the total project. Includes long-term maintenance coverage and dehumidifier warranty for complete peace of mind.
+        </div>
+      </div>
+
+      {CRAWLSPACE_ELITE_BUNDLES.map((bundle, idx) => (
+        <div key={idx} style={{
+          border: "1px solid #e0e0e0",
+          borderRadius: 8,
+          marginBottom: 12,
+          overflow: "hidden",
+        }}>
+          <div style={{
+            padding: "8px 14px",
+            background: "#fafafa",
+            borderBottom: "1px solid #eee",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 12, color: "#111" }}>{bundle.name}</div>
+              <div style={{ fontSize: 9, color: "#888" }}>{bundle.description}</div>
+            </div>
+            <div style={{
+              background: BRAND_COLOR,
+              color: "#fff",
+              padding: "3px 10px",
+              borderRadius: 12,
+              fontSize: 12,
+              fontWeight: 700,
+            }}>
+              ${bundle.price.toLocaleString()}
+            </div>
+          </div>
+          <div style={{ padding: "8px 14px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3 }}>
+              {bundle.benefits.map((b, i) => (
+                <div key={i} style={{ fontSize: 9, color: "#15803d", display: "flex", alignItems: "flex-start", gap: 3 }}>
+                  <span style={{ color: "#22c55e", fontWeight: 700, flexShrink: 0, marginTop: 1 }}>✓</span>
+                  <span>{b}</span>
+                </div>
+              ))}
+            </div>
+            {bundle.notCovered && bundle.notCovered.length > 0 && (
+              <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px solid #f0f0f0" }}>
+                <div style={{ fontSize: 9, fontWeight: 600, color: "#dc2626", marginBottom: 3 }}>Not Covered:</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3 }}>
+                  {bundle.notCovered.map((item, i) => (
+                    <div key={i} style={{ fontSize: 9, color: "#888", display: "flex", alignItems: "flex-start", gap: 3 }}>
+                      <span style={{ color: "#dc2626", fontWeight: 700, flexShrink: 0, marginTop: 1 }}>✕</span>
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+
+      <div style={{
+        background: "#f8f8f8",
+        border: "1px solid #e0e0e0",
+        borderRadius: 8,
+        padding: "10px 14px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "#333" }}>Total Elite Add-On</span>
+        <span style={{ fontSize: 16, fontWeight: 700, color: BRAND_COLOR }}>${CRAWLSPACE_ELITE_TOTAL.toLocaleString()}</span>
+      </div>
+    </div>
+
+    <div style={{ height: 3, background: BRAND_COLOR }} />
+  </PageWrapper>
+));
+CrawlspaceElitePage.displayName = "CrawlspaceElitePage";
+
+export const CrawlspaceEliteExamplePage = forwardRef<HTMLDivElement, object>((_, ref) => {
+  const basePrice = 5379;
+  const eliteTotal = CRAWLSPACE_ELITE_TOTAL;
+  const subtotal = basePrice + eliteTotal;
+  const discount = Math.round(subtotal * 0.2);
+  const finalTotal = subtotal - discount;
+
+  return (
+    <PageWrapper ref={ref}>
+      <div style={{
+        background: BRAND_COLOR,
+        padding: "12px 20px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}>
+        <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>Elite Crawlspace Example</div>
+        <div style={{ color: "rgba(255,215,0,0.8)", fontSize: 11, fontWeight: 600 }}>See the Savings</div>
+      </div>
+
+      <div style={{ flex: 1, padding: "20px 24px", overflow: "hidden" }}>
+        <div style={{
+          background: "linear-gradient(135deg, #fef9e7 0%, #fdf2d1 100%)",
+          border: "2px solid #e8c84a",
+          borderRadius: 10,
+          padding: "14px 18px",
+          marginBottom: 18,
+        }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#7a5c00", marginBottom: 4 }}>
+            20% Off Your Crawlspace Project
+          </div>
+          <div style={{ fontSize: 11, color: "#6b5000", lineHeight: 1.6 }}>
+            When you bundle the Elite Package with your crawlspace encapsulation, the <b>20% discount</b> applies to the entire project — base install plus all Elite add-ons.
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#111", marginBottom: 10 }}>
+            Example Scenario
+          </div>
+          <div style={{
+            border: "1px solid #e0e0e0",
+            borderRadius: 8,
+            overflow: "hidden",
+          }}>
+            <div style={{ padding: "10px 16px", background: "#f8f8f8", borderBottom: "1px solid #e0e0e0" }}>
+              <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Customer selects:</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#222" }}>Essential 10-mil — 1,000 sqft + Elite Package</div>
+            </div>
+            <div style={{ padding: "12px 16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ fontSize: 11, color: "#555" }}>Base Package (1,000 sqft)</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#333" }}>${basePrice.toLocaleString()}</span>
+              </div>
+              {CRAWLSPACE_ELITE_BUNDLES.map((bundle, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, color: "#555" }}>+ {bundle.name}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#333" }}>${bundle.price.toLocaleString()}</span>
+                </div>
+              ))}
+              <div style={{ borderTop: "1px dashed #ddd", paddingTop: 8, display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 11, color: "#555" }}>Subtotal before discount</span>
+                <span style={{ fontSize: 12, color: "#888", textDecoration: "line-through" }}>${subtotal.toLocaleString()}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "#1a6b3c" }}>20% Elite Discount</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#1a6b3c" }}>-${discount.toLocaleString()}</span>
+              </div>
+              <div style={{
+                borderTop: "2px solid #111",
+                paddingTop: 8,
+                marginTop: 4,
+                display: "flex",
+                justifyContent: "space-between",
+              }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#111" }}>Total Investment</span>
+                <span style={{ fontSize: 16, fontWeight: 700, color: BRAND_COLOR }}>${finalTotal.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{
+          background: "#f0fdf4",
+          border: "1px solid #bbf7d0",
+          borderRadius: 8,
+          padding: "12px 16px",
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#166534" }}>You Save ${discount.toLocaleString()} (20%)</div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
+            {[
+              "Full vapor barrier install",
+              "10-year maintenance plan",
+              "Dehumidifier warranty",
+              "Annual inspections",
+              "Priority service status",
+              "Complete peace of mind",
+            ].map((item, i) => (
+              <div key={i} style={{ fontSize: 10, color: "#15803d", display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ color: "#22c55e", fontWeight: 700 }}>✓</span> {item}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ height: 3, background: BRAND_COLOR }} />
+    </PageWrapper>
+  );
+});
+CrawlspaceEliteExamplePage.displayName = "CrawlspaceEliteExamplePage";
+
 export interface EliteBundle {
   id: string;
   name: string;
@@ -1023,6 +1282,7 @@ export interface EliteBundle {
   priceByTonnage?: Record<string, number>;
   fixedPrice?: number;
   benefits: string[];
+  notCovered?: string[];
 }
 
 export interface EliteAirflowOption {
@@ -1033,7 +1293,7 @@ export interface EliteAirflowOption {
 }
 
 export interface SalesbookSection {
-  type: "static" | "category-divider" | "tier-header" | "product-detail" | "ducting-detail" | "elite-divider" | "elite-bundles" | "elite-discount" | "elite-airflow" | "crawlspace-divider" | "crawlspace-tiers" | "crawlspace-example";
+  type: "static" | "category-divider" | "tier-header" | "product-detail" | "ducting-detail" | "elite-divider" | "elite-bundles" | "elite-discount" | "elite-airflow" | "crawlspace-divider" | "crawlspace-tiers" | "crawlspace-example" | "crawlspace-elite" | "crawlspace-elite-example";
   label?: string;
   unitType?: string;
   tier?: string;
@@ -1168,6 +1428,8 @@ export function buildSalesbookSections(
     sections.push({ type: "crawlspace-divider", pageIndex: pageIndex++, label: "Crawlspace Services" });
     sections.push({ type: "crawlspace-tiers", crawlspaceTiers, pageIndex: pageIndex++, label: "Crawlspace Tiers & Pricing" });
     sections.push({ type: "crawlspace-example", pageIndex: pageIndex++, label: "Crawlspace Pricing Example" });
+    sections.push({ type: "crawlspace-elite", pageIndex: pageIndex++, label: "Crawlspace Elite Package" });
+    sections.push({ type: "crawlspace-elite-example", pageIndex: pageIndex++, label: "Crawlspace Elite Example" });
   }
 
   return sections;
