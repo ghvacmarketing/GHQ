@@ -3425,29 +3425,6 @@ export default function CrmDispatch() {
     return { scheduledStartUTC, scheduledEndUTC };
   }, []);
 
-  const handleDragMove = useCallback((_event: DragMoveEvent) => {
-    const pointerX = lastPointerXRef.current;
-    const pointerY = lastPointerYRef.current;
-    if (pointerX === null || pointerY === null) return;
-
-    const nodes = techTimelineNodesRef.current;
-    const techIds = Object.keys(nodes);
-    for (const techId of techIds) {
-      const node = nodes[techId];
-      if (!node) continue;
-      const rect = node.getBoundingClientRect();
-
-      if (pointerY >= rect.top && pointerY <= rect.bottom) {
-        const hourOffset = computeDropHourOffset(pointerX, rect, dragClickHourOffsetRef.current, activeDragDurationHours);
-        handlePreviewTimeChange(techId, hourOffset);
-      } else {
-        if (previewHourByTechRef.current[techId] !== undefined) {
-          handlePreviewTimeChange(techId, null);
-        }
-      }
-    }
-  }, [activeDragDurationHours, handlePreviewTimeChange]);
-
   const handleDragCleanup = useCallback(() => {
     cleanupPointerTracker();
     lastPointerXRef.current = null;
@@ -3783,6 +3760,29 @@ export default function CrmDispatch() {
     const wo = localWorkOrders.find(w => w.id === activeId);
     return wo?.customerName || wo?.title || 'Work Order';
   }, [activeId, localWorkOrders]);
+
+  const handleDragMove = useCallback((_event: DragMoveEvent) => {
+    const pointerX = lastPointerXRef.current;
+    const pointerY = lastPointerYRef.current;
+    if (pointerX === null || pointerY === null) return;
+
+    const nodes = techTimelineNodesRef.current;
+    const techIds = Object.keys(nodes);
+    for (const techId of techIds) {
+      const node = nodes[techId];
+      if (!node) continue;
+      const rect = node.getBoundingClientRect();
+
+      if (pointerY >= rect.top && pointerY <= rect.bottom) {
+        const hourOffset = computeDropHourOffset(pointerX, rect, dragClickHourOffsetRef.current, activeDragDurationHours);
+        handlePreviewTimeChange(techId, hourOffset);
+      } else {
+        if (previewHourByTechRef.current[techId] !== undefined) {
+          handlePreviewTimeChange(techId, null);
+        }
+      }
+    }
+  }, [activeDragDurationHours, handlePreviewTimeChange]);
 
   const combinedModifiers = useMemo(() => {
     const restrictModifier = createRestrictToContainerModifier(dispatchBoardRef);
