@@ -22,11 +22,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-const DRAG_THRESHOLD = 8;
-
 function ResizableImageView({ node, updateAttributes, selected }: NodeViewProps) {
   const [resizing, setResizing] = useState(false);
-  const [dragging, setDragging] = useState(false);
   const imgRef = useRef<HTMLDivElement>(null);
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
@@ -57,50 +54,14 @@ function ResizableImageView({ node, updateAttributes, selected }: NodeViewProps)
     document.addEventListener('mouseup', onMouseUp);
   }, [updateAttributes]);
 
-  const handleImageMouseDown = useCallback((e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('.resize-handle') || (e.target as HTMLElement).closest('.align-btn')) return;
-    const originX = e.clientX;
-    let activated = false;
-
-    const onMouseMove = (ev: MouseEvent) => {
-      const diffX = Math.abs(ev.clientX - originX);
-      if (!activated && diffX > DRAG_THRESHOLD) {
-        activated = true;
-        setDragging(true);
-      }
-      if (activated) {
-        const containerWidth = imgRef.current?.parentElement?.offsetWidth || 600;
-        const moveX = ev.clientX - originX;
-        const zone = containerWidth / 4;
-        if (moveX < -zone) {
-          updateAttributes({ align: 'left' });
-        } else if (moveX > zone) {
-          updateAttributes({ align: 'right' });
-        } else {
-          updateAttributes({ align: 'center' });
-        }
-      }
-    };
-
-    const onMouseUp = () => {
-      setDragging(false);
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-    };
-
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  }, [updateAttributes]);
-
   const justifyClass = align === 'left' ? 'justify-start' : align === 'right' ? 'justify-end' : 'justify-center';
 
   return (
-    <NodeViewWrapper className={`flex ${justifyClass} my-3`}>
+    <NodeViewWrapper className={`flex ${justifyClass} my-3`} data-drag-handle>
       <div
         ref={imgRef}
-        className={`relative inline-block group ${selected ? 'ring-2 ring-[#711419] ring-offset-2 rounded' : ''} ${dragging ? 'opacity-75 cursor-grabbing' : ''}`}
-        style={{ width: width ? `${width}px` : 'auto', maxWidth: '100%' }}
-        onMouseDown={handleImageMouseDown}
+        className={`relative inline-block group ${selected ? 'ring-2 ring-[#711419] ring-offset-2 rounded' : ''}`}
+        style={{ width: width ? `${width}px` : 'auto', maxWidth: '100%', cursor: 'grab' }}
       >
         <img
           src={node.attrs.src}
@@ -117,19 +78,6 @@ function ResizableImageView({ node, updateAttributes, selected }: NodeViewProps)
           className="resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize opacity-0 group-hover:opacity-100 transition-opacity bg-[#711419] rounded-tl"
           onMouseDown={handleResizeStart}
         />
-        {selected && (
-          <div className="absolute -bottom-7 left-1/2 -translate-x-1/2 flex gap-1 z-10">
-            {(['left', 'center', 'right'] as const).map((a) => (
-              <button
-                key={a}
-                className={`align-btn px-2 py-0.5 text-[10px] rounded ${align === a ? 'bg-[#711419] text-white' : 'bg-white border text-slate-500 hover:bg-slate-100'}`}
-                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); updateAttributes({ align: a }); }}
-              >
-                {a.charAt(0).toUpperCase() + a.slice(1)}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
     </NodeViewWrapper>
   );
@@ -142,6 +90,7 @@ const alignStyles: Record<string, string> = {
 };
 
 const ResizableImage = Image.extend({
+  draggable: true,
   addAttributes() {
     return {
       ...this.parent?.(),
@@ -171,7 +120,7 @@ const ResizableImage = Image.extend({
     return ['img', { ...HTMLAttributes, style, class: 'proposal-image' }];
   },
   addNodeView() {
-    return ReactNodeViewRenderer(ResizableImageView);
+    return ReactNodeViewRenderer(ResizableImageView, { draggable: true });
   },
 });
 
@@ -229,16 +178,12 @@ export default function ProposalEditor({
       attributes: {
         class: 'prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-[500px] p-6',
       },
-      handlePaste: () => false,
       handleDrop: (view, event) => {
         const files = event.dataTransfer?.files;
-        if (files && files.length > 0) {
+        if (files && files.length > 0 && files[0]?.type?.startsWith('image/')) {
           event.preventDefault();
-          const file = files[0];
-          if (file.type.startsWith('image/')) {
-            handleImageUpload(file);
-            return true;
-          }
+          handleImageUpload(files[0]);
+          return true;
         }
         return false;
       },
@@ -279,7 +224,7 @@ export default function ProposalEditor({
       });
 
       const imageUrl = objectPath;
-      editor.chain().focus().setImage({ src: imageUrl }).run();
+      editor.chain().focus('end').setImage({ src: imageUrl }).run();
       toast({ title: "Image added" });
     } catch (err) {
       console.error("Image upload failed:", err);
@@ -394,22 +339,40 @@ export default function ProposalEditor({
         <Divider />
 
         <ToolbarButton
-          onClick={() => editor.chain().focus().setTextAlign('left').run()}
-          active={editor.isActive({ textAlign: 'left' })}
+          onClick={() => {
+            if (editor.isActive('image')) {
+              editor.chain().focus().updateAttributes('image', { align: 'left' }).run();
+            } else {
+              editor.chain().focus().setTextAlign('left').run();
+            }
+          }}
+          active={editor.isActive({ textAlign: 'left' }) || (editor.isActive('image') && editor.getAttributes('image').align === 'left')}
           title="Align left"
         >
           <AlignLeft className="h-4 w-4" />
         </ToolbarButton>
         <ToolbarButton
-          onClick={() => editor.chain().focus().setTextAlign('center').run()}
-          active={editor.isActive({ textAlign: 'center' })}
+          onClick={() => {
+            if (editor.isActive('image')) {
+              editor.chain().focus().updateAttributes('image', { align: 'center' }).run();
+            } else {
+              editor.chain().focus().setTextAlign('center').run();
+            }
+          }}
+          active={editor.isActive({ textAlign: 'center' }) || (editor.isActive('image') && (editor.getAttributes('image').align === 'center' || !editor.getAttributes('image').align))}
           title="Align center"
         >
           <AlignCenter className="h-4 w-4" />
         </ToolbarButton>
         <ToolbarButton
-          onClick={() => editor.chain().focus().setTextAlign('right').run()}
-          active={editor.isActive({ textAlign: 'right' })}
+          onClick={() => {
+            if (editor.isActive('image')) {
+              editor.chain().focus().updateAttributes('image', { align: 'right' }).run();
+            } else {
+              editor.chain().focus().setTextAlign('right').run();
+            }
+          }}
+          active={editor.isActive({ textAlign: 'right' }) || (editor.isActive('image') && editor.getAttributes('image').align === 'right')}
           title="Align right"
         >
           <AlignRight className="h-4 w-4" />
@@ -517,7 +480,7 @@ export default function ProposalEditor({
                     key={img.id}
                     className="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-slate-100 text-left"
                     onClick={() => {
-                      editor.chain().focus().setImage({ src: img.url }).run();
+                      editor.chain().focus('end').setImage({ src: img.url }).run();
                       setLibraryOpen(false);
                     }}
                   >
