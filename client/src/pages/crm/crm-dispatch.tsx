@@ -1369,8 +1369,9 @@ function DraggableScheduleCard({
     left: `${visualLeft}%`,
     width: `${visualWidth}%`,
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-    opacity: 1,
-    zIndex: isDragging ? 1000 : isResizing ? 50 : 1,
+    opacity: isDragging ? 0 : 1,
+    pointerEvents: isDragging ? 'none' : undefined,
+    zIndex: isDragging ? -1 : isResizing ? 50 : 1,
   };
 
   const dragListeners = isResizing ? {} : listeners;
@@ -1456,20 +1457,27 @@ function ScheduleRowTimeline({
 }) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const [previewLeft, setPreviewLeft] = useState<number | null>(null);
+  const [previewStartHour, setPreviewStartHour] = useState<number>(0);
   const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
   const previewWidthPercent = (previewDurationHours / totalHours) * 100;
-  const previewLabel = Number.isInteger(previewDurationHours) ? `${previewDurationHours} hr` : `${previewDurationHours.toFixed(1)} hr`;
+
+  const formatPreviewTime = (absHour: number) => {
+    const h = Math.floor(absHour);
+    const m = Math.round((absHour % 1) * 60);
+    const displayH = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    return m === 0 ? `${displayH} ${ampm}` : `${displayH}:${String(m).padStart(2, '0')} ${ampm}`;
+  };
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isDragActive || !timelineRef.current) return;
     const rect = timelineRef.current.getBoundingClientRect();
-    // Subtract dragOffsetX so the position aligns with the left edge of the
-    // drag overlay card rather than the raw cursor position.
     const x = e.clientX - rect.left - dragOffsetX;
     const clampedHour = snapHourOffsetFromTimeline(x, rect.width, previewDurationHours);
     const snappedPercent = (clampedHour / totalHours) * 100;
     const maxLeftPercent = ((totalHours - previewDurationHours) / totalHours) * 100;
     setPreviewLeft(Math.max(0, Math.min(snappedPercent, maxLeftPercent)));
+    setPreviewStartHour(SCHEDULE_START_HOUR + clampedHour);
     onPreviewTimeChange?.(clampedHour);
   }, [isDragActive, onPreviewTimeChange, totalHours, dragOffsetX, previewDurationHours]);
 
@@ -1514,7 +1522,12 @@ function ScheduleRowTimeline({
           className="absolute top-1 bottom-1 bg-[#711419]/15 border-2 border-dashed border-[#711419]/40 rounded-md pointer-events-none z-[5]"
           style={{ left: `${previewLeft}%`, width: `${previewWidthPercent}%` }}
         >
-          <div className="text-[10px] text-[#711419]/60 font-medium text-center mt-1">{previewLabel}</div>
+          <div className="text-[10px] text-[#711419]/80 font-semibold text-center mt-1">
+            {formatPreviewTime(previewStartHour)}
+          </div>
+          <div className="text-[9px] text-[#711419]/50 text-center">
+            {formatPreviewTime(previewStartHour + previewDurationHours)}
+          </div>
         </div>
       )}
 
@@ -4166,14 +4179,21 @@ export default function CrmDispatch() {
             )}
           </div>
           
-          {/* Drag Overlay - morphs queue items to look like schedule cards */}
+          {/* Drag Overlay - small cursor indicator; the preview rectangle shows the actual landing position */}
           <DragOverlay dropAnimation={null}>
-            {activeId ? (
-              <div
-                className="rounded-md bg-slate-300/70 border border-slate-400/50 shadow-md cursor-grabbing"
-                style={{ width: activeFromQueue ? 120 : (activeCardWidthRef.current || 120), height: 40 }}
-              />
-            ) : null}
+            {activeId ? (() => {
+              const wo = localWorkOrders.find(w => w.id === activeId);
+              const title = wo?.title || wo?.customerName || 'Work Order';
+              return (
+                <div
+                  className="rounded-md bg-slate-200/90 border border-slate-400/60 shadow-lg cursor-grabbing px-2 py-1 flex items-center gap-1.5"
+                  style={{ width: activeFromQueue ? 140 : Math.min(activeCardWidthRef.current || 140, 200), height: 36 }}
+                >
+                  <div className="w-1.5 h-5 rounded-full bg-slate-400/70 flex-shrink-0" />
+                  <span className="text-[10px] font-medium text-slate-600 truncate">{title}</span>
+                </div>
+              );
+            })() : null}
           </DragOverlay>
         </DndContext>
 
