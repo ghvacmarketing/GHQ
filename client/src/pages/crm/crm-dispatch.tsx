@@ -3463,14 +3463,7 @@ export default function CrmDispatch() {
             : over.rect;
           const timelineWidth = timelineRect.width;
           if (timelineWidth > 0) {
-            const translatedRect = active.rect.current.translated;
-            let cardLeftX: number;
-            if (translatedRect) {
-              cardLeftX = translatedRect.left;
-            } else {
-              cardLeftX = lastPointerXRef.current - dragOffsetXRef.current;
-            }
-            const relativeX = cardLeftX - timelineRect.left;
+            const relativeX = lastPointerXRef.current - timelineRect.left - dragOffsetXRef.current;
             const snappedHourOffset = snapHourOffsetFromTimeline(relativeX, timelineWidth, defaultDuration);
             newStartHour = SCHEDULE_START_HOUR + snappedHourOffset;
           }
@@ -3541,13 +3534,9 @@ export default function CrmDispatch() {
             : over.rect;
           const timelineWidth = timelineRect.width;
           if (timelineWidth > 0) {
-            const cardLeftX = lastPointerXRef.current - dragOffsetXRef.current;
-            const relativeX = cardLeftX - timelineRect.left;
-            const percent = Math.max(0, relativeX / timelineWidth);
-            const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
-            const hourOffset = percent * totalHours;
-            const snappedHour = Math.round(hourOffset * 2) / 2;
-            newStartHour = SCHEDULE_START_HOUR + Math.max(0, Math.min(snappedHour, totalHours - duration));
+            const relativeX = lastPointerXRef.current - timelineRect.left - dragOffsetXRef.current;
+            const snappedHourOffset = snapHourOffsetFromTimeline(relativeX, timelineWidth, duration);
+            newStartHour = SCHEDULE_START_HOUR + snappedHourOffset;
           }
         }
         const newEndHour = newStartHour + duration;
@@ -4194,7 +4183,7 @@ export default function CrmDispatch() {
             )}
           </div>
           
-          {/* Drag Overlay - small cursor indicator; the preview rectangle shows the actual landing position */}
+          {/* Drag Overlay - small cursor indicator; pointer-events:none so mouse events reach the timeline for accurate preview tracking */}
           <DragOverlay dropAnimation={null}>
             {activeId ? (() => {
               const wo = localWorkOrders.find(w => w.id === activeId);
@@ -4202,7 +4191,7 @@ export default function CrmDispatch() {
               return (
                 <div
                   className="rounded-md bg-slate-200/90 border border-slate-400/60 shadow-lg cursor-grabbing px-2 py-1 flex items-center gap-1.5"
-                  style={{ width: activeFromQueue ? 140 : Math.min(activeCardWidthRef.current || 140, 200), height: 36 }}
+                  style={{ width: activeFromQueue ? 140 : Math.min(activeCardWidthRef.current || 140, 200), height: 36, pointerEvents: 'none' }}
                 >
                   <div className="w-1.5 h-5 rounded-full bg-slate-400/70 flex-shrink-0" />
                   <span className="text-[10px] font-medium text-slate-600 truncate">{title}</span>
