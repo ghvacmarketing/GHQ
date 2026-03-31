@@ -445,7 +445,7 @@ export default function CrmCustomers() {
         </div>
 
         {/* Tabs styled like projects page - underline style */}
-        <div className="flex overflow-x-auto overflow-y-hidden border-b border-slate-200">
+        <div className="flex overflow-x-auto overflow-y-hidden border-b border-slate-200 scrollbar-hide">
           <button
             onClick={() => { setStatusTab("all"); setCustomerType("all"); setHasAgreement(false); setSourceFilter("all"); setAccountRole("all"); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
