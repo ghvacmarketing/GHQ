@@ -379,6 +379,12 @@ export default function CrmInvoiceCreate() {
       return res.json();
     },
     onSuccess: (data) => {
+      // Optimistically inject the new invoice into the list cache so it shows immediately
+      queryClient.setQueriesData({ queryKey: ["/api/crm/invoices"] }, (old: any) => {
+        if (!old?.invoices) return old;
+        if (old.invoices.some((inv: any) => inv.id === data.id)) return old;
+        return { ...old, invoices: [data, ...old.invoices] };
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       if (formData.workOrderId) {
@@ -406,6 +412,11 @@ export default function CrmInvoiceCreate() {
       return res.json();
     },
     onSuccess: (data) => {
+      queryClient.setQueriesData({ queryKey: ["/api/crm/invoices"] }, (old: any) => {
+        if (!old?.invoices) return old;
+        if (old.invoices.some((inv: any) => inv.id === data.id)) return old;
+        return { ...old, invoices: [data, ...old.invoices] };
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       if (formData.workOrderId) {

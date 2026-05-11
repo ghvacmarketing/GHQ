@@ -17065,6 +17065,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("[Invoice SMS] Sending to:", phoneNumber);
         
         const balanceDue = parseFloat(invoice.balanceDue || invoice.total || "0");
+        const total = parseFloat(invoice.total || "0");
+        const isPaid = invoice.status === "paid" || balanceDue <= 0;
+        const smsAmount = isPaid ? total : balanceDue;
         
         smsResult = await sendInvoiceSms({
           customerId: invoice.customerId || "",
@@ -17072,8 +17075,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerName,
           invoiceId: invoice.id,
           invoiceNumber: invoice.invoiceNumber,
-          amount: balanceDue,
+          amount: smsAmount,
           paymentLink,
+          isPaid,
         });
         
         smsSent = smsResult.success;
@@ -22721,6 +22725,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     { key: "sms_template_work_order_en_route", description: "Technician En Route", defaultValue: "Your GHVAC technician is on the way! They should arrive shortly." },
     { key: "sms_template_work_order_on_site", description: "Technician On Site", defaultValue: "Your GHVAC technician has arrived and is ready to help!" },
     { key: "sms_template_invoice", description: "Invoice Payment (uses {invoiceNumber} and {paymentLink} placeholders)", defaultValue: "Your invoice #{invoiceNumber} is ready. Pay online: {paymentLink}\n\n- GHVAC" },
+    { key: "sms_template_invoice_send", description: "Invoice Send (unpaid - uses {customerName}, {invoiceNumber}, {amount}, {paymentLink})", defaultValue: "Hi {customerName}! Your invoice #{invoiceNumber} for {amount} is ready. Pay here: {paymentLink}\n\n- GHVAC" },
+    { key: "sms_template_invoice_paid", description: "Invoice Send (paid - uses {customerName}, {invoiceNumber}, {amount}, {viewLink})", defaultValue: "Hi {customerName}! Your invoice #{invoiceNumber} for {amount} has been paid in full. Thank you! View your receipt here: {viewLink}\n\n- GHVAC" },
+    { key: "sms_template_quote", description: "Quote Send (uses {customerName}, {quoteNumber}, {totalAmount}, {viewLink})", defaultValue: "Hi {customerName}! Your quote #{quoteNumber} for {totalAmount} is ready. View it here: {viewLink}\n\n- GHVAC" },
   ];
 
   // GET /api/admin/settings/sms-templates - Get all SMS templates
