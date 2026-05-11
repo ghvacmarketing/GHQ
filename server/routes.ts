@@ -18239,7 +18239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/quotes/quick - Create standalone quick quote
-  app.post("/api/crm/quotes/quick", requireCrmSalesOrAbove, async (req, res) => {
+  app.post("/api/crm/quotes/quick", requireCrmTechOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
       if (!user) {
