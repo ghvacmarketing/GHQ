@@ -1,7 +1,7 @@
 import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type CallLogTask, type InsertCallLogTask, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, type CrmItem, type InsertCrmItem, type CrmMessagingConversation, type InsertCrmMessagingConversation, type CrmMessagingMessage, type InsertCrmMessagingMessage, type CrmMessagingConversationTag, type InsertCrmMessagingConversationTag, type CrmTimeEntry, type InsertCrmTimeEntry, type SmsNotificationLog, type InsertSmsNotificationLog, type SmsNotificationType, type CrmProjectTask, type InsertCrmProjectTask, type Task, type InsertTask, type TaskType, type InsertTaskType, type TaskActivity, type InsertTaskActivity, type TaskSubtask, type InsertTaskSubtask, type ProposalTemplate, type InsertProposalTemplate, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, callLogTasks, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems, crmItems, crmMessagingConversations, crmMessagingMessages, crmMessagingConversationTags, crmCustomers, crmTimeEntries, smsNotificationLog, crmUsers, crmProjectTasks, tasks, taskTypes, taskActivity, taskSubtasks, proposalTemplates, proposalTemplateImages, type ProposalTemplateImage, type InsertProposalTemplateImage, customerFiles, type CustomerFile, type InsertCustomerFile, rebateCases, rebateCaseWorkflowSteps, rebateCaseScopeChecklist, rebateCaseDocuments, rebateCaseActivityLog, type RebateCase, type InsertRebateCase, type RebateCaseWorkflowStep, type InsertRebateCaseWorkflowStep, type RebateCaseScopeChecklist, type InsertRebateCaseScopeChecklist, type RebateCaseDocument, type InsertRebateCaseDocument, type RebateCaseActivityLog, type InsertRebateCaseActivityLog, type RebateWorkflowStep, rebateWorkflowStepEnum } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, or, and, ilike, sql, notInArray, desc, gte, lte, asc, isNull, isNotNull, lt, ne, type SQL } from "drizzle-orm";
+import { eq, or, and, ilike, sql, notInArray, inArray, desc, gte, lte, asc, isNull, isNotNull, lt, ne, type SQL } from "drizzle-orm";
 
 export interface IStorage {
   // Quote operations
@@ -343,6 +343,7 @@ export interface IStorage {
   // Rebate Programs
   getRebateCases(filters?: { search?: string; status?: string; programType?: string; assignedToUserId?: string }): Promise<RebateCase[]>;
   getRebateCase(id: string): Promise<RebateCase | undefined>;
+  getRebateCasesWithProgress(filters?: { search?: string; status?: string; programType?: string; assignedToUserId?: string }): Promise<Array<RebateCase & { workflowCompleted: number; workflowTotal: number; currentStep: RebateWorkflowStep | null }>>;
   createRebateCase(data: InsertRebateCase): Promise<RebateCase>;
   updateRebateCase(id: string, data: Partial<RebateCase>): Promise<RebateCase | undefined>;
   deleteRebateCase(id: string): Promise<boolean>;
@@ -2840,37 +2841,65 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createRebateCase(data: InsertRebateCase): Promise<RebateCase> {
-    const [row] = await db.insert(rebateCases).values(data).returning();
-    // Seed 8 workflow steps
-    const steps = rebateWorkflowStepEnum.map((step, idx) => ({
-      caseId: row.id,
-      step: step as RebateWorkflowStep,
-      status: "not_started" as const,
-      sortOrder: idx,
-    }));
-    await db.insert(rebateCaseWorkflowSteps).values(steps);
-    // Seed scope checklist (12 standard Neighborly items)
-    const scopeItems = [
-      "Heat pump HVAC system",
-      "Heat pump water heater",
-      "Electric stove/cooktop",
-      "Heat pump clothes dryer",
-      "Electrical panel upgrade",
-      "Electric wiring upgrade",
-      "Attic / wall insulation",
-      "Air sealing",
-      "Mechanical ventilation",
-      "Door / window replacement",
-      "Smart thermostat",
-      "Other electrification work",
-    ].map((itemName, idx) => ({
-      caseId: row.id,
-      itemName,
-      isChecked: false,
-      sortOrder: idx,
-    }));
-    await db.insert(rebateCaseScopeChecklist).values(scopeItems);
-    return row;
+    return db.transaction(async (tx) => {
+      const [row] = await tx.insert(rebateCases).values(data).returning();
+      // Seed 8 workflow steps
+      const steps = rebateWorkflowStepEnum.map((step, idx) => ({
+        caseId: row.id,
+        step: step as RebateWorkflowStep,
+        status: "not_started" as const,
+        sortOrder: idx,
+      }));
+      await tx.insert(rebateCaseWorkflowSteps).values(steps);
+      // Seed scope checklist (12 standard Neighborly items)
+      const scopeItems = [
+        "Heat pump HVAC system",
+        "Heat pump water heater",
+        "Electric stove/cooktop",
+        "Heat pump clothes dryer",
+        "Electrical panel upgrade",
+        "Electric wiring upgrade",
+        "Attic / wall insulation",
+        "Air sealing",
+        "Mechanical ventilation",
+        "Door / window replacement",
+        "Smart thermostat",
+        "Other electrification work",
+      ].map((itemName, idx) => ({
+        caseId: row.id,
+        itemName,
+        isChecked: false,
+        sortOrder: idx,
+      }));
+      await tx.insert(rebateCaseScopeChecklist).values(scopeItems);
+      return row;
+    });
+  }
+
+  // Enriched list with workflow progress for dashboard
+  async getRebateCasesWithProgress(filters: { search?: string; status?: string; programType?: string; assignedToUserId?: string } = {}) {
+    const cases = await this.getRebateCases(filters);
+    if (cases.length === 0) return [];
+    const ids = cases.map((c) => c.id);
+    const steps = await db.select().from(rebateCaseWorkflowSteps)
+      .where(inArray(rebateCaseWorkflowSteps.caseId, ids));
+    const byCase = new Map<string, RebateCaseWorkflowStep[]>();
+    for (const s of steps) {
+      const arr = byCase.get(s.caseId) || [];
+      arr.push(s);
+      byCase.set(s.caseId, arr);
+    }
+    return cases.map((c) => {
+      const list = (byCase.get(c.id) || []).sort((a, b) => a.sortOrder - b.sortOrder);
+      const completed = list.filter((s) => s.status === "complete").length;
+      const current = list.find((s) => s.status !== "complete") || list[list.length - 1];
+      return {
+        ...c,
+        workflowCompleted: completed,
+        workflowTotal: list.length,
+        currentStep: current?.step || null,
+      };
+    });
   }
 
   async updateRebateCase(id: string, data: Partial<RebateCase>): Promise<RebateCase | undefined> {

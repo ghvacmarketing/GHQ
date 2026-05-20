@@ -3532,6 +3532,7 @@ export const rebateApplicationStatusEnum = [
   "declined",
   "not_interested",
   "on_hold",
+  "closed",
 ] as const;
 export type RebateApplicationStatus = typeof rebateApplicationStatusEnum[number];
 

@@ -28181,7 +28181,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   app.get("/api/crm/rebate-cases", requireCrmTechOrAbove, async (req, res) => {
     try {
       const { search, status, programType, assignedToUserId } = req.query;
-      const cases = await storage.getRebateCases({
+      const cases = await storage.getRebateCasesWithProgress({
         search: search as string | undefined,
         status: status as string | undefined,
         programType: programType as string | undefined,
@@ -28263,16 +28263,60 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(400).json({ message: "Validation error", errors: validation.error.errors });
       }
       const updated = await storage.updateRebateCase(id, validation.data as any);
-      // Log status change
-      if (validation.data.applicationStatus && validation.data.applicationStatus !== existing.applicationStatus) {
+      const d = validation.data as any;
+      let loggedSomething = false;
+      // Status change
+      if (d.applicationStatus && d.applicationStatus !== existing.applicationStatus) {
         await storage.logRebateCaseActivity({
           caseId: id,
           userId: user?.id || null,
           action: "status_changed",
-          description: `Status changed from "${existing.applicationStatus}" to "${validation.data.applicationStatus}"`,
-          metadata: { from: existing.applicationStatus, to: validation.data.applicationStatus },
+          description: `Status changed from "${existing.applicationStatus}" to "${d.applicationStatus}"`,
+          metadata: { from: existing.applicationStatus, to: d.applicationStatus },
         });
-      } else {
+        loggedSomething = true;
+        // Case closed (terminal statuses)
+        if (["closed", "paid", "declined", "not_interested"].includes(d.applicationStatus)) {
+          await storage.logRebateCaseActivity({
+            caseId: id,
+            userId: user?.id || null,
+            action: "case_closed",
+            description: `Case closed (${d.applicationStatus})`,
+          });
+        }
+      }
+      // Assignee change
+      if ("assignedToUserId" in d && d.assignedToUserId !== existing.assignedToUserId) {
+        await storage.logRebateCaseActivity({
+          caseId: id,
+          userId: user?.id || null,
+          action: "assignee_changed",
+          description: d.assignedToUserId ? `Assigned to user ${d.assignedToUserId}` : "Unassigned",
+          metadata: { from: existing.assignedToUserId, to: d.assignedToUserId },
+        });
+        loggedSomething = true;
+      }
+      // Expected-date changes (reservation/approval/install dates)
+      const dateFields = ["reservationDate", "approvalDate", "installCompletionDate", "expectedCompletionDate"] as const;
+      for (const f of dateFields) {
+        if (f in d) {
+          const oldVal = (existing as any)[f];
+          const newVal = (d as any)[f];
+          const oldStr = oldVal ? new Date(oldVal).toISOString() : null;
+          const newStr = newVal ? new Date(newVal).toISOString() : null;
+          if (oldStr !== newStr) {
+            await storage.logRebateCaseActivity({
+              caseId: id,
+              userId: user?.id || null,
+              action: "date_changed",
+              description: `${f} changed${newStr ? ` to ${newStr.slice(0, 10)}` : " (cleared)"}`,
+              metadata: { field: f, from: oldStr, to: newStr },
+            });
+            loggedSomething = true;
+          }
+        }
+      }
+      if (!loggedSomething) {
         await storage.logRebateCaseActivity({
           caseId: id,
           userId: user?.id || null,
@@ -28325,6 +28369,15 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         action: "workflow_step_updated",
         description: `Step "${updated.step}" updated to "${updated.status}"`,
       });
+      // Special-case: scope submitted
+      if (updated.step === "scope_of_work" && updated.status === "complete") {
+        await storage.logRebateCaseActivity({
+          caseId: id,
+          userId: user?.id || null,
+          action: "scope_submitted",
+          description: "Scope of Work submitted",
+        });
+      }
       res.json(updated);
     } catch (error: any) {
       console.error("Failed to update workflow step:", error);

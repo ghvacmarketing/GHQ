@@ -33,6 +33,7 @@ export const APPLICATION_STATUS_LABELS: Record<RebateApplicationStatus, string> 
   declined: "Declined",
   not_interested: "Not Interested",
   on_hold: "On Hold",
+  closed: "Closed",
 };
 
 export const APPLICATION_STATUS_OPTIONS: RebateApplicationStatus[] = [
@@ -51,6 +52,7 @@ export const APPLICATION_STATUS_OPTIONS: RebateApplicationStatus[] = [
   "declined",
   "not_interested",
   "on_hold",
+  "closed",
 ];
 
 export const APPLICATION_STATUS_COLORS: Record<RebateApplicationStatus, string> = {
@@ -69,6 +71,7 @@ export const APPLICATION_STATUS_COLORS: Record<RebateApplicationStatus, string> 
   declined: "bg-slate-800 text-white border-slate-900",
   not_interested: "bg-slate-800 text-white border-slate-900",
   on_hold: "bg-amber-100 text-amber-700 border-amber-200",
+  closed: "bg-slate-700 text-white border-slate-800",
 };
 
 export const APPLICATION_STATUS_ROW_BG: Record<RebateApplicationStatus, string> = {
@@ -87,6 +90,7 @@ export const APPLICATION_STATUS_ROW_BG: Record<RebateApplicationStatus, string> 
   declined: "bg-slate-100/60 text-slate-500",
   not_interested: "bg-slate-100/60 text-slate-500",
   on_hold: "bg-amber-50/40",
+  closed: "bg-slate-100/60 text-slate-500",
 };
 
 export const WORKFLOW_STEPS_ORDER: RebateWorkflowStep[] = [
