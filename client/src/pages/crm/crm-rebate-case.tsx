@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -378,293 +378,222 @@ function FieldLabel({ code, label, required }: { code: string; label: string; re
 }
 
 function RebateRequestTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onPatch: (d: Partial<RebateCase>) => void; saving: boolean }) {
-  const schema = insertRebateCaseSchema.pick({
-    initiatorType: true,
-    initiatorCompanyName: true,
-    initiatorFirstName: true,
-    initiatorLastName: true,
-    initiatorPhone: true,
-    initiatorEmail: true,
-    propertyAddress: true,
-    propertyAddressLine2: true,
-    propertyCity: true,
-    propertyState: true,
-    propertyZip: true,
-    addressCertified: true,
-    constructionType: true,
-    buildingType: true,
-    buildingSubtype: true,
-    isRented: true,
-    bedroomCount: true,
-    sqftRange: true,
+  type FormState = {
+    initiatorType: string;
+    initiatorCompanyName: string;
+    initiatorFirstName: string;
+    initiatorLastName: string;
+    initiatorPhone: string;
+    initiatorEmail: string;
+    propertyAddress: string;
+    propertyAddressLine2: string;
+    propertyCity: string;
+    propertyState: string;
+    propertyZip: string;
+    addressCertified: boolean;
+    constructionType: string;
+    buildingType: string;
+    buildingSubtype: string;
+    isRented: boolean | null;
+    bedroomCount: number | null;
+    sqftRange: string;
+  };
+
+  const buildInitial = (d: CaseDetail): FormState => ({
+    initiatorType: d.initiatorType ?? "Contractor/Installer",
+    initiatorCompanyName: d.initiatorCompanyName ?? "Giesbrecht HVAC",
+    initiatorFirstName: d.initiatorFirstName ?? "",
+    initiatorLastName: d.initiatorLastName ?? "",
+    initiatorPhone: d.initiatorPhone ?? "",
+    initiatorEmail: d.initiatorEmail ?? "",
+    propertyAddress: d.propertyAddress ?? "",
+    propertyAddressLine2: d.propertyAddressLine2 ?? "",
+    propertyCity: d.propertyCity ?? "",
+    propertyState: d.propertyState ?? "GA",
+    propertyZip: d.propertyZip ?? "",
+    addressCertified: d.addressCertified ?? false,
+    constructionType: d.constructionType ?? "",
+    buildingType: d.buildingType ?? "",
+    buildingSubtype: d.buildingSubtype ?? "",
+    isRented: d.isRented ?? null,
+    bedroomCount: d.bedroomCount ?? null,
+    sqftRange: d.sqftRange ?? "",
   });
 
-  const form = useForm<z.infer<typeof schema> & {
-    applicationDate: string; reservationDate: string; approvalDate: string; paidDate: string;
-    rebateAmount: string; utilityRebateAmount: string; federalRebateAmount: string; rebateRequestNotes: string;
-  }>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      initiatorType: caseData.initiatorType ?? "Contractor/Installer",
-      initiatorCompanyName: caseData.initiatorCompanyName ?? "Giesbrecht HVAC",
-      initiatorFirstName: caseData.initiatorFirstName ?? "",
-      initiatorLastName: caseData.initiatorLastName ?? "",
-      initiatorPhone: caseData.initiatorPhone ?? "",
-      initiatorEmail: caseData.initiatorEmail ?? "",
-      propertyAddress: caseData.propertyAddress ?? "",
-      propertyAddressLine2: caseData.propertyAddressLine2 ?? "",
-      propertyCity: caseData.propertyCity ?? "",
-      propertyState: caseData.propertyState ?? "GA",
-      propertyZip: caseData.propertyZip ?? "",
-      addressCertified: caseData.addressCertified ?? false,
-      constructionType: caseData.constructionType ?? "",
-      buildingType: caseData.buildingType ?? "",
-      buildingSubtype: caseData.buildingSubtype ?? "",
-      isRented: caseData.isRented ?? false,
-      bedroomCount: caseData.bedroomCount ?? undefined,
-      sqftRange: caseData.sqftRange ?? "",
-      applicationDate: caseData.applicationDate ? format(new Date(caseData.applicationDate), "yyyy-MM-dd") : "",
-      reservationDate: caseData.reservationDate ? format(new Date(caseData.reservationDate), "yyyy-MM-dd") : "",
-      approvalDate: caseData.approvalDate ? format(new Date(caseData.approvalDate), "yyyy-MM-dd") : "",
-      paidDate: caseData.paidDate ? format(new Date(caseData.paidDate), "yyyy-MM-dd") : "",
-      rebateAmount: caseData.rebateAmount ?? "",
-      utilityRebateAmount: caseData.utilityRebateAmount ?? "",
-      federalRebateAmount: caseData.federalRebateAmount ?? "",
-      rebateRequestNotes: caseData.rebateRequestNotes ?? "",
-    },
-  });
+  const [values, setValues] = useState<FormState>(() => buildInitial(caseData));
+  const initialRef = useRef<FormState>(values);
+  useEffect(() => {
+    const fresh = buildInitial(caseData);
+    initialRef.current = fresh;
+    setValues(fresh);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseData.id]);
+  const initial = initialRef.current;
 
-  const watchBuildingType = form.watch("buildingType");
-  const onSubmit = (values: any) => onPatch(values);
+  const dirty = JSON.stringify(values) !== JSON.stringify(initial);
+  const set = <K extends keyof FormState>(key: K, v: FormState[K]) => setValues(prev => ({ ...prev, [key]: v }));
+
+  const handleSave = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    onPatch(values as Partial<RebateCase>);
+  };
+
+  const inputCls = "w-full h-9 px-3 rounded-md bg-slate-50 border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-[#711419] focus:ring-1 focus:ring-[#711419]/30";
+  const labelCls = "block text-sm text-slate-700 mb-1";
+  const codeCls = "font-semibold text-slate-800";
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="max-w-3xl space-y-6">
+    <form onSubmit={handleSave} className="max-w-3xl mx-auto pb-24">
+      <header className="mb-6">
+        <h2 className="text-xl font-semibold text-slate-900 mb-1">A. Rebate Request</h2>
+        <p className="text-sm text-slate-500">
+          Contractor companies should use this page to fill out information about their organization and their proposed project. All fields are required.
+        </p>
+      </header>
+
+      {/* CONTRACTOR / INITIATOR INFORMATION */}
+      <div className="bg-[#1e3a5f] text-white px-4 py-2.5 rounded-sm mb-4">
+        <span className="text-xs font-bold uppercase tracking-wide">Contractor / Initiator Information</span>
+      </div>
+      <div className="space-y-5 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div>
-            <h2 className="text-xl font-semibold text-slate-900 mb-1">A. Rebate Request</h2>
-            <p className="text-sm text-slate-500">
-              Contractor companies should use this page to fill out information about their organization and their proposed project. All fields are required.
-            </p>
+            <label className={labelCls}><span className={codeCls}>A.1.</span> Who is initiating the energy rebate request?</label>
+            <select className={inputCls} value={values.initiatorType} onChange={e => set("initiatorType", e.target.value)}>
+              <option value="Contractor/Installer">Contractor/Installer</option>
+              <option value="Customer/Homeowner">Customer/Homeowner</option>
+              <option value="Utility">Utility</option>
+            </select>
           </div>
-
-          {/* Contractor / Initiator Information */}
-          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-            <RebateRequestSectionHeader letter="CONTRACTOR / INITIATOR INFORMATION" title="" />
-            <div className="px-5 pb-5 space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <FormField control={form.control} name="initiatorType" render={({ field }) => (
-                  <FormItem>
-                    <FieldLabel code="A.1" label="Who is initiating the energy rebate request?" />
-                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300"><SelectValue placeholder="Select..." /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Contractor/Installer">Contractor/Installer</SelectItem>
-                        <SelectItem value="Customer/Homeowner">Customer/Homeowner</SelectItem>
-                        <SelectItem value="Utility">Utility</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="initiatorCompanyName" render={({ field }) => (
-                  <FormItem>
-                    <FieldLabel code="A.2" label="Company Name Starting the Application" />
-                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300"><SelectValue placeholder="Select..." /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Giesbrecht HVAC">Giesbrecht HVAC</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-800 mb-3"><span className="font-bold">A.3.</span> Primary Initiator Contact Name</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <FormField control={form.control} name="initiatorFirstName" render={({ field }) => (
-                    <FormItem>
-                      <FieldLabel code="A.3a" label="First Name" />
-                      <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" {...field} value={field.value ?? ""} /></FormControl>
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="initiatorPhone" render={({ field }) => (
-                    <FormItem>
-                      <FieldLabel code="A.3c" label="Phone Number" />
-                      <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" {...field} value={field.value ?? ""} /></FormControl>
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="initiatorLastName" render={({ field }) => (
-                    <FormItem>
-                      <FieldLabel code="A.3b" label="Last Name" />
-                      <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" {...field} value={field.value ?? ""} /></FormControl>
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="initiatorEmail" render={({ field }) => (
-                    <FormItem>
-                      <FieldLabel code="A.3d" label="Email" />
-                      <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" {...field} value={field.value ?? ""} /></FormControl>
-                    </FormItem>
-                  )} />
-                </div>
-              </div>
-            </div>
+          <div>
+            <label className={labelCls}><span className={codeCls}>A.2.</span> Company Name Starting the Application</label>
+            <select className={inputCls} value={values.initiatorCompanyName} onChange={e => set("initiatorCompanyName", e.target.value)}>
+              <option value="Giesbrecht HVAC">Giesbrecht HVAC</option>
+            </select>
           </div>
-
-          {/* Property and Building Information */}
-          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-            <RebateRequestSectionHeader letter="PROPERTY AND BUILDING INFORMATION" title="" />
-            <div className="px-5 pb-5 space-y-5">
-              <div>
-                <FieldLabel code="A.4" label="Project Home Address" />
-                <div className="space-y-2">
-                  <FormField control={form.control} name="propertyAddress" render={({ field }) => (
-                    <FormItem>
-                      <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" placeholder="Address Line 1" {...field} value={field.value ?? ""} /></FormControl>
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="propertyAddressLine2" render={({ field }) => (
-                    <FormItem>
-                      <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" placeholder="Address Line 2" {...field} value={field.value ?? ""} /></FormControl>
-                    </FormItem>
-                  )} />
-                  <div className="grid grid-cols-5 gap-2">
-                    <FormField control={form.control} name="propertyCity" render={({ field }) => (
-                      <FormItem className="col-span-2">
-                        <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" placeholder="City" {...field} value={field.value ?? ""} /></FormControl>
-                      </FormItem>
-                    )} />
-                    <FormField control={form.control} name="propertyState" render={({ field }) => (
-                      <FormItem className="col-span-1">
-                        <Select value={field.value ?? ""} onValueChange={field.onChange}>
-                          <FormControl>
-                            <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300"><SelectValue placeholder="ST" /></SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {US_STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
-                    )} />
-                    <FormField control={form.control} name="propertyZip" render={({ field }) => (
-                      <FormItem className="col-span-2">
-                        <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" placeholder="ZIP" {...field} value={field.value ?? ""} /></FormControl>
-                      </FormItem>
-                    )} />
-                  </div>
-                </div>
-                <FormField control={form.control} name="addressCertified" render={({ field }) => (
-                  <FormItem className="flex items-center gap-2 mt-3">
-                    <FormControl>
-                      <input type="checkbox" checked={field.value ?? false} onChange={e => field.onChange(e.target.checked)} className="w-4 h-4 accent-[#711419]" />
-                    </FormControl>
-                    <FormLabel className="text-sm text-slate-700 cursor-pointer !mt-0">
-                      I certify the above address is complete and correct.{" "}
-                      <span className="text-red-500 font-medium">*Required</span>
-                    </FormLabel>
-                  </FormItem>
-                )} />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <FormField control={form.control} name="constructionType" render={({ field }) => (
-                  <FormItem>
-                    <FieldLabel code="A.5" label="Is the building new or existing construction?" />
-                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300"><SelectValue placeholder="Select..." /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Existing Construction">Existing Construction</SelectItem>
-                        <SelectItem value="New Construction">New Construction</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="buildingType" render={({ field }) => (
-                  <FormItem>
-                    <FieldLabel code="A.6" label="What is the building type?" />
-                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300"><SelectValue placeholder="Select..." /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Single Family">Single Family</SelectItem>
-                        <SelectItem value="Multi-Family">Multi-Family</SelectItem>
-                        <SelectItem value="Mobile Home">Mobile Home</SelectItem>
-                        <SelectItem value="Commercial">Commercial</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-              </div>
-              {watchBuildingType === "Single Family" && (
-                <FormField control={form.control} name="buildingSubtype" render={({ field }) => (
-                  <FormItem className="max-w-sm">
-                    <FieldLabel code="A.6a" label="Single Family Building Type Details" />
-                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300"><SelectValue placeholder="Select..." /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Single Family Attached">Single Family Attached</SelectItem>
-                        <SelectItem value="Single Family Detached">Single Family Detached</SelectItem>
-                        <SelectItem value="Townhouse">Townhouse</SelectItem>
-                        <SelectItem value="Manufactured Home">Manufactured Home</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-              )}
-              <FormField control={form.control} name="isRented" render={({ field }) => (
-                <FormItem>
-                  <FieldLabel code="A.7" label="Is the building rented?" />
-                  <div className="flex flex-col gap-1.5 mt-1">
-                    {[{ label: "Yes", value: true }, { label: "No", value: false }].map(opt => (
-                      <label key={String(opt.value)} className="flex items-center gap-2 cursor-pointer">
-                        <input type="radio" checked={field.value === opt.value} onChange={() => field.onChange(opt.value)} className="accent-[#711419]" />
-                        <span className="text-sm text-slate-700">{opt.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </FormItem>
-              )} />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <FormField control={form.control} name="bedroomCount" render={({ field }) => (
-                  <FormItem>
-                    <FieldLabel code="A.8" label="Total Number of Bedrooms" />
-                    <FormControl>
-                      <Input type="number" min={0} className="h-9 text-sm bg-slate-50 border-slate-300 text-right" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : undefined)} />
-                    </FormControl>
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="sqftRange" render={({ field }) => (
-                  <FormItem>
-                    <FieldLabel code="A.9" label="Conditioned square footage of single family home:" />
-                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300"><SelectValue placeholder="Select range..." /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="500 - 1,500 sq ft">500 – 1,500 sq ft</SelectItem>
-                        <SelectItem value="1,501 - 2,500 sq ft">1,501 – 2,500 sq ft</SelectItem>
-                        <SelectItem value="2,501 - 3,500 sq ft">2,501 – 3,500 sq ft</SelectItem>
-                        <SelectItem value="3,501 - 5,000 sq ft">3,501 – 5,000 sq ft</SelectItem>
-                        <SelectItem value="5,001+ sq ft">5,001+ sq ft</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-              </div>
-            </div>
-          </div>
-
-          <SaveBar onSave={form.handleSubmit(onSubmit)} saving={saving} dirty={form.formState.isDirty} />
         </div>
-      </form>
-    </Form>
+
+        <div>
+          <p className="text-sm mb-3"><span className={codeCls}>A.3.</span> Primary Initiator Contact Name</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4">
+            <div>
+              <label className={labelCls}><span className={codeCls}>A.3a.</span> First Name</label>
+              <input className={inputCls} value={values.initiatorFirstName} onChange={e => set("initiatorFirstName", e.target.value)} />
+            </div>
+            <div>
+              <label className={labelCls}><span className={codeCls}>A.3c.</span> Phone Number</label>
+              <input className={inputCls} value={values.initiatorPhone} onChange={e => set("initiatorPhone", e.target.value)} />
+            </div>
+            <div>
+              <label className={labelCls}><span className={codeCls}>A.3b.</span> Last Name</label>
+              <input className={inputCls} value={values.initiatorLastName} onChange={e => set("initiatorLastName", e.target.value)} />
+            </div>
+            <div>
+              <label className={labelCls}><span className={codeCls}>A.3d.</span> Email</label>
+              <input type="email" className={inputCls} value={values.initiatorEmail} onChange={e => set("initiatorEmail", e.target.value)} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* PROPERTY AND BUILDING INFORMATION */}
+      <div className="bg-[#1e3a5f] text-white px-4 py-2.5 rounded-sm mb-4">
+        <span className="text-xs font-bold uppercase tracking-wide">Property and Building Information</span>
+      </div>
+      <div className="space-y-5">
+        <div>
+          <label className={labelCls}><span className={codeCls}>A.4.</span> Project Home Address</label>
+          <div className="space-y-2">
+            <input className={inputCls} placeholder="Address Line 1" value={values.propertyAddress} onChange={e => set("propertyAddress", e.target.value)} />
+            <input className={inputCls} placeholder="Address Line 2" value={values.propertyAddressLine2} onChange={e => set("propertyAddressLine2", e.target.value)} />
+            <div className="grid grid-cols-5 gap-2">
+              <input className={`${inputCls} col-span-2`} placeholder="City" value={values.propertyCity} onChange={e => set("propertyCity", e.target.value)} />
+              <select className={`${inputCls} col-span-1`} value={values.propertyState} onChange={e => set("propertyState", e.target.value)}>
+                {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <input className={`${inputCls} col-span-2`} placeholder="ZIP" value={values.propertyZip} onChange={e => set("propertyZip", e.target.value)} />
+            </div>
+          </div>
+          <label className="flex items-center gap-2 mt-3 cursor-pointer">
+            <input type="checkbox" checked={values.addressCertified} onChange={e => set("addressCertified", e.target.checked)} className="w-4 h-4 accent-[#711419]" />
+            <span className="text-sm text-slate-700">I certify the above address is complete and correct. <span className="text-red-500 font-medium">*Required</span></span>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <label className={labelCls}><span className={codeCls}>A.5.</span> Is the building new or existing construction?</label>
+            <select className={inputCls} value={values.constructionType} onChange={e => set("constructionType", e.target.value)}>
+              <option value="">Select...</option>
+              <option value="Existing Construction">Existing Construction</option>
+              <option value="New Construction">New Construction</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}><span className={codeCls}>A.6.</span> What is the building type?</label>
+            <select className={inputCls} value={values.buildingType} onChange={e => set("buildingType", e.target.value)}>
+              <option value="">Select...</option>
+              <option value="Single Family">Single Family</option>
+              <option value="Multi-Family">Multi-Family</option>
+              <option value="Mobile Home">Mobile Home</option>
+              <option value="Commercial">Commercial</option>
+            </select>
+          </div>
+        </div>
+
+        {values.buildingType === "Single Family" && (
+          <div className="max-w-sm">
+            <label className={labelCls}><span className={codeCls}>A.6a.</span> Single Family Building Type Details</label>
+            <select className={inputCls} value={values.buildingSubtype} onChange={e => set("buildingSubtype", e.target.value)}>
+              <option value="">Select...</option>
+              <option value="Single Family Attached">Single Family Attached</option>
+              <option value="Single Family Detached">Single Family Detached</option>
+              <option value="Townhouse">Townhouse</option>
+              <option value="Manufactured Home">Manufactured Home</option>
+            </select>
+          </div>
+        )}
+
+        <div>
+          <label className={labelCls}><span className={codeCls}>A.7.</span> Is the building rented?</label>
+          <div className="flex flex-col gap-1.5 mt-1">
+            {[{ label: "Yes", value: true }, { label: "No", value: false }].map(opt => (
+              <label key={String(opt.value)} className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" checked={values.isRented === opt.value} onChange={() => set("isRented", opt.value)} className="accent-[#711419]" />
+                <span className="text-sm text-slate-700">{opt.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <label className={labelCls}><span className={codeCls}>A.8.</span> Total Number of Bedrooms</label>
+            <input type="number" min={0} className={`${inputCls} text-right`} value={values.bedroomCount ?? ""} onChange={e => set("bedroomCount", e.target.value ? Number(e.target.value) : null)} />
+          </div>
+          <div>
+            <label className={labelCls}><span className={codeCls}>A.9.</span> Conditioned square footage of single family home:</label>
+            <select className={inputCls} value={values.sqftRange} onChange={e => set("sqftRange", e.target.value)}>
+              <option value="">Select range...</option>
+              <option value="500 - 1,500 sq ft">500 – 1,500 sq ft</option>
+              <option value="1,501 - 2,500 sq ft">1,501 – 2,500 sq ft</option>
+              <option value="2,501 - 3,500 sq ft">2,501 – 3,500 sq ft</option>
+              <option value="3,501 - 5,000 sq ft">3,501 – 5,000 sq ft</option>
+              <option value="5,001+ sq ft">5,001+ sq ft</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {dirty && (
+        <div className="sticky bottom-0 left-0 right-0 mt-8 -mx-4 lg:-mx-6 px-4 lg:px-6 py-3 bg-white border-t border-slate-200 flex justify-end shadow-[0_-2px_8px_rgba(0,0,0,0.04)]">
+          <Button type="submit" disabled={saving} size="sm" className="bg-[#711419] hover:bg-[#5a1014]">
+            {saving ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : null}
+            Save Changes
+          </Button>
+        </div>
+      )}
+    </form>
   );
 }
 
