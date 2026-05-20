@@ -87,9 +87,8 @@ export default function CrmRebatePrograms() {
   });
 
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState("");
+  const [activeTab, setActiveTab] = useState("all");
   const [filterProgram, setFilterProgram] = useState("all");
-  const [filterWorkflowStep, setFilterWorkflowStep] = useState("all");
 
   // Dialog state
   const [showCreate, setShowCreate] = useState(false);
@@ -176,10 +175,9 @@ export default function CrmRebatePrograms() {
       [c.clientFirstName, c.clientLastName, c.propertyAddress, c.caseNumber]
         .filter(Boolean).join(" ").toLowerCase().includes(q)
     );
-    const matchStatus = !activeTab || c.applicationStatus === activeTab;
     const matchProgram = filterProgram === "all" || c.programType === filterProgram;
-    const matchWorkflowStep = filterWorkflowStep === "all" || c.currentStep === filterWorkflowStep;
-    return matchSearch && matchStatus && matchProgram && matchWorkflowStep;
+    const matchStep = activeTab === "all" || c.currentStep === activeTab;
+    return matchSearch && matchProgram && matchStep;
   });
 
   function handleSelectCustomer(customer: CrmCustomer) {
@@ -289,17 +287,6 @@ export default function CrmRebatePrograms() {
               <SelectItem value="HER">HER</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={filterWorkflowStep} onValueChange={setFilterWorkflowStep}>
-            <SelectTrigger className="w-[160px] h-8 text-xs border-slate-200 focus:ring-0 focus:ring-offset-0">
-              <SelectValue placeholder="All Workflow Steps" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Workflow Steps</SelectItem>
-              {WORKFLOW_STEPS_ORDER.map(s => (
-                <SelectItem key={s} value={s}>{WORKFLOW_STEP_LABELS[s]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Button
             size="sm"
             className="bg-[#711419] hover:bg-[#5a1014] text-white"
@@ -311,22 +298,22 @@ export default function CrmRebatePrograms() {
         </div>
       </div>
 
-      {/* Underline status tabs */}
+      {/* Underline workflow-step tabs */}
       <div className="flex overflow-x-auto overflow-y-hidden border-b border-slate-200">
-        {QUICK_FILTERS.map(qf => {
-          const count = qf.status === "" ? cases.length : cases.filter(c => c.applicationStatus === qf.status).length;
+        {[{ key: "all", label: "All" }, ...WORKFLOW_STEPS_ORDER.map(s => ({ key: s, label: WORKFLOW_STEP_LABELS[s] }))].map(tab => {
+          const count = tab.key === "all" ? cases.length : cases.filter(c => c.currentStep === tab.key).length;
           return (
             <button
-              key={qf.status}
-              onClick={() => setActiveTab(qf.status)}
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
               className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-                activeTab === qf.status
+                activeTab === tab.key
                   ? "border-[#711419] text-[#711419]"
                   : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
               }`}
             >
-              {qf.label}
-              <span className={`ml-1.5 text-xs ${activeTab === qf.status ? "text-[#711419]" : "text-slate-400"}`}>
+              {tab.label}
+              <span className={`ml-1.5 text-xs ${activeTab === tab.key ? "text-[#711419]" : "text-slate-400"}`}>
                 {count}
               </span>
             </button>
