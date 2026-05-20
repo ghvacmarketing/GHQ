@@ -91,7 +91,7 @@ const taskFormSchema = z.object({
     },
     { message: "Due date cannot be in the past" }
   ),
-  relatedEntityType: z.enum(["customer", "lead", "project", "work_order", "invoice", "none"]).optional(),
+  relatedEntityType: z.enum(["customer", "lead", "project", "work_order", "invoice", "rebate_case", "none"]).optional(),
   relatedEntityId: z.string().optional(),
   customerId: z.string().optional(),
 });

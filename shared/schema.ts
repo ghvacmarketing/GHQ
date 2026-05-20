@@ -3266,7 +3266,7 @@ export const taskPriorityEnum = ["low", "normal", "high"] as const;
 export type TaskPriority = typeof taskPriorityEnum[number];
 
 // Task Related Entity Type Enum
-export const taskRelatedEntityTypeEnum = ["customer", "lead", "project", "work_order", "invoice", "none"] as const;
+export const taskRelatedEntityTypeEnum = ["customer", "lead", "project", "work_order", "invoice", "rebate_case", "none"] as const;
 export type TaskRelatedEntityType = typeof taskRelatedEntityTypeEnum[number];
 
 // Task List Enum - Google Tasks-style columns
@@ -3508,3 +3508,239 @@ export const insertCustomerFileSchema = createInsertSchema(customerFiles).omit({
 
 export type InsertCustomerFile = z.infer<typeof insertCustomerFileSchema>;
 export type CustomerFile = typeof customerFiles.$inferSelect;
+
+// ============================================================================
+// Rebate Programs Module (HEAR / HER case management)
+// ============================================================================
+
+export const rebateProgramTypeEnum = ["HEAR", "HER"] as const;
+export type RebateProgramType = typeof rebateProgramTypeEnum[number];
+
+export const rebateApplicationStatusEnum = [
+  "not_started",
+  "in_progress",
+  "waiting_on_customer",
+  "waiting_on_neighborly",
+  "waiting_on_utility",
+  "scope_needed",
+  "scope_submitted",
+  "scope_approved",
+  "completion_submitted",
+  "completion_approved",
+  "approved",
+  "paid",
+  "declined",
+  "not_interested",
+  "on_hold",
+] as const;
+export type RebateApplicationStatus = typeof rebateApplicationStatusEnum[number];
+
+export const rebateWorkflowStepEnum = [
+  "program_overview",
+  "rebate_request",
+  "head_of_household",
+  "scope_of_work",
+  "contractor_pre_approval",
+  "project_completion",
+  "completion_attestations",
+  "reservation_summary",
+] as const;
+export type RebateWorkflowStep = typeof rebateWorkflowStepEnum[number];
+
+export const rebateWorkflowStepStatusEnum = [
+  "not_started",
+  "in_progress",
+  "complete",
+  "waiting",
+  "blocked",
+] as const;
+export type RebateWorkflowStepStatus = typeof rebateWorkflowStepStatusEnum[number];
+
+export const rebatePriorityEnum = ["low", "normal", "high", "urgent"] as const;
+export type RebatePriority = typeof rebatePriorityEnum[number];
+
+export const rebateDocumentCategoryEnum = [
+  "rebate_request",
+  "head_of_household",
+  "scope_of_work",
+  "contractor_pre_approval",
+  "project_completion",
+  "completion_attestations",
+  "reservation_summary",
+  "other",
+] as const;
+export type RebateDocumentCategory = typeof rebateDocumentCategoryEnum[number];
+
+// Main rebate case record
+export const rebateCases = pgTable("rebate_cases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+
+  // Summary
+  caseNumber: text("case_number"),
+  programType: text("program_type").$type<RebateProgramType>().notNull().default("HEAR"),
+  applicationStatus: text("application_status").$type<RebateApplicationStatus>().notNull().default("not_started"),
+  priority: text("priority").$type<RebatePriority>().notNull().default("normal"),
+  assignedToUserId: varchar("assigned_to_user_id").references(() => crmUsers.id, { onDelete: "set null" }),
+  customerId: varchar("customer_id").references(() => crmCustomers.id, { onDelete: "set null" }),
+  applicationDate: timestamp("application_date"),
+  reservationDate: timestamp("reservation_date"),
+  approvalDate: timestamp("approval_date"),
+  paidDate: timestamp("paid_date"),
+  rebateAmount: text("rebate_amount"),
+  notes: text("notes"),
+
+  // Client
+  clientFirstName: text("client_first_name"),
+  clientLastName: text("client_last_name"),
+  clientEmail: text("client_email"),
+  clientPhone: text("client_phone"),
+  clientDob: text("client_dob"),
+  householdSize: integer("household_size"),
+  householdIncome: text("household_income"),
+  amiBracket: text("ami_bracket"),
+
+  // Property
+  propertyAddress: text("property_address"),
+  propertyCity: text("property_city"),
+  propertyState: text("property_state"),
+  propertyZip: text("property_zip"),
+  propertyType: text("property_type"),
+  ownershipStatus: text("ownership_status"),
+  yearBuilt: integer("year_built"),
+  squareFootage: integer("square_footage"),
+
+  // Utility
+  electricUtility: text("electric_utility"),
+  electricAccountNumber: text("electric_account_number"),
+  gasUtility: text("gas_utility"),
+  gasAccountNumber: text("gas_account_number"),
+
+  // Existing equipment
+  existingHeatingType: text("existing_heating_type"),
+  existingHeatingAge: integer("existing_heating_age"),
+  existingCoolingType: text("existing_cooling_type"),
+  existingCoolingAge: integer("existing_cooling_age"),
+  existingWaterHeaterType: text("existing_water_heater_type"),
+  existingWaterHeaterAge: integer("existing_water_heater_age"),
+
+  // New equipment
+  newHeatingType: text("new_heating_type"),
+  newHeatingBrand: text("new_heating_brand"),
+  newHeatingModel: text("new_heating_model"),
+  newHeatingSerial: text("new_heating_serial"),
+  newHeatingSeer: text("new_heating_seer"),
+  newHeatingHspf: text("new_heating_hspf"),
+  newCoolingType: text("new_cooling_type"),
+  newCoolingBrand: text("new_cooling_brand"),
+  newCoolingModel: text("new_cooling_model"),
+  newCoolingSerial: text("new_cooling_serial"),
+  newWaterHeaterType: text("new_water_heater_type"),
+  newWaterHeaterBrand: text("new_water_heater_brand"),
+  newWaterHeaterModel: text("new_water_heater_model"),
+
+  // Scope summary
+  scopeSummary: text("scope_summary"),
+  installCost: text("install_cost"),
+  installDate: timestamp("install_date"),
+  installCompletedDate: timestamp("install_completed_date"),
+
+  createdByUserId: varchar("created_by_user_id").references(() => crmUsers.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+const coerceRebateDate = z.union([
+  z.string().transform((val) => val ? new Date(val) : null),
+  z.date(),
+  z.null(),
+]).nullable().optional();
+
+export const insertRebateCaseSchema = createInsertSchema(rebateCases)
+  .omit({ id: true, createdAt: true, updatedAt: true })
+  .extend({
+    applicationDate: coerceRebateDate,
+    reservationDate: coerceRebateDate,
+    approvalDate: coerceRebateDate,
+    paidDate: coerceRebateDate,
+    installDate: coerceRebateDate,
+    installCompletedDate: coerceRebateDate,
+  });
+export type InsertRebateCase = z.infer<typeof insertRebateCaseSchema>;
+export type RebateCase = typeof rebateCases.$inferSelect;
+
+// Workflow steps - 8 seeded per case
+export const rebateCaseWorkflowSteps = pgTable("rebate_case_workflow_steps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").notNull().references(() => rebateCases.id, { onDelete: "cascade" }),
+  step: text("step").$type<RebateWorkflowStep>().notNull(),
+  status: text("status").$type<RebateWorkflowStepStatus>().notNull().default("not_started"),
+  notes: text("notes"),
+  completedAt: timestamp("completed_at"),
+  completedByUserId: varchar("completed_by_user_id").references(() => crmUsers.id, { onDelete: "set null" }),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertRebateCaseWorkflowStepSchema = createInsertSchema(rebateCaseWorkflowSteps).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type InsertRebateCaseWorkflowStep = z.infer<typeof insertRebateCaseWorkflowStepSchema>;
+export type RebateCaseWorkflowStep = typeof rebateCaseWorkflowSteps.$inferSelect;
+
+// Scope checklist - 12 seeded items per case
+export const rebateCaseScopeChecklist = pgTable("rebate_case_scope_checklist", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").notNull().references(() => rebateCases.id, { onDelete: "cascade" }),
+  itemName: text("item_name").notNull(),
+  isChecked: boolean("is_checked").notNull().default(false),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  completedAt: timestamp("completed_at"),
+  completedByUserId: varchar("completed_by_user_id").references(() => crmUsers.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertRebateCaseScopeChecklistSchema = createInsertSchema(rebateCaseScopeChecklist).omit({
+  id: true, createdAt: true,
+});
+export type InsertRebateCaseScopeChecklist = z.infer<typeof insertRebateCaseScopeChecklistSchema>;
+export type RebateCaseScopeChecklist = typeof rebateCaseScopeChecklist.$inferSelect;
+
+// Documents
+export const rebateCaseDocuments = pgTable("rebate_case_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").notNull().references(() => rebateCases.id, { onDelete: "cascade" }),
+  category: text("category").$type<RebateDocumentCategory>().notNull().default("other"),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  objectPath: text("object_path"),
+  contentType: text("content_type"),
+  size: integer("size"),
+  notes: text("notes"),
+  uploadedByUserId: varchar("uploaded_by_user_id").references(() => crmUsers.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertRebateCaseDocumentSchema = createInsertSchema(rebateCaseDocuments).omit({
+  id: true, createdAt: true,
+});
+export type InsertRebateCaseDocument = z.infer<typeof insertRebateCaseDocumentSchema>;
+export type RebateCaseDocument = typeof rebateCaseDocuments.$inferSelect;
+
+// Activity log (timeline per case)
+export const rebateCaseActivityLog = pgTable("rebate_case_activity_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").notNull().references(() => rebateCases.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => crmUsers.id, { onDelete: "set null" }),
+  action: text("action").notNull(),
+  description: text("description"),
+  metadata: json("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertRebateCaseActivityLogSchema = createInsertSchema(rebateCaseActivityLog).omit({
+  id: true, createdAt: true,
+});
+export type InsertRebateCaseActivityLog = z.infer<typeof insertRebateCaseActivityLogSchema>;
+export type RebateCaseActivityLog = typeof rebateCaseActivityLog.$inferSelect;

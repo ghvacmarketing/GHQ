@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, crmNotifications, crmComments, crmCommentMentions, insertCrmNotificationSchema, insertCrmCommentSchema, insertCrmCommentMentionSchema, type CrmNotification, type InsertCrmNotification, type CrmComment, type InsertCrmComment, type CrmCommentMention, type InsertCrmCommentMention, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry, crmLeads, crmLeadTypes, insertCrmLeadSchema, insertCrmLeadTypeSchema, type CrmLead, type CrmLeadType, type InsertCrmLead, type InsertCrmLeadType, crmLeadTempOptions, crmLeadDriverOptions, insertCrmLeadTempOptionSchema, insertCrmLeadDriverOptionSchema, type CrmLeadTempOption, type CrmLeadDriverOption, type InsertCrmLeadTempOption, type InsertCrmLeadDriverOption, tasks, taskTypes, taskActivity, insertTaskSchema, insertTaskTypeSchema, insertTaskActivitySchema, type Task, type TaskType, type TaskActivity, type InsertTask, type InsertTaskType, type InsertTaskActivity, crmTaggedComments, crmTaggedCommentRecipients, salesbookBookmarks, insertSalesbookBookmarkSchema, customerFiles, insertCustomerFileSchema, type CustomerFile } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, crmNotifications, crmComments, crmCommentMentions, insertCrmNotificationSchema, insertCrmCommentSchema, insertCrmCommentMentionSchema, type CrmNotification, type InsertCrmNotification, type CrmComment, type InsertCrmComment, type CrmCommentMention, type InsertCrmCommentMention, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry, crmLeads, crmLeadTypes, insertCrmLeadSchema, insertCrmLeadTypeSchema, type CrmLead, type CrmLeadType, type InsertCrmLead, type InsertCrmLeadType, crmLeadTempOptions, crmLeadDriverOptions, insertCrmLeadTempOptionSchema, insertCrmLeadDriverOptionSchema, type CrmLeadTempOption, type CrmLeadDriverOption, type InsertCrmLeadTempOption, type InsertCrmLeadDriverOption, tasks, taskTypes, taskActivity, insertTaskSchema, insertTaskTypeSchema, insertTaskActivitySchema, type Task, type TaskType, type TaskActivity, type InsertTask, type InsertTaskType, type InsertTaskActivity, crmTaggedComments, crmTaggedCommentRecipients, salesbookBookmarks, insertSalesbookBookmarkSchema, customerFiles, insertCustomerFileSchema, type CustomerFile, rebateCases, insertRebateCaseSchema, type RebateCase, type InsertRebateCase, insertRebateCaseDocumentSchema, insertRebateCaseScopeChecklistSchema, rebateProgramTypeEnum, rebateApplicationStatusEnum, rebateWorkflowStepStatusEnum, rebateDocumentCategoryEnum } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
@@ -28170,6 +28170,305 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============================================================================
+  // Rebate Programs (HEAR/HER case management)
+  // ============================================================================
+
+  // GET /api/crm/rebate-cases - list cases
+  app.get("/api/crm/rebate-cases", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const { search, status, programType, assignedToUserId } = req.query;
+      const cases = await storage.getRebateCases({
+        search: search as string | undefined,
+        status: status as string | undefined,
+        programType: programType as string | undefined,
+        assignedToUserId: assignedToUserId as string | undefined,
+      });
+      res.json(cases);
+    } catch (error: any) {
+      console.error("Failed to list rebate cases:", error);
+      res.status(500).json({ message: error.message || "Failed to list rebate cases" });
+    }
+  });
+
+  // GET /api/crm/rebate-cases/:id - single case with related data
+  app.get("/api/crm/rebate-cases/:id", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const rebateCase = await storage.getRebateCase(id);
+      if (!rebateCase) {
+        return res.status(404).json({ message: "Rebate case not found" });
+      }
+      const [workflowSteps, scopeChecklist, documents, activity] = await Promise.all([
+        storage.getRebateCaseWorkflowSteps(id),
+        storage.getRebateCaseScopeChecklist(id),
+        storage.getRebateCaseDocuments(id),
+        storage.getRebateCaseActivity(id),
+      ]);
+      res.json({ ...rebateCase, workflowSteps, scopeChecklist, documents, activity });
+    } catch (error: any) {
+      console.error("Failed to fetch rebate case:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch rebate case" });
+    }
+  });
+
+  // POST /api/crm/rebate-cases - create
+  app.post("/api/crm/rebate-cases", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const body = { ...req.body };
+      // Convenience: split a single "customerName" string into first/last
+      if (body.customerName && !body.clientFirstName && !body.clientLastName) {
+        const parts = String(body.customerName).trim().split(/\s+/);
+        body.clientFirstName = parts.shift() || null;
+        body.clientLastName = parts.join(" ") || null;
+      }
+      delete body.customerName;
+      const validation = insertRebateCaseSchema.safeParse({
+        ...body,
+        createdByUserId: user?.id,
+      });
+      if (!validation.success) {
+        return res.status(400).json({ message: "Validation error", errors: validation.error.errors });
+      }
+      const created = await storage.createRebateCase(validation.data);
+      await storage.logRebateCaseActivity({
+        caseId: created.id,
+        userId: user?.id || null,
+        action: "case_created",
+        description: `Case created (${created.programType})`,
+      });
+      res.status(201).json(created);
+    } catch (error: any) {
+      console.error("Failed to create rebate case:", error);
+      res.status(500).json({ message: error.message || "Failed to create rebate case" });
+    }
+  });
+
+  // PATCH /api/crm/rebate-cases/:id - update
+  app.patch("/api/crm/rebate-cases/:id", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const { id } = req.params;
+      const existing = await storage.getRebateCase(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Rebate case not found" });
+      }
+      const updateSchema = insertRebateCaseSchema.partial();
+      const validation = updateSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Validation error", errors: validation.error.errors });
+      }
+      const updated = await storage.updateRebateCase(id, validation.data as any);
+      // Log status change
+      if (validation.data.applicationStatus && validation.data.applicationStatus !== existing.applicationStatus) {
+        await storage.logRebateCaseActivity({
+          caseId: id,
+          userId: user?.id || null,
+          action: "status_changed",
+          description: `Status changed from "${existing.applicationStatus}" to "${validation.data.applicationStatus}"`,
+          metadata: { from: existing.applicationStatus, to: validation.data.applicationStatus },
+        });
+      } else {
+        await storage.logRebateCaseActivity({
+          caseId: id,
+          userId: user?.id || null,
+          action: "case_updated",
+          description: "Case details updated",
+        });
+      }
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to update rebate case:", error);
+      res.status(500).json({ message: error.message || "Failed to update rebate case" });
+    }
+  });
+
+  // DELETE /api/crm/rebate-cases/:id
+  app.delete("/api/crm/rebate-cases/:id", requireCrmAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const ok = await storage.deleteRebateCase(id);
+      if (!ok) return res.status(404).json({ message: "Rebate case not found" });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete rebate case:", error);
+      res.status(500).json({ message: error.message || "Failed to delete rebate case" });
+    }
+  });
+
+  // PATCH /api/crm/rebate-cases/:id/workflow-steps/:stepId
+  app.patch("/api/crm/rebate-cases/:id/workflow-steps/:stepId", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const { id, stepId } = req.params;
+      const allowed = ["status", "notes", "completedAt", "completedByUserId"] as const;
+      const updateData: any = {};
+      for (const key of allowed) {
+        if (key in req.body) updateData[key] = req.body[key];
+      }
+      if (updateData.status && !rebateWorkflowStepStatusEnum.includes(updateData.status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+      if (updateData.status === "complete" && !updateData.completedAt) {
+        updateData.completedAt = new Date();
+        updateData.completedByUserId = user?.id || null;
+      }
+      const updated = await storage.updateRebateCaseWorkflowStep(stepId, id, updateData);
+      if (!updated) return res.status(404).json({ message: "Workflow step not found" });
+      await storage.logRebateCaseActivity({
+        caseId: id,
+        userId: user?.id || null,
+        action: "workflow_step_updated",
+        description: `Step "${updated.step}" updated to "${updated.status}"`,
+      });
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to update workflow step:", error);
+      res.status(500).json({ message: error.message || "Failed to update workflow step" });
+    }
+  });
+
+  // POST /api/crm/rebate-cases/:id/scope-items
+  app.post("/api/crm/rebate-cases/:id/scope-items", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validation = insertRebateCaseScopeChecklistSchema.safeParse({
+        ...req.body,
+        caseId: id,
+      });
+      if (!validation.success) {
+        return res.status(400).json({ message: "Validation error", errors: validation.error.errors });
+      }
+      const item = await storage.createRebateScopeItem(validation.data);
+      res.status(201).json(item);
+    } catch (error: any) {
+      console.error("Failed to add scope item:", error);
+      res.status(500).json({ message: error.message || "Failed to add scope item" });
+    }
+  });
+
+  // PATCH /api/crm/rebate-cases/:id/scope-items/:itemId
+  app.patch("/api/crm/rebate-cases/:id/scope-items/:itemId", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const { id, itemId } = req.params;
+      const allowed = ["itemName", "isChecked", "notes", "sortOrder"] as const;
+      const updateData: any = {};
+      for (const key of allowed) {
+        if (key in req.body) updateData[key] = req.body[key];
+      }
+      if (updateData.isChecked === true) {
+        updateData.completedAt = new Date();
+        updateData.completedByUserId = user?.id || null;
+      } else if (updateData.isChecked === false) {
+        updateData.completedAt = null;
+        updateData.completedByUserId = null;
+      }
+      const updated = await storage.updateRebateScopeItem(itemId, id, updateData);
+      if (!updated) return res.status(404).json({ message: "Scope item not found" });
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to update scope item:", error);
+      res.status(500).json({ message: error.message || "Failed to update scope item" });
+    }
+  });
+
+  // DELETE /api/crm/rebate-cases/:id/scope-items/:itemId
+  app.delete("/api/crm/rebate-cases/:id/scope-items/:itemId", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const { id, itemId } = req.params;
+      const ok = await storage.deleteRebateScopeItem(itemId, id);
+      if (!ok) return res.status(404).json({ message: "Scope item not found" });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete scope item:", error);
+      res.status(500).json({ message: error.message || "Failed to delete scope item" });
+    }
+  });
+
+  // POST /api/crm/rebate-cases/:id/documents
+  app.post("/api/crm/rebate-cases/:id/documents", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const { id } = req.params;
+      const { ObjectStorageService } = await import("./replit_integrations/object_storage/objectStorage");
+      const objectStorageService = new ObjectStorageService();
+      const rawUrl = req.body.url || req.body.uploadURL;
+      let normalizedPath = rawUrl;
+      if (rawUrl && rawUrl.startsWith("https://")) {
+        normalizedPath = objectStorageService.normalizeObjectEntityPath(rawUrl);
+      }
+      const validation = insertRebateCaseDocumentSchema.safeParse({
+        caseId: id,
+        category: (req.body.category || "other") as any,
+        name: req.body.name,
+        url: normalizedPath,
+        objectPath: normalizedPath,
+        contentType: req.body.contentType || null,
+        size: req.body.size || null,
+        notes: req.body.notes || null,
+        uploadedByUserId: user?.id || null,
+      });
+      if (!validation.success) {
+        return res.status(400).json({ message: "Validation error", errors: validation.error.errors });
+      }
+      const doc = await storage.createRebateCaseDocument(validation.data);
+      await storage.logRebateCaseActivity({
+        caseId: id,
+        userId: user?.id || null,
+        action: "document_uploaded",
+        description: `Document "${doc.name}" uploaded (${doc.category})`,
+      });
+      res.status(201).json(doc);
+    } catch (error: any) {
+      console.error("Failed to add document:", error);
+      res.status(500).json({ message: error.message || "Failed to add document" });
+    }
+  });
+
+  // DELETE /api/crm/rebate-cases/:id/documents/:docId
+  app.delete("/api/crm/rebate-cases/:id/documents/:docId", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const { id, docId } = req.params;
+      const ok = await storage.deleteRebateCaseDocument(docId, id);
+      if (!ok) return res.status(404).json({ message: "Document not found" });
+      await storage.logRebateCaseActivity({
+        caseId: id,
+        userId: user?.id || null,
+        action: "document_deleted",
+        description: "Document deleted",
+      });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete document:", error);
+      res.status(500).json({ message: error.message || "Failed to delete document" });
+    }
+  });
+
+  // POST /api/crm/rebate-cases/:id/activity - manual note
+  app.post("/api/crm/rebate-cases/:id/activity", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const { id } = req.params;
+      const description = (req.body.description || "").toString().trim();
+      if (!description) {
+        return res.status(400).json({ message: "Description is required" });
+      }
+      const entry = await storage.logRebateCaseActivity({
+        caseId: id,
+        userId: user?.id || null,
+        action: "note",
+        description,
+      });
+      res.status(201).json(entry);
+    } catch (error: any) {
+      console.error("Failed to add activity:", error);
+      res.status(500).json({ message: error.message || "Failed to add activity" });
     }
   });
 

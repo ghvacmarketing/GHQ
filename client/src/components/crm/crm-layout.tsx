@@ -31,6 +31,7 @@ import {
   MessageSquare,
   Bell,
   ListTodo,
+  Award,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 import ghqLogo from "@assets/redlogo.webp";
@@ -83,6 +84,7 @@ const navSections: NavSection[] = [
       { label: "Work Orders", href: "/crm/work-orders", icon: ClipboardList },
       { label: "Projects", href: "/crm/projects", icon: FolderKanban },
       { label: "Tasks", href: "/crm/tasks/board", icon: ListTodo },
+      { label: "Rebate Programs", href: "/crm/rebate-programs", icon: Award },
       { label: "Items", href: "/crm/items", icon: Package },
     ],
   },

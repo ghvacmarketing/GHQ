@@ -60,6 +60,8 @@ const CrmProposalBuilder = lazy(() => import("@/pages/crm/crm-proposal-builder")
 const CrmProposalPreview = lazy(() => import("@/pages/crm/crm-proposal-preview"));
 const CrmPhone = lazy(() => import("@/pages/crm/crm-phone"));
 const CrmChecklists = lazy(() => import("@/pages/crm/crm-checklists"));
+const CrmRebatePrograms = lazy(() => import("@/pages/crm/crm-rebate-programs"));
+const CrmRebateCase = lazy(() => import("@/pages/crm/crm-rebate-case"));
 const CrmSettings = lazy(() => import("@/pages/crm/crm-settings"));
 const CrmSettingsUsers = lazy(() => import("@/pages/crm/crm-settings-users"));
 const CrmSettingsSubtypes = lazy(() => import("@/pages/crm/crm-settings-subtypes"));
@@ -260,6 +262,8 @@ function Router() {
       <Route path="/employee-portal" component={EmployeePortal} />
       <Route path="/crm/login">{() => <CrmWrapper><CrmLogin /></CrmWrapper>}</Route>
       <Route path="/crm/dispatch">{() => <ProtectedCrmWrapper><CrmDispatch /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/rebate-programs/:id">{() => <ProtectedCrmWrapper><CrmRebateCase /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/rebate-programs">{() => <ProtectedCrmWrapper><CrmRebatePrograms /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/work-orders/:id">{() => <ProtectedCrmWrapper><CrmWorkOrderDetail /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/work-orders">{() => <ProtectedCrmWrapper><CrmWorkOrders /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/accounts/new">{() => <ProtectedCrmWrapper><CrmAccountCreate /></ProtectedCrmWrapper>}</Route>
