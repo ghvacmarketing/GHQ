@@ -3600,11 +3600,27 @@ export const rebateCases = pgTable("rebate_cases", {
   householdIncome: text("household_income"),
   amiBracket: text("ami_bracket"),
 
+  // Rebate Request — Section A: Contractor/Initiator Info (Neighborly form fields)
+  initiatorType: text("initiator_type"),           // A.1 Who is initiating
+  initiatorCompanyName: text("initiator_company_name"), // A.2 Company name
+  initiatorFirstName: text("initiator_first_name"), // A.3a
+  initiatorLastName: text("initiator_last_name"),   // A.3b
+  initiatorPhone: text("initiator_phone"),           // A.3c
+  initiatorEmail: text("initiator_email"),           // A.3d
+
   // Property
   propertyAddress: text("property_address"),
+  propertyAddressLine2: text("property_address_line2"), // A.4 line 2
   propertyCity: text("property_city"),
   propertyState: text("property_state"),
   propertyZip: text("property_zip"),
+  addressCertified: boolean("address_certified").default(false), // A.4 certification
+  constructionType: text("construction_type"),      // A.5 new/existing
+  buildingType: text("building_type"),              // A.6 building type
+  buildingSubtype: text("building_subtype"),        // A.6a single family subtype
+  isRented: boolean("is_rented"),                   // A.7
+  bedroomCount: integer("bedroom_count"),           // A.8
+  sqftRange: text("sqft_range"),                    // A.9 conditioned sqft range
   propertyType: text("property_type"),
   ownershipStatus: text("ownership_status"),
   yearBuilt: integer("year_built"),

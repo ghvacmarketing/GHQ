@@ -356,104 +356,351 @@ function SaveBar({ onSave, saving, dirty }: { onSave: () => void; saving: boolea
 
 // ─── Client/Property Tab ───────────────────────────────────────────────────────
 
+const US_STATES = [
+  "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA",
+  "KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ",
+  "NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT",
+  "VA","WA","WV","WI","WY","DC",
+];
+
+function RebateRequestSectionHeader({ letter, title }: { letter: string; title: string }) {
+  return (
+    <div className="bg-[#1e3a5f] text-white px-4 py-2.5 rounded-sm mb-4">
+      <span className="text-xs font-bold uppercase tracking-wide">{letter}. {title}</span>
+    </div>
+  );
+}
+
+function FieldLabel({ code, label, required }: { code: string; label: string; required?: boolean }) {
+  return (
+    <div className="flex items-baseline gap-1 mb-1">
+      <span className="text-sm font-semibold text-slate-800">{code}.</span>
+      <span className="text-sm text-slate-700">{label}</span>
+      {required && <span className="text-red-500 text-xs ml-0.5">*Required</span>}
+    </div>
+  );
+}
+
 function ClientPropertyTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onPatch: (d: Partial<RebateCase>) => void; saving: boolean }) {
   const schema = insertRebateCaseSchema.pick({
-    clientFirstName: true, clientLastName: true, clientEmail: true, clientPhone: true,
-    clientDob: true, householdSize: true, householdIncome: true, amiBracket: true,
-    propertyAddress: true, propertyCity: true, propertyState: true, propertyZip: true,
-    propertyType: true, ownershipStatus: true, yearBuilt: true, squareFootage: true,
+    initiatorType: true,
+    initiatorCompanyName: true,
+    initiatorFirstName: true,
+    initiatorLastName: true,
+    initiatorPhone: true,
+    initiatorEmail: true,
+    propertyAddress: true,
+    propertyAddressLine2: true,
+    propertyCity: true,
+    propertyState: true,
+    propertyZip: true,
+    addressCertified: true,
+    constructionType: true,
+    buildingType: true,
+    buildingSubtype: true,
+    isRented: true,
+    bedroomCount: true,
+    sqftRange: true,
   });
+
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: {
-      clientFirstName: caseData.clientFirstName ?? "",
-      clientLastName: caseData.clientLastName ?? "",
-      clientEmail: caseData.clientEmail ?? "",
-      clientPhone: caseData.clientPhone ?? "",
-      clientDob: caseData.clientDob ?? "",
-      householdSize: caseData.householdSize ?? undefined,
-      householdIncome: caseData.householdIncome ?? "",
-      amiBracket: caseData.amiBracket ?? "",
+      initiatorType: caseData.initiatorType ?? "Contractor/Installer",
+      initiatorCompanyName: caseData.initiatorCompanyName ?? "Giesbrecht HVAC",
+      initiatorFirstName: caseData.initiatorFirstName ?? "",
+      initiatorLastName: caseData.initiatorLastName ?? "",
+      initiatorPhone: caseData.initiatorPhone ?? "",
+      initiatorEmail: caseData.initiatorEmail ?? "",
       propertyAddress: caseData.propertyAddress ?? "",
+      propertyAddressLine2: caseData.propertyAddressLine2 ?? "",
       propertyCity: caseData.propertyCity ?? "",
-      propertyState: caseData.propertyState ?? "",
+      propertyState: caseData.propertyState ?? "GA",
       propertyZip: caseData.propertyZip ?? "",
-      propertyType: caseData.propertyType ?? "",
-      ownershipStatus: caseData.ownershipStatus ?? "",
-      yearBuilt: caseData.yearBuilt ?? undefined,
-      squareFootage: caseData.squareFootage ?? undefined,
+      addressCertified: caseData.addressCertified ?? false,
+      constructionType: caseData.constructionType ?? "",
+      buildingType: caseData.buildingType ?? "",
+      buildingSubtype: caseData.buildingSubtype ?? "",
+      isRented: caseData.isRented ?? false,
+      bedroomCount: caseData.bedroomCount ?? undefined,
+      sqftRange: caseData.sqftRange ?? "",
     },
   });
 
+  const watchBuildingType = form.watch("buildingType");
   const onSubmit = (values: z.infer<typeof schema>) => onPatch(values as any);
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Client Information</CardTitle></CardHeader>
-            <CardContent className="pt-0 space-y-3">
-              {[
-                { name: "clientFirstName", label: "First Name" },
-                { name: "clientLastName", label: "Last Name" },
-                { name: "clientEmail", label: "Email" },
-                { name: "clientPhone", label: "Phone" },
-                { name: "clientDob", label: "Date of Birth" },
-                { name: "householdIncome", label: "Household Income" },
-                { name: "amiBracket", label: "AMI Bracket" },
-              ].map(({ name, label }) => (
-                <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
+        <div className="max-w-3xl space-y-6">
+          {/* Section header */}
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900 mb-1">A. Rebate Request</h2>
+            <p className="text-sm text-slate-500">
+              Contractor companies should use this page to fill out information about their organization and their proposed project. All fields are required.
+            </p>
+          </div>
+
+          {/* Contractor / Initiator Information */}
+          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <RebateRequestSectionHeader letter="CONTRACTOR / INITIATOR INFORMATION" title="" />
+            <div className="px-5 pb-5 space-y-5">
+              {/* A.1 and A.2 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <FormField control={form.control} name="initiatorType" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
-                    <FormControl><Input className="h-8 text-sm" {...field} value={field.value ?? ""} /></FormControl>
+                    <FieldLabel code="A.1" label="Who is initiating the energy rebate request?" />
+                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300">
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Contractor/Installer">Contractor/Installer</SelectItem>
+                        <SelectItem value="Customer/Homeowner">Customer/Homeowner</SelectItem>
+                        <SelectItem value="Utility">Utility</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </FormItem>
                 )} />
-              ))}
-              <FormField control={form.control} name="householdSize" render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs text-slate-500">Household Size</FormLabel>
-                  <FormControl><Input className="h-8 text-sm" type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : undefined)} /></FormControl>
-                </FormItem>
-              )} />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Property</CardTitle></CardHeader>
-            <CardContent className="pt-0 space-y-3">
-              {[
-                { name: "propertyAddress", label: "Address" },
-                { name: "propertyCity", label: "City" },
-                { name: "propertyState", label: "State" },
-                { name: "propertyZip", label: "ZIP" },
-                { name: "propertyType", label: "Property Type" },
-                { name: "ownershipStatus", label: "Ownership" },
-              ].map(({ name, label }) => (
-                <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
+
+                <FormField control={form.control} name="initiatorCompanyName" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
-                    <FormControl><Input className="h-8 text-sm" {...field} value={field.value ?? ""} /></FormControl>
-                  </FormItem>
-                )} />
-              ))}
-              <div className="grid grid-cols-2 gap-3">
-                <FormField control={form.control} name="yearBuilt" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-500">Year Built</FormLabel>
-                    <FormControl><Input className="h-8 text-sm" type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : undefined)} /></FormControl>
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="squareFootage" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-500">Sq Ft</FormLabel>
-                    <FormControl><Input className="h-8 text-sm" type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : undefined)} /></FormControl>
+                    <FieldLabel code="A.2" label="Company Name Starting the Application" />
+                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300">
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Giesbrecht HVAC">Giesbrecht HVAC</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </FormItem>
                 )} />
               </div>
-            </CardContent>
-          </Card>
-        </div>
-        <div className="mt-3">
+
+              {/* A.3 */}
+              <div>
+                <p className="text-sm font-semibold text-slate-800 mb-3"><span className="font-bold">A.3.</span> Primary Initiator Contact Name</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <FormField control={form.control} name="initiatorFirstName" render={({ field }) => (
+                    <FormItem>
+                      <FieldLabel code="A.3a" label="First Name" />
+                      <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" {...field} value={field.value ?? ""} /></FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="initiatorPhone" render={({ field }) => (
+                    <FormItem>
+                      <FieldLabel code="A.3c" label="Phone Number" />
+                      <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" {...field} value={field.value ?? ""} /></FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="initiatorLastName" render={({ field }) => (
+                    <FormItem>
+                      <FieldLabel code="A.3b" label="Last Name" />
+                      <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" {...field} value={field.value ?? ""} /></FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="initiatorEmail" render={({ field }) => (
+                    <FormItem>
+                      <FieldLabel code="A.3d" label="Email" />
+                      <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" {...field} value={field.value ?? ""} /></FormControl>
+                    </FormItem>
+                  )} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Property and Building Information */}
+          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <RebateRequestSectionHeader letter="PROPERTY AND BUILDING INFORMATION" title="" />
+            <div className="px-5 pb-5 space-y-5">
+              {/* A.4 Address */}
+              <div>
+                <FieldLabel code="A.4" label="Project Home Address" />
+                <div className="space-y-2">
+                  <FormField control={form.control} name="propertyAddress" render={({ field }) => (
+                    <FormItem>
+                      <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" placeholder="Address Line 1" {...field} value={field.value ?? ""} /></FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="propertyAddressLine2" render={({ field }) => (
+                    <FormItem>
+                      <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" placeholder="Address Line 2" {...field} value={field.value ?? ""} /></FormControl>
+                    </FormItem>
+                  )} />
+                  <div className="grid grid-cols-5 gap-2">
+                    <FormField control={form.control} name="propertyCity" render={({ field }) => (
+                      <FormItem className="col-span-2">
+                        <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" placeholder="City" {...field} value={field.value ?? ""} /></FormControl>
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="propertyState" render={({ field }) => (
+                      <FormItem className="col-span-1">
+                        <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300">
+                              <SelectValue placeholder="ST" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {US_STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="propertyZip" render={({ field }) => (
+                      <FormItem className="col-span-2">
+                        <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" placeholder="ZIP" {...field} value={field.value ?? ""} /></FormControl>
+                      </FormItem>
+                    )} />
+                  </div>
+                </div>
+                <FormField control={form.control} name="addressCertified" render={({ field }) => (
+                  <FormItem className="flex items-center gap-2 mt-3">
+                    <FormControl>
+                      <input
+                        type="checkbox"
+                        checked={field.value ?? false}
+                        onChange={e => field.onChange(e.target.checked)}
+                        className="w-4 h-4 accent-[#711419]"
+                      />
+                    </FormControl>
+                    <FormLabel className="text-sm text-slate-700 cursor-pointer !mt-0">
+                      I certify the above address is complete and correct.{" "}
+                      <span className="text-red-500 font-medium">*Required</span>
+                    </FormLabel>
+                  </FormItem>
+                )} />
+              </div>
+
+              {/* A.5 and A.6 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <FormField control={form.control} name="constructionType" render={({ field }) => (
+                  <FormItem>
+                    <FieldLabel code="A.5" label="Is the building new or existing construction?" />
+                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300">
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Existing Construction">Existing Construction</SelectItem>
+                        <SelectItem value="New Construction">New Construction</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="buildingType" render={({ field }) => (
+                  <FormItem>
+                    <FieldLabel code="A.6" label="What is the building type?" />
+                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300">
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Single Family">Single Family</SelectItem>
+                        <SelectItem value="Multi-Family">Multi-Family</SelectItem>
+                        <SelectItem value="Mobile Home">Mobile Home</SelectItem>
+                        <SelectItem value="Commercial">Commercial</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
+              </div>
+
+              {/* A.6a — conditional on Single Family */}
+              {watchBuildingType === "Single Family" && (
+                <FormField control={form.control} name="buildingSubtype" render={({ field }) => (
+                  <FormItem className="max-w-sm">
+                    <FieldLabel code="A.6a" label="Single Family Building Type Details" />
+                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300">
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Single Family Attached">Single Family Attached</SelectItem>
+                        <SelectItem value="Single Family Detached">Single Family Detached</SelectItem>
+                        <SelectItem value="Townhouse">Townhouse</SelectItem>
+                        <SelectItem value="Manufactured Home">Manufactured Home</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
+              )}
+
+              {/* A.7 */}
+              <FormField control={form.control} name="isRented" render={({ field }) => (
+                <FormItem>
+                  <FieldLabel code="A.7" label="Is the building rented?" />
+                  <div className="flex flex-col gap-1.5 mt-1">
+                    {[{ label: "Yes", value: true }, { label: "No", value: false }].map(opt => (
+                      <label key={String(opt.value)} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          checked={field.value === opt.value}
+                          onChange={() => field.onChange(opt.value)}
+                          className="accent-[#711419]"
+                        />
+                        <span className="text-sm text-slate-700">{opt.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </FormItem>
+              )} />
+
+              {/* A.8 and A.9 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <FormField control={form.control} name="bedroomCount" render={({ field }) => (
+                  <FormItem>
+                    <FieldLabel code="A.8" label="Total Number of Bedrooms" />
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={0}
+                        className="h-9 text-sm bg-slate-50 border-slate-300 text-right"
+                        {...field}
+                        value={field.value ?? ""}
+                        onChange={e => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="sqftRange" render={({ field }) => (
+                  <FormItem>
+                    <FieldLabel code="A.9" label="Conditioned square footage of single family home:" />
+                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300">
+                          <SelectValue placeholder="Select range..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="500 - 1,500 sq ft">500 – 1,500 sq ft</SelectItem>
+                        <SelectItem value="1,501 - 2,500 sq ft">1,501 – 2,500 sq ft</SelectItem>
+                        <SelectItem value="2,501 - 3,500 sq ft">2,501 – 3,500 sq ft</SelectItem>
+                        <SelectItem value="3,501 - 5,000 sq ft">3,501 – 5,000 sq ft</SelectItem>
+                        <SelectItem value="5,001+ sq ft">5,001+ sq ft</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
+              </div>
+            </div>
+          </div>
+
           <SaveBar onSave={form.handleSubmit(onSubmit)} saving={saving} dirty={form.formState.isDirty} />
         </div>
       </form>
