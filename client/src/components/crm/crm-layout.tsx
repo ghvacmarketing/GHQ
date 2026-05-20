@@ -320,7 +320,7 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
   });
 
   return (
-    <div className="min-h-screen bg-white flex">
+    <div className="h-screen overflow-hidden bg-white flex">
       <aside className="hidden lg:flex w-60 flex-shrink-0 fixed inset-y-0 left-0 z-40">
         <SidebarContent currentUser={currentUser} />
       </aside>
