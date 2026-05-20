@@ -176,7 +176,7 @@ export default function CrmRebatePrograms() {
         .filter(Boolean).join(" ").toLowerCase().includes(q)
     );
     const matchProgram = filterProgram === "all" || c.programType === filterProgram;
-    const matchStep = activeTab === "all" || c.currentStep === activeTab;
+    const matchStep = activeTab === "all" || c.applicationStatus === activeTab;
     return matchSearch && matchProgram && matchStep;
   });
 
@@ -298,22 +298,22 @@ export default function CrmRebatePrograms() {
         </div>
       </div>
 
-      {/* Underline workflow-step tabs */}
+      {/* Underline status tabs */}
       <div className="flex overflow-x-auto overflow-y-hidden border-b border-slate-200">
-        {[{ key: "all", label: "All" }, ...WORKFLOW_STEPS_ORDER.map(s => ({ key: s, label: WORKFLOW_STEP_LABELS[s] }))].map(tab => {
-          const count = tab.key === "all" ? cases.length : cases.filter(c => c.currentStep === tab.key).length;
+        {QUICK_FILTERS.map(tab => {
+          const count = tab.status === "" ? cases.length : cases.filter(c => c.applicationStatus === tab.status).length;
           return (
             <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              key={tab.status || "all"}
+              onClick={() => setActiveTab(tab.status || "all")}
               className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-                activeTab === tab.key
+                activeTab === (tab.status || "all")
                   ? "border-[#711419] text-[#711419]"
                   : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
               }`}
             >
               {tab.label}
-              <span className={`ml-1.5 text-xs ${activeTab === tab.key ? "text-[#711419]" : "text-slate-400"}`}>
+              <span className={`ml-1.5 text-xs ${activeTab === (tab.status || "all") ? "text-[#711419]" : "text-slate-400"}`}>
                 {count}
               </span>
             </button>

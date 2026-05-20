@@ -9,7 +9,7 @@ import {
   ArrowLeft, CheckCircle2, Circle, ChevronDown, ChevronUp,
   FileText, Trash2, Upload, Plus, User, Calendar, ClipboardList,
   Activity, Settings2, Zap, Home, Droplets, Wrench, Star, FolderOpen,
-  AlertCircle, Loader2, Lock
+  AlertCircle, Loader2, Lock, BookOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -180,18 +180,19 @@ export default function CrmRebateCase() {
       </div>
 
       {/* Tabs — underline style matching customer profile */}
-      <Tabs defaultValue="summary">
+      <Tabs defaultValue="program_overview">
         <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 flex-wrap">
           {[
-            { value: "summary", label: "Summary", icon: Star },
-            { value: "client", label: "Client/Property", icon: Home },
-            { value: "utility", label: "Utility", icon: Zap },
-            { value: "existing", label: "Existing System", icon: Settings2 },
-            { value: "new", label: "New System", icon: Wrench },
-            { value: "scope", label: "Scope of Work", icon: ClipboardList },
-            { value: "workflow", label: "Neighborly Workflow", icon: CheckCircle2 },
-            { value: "documents", label: "Documents", icon: FolderOpen },
-            { value: "activity", label: "Activity Log", icon: FileText },
+            { value: "program_overview",       label: "Program Overview",        icon: Star },
+            { value: "rebate_request",          label: "Rebate Request",          icon: FileText },
+            { value: "head_of_household",       label: "Head of Household",       icon: User },
+            { value: "scope_of_work",           label: "Scope of Work",           icon: ClipboardList },
+            { value: "contractor_pre_approval", label: "Contractor Pre-Approval", icon: CheckCircle2 },
+            { value: "project_completion",      label: "Project Completion",      icon: Wrench },
+            { value: "completion_attestations", label: "Completion Attestations", icon: Activity },
+            { value: "reservation_summary",     label: "Reservation Summary",     icon: Calendar },
+            { value: "documents",               label: "Documents",               icon: FolderOpen },
+            { value: "activity",                label: "Activity Log",            icon: Activity },
           ].map(({ value, label, icon: Icon }) => (
             <TabsTrigger
               key={value}
@@ -205,26 +206,33 @@ export default function CrmRebateCase() {
         </TabsList>
 
         <div className="mt-6">
-          <TabsContent value="summary">
+          <TabsContent value="program_overview">
             <SummaryTab caseData={caseData} users={users} onPatch={patchCase.mutate} saving={patchCase.isPending} />
           </TabsContent>
-          <TabsContent value="client">
+          <TabsContent value="rebate_request">
             <ClientPropertyTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} />
           </TabsContent>
-          <TabsContent value="utility">
+          <TabsContent value="head_of_household">
             <UtilityTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} />
           </TabsContent>
-          <TabsContent value="existing">
-            <ExistingSystemTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} />
-          </TabsContent>
-          <TabsContent value="new">
-            <NewSystemTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} />
-          </TabsContent>
-          <TabsContent value="scope">
+          <TabsContent value="scope_of_work">
             <ScopeTab caseData={caseData} caseId={id} onPatch={patchCase.mutate} saving={patchCase.isPending} onInvalidate={invalidate} />
           </TabsContent>
-          <TabsContent value="workflow">
+          <TabsContent value="contractor_pre_approval">
+            <ExistingSystemTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} />
+          </TabsContent>
+          <TabsContent value="project_completion">
+            <NewSystemTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} />
+          </TabsContent>
+          <TabsContent value="completion_attestations">
             <WorkflowTab caseData={caseData} caseId={id} onInvalidate={invalidate} />
+          </TabsContent>
+          <TabsContent value="reservation_summary">
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Calendar className="h-10 w-10 text-slate-200 mb-3" />
+              <p className="text-sm font-medium text-slate-500">Reservation Summary</p>
+              <p className="text-xs text-slate-400 mt-1">Content coming soon.</p>
+            </div>
           </TabsContent>
           <TabsContent value="documents">
             <DocumentsTab caseData={caseData} caseId={id} onInvalidate={invalidate} />
