@@ -87,11 +87,8 @@ export default function CrmRebatePrograms() {
   });
 
   const [search, setSearch] = useState("");
-  const [quickStatus, setQuickStatus] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
+  const [activeTab, setActiveTab] = useState("");
   const [filterProgram, setFilterProgram] = useState("all");
-  const [filterAssignee, setFilterAssignee] = useState("all");
-  const [filterPriority, setFilterPriority] = useState("all");
   const [filterWorkflowStep, setFilterWorkflowStep] = useState("all");
 
   // Dialog state
@@ -172,7 +169,6 @@ export default function CrmRebatePrograms() {
   });
 
   const usersMap = new Map(users.map(u => [u.id, u.name]));
-  const activeStatus = quickStatus || (filterStatus !== "all" ? filterStatus : "");
 
   const filtered = cases.filter(c => {
     const q = search.toLowerCase();
@@ -180,13 +176,10 @@ export default function CrmRebatePrograms() {
       [c.clientFirstName, c.clientLastName, c.propertyAddress, c.caseNumber]
         .filter(Boolean).join(" ").toLowerCase().includes(q)
     );
-    const matchStatus = !activeStatus || c.applicationStatus === activeStatus;
+    const matchStatus = !activeTab || c.applicationStatus === activeTab;
     const matchProgram = filterProgram === "all" || c.programType === filterProgram;
-    const matchAssignee = filterAssignee === "all" ||
-      (filterAssignee === "unassigned" ? !c.assignedToUserId : c.assignedToUserId === filterAssignee);
-    const matchPriority = filterPriority === "all" || c.priority === filterPriority;
     const matchWorkflowStep = filterWorkflowStep === "all" || c.currentStep === filterWorkflowStep;
-    return matchSearch && matchStatus && matchProgram && matchAssignee && matchPriority && matchWorkflowStep;
+    return matchSearch && matchStatus && matchProgram && matchWorkflowStep;
   });
 
   function handleSelectCustomer(customer: CrmCustomer) {
@@ -262,49 +255,33 @@ export default function CrmRebatePrograms() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-    <div className="min-h-screen bg-slate-50">
-      {/* Page header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#711419] flex items-center justify-center">
-              <Award className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold text-slate-900">Rebate Program Cases</h1>
-              <p className="text-xs text-slate-500">HEAR / HER Neighborly rebate application tracking</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => refetch()}>
-              <RefreshCw className="w-4 h-4" />
-            </Button>
-            <Button
-              size="sm"
-              className="bg-[#711419] hover:bg-[#5a1014] text-white"
-              onClick={openCreateDialog}
-            >
-              <Plus className="w-4 h-4 mr-1.5" />
-              New Case
-            </Button>
-          </div>
-        </div>
-      </div>
+    <div className="space-y-4">
 
-      <div className="px-6 py-4 space-y-3">
-        {/* Search + filter row */}
-        <div className="flex items-center gap-1 flex-wrap bg-white border border-slate-200 rounded-lg px-3 py-1.5">
-          <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          <input
-            className="flex-1 min-w-[160px] bg-transparent text-sm outline-none placeholder:text-slate-400 py-1 px-2"
+      {/* Centered search bar */}
+      <div className="flex justify-center">
+        <div className="relative w-full max-w-xl">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input
             placeholder="Search client, address, case #..."
             value={search}
             onChange={e => setSearch(e.target.value)}
+            className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
           />
-          <div className="h-4 w-px bg-slate-200 mx-1" />
+        </div>
+      </div>
+
+      {/* Title row */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Rebate Program Cases</h1>
+          <p className="text-sm text-slate-500">
+            {filtered.length} {filtered.length === 1 ? "case" : "cases"}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
           <Select value={filterProgram} onValueChange={setFilterProgram}>
-            <SelectTrigger className="h-7 text-xs border-0 bg-transparent shadow-none px-2 w-auto gap-1 focus:ring-0">
-              <SelectValue placeholder="Program" />
+            <SelectTrigger className="w-[130px] h-8 text-xs border-slate-200 focus:ring-0 focus:ring-offset-0">
+              <SelectValue placeholder="All Programs" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Programs</SelectItem>
@@ -312,81 +289,50 @@ export default function CrmRebatePrograms() {
               <SelectItem value="HER">HER</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={filterStatus} onValueChange={v => { setFilterStatus(v); setQuickStatus(""); }}>
-            <SelectTrigger className="h-7 text-xs border-0 bg-transparent shadow-none px-2 w-auto gap-1 focus:ring-0">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              {APPLICATION_STATUS_OPTIONS.map(s => (
-                <SelectItem key={s} value={s}>{APPLICATION_STATUS_LABELS[s]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filterAssignee} onValueChange={setFilterAssignee}>
-            <SelectTrigger className="h-7 text-xs border-0 bg-transparent shadow-none px-2 w-auto gap-1 focus:ring-0">
-              <SelectValue placeholder="Assignee" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Assignees</SelectItem>
-              <SelectItem value="unassigned">Unassigned</SelectItem>
-              {users.filter(u => u.isActive).map(u => (
-                <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filterPriority} onValueChange={setFilterPriority}>
-            <SelectTrigger className="h-7 text-xs border-0 bg-transparent shadow-none px-2 w-auto gap-1 focus:ring-0">
-              <SelectValue placeholder="Priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priorities</SelectItem>
-              {(["low","normal","high","urgent"] as const).map(p => (
-                <SelectItem key={p} value={p}>{PRIORITY_LABELS[p]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Select value={filterWorkflowStep} onValueChange={setFilterWorkflowStep}>
-            <SelectTrigger className="h-7 text-xs border-0 bg-transparent shadow-none px-2 w-auto gap-1 focus:ring-0">
-              <SelectValue placeholder="Workflow Step" />
+            <SelectTrigger className="w-[160px] h-8 text-xs border-slate-200 focus:ring-0 focus:ring-offset-0">
+              <SelectValue placeholder="All Workflow Steps" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Workflow Steps</SelectItem>
-              {WORKFLOW_STEPS_ORDER.map(step => (
-                <SelectItem key={step} value={step}>{WORKFLOW_STEP_LABELS[step]}</SelectItem>
+              {WORKFLOW_STEPS_ORDER.map(s => (
+                <SelectItem key={s} value={s}>{WORKFLOW_STEP_LABELS[s]}</SelectItem>
               ))}
             </SelectContent>
           </Select>
+          <Button
+            size="sm"
+            className="bg-[#711419] hover:bg-[#5a1014] text-white"
+            onClick={openCreateDialog}
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            New Case
+          </Button>
         </div>
+      </div>
 
-        {/* Quick-filter chips */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {QUICK_FILTERS.map(qf => (
+      {/* Underline status tabs */}
+      <div className="flex overflow-x-auto overflow-y-hidden border-b border-slate-200">
+        {QUICK_FILTERS.map(qf => {
+          const count = qf.status === "" ? cases.length : cases.filter(c => c.applicationStatus === qf.status).length;
+          return (
             <button
               key={qf.status}
-              onClick={() => { setQuickStatus(qf.status); setFilterStatus("all"); }}
-              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                quickStatus === qf.status
-                  ? "bg-[#711419] text-white border-[#711419]"
-                  : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+              onClick={() => setActiveTab(qf.status)}
+              className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                activeTab === qf.status
+                  ? "border-[#711419] text-[#711419]"
+                  : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
               }`}
             >
               {qf.label}
-              {qf.status === "" ? (
-                cases.length > 0 && (
-                  <span className="ml-1.5 opacity-70">{cases.length}</span>
-                )
-              ) : (
-                <span className="ml-1.5 opacity-70">
-                  {cases.filter(c => c.applicationStatus === qf.status).length}
-                </span>
-              )}
+              <span className={`ml-1.5 text-xs ${activeTab === qf.status ? "text-[#711419]" : "text-slate-400"}`}>
+                {count}
+              </span>
             </button>
-          ))}
-          <span className="text-xs text-slate-400 ml-auto">
-            {filtered.length} of {cases.length} cases
-          </span>
-        </div>
+          );
+        })}
+      </div>
 
         {/* Table */}
         <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
@@ -499,7 +445,6 @@ export default function CrmRebatePrograms() {
             </div>
           )}
         </div>
-      </div>
 
       {/* Create Case Dialog */}
       <Dialog open={showCreate} onOpenChange={open => { if (!open) setShowCreate(false); }}>
