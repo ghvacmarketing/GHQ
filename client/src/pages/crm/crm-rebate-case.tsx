@@ -1001,6 +1001,32 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
     ventilationCfm: string;
     ventilationSystemType: string;
     coolingSystemType: string;
+    // Cooling Systems
+    coolingEfficiencyKnown: boolean | null;
+    coolingEfficiencySeer: string;
+    coolingFloorAreaKnown: boolean | null;
+    coolingFloorAreaPct: string;
+    // Heating System
+    heatingSystemFuelType: string;
+    heatingEfficiencyKnown: boolean | null;
+    heatingHspf: string;
+    heatingAfue: string;
+    heatingFloorAreaKnown: boolean | null;
+    heatingFloorAreaPct: string;
+    electricalPanelAmps: string;
+    // Electrical Upgrades
+    scopeIncludesPanel: boolean;
+    scopeIncludesWiring: boolean;
+    wiringExternalRebates: boolean | null;
+    wiringMaterialCost: string;
+    wiringInstallCost: string;
+    // Insulation
+    scopeIncludesInsulation: boolean | null;
+    // Financials
+    totalExternalRebate: string;
+    totalEstimatedProjectCost: string;
+    estimatedRebate50Pct: string;
+    estimatedRebate100Pct: string;
     scopeSummary: string;
     installCost: string;
   };
@@ -1056,6 +1082,27 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
     ventilationCfm: d.ventilationCfm ?? "",
     ventilationSystemType: d.ventilationSystemType ?? "",
     coolingSystemType: d.coolingSystemType ?? "",
+    coolingEfficiencyKnown: d.coolingEfficiencyKnown ?? null,
+    coolingEfficiencySeer: d.coolingEfficiencySeer ?? "",
+    coolingFloorAreaKnown: d.coolingFloorAreaKnown ?? null,
+    coolingFloorAreaPct: d.coolingFloorAreaPct ?? "",
+    heatingSystemFuelType: d.heatingSystemFuelType ?? "",
+    heatingEfficiencyKnown: d.heatingEfficiencyKnown ?? null,
+    heatingHspf: d.heatingHspf ?? "",
+    heatingAfue: d.heatingAfue ?? "",
+    heatingFloorAreaKnown: d.heatingFloorAreaKnown ?? null,
+    heatingFloorAreaPct: d.heatingFloorAreaPct ?? "",
+    electricalPanelAmps: d.electricalPanelAmps ?? "",
+    scopeIncludesPanel: d.scopeIncludesPanel ?? false,
+    scopeIncludesWiring: d.scopeIncludesWiring ?? false,
+    wiringExternalRebates: d.wiringExternalRebates ?? null,
+    wiringMaterialCost: d.wiringMaterialCost ?? "",
+    wiringInstallCost: d.wiringInstallCost ?? "",
+    scopeIncludesInsulation: d.scopeIncludesInsulation ?? null,
+    totalExternalRebate: d.totalExternalRebate ?? "",
+    totalEstimatedProjectCost: d.totalEstimatedProjectCost ?? "",
+    estimatedRebate50Pct: d.estimatedRebate50Pct ?? "",
+    estimatedRebate100Pct: d.estimatedRebate100Pct ?? "",
     scopeSummary: d.scopeSummary ?? "",
     installCost: d.installCost ?? "",
   });
@@ -1535,11 +1582,153 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
                       </select>
                     </div>
 
+                    {/* Cooling Systems */}
+                    <div className="pt-2">
+                      <p className="font-semibold text-slate-800 mb-4">Cooling Systems</p>
+                      <div className="space-y-5">
+                        <div>
+                          <label className={lbl}>Is efficiency known?</label>
+                          <RadioGroup value={vals.coolingEfficiencyKnown} onChange={v => set("coolingEfficiencyKnown", v)} />
+                        </div>
+                        {vals.coolingEfficiencyKnown && (
+                          <div>
+                            <label className={lbl}>Efficiency SEER (Seasonal Energy Efficiency Ratio)</label>
+                            <input className={inp} placeholder="e.g. 16" value={vals.coolingEfficiencySeer} onChange={e => set("coolingEfficiencySeer", e.target.value)} />
+                          </div>
+                        )}
+                        <div>
+                          <label className={lbl}>Is the percent of floor area served by cooling system known?</label>
+                          <RadioGroup value={vals.coolingFloorAreaKnown} onChange={v => set("coolingFloorAreaKnown", v)} />
+                        </div>
+                        {vals.coolingFloorAreaKnown && (
+                          <div className="max-w-xs">
+                            <label className={lbl}>Percent of floor area served by cooling system</label>
+                            <div className="flex items-center gap-2">
+                              <input className={inp} placeholder="100" value={vals.coolingFloorAreaPct} onChange={e => set("coolingFloorAreaPct", e.target.value)} />
+                              <span className="text-sm text-slate-500 flex-shrink-0">%</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Heating System */}
+                    <div className="pt-2">
+                      <p className="font-semibold text-slate-800 mb-4">Heating System</p>
+                      <div className="space-y-5">
+                        <div>
+                          <label className={lbl}>Fuel and system type</label>
+                          <select className={inp} value={vals.heatingSystemFuelType} onChange={e => set("heatingSystemFuelType", e.target.value)}>
+                            <option value="">Select…</option>
+                            <option value="Gas Propane Furnace">Gas Propane Furnace</option>
+                            <option value="Natural Gas Furnace">Natural Gas Furnace</option>
+                            <option value="Electric Furnace">Electric Furnace</option>
+                            <option value="Heat Pump">Heat Pump</option>
+                            <option value="Oil Furnace">Oil Furnace</option>
+                            <option value="Electric Baseboard">Electric Baseboard</option>
+                            <option value="No heating">No heating</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className={lbl}>Is efficiency known?</label>
+                          <RadioGroup value={vals.heatingEfficiencyKnown} onChange={v => set("heatingEfficiencyKnown", v)} />
+                        </div>
+                        {vals.heatingEfficiencyKnown && (
+                          <>
+                            <div>
+                              <label className={lbl}>Heating Seasonal Performance Factor (HSPF)</label>
+                              <input className={inp} placeholder="e.g. 8.5" value={vals.heatingHspf} onChange={e => set("heatingHspf", e.target.value)} />
+                            </div>
+                            <div>
+                              <label className={lbl}>Annual Fuel Utilization Efficiency (AFUE)</label>
+                              <input className={inp} placeholder="e.g. 0.80" value={vals.heatingAfue} onChange={e => set("heatingAfue", e.target.value)} />
+                            </div>
+                          </>
+                        )}
+                        <div>
+                          <label className={lbl}>Is percent of floor area served by the heating system known?</label>
+                          <RadioGroup value={vals.heatingFloorAreaKnown} onChange={v => set("heatingFloorAreaKnown", v)} />
+                        </div>
+                        {vals.heatingFloorAreaKnown && (
+                          <div className="max-w-xs">
+                            <label className={lbl}>Percent of floor area served by heating system</label>
+                            <div className="flex items-center gap-2">
+                              <input className={inp} placeholder="100" value={vals.heatingFloorAreaPct} onChange={e => set("heatingFloorAreaPct", e.target.value)} />
+                              <span className="text-sm text-slate-500 flex-shrink-0">%</span>
+                            </div>
+                          </div>
+                        )}
+                        <div className="max-w-xs">
+                          <label className={lbl}>Electrical panel max amps</label>
+                          <input className={inp} placeholder="e.g. 200" value={vals.electricalPanelAmps} onChange={e => set("electricalPanelAmps", e.target.value)} />
+                        </div>
+                      </div>
+                    </div>
+
                   </div>
                 </div>
               )}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* ELECTRICAL UPGRADES */}
+      <div>
+        <div className="bg-[#711419] text-white px-4 py-2.5 rounded-sm mb-4">
+          <span className="text-xs font-bold uppercase tracking-wide">Electrical Upgrades</span>
+        </div>
+        <div className="space-y-6">
+          <div>
+            <label className={lbl}><span className={cod}>C.10.</span> Will the upgrades include an <strong>electrical panel</strong>?</label>
+            <RadioGroup value={vals.scopeIncludesPanel ? true : vals.scopeIncludesPanel === false ? false : null} onChange={v => set("scopeIncludesPanel", v)} />
+          </div>
+
+          <div>
+            <label className={lbl}><span className={cod}>C.11.</span> Will the upgrades include <strong>electrical wiring</strong>?</label>
+            <RadioGroup value={vals.scopeIncludesWiring ? true : vals.scopeIncludesWiring === false ? false : null} onChange={v => set("scopeIncludesWiring", v)} />
+          </div>
+
+          {vals.scopeIncludesWiring && (
+            <div className="ml-4 pl-4 border-l-2 border-[#711419]/20 space-y-5">
+              <p className="text-sm font-semibold text-red-600">
+                Please note: Electrical wiring must be paired with either another HEAR update or HER project.
+              </p>
+              <div>
+                <label className={lbl}><span className={cod}>a.</span> Are there any External Rebates (i.e. GA Power, WAP, etc.) that will apply to this measure's installation?</label>
+                <RadioGroup value={vals.wiringExternalRebates} onChange={v => set("wiringExternalRebates", v)} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className={lbl}>Estimated Electrical wiring Material Costs</label>
+                  <input className={inp} placeholder="$ 0.00" value={vals.wiringMaterialCost} onChange={e => set("wiringMaterialCost", e.target.value)} />
+                </div>
+                <div>
+                  <label className={lbl}>Estimated Electrical wiring Install Costs</label>
+                  <input className={inp} placeholder="$ 0.00" value={vals.wiringInstallCost} onChange={e => set("wiringInstallCost", e.target.value)} />
+                </div>
+                <div>
+                  <label className={lbl}>Estimated Electrical wiring Total Cost</label>
+                  <input
+                    className={`${inp} bg-slate-100 text-slate-500`}
+                    readOnly
+                    value={
+                      vals.wiringMaterialCost && vals.wiringInstallCost
+                        ? `$ ${(parseFloat(vals.wiringMaterialCost.replace(/[^0-9.]/g, "")) + parseFloat(vals.wiringInstallCost.replace(/[^0-9.]/g, ""))).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : ""
+                    }
+                    placeholder="Auto-calculated"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className={lbl}>Will the project include <strong>insulation, air sealing, or ventilation upgrades</strong>?</label>
+            <RadioGroup value={vals.scopeIncludesInsulation} onChange={v => set("scopeIncludesInsulation", v)} />
+          </div>
         </div>
       </div>
 
@@ -1595,6 +1784,33 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
           <div className="max-w-xs">
             <label className={lbl}><span className={cod}>D.3.</span> Total Proposed Project Cost</label>
             <input className={inp} placeholder="e.g. $12,500" value={vals.installCost} onChange={e => set("installCost", e.target.value)} />
+          </div>
+        </div>
+      </div>
+
+      {/* ESTIMATED PROJECT FINANCIALS */}
+      <div>
+        <div className="bg-[#711419] text-white px-4 py-2.5 rounded-sm mb-5">
+          <span className="text-xs font-bold uppercase tracking-wide">Estimated Project Financials</span>
+        </div>
+        <div className="space-y-5">
+          <div>
+            <label className={lbl}>Final Total Project External Rebate</label>
+            <input className={inp} placeholder="$ 0.00" value={vals.totalExternalRebate} onChange={e => set("totalExternalRebate", e.target.value)} />
+          </div>
+          <div>
+            <label className={lbl}><span className={cod}>C.21.</span> Total Estimated Project Costs</label>
+            <input className={inp} placeholder="$ 0.00" value={vals.totalEstimatedProjectCost} onChange={e => set("totalEstimatedProjectCost", e.target.value)} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={lbl}>Estimated Rebate at 50%</label>
+              <input className={inp} placeholder="$ 0.00" value={vals.estimatedRebate50Pct} onChange={e => set("estimatedRebate50Pct", e.target.value)} />
+            </div>
+            <div>
+              <label className={lbl}>Estimated Rebate at 100%</label>
+              <input className={inp} placeholder="$ 0.00" value={vals.estimatedRebate100Pct} onChange={e => set("estimatedRebate100Pct", e.target.value)} />
+            </div>
           </div>
         </div>
       </div>

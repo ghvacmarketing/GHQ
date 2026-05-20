@@ -3723,6 +3723,37 @@ export const rebateCases = pgTable("rebate_cases", {
   ventilationSystemType: text("ventilation_system_type"),
   coolingSystemType: text("cooling_system_type"),
 
+  // Cooling Systems (limited assessment)
+  coolingEfficiencyKnown: boolean("cooling_efficiency_known"),
+  coolingEfficiencySeer: text("cooling_efficiency_seer"),
+  coolingFloorAreaKnown: boolean("cooling_floor_area_known"),
+  coolingFloorAreaPct: text("cooling_floor_area_pct"),
+
+  // Heating System (limited assessment)
+  heatingSystemFuelType: text("heating_system_fuel_type"),
+  heatingEfficiencyKnown: boolean("heating_efficiency_known"),
+  heatingHspf: text("heating_hspf"),
+  heatingAfue: text("heating_afue"),
+  heatingFloorAreaKnown: boolean("heating_floor_area_known"),
+  heatingFloorAreaPct: text("heating_floor_area_pct"),
+  electricalPanelAmps: text("electrical_panel_amps"),
+
+  // Electrical Upgrades (C.10–C.11)
+  scopeIncludesPanel: boolean("scope_includes_panel").default(false),
+  scopeIncludesWiring: boolean("scope_includes_wiring").default(false),
+  wiringExternalRebates: boolean("wiring_external_rebates"),
+  wiringMaterialCost: text("wiring_material_cost"),
+  wiringInstallCost: text("wiring_install_cost"),
+
+  // Insulation / air sealing / ventilation
+  scopeIncludesInsulation: boolean("scope_includes_insulation"),
+
+  // Estimated Project Financials
+  totalExternalRebate: text("total_external_rebate"),
+  totalEstimatedProjectCost: text("total_estimated_project_cost"),
+  estimatedRebate50Pct: text("estimated_rebate_50_pct"),
+  estimatedRebate100Pct: text("estimated_rebate_100_pct"),
+
   // Head of Household confirmation
   hohConfirmed: boolean("hoh_confirmed").default(false),
   hohConfirmedDate: text("hoh_confirmed_date"),
