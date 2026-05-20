@@ -407,7 +407,7 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
           </div>
         ) : (
           <div className="h-screen pt-16 lg:pt-14 overflow-y-auto overflow-x-hidden bg-white">
-            <div className="p-4 lg:p-6 overflow-x-hidden min-h-full">{children}</div>
+            <div className="p-4 lg:p-6 overflow-x-hidden">{children}</div>
           </div>
         )}
       </main>
