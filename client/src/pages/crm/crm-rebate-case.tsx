@@ -661,50 +661,6 @@ function RebateRequestTab({ caseData, onPatch, saving }: { caseData: CaseDetail;
             </div>
           </div>
 
-          {/* Dates & Amounts */}
-          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-            <RebateRequestSectionHeader letter="PROGRAM DATES &amp; REBATE AMOUNTS" title="" />
-            <div className="px-5 pb-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {[
-                  { name: "applicationDate", label: "Application Date" },
-                  { name: "reservationDate", label: "Reservation Date" },
-                  { name: "approvalDate", label: "Approval Date" },
-                  { name: "paidDate", label: "Paid Date" },
-                ].map(({ name, label }) => (
-                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
-                      <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" type="date" {...field} value={field.value ?? ""} /></FormControl>
-                    </FormItem>
-                  )} />
-                ))}
-                {[
-                  { name: "rebateAmount", label: "Total Rebate Amount" },
-                  { name: "utilityRebateAmount", label: "Utility Rebate Amount" },
-                  { name: "federalRebateAmount", label: "Federal Rebate Amount" },
-                ].map(({ name, label }) => (
-                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
-                      <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" placeholder="e.g. $4,000" {...field} value={field.value ?? ""} /></FormControl>
-                    </FormItem>
-                  )} />
-                ))}
-              </div>
-              <div className="mt-5">
-                <FormField control={form.control} name="rebateRequestNotes" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-500">Request Notes</FormLabel>
-                    <FormControl>
-                      <Textarea className="text-sm min-h-[80px] resize-none bg-slate-50 border-slate-300" placeholder="Notes about this rebate request..." {...field} value={field.value ?? ""} />
-                    </FormControl>
-                  </FormItem>
-                )} />
-              </div>
-            </div>
-          </div>
-
           <SaveBar onSave={form.handleSubmit(onSubmit)} saving={saving} dirty={form.formState.isDirty} />
         </div>
       </form>
