@@ -3686,6 +3686,43 @@ export const rebateCases = pgTable("rebate_cases", {
   hasDeliveredFuel: boolean("has_delivered_fuel"),
   deliveredFuelCompany: text("delivered_fuel_company"),
 
+  // Project Details — Appliances (C.6–C.9)
+  scopeIncludesStove: boolean("scope_includes_stove").default(false),
+  scopeIncludesDryer: boolean("scope_includes_dryer").default(false),
+  scopeIncludesWaterHeater: boolean("scope_includes_water_heater").default(false),
+  scopeIncludesHeatPump: boolean("scope_includes_heat_pump").default(false),
+
+  // Heat Pump details (C.9 sub-questions)
+  hpRebateRecipient: text("hp_rebate_recipient"),
+  hpType: text("hp_type"),
+  hpDucted: text("hp_ducted"),
+  hpPrimarySource: boolean("hp_primary_source"),
+  hpExistingDistributionType: text("hp_existing_distribution_type"),
+  hpEnergyStarColdClimate: text("hp_energy_star_cold_climate"),
+  hpHeatingLoadPercent: text("hp_heating_load_percent"),
+  hpHeatingCapacityBtu: text("hp_heating_capacity_btu"),
+  hpCoolingCapacityBtu: text("hp_cooling_capacity_btu"),
+  hpMake: text("hp_make"),
+  hpModel: text("hp_model"),
+  hpExternalRebates: boolean("hp_external_rebates"),
+  hpMaterialCost: text("hp_material_cost"),
+  hpInstallCost: text("hp_install_cost"),
+  hpFuelSwitching: boolean("hp_fuel_switching"),
+
+  // Limited Assessment (existing construction heat pump)
+  assessmentDate: text("assessment_date"),
+  assessmentYearBuilt: text("assessment_year_built"),
+  ceilingInsulationKnown: boolean("ceiling_insulation_known"),
+  ceilingInsulationRValue: text("ceiling_insulation_r_value"),
+  ceilingInsulationType: text("ceiling_insulation_type"),
+  ductsInsulated: text("ducts_insulated"),
+  ductsSealed: text("ducts_sealed"),
+  envelopeAirSealed: text("envelope_air_sealed"),
+  ventilationCfmKnown: boolean("ventilation_cfm_known"),
+  ventilationCfm: text("ventilation_cfm"),
+  ventilationSystemType: text("ventilation_system_type"),
+  coolingSystemType: text("cooling_system_type"),
+
   // Head of Household confirmation
   hohConfirmed: boolean("hoh_confirmed").default(false),
   hohConfirmedDate: text("hoh_confirmed_date"),

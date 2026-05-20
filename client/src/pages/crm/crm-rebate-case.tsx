@@ -967,6 +967,40 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
     gasAccountCertified: boolean;
     hasDeliveredFuel: boolean | null;
     deliveredFuelCompany: string;
+    // C.6–C.9 appliances
+    scopeIncludesStove: boolean;
+    scopeIncludesDryer: boolean;
+    scopeIncludesWaterHeater: boolean;
+    scopeIncludesHeatPump: boolean;
+    // Heat pump sub-questions
+    hpRebateRecipient: string;
+    hpType: string;
+    hpDucted: string;
+    hpPrimarySource: boolean | null;
+    hpExistingDistributionType: string;
+    hpEnergyStarColdClimate: string;
+    hpHeatingLoadPercent: string;
+    hpHeatingCapacityBtu: string;
+    hpCoolingCapacityBtu: string;
+    hpMake: string;
+    hpModel: string;
+    hpExternalRebates: boolean | null;
+    hpMaterialCost: string;
+    hpInstallCost: string;
+    hpFuelSwitching: boolean | null;
+    // Limited assessment
+    assessmentDate: string;
+    assessmentYearBuilt: string;
+    ceilingInsulationKnown: boolean | null;
+    ceilingInsulationRValue: string;
+    ceilingInsulationType: string;
+    ductsInsulated: string;
+    ductsSealed: string;
+    envelopeAirSealed: string;
+    ventilationCfmKnown: boolean | null;
+    ventilationCfm: string;
+    ventilationSystemType: string;
+    coolingSystemType: string;
     scopeSummary: string;
     installCost: string;
   };
@@ -991,6 +1025,37 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
     gasAccountCertified: d.gasAccountCertified ?? false,
     hasDeliveredFuel: d.hasDeliveredFuel ?? null,
     deliveredFuelCompany: d.deliveredFuelCompany ?? "",
+    scopeIncludesStove: d.scopeIncludesStove ?? false,
+    scopeIncludesDryer: d.scopeIncludesDryer ?? false,
+    scopeIncludesWaterHeater: d.scopeIncludesWaterHeater ?? false,
+    scopeIncludesHeatPump: d.scopeIncludesHeatPump ?? false,
+    hpRebateRecipient: d.hpRebateRecipient ?? "",
+    hpType: d.hpType ?? "",
+    hpDucted: d.hpDucted ?? "",
+    hpPrimarySource: d.hpPrimarySource ?? null,
+    hpExistingDistributionType: d.hpExistingDistributionType ?? "",
+    hpEnergyStarColdClimate: d.hpEnergyStarColdClimate ?? "",
+    hpHeatingLoadPercent: d.hpHeatingLoadPercent ?? "",
+    hpHeatingCapacityBtu: d.hpHeatingCapacityBtu ?? "",
+    hpCoolingCapacityBtu: d.hpCoolingCapacityBtu ?? "",
+    hpMake: d.hpMake ?? "",
+    hpModel: d.hpModel ?? "",
+    hpExternalRebates: d.hpExternalRebates ?? null,
+    hpMaterialCost: d.hpMaterialCost ?? "",
+    hpInstallCost: d.hpInstallCost ?? "",
+    hpFuelSwitching: d.hpFuelSwitching ?? null,
+    assessmentDate: d.assessmentDate ?? "",
+    assessmentYearBuilt: d.assessmentYearBuilt ?? "",
+    ceilingInsulationKnown: d.ceilingInsulationKnown ?? null,
+    ceilingInsulationRValue: d.ceilingInsulationRValue ?? "",
+    ceilingInsulationType: d.ceilingInsulationType ?? "",
+    ductsInsulated: d.ductsInsulated ?? "",
+    ductsSealed: d.ductsSealed ?? "",
+    envelopeAirSealed: d.envelopeAirSealed ?? "",
+    ventilationCfmKnown: d.ventilationCfmKnown ?? null,
+    ventilationCfm: d.ventilationCfm ?? "",
+    ventilationSystemType: d.ventilationSystemType ?? "",
+    coolingSystemType: d.coolingSystemType ?? "",
     scopeSummary: d.scopeSummary ?? "",
     installCost: d.installCost ?? "",
   });
@@ -1180,6 +1245,299 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
             <div>
               <label className={lbl}>Delivered Fuel Company Name</label>
               <input className={inp} value={vals.deliveredFuelCompany} onChange={e => set("deliveredFuelCompany", e.target.value)} />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* PROJECT DETAILS — APPLIANCES */}
+      <div>
+        <div className="bg-[#711419] text-white px-4 py-2.5 rounded-sm mb-4">
+          <span className="text-xs font-bold uppercase tracking-wide">Project Details</span>
+        </div>
+        <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-4">Appliances</p>
+        <div className="space-y-6">
+
+          {/* C.6 */}
+          <div>
+            <label className={lbl}><span className={cod}>C.6.</span> Will the upgrades include an electric <strong>stove/cooktop/range/oven</strong>?</label>
+            <RadioGroup value={vals.scopeIncludesStove ? true : vals.scopeIncludesStove === false ? false : null} onChange={v => set("scopeIncludesStove", v)} />
+          </div>
+
+          {/* C.7 */}
+          <div>
+            <label className={lbl}><span className={cod}>C.7.</span> Will the upgrades include a <strong>heat pump clothes dryer</strong>?</label>
+            <RadioGroup value={vals.scopeIncludesDryer ? true : vals.scopeIncludesDryer === false ? false : null} onChange={v => set("scopeIncludesDryer", v)} />
+          </div>
+
+          {/* C.8 */}
+          <div>
+            <label className={lbl}><span className={cod}>C.8.</span> Will the upgrades include a <strong>heat pump water heater</strong>?</label>
+            <RadioGroup value={vals.scopeIncludesWaterHeater ? true : vals.scopeIncludesWaterHeater === false ? false : null} onChange={v => set("scopeIncludesWaterHeater", v)} />
+          </div>
+
+          {/* C.9 */}
+          <div>
+            <label className={lbl}><span className={cod}>C.9.</span> Will the upgrades include a <strong>heat pump for space heating or cooling</strong>?</label>
+            <RadioGroup value={vals.scopeIncludesHeatPump ? true : vals.scopeIncludesHeatPump === false ? false : null} onChange={v => set("scopeIncludesHeatPump", v)} />
+          </div>
+
+          {/* C.9 sub-questions */}
+          {vals.scopeIncludesHeatPump && (
+            <div className="ml-4 pl-4 border-l-2 border-[#711419]/20 space-y-5">
+
+              <div>
+                <label className={lbl}>Who will be receiving the rebate on this measure?</label>
+                <div className="flex gap-5 mt-1">
+                  {["Contractor", "Distributor"].map(opt => (
+                    <label key={opt} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+                      <input type="radio" checked={vals.hpRebateRecipient === opt} onChange={() => set("hpRebateRecipient", opt)} className="accent-[#711419]" />
+                      {opt}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className={lbl}><span className={cod}>a.</span> What type of heat pump will be installed?</label>
+                <select className={inp} value={vals.hpType} onChange={e => set("hpType", e.target.value)}>
+                  <option value="">Select…</option>
+                  <option value="Central system with backup">Central system with backup</option>
+                  <option value="Central system without backup">Central system without backup</option>
+                  <option value="Mini-split">Mini-split</option>
+                  <option value="Ground source heat pump">Ground source heat pump</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className={lbl}>Will the new heat pump for space heating and cooling be ducted or non-ducted?</label>
+                <div className="flex gap-5 mt-1">
+                  {["Ducted", "Non-Ducted"].map(opt => (
+                    <label key={opt} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+                      <input type="radio" checked={vals.hpDucted === opt} onChange={() => set("hpDucted", opt)} className="accent-[#711419]" />
+                      {opt}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className={lbl}>Will the heat pump system serve as the primary heating and cooling source?</label>
+                <RadioGroup value={vals.hpPrimarySource} onChange={v => set("hpPrimarySource", v)} />
+              </div>
+
+              <div>
+                <label className={lbl}><span className={cod}>b.</span> What is the primary heating and cooling distribution type of the existing system?</label>
+                <select className={inp} value={vals.hpExistingDistributionType} onChange={e => set("hpExistingDistributionType", e.target.value)}>
+                  <option value="">Select…</option>
+                  <option value="None">None</option>
+                  <option value="Forced air (ducts)">Forced air (ducts)</option>
+                  <option value="Hydronic (radiators/baseboards)">Hydronic (radiators/baseboards)</option>
+                  <option value="Radiant floor">Radiant floor</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className={lbl}><span className={cod}>c.</span> Does the new heat pump meet ENERGY STAR™ requirements for cold climate heat pumps?</label>
+                <select className={inp} value={vals.hpEnergyStarColdClimate} onChange={e => set("hpEnergyStarColdClimate", e.target.value)}>
+                  <option value="">Select…</option>
+                  <option value="Yes">Yes</option>
+                  <option value="No">No</option>
+                  <option value="Unknown">Unknown</option>
+                </select>
+              </div>
+
+              <div className="max-w-xs">
+                <label className={lbl}><span className={cod}>d.</span> What percent of the heating load will this system cover? <span className="text-slate-400 font-normal">(choose closest)</span></label>
+                <div className="flex items-center gap-2">
+                  <input className={inp} placeholder="100" value={vals.hpHeatingLoadPercent} onChange={e => set("hpHeatingLoadPercent", e.target.value)} />
+                  <span className="text-sm text-slate-500 flex-shrink-0">%</span>
+                </div>
+              </div>
+
+              <div>
+                <label className={lbl}><span className={cod}>e.</span> What is the heating capacity of new heat pump system? <span className="text-slate-400 font-normal">(BTU/hr)</span></label>
+                <input className={inp} placeholder="e.g. 20043" value={vals.hpHeatingCapacityBtu} onChange={e => set("hpHeatingCapacityBtu", e.target.value)} />
+              </div>
+
+              <div>
+                <label className={lbl}><span className={cod}>f.</span> What is the cooling capacity of the new heat pump system? <span className="text-slate-400 font-normal">(BTU/hr)</span></label>
+                <input className={inp} placeholder="e.g. 32000" value={vals.hpCoolingCapacityBtu} onChange={e => set("hpCoolingCapacityBtu", e.target.value)} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={lbl}>Make</label>
+                  <input className={inp} placeholder="e.g. Trane" value={vals.hpMake} onChange={e => set("hpMake", e.target.value)} />
+                </div>
+                <div>
+                  <label className={lbl}>Model</label>
+                  <input className={inp} placeholder="e.g. 5TWR7036A1000" value={vals.hpModel} onChange={e => set("hpModel", e.target.value)} />
+                </div>
+              </div>
+
+              <div>
+                <label className={lbl}><span className={cod}>g.</span> Are there any External Rebates (i.e. GA Power, WAP, etc.) that will apply to this measure's installation?</label>
+                <RadioGroup value={vals.hpExternalRebates} onChange={v => set("hpExternalRebates", v)} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className={lbl}>Estimated HVAC Heat Pump Material Costs</label>
+                  <input className={inp} placeholder="$ 0.00" value={vals.hpMaterialCost} onChange={e => set("hpMaterialCost", e.target.value)} />
+                </div>
+                <div>
+                  <label className={lbl}>Estimated HVAC Heat Pump Install Costs</label>
+                  <input className={inp} placeholder="$ 0.00" value={vals.hpInstallCost} onChange={e => set("hpInstallCost", e.target.value)} />
+                </div>
+                <div>
+                  <label className={lbl}>Estimated HVAC Heat Pump Total Cost</label>
+                  <input
+                    className={`${inp} bg-slate-100 text-slate-500`}
+                    readOnly
+                    value={
+                      vals.hpMaterialCost && vals.hpInstallCost
+                        ? `$ ${(parseFloat(vals.hpMaterialCost.replace(/[^0-9.]/g, "")) + parseFloat(vals.hpInstallCost.replace(/[^0-9.]/g, ""))).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : ""
+                    }
+                    placeholder="Auto-calculated"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className={lbl}>Will the upgrades include fuel-switching?</label>
+                <RadioGroup value={vals.hpFuelSwitching} onChange={v => set("hpFuelSwitching", v)} />
+              </div>
+
+              {/* Construction Type read-only */}
+              {caseData.constructionType && (
+                <div>
+                  <label className={lbl}>Construction Type</label>
+                  <div className="w-full h-9 px-3 flex items-center rounded-md bg-slate-100 border border-slate-300 text-sm text-slate-600">
+                    {caseData.constructionType}
+                  </div>
+                </div>
+              )}
+
+              {/* Limited Assessment — shown for Existing Construction */}
+              {caseData.constructionType === "Existing Construction" && (
+                <div className="mt-2">
+                  <p className="text-sm text-slate-600 mb-3">
+                    Existing Constructions require a limited assessment for heat pumps. Please complete the limited assessment questions below.
+                  </p>
+                  <p className="font-semibold text-slate-800 mb-4">Limited Assessment</p>
+                  <div className="space-y-5">
+
+                    <div>
+                      <label className={lbl}>Assessment Date</label>
+                      <input type="date" className={inp} value={vals.assessmentDate} onChange={e => set("assessmentDate", e.target.value)} />
+                    </div>
+
+                    <div>
+                      <label className={lbl}>What year was the home built?</label>
+                      <input className={inp} placeholder="e.g. 1971" value={vals.assessmentYearBuilt} onChange={e => set("assessmentYearBuilt", e.target.value)} />
+                    </div>
+
+                    <div>
+                      <label className={lbl}>Is ceiling insulation R-value known?</label>
+                      <RadioGroup value={vals.ceilingInsulationKnown} onChange={v => set("ceilingInsulationKnown", v)} />
+                    </div>
+
+                    {vals.ceilingInsulationKnown && (
+                      <>
+                        <div className="max-w-xs">
+                          <label className={lbl}>Ceiling Insulation R-Value</label>
+                          <input className={inp} placeholder="e.g. 28" value={vals.ceilingInsulationRValue} onChange={e => set("ceilingInsulationRValue", e.target.value)} />
+                        </div>
+                        <div>
+                          <label className={lbl}>Ceiling insulation type</label>
+                          <select className={inp} value={vals.ceilingInsulationType} onChange={e => set("ceilingInsulationType", e.target.value)}>
+                            <option value="">Select…</option>
+                            <option value="Batt insulation">Batt insulation</option>
+                            <option value="Blown-in insulation">Blown-in insulation</option>
+                            <option value="Spray foam">Spray foam</option>
+                            <option value="Rigid board">Rigid board</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+
+                    <div>
+                      <label className={lbl}>Are the air ducts insulated?</label>
+                      <select className={inp} value={vals.ductsInsulated} onChange={e => set("ductsInsulated", e.target.value)}>
+                        <option value="">Select…</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                        <option value="Unknown">Unknown</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={lbl}>Are the air ducts sealed?</label>
+                      <select className={inp} value={vals.ductsSealed} onChange={e => set("ductsSealed", e.target.value)}>
+                        <option value="">Select…</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                        <option value="Unknown">Unknown</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={lbl}>Is envelope professionally air sealed?</label>
+                      <select className={inp} value={vals.envelopeAirSealed} onChange={e => set("envelopeAirSealed", e.target.value)}>
+                        <option value="">Select…</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                        <option value="Unknown">Unknown</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={lbl}>Is whole home ventilation system rated flow CFM (cubic feet per minute) known?</label>
+                      <RadioGroup value={vals.ventilationCfmKnown} onChange={v => set("ventilationCfmKnown", v)} />
+                    </div>
+
+                    {vals.ventilationCfmKnown && (
+                      <div className="max-w-xs">
+                        <label className={lbl}>Whole home ventilation system rated flow CFM</label>
+                        <input className={inp} placeholder="e.g. 1" value={vals.ventilationCfm} onChange={e => set("ventilationCfm", e.target.value)} />
+                      </div>
+                    )}
+
+                    <div>
+                      <label className={lbl}><span className={cod}>b.</span> Whole home ventilation system type</label>
+                      <select className={inp} value={vals.ventilationSystemType} onChange={e => set("ventilationSystemType", e.target.value)}>
+                        <option value="">Select…</option>
+                        <option value="None">None</option>
+                        <option value="HRV (Heat Recovery Ventilator)">HRV (Heat Recovery Ventilator)</option>
+                        <option value="ERV (Energy Recovery Ventilator)">ERV (Energy Recovery Ventilator)</option>
+                        <option value="Exhaust-only">Exhaust-only</option>
+                        <option value="Supply-only">Supply-only</option>
+                        <option value="Balanced (no heat recovery)">Balanced (no heat recovery)</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={lbl}><span className={cod}>c.</span> Cooling system type</label>
+                      <select className={inp} value={vals.coolingSystemType} onChange={e => set("coolingSystemType", e.target.value)}>
+                        <option value="">Select…</option>
+                        <option value="Heat pump">Heat pump</option>
+                        <option value="Central air conditioner">Central air conditioner</option>
+                        <option value="Mini-split">Mini-split</option>
+                        <option value="Window unit(s)">Window unit(s)</option>
+                        <option value="No cooling">No cooling</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
