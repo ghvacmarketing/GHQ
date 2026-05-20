@@ -3661,6 +3661,35 @@ export const rebateCases = pgTable("rebate_cases", {
   installDate: timestamp("install_date"),
   installCompletedDate: timestamp("install_completed_date"),
 
+  // Rebate request
+  utilityRebateAmount: text("utility_rebate_amount"),
+  federalRebateAmount: text("federal_rebate_amount"),
+  rebateRequestNotes: text("rebate_request_notes"),
+
+  // Contractor pre-approval
+  contractorName: text("contractor_name"),
+  contractorLicenseNumber: text("contractor_license_number"),
+  preApprovalStatus: text("pre_approval_status"),
+  preApprovalSubmittedDate: timestamp("pre_approval_submitted_date"),
+  preApprovalApprovedDate: timestamp("pre_approval_approved_date"),
+  preApprovalNotes: text("pre_approval_notes"),
+
+  // Project completion
+  completionNotes: text("completion_notes"),
+
+  // Completion attestations
+  customerAttestationSigned: boolean("customer_attestation_signed").default(false),
+  customerAttestationDate: timestamp("customer_attestation_date"),
+  contractorAttestationSigned: boolean("contractor_attestation_signed").default(false),
+  contractorAttestationDate: timestamp("contractor_attestation_date"),
+  attestationNotes: text("attestation_notes"),
+
+  // Reservation summary
+  reservationNumber: text("reservation_number"),
+  paymentReleaseAmount: text("payment_release_amount"),
+  caseCloseoutDate: timestamp("case_closeout_date"),
+  caseCloseoutNotes: text("case_closeout_notes"),
+
   createdByUserId: varchar("created_by_user_id").references(() => crmUsers.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -3681,6 +3710,11 @@ export const insertRebateCaseSchema = createInsertSchema(rebateCases)
     paidDate: coerceRebateDate,
     installDate: coerceRebateDate,
     installCompletedDate: coerceRebateDate,
+    preApprovalSubmittedDate: coerceRebateDate,
+    preApprovalApprovedDate: coerceRebateDate,
+    customerAttestationDate: coerceRebateDate,
+    contractorAttestationDate: coerceRebateDate,
+    caseCloseoutDate: coerceRebateDate,
   });
 export type InsertRebateCase = z.infer<typeof insertRebateCaseSchema>;
 export type RebateCase = typeof rebateCases.$inferSelect;

@@ -210,29 +210,25 @@ export default function CrmRebateCase() {
             <SummaryTab caseData={caseData} users={users} onPatch={patchCase.mutate} saving={patchCase.isPending} />
           </TabsContent>
           <TabsContent value="rebate_request">
-            <ClientPropertyTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} />
+            <RebateRequestTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} />
           </TabsContent>
           <TabsContent value="head_of_household">
-            <UtilityTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} />
+            <HeadOfHouseholdTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} />
           </TabsContent>
           <TabsContent value="scope_of_work">
             <ScopeTab caseData={caseData} caseId={id} onPatch={patchCase.mutate} saving={patchCase.isPending} onInvalidate={invalidate} />
           </TabsContent>
           <TabsContent value="contractor_pre_approval">
-            <ExistingSystemTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} />
+            <ContractorPreApprovalTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} />
           </TabsContent>
           <TabsContent value="project_completion">
-            <NewSystemTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} />
+            <ProjectCompletionTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} />
           </TabsContent>
           <TabsContent value="completion_attestations">
-            <WorkflowTab caseData={caseData} caseId={id} onInvalidate={invalidate} />
+            <CompletionAttestationsTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} />
           </TabsContent>
           <TabsContent value="reservation_summary">
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <Calendar className="h-10 w-10 text-slate-200 mb-3" />
-              <p className="text-sm font-medium text-slate-500">Reservation Summary</p>
-              <p className="text-xs text-slate-400 mt-1">Content coming soon.</p>
-            </div>
+            <ReservationSummaryTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} />
           </TabsContent>
           <TabsContent value="documents">
             <DocumentsTab caseData={caseData} caseId={id} onInvalidate={invalidate} />
@@ -354,7 +350,7 @@ function SaveBar({ onSave, saving, dirty }: { onSave: () => void; saving: boolea
   );
 }
 
-// ─── Client/Property Tab ───────────────────────────────────────────────────────
+// ─── Rebate Request Tab ────────────────────────────────────────────────────────
 
 const US_STATES = [
   "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA",
@@ -366,7 +362,7 @@ const US_STATES = [
 function RebateRequestSectionHeader({ letter, title }: { letter: string; title: string }) {
   return (
     <div className="bg-[#1e3a5f] text-white px-4 py-2.5 rounded-sm mb-4">
-      <span className="text-xs font-bold uppercase tracking-wide">{letter}. {title}</span>
+      <span className="text-xs font-bold uppercase tracking-wide">{letter}{title ? `. ${title}` : ""}</span>
     </div>
   );
 }
@@ -381,7 +377,7 @@ function FieldLabel({ code, label, required }: { code: string; label: string; re
   );
 }
 
-function ClientPropertyTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onPatch: (d: Partial<RebateCase>) => void; saving: boolean }) {
+function RebateRequestTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onPatch: (d: Partial<RebateCase>) => void; saving: boolean }) {
   const schema = insertRebateCaseSchema.pick({
     initiatorType: true,
     initiatorCompanyName: true,
@@ -403,7 +399,10 @@ function ClientPropertyTab({ caseData, onPatch, saving }: { caseData: CaseDetail
     sqftRange: true,
   });
 
-  const form = useForm<z.infer<typeof schema>>({
+  const form = useForm<z.infer<typeof schema> & {
+    applicationDate: string; reservationDate: string; approvalDate: string; paidDate: string;
+    rebateAmount: string; utilityRebateAmount: string; federalRebateAmount: string; rebateRequestNotes: string;
+  }>({
     resolver: zodResolver(schema),
     defaultValues: {
       initiatorType: caseData.initiatorType ?? "Contractor/Installer",
@@ -424,17 +423,24 @@ function ClientPropertyTab({ caseData, onPatch, saving }: { caseData: CaseDetail
       isRented: caseData.isRented ?? false,
       bedroomCount: caseData.bedroomCount ?? undefined,
       sqftRange: caseData.sqftRange ?? "",
+      applicationDate: caseData.applicationDate ? format(new Date(caseData.applicationDate), "yyyy-MM-dd") : "",
+      reservationDate: caseData.reservationDate ? format(new Date(caseData.reservationDate), "yyyy-MM-dd") : "",
+      approvalDate: caseData.approvalDate ? format(new Date(caseData.approvalDate), "yyyy-MM-dd") : "",
+      paidDate: caseData.paidDate ? format(new Date(caseData.paidDate), "yyyy-MM-dd") : "",
+      rebateAmount: caseData.rebateAmount ?? "",
+      utilityRebateAmount: caseData.utilityRebateAmount ?? "",
+      federalRebateAmount: caseData.federalRebateAmount ?? "",
+      rebateRequestNotes: caseData.rebateRequestNotes ?? "",
     },
   });
 
   const watchBuildingType = form.watch("buildingType");
-  const onSubmit = (values: z.infer<typeof schema>) => onPatch(values as any);
+  const onSubmit = (values: any) => onPatch(values);
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <div className="max-w-3xl space-y-6">
-          {/* Section header */}
           <div>
             <h2 className="text-xl font-semibold text-slate-900 mb-1">A. Rebate Request</h2>
             <p className="text-sm text-slate-500">
@@ -446,16 +452,13 @@ function ClientPropertyTab({ caseData, onPatch, saving }: { caseData: CaseDetail
           <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
             <RebateRequestSectionHeader letter="CONTRACTOR / INITIATOR INFORMATION" title="" />
             <div className="px-5 pb-5 space-y-5">
-              {/* A.1 and A.2 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <FormField control={form.control} name="initiatorType" render={({ field }) => (
                   <FormItem>
                     <FieldLabel code="A.1" label="Who is initiating the energy rebate request?" />
                     <Select value={field.value ?? ""} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300">
-                          <SelectValue placeholder="Select..." />
-                        </SelectTrigger>
+                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300"><SelectValue placeholder="Select..." /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="Contractor/Installer">Contractor/Installer</SelectItem>
@@ -465,15 +468,12 @@ function ClientPropertyTab({ caseData, onPatch, saving }: { caseData: CaseDetail
                     </Select>
                   </FormItem>
                 )} />
-
                 <FormField control={form.control} name="initiatorCompanyName" render={({ field }) => (
                   <FormItem>
                     <FieldLabel code="A.2" label="Company Name Starting the Application" />
                     <Select value={field.value ?? ""} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300">
-                          <SelectValue placeholder="Select..." />
-                        </SelectTrigger>
+                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300"><SelectValue placeholder="Select..." /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="Giesbrecht HVAC">Giesbrecht HVAC</SelectItem>
@@ -482,8 +482,6 @@ function ClientPropertyTab({ caseData, onPatch, saving }: { caseData: CaseDetail
                   </FormItem>
                 )} />
               </div>
-
-              {/* A.3 */}
               <div>
                 <p className="text-sm font-semibold text-slate-800 mb-3"><span className="font-bold">A.3.</span> Primary Initiator Contact Name</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -520,7 +518,6 @@ function ClientPropertyTab({ caseData, onPatch, saving }: { caseData: CaseDetail
           <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
             <RebateRequestSectionHeader letter="PROPERTY AND BUILDING INFORMATION" title="" />
             <div className="px-5 pb-5 space-y-5">
-              {/* A.4 Address */}
               <div>
                 <FieldLabel code="A.4" label="Project Home Address" />
                 <div className="space-y-2">
@@ -544,9 +541,7 @@ function ClientPropertyTab({ caseData, onPatch, saving }: { caseData: CaseDetail
                       <FormItem className="col-span-1">
                         <Select value={field.value ?? ""} onValueChange={field.onChange}>
                           <FormControl>
-                            <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300">
-                              <SelectValue placeholder="ST" />
-                            </SelectTrigger>
+                            <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300"><SelectValue placeholder="ST" /></SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             {US_STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -564,12 +559,7 @@ function ClientPropertyTab({ caseData, onPatch, saving }: { caseData: CaseDetail
                 <FormField control={form.control} name="addressCertified" render={({ field }) => (
                   <FormItem className="flex items-center gap-2 mt-3">
                     <FormControl>
-                      <input
-                        type="checkbox"
-                        checked={field.value ?? false}
-                        onChange={e => field.onChange(e.target.checked)}
-                        className="w-4 h-4 accent-[#711419]"
-                      />
+                      <input type="checkbox" checked={field.value ?? false} onChange={e => field.onChange(e.target.checked)} className="w-4 h-4 accent-[#711419]" />
                     </FormControl>
                     <FormLabel className="text-sm text-slate-700 cursor-pointer !mt-0">
                       I certify the above address is complete and correct.{" "}
@@ -578,17 +568,13 @@ function ClientPropertyTab({ caseData, onPatch, saving }: { caseData: CaseDetail
                   </FormItem>
                 )} />
               </div>
-
-              {/* A.5 and A.6 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <FormField control={form.control} name="constructionType" render={({ field }) => (
                   <FormItem>
                     <FieldLabel code="A.5" label="Is the building new or existing construction?" />
                     <Select value={field.value ?? ""} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300">
-                          <SelectValue placeholder="Select..." />
-                        </SelectTrigger>
+                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300"><SelectValue placeholder="Select..." /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="Existing Construction">Existing Construction</SelectItem>
@@ -597,15 +583,12 @@ function ClientPropertyTab({ caseData, onPatch, saving }: { caseData: CaseDetail
                     </Select>
                   </FormItem>
                 )} />
-
                 <FormField control={form.control} name="buildingType" render={({ field }) => (
                   <FormItem>
                     <FieldLabel code="A.6" label="What is the building type?" />
                     <Select value={field.value ?? ""} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300">
-                          <SelectValue placeholder="Select..." />
-                        </SelectTrigger>
+                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300"><SelectValue placeholder="Select..." /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="Single Family">Single Family</SelectItem>
@@ -617,17 +600,13 @@ function ClientPropertyTab({ caseData, onPatch, saving }: { caseData: CaseDetail
                   </FormItem>
                 )} />
               </div>
-
-              {/* A.6a — conditional on Single Family */}
               {watchBuildingType === "Single Family" && (
                 <FormField control={form.control} name="buildingSubtype" render={({ field }) => (
                   <FormItem className="max-w-sm">
                     <FieldLabel code="A.6a" label="Single Family Building Type Details" />
                     <Select value={field.value ?? ""} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300">
-                          <SelectValue placeholder="Select..." />
-                        </SelectTrigger>
+                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300"><SelectValue placeholder="Select..." /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="Single Family Attached">Single Family Attached</SelectItem>
@@ -639,53 +618,34 @@ function ClientPropertyTab({ caseData, onPatch, saving }: { caseData: CaseDetail
                   </FormItem>
                 )} />
               )}
-
-              {/* A.7 */}
               <FormField control={form.control} name="isRented" render={({ field }) => (
                 <FormItem>
                   <FieldLabel code="A.7" label="Is the building rented?" />
                   <div className="flex flex-col gap-1.5 mt-1">
                     {[{ label: "Yes", value: true }, { label: "No", value: false }].map(opt => (
                       <label key={String(opt.value)} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          checked={field.value === opt.value}
-                          onChange={() => field.onChange(opt.value)}
-                          className="accent-[#711419]"
-                        />
+                        <input type="radio" checked={field.value === opt.value} onChange={() => field.onChange(opt.value)} className="accent-[#711419]" />
                         <span className="text-sm text-slate-700">{opt.label}</span>
                       </label>
                     ))}
                   </div>
                 </FormItem>
               )} />
-
-              {/* A.8 and A.9 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <FormField control={form.control} name="bedroomCount" render={({ field }) => (
                   <FormItem>
                     <FieldLabel code="A.8" label="Total Number of Bedrooms" />
                     <FormControl>
-                      <Input
-                        type="number"
-                        min={0}
-                        className="h-9 text-sm bg-slate-50 border-slate-300 text-right"
-                        {...field}
-                        value={field.value ?? ""}
-                        onChange={e => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
-                      />
+                      <Input type="number" min={0} className="h-9 text-sm bg-slate-50 border-slate-300 text-right" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : undefined)} />
                     </FormControl>
                   </FormItem>
                 )} />
-
                 <FormField control={form.control} name="sqftRange" render={({ field }) => (
                   <FormItem>
                     <FieldLabel code="A.9" label="Conditioned square footage of single family home:" />
                     <Select value={field.value ?? ""} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300">
-                          <SelectValue placeholder="Select range..." />
-                        </SelectTrigger>
+                        <SelectTrigger className="h-9 text-sm bg-slate-50 border-slate-300"><SelectValue placeholder="Select range..." /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="500 - 1,500 sq ft">500 – 1,500 sq ft</SelectItem>
@@ -701,6 +661,50 @@ function ClientPropertyTab({ caseData, onPatch, saving }: { caseData: CaseDetail
             </div>
           </div>
 
+          {/* Dates & Amounts */}
+          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <RebateRequestSectionHeader letter="PROGRAM DATES &amp; REBATE AMOUNTS" title="" />
+            <div className="px-5 pb-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {[
+                  { name: "applicationDate", label: "Application Date" },
+                  { name: "reservationDate", label: "Reservation Date" },
+                  { name: "approvalDate", label: "Approval Date" },
+                  { name: "paidDate", label: "Paid Date" },
+                ].map(({ name, label }) => (
+                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
+                      <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" type="date" {...field} value={field.value ?? ""} /></FormControl>
+                    </FormItem>
+                  )} />
+                ))}
+                {[
+                  { name: "rebateAmount", label: "Total Rebate Amount" },
+                  { name: "utilityRebateAmount", label: "Utility Rebate Amount" },
+                  { name: "federalRebateAmount", label: "Federal Rebate Amount" },
+                ].map(({ name, label }) => (
+                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
+                      <FormControl><Input className="h-9 text-sm bg-slate-50 border-slate-300" placeholder="e.g. $4,000" {...field} value={field.value ?? ""} /></FormControl>
+                    </FormItem>
+                  )} />
+                ))}
+              </div>
+              <div className="mt-5">
+                <FormField control={form.control} name="rebateRequestNotes" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">Request Notes</FormLabel>
+                    <FormControl>
+                      <Textarea className="text-sm min-h-[80px] resize-none bg-slate-50 border-slate-300" placeholder="Notes about this rebate request..." {...field} value={field.value ?? ""} />
+                    </FormControl>
+                  </FormItem>
+                )} />
+              </div>
+            </div>
+          </div>
+
           <SaveBar onSave={form.handleSubmit(onSubmit)} saving={saving} dirty={form.formState.isDirty} />
         </div>
       </form>
@@ -708,11 +712,27 @@ function ClientPropertyTab({ caseData, onPatch, saving }: { caseData: CaseDetail
   );
 }
 
-// ─── Utility Tab ───────────────────────────────────────────────────────────────
+// ─── Head of Household Tab ─────────────────────────────────────────────────────
 
-function UtilityTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onPatch: (d: Partial<RebateCase>) => void; saving: boolean }) {
+function HeadOfHouseholdTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onPatch: (d: Partial<RebateCase>) => void; saving: boolean }) {
   const form = useForm({
     defaultValues: {
+      clientFirstName: caseData.clientFirstName ?? "",
+      clientLastName: caseData.clientLastName ?? "",
+      clientEmail: caseData.clientEmail ?? "",
+      clientPhone: caseData.clientPhone ?? "",
+      clientDob: caseData.clientDob ?? "",
+      householdSize: caseData.householdSize ?? "",
+      householdIncome: caseData.householdIncome ?? "",
+      amiBracket: caseData.amiBracket ?? "",
+      propertyAddress: caseData.propertyAddress ?? "",
+      propertyCity: caseData.propertyCity ?? "",
+      propertyState: caseData.propertyState ?? "",
+      propertyZip: caseData.propertyZip ?? "",
+      propertyType: caseData.propertyType ?? "",
+      ownershipStatus: caseData.ownershipStatus ?? "",
+      yearBuilt: caseData.yearBuilt ?? "",
+      squareFootage: caseData.squareFootage ?? "",
       electricUtility: caseData.electricUtility ?? "",
       electricAccountNumber: caseData.electricAccountNumber ?? "",
       gasUtility: caseData.gasUtility ?? "",
@@ -723,24 +743,114 @@ function UtilityTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onPat
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
-        <Card className="max-w-lg">
-          <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Utility Information</CardTitle></CardHeader>
-          <CardContent className="pt-0 space-y-3">
-            {[
-              { name: "electricUtility", label: "Electric Utility" },
-              { name: "electricAccountNumber", label: "Electric Account #" },
-              { name: "gasUtility", label: "Gas Utility" },
-              { name: "gasAccountNumber", label: "Gas Account #" },
-            ].map(({ name, label }) => (
-              <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
-                  <FormControl><Input className="h-8 text-sm" {...field} /></FormControl>
-                </FormItem>
-              )} />
-            ))}
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Head of Household</CardTitle></CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                {[
+                  { name: "clientFirstName", label: "First Name" },
+                  { name: "clientLastName", label: "Last Name" },
+                  { name: "clientEmail", label: "Email" },
+                  { name: "clientPhone", label: "Phone" },
+                  { name: "clientDob", label: "Date of Birth" },
+                ].map(({ name, label }) => (
+                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
+                      <FormControl><Input className="h-8 text-sm" {...field} value={field.value ?? ""} /></FormControl>
+                    </FormItem>
+                  )} />
+                ))}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Income &amp; Eligibility</CardTitle></CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                {[
+                  { name: "householdIncome", label: "Annual Household Income" },
+                  { name: "amiBracket", label: "AMI Bracket (e.g. ≤80% AMI)" },
+                ].map(({ name, label }) => (
+                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
+                      <FormControl><Input className="h-8 text-sm" {...field} value={field.value ?? ""} /></FormControl>
+                    </FormItem>
+                  )} />
+                ))}
+                <FormField control={form.control} name="householdSize" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">Household Size (# of people)</FormLabel>
+                    <FormControl><Input className="h-8 text-sm" type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : "")} /></FormControl>
+                  </FormItem>
+                )} />
+                {[
+                  { name: "ownershipStatus", label: "Ownership Status" },
+                ].map(({ name, label }) => (
+                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
+                      <FormControl><Input className="h-8 text-sm" placeholder="e.g. Owner-occupied" {...field} value={field.value ?? ""} /></FormControl>
+                    </FormItem>
+                  )} />
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Property</CardTitle></CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                {[
+                  { name: "propertyAddress", label: "Address" },
+                  { name: "propertyCity", label: "City" },
+                  { name: "propertyState", label: "State" },
+                  { name: "propertyZip", label: "ZIP" },
+                  { name: "propertyType", label: "Property Type" },
+                ].map(({ name, label }) => (
+                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
+                      <FormControl><Input className="h-8 text-sm" {...field} value={field.value ?? ""} /></FormControl>
+                    </FormItem>
+                  )} />
+                ))}
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField control={form.control} name="yearBuilt" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-500">Year Built</FormLabel>
+                      <FormControl><Input className="h-8 text-sm" type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : "")} /></FormControl>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="squareFootage" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-500">Sq Ft</FormLabel>
+                      <FormControl><Input className="h-8 text-sm" type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : "")} /></FormControl>
+                    </FormItem>
+                  )} />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Utility Accounts</CardTitle></CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                {[
+                  { name: "electricUtility", label: "Electric Utility" },
+                  { name: "electricAccountNumber", label: "Electric Account #" },
+                  { name: "gasUtility", label: "Gas Utility" },
+                  { name: "gasAccountNumber", label: "Gas Account #" },
+                ].map(({ name, label }) => (
+                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
+                      <FormControl><Input className="h-8 text-sm" {...field} value={field.value ?? ""} /></FormControl>
+                    </FormItem>
+                  )} />
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
         <div className="mt-3">
           <SaveBar onSave={form.handleSubmit(onSubmit)} saving={saving} dirty={form.formState.isDirty} />
         </div>
@@ -749,11 +859,17 @@ function UtilityTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onPat
   );
 }
 
-// ─── Existing System Tab ────────────────────────────────────────────────────────
+// ─── Contractor Pre-Approval Tab ───────────────────────────────────────────────
 
-function ExistingSystemTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onPatch: (d: Partial<RebateCase>) => void; saving: boolean }) {
+function ContractorPreApprovalTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onPatch: (d: Partial<RebateCase>) => void; saving: boolean }) {
   const form = useForm({
     defaultValues: {
+      contractorName: caseData.contractorName ?? "",
+      contractorLicenseNumber: caseData.contractorLicenseNumber ?? "",
+      preApprovalStatus: caseData.preApprovalStatus ?? "",
+      preApprovalSubmittedDate: caseData.preApprovalSubmittedDate ? format(new Date(caseData.preApprovalSubmittedDate), "yyyy-MM-dd") : "",
+      preApprovalApprovedDate: caseData.preApprovalApprovedDate ? format(new Date(caseData.preApprovalApprovedDate), "yyyy-MM-dd") : "",
+      preApprovalNotes: caseData.preApprovalNotes ?? "",
       existingHeatingType: caseData.existingHeatingType ?? "",
       existingHeatingAge: caseData.existingHeatingAge ?? "",
       existingCoolingType: caseData.existingCoolingType ?? "",
@@ -772,26 +888,81 @@ function ExistingSystemTab({ caseData, onPatch, saving }: { caseData: CaseDetail
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
-        <Card className="max-w-lg">
-          <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Existing Equipment</CardTitle></CardHeader>
-          <CardContent className="pt-0 space-y-3">
-            {[
-              { name: "existingHeatingType", label: "Heating Type", type: "text" },
-              { name: "existingHeatingAge", label: "Heating Age (years)", type: "number" },
-              { name: "existingCoolingType", label: "Cooling Type", type: "text" },
-              { name: "existingCoolingAge", label: "Cooling Age (years)", type: "number" },
-              { name: "existingWaterHeaterType", label: "Water Heater Type", type: "text" },
-              { name: "existingWaterHeaterAge", label: "Water Heater Age (years)", type: "number" },
-            ].map(({ name, label, type }) => (
-              <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Contractor Information</CardTitle></CardHeader>
+            <CardContent className="pt-0 space-y-3">
+              {[
+                { name: "contractorName", label: "Contractor / Company Name" },
+                { name: "contractorLicenseNumber", label: "License Number" },
+              ].map(({ name, label }) => (
+                <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
+                    <FormControl><Input className="h-8 text-sm" {...field} value={field.value ?? ""} /></FormControl>
+                  </FormItem>
+                )} />
+              ))}
+              <Separator />
+              <FormField control={form.control} name="preApprovalStatus" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
-                  <FormControl><Input className="h-8 text-sm" type={type} {...field} value={field.value ?? ""} /></FormControl>
+                  <FormLabel className="text-xs text-slate-500">Pre-Approval Status</FormLabel>
+                  <FormControl>
+                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select status…" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="not_submitted">Not Submitted</SelectItem>
+                        <SelectItem value="submitted">Submitted</SelectItem>
+                        <SelectItem value="under_review">Under Review</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="denied">Denied</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
                 </FormItem>
               )} />
-            ))}
-          </CardContent>
-        </Card>
+              {[
+                { name: "preApprovalSubmittedDate", label: "Submission Date" },
+                { name: "preApprovalApprovedDate", label: "Approval Date" },
+              ].map(({ name, label }) => (
+                <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
+                    <FormControl><Input className="h-8 text-sm" type="date" {...field} value={field.value ?? ""} /></FormControl>
+                  </FormItem>
+                )} />
+              ))}
+              <FormField control={form.control} name="preApprovalNotes" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs text-slate-500">Notes</FormLabel>
+                  <FormControl>
+                    <Textarea className="text-sm min-h-[80px] resize-none" placeholder="Pre-approval package notes…" {...field} value={field.value ?? ""} />
+                  </FormControl>
+                </FormItem>
+              )} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Existing Equipment (for approval package)</CardTitle></CardHeader>
+            <CardContent className="pt-0 space-y-3">
+              {[
+                { name: "existingHeatingType", label: "Heating Type", type: "text" },
+                { name: "existingHeatingAge", label: "Heating Age (years)", type: "number" },
+                { name: "existingCoolingType", label: "Cooling Type", type: "text" },
+                { name: "existingCoolingAge", label: "Cooling Age (years)", type: "number" },
+                { name: "existingWaterHeaterType", label: "Water Heater Type", type: "text" },
+                { name: "existingWaterHeaterAge", label: "Water Heater Age (years)", type: "number" },
+              ].map(({ name, label, type }) => (
+                <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
+                    <FormControl><Input className="h-8 text-sm" type={type} {...field} value={field.value ?? ""} /></FormControl>
+                  </FormItem>
+                )} />
+              ))}
+            </CardContent>
+          </Card>
+        </div>
         <div className="mt-3">
           <SaveBar onSave={form.handleSubmit(onSubmit)} saving={saving} dirty={form.formState.isDirty} />
         </div>
@@ -800,11 +971,15 @@ function ExistingSystemTab({ caseData, onPatch, saving }: { caseData: CaseDetail
   );
 }
 
-// ─── New System Tab ─────────────────────────────────────────────────────────────
+// ─── Project Completion Tab ─────────────────────────────────────────────────────
 
-function NewSystemTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onPatch: (d: Partial<RebateCase>) => void; saving: boolean }) {
+function ProjectCompletionTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onPatch: (d: Partial<RebateCase>) => void; saving: boolean }) {
   const form = useForm({
     defaultValues: {
+      installDate: caseData.installDate ? format(new Date(caseData.installDate), "yyyy-MM-dd") : "",
+      installCompletedDate: caseData.installCompletedDate ? format(new Date(caseData.installCompletedDate), "yyyy-MM-dd") : "",
+      installCost: caseData.installCost ?? "",
+      completionNotes: caseData.completionNotes ?? "",
       newHeatingType: caseData.newHeatingType ?? "",
       newHeatingBrand: caseData.newHeatingBrand ?? "",
       newHeatingModel: caseData.newHeatingModel ?? "",
@@ -825,41 +1000,86 @@ function NewSystemTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onP
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Heating</CardTitle></CardHeader>
-            <CardContent className="pt-0 space-y-3">
-              {["newHeatingType","newHeatingBrand","newHeatingModel","newHeatingSerial","newHeatingSeer","newHeatingHspf"].map(name => (
-                <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-500">{name.replace("newHeating","").replace(/([A-Z])/g," $1").trim()}</FormLabel>
-                    <FormControl><Input className="h-8 text-sm" {...field} /></FormControl>
-                  </FormItem>
-                )} />
-              ))}
-            </CardContent>
-          </Card>
           <div className="space-y-4">
             <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Cooling</CardTitle></CardHeader>
+              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Installation Details</CardTitle></CardHeader>
               <CardContent className="pt-0 space-y-3">
-                {["newCoolingType","newCoolingBrand","newCoolingModel","newCoolingSerial"].map(name => (
+                {[
+                  { name: "installDate", label: "Installation Date", type: "date" },
+                  { name: "installCompletedDate", label: "Completion Date", type: "date" },
+                  { name: "installCost", label: "Installation Cost", type: "text" },
+                ].map(({ name, label, type }) => (
                   <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs text-slate-500">{name.replace("newCooling","").replace(/([A-Z])/g," $1").trim()}</FormLabel>
-                      <FormControl><Input className="h-8 text-sm" {...field} /></FormControl>
+                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
+                      <FormControl>
+                        <Input className="h-8 text-sm" type={type} placeholder={type === "text" ? "e.g. $12,500" : undefined} {...field} value={field.value ?? ""} />
+                      </FormControl>
+                    </FormItem>
+                  )} />
+                ))}
+                <FormField control={form.control} name="completionNotes" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">Completion Notes</FormLabel>
+                    <FormControl>
+                      <Textarea className="text-sm min-h-[80px] resize-none" placeholder="Notes about project completion…" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                  </FormItem>
+                )} />
+              </CardContent>
+            </Card>
+          </div>
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">New Heating Equipment</CardTitle></CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                {[
+                  { name: "newHeatingType", label: "Type" },
+                  { name: "newHeatingBrand", label: "Brand" },
+                  { name: "newHeatingModel", label: "Model" },
+                  { name: "newHeatingSerial", label: "Serial #" },
+                  { name: "newHeatingSeer", label: "SEER Rating" },
+                  { name: "newHeatingHspf", label: "HSPF Rating" },
+                ].map(({ name, label }) => (
+                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
+                      <FormControl><Input className="h-8 text-sm" {...field} value={field.value ?? ""} /></FormControl>
                     </FormItem>
                   )} />
                 ))}
               </CardContent>
             </Card>
             <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Water Heater</CardTitle></CardHeader>
+              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">New Cooling Equipment</CardTitle></CardHeader>
               <CardContent className="pt-0 space-y-3">
-                {["newWaterHeaterType","newWaterHeaterBrand","newWaterHeaterModel"].map(name => (
+                {[
+                  { name: "newCoolingType", label: "Type" },
+                  { name: "newCoolingBrand", label: "Brand" },
+                  { name: "newCoolingModel", label: "Model" },
+                  { name: "newCoolingSerial", label: "Serial #" },
+                ].map(({ name, label }) => (
                   <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs text-slate-500">{name.replace("newWaterHeater","").replace(/([A-Z])/g," $1").trim()}</FormLabel>
-                      <FormControl><Input className="h-8 text-sm" {...field} /></FormControl>
+                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
+                      <FormControl><Input className="h-8 text-sm" {...field} value={field.value ?? ""} /></FormControl>
+                    </FormItem>
+                  )} />
+                ))}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">New Water Heater</CardTitle></CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                {[
+                  { name: "newWaterHeaterType", label: "Type" },
+                  { name: "newWaterHeaterBrand", label: "Brand" },
+                  { name: "newWaterHeaterModel", label: "Model" },
+                ].map(({ name, label }) => (
+                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
+                      <FormControl><Input className="h-8 text-sm" {...field} value={field.value ?? ""} /></FormControl>
                     </FormItem>
                   )} />
                 ))}
@@ -966,105 +1186,214 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
   );
 }
 
-// ─── Workflow Tab ───────────────────────────────────────────────────────────────
+// ─── Completion Attestations Tab ───────────────────────────────────────────────
 
-function WorkflowTab({ caseData, caseId, onInvalidate }: { caseData: CaseDetail; caseId: string; onInvalidate: () => void }) {
-  const [expandedStep, setExpandedStep] = useState<string | null>(null);
-  const { toast } = useToast();
-
-  const updateStep = useMutation({
-    mutationFn: ({ stepId, data }: { stepId: string; data: Partial<RebateCaseWorkflowStep> }) =>
-      apiRequest("PATCH", `/api/crm/rebate-cases/${caseId}/workflow-steps/${stepId}`, data),
-    onSuccess: onInvalidate,
-    onError: () => toast({ title: "Failed to update step", variant: "destructive" }),
+function CompletionAttestationsTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onPatch: (d: Partial<RebateCase>) => void; saving: boolean }) {
+  const form = useForm({
+    defaultValues: {
+      customerAttestationSigned: caseData.customerAttestationSigned ?? false,
+      customerAttestationDate: caseData.customerAttestationDate ? format(new Date(caseData.customerAttestationDate), "yyyy-MM-dd") : "",
+      contractorAttestationSigned: caseData.contractorAttestationSigned ?? false,
+      contractorAttestationDate: caseData.contractorAttestationDate ? format(new Date(caseData.contractorAttestationDate), "yyyy-MM-dd") : "",
+      attestationNotes: caseData.attestationNotes ?? "",
+    },
   });
-
-  const stepsMap = new Map((caseData.workflowSteps ?? []).map(s => [s.step, s]));
-  const completeCount = (caseData.workflowSteps ?? []).filter(s => s.status === "complete").length;
+  const onSubmit = (v: any) => onPatch(v);
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-slate-700">Neighborly Process Steps</h3>
-        <span className="text-sm text-slate-500">{completeCount} of {WORKFLOW_STEPS_ORDER.length} complete</span>
-      </div>
-      <div className="w-full bg-slate-100 rounded-full h-2 mb-4">
-        <div
-          className="bg-[#711419] h-2 rounded-full transition-all"
-          style={{ width: `${(completeCount / WORKFLOW_STEPS_ORDER.length) * 100}%` }}
-        />
-      </div>
-      {WORKFLOW_STEPS_ORDER.map((stepKey, idx) => {
-        const step = stepsMap.get(stepKey);
-        const isExpanded = expandedStep === stepKey;
-        if (!step) return null;
-        return (
-          <Card key={stepKey} className="overflow-hidden">
-            <button
-              className="w-full flex items-center gap-3 p-4 text-left hover:bg-slate-50 transition-colors"
-              onClick={() => setExpandedStep(isExpanded ? null : stepKey)}
-            >
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0
-                ${step.status === "complete" ? "bg-[#711419] text-white" : "bg-slate-100 text-slate-600"}`}>
-                {step.status === "complete" ? <CheckCircle2 className="w-4 h-4" /> : idx + 1}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-slate-800">{WORKFLOW_STEP_LABELS[stepKey]}</span>
-                  <Badge className={`text-xs border ${WORKFLOW_STEP_STATUS_COLORS[step.status]}`}>
-                    {WORKFLOW_STEP_STATUS_LABELS[step.status]}
-                  </Badge>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5 truncate">{WORKFLOW_STEP_DESCRIPTIONS[stepKey]}</p>
-              </div>
-              {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />}
-            </button>
-            {isExpanded && (
-              <div className="px-4 pb-4 border-t border-slate-100 pt-3 space-y-3">
-                <div>
-                  <label className="text-xs text-slate-500 mb-1 block">Status</label>
-                  <Select
-                    value={step.status}
-                    onValueChange={v => updateStep.mutate({ stepId: step.id, data: { status: v as RebateWorkflowStepStatus } })}
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-slate-700">Customer Attestation</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0 space-y-4">
+              <p className="text-xs text-slate-500 leading-relaxed">
+                The customer certifies that the information provided is accurate, the work described was completed at the property, and they understand the terms of the rebate program.
+              </p>
+              <FormField control={form.control} name="customerAttestationSigned" render={({ field }) => (
+                <FormItem>
+                  <button
+                    type="button"
+                    onClick={() => field.onChange(!field.value)}
+                    className={`flex items-center gap-3 w-full p-3 rounded-lg border-2 transition-colors text-left
+                      ${field.value
+                        ? "border-[#711419] bg-red-50"
+                        : "border-slate-200 hover:border-slate-300 bg-white"}`}
                   >
-                    <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {(["not_started","in_progress","complete","waiting","blocked"] as RebateWorkflowStepStatus[]).map(s => (
-                        <SelectItem key={s} value={s}>{WORKFLOW_STEP_STATUS_LABELS[s]}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-xs text-slate-500 mb-1 block">Notes</label>
-                  <Textarea
-                    className="text-sm min-h-[60px] resize-none"
-                    defaultValue={step.notes ?? ""}
-                    onBlur={e => {
-                      if (e.target.value !== (step.notes ?? "")) {
-                        updateStep.mutate({ stepId: step.id, data: { notes: e.target.value || null } });
-                      }
-                    }}
-                    placeholder="Notes for this step..."
-                  />
-                </div>
-                {step.status !== "complete" && (
-                  <Button
-                    size="sm"
-                    className="bg-[#711419] hover:bg-[#5a1014]"
-                    onClick={() => updateStep.mutate({ stepId: step.id, data: { status: "complete" } })}
-                    disabled={updateStep.isPending}
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                    Mark Complete
-                  </Button>
-                )}
-              </div>
-            )}
+                    <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0
+                      ${field.value ? "bg-[#711419]" : "bg-white border-2 border-slate-300"}`}>
+                      {field.value && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                    </div>
+                    <span className="text-sm font-medium text-slate-700">
+                      {field.value ? "Customer has signed attestation" : "Mark as signed by customer"}
+                    </span>
+                  </button>
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="customerAttestationDate" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs text-slate-500">Customer Signature Date</FormLabel>
+                  <FormControl><Input className="h-8 text-sm" type="date" {...field} value={field.value ?? ""} /></FormControl>
+                </FormItem>
+              )} />
+            </CardContent>
           </Card>
-        );
-      })}
-    </div>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-slate-700">Contractor Attestation</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0 space-y-4">
+              <p className="text-xs text-slate-500 leading-relaxed">
+                The contractor certifies that the installed equipment meets all program requirements, is properly installed, and the information submitted in the rebate application is accurate.
+              </p>
+              <FormField control={form.control} name="contractorAttestationSigned" render={({ field }) => (
+                <FormItem>
+                  <button
+                    type="button"
+                    onClick={() => field.onChange(!field.value)}
+                    className={`flex items-center gap-3 w-full p-3 rounded-lg border-2 transition-colors text-left
+                      ${field.value
+                        ? "border-[#711419] bg-red-50"
+                        : "border-slate-200 hover:border-slate-300 bg-white"}`}
+                  >
+                    <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0
+                      ${field.value ? "bg-[#711419]" : "bg-white border-2 border-slate-300"}`}>
+                      {field.value && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                    </div>
+                    <span className="text-sm font-medium text-slate-700">
+                      {field.value ? "Contractor has signed attestation" : "Mark as signed by contractor"}
+                    </span>
+                  </button>
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="contractorAttestationDate" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs text-slate-500">Contractor Signature Date</FormLabel>
+                  <FormControl><Input className="h-8 text-sm" type="date" {...field} value={field.value ?? ""} /></FormControl>
+                </FormItem>
+              )} />
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="mt-4">
+          <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Attestation Notes</CardTitle></CardHeader>
+          <CardContent className="pt-0">
+            <FormField control={form.control} name="attestationNotes" render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <Textarea className="text-sm min-h-[80px] resize-none" placeholder="Notes about attestations or signatures…" {...field} value={field.value ?? ""} />
+                </FormControl>
+              </FormItem>
+            )} />
+          </CardContent>
+        </Card>
+
+        <div className="mt-3">
+          <SaveBar onSave={form.handleSubmit(onSubmit)} saving={saving} dirty={form.formState.isDirty} />
+        </div>
+      </form>
+    </Form>
+  );
+}
+
+// ─── Reservation Summary Tab ───────────────────────────────────────────────────
+
+function ReservationSummaryTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onPatch: (d: Partial<RebateCase>) => void; saving: boolean }) {
+  const form = useForm({
+    defaultValues: {
+      reservationNumber: caseData.reservationNumber ?? "",
+      reservationDate: caseData.reservationDate ? format(new Date(caseData.reservationDate), "yyyy-MM-dd") : "",
+      rebateAmount: caseData.rebateAmount ?? "",
+      paymentReleaseAmount: caseData.paymentReleaseAmount ?? "",
+      caseCloseoutDate: caseData.caseCloseoutDate ? format(new Date(caseData.caseCloseoutDate), "yyyy-MM-dd") : "",
+      caseCloseoutNotes: caseData.caseCloseoutNotes ?? "",
+    },
+  });
+  const onSubmit = (v: any) => onPatch(v);
+
+  const isFullyAttested = caseData.customerAttestationSigned && caseData.contractorAttestationSigned;
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        {!isFullyAttested && (
+          <div className="mb-4 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span>Both customer and contractor attestations should be signed before finalizing the reservation summary.</span>
+          </div>
+        )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Reservation Details</CardTitle></CardHeader>
+            <CardContent className="pt-0 space-y-3">
+              {[
+                { name: "reservationNumber", label: "Reservation #", placeholder: "e.g. RES-2024-00123" },
+                { name: "reservationDate", label: "Reservation Date", type: "date" },
+                { name: "rebateAmount", label: "Approved Rebate Amount", placeholder: "e.g. $4,000" },
+                { name: "paymentReleaseAmount", label: "Payment Release Amount", placeholder: "e.g. $4,000" },
+              ].map(({ name, label, placeholder, type }) => (
+                <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
+                    <FormControl>
+                      <Input className="h-8 text-sm" type={type ?? "text"} placeholder={placeholder} {...field} value={field.value ?? ""} />
+                    </FormControl>
+                  </FormItem>
+                )} />
+              ))}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Case Close-out</CardTitle></CardHeader>
+            <CardContent className="pt-0 space-y-3">
+              <FormField control={form.control} name="caseCloseoutDate" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs text-slate-500">Close-out Date</FormLabel>
+                  <FormControl><Input className="h-8 text-sm" type="date" {...field} value={field.value ?? ""} /></FormControl>
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="caseCloseoutNotes" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs text-slate-500">Close-out Notes</FormLabel>
+                  <FormControl>
+                    <Textarea className="text-sm min-h-[120px] resize-none" placeholder="Final notes, payment instructions, or case close-out details…" {...field} value={field.value ?? ""} />
+                  </FormControl>
+                </FormItem>
+              )} />
+              <Separator />
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-slate-600">Attestation Status</p>
+                <div className="flex items-center gap-2 text-sm">
+                  {caseData.customerAttestationSigned
+                    ? <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                    : <Circle className="w-4 h-4 text-slate-300 flex-shrink-0" />}
+                  <span className={caseData.customerAttestationSigned ? "text-slate-700" : "text-slate-400"}>
+                    Customer attestation
+                    {caseData.customerAttestationDate && ` — ${format(new Date(caseData.customerAttestationDate), "MMM d, yyyy")}`}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  {caseData.contractorAttestationSigned
+                    ? <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                    : <Circle className="w-4 h-4 text-slate-300 flex-shrink-0" />}
+                  <span className={caseData.contractorAttestationSigned ? "text-slate-700" : "text-slate-400"}>
+                    Contractor attestation
+                    {caseData.contractorAttestationDate && ` — ${format(new Date(caseData.contractorAttestationDate), "MMM d, yyyy")}`}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        <div className="mt-3">
+          <SaveBar onSave={form.handleSubmit(onSubmit)} saving={saving} dirty={form.formState.isDirty} />
+        </div>
+      </form>
+    </Form>
   );
 }
 
