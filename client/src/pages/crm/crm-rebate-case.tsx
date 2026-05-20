@@ -361,7 +361,7 @@ const US_STATES = [
 
 function RebateRequestSectionHeader({ letter, title }: { letter: string; title: string }) {
   return (
-    <div className="bg-[#1e3a5f] text-white px-4 py-2.5 rounded-sm mb-4">
+    <div className="bg-[#711419] text-white px-4 py-2.5 rounded-sm mb-4">
       <span className="text-xs font-bold uppercase tracking-wide">{letter}{title ? `. ${title}` : ""}</span>
     </div>
   );
@@ -452,7 +452,7 @@ function RebateRequestTab({ caseData, onPatch, saving }: { caseData: CaseDetail;
       </header>
 
       {/* CONTRACTOR / INITIATOR INFORMATION */}
-      <div className="bg-[#1e3a5f] text-white px-4 py-2.5 rounded-sm mb-4">
+      <div className="bg-[#711419] text-white px-4 py-2.5 rounded-sm mb-4">
         <span className="text-xs font-bold uppercase tracking-wide">Contractor / Initiator Information</span>
       </div>
       <div className="space-y-5 mb-8">
@@ -497,7 +497,7 @@ function RebateRequestTab({ caseData, onPatch, saving }: { caseData: CaseDetail;
       </div>
 
       {/* PROPERTY AND BUILDING INFORMATION */}
-      <div className="bg-[#1e3a5f] text-white px-4 py-2.5 rounded-sm mb-4">
+      <div className="bg-[#711419] text-white px-4 py-2.5 rounded-sm mb-4">
         <span className="text-xs font-bold uppercase tracking-wide">Property and Building Information</span>
       </div>
       <div className="space-y-5">
@@ -946,12 +946,66 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
   caseData: CaseDetail; caseId: string; onPatch: (d: Partial<RebateCase>) => void; saving: boolean; onInvalidate: () => void;
 }) {
   const { toast } = useToast();
-  const form = useForm({
-    defaultValues: {
-      scopeSummary: caseData.scopeSummary ?? "",
-      installCost: caseData.installCost ?? "",
-    },
+
+  type ScopeForm = {
+    scopeCounty: string;
+    scopeExpectedCompletionDate: string;
+    scopeIsDiy: boolean | null;
+    scopeAssociatedHerApp: boolean | null;
+    scopeAssociatedDiyApp: boolean | null;
+    electricUtilityType: string;
+    electricMunicipalProvider: string;
+    electricCompanyName: string;
+    electricMeterNumber: string;
+    electricAccountNumber: string;
+    electricAccountCertified: boolean;
+    hasGas: boolean | null;
+    gasCertifiedNoGas: boolean;
+    gasCompanyName: string;
+    gasMeterNumber: string;
+    gasAccountNumberScope: string;
+    gasAccountCertified: boolean;
+    hasDeliveredFuel: boolean | null;
+    deliveredFuelCompany: string;
+    scopeSummary: string;
+    installCost: string;
+  };
+
+  const buildInitial = (d: CaseDetail): ScopeForm => ({
+    scopeCounty: d.scopeCounty ?? "",
+    scopeExpectedCompletionDate: d.scopeExpectedCompletionDate ?? "",
+    scopeIsDiy: d.scopeIsDiy ?? null,
+    scopeAssociatedHerApp: d.scopeAssociatedHerApp ?? null,
+    scopeAssociatedDiyApp: d.scopeAssociatedDiyApp ?? null,
+    electricUtilityType: d.electricUtilityType ?? "",
+    electricMunicipalProvider: d.electricMunicipalProvider ?? "",
+    electricCompanyName: d.electricCompanyName ?? "",
+    electricMeterNumber: d.electricMeterNumber ?? "",
+    electricAccountNumber: d.electricAccountNumber ?? "",
+    electricAccountCertified: d.electricAccountCertified ?? false,
+    hasGas: d.hasGas ?? null,
+    gasCertifiedNoGas: d.gasCertifiedNoGas ?? false,
+    gasCompanyName: d.gasCompanyName ?? "",
+    gasMeterNumber: d.gasMeterNumber ?? "",
+    gasAccountNumberScope: d.gasAccountNumberScope ?? "",
+    gasAccountCertified: d.gasAccountCertified ?? false,
+    hasDeliveredFuel: d.hasDeliveredFuel ?? null,
+    deliveredFuelCompany: d.deliveredFuelCompany ?? "",
+    scopeSummary: d.scopeSummary ?? "",
+    installCost: d.installCost ?? "",
   });
+
+  const [vals, setVals] = useState<ScopeForm>(() => buildInitial(caseData));
+  const savedRef = useRef<ScopeForm>(vals);
+  useEffect(() => {
+    const f = buildInitial(caseData);
+    savedRef.current = f;
+    setVals(f);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseData.id]);
+
+  const dirty = JSON.stringify(vals) !== JSON.stringify(savedRef.current);
+  const set = <K extends keyof ScopeForm>(k: K, v: ScopeForm[K]) => setVals(p => ({ ...p, [k]: v }));
 
   const toggleItem = useMutation({
     mutationFn: ({ itemId, isChecked }: { itemId: string; isChecked: boolean }) =>
@@ -963,99 +1017,238 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
   const checkedItems = (caseData.scopeChecklist ?? []).filter(i => i.isChecked);
   const allItems = [...(caseData.scopeChecklist ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
 
+  const inp = "w-full h-9 px-3 rounded-md bg-slate-50 border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-[#711419] focus:ring-1 focus:ring-[#711419]/30";
+  const lbl = "block text-sm text-slate-700 mb-1";
+  const cod = "font-semibold text-slate-800";
+
+  const RadioGroup = ({ value, onChange }: { value: boolean | null; onChange: (v: boolean) => void }) => (
+    <div className="flex gap-5 mt-1">
+      {[{ label: "Yes", val: true }, { label: "No", val: false }].map(o => (
+        <label key={String(o.val)} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+          <input type="radio" checked={value === o.val} onChange={() => onChange(o.val)} className="accent-[#711419]" />
+          {o.label}
+        </label>
+      ))}
+    </div>
+  );
+
+  const GA_COUNTIES = ["Appling","Atkinson","Bacon","Baker","Baldwin","Banks","Barrow","Bartow","Ben Hill","Berrien","Bibb","Bleckley","Brantley","Brooks","Bryan","Bulloch","Burke","Butts","Calhoun","Camden","Candler","Carroll","Catoosa","Charlton","Chatham","Chattahoochee","Chattooga","Cherokee","Clarke","Clay","Clayton","Clinch","Cobb","Coffee","Colquitt","Columbia","Cook","Coweta","Crawford","Crisp","Dade","Dawson","Decatur","DeKalb","Dodge","Dooly","Dougherty","Douglas","Early","Echols","Effingham","Elbert","Emanuel","Evans","Fannin","Fayette","Floyd","Forsyth","Franklin","Fulton","Gilmer","Glascock","Glynn","Gordon","Grady","Greene","Gwinnett","Habersham","Hall","Hancock","Haralson","Harris","Hart","Heard","Henry","Houston","Irwin","Jackson","Jasper","Jeff Davis","Jefferson","Jenkins","Johnson","Jones","Lamar","Lanier","Laurens","Lee","Liberty","Lincoln","Long","Lowndes","Lumpkin","Macon","Madison","Marion","McDuffie","McIntosh","Meriwether","Miller","Mitchell","Monroe","Montgomery","Morgan","Murray","Muscogee","Newton","Oconee","Oglethorpe","Paulding","Peach","Pickens","Pierce","Pike","Polk","Pulaski","Putnam","Quitman","Rabun","Randolph","Richmond","Rockdale","Schley","Screven","Seminole","Spalding","Stephens","Stewart","Sumter","Talbot","Taliaferro","Tattnall","Taylor","Telfair","Terrell","Thomas","Tift","Toombs","Towns","Treutlen","Troup","Turner","Twiggs","Union","Upson","Walker","Walton","Ware","Warren","Washington","Wayne","Webster","Wheeler","White","Whitfield","Wilcox","Wilkes","Wilkinson","Worth"];
+
   return (
-    <div className="max-w-3xl space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-slate-900 mb-1">D. Scope of Work</h2>
+    <div className="max-w-3xl mx-auto pb-24 space-y-8">
+      <header>
+        <h2 className="text-xl font-semibold text-slate-900 mb-1">C. Scope of Work</h2>
         <p className="text-sm text-slate-500">
-          Select all electrification measures included in this project and provide the proposed scope description and cost.
+          Fill out the scope of work for the project. Upload the ENERGY STAR or AHRI Certificate for all appliance upgrades.
         </p>
+        {caseData.constructionType && (
+          <div className="mt-3 px-4 py-3 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-600">
+            <span className="font-medium text-slate-700">Construction Type (from Section A):</span> {caseData.constructionType}
+          </div>
+        )}
+      </header>
+
+      {/* PROJECT INFORMATION */}
+      <div>
+        <div className="bg-[#711419] text-white px-4 py-2.5 rounded-sm mb-4">
+          <span className="text-xs font-bold uppercase tracking-wide">Project Information</span>
+        </div>
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label className={lbl}><span className={cod}>County</span></label>
+              <select className={inp} value={vals.scopeCounty} onChange={e => set("scopeCounty", e.target.value)}>
+                <option value="">Select county…</option>
+                {GA_COUNTIES.map(c => <option key={c} value={c}>{c} County</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={lbl}><span className={cod}>C.1.</span> Expected completion date</label>
+              <input type="date" className={inp} value={vals.scopeExpectedCompletionDate} onChange={e => set("scopeExpectedCompletionDate", e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <label className={lbl}><span className={cod}>C.2.</span> Is this a DIY (homeowner/tenant) rebate?</label>
+            <RadioGroup value={vals.scopeIsDiy} onChange={v => set("scopeIsDiy", v)} />
+          </div>
+          <div>
+            <label className={lbl}>Is this project associated with another HER application at this address?</label>
+            <RadioGroup value={vals.scopeAssociatedHerApp} onChange={v => set("scopeAssociatedHerApp", v)} />
+          </div>
+          <div>
+            <label className={lbl}>Is this project associated with another DIY application at this address?</label>
+            <RadioGroup value={vals.scopeAssociatedDiyApp} onChange={v => set("scopeAssociatedDiyApp", v)} />
+          </div>
+        </div>
       </div>
 
-      {/* Electrification Measures */}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-        <RebateRequestSectionHeader letter="ELECTRIFICATION MEASURES" title="" />
-        <div className="px-5 pb-5">
-          <p className="text-sm text-slate-500 mb-4">
-            <span className="font-semibold text-slate-700">D.1.</span> Select all measures included in the proposed scope of work:
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {allItems.map(item => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => toggleItem.mutate({ itemId: item.id, isChecked: !item.isChecked })}
-                disabled={toggleItem.isPending}
-                className={`flex items-center gap-3 p-3 rounded-md border text-sm text-left transition-all ${
-                  item.isChecked
-                    ? "border-[#711419] bg-red-50 text-slate-800"
-                    : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white"
-                }`}
-              >
-                <div className={`w-4 h-4 rounded flex-shrink-0 border-2 flex items-center justify-center transition-colors ${
-                  item.isChecked ? "border-[#711419] bg-[#711419]" : "border-slate-300 bg-white"
-                }`}>
-                  {item.isChecked && (
-                    <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 10 10">
-                      <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )}
-                </div>
-                <span className="font-medium">{item.itemName}</span>
-              </button>
-            ))}
+      {/* UTILITY INFORMATION */}
+      <div>
+        <div className="bg-[#711419] text-white px-4 py-2.5 rounded-sm mb-4">
+          <span className="text-xs font-bold uppercase tracking-wide">Utility Information</span>
+        </div>
+
+        {/* Electric */}
+        <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">Electric Information</p>
+        <div className="space-y-4 mb-6">
+          <div>
+            <label className={lbl}><span className={cod}>C.3.</span> Type of Electric Utility Provider</label>
+            <select className={inp} value={vals.electricUtilityType} onChange={e => set("electricUtilityType", e.target.value)}>
+              <option value="">Select…</option>
+              <option value="Municipal Utility">Municipal Utility</option>
+              <option value="Electric Membership Cooperative">Electric Membership Cooperative</option>
+              <option value="Investor-Owned Utility">Investor-Owned Utility</option>
+              <option value="Other">Other</option>
+            </select>
           </div>
-          {checkedItems.length > 0 && (
-            <div className="mt-4 flex items-center gap-2 text-sm text-[#711419] font-medium">
-              <CheckCircle2 className="w-4 h-4" />
-              {checkedItems.length} measure{checkedItems.length !== 1 ? "s" : ""} selected
+          {vals.electricUtilityType === "Municipal Utility" && (
+            <div>
+              <label className={lbl}><span className={cod}>C.3b.</span> Municipal Utility Provider</label>
+              <select className={inp} value={vals.electricMunicipalProvider} onChange={e => set("electricMunicipalProvider", e.target.value)}>
+                <option value="">Select…</option>
+                <option value="Other">Other</option>
+                <option value="Georgia Power">Georgia Power</option>
+                <option value="Snapping Shoals EMC">Snapping Shoals EMC</option>
+              </select>
             </div>
           )}
-          {allItems.length === 0 && (
-            <p className="text-sm text-slate-400 py-4 text-center">No measures found.</p>
+          <div>
+            <label className={lbl}>Electric Utility Company Name</label>
+            <input className={inp} value={vals.electricCompanyName} onChange={e => set("electricCompanyName", e.target.value)} placeholder="e.g. Georgia Power" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={lbl}><span className={cod}>C.3b.</span> Meter Number <span className="font-normal text-slate-400 text-xs">(20 char limit)</span></label>
+              <input className={inp} maxLength={20} value={vals.electricMeterNumber} onChange={e => set("electricMeterNumber", e.target.value)} />
+            </div>
+            <div>
+              <label className={lbl}><span className={cod}>C.3c.</span> Account Number <span className="font-normal text-slate-400 text-xs">(20 char limit)</span></label>
+              <input className={inp} maxLength={20} value={vals.electricAccountNumber} onChange={e => set("electricAccountNumber", e.target.value)} />
+            </div>
+          </div>
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input type="checkbox" checked={vals.electricAccountCertified} onChange={e => set("electricAccountCertified", e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#711419]" />
+            <span className="text-sm text-slate-700">I certify the above account and meter numbers are correct. <span className="text-red-500 font-medium">*Required</span></span>
+          </label>
+        </div>
+
+        {/* Gas */}
+        <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">Gas Utility Information</p>
+        <div className="space-y-4 mb-6">
+          <div>
+            <label className={lbl}><span className={cod}>C.4.</span> Do you have gas as a utility?</label>
+            <RadioGroup value={vals.hasGas} onChange={v => set("hasGas", v)} />
+          </div>
+          {vals.hasGas === false && (
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input type="checkbox" checked={vals.gasCertifiedNoGas} onChange={e => set("gasCertifiedNoGas", e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#711419]" />
+              <span className="text-sm text-slate-700">I certify that I DO NOT have a gas utility or bill. <span className="text-red-500 font-medium">*Required</span></span>
+            </label>
+          )}
+          {vals.hasGas === true && (
+            <div className="space-y-4">
+              <div>
+                <label className={lbl}>Gas Company Name</label>
+                <input className={inp} value={vals.gasCompanyName} onChange={e => set("gasCompanyName", e.target.value)} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={lbl}>Meter Number</label>
+                  <input className={inp} maxLength={20} value={vals.gasMeterNumber} onChange={e => set("gasMeterNumber", e.target.value)} />
+                </div>
+                <div>
+                  <label className={lbl}>Account Number</label>
+                  <input className={inp} maxLength={20} value={vals.gasAccountNumberScope} onChange={e => set("gasAccountNumberScope", e.target.value)} />
+                </div>
+              </div>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" checked={vals.gasAccountCertified} onChange={e => set("gasAccountCertified", e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#711419]" />
+                <span className="text-sm text-slate-700">I certify the above gas account and meter numbers are correct. <span className="text-red-500 font-medium">*Required</span></span>
+              </label>
+            </div>
+          )}
+        </div>
+
+        {/* Delivered Fuel */}
+        <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">Delivered Fuel Company Information</p>
+        <div className="space-y-4">
+          <div>
+            <label className={lbl}><span className={cod}>C.5.</span> Do you have a delivered fuel company?</label>
+            <RadioGroup value={vals.hasDeliveredFuel} onChange={v => set("hasDeliveredFuel", v)} />
+          </div>
+          {vals.hasDeliveredFuel === true && (
+            <div>
+              <label className={lbl}>Delivered Fuel Company Name</label>
+              <input className={inp} value={vals.deliveredFuelCompany} onChange={e => set("deliveredFuelCompany", e.target.value)} />
+            </div>
           )}
         </div>
       </div>
 
-      {/* Scope Description & Cost */}
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(v => onPatch(v as any))}>
-          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-            <RebateRequestSectionHeader letter="SCOPE DESCRIPTION &amp; COST" title="" />
-            <div className="px-5 pb-5 space-y-5">
-              <FormField control={form.control} name="scopeSummary" render={({ field }) => (
-                <FormItem>
-                  <FieldLabel code="D.2" label="Describe the proposed scope of work" />
-                  <FormControl>
-                    <Textarea
-                      className="text-sm min-h-[100px] resize-none bg-slate-50 border-slate-300"
-                      placeholder="Describe all work to be performed, equipment to be installed, and any additional measures..."
-                      {...field}
-                      value={field.value ?? ""}
-                    />
-                  </FormControl>
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="installCost" render={({ field }) => (
-                <FormItem className="max-w-xs">
-                  <FieldLabel code="D.3" label="Total Proposed Project Cost" />
-                  <FormControl>
-                    <Input
-                      className="h-9 text-sm bg-slate-50 border-slate-300"
-                      placeholder="e.g. $12,500"
-                      {...field}
-                      value={field.value ?? ""}
-                    />
-                  </FormControl>
-                </FormItem>
-              )} />
-            </div>
+      {/* ELECTRIFICATION MEASURES */}
+      <div>
+        <div className="bg-[#711419] text-white px-4 py-2.5 rounded-sm mb-4">
+          <span className="text-xs font-bold uppercase tracking-wide">Electrification Measures</span>
+        </div>
+        <p className="text-sm text-slate-600 mb-4"><span className={cod}>D.1.</span> Select all measures included in the proposed scope of work:</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {[...(caseData.scopeChecklist ?? [])].sort((a, b) => a.sortOrder - b.sortOrder).map(item => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => toggleItem.mutate({ itemId: item.id, isChecked: !item.isChecked })}
+              disabled={toggleItem.isPending}
+              className={`flex items-center gap-3 p-3 rounded-md border text-sm text-left transition-all ${
+                item.isChecked ? "border-[#711419] bg-red-50 text-slate-800" : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white"
+              }`}
+            >
+              <div className={`w-4 h-4 rounded flex-shrink-0 border-2 flex items-center justify-center transition-colors ${item.isChecked ? "border-[#711419] bg-[#711419]" : "border-slate-300 bg-white"}`}>
+                {item.isChecked && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 10 10"><path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+              </div>
+              <span className="font-medium">{item.itemName}</span>
+            </button>
+          ))}
+        </div>
+        {checkedItems.length > 0 && (
+          <div className="mt-3 flex items-center gap-2 text-sm text-[#711419] font-medium">
+            <CheckCircle2 className="w-4 h-4" />
+            {checkedItems.length} measure{checkedItems.length !== 1 ? "s" : ""} selected
           </div>
-          <div className="mt-4">
-            <SaveBar onSave={form.handleSubmit(v => onPatch(v as any))} saving={saving} dirty={form.formState.isDirty} />
+        )}
+        {allItems.length === 0 && <p className="text-sm text-slate-400 py-4 text-center">No measures configured.</p>}
+      </div>
+
+      {/* SCOPE DESCRIPTION & COST */}
+      <div>
+        <div className="bg-[#711419] text-white px-4 py-2.5 rounded-sm mb-4">
+          <span className="text-xs font-bold uppercase tracking-wide">Scope Description &amp; Cost</span>
+        </div>
+        <div className="space-y-5">
+          <div>
+            <label className={lbl}><span className={cod}>D.2.</span> Describe the proposed scope of work</label>
+            <textarea
+              rows={4}
+              className="w-full px-3 py-2 rounded-md bg-slate-50 border border-slate-300 text-sm text-slate-800 resize-none focus:outline-none focus:border-[#711419] focus:ring-1 focus:ring-[#711419]/30"
+              placeholder="Describe all work to be performed, equipment to be installed, and any additional measures..."
+              value={vals.scopeSummary}
+              onChange={e => set("scopeSummary", e.target.value)}
+            />
           </div>
-        </form>
-      </Form>
+          <div className="max-w-xs">
+            <label className={lbl}><span className={cod}>D.3.</span> Total Proposed Project Cost</label>
+            <input className={inp} placeholder="e.g. $12,500" value={vals.installCost} onChange={e => set("installCost", e.target.value)} />
+          </div>
+        </div>
+      </div>
+
+      {dirty && (
+        <div className="sticky bottom-0 left-0 right-0 -mx-4 lg:-mx-6 px-4 lg:px-6 py-3 bg-white border-t border-slate-200 flex justify-end shadow-[0_-2px_8px_rgba(0,0,0,0.04)]">
+          <Button onClick={() => onPatch(vals as any)} disabled={saving} size="sm" className="bg-[#711419] hover:bg-[#5a1014]">
+            {saving ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : null}
+            Save Changes
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

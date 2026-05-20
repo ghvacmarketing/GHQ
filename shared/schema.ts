@@ -3666,6 +3666,26 @@ export const rebateCases = pgTable("rebate_cases", {
   federalRebateAmount: text("federal_rebate_amount"),
   rebateRequestNotes: text("rebate_request_notes"),
 
+  // Scope of Work — Section C fields
+  scopeCounty: text("scope_county"),
+  scopeExpectedCompletionDate: text("scope_expected_completion_date"),
+  scopeIsDiy: boolean("scope_is_diy").default(false),
+  scopeAssociatedHerApp: boolean("scope_associated_her_app").default(false),
+  scopeAssociatedDiyApp: boolean("scope_associated_diy_app").default(false),
+  electricUtilityType: text("electric_utility_type"),
+  electricMunicipalProvider: text("electric_municipal_provider"),
+  electricCompanyName: text("electric_company_name"),
+  electricMeterNumber: text("electric_meter_number"),
+  electricAccountCertified: boolean("electric_account_certified").default(false),
+  hasGas: boolean("has_gas"),
+  gasCertifiedNoGas: boolean("gas_certified_no_gas").default(false),
+  gasCompanyName: text("gas_company_name"),
+  gasMeterNumber: text("gas_meter_number"),
+  gasAccountNumberScope: text("gas_account_number_scope"),
+  gasAccountCertified: boolean("gas_account_certified").default(false),
+  hasDeliveredFuel: boolean("has_delivered_fuel"),
+  deliveredFuelCompany: text("delivered_fuel_company"),
+
   // Head of Household confirmation
   hohConfirmed: boolean("hoh_confirmed").default(false),
   hohConfirmedDate: text("hoh_confirmed_date"),
