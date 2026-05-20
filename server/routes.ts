@@ -28297,7 +28297,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         loggedSomething = true;
       }
       // Expected-date changes (reservation/approval/install dates)
-      const dateFields = ["reservationDate", "approvalDate", "installCompletionDate", "expectedCompletionDate"] as const;
+      const dateFields = ["reservationDate", "approvalDate", "installCompletedDate", "paidDate"] as const;
       for (const f of dateFields) {
         if (f in d) {
           const oldVal = (existing as any)[f];
@@ -28366,7 +28366,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       await storage.logRebateCaseActivity({
         caseId: id,
         userId: user?.id || null,
-        action: "workflow_step_updated",
+        action: updated.status === "complete" ? "workflow_step_complete" : "workflow_step_updated",
         description: `Step "${updated.step}" updated to "${updated.status}"`,
       });
       // Special-case: scope submitted
@@ -28515,7 +28515,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       const entry = await storage.logRebateCaseActivity({
         caseId: id,
         userId: user?.id || null,
-        action: "note",
+        action: "note_added",
         description,
       });
       res.status(201).json(entry);

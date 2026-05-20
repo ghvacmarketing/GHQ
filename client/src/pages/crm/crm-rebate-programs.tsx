@@ -138,7 +138,8 @@ export default function CrmRebatePrograms() {
     );
     const matchStatus = !activeStatus || c.applicationStatus === activeStatus;
     const matchProgram = filterProgram === "all" || c.programType === filterProgram;
-    const matchAssignee = filterAssignee === "all" || c.assignedToUserId === filterAssignee;
+    const matchAssignee = filterAssignee === "all" ||
+      (filterAssignee === "unassigned" ? !c.assignedToUserId : c.assignedToUserId === filterAssignee);
     const matchPriority = filterPriority === "all" || c.priority === filterPriority;
     const matchWorkflowStep = filterWorkflowStep === "all" || c.currentStep === filterWorkflowStep;
     return matchSearch && matchStatus && matchProgram && matchAssignee && matchPriority && matchWorkflowStep;
