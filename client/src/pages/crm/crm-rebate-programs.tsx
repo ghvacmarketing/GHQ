@@ -5,6 +5,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
+import { CrmLayout } from "@/components/crm/crm-layout";
+import { getQueryFn } from "@/lib/queryClient";
 import {
   Search, Plus, Award, Loader2, AlertCircle,
   ChevronRight, User, RefreshCw, X, CheckCircle2,
@@ -27,15 +29,13 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { insertRebateCaseSchema } from "@shared/schema";
-import type { RebateCase } from "@shared/schema";
+import type { RebateCase, CrmUser } from "@shared/schema";
 import type { RebateWorkflowStep } from "@shared/schema";
 import {
   PROGRAM_TYPE_LABELS, PROGRAM_TYPE_SHORT, APPLICATION_STATUS_LABELS,
   APPLICATION_STATUS_OPTIONS, APPLICATION_STATUS_COLORS, APPLICATION_STATUS_ROW_BG,
   WORKFLOW_STEPS_ORDER, WORKFLOW_STEP_LABELS, PRIORITY_LABELS, PRIORITY_COLORS,
 } from "@/lib/rebate-constants";
-
-type CrmUser = { id: string; name: string; role: string; isActive: boolean };
 type CrmCustomer = {
   id: string;
   name: string;
@@ -80,6 +80,11 @@ export default function CrmRebatePrograms() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const qc = useQueryClient();
+
+  const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
+    queryKey: ["/api/crm/auth/me"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
 
   const [search, setSearch] = useState("");
   const [quickStatus, setQuickStatus] = useState("");
@@ -247,7 +252,16 @@ export default function CrmRebatePrograms() {
     createMutation.mutate(payload);
   };
 
+  if (authLoading || !currentUser) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+      </div>
+    );
+  }
+
   return (
+    <CrmLayout currentUser={currentUser}>
     <div className="min-h-screen bg-slate-50">
       {/* Page header */}
       <div className="bg-white border-b border-slate-200 px-6 py-4">
@@ -686,5 +700,6 @@ export default function CrmRebatePrograms() {
         </DialogContent>
       </Dialog>
     </div>
+    </CrmLayout>
   );
 }

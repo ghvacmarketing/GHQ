@@ -21,7 +21,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getQueryFn } from "@/lib/queryClient";
+import { CrmLayout } from "@/components/crm/crm-layout";
 import type {
   RebateCase, RebateCaseWorkflowStep, RebateCaseScopeChecklist,
   RebateCaseDocument, RebateCaseActivityLog,
@@ -35,7 +36,7 @@ import {
   PRIORITY_LABELS, PRIORITY_COLORS,
   DOCUMENT_CATEGORY_LABELS,
 } from "@/lib/rebate-constants";
-import type { RebateDocumentCategory, RebateWorkflowStepStatus } from "@shared/schema";
+import type { RebateDocumentCategory, RebateWorkflowStepStatus, CrmUser } from "@shared/schema";
 
 type CaseDetail = RebateCase & {
   workflowSteps: RebateCaseWorkflowStep[];
@@ -44,7 +45,6 @@ type CaseDetail = RebateCase & {
   activity: RebateCaseActivityLog[];
 };
 
-type CrmUser = { id: string; name: string; role: string; isActive: boolean };
 
 const DOC_CATEGORIES: RebateDocumentCategory[] = [
   "rebate_request","head_of_household","scope_of_work","contractor_pre_approval",
@@ -57,6 +57,11 @@ export default function CrmRebateCase() {
   const id = params?.id ?? "";
   const { toast } = useToast();
   const qc = useQueryClient();
+
+  const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
+    queryKey: ["/api/crm/auth/me"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
 
   const { data: caseData, isLoading } = useQuery<CaseDetail>({
     queryKey: ["/api/crm/rebate-cases", id],
@@ -89,29 +94,31 @@ export default function CrmRebateCase() {
     onError: () => toast({ title: "Delete failed", variant: "destructive" }),
   });
 
-  if (isLoading) {
+  if (authLoading || !currentUser) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-screen">
         <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
       </div>
     );
   }
 
-  if (!caseData) {
-    return (
+  const stepsComplete = (caseData?.workflowSteps ?? []).filter(s => s.status === "complete").length;
+  const totalSteps = WORKFLOW_STEPS_ORDER.length;
+  const clientName = [caseData?.clientFirstName, caseData?.clientLastName].filter(Boolean).join(" ") || "Unnamed Client";
+  const isClosed = caseData?.applicationStatus === "closed";
+
+  return (
+    <CrmLayout currentUser={currentUser}>
+    {isLoading ? (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+      </div>
+    ) : !caseData ? (
       <div className="p-6 text-center text-slate-500">
         <AlertCircle className="w-8 h-8 mx-auto mb-2" />
         Case not found.
       </div>
-    );
-  }
-
-  const stepsComplete = (caseData.workflowSteps ?? []).filter(s => s.status === "complete").length;
-  const totalSteps = WORKFLOW_STEPS_ORDER.length;
-  const clientName = [caseData.clientFirstName, caseData.clientLastName].filter(Boolean).join(" ") || "Unnamed Client";
-  const isClosed = caseData.applicationStatus === "closed";
-
-  return (
+    ) : (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-6 py-4">
@@ -228,6 +235,8 @@ export default function CrmRebateCase() {
         </Tabs>
       </div>
     </div>
+    )}
+    </CrmLayout>
   );
 }
 
