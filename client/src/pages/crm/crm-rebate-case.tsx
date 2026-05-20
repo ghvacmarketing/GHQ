@@ -9,7 +9,7 @@ import {
   ArrowLeft, CheckCircle2, Circle, ChevronDown, ChevronUp,
   FileText, Trash2, Upload, Plus, User, Calendar, ClipboardList,
   Activity, Settings2, Zap, Home, Droplets, Wrench, Star, FolderOpen,
-  AlertCircle, Loader2, Lock, BookOpen
+  AlertCircle, Loader2, Lock, BookOpen, Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -600,147 +600,107 @@ function RebateRequestTab({ caseData, onPatch, saving }: { caseData: CaseDetail;
 // ─── Head of Household Tab ─────────────────────────────────────────────────────
 
 function HeadOfHouseholdTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onPatch: (d: Partial<RebateCase>) => void; saving: boolean }) {
-  const form = useForm({
-    defaultValues: {
-      clientFirstName: caseData.clientFirstName ?? "",
-      clientLastName: caseData.clientLastName ?? "",
-      clientEmail: caseData.clientEmail ?? "",
-      clientPhone: caseData.clientPhone ?? "",
-      clientDob: caseData.clientDob ?? "",
-      householdSize: caseData.householdSize ?? "",
-      householdIncome: caseData.householdIncome ?? "",
-      amiBracket: caseData.amiBracket ?? "",
-      propertyAddress: caseData.propertyAddress ?? "",
-      propertyCity: caseData.propertyCity ?? "",
-      propertyState: caseData.propertyState ?? "",
-      propertyZip: caseData.propertyZip ?? "",
-      propertyType: caseData.propertyType ?? "",
-      ownershipStatus: caseData.ownershipStatus ?? "",
-      yearBuilt: caseData.yearBuilt ?? "",
-      squareFootage: caseData.squareFootage ?? "",
-      electricUtility: caseData.electricUtility ?? "",
-      electricAccountNumber: caseData.electricAccountNumber ?? "",
-      gasUtility: caseData.gasUtility ?? "",
-      gasAccountNumber: caseData.gasAccountNumber ?? "",
-    },
-  });
-  const onSubmit = (v: any) => onPatch(v);
+  const [confirmed, setConfirmed] = useState<boolean>(caseData.hohConfirmed ?? false);
+  const [confirmedDate, setConfirmedDate] = useState<string>(caseData.hohConfirmedDate ?? "");
+  const [notes, setNotes] = useState<string>(caseData.hohNotes ?? "");
+  useEffect(() => {
+    setConfirmed(caseData.hohConfirmed ?? false);
+    setConfirmedDate(caseData.hohConfirmedDate ?? "");
+    setNotes(caseData.hohNotes ?? "");
+  }, [caseData.id]);
+
+  const savedState = { confirmed: caseData.hohConfirmed ?? false, confirmedDate: caseData.hohConfirmedDate ?? "", notes: caseData.hohNotes ?? "" };
+  const dirty = confirmed !== savedState.confirmed || confirmedDate !== savedState.confirmedDate || notes !== savedState.notes;
+
+  const handleConfirmToggle = (checked: boolean) => {
+    setConfirmed(checked);
+    if (checked && !confirmedDate) setConfirmedDate(new Date().toISOString().split("T")[0]);
+    if (!checked) setConfirmedDate("");
+  };
+
+  const handleSave = () => onPatch({ hohConfirmed: confirmed, hohConfirmedDate: confirmedDate || null, hohNotes: notes || null } as any);
+
+  const homeownerName = [caseData.clientFirstName, caseData.clientLastName].filter(Boolean).join(" ") || "Homeowner";
+
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="space-y-4">
-            <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Head of Household</CardTitle></CardHeader>
-              <CardContent className="pt-0 space-y-3">
-                {[
-                  { name: "clientFirstName", label: "First Name" },
-                  { name: "clientLastName", label: "Last Name" },
-                  { name: "clientEmail", label: "Email" },
-                  { name: "clientPhone", label: "Phone" },
-                  { name: "clientDob", label: "Date of Birth" },
-                ].map(({ name, label }) => (
-                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
-                      <FormControl><Input className="h-8 text-sm" {...field} value={field.value ?? ""} /></FormControl>
-                    </FormItem>
-                  )} />
-                ))}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Income &amp; Eligibility</CardTitle></CardHeader>
-              <CardContent className="pt-0 space-y-3">
-                {[
-                  { name: "householdIncome", label: "Annual Household Income" },
-                  { name: "amiBracket", label: "AMI Bracket (e.g. ≤80% AMI)" },
-                ].map(({ name, label }) => (
-                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
-                      <FormControl><Input className="h-8 text-sm" {...field} value={field.value ?? ""} /></FormControl>
-                    </FormItem>
-                  )} />
-                ))}
-                <FormField control={form.control} name="householdSize" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-500">Household Size (# of people)</FormLabel>
-                    <FormControl><Input className="h-8 text-sm" type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : "")} /></FormControl>
-                  </FormItem>
-                )} />
-                {[
-                  { name: "ownershipStatus", label: "Ownership Status" },
-                ].map(({ name, label }) => (
-                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
-                      <FormControl><Input className="h-8 text-sm" placeholder="e.g. Owner-occupied" {...field} value={field.value ?? ""} /></FormControl>
-                    </FormItem>
-                  )} />
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-          <div className="space-y-4">
-            <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Property</CardTitle></CardHeader>
-              <CardContent className="pt-0 space-y-3">
-                {[
-                  { name: "propertyAddress", label: "Address" },
-                  { name: "propertyCity", label: "City" },
-                  { name: "propertyState", label: "State" },
-                  { name: "propertyZip", label: "ZIP" },
-                  { name: "propertyType", label: "Property Type" },
-                ].map(({ name, label }) => (
-                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
-                      <FormControl><Input className="h-8 text-sm" {...field} value={field.value ?? ""} /></FormControl>
-                    </FormItem>
-                  )} />
-                ))}
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField control={form.control} name="yearBuilt" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs text-slate-500">Year Built</FormLabel>
-                      <FormControl><Input className="h-8 text-sm" type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : "")} /></FormControl>
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="squareFootage" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs text-slate-500">Sq Ft</FormLabel>
-                      <FormControl><Input className="h-8 text-sm" type="number" {...field} value={field.value ?? ""} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : "")} /></FormControl>
-                    </FormItem>
-                  )} />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Utility Accounts</CardTitle></CardHeader>
-              <CardContent className="pt-0 space-y-3">
-                {[
-                  { name: "electricUtility", label: "Electric Utility" },
-                  { name: "electricAccountNumber", label: "Electric Account #" },
-                  { name: "gasUtility", label: "Gas Utility" },
-                  { name: "gasAccountNumber", label: "Gas Account #" },
-                ].map(({ name, label }) => (
-                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
-                      <FormControl><Input className="h-8 text-sm" {...field} value={field.value ?? ""} /></FormControl>
-                    </FormItem>
-                  )} />
-                ))}
-              </CardContent>
-            </Card>
-          </div>
+    <div className="max-w-2xl mx-auto pb-24">
+      <header className="mb-6">
+        <h2 className="text-xl font-semibold text-slate-900 mb-1">B. Head of Household Confirmation</h2>
+        <p className="text-sm text-slate-500">
+          This section tracks whether the homeowner has completed and signed their confirmation. No data entry from us — mark it confirmed once the homeowner has submitted their portion.
+        </p>
+      </header>
+
+      {/* Status Banner */}
+      <div className={`flex items-center gap-3 rounded-lg px-5 py-4 mb-6 border ${confirmed ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"}`}>
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${confirmed ? "bg-green-100" : "bg-amber-100"}`}>
+          {confirmed
+            ? <CheckCircle2 className="w-5 h-5 text-green-600" />
+            : <Clock className="w-5 h-5 text-amber-500" />}
         </div>
-        <div className="mt-3">
-          <SaveBar onSave={form.handleSubmit(onSubmit)} saving={saving} dirty={form.formState.isDirty} />
+        <div>
+          <p className={`text-sm font-semibold ${confirmed ? "text-green-800" : "text-amber-800"}`}>
+            {confirmed ? "Confirmation Received" : "Awaiting Homeowner Confirmation"}
+          </p>
+          <p className={`text-xs mt-0.5 ${confirmed ? "text-green-600" : "text-amber-600"}`}>
+            {confirmed
+              ? `${homeownerName} has confirmed their household information${confirmedDate ? ` on ${confirmedDate}` : ""}.`
+              : `Waiting for ${homeownerName} to complete and submit their confirmation.`}
+          </p>
         </div>
-      </form>
-    </Form>
+      </div>
+
+      {/* Confirmation Toggle */}
+      <div className="bg-white border border-slate-200 rounded-lg p-5 mb-5">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={confirmed}
+            onChange={e => handleConfirmToggle(e.target.checked)}
+            className="mt-0.5 w-5 h-5 accent-[#711419] cursor-pointer"
+          />
+          <div>
+            <p className="text-sm font-semibold text-slate-800">Homeowner confirmation received</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Check this once the homeowner has completed and returned their signed Head of Household confirmation form.
+            </p>
+          </div>
+        </label>
+
+        {confirmed && (
+          <div className="mt-4 ml-8">
+            <label className="block text-sm text-slate-700 mb-1 font-medium">Date confirmed</label>
+            <input
+              type="date"
+              value={confirmedDate}
+              onChange={e => setConfirmedDate(e.target.value)}
+              className="h-9 px-3 rounded-md bg-slate-50 border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-[#711419] focus:ring-1 focus:ring-[#711419]/30"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Notes */}
+      <div className="bg-white border border-slate-200 rounded-lg p-5">
+        <label className="block text-sm font-semibold text-slate-800 mb-2">Notes</label>
+        <textarea
+          rows={4}
+          placeholder="Any notes about the homeowner confirmation process…"
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          className="w-full px-3 py-2 rounded-md bg-slate-50 border border-slate-300 text-sm text-slate-800 resize-none focus:outline-none focus:border-[#711419] focus:ring-1 focus:ring-[#711419]/30"
+        />
+      </div>
+
+      {dirty && (
+        <div className="sticky bottom-0 left-0 right-0 mt-6 -mx-4 lg:-mx-6 px-4 lg:px-6 py-3 bg-white border-t border-slate-200 flex justify-end shadow-[0_-2px_8px_rgba(0,0,0,0.04)]">
+          <Button onClick={handleSave} disabled={saving} size="sm" className="bg-[#711419] hover:bg-[#5a1014]">
+            {saving ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : null}
+            Save Changes
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 

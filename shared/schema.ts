@@ -3666,6 +3666,11 @@ export const rebateCases = pgTable("rebate_cases", {
   federalRebateAmount: text("federal_rebate_amount"),
   rebateRequestNotes: text("rebate_request_notes"),
 
+  // Head of Household confirmation
+  hohConfirmed: boolean("hoh_confirmed").default(false),
+  hohConfirmedDate: text("hoh_confirmed_date"),
+  hohNotes: text("hoh_notes"),
+
   // Contractor pre-approval
   contractorName: text("contractor_name"),
   contractorLicenseNumber: text("contractor_license_number"),
