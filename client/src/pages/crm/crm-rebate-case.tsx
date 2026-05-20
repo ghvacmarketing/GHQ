@@ -1115,73 +1115,102 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
     onError: () => toast({ title: "Failed to update item", variant: "destructive" }),
   });
 
-  const checkedCount = (caseData.scopeChecklist ?? []).filter(i => i.isChecked).length;
-  const totalItems = (caseData.scopeChecklist ?? []).length;
+  const checkedItems = (caseData.scopeChecklist ?? []).filter(i => i.isChecked);
+  const allItems = [...(caseData.scopeChecklist ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
 
   return (
-    <div className="space-y-4">
+    <div className="max-w-3xl space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold text-slate-900 mb-1">D. Scope of Work</h2>
+        <p className="text-sm text-slate-500">
+          Select all electrification measures included in this project and provide the proposed scope description and cost.
+        </p>
+      </div>
+
+      {/* Electrification Measures */}
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <RebateRequestSectionHeader letter="ELECTRIFICATION MEASURES" title="" />
+        <div className="px-5 pb-5">
+          <p className="text-sm text-slate-500 mb-4">
+            <span className="font-semibold text-slate-700">D.1.</span> Select all measures included in the proposed scope of work:
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {allItems.map(item => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => toggleItem.mutate({ itemId: item.id, isChecked: !item.isChecked })}
+                disabled={toggleItem.isPending}
+                className={`flex items-center gap-3 p-3 rounded-md border text-sm text-left transition-all ${
+                  item.isChecked
+                    ? "border-[#711419] bg-red-50 text-slate-800"
+                    : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white"
+                }`}
+              >
+                <div className={`w-4 h-4 rounded flex-shrink-0 border-2 flex items-center justify-center transition-colors ${
+                  item.isChecked ? "border-[#711419] bg-[#711419]" : "border-slate-300 bg-white"
+                }`}>
+                  {item.isChecked && (
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 10 10">
+                      <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </div>
+                <span className="font-medium">{item.itemName}</span>
+              </button>
+            ))}
+          </div>
+          {checkedItems.length > 0 && (
+            <div className="mt-4 flex items-center gap-2 text-sm text-[#711419] font-medium">
+              <CheckCircle2 className="w-4 h-4" />
+              {checkedItems.length} measure{checkedItems.length !== 1 ? "s" : ""} selected
+            </div>
+          )}
+          {allItems.length === 0 && (
+            <p className="text-sm text-slate-400 py-4 text-center">No measures found.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Scope Description & Cost */}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(v => onPatch(v as any))}>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-slate-700">Scope Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-3">
+          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <RebateRequestSectionHeader letter="SCOPE DESCRIPTION &amp; COST" title="" />
+            <div className="px-5 pb-5 space-y-5">
               <FormField control={form.control} name="scopeSummary" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-xs text-slate-500">Scope Description</FormLabel>
+                  <FieldLabel code="D.2" label="Describe the proposed scope of work" />
                   <FormControl>
-                    <Textarea className="text-sm min-h-[80px] resize-none" placeholder="Describe the scope of work..." {...field} />
+                    <Textarea
+                      className="text-sm min-h-[100px] resize-none bg-slate-50 border-slate-300"
+                      placeholder="Describe all work to be performed, equipment to be installed, and any additional measures..."
+                      {...field}
+                      value={field.value ?? ""}
+                    />
                   </FormControl>
                 </FormItem>
               )} />
               <FormField control={form.control} name="installCost" render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs text-slate-500">Install Cost</FormLabel>
-                  <FormControl><Input className="h-8 text-sm" placeholder="e.g. $12,500" {...field} /></FormControl>
+                <FormItem className="max-w-xs">
+                  <FieldLabel code="D.3" label="Total Proposed Project Cost" />
+                  <FormControl>
+                    <Input
+                      className="h-9 text-sm bg-slate-50 border-slate-300"
+                      placeholder="e.g. $12,500"
+                      {...field}
+                      value={field.value ?? ""}
+                    />
+                  </FormControl>
                 </FormItem>
               )} />
-              <SaveBar onSave={form.handleSubmit(v => onPatch(v as any))} saving={saving} dirty={form.formState.isDirty} />
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+          <div className="mt-4">
+            <SaveBar onSave={form.handleSubmit(v => onPatch(v as any))} saving={saving} dirty={form.formState.isDirty} />
+          </div>
         </form>
       </Form>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium text-slate-700">Scope Checklist</CardTitle>
-            <span className="text-xs text-slate-500">{checkedCount} of {totalItems} complete</span>
-          </div>
-          <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2">
-            <div
-              className="bg-[#711419] h-1.5 rounded-full transition-all"
-              style={{ width: totalItems > 0 ? `${(checkedCount / totalItems) * 100}%` : "0%" }}
-            />
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0 space-y-1">
-          {(caseData.scopeChecklist ?? [])
-            .sort((a, b) => a.sortOrder - b.sortOrder)
-            .map(item => (
-              <button
-                key={item.id}
-                onClick={() => toggleItem.mutate({ itemId: item.id, isChecked: !item.isChecked })}
-                disabled={toggleItem.isPending}
-                className="w-full flex items-center gap-3 p-2.5 rounded-md text-sm text-left hover:bg-slate-50 transition-colors group"
-              >
-                {item.isChecked
-                  ? <CheckCircle2 className="w-4 h-4 text-[#711419] flex-shrink-0" />
-                  : <Circle className="w-4 h-4 text-slate-300 group-hover:text-slate-400 flex-shrink-0" />
-                }
-                <span className={item.isChecked ? "text-slate-500 line-through" : "text-slate-700"}>{item.itemName}</span>
-              </button>
-            ))}
-          {(caseData.scopeChecklist ?? []).length === 0 && (
-            <p className="text-sm text-slate-400 py-4 text-center">No checklist items found.</p>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
