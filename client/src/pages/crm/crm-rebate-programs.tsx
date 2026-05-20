@@ -120,7 +120,12 @@ export default function CrmRebatePrograms() {
 
   const { data: cases = [], isLoading, refetch } = useQuery<RebateCaseListItem[]>({
     queryKey: ["/api/crm/rebate-cases"],
-    queryFn: () => fetch("/api/crm/rebate-cases", { credentials: "include" }).then(r => r.json()),
+    queryFn: async () => {
+      const r = await fetch("/api/crm/rebate-cases", { credentials: "include" });
+      if (!r.ok) throw new Error("Failed to load rebate cases");
+      const d = await r.json();
+      return Array.isArray(d) ? d : [];
+    },
   });
 
   const { data: users = [] } = useQuery<CrmUser[]>({
