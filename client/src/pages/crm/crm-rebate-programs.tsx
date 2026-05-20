@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -6,8 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import {
-  Search, Plus, Filter, Award, Loader2, AlertCircle,
-  ChevronRight, User, RefreshCw,
+  Search, Plus, Award, Loader2, AlertCircle,
+  ChevronRight, User, RefreshCw, X, CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,13 @@ import {
 } from "@/lib/rebate-constants";
 
 type CrmUser = { id: string; name: string; role: string; isActive: boolean };
+type CrmCustomer = {
+  id: string;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  fullAddress?: string | null;
+};
 
 type RebateCaseListItem = RebateCase & {
   workflowCompleted: number;
@@ -43,7 +50,6 @@ type RebateCaseListItem = RebateCase & {
   currentStep: RebateWorkflowStep | null;
 };
 
-// Quick filter chips definition
 const QUICK_FILTERS = [
   { label: "All", status: "" },
   { label: "In Progress", status: "in_progress" },
@@ -60,15 +66,12 @@ const createSchema = insertRebateCaseSchema.pick({
   clientPhone: true,
   clientEmail: true,
   propertyAddress: true,
-  propertyCity: true,
-  propertyState: true,
-  propertyZip: true,
   caseNumber: true,
   assignedToUserId: true,
   priority: true,
+  customerId: true,
 }).extend({
-  clientFirstName: z.string().min(1, "First name is required"),
-  clientLastName: z.string().min(1, "Last name is required"),
+  caseNumber: z.string().min(1, "Neighborly case # is required"),
 });
 
 type CreateFormValues = z.infer<typeof createSchema>;
@@ -85,7 +88,34 @@ export default function CrmRebatePrograms() {
   const [filterAssignee, setFilterAssignee] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
   const [filterWorkflowStep, setFilterWorkflowStep] = useState("all");
+
+  // Dialog state
   const [showCreate, setShowCreate] = useState(false);
+  const [step, setStep] = useState<"case_number" | "details">("case_number");
+  const [caseNumberInput, setCaseNumberInput] = useState("");
+  const [caseNumberError, setCaseNumberError] = useState("");
+
+  // Customer search state
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [debouncedCustomerSearch, setDebouncedCustomerSearch] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomer | null>(null);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const customerSearchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedCustomerSearch(customerSearch), 300);
+    return () => clearTimeout(t);
+  }, [customerSearch]);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (customerSearchRef.current && !customerSearchRef.current.contains(e.target as Node)) {
+        setShowCustomerDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   const { data: cases = [], isLoading, refetch } = useQuery<RebateCaseListItem[]>({
     queryKey: ["/api/crm/rebate-cases"],
@@ -94,6 +124,18 @@ export default function CrmRebatePrograms() {
 
   const { data: users = [] } = useQuery<CrmUser[]>({
     queryKey: ["/api/crm/users"],
+  });
+
+  const { data: customerResults = [], isFetching: customerLoading } = useQuery<CrmCustomer[]>({
+    queryKey: ["/api/crm/customers", { search: debouncedCustomerSearch }],
+    queryFn: async () => {
+      if (debouncedCustomerSearch.length < 2) return [];
+      const res = await fetch(`/api/crm/customers?search=${encodeURIComponent(debouncedCustomerSearch)}&limit=20`, { credentials: "include" });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : (data.customers ?? []);
+    },
+    enabled: debouncedCustomerSearch.length >= 2,
   });
 
   const createMutation = useMutation({
@@ -118,15 +160,12 @@ export default function CrmRebatePrograms() {
       clientPhone: "",
       clientEmail: "",
       propertyAddress: "",
-      propertyCity: "",
-      propertyState: "",
-      propertyZip: "",
       caseNumber: "",
       assignedToUserId: null,
+      customerId: null,
     },
   });
 
-  // Apply filters
   const usersMap = new Map(users.map(u => [u.id, u.name]));
   const activeStatus = quickStatus || (filterStatus !== "all" ? filterStatus : "");
 
@@ -145,10 +184,66 @@ export default function CrmRebatePrograms() {
     return matchSearch && matchStatus && matchProgram && matchAssignee && matchPriority && matchWorkflowStep;
   });
 
+  function handleSelectCustomer(customer: CrmCustomer) {
+    setSelectedCustomer(customer);
+    setCustomerSearch("");
+    setShowCustomerDropdown(false);
+    const parts = customer.name.trim().split(/\s+/);
+    const firstName = parts[0] || "";
+    const lastName = parts.slice(1).join(" ") || "";
+    form.setValue("clientFirstName", firstName);
+    form.setValue("clientLastName", lastName);
+    form.setValue("clientPhone", customer.phone ?? "");
+    form.setValue("clientEmail", customer.email ?? "");
+    form.setValue("propertyAddress", customer.fullAddress ?? "");
+    form.setValue("customerId", customer.id);
+  }
+
+  function clearSelectedCustomer() {
+    setSelectedCustomer(null);
+    form.setValue("clientFirstName", "");
+    form.setValue("clientLastName", "");
+    form.setValue("clientPhone", "");
+    form.setValue("clientEmail", "");
+    form.setValue("propertyAddress", "");
+    form.setValue("customerId", null);
+  }
+
+  function openCreateDialog() {
+    form.reset({
+      programType: "HEAR",
+      priority: "normal",
+      clientFirstName: "",
+      clientLastName: "",
+      clientPhone: "",
+      clientEmail: "",
+      propertyAddress: "",
+      caseNumber: "",
+      assignedToUserId: null,
+      customerId: null,
+    });
+    setCaseNumberInput("");
+    setCaseNumberError("");
+    setSelectedCustomer(null);
+    setCustomerSearch("");
+    setStep("case_number");
+    setShowCreate(true);
+  }
+
+  function handleContinue() {
+    if (!caseNumberInput.trim()) {
+      setCaseNumberError("Neighborly case # is required to continue");
+      return;
+    }
+    form.setValue("caseNumber", caseNumberInput.trim());
+    setCaseNumberError("");
+    setStep("details");
+  }
+
   const onSubmit = (values: CreateFormValues) => {
     const payload = { ...values };
-    if (!payload.caseNumber) delete (payload as any).caseNumber;
     if (!payload.assignedToUserId) delete (payload as any).assignedToUserId;
+    if (!payload.customerId) delete (payload as any).customerId;
     createMutation.mutate(payload);
   };
 
@@ -172,8 +267,8 @@ export default function CrmRebatePrograms() {
             </Button>
             <Button
               size="sm"
-              className="bg-[#711419] hover:bg-[#5a1014]"
-              onClick={() => { form.reset(); setShowCreate(true); }}
+              className="bg-[#711419] hover:bg-[#5a1014] text-white"
+              onClick={openCreateDialog}
             >
               <Plus className="w-4 h-4 mr-1.5" />
               New Case
@@ -184,19 +279,19 @@ export default function CrmRebatePrograms() {
 
       <div className="px-6 py-4 space-y-3">
         {/* Search + filter row */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative flex-1 min-w-[200px] max-w-xs">
-            <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-slate-400" />
-            <Input
-              className="pl-9 h-9 text-sm"
-              placeholder="Search client, address, case #..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
-          <Filter className="w-4 h-4 text-slate-400 ml-1" />
+        <div className="flex items-center gap-1 flex-wrap bg-white border border-slate-200 rounded-lg px-3 py-1.5">
+          <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <input
+            className="flex-1 min-w-[160px] bg-transparent text-sm outline-none placeholder:text-slate-400 py-1 px-2"
+            placeholder="Search client, address, case #..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          <div className="h-4 w-px bg-slate-200 mx-1" />
           <Select value={filterProgram} onValueChange={setFilterProgram}>
-            <SelectTrigger className="h-9 text-sm w-32"><SelectValue placeholder="Program" /></SelectTrigger>
+            <SelectTrigger className="h-7 text-xs border-0 bg-transparent shadow-none px-2 w-auto gap-1 focus:ring-0">
+              <SelectValue placeholder="Program" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Programs</SelectItem>
               <SelectItem value="HEAR">HEAR</SelectItem>
@@ -204,7 +299,9 @@ export default function CrmRebatePrograms() {
             </SelectContent>
           </Select>
           <Select value={filterStatus} onValueChange={v => { setFilterStatus(v); setQuickStatus(""); }}>
-            <SelectTrigger className="h-9 text-sm w-44"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectTrigger className="h-7 text-xs border-0 bg-transparent shadow-none px-2 w-auto gap-1 focus:ring-0">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
               {APPLICATION_STATUS_OPTIONS.map(s => (
@@ -213,7 +310,9 @@ export default function CrmRebatePrograms() {
             </SelectContent>
           </Select>
           <Select value={filterAssignee} onValueChange={setFilterAssignee}>
-            <SelectTrigger className="h-9 text-sm w-40"><SelectValue placeholder="Assignee" /></SelectTrigger>
+            <SelectTrigger className="h-7 text-xs border-0 bg-transparent shadow-none px-2 w-auto gap-1 focus:ring-0">
+              <SelectValue placeholder="Assignee" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Assignees</SelectItem>
               <SelectItem value="unassigned">Unassigned</SelectItem>
@@ -223,7 +322,9 @@ export default function CrmRebatePrograms() {
             </SelectContent>
           </Select>
           <Select value={filterPriority} onValueChange={setFilterPriority}>
-            <SelectTrigger className="h-9 text-sm w-36"><SelectValue placeholder="Priority" /></SelectTrigger>
+            <SelectTrigger className="h-7 text-xs border-0 bg-transparent shadow-none px-2 w-auto gap-1 focus:ring-0">
+              <SelectValue placeholder="Priority" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Priorities</SelectItem>
               {(["low","normal","high","urgent"] as const).map(p => (
@@ -232,7 +333,9 @@ export default function CrmRebatePrograms() {
             </SelectContent>
           </Select>
           <Select value={filterWorkflowStep} onValueChange={setFilterWorkflowStep}>
-            <SelectTrigger className="h-9 text-sm w-48"><SelectValue placeholder="Workflow Step" /></SelectTrigger>
+            <SelectTrigger className="h-7 text-xs border-0 bg-transparent shadow-none px-2 w-auto gap-1 focus:ring-0">
+              <SelectValue placeholder="Workflow Step" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Workflow Steps</SelectItem>
               {WORKFLOW_STEPS_ORDER.map(step => (
@@ -251,14 +354,15 @@ export default function CrmRebatePrograms() {
               className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                 quickStatus === qf.status
                   ? "bg-[#711419] text-white border-[#711419]"
-                  : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
+                  : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
               }`}
             >
               {qf.label}
-              {qf.status === "" && cases.length > 0 && (
-                <span className="ml-1.5 bg-white/20 px-1 rounded-full">{cases.length}</span>
-              )}
-              {qf.status !== "" && (
+              {qf.status === "" ? (
+                cases.length > 0 && (
+                  <span className="ml-1.5 opacity-70">{cases.length}</span>
+                )
+              ) : (
                 <span className="ml-1.5 opacity-70">
                   {cases.filter(c => c.applicationStatus === qf.status).length}
                 </span>
@@ -384,108 +488,167 @@ export default function CrmRebatePrograms() {
       </div>
 
       {/* Create Case Dialog */}
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent className="max-w-lg">
+      <Dialog open={showCreate} onOpenChange={open => { if (!open) setShowCreate(false); }}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Create New Case</DialogTitle>
+            <DialogTitle className="text-base">
+              {step === "case_number" ? "Enter Neighborly Case #" : "New Rebate Case"}
+            </DialogTitle>
           </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <FormField control={form.control} name="programType" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">Program Type</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="HEAR">{PROGRAM_TYPE_LABELS.HEAR}</SelectItem>
-                        <SelectItem value="HER">{PROGRAM_TYPE_LABELS.HER}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="priority" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">Priority</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="normal">Normal</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="urgent">Urgent</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
+
+          {step === "case_number" ? (
+            /* ── Step 1: Case number gate ── */
+            <div className="space-y-4 py-1">
+              <p className="text-sm text-slate-500">
+                Every rebate case requires a Neighborly case number. Enter it below to continue.
+              </p>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">Neighborly Case #</label>
+                <Input
+                  autoFocus
+                  className="h-9 text-sm font-mono"
+                  placeholder="e.g. 123456"
+                  value={caseNumberInput}
+                  onChange={e => { setCaseNumberInput(e.target.value); if (caseNumberError) setCaseNumberError(""); }}
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleContinue(); } }}
+                />
+                {caseNumberError && (
+                  <p className="text-xs text-red-500">{caseNumberError}</p>
+                )}
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <FormField control={form.control} name="clientFirstName" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">First Name *</FormLabel>
-                    <FormControl><Input className="h-9 text-sm" {...field} /></FormControl>
-                    <FormMessage className="text-xs" />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="clientLastName" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">Last Name *</FormLabel>
-                    <FormControl><Input className="h-9 text-sm" {...field} /></FormControl>
-                    <FormMessage className="text-xs" />
-                  </FormItem>
-                )} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <FormField control={form.control} name="clientPhone" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">Phone</FormLabel>
-                    <FormControl><Input className="h-9 text-sm" {...field} value={field.value ?? ""} /></FormControl>
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="clientEmail" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">Email</FormLabel>
-                    <FormControl><Input className="h-9 text-sm" type="email" {...field} value={field.value ?? ""} /></FormControl>
-                  </FormItem>
-                )} />
-              </div>
-              <FormField control={form.control} name="propertyAddress" render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs">Property Address</FormLabel>
-                  <FormControl><Input className="h-9 text-sm" placeholder="123 Main St" {...field} value={field.value ?? ""} /></FormControl>
-                </FormItem>
-              )} />
-              <div className="grid grid-cols-3 gap-3">
-                <FormField control={form.control} name="propertyCity" render={({ field }) => (
-                  <FormItem className="col-span-1">
-                    <FormLabel className="text-xs">City</FormLabel>
-                    <FormControl><Input className="h-9 text-sm" {...field} value={field.value ?? ""} /></FormControl>
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="propertyState" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">State</FormLabel>
-                    <FormControl><Input className="h-9 text-sm" placeholder="AZ" {...field} value={field.value ?? ""} /></FormControl>
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="propertyZip" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">ZIP</FormLabel>
-                    <FormControl><Input className="h-9 text-sm" {...field} value={field.value ?? ""} /></FormControl>
-                  </FormItem>
-                )} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <FormField control={form.control} name="caseNumber" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">Neighborly Case # (optional)</FormLabel>
-                    <FormControl><Input className="h-9 text-sm font-mono" placeholder="e.g. 123456" {...field} value={field.value ?? ""} /></FormControl>
-                  </FormItem>
-                )} />
+              <DialogFooter>
+                <Button variant="outline" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
+                <Button
+                  size="sm"
+                  className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                  onClick={handleContinue}
+                >
+                  Continue
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            /* ── Step 2: Details ── */
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-1">
+                {/* Case # confirmation pill */}
+                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-md px-3 py-2">
+                  <CheckCircle2 className="w-4 h-4 text-[#711419] shrink-0" />
+                  <span className="text-xs text-slate-500">Case #</span>
+                  <span className="text-sm font-mono font-medium text-slate-800">{caseNumberInput}</span>
+                  <button
+                    type="button"
+                    className="ml-auto text-xs text-slate-400 hover:text-slate-600 underline"
+                    onClick={() => setStep("case_number")}
+                  >
+                    Edit
+                  </button>
+                </div>
+
+                {/* Customer search */}
+                <div className="space-y-1.5" ref={customerSearchRef}>
+                  <label className="text-xs font-medium text-slate-700">Customer</label>
+                  {selectedCustomer ? (
+                    <div className="flex items-center gap-2 border border-slate-200 rounded-md px-3 py-2 bg-white">
+                      <User className="w-4 h-4 text-slate-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-800 truncate">{selectedCustomer.name}</p>
+                        {(selectedCustomer.phone || selectedCustomer.email) && (
+                          <p className="text-xs text-slate-400 truncate">
+                            {[selectedCustomer.phone, selectedCustomer.email].filter(Boolean).join(" · ")}
+                          </p>
+                        )}
+                        {selectedCustomer.fullAddress && (
+                          <p className="text-xs text-slate-400 truncate">{selectedCustomer.fullAddress}</p>
+                        )}
+                      </div>
+                      <button type="button" onClick={clearSelectedCustomer} className="shrink-0 text-slate-400 hover:text-slate-600">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                      <Input
+                        className="pl-8 h-9 text-sm"
+                        placeholder="Search by name, phone, or address..."
+                        value={customerSearch}
+                        onChange={e => { setCustomerSearch(e.target.value); setShowCustomerDropdown(true); }}
+                        onFocus={() => { if (customerSearch.length >= 2) setShowCustomerDropdown(true); }}
+                        autoComplete="off"
+                      />
+                      {showCustomerDropdown && customerSearch.length >= 2 && (
+                        <div className="absolute z-50 top-full mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg max-h-52 overflow-y-auto">
+                          {customerLoading ? (
+                            <div className="flex items-center justify-center py-4">
+                              <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                            </div>
+                          ) : customerResults.length > 0 ? (
+                            customerResults.map(customer => (
+                              <button
+                                key={customer.id}
+                                type="button"
+                                className="w-full text-left px-3 py-2 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0"
+                                onClick={() => handleSelectCustomer(customer)}
+                              >
+                                <p className="text-sm font-medium text-slate-800">{customer.name}</p>
+                                {(customer.phone || customer.email) && (
+                                  <p className="text-xs text-slate-400">
+                                    {[customer.phone, customer.email].filter(Boolean).join(" · ")}
+                                  </p>
+                                )}
+                                {customer.fullAddress && (
+                                  <p className="text-xs text-slate-400 truncate">{customer.fullAddress}</p>
+                                )}
+                              </button>
+                            ))
+                          ) : (
+                            <p className="text-xs text-slate-400 text-center py-4">No customers found</p>
+                          )}
+                        </div>
+                      )}
+                      {!showCustomerDropdown && customerSearch.length === 0 && (
+                        <p className="text-xs text-slate-400 mt-1">Type to search existing customers</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Program + Priority */}
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField control={form.control} name="programType" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Program</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="HEAR">{PROGRAM_TYPE_LABELS.HEAR}</SelectItem>
+                          <SelectItem value="HER">{PROGRAM_TYPE_LABELS.HER}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="priority" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Priority</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="normal">Normal</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="urgent">Urgent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )} />
+                </div>
+
+                {/* Assign To */}
                 <FormField control={form.control} name="assignedToUserId" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs">Assign To</FormLabel>
@@ -502,22 +665,24 @@ export default function CrmRebatePrograms() {
                     </Select>
                   </FormItem>
                 )} />
-              </div>
-              <DialogFooter className="pt-2">
-                <Button type="button" variant="outline" onClick={() => setShowCreate(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={createMutation.isPending}
-                  className="bg-[#711419] hover:bg-[#5a1014]"
-                >
-                  {createMutation.isPending && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
-                  Create Case
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
+
+                <DialogFooter className="pt-1">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setShowCreate(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={createMutation.isPending}
+                    className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                  >
+                    {createMutation.isPending && <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />}
+                    Create Case
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
