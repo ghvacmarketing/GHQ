@@ -32,7 +32,7 @@ import type { RebateWorkflowStep } from "@shared/schema";
 import {
   PROGRAM_TYPE_LABELS, PROGRAM_TYPE_SHORT, APPLICATION_STATUS_LABELS,
   APPLICATION_STATUS_OPTIONS, APPLICATION_STATUS_COLORS, APPLICATION_STATUS_ROW_BG,
-  WORKFLOW_STEP_LABELS, PRIORITY_LABELS, PRIORITY_COLORS,
+  WORKFLOW_STEPS_ORDER, WORKFLOW_STEP_LABELS, PRIORITY_LABELS, PRIORITY_COLORS,
 } from "@/lib/rebate-constants";
 
 type CrmUser = { id: string; name: string; role: string; isActive: boolean };
@@ -84,6 +84,7 @@ export default function CrmRebatePrograms() {
   const [filterProgram, setFilterProgram] = useState("all");
   const [filterAssignee, setFilterAssignee] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
+  const [filterWorkflowStep, setFilterWorkflowStep] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
 
   const { data: cases = [], isLoading, refetch } = useQuery<RebateCaseListItem[]>({
@@ -139,7 +140,8 @@ export default function CrmRebatePrograms() {
     const matchProgram = filterProgram === "all" || c.programType === filterProgram;
     const matchAssignee = filterAssignee === "all" || c.assignedToUserId === filterAssignee;
     const matchPriority = filterPriority === "all" || c.priority === filterPriority;
-    return matchSearch && matchStatus && matchProgram && matchAssignee && matchPriority;
+    const matchWorkflowStep = filterWorkflowStep === "all" || c.currentStep === filterWorkflowStep;
+    return matchSearch && matchStatus && matchProgram && matchAssignee && matchPriority && matchWorkflowStep;
   });
 
   const onSubmit = (values: CreateFormValues) => {
@@ -225,6 +227,15 @@ export default function CrmRebatePrograms() {
               <SelectItem value="all">All Priorities</SelectItem>
               {(["low","normal","high","urgent"] as const).map(p => (
                 <SelectItem key={p} value={p}>{PRIORITY_LABELS[p]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterWorkflowStep} onValueChange={setFilterWorkflowStep}>
+            <SelectTrigger className="h-9 text-sm w-48"><SelectValue placeholder="Workflow Step" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Workflow Steps</SelectItem>
+              {WORKFLOW_STEPS_ORDER.map(step => (
+                <SelectItem key={step} value={step}>{WORKFLOW_STEP_LABELS[step]}</SelectItem>
               ))}
             </SelectContent>
           </Select>

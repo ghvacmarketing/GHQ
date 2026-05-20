@@ -821,20 +821,43 @@ function DocumentsTab({ caseData, caseId, onInvalidate }: { caseData: CaseDetail
   const handleFileUpload = async (file: File) => {
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("category", uploadCategory);
-      formData.append("name", file.name);
-      const res = await fetch(`/api/crm/rebate-cases/${caseId}/documents`, {
+      // Step 1: Request a presigned upload URL
+      const urlRes = await fetch("/api/uploads/request-url", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
       });
-      if (!res.ok) throw new Error("Upload failed");
+      if (!urlRes.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await urlRes.json();
+
+      // Step 2: Upload the file directly to the presigned URL
+      const putRes = await fetch(uploadURL, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!putRes.ok) throw new Error("File upload failed");
+
+      // Step 3: Save document metadata
+      const metaRes = await fetch(`/api/crm/rebate-cases/${caseId}/documents`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: file.name,
+          url: uploadURL,
+          objectPath,
+          category: uploadCategory,
+          contentType: file.type,
+          size: file.size,
+        }),
+      });
+      if (!metaRes.ok) throw new Error("Failed to save document metadata");
       onInvalidate();
       toast({ title: "Document uploaded" });
-    } catch {
-      toast({ title: "Upload failed", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: err?.message ?? "Upload failed", variant: "destructive" });
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -931,10 +954,11 @@ function DocumentsTab({ caseData, caseId, onInvalidate }: { caseData: CaseDetail
 
 function TasksTab({ caseId, clientName }: { caseId: string; clientName: string }) {
   type TaskItem = { id: string; title: string; status: string; dueDate?: string | null; assignedUserId?: string | null };
-  const { data: tasks = [], isLoading } = useQuery<TaskItem[]>({
+  const { data: tasksData, isLoading } = useQuery<{ tasks: TaskItem[]; total: number } | TaskItem[]>({
     queryKey: ["/api/tasks/entity/rebate_case", caseId],
     queryFn: () => fetch(`/api/tasks/entity/rebate_case/${caseId}`, { credentials: "include" }).then(r => r.json()),
   });
+  const tasks: TaskItem[] = Array.isArray(tasksData) ? tasksData : (tasksData as any)?.tasks ?? [];
 
   if (isLoading) return <div className="flex justify-center py-10"><Loader2 className="w-5 h-5 animate-spin text-slate-400" /></div>;
 
