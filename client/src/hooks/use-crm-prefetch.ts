@@ -1,6 +1,11 @@
 import { useEffect, useRef } from "react";
 import { queryClient } from "@/lib/queryClient";
 
+// Module-level flag — persists across CrmLayout remounts (page navigations)
+// without this, the hasPrefetched ref resets on every navigation and fires
+// 14 parallel requests every time the user changes pages.
+let moduleHasPrefetched = false;
+
 // Debug logging helper - set to false for production
 const DEBUG_PREFETCH = false;
 const log = (...args: unknown[]) => {
@@ -121,19 +126,20 @@ export function useCrmPrefetch(isAuthenticated: boolean) {
   const hasPrefetched = useRef(false);
 
   useEffect(() => {
-    log('Hook called', { isAuthenticated, hasPrefetched: hasPrefetched.current });
+    log('Hook called', { isAuthenticated, hasPrefetched: hasPrefetched.current, moduleHasPrefetched });
     
     if (!isAuthenticated) {
       log('Skipping - not authenticated');
       return;
     }
     
-    if (hasPrefetched.current) {
+    if (hasPrefetched.current || moduleHasPrefetched) {
       log('Skipping - already prefetched');
       return;
     }
     
     hasPrefetched.current = true;
+    moduleHasPrefetched = true;
     const overallStart = performance.now();
     
     log('========================================');

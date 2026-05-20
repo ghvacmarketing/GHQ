@@ -82,7 +82,8 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
-    refetchInterval: 5000,
+    refetchInterval: 20000,
+    staleTime: 15000,
   });
 
   const invalidateAll = () => {

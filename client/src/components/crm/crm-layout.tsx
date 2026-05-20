@@ -154,12 +154,14 @@ function SidebarContent({
 
   const { data: unreadData } = useQuery<{ unreadCount: number }>({
     queryKey: ["/api/crm/messaging/unread-count"],
-    refetchInterval: 10000,
+    refetchInterval: 30000,
+    staleTime: 25000,
   });
 
   const { data: notificationCount } = useQuery<{ count: number }>({
     queryKey: ["/api/crm/notifications/unread-count"],
-    refetchInterval: 10000,
+    refetchInterval: 30000,
+    staleTime: 25000,
   });
 
   const logoutMutation = useMutation({
@@ -309,9 +311,12 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
   
   useCrmPrefetch(!!currentUser);
 
+  // Shared queryKey with SidebarContent — TanStack deduplicates the network call,
+  // only one request fires every 30s. Used here for the top-right bell badge.
   const { data: notificationCount } = useQuery<{ count: number }>({
     queryKey: ["/api/crm/notifications/unread-count"],
-    refetchInterval: 10000,
+    refetchInterval: 30000,
+    staleTime: 25000,
   });
 
   return (

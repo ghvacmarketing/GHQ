@@ -38,7 +38,8 @@ export function TaggedCommentsDisplay() {
       if (!res.ok) return [];
       return res.json();
     },
-    refetchInterval: 10000,
+    refetchInterval: 30000,
+    staleTime: 25000,
   });
 
   const resolveMutation = useMutation({
