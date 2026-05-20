@@ -119,89 +119,92 @@ export default function CrmRebateCase() {
         Case not found.
       </div>
     ) : (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="flex items-start gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/crm/rebate-programs")} className="mt-0.5">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-lg font-semibold text-slate-900">{clientName}</h1>
-                {caseData.caseNumber && (
-                  <span className="text-sm text-slate-500 font-mono">#{caseData.caseNumber}</span>
-                )}
-                <Badge className={`text-xs border ${APPLICATION_STATUS_COLORS[caseData.applicationStatus]}`}>
-                  {APPLICATION_STATUS_LABELS[caseData.applicationStatus]}
-                </Badge>
-                <Badge variant="outline" className="text-xs">
-                  {PROGRAM_TYPE_SHORT[caseData.programType]}
-                </Badge>
-                <Badge className={`text-xs ${PRIORITY_COLORS[caseData.priority]}`}>
-                  {PRIORITY_LABELS[caseData.priority]}
-                </Badge>
-              </div>
-              <p className="text-sm text-slate-500 mt-0.5">
-                {caseData.propertyAddress ? `${caseData.propertyAddress}, ${caseData.propertyCity ?? ""}` : "No address on file"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Progress indicator */}
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-sm">
-              <div className={`w-2 h-2 rounded-full ${stepsComplete === totalSteps ? "bg-green-500" : "bg-amber-400"}`} />
-              <span className="font-medium text-slate-700">{stepsComplete} of {totalSteps} complete</span>
-            </div>
-            {!isClosed && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-slate-700 text-slate-700 hover:bg-slate-700 hover:text-white"
-                onClick={() => { if (confirm("Close this case?")) closeCase.mutate(); }}
-                disabled={closeCase.isPending}
-              >
-                <Lock className="w-3.5 h-3.5 mr-1" />
-                Close Case
-              </Button>
-            )}
+    <div className="space-y-6">
+      {/* Header row — matches customer profile style */}
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" onClick={() => navigate("/crm/rebate-programs")}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </Button>
+        <div className="flex items-center gap-1">
+          {!isClosed && (
             <Button
               variant="ghost"
               size="sm"
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-              onClick={() => { if (confirm("Delete this case? This cannot be undone.")) deleteCase.mutate(); }}
-              disabled={deleteCase.isPending}
+              className="text-slate-600 hover:text-slate-900"
+              onClick={() => { if (confirm("Close this case?")) closeCase.mutate(); }}
+              disabled={closeCase.isPending}
             >
-              <Trash2 className="w-4 h-4" />
+              <Lock className="h-3.5 w-3.5 mr-1.5" />
+              Close Case
             </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+            onClick={() => { if (confirm("Delete this case? This cannot be undone.")) deleteCase.mutate(); }}
+            disabled={deleteCase.isPending}
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+            Delete
+          </Button>
+        </div>
+      </div>
+
+      {/* Title block */}
+      <div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <h1 className="text-2xl font-bold text-slate-900">{clientName}</h1>
+          {caseData.caseNumber && (
+            <span className="text-slate-400 font-mono text-base">#{caseData.caseNumber}</span>
+          )}
+          <Badge className={`text-xs border ${APPLICATION_STATUS_COLORS[caseData.applicationStatus]}`}>
+            {APPLICATION_STATUS_LABELS[caseData.applicationStatus]}
+          </Badge>
+          <Badge variant="outline" className="text-xs">{PROGRAM_TYPE_SHORT[caseData.programType]}</Badge>
+          <Badge className={`text-xs ${PRIORITY_COLORS[caseData.priority]}`}>
+            {PRIORITY_LABELS[caseData.priority]}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-3 mt-1">
+          <p className="text-sm text-slate-500">
+            {caseData.propertyAddress ? `${caseData.propertyAddress}, ${caseData.propertyCity ?? ""}` : "No address on file"}
+          </p>
+          <span className="text-slate-200">·</span>
+          <div className="flex items-center gap-1.5 text-sm text-slate-500">
+            <div className={`w-2 h-2 rounded-full ${stepsComplete === totalSteps ? "bg-green-500" : "bg-amber-400"}`} />
+            {stepsComplete} of {totalSteps} complete
           </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="px-6 py-4">
-        <Tabs defaultValue="summary">
-          <TabsList className="flex flex-wrap h-auto gap-1 bg-white border border-slate-200 p-1 rounded-lg mb-4">
-            {[
-              { value: "summary", label: "Summary", icon: Star },
-              { value: "client", label: "Client/Property", icon: Home },
-              { value: "utility", label: "Utility", icon: Zap },
-              { value: "existing", label: "Existing System", icon: Settings2 },
-              { value: "new", label: "New System", icon: Wrench },
-              { value: "scope", label: "Scope of Work", icon: ClipboardList },
-              { value: "workflow", label: "Neighborly Workflow", icon: CheckCircle2 },
-              { value: "documents", label: "Documents", icon: FolderOpen },
-              { value: "tasks", label: "Tasks", icon: Activity },
-              { value: "activity", label: "Activity Log", icon: FileText },
-            ].map(({ value, label, icon: Icon }) => (
-              <TabsTrigger key={value} value={value} className="flex items-center gap-1.5 text-xs px-3 py-1.5">
-                <Icon className="w-3.5 h-3.5" />
-                {label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+      {/* Tabs — underline style matching customer profile */}
+      <Tabs defaultValue="summary">
+        <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 flex-wrap">
+          {[
+            { value: "summary", label: "Summary", icon: Star },
+            { value: "client", label: "Client/Property", icon: Home },
+            { value: "utility", label: "Utility", icon: Zap },
+            { value: "existing", label: "Existing System", icon: Settings2 },
+            { value: "new", label: "New System", icon: Wrench },
+            { value: "scope", label: "Scope of Work", icon: ClipboardList },
+            { value: "workflow", label: "Neighborly Workflow", icon: CheckCircle2 },
+            { value: "documents", label: "Documents", icon: FolderOpen },
+            { value: "activity", label: "Activity Log", icon: FileText },
+          ].map(({ value, label, icon: Icon }) => (
+            <TabsTrigger
+              key={value}
+              value={value}
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+            >
+              <Icon className="h-4 w-4 mr-2" />
+              {label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
+        <div className="mt-6">
           <TabsContent value="summary">
             <SummaryTab caseData={caseData} users={users} onPatch={patchCase.mutate} saving={patchCase.isPending} />
           </TabsContent>
@@ -226,14 +229,11 @@ export default function CrmRebateCase() {
           <TabsContent value="documents">
             <DocumentsTab caseData={caseData} caseId={id} onInvalidate={invalidate} />
           </TabsContent>
-          <TabsContent value="tasks">
-            <TasksTab caseId={id} clientName={clientName} />
-          </TabsContent>
           <TabsContent value="activity">
             <ActivityTab caseData={caseData} caseId={id} users={users} onInvalidate={invalidate} />
           </TabsContent>
-        </Tabs>
-      </div>
+        </div>
+      </Tabs>
     </div>
     )}
     </CrmLayout>
@@ -1007,6 +1007,18 @@ function TasksTab({ caseId, clientName }: { caseId: string; clientName: string }
 
 // ─── Activity Log Tab ───────────────────────────────────────────────────────────
 
+const ACTIVITY_CONFIG: Record<string, { icon: any; bgColor: string; textColor: string; borderColor: string; label: string }> = {
+  case_created:            { icon: Activity,      bgColor: "bg-[#711419]",      textColor: "text-white",        borderColor: "border-red-100",    label: "Case Created" },
+  case_closed:             { icon: Lock,          bgColor: "bg-slate-700",      textColor: "text-white",        borderColor: "border-slate-200",  label: "Case Closed" },
+  note_added:              { icon: FileText,      bgColor: "bg-blue-100",       textColor: "text-blue-600",     borderColor: "border-blue-100",   label: "Note" },
+  document_uploaded:       { icon: Upload,        bgColor: "bg-purple-100",     textColor: "text-purple-600",   borderColor: "border-purple-100", label: "Document" },
+  workflow_step_complete:  { icon: CheckCircle2,  bgColor: "bg-green-100",      textColor: "text-green-600",    borderColor: "border-green-100",  label: "Workflow Step" },
+  status_changed:          { icon: Activity,      bgColor: "bg-amber-100",      textColor: "text-amber-600",    borderColor: "border-amber-100",  label: "Status Changed" },
+  assignee_changed:        { icon: User,          bgColor: "bg-indigo-100",     textColor: "text-indigo-600",   borderColor: "border-indigo-100", label: "Reassigned" },
+  scope_submitted:         { icon: ClipboardList, bgColor: "bg-teal-100",       textColor: "text-teal-600",     borderColor: "border-teal-100",   label: "Scope Submitted" },
+};
+const DEFAULT_ACTIVITY = { icon: Activity, bgColor: "bg-slate-100", textColor: "text-slate-500", borderColor: "border-slate-200", label: "Activity" };
+
 function ActivityTab({ caseData, caseId, users, onInvalidate }: {
   caseData: CaseDetail; caseId: string; users: CrmUser[]; onInvalidate: () => void;
 }) {
@@ -1026,83 +1038,95 @@ function ActivityTab({ caseData, caseId, users, onInvalidate }: {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Add note */}
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Add Note</CardTitle></CardHeader>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <FileText className="h-5 w-5 text-[#711419]" />
+            Activity Log
+          </CardTitle>
+        </CardHeader>
         <CardContent className="pt-0">
-          <Textarea
-            className="text-sm min-h-[70px] resize-none mb-2"
-            placeholder="Add a note or comment..."
-            value={note}
-            onChange={e => setNote(e.target.value)}
-          />
-          <Button
-            size="sm"
-            className="bg-[#711419] hover:bg-[#5a1014]"
-            onClick={() => { if (note.trim()) addNote.mutate(note.trim()); }}
-            disabled={!note.trim() || addNote.isPending}
-          >
-            {addNote.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Plus className="w-3.5 h-3.5 mr-1" />}
-            Add Note
-          </Button>
+          <div className="flex gap-2">
+            <Textarea
+              className="text-sm min-h-[60px] resize-none flex-1"
+              placeholder="Add a note..."
+              value={note}
+              onChange={e => setNote(e.target.value)}
+            />
+            <Button
+              size="sm"
+              className="bg-[#711419] hover:bg-[#5a1014] self-end"
+              onClick={() => { if (note.trim()) addNote.mutate(note.trim()); }}
+              disabled={!note.trim() || addNote.isPending}
+            >
+              {addNote.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
+      {/* Timeline */}
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Activity Timeline</CardTitle></CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="pt-6">
           {entries.length === 0 ? (
-            <div className="text-center py-8">
-              <FileText className="w-7 h-7 text-slate-300 mx-auto mb-2" />
+            <div className="text-center py-10">
+              <Activity className="w-10 h-10 text-slate-200 mx-auto mb-3" />
               <p className="text-sm text-slate-400">No activity recorded yet.</p>
             </div>
           ) : (
-            <div className="relative space-y-0">
-              {entries.map((entry, idx) => (
-                <div key={entry.id} className="flex gap-3 pb-4 relative">
-                  <div className="flex flex-col items-center">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5
-                      ${entry.action === "case_created" ? "bg-[#711419] text-white" :
-                        entry.action === "case_closed" ? "bg-slate-700 text-white" :
-                        entry.action === "note_added" ? "bg-blue-100 text-blue-600" :
-                        entry.action === "document_uploaded" ? "bg-purple-100 text-purple-600" :
-                        "bg-slate-100 text-slate-500"}`}>
-                      {entry.action === "note_added"
-                        ? <FileText className="w-3.5 h-3.5" />
-                        : entry.action === "document_uploaded"
-                        ? <Upload className="w-3.5 h-3.5" />
-                        : entry.action === "workflow_step_complete"
-                        ? <CheckCircle2 className="w-3.5 h-3.5" />
-                        : <Activity className="w-3.5 h-3.5" />}
-                    </div>
-                    {idx < entries.length - 1 && (
-                      <div className="w-px flex-1 bg-slate-100 mt-1" />
-                    )}
-                  </div>
-                  <div className="flex-1 pt-1 pb-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <span className="text-sm font-medium text-slate-700 capitalize">
-                          {entry.action?.replace(/_/g, " ")}
-                        </span>
-                        {entry.userId && (
-                          <span className="text-xs text-slate-400 ml-2">
-                            by {usersMap.get(entry.userId) ?? "Unknown"}
-                          </span>
+            <div className="relative">
+              {/* Vertical line */}
+              <div className="absolute left-[92px] top-0 bottom-0 w-px bg-slate-200" />
+              <div className="space-y-4">
+                {entries.map(entry => {
+                  const cfg = ACTIVITY_CONFIG[entry.action ?? ""] ?? DEFAULT_ACTIVITY;
+                  const IconComp = cfg.icon;
+                  return (
+                    <div key={entry.id} className="flex items-start gap-4">
+                      {/* Date column */}
+                      <div className="w-[80px] text-right flex-shrink-0 pt-2">
+                        {entry.createdAt && (
+                          <>
+                            <p className="text-xs font-medium text-slate-600">
+                              {format(new Date(entry.createdAt), "MMM d, yyyy")}
+                            </p>
+                            <p className="text-xs text-slate-400">
+                              {format(new Date(entry.createdAt), "h:mm a")}
+                            </p>
+                          </>
                         )}
                       </div>
-                      {entry.createdAt && (
-                        <span className="text-xs text-slate-400 flex-shrink-0">
-                          {format(new Date(entry.createdAt), "MMM d, h:mm a")}
-                        </span>
-                      )}
+                      {/* Icon */}
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 border-2 border-white shadow-sm ${cfg.bgColor}`}>
+                        <IconComp className={`h-4 w-4 ${cfg.textColor}`} />
+                      </div>
+                      {/* Content card */}
+                      <div className={`flex-1 p-4 rounded-lg border bg-white ${cfg.borderColor}`}>
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge className={`text-xs ${cfg.bgColor} ${cfg.textColor}`}>{cfg.label}</Badge>
+                            {entry.userId && (
+                              <span className="text-xs text-slate-400">
+                                by {usersMap.get(entry.userId) ?? "Unknown"}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {entry.description && (
+                          <p className="text-sm text-slate-700">{entry.description}</p>
+                        )}
+                        {!entry.description && (
+                          <p className="text-sm text-slate-500 capitalize">
+                            {entry.action?.replace(/_/g, " ")}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    {entry.description && (
-                      <p className="text-sm text-slate-500 mt-0.5">{entry.description}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
           )}
         </CardContent>
