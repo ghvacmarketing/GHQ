@@ -393,12 +393,12 @@ const fTriplet = "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-4
 
 function FormCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-      <header className="bg-[#711419] px-4 sm:px-5 py-3">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-white">{title}</h3>
-      </header>
-      <div className="p-4 sm:p-5">{children}</div>
-    </section>
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-medium text-slate-700">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">{children}</CardContent>
+    </Card>
   );
 }
 
