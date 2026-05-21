@@ -49,6 +49,7 @@ type CaseDetail = RebateCase & {
 const DOC_CATEGORIES: RebateDocumentCategory[] = [
   "rebate_request","head_of_household","scope_of_work","electrical_wiring_pre_retrofit",
   "ahri_certificate","snugg_pro_pdf","fuel_switching_calculator","manual_j_report",
+  "quality_install_address_photo",
   "contractor_pre_approval","project_completion","completion_attestations","reservation_summary","other",
 ];
 
@@ -226,7 +227,7 @@ export default function CrmRebateCase() {
             <ContractorPreApprovalTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} />
           </TabsContent>
           <TabsContent value="project_completion">
-            <ProjectCompletionTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} />
+            <ProjectCompletionTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} caseId={id} onInvalidate={invalidate} />
           </TabsContent>
           <TabsContent value="completion_attestations">
             <CompletionAttestationsTab caseData={caseData} onPatch={patchCase.mutate} saving={patchCase.isPending} />
@@ -1112,7 +1113,7 @@ function ContractorPreApprovalTab({ caseData, onPatch, saving }: { caseData: Cas
 
 // ─── Project Completion Tab ─────────────────────────────────────────────────────
 
-function ProjectCompletionTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onPatch: (d: Partial<RebateCase>) => void; saving: boolean }) {
+function ProjectCompletionTab({ caseData, onPatch, saving, caseId, onInvalidate }: { caseData: CaseDetail; onPatch: (d: Partial<RebateCase>) => void; saving: boolean; caseId: string; onInvalidate: () => void }) {
   const form = useForm({
     defaultValues: {
       installDate: caseData.installDate ? format(new Date(caseData.installDate), "yyyy-MM-dd") : "",
@@ -1141,28 +1142,29 @@ function ProjectCompletionTab({ caseData, onPatch, saving }: { caseData: CaseDet
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="space-y-4">
             <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Installation Details</CardTitle></CardHeader>
-              <CardContent className="pt-0 space-y-3">
-                {[
-                  { name: "installDate", label: "Installation Date", type: "date" },
-                  { name: "installCompletedDate", label: "Completion Date", type: "date" },
-                  { name: "installCost", label: "Installation Cost", type: "text" },
-                ].map(({ name, label, type }) => (
-                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
-                      <FormControl>
-                        <Input className="h-8 text-sm" type={type} placeholder={type === "text" ? "e.g. $12,500" : undefined} {...field} value={field.value ?? ""} />
-                      </FormControl>
-                    </FormItem>
-                  )} />
-                ))}
-                <FormField control={form.control} name="completionNotes" render={({ field }) => (
+              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Project Information</CardTitle></CardHeader>
+              <CardContent className="pt-0 space-y-4">
+                <div>
+                  <p className="text-xs text-slate-600 mb-2">Upload a photo of the Property Address including the Building Number</p>
+                  <RebatePhotoUploader
+                    caseId={caseId}
+                    photos={(caseData.documents ?? []).filter(d => d.category === "quality_install_address_photo")}
+                    onInvalidate={onInvalidate}
+                    category="quality_install_address_photo"
+                    label="Quality Install — Property Address Photo"
+                    required
+                  />
+                </div>
+                <FormField control={form.control} name="installDate" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs text-slate-500">Completion Notes</FormLabel>
-                    <FormControl>
-                      <Textarea className="text-sm min-h-[80px] resize-none" placeholder="Notes about project completion…" {...field} value={field.value ?? ""} />
-                    </FormControl>
+                    <FormLabel className="text-xs text-slate-500"><span className="font-mono text-slate-400">D.1.</span> Install Start Date</FormLabel>
+                    <FormControl><Input className="h-8 text-sm" type="date" {...field} value={field.value ?? ""} /></FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="installCompletedDate" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500"><span className="font-mono text-slate-400">D.2.</span> Date Completed</FormLabel>
+                    <FormControl><Input className="h-8 text-sm" type="date" {...field} value={field.value ?? ""} /></FormControl>
                   </FormItem>
                 )} />
               </CardContent>

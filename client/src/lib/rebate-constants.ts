@@ -165,6 +165,7 @@ export const DOCUMENT_CATEGORY_LABELS: Record<RebateDocumentCategory, string> = 
   snugg_pro_pdf: "SnuggPro PDF",
   fuel_switching_calculator: "Heat Pump Fuel-Switching Calculator",
   manual_j_report: "Manual J Report",
+  quality_install_address_photo: "Quality Install — Property Address Photo",
   contractor_pre_approval: "Contractor Pre-Approval",
   project_completion: "Project Completion",
   completion_attestations: "Completion Attestations",

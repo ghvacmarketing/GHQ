@@ -3569,6 +3569,7 @@ export const rebateDocumentCategoryEnum = [
   "snugg_pro_pdf",
   "fuel_switching_calculator",
   "manual_j_report",
+  "quality_install_address_photo",
   "contractor_pre_approval",
   "project_completion",
   "completion_attestations",
