@@ -45,6 +45,42 @@ type CaseDetail = RebateCase & {
   activity: RebateCaseActivityLog[];
 };
 
+// Derive completion of each workflow step from case data (client-side, instant).
+function computeCompletedSteps(c: CaseDetail | undefined): Set<string> {
+  const done = new Set<string>();
+  if (!c) return done;
+  // Program Overview: case exists -> overview acknowledged
+  done.add("program_overview");
+  // Rebate Request: minimum identifying + property info
+  if (c.clientFirstName && c.clientLastName && c.propertyAddress && c.propertyCity) {
+    done.add("rebate_request");
+  }
+  // Head of Household: confirmed by user
+  if (c.hohConfirmed) done.add("head_of_household");
+  // Scope of Work: at least one scope item selected
+  const hasScopeItem =
+    (c.scopeChecklist ?? []).some((s) => s.isChecked) ||
+    c.scopeIncludesHeatPump || c.scopeIncludesWaterHeater || c.scopeIncludesStove ||
+    c.scopeIncludesDryer || c.scopeIncludesPanel || c.scopeIncludesWiring ||
+    c.scopeIncludesInsulation;
+  if (hasScopeItem) done.add("scope_of_work");
+  // Contractor Pre-Approval: approved status or approved date present
+  if (c.preApprovalStatus === "approved" || c.preApprovalApprovedDate) {
+    done.add("contractor_pre_approval");
+  }
+  // Project Completion: install completion date recorded
+  if (c.installCompletedDate) done.add("project_completion");
+  // Completion Attestations: both signatures
+  if (c.customerAttestationSigned && c.contractorAttestationSigned) {
+    done.add("completion_attestations");
+  }
+  // Reservation Summary: reservation number or closeout date set
+  if (c.reservationNumber || c.caseCloseoutDate) {
+    done.add("reservation_summary");
+  }
+  return done;
+}
+
 
 const DOC_CATEGORIES: RebateDocumentCategory[] = [
   "rebate_request","head_of_household","scope_of_work","electrical_wiring_pre_retrofit",
@@ -105,7 +141,8 @@ export default function CrmRebateCase() {
     );
   }
 
-  const stepsComplete = (caseData?.workflowSteps ?? []).filter(s => s.status === "complete").length;
+  const completedStepKeys = computeCompletedSteps(caseData);
+  const stepsComplete = completedStepKeys.size;
   const totalSteps = WORKFLOW_STEPS_ORDER.length;
   const clientName = [caseData?.clientFirstName, caseData?.clientLastName].filter(Boolean).join(" ") || "Unnamed Client";
   const isClosed = caseData?.applicationStatus === "closed";
@@ -198,16 +235,23 @@ export default function CrmRebateCase() {
               { value: "reservation_summary",     label: "Reservation Summary",     icon: Calendar },
               { value: "documents",               label: "Documents",               icon: FolderOpen },
               { value: "activity",                label: "Activity Log",            icon: Activity },
-            ].map(({ value, label, icon: Icon }) => (
-              <TabsTrigger
-                key={value}
-                value={value}
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-2.5 sm:px-3.5 md:px-4 py-2 text-xs sm:text-sm whitespace-nowrap flex items-center gap-1.5"
-              >
-                <Icon className="h-3.5 w-3.5 hidden md:block flex-shrink-0" />
-                {label}
-              </TabsTrigger>
-            ))}
+            ].map(({ value, label, icon: Icon }) => {
+              const isComplete = completedStepKeys.has(value);
+              return (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-2.5 sm:px-3.5 md:px-4 py-2 text-xs sm:text-sm whitespace-nowrap flex items-center gap-1.5"
+                >
+                  {isComplete ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 flex-shrink-0" />
+                  ) : (
+                    <Icon className="h-3.5 w-3.5 hidden md:block flex-shrink-0" />
+                  )}
+                  {label}
+                </TabsTrigger>
+              );
+            })}
           </TabsList>
         </div>
 
