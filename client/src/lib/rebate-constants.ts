@@ -166,6 +166,7 @@ export const DOCUMENT_CATEGORY_LABELS: Record<RebateDocumentCategory, string> = 
   fuel_switching_calculator: "Heat Pump Fuel-Switching Calculator",
   manual_j_report: "Manual J Report",
   quality_install_address_photo: "Quality Install — Property Address Photo",
+  quality_install_hp_post_retrofit: "Quality Install — Heat Pump Post-Retrofit Photos",
   contractor_pre_approval: "Contractor Pre-Approval",
   project_completion: "Project Completion",
   completion_attestations: "Completion Attestations",

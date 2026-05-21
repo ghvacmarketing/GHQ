@@ -3570,6 +3570,7 @@ export const rebateDocumentCategoryEnum = [
   "fuel_switching_calculator",
   "manual_j_report",
   "quality_install_address_photo",
+  "quality_install_hp_post_retrofit",
   "contractor_pre_approval",
   "project_completion",
   "completion_attestations",
@@ -3777,6 +3778,20 @@ export const rebateCases = pgTable("rebate_cases", {
 
   // Project completion
   completionNotes: text("completion_notes"),
+
+  // Post-Installation Information (heat pump)
+  postHpType: text("post_hp_type"),
+  postHpEnergyStarColdClimate: text("post_hp_energy_star_cold_climate"),
+  postHpHeatingLoadPercent: text("post_hp_heating_load_percent"),
+  postHpHeatingCapacityBtu: text("post_hp_heating_capacity_btu"),
+  postHpCoolingCapacityBtu: text("post_hp_cooling_capacity_btu"),
+  postHpModelNumber: text("post_hp_model_number"),
+  postHpCount: integer("post_hp_count"),
+  postHpSerialNumber: text("post_hp_serial_number"),
+  postHpMake: text("post_hp_make"),
+  postHpExternalRebates: boolean("post_hp_external_rebates"),
+  postHpFinalMaterialCost: text("post_hp_final_material_cost"),
+  postHpFinalInstallCost: text("post_hp_final_install_cost"),
 
   // Completion attestations
   customerAttestationSigned: boolean("customer_attestation_signed").default(false),

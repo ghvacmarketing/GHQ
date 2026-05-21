@@ -49,7 +49,7 @@ type CaseDetail = RebateCase & {
 const DOC_CATEGORIES: RebateDocumentCategory[] = [
   "rebate_request","head_of_household","scope_of_work","electrical_wiring_pre_retrofit",
   "ahri_certificate","snugg_pro_pdf","fuel_switching_calculator","manual_j_report",
-  "quality_install_address_photo",
+  "quality_install_address_photo","quality_install_hp_post_retrofit",
   "contractor_pre_approval","project_completion","completion_attestations","reservation_summary","other",
 ];
 
@@ -1120,22 +1120,30 @@ function ProjectCompletionTab({ caseData, onPatch, saving, caseId, onInvalidate 
       installCompletedDate: caseData.installCompletedDate ? format(new Date(caseData.installCompletedDate), "yyyy-MM-dd") : "",
       installCost: caseData.installCost ?? "",
       completionNotes: caseData.completionNotes ?? "",
-      newHeatingType: caseData.newHeatingType ?? "",
-      newHeatingBrand: caseData.newHeatingBrand ?? "",
-      newHeatingModel: caseData.newHeatingModel ?? "",
-      newHeatingSerial: caseData.newHeatingSerial ?? "",
-      newHeatingSeer: caseData.newHeatingSeer ?? "",
-      newHeatingHspf: caseData.newHeatingHspf ?? "",
-      newCoolingType: caseData.newCoolingType ?? "",
-      newCoolingBrand: caseData.newCoolingBrand ?? "",
-      newCoolingModel: caseData.newCoolingModel ?? "",
-      newCoolingSerial: caseData.newCoolingSerial ?? "",
-      newWaterHeaterType: caseData.newWaterHeaterType ?? "",
-      newWaterHeaterBrand: caseData.newWaterHeaterBrand ?? "",
-      newWaterHeaterModel: caseData.newWaterHeaterModel ?? "",
+      postHpType: caseData.postHpType ?? "",
+      postHpEnergyStarColdClimate: caseData.postHpEnergyStarColdClimate ?? "",
+      postHpHeatingLoadPercent: caseData.postHpHeatingLoadPercent ?? "",
+      postHpHeatingCapacityBtu: caseData.postHpHeatingCapacityBtu ?? "",
+      postHpCoolingCapacityBtu: caseData.postHpCoolingCapacityBtu ?? "",
+      postHpModelNumber: caseData.postHpModelNumber ?? "",
+      postHpCount: caseData.postHpCount != null ? String(caseData.postHpCount) : "",
+      postHpSerialNumber: caseData.postHpSerialNumber ?? "",
+      postHpMake: caseData.postHpMake ?? "",
+      postHpExternalRebates: caseData.postHpExternalRebates ?? null,
+      postHpFinalMaterialCost: caseData.postHpFinalMaterialCost ?? "",
+      postHpFinalInstallCost: caseData.postHpFinalInstallCost ?? "",
     },
   });
-  const onSubmit = (v: any) => onPatch(v);
+  const num = (v: string) => parseFloat((v ?? "").replace(/[^0-9.]/g, "")) || 0;
+  const fmt = (n: number) => `$ ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const watchMat = form.watch("postHpFinalMaterialCost");
+  const watchInst = form.watch("postHpFinalInstallCost");
+  const postHpTotal = num(watchMat) + num(watchInst);
+  const onSubmit = (v: any) => {
+    const cleaned: any = { ...v };
+    cleaned.postHpCount = v.postHpCount ? Number(v.postHpCount) : null;
+    onPatch(cleaned);
+  };
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -1172,58 +1180,128 @@ function ProjectCompletionTab({ caseData, onPatch, saving, caseId, onInvalidate 
           </div>
           <div className="space-y-4">
             <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">New Heating Equipment</CardTitle></CardHeader>
+              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Post-Installation Information</CardTitle></CardHeader>
               <CardContent className="pt-0 space-y-3">
-                {[
-                  { name: "newHeatingType", label: "Type" },
-                  { name: "newHeatingBrand", label: "Brand" },
-                  { name: "newHeatingModel", label: "Model" },
-                  { name: "newHeatingSerial", label: "Serial #" },
-                  { name: "newHeatingSeer", label: "SEER Rating" },
-                  { name: "newHeatingHspf", label: "HSPF Rating" },
-                ].map(({ name, label }) => (
-                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
-                      <FormControl><Input className="h-8 text-sm" {...field} value={field.value ?? ""} /></FormControl>
-                    </FormItem>
-                  )} />
-                ))}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">New Cooling Equipment</CardTitle></CardHeader>
-              <CardContent className="pt-0 space-y-3">
-                {[
-                  { name: "newCoolingType", label: "Type" },
-                  { name: "newCoolingBrand", label: "Brand" },
-                  { name: "newCoolingModel", label: "Model" },
-                  { name: "newCoolingSerial", label: "Serial #" },
-                ].map(({ name, label }) => (
-                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
-                      <FormControl><Input className="h-8 text-sm" {...field} value={field.value ?? ""} /></FormControl>
-                    </FormItem>
-                  )} />
-                ))}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">New Water Heater</CardTitle></CardHeader>
-              <CardContent className="pt-0 space-y-3">
-                {[
-                  { name: "newWaterHeaterType", label: "Type" },
-                  { name: "newWaterHeaterBrand", label: "Brand" },
-                  { name: "newWaterHeaterModel", label: "Model" },
-                ].map(({ name, label }) => (
-                  <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
-                      <FormControl><Input className="h-8 text-sm" {...field} value={field.value ?? ""} /></FormControl>
-                    </FormItem>
-                  )} />
-                ))}
+                <FormField control={form.control} name="postHpType" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">What type of heat pump was installed?</FormLabel>
+                    <FormControl>
+                      <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Central system with backup">Central system with backup</SelectItem>
+                          <SelectItem value="Central system without backup">Central system without backup</SelectItem>
+                          <SelectItem value="Mini-split">Mini-split</SelectItem>
+                          <SelectItem value="Ground source heat pump">Ground source heat pump</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="postHpEnergyStarColdClimate" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">Does the new heat pump meet ENERGY STAR's requirements for cold climate heat pumps?</FormLabel>
+                    <FormControl>
+                      <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                          <SelectItem value="Unknown">Unknown</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="postHpHeatingLoadPercent" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">What percent of the heating load will this system cover?</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center gap-2">
+                        <Input className="h-8 text-sm" placeholder="100" {...field} value={field.value ?? ""} />
+                        <span className="text-sm text-slate-500">%</span>
+                      </div>
+                    </FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="postHpHeatingCapacityBtu" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">What is the heating capacity of new heat pump system? (BTU/hr)</FormLabel>
+                    <FormControl><Input className="h-8 text-sm" placeholder="e.g. 38982" {...field} value={field.value ?? ""} /></FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="postHpCoolingCapacityBtu" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">What is the cooling capacity of the new heat pump system? (BTU/hr)</FormLabel>
+                    <FormControl><Input className="h-8 text-sm" placeholder="e.g. 35419" {...field} value={field.value ?? ""} /></FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="postHpModelNumber" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">Model Number</FormLabel>
+                    <FormControl><Input className="h-8 text-sm" placeholder="e.g. 5WCZ5048A1000" {...field} value={field.value ?? ""} /></FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="postHpCount" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">Count</FormLabel>
+                    <FormControl><Input className="h-8 text-sm" type="number" min="1" placeholder="1" {...field} value={field.value ?? ""} /></FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="postHpSerialNumber" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">Serial Number</FormLabel>
+                    <FormControl><Input className="h-8 text-sm" placeholder="e.g. 25278511FA" {...field} value={field.value ?? ""} /></FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="postHpMake" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">Make</FormLabel>
+                    <FormControl><Input className="h-8 text-sm" placeholder="e.g. Trane" {...field} value={field.value ?? ""} /></FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="postHpExternalRebates" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">Are there any External Rebates (i.e. GA Power, WAP, etc.) that will apply to this measure's installation?</FormLabel>
+                    <FormControl>
+                      <div className="flex gap-5 mt-1">
+                        {[{ label: "Yes", val: true }, { label: "No", val: false }].map(o => (
+                          <label key={String(o.val)} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+                            <input type="radio" checked={field.value === o.val} onChange={() => field.onChange(o.val)} className="accent-[#711419]" />
+                            {o.label}
+                          </label>
+                        ))}
+                      </div>
+                    </FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="postHpFinalMaterialCost" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">Final Heat Pump HVAC Material Costs</FormLabel>
+                    <FormControl><Input className="h-8 text-sm" placeholder="$ 0.00" {...field} value={field.value ?? ""} /></FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="postHpFinalInstallCost" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">Final Heat Pump HVAC Installation Cost (Contractor Installed Only)</FormLabel>
+                    <FormControl><Input className="h-8 text-sm" placeholder="$ 0.00" {...field} value={field.value ?? ""} /></FormControl>
+                  </FormItem>
+                )} />
+                <FormItem>
+                  <FormLabel className="text-xs text-slate-500">Final Heat Pump HVAC Total Cost</FormLabel>
+                  <Input className="h-8 text-sm bg-slate-100 text-slate-600" readOnly value={postHpTotal > 0 ? fmt(postHpTotal) : ""} placeholder="Auto-calculated" />
+                </FormItem>
+                <div className="pt-2">
+                  <RebatePhotoUploader
+                    caseId={caseId}
+                    photos={(caseData.documents ?? []).filter(d => d.category === "quality_install_hp_post_retrofit")}
+                    onInvalidate={onInvalidate}
+                    category="quality_install_hp_post_retrofit"
+                    label="Quality Install — Heat Pump for Space Heating and Cooling Post-Retrofit"
+                    required
+                  />
+                </div>
               </CardContent>
             </Card>
           </div>
