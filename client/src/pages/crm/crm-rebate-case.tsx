@@ -459,7 +459,7 @@ function RebateRequestTab({ caseData, onPatch, saving }: { caseData: CaseDetail;
         <span className="text-xs font-bold uppercase tracking-wide">Contractor / Initiator Information</span>
       </div>
       <div className="space-y-5 mb-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <div>
             <label className={labelCls}><span className={codeCls}>A.1.</span> Who is initiating the energy rebate request?</label>
             <select className={inputCls} value={values.initiatorType} onChange={e => set("initiatorType", e.target.value)}>
@@ -478,7 +478,7 @@ function RebateRequestTab({ caseData, onPatch, saving }: { caseData: CaseDetail;
 
         <div>
           <p className="text-sm mb-3"><span className={codeCls}>A.3.</span> Primary Initiator Contact Name</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-5 gap-y-4">
             <div>
               <label className={labelCls}><span className={codeCls}>A.3a.</span> First Name</label>
               <input className={inputCls} value={values.initiatorFirstName} onChange={e => set("initiatorFirstName", e.target.value)} />
@@ -509,12 +509,12 @@ function RebateRequestTab({ caseData, onPatch, saving }: { caseData: CaseDetail;
           <div className="space-y-2">
             <input className={inputCls} placeholder="Address Line 1" value={values.propertyAddress} onChange={e => set("propertyAddress", e.target.value)} />
             <input className={inputCls} placeholder="Address Line 2" value={values.propertyAddressLine2} onChange={e => set("propertyAddressLine2", e.target.value)} />
-            <div className="grid grid-cols-5 gap-2">
-              <input className={`${inputCls} col-span-2`} placeholder="City" value={values.propertyCity} onChange={e => set("propertyCity", e.target.value)} />
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+              <input className={`${inputCls} col-span-3 sm:col-span-2`} placeholder="City" value={values.propertyCity} onChange={e => set("propertyCity", e.target.value)} />
               <select className={`${inputCls} col-span-1`} value={values.propertyState} onChange={e => set("propertyState", e.target.value)}>
                 {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
-              <input className={`${inputCls} col-span-2`} placeholder="ZIP" value={values.propertyZip} onChange={e => set("propertyZip", e.target.value)} />
+              <input className={`${inputCls} col-span-2 sm:col-span-2`} placeholder="ZIP" value={values.propertyZip} onChange={e => set("propertyZip", e.target.value)} />
             </div>
           </div>
           <label className="flex items-center gap-2 mt-3 cursor-pointer">
@@ -523,7 +523,7 @@ function RebateRequestTab({ caseData, onPatch, saving }: { caseData: CaseDetail;
           </label>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <div>
             <label className={labelCls}><span className={codeCls}>A.5.</span> Is the building new or existing construction?</label>
             <select className={inputCls} value={values.constructionType} onChange={e => set("constructionType", e.target.value)}>
@@ -569,7 +569,7 @@ function RebateRequestTab({ caseData, onPatch, saving }: { caseData: CaseDetail;
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <div>
             <label className={labelCls}><span className={codeCls}>A.8.</span> Total Number of Bedrooms</label>
             <input type="number" min={0} className={`${inputCls} text-right`} value={values.bedroomCount ?? ""} onChange={e => set("bedroomCount", e.target.value ? Number(e.target.value) : null)} />
@@ -1169,7 +1169,7 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
           <span className="text-xs font-bold uppercase tracking-wide">Project Information</span>
         </div>
         <div className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div>
               <label className={lbl}><span className={cod}>County</span></label>
               <select className={inp} value={vals.scopeCounty} onChange={e => set("scopeCounty", e.target.value)}>
@@ -1231,7 +1231,7 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
             <label className={lbl}>Electric Utility Company Name</label>
             <input className={inp} value={vals.electricCompanyName} onChange={e => set("electricCompanyName", e.target.value)} placeholder="e.g. Georgia Power" />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
               <label className={lbl}><span className={cod}>C.3b.</span> Meter Number <span className="font-normal text-slate-400 text-xs">(20 char limit)</span></label>
               <input className={inp} maxLength={20} value={vals.electricMeterNumber} onChange={e => set("electricMeterNumber", e.target.value)} />
@@ -1266,7 +1266,7 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
                 <label className={lbl}>Gas Company Name</label>
                 <input className={inp} value={vals.gasCompanyName} onChange={e => set("gasCompanyName", e.target.value)} />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div>
                   <label className={lbl}>Meter Number</label>
                   <input className={inp} maxLength={20} value={vals.gasMeterNumber} onChange={e => set("gasMeterNumber", e.target.value)} />
@@ -1417,7 +1417,7 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
                 <input className={inp} placeholder="e.g. 32000" value={vals.hpCoolingCapacityBtu} onChange={e => set("hpCoolingCapacityBtu", e.target.value)} />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div>
                   <label className={lbl}>Make</label>
                   <input className={inp} placeholder="e.g. Trane" value={vals.hpMake} onChange={e => set("hpMake", e.target.value)} />
@@ -1433,7 +1433,7 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
                 <RadioGroup value={vals.hpExternalRebates} onChange={v => set("hpExternalRebates", v)} />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div>
                   <label className={lbl}>Estimated HVAC Heat Pump Material Costs</label>
                   <input className={inp} placeholder="$ 0.00" value={vals.hpMaterialCost} onChange={e => set("hpMaterialCost", e.target.value)} />
@@ -1702,7 +1702,7 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
                 <label className={lbl}><span className={cod}>a.</span> Are there any External Rebates (i.e. GA Power, WAP, etc.) that will apply to this measure's installation?</label>
                 <RadioGroup value={vals.wiringExternalRebates} onChange={v => set("wiringExternalRebates", v)} />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div>
                   <label className={lbl}>Estimated Electrical wiring Material Costs</label>
                   <input className={inp} placeholder="$ 0.00" value={vals.wiringMaterialCost} onChange={e => set("wiringMaterialCost", e.target.value)} />
@@ -1805,7 +1805,7 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
             <label className={lbl}><span className={cod}>C.21.</span> Total Estimated Project Costs</label>
             <input className={inp} placeholder="$ 0.00" value={vals.totalEstimatedProjectCost} onChange={e => set("totalEstimatedProjectCost", e.target.value)} />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Estimated Rebate at 50%</label>
               <input className={inp} placeholder="$ 0.00" value={vals.estimatedRebate50Pct} onChange={e => set("estimatedRebate50Pct", e.target.value)} />
