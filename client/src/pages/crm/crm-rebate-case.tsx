@@ -1184,6 +1184,7 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
     scopeIncludesDryer: boolean;
     scopeIncludesWaterHeater: boolean;
     scopeIncludesHeatPump: boolean;
+    constructionType: string;
     // Heat pump sub-questions
     hpRebateRecipient: string;
     hpType: string;
@@ -1269,6 +1270,7 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
     scopeIncludesDryer: d.scopeIncludesDryer ?? false,
     scopeIncludesWaterHeater: d.scopeIncludesWaterHeater ?? false,
     scopeIncludesHeatPump: d.scopeIncludesHeatPump ?? false,
+    constructionType: d.constructionType ?? "",
     hpRebateRecipient: d.hpRebateRecipient ?? "",
     hpType: d.hpType ?? "",
     hpDucted: d.hpDucted ?? "",
@@ -1353,11 +1355,6 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
         <p className="text-sm text-slate-500">
           Fill out the scope of work for the project. Upload the ENERGY STAR or AHRI Certificate for all appliance upgrades.
         </p>
-        {caseData.constructionType && (
-          <div className="mt-3 px-4 py-3 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-600">
-            <span className="font-medium text-slate-700">Construction Type (from Section A):</span> {caseData.constructionType}
-          </div>
-        )}
       </header>
 
       <FormCard title="Project Information">
@@ -1659,21 +1656,21 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
                 label="Upload geotagged photo(s) of heat pump for space heating and cooling pre-retrofit"
               />
 
-              {caseData.constructionType && (
-                <div className="sm:max-w-md">
-                  <label className={fLabel}>Construction Type</label>
-                  <div className={`${fInput} bg-slate-100 text-slate-600 flex items-center`}>
-                    {caseData.constructionType}
-                  </div>
-                </div>
-              )}
-
             </NestedPanel>
           )}
+
+          <div className="sm:max-w-md">
+            <label className={fLabel}>Construction Type</label>
+            <select className={fInput} value={vals.constructionType} onChange={e => set("constructionType", e.target.value)}>
+              <option value="">Select…</option>
+              <option value="Existing Construction">Existing Construction</option>
+              <option value="New Construction">New Construction</option>
+            </select>
+          </div>
         </div>
       </FormCard>
 
-      {caseData.constructionType === "Existing Construction" && vals.scopeIncludesHeatPump && (
+      {vals.constructionType === "Existing Construction" && vals.scopeIncludesHeatPump && (
         <FormCard title="Limited Assessment">
           <div className="space-y-5">
             <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
@@ -1790,7 +1787,7 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
         </FormCard>
       )}
 
-      {caseData.constructionType === "Existing Construction" && vals.scopeIncludesHeatPump && (
+      {vals.constructionType === "Existing Construction" && vals.scopeIncludesHeatPump && (
         <FormCard title="Heating and Cooling System">
           <div className="space-y-5">
             <SubGroup title="Cooling Systems">
