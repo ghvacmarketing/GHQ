@@ -76,7 +76,7 @@ export default function CrmNotifications() {
       return res.json();
     },
     enabled: !!currentUser,
-    refetchInterval: 5000,
+    refetchInterval: 30000,
   });
 
   const { data: taggedHistory = [] } = useQuery<TaggedCommentHistoryItem[]>({

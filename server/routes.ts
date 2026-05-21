@@ -55,9 +55,9 @@ const adminTokens = new Map<string, { createdAt: number }>();
 const TOKEN_EXPIRY_DAYS = parseInt(process.env.ADMIN_TOKEN_EXPIRY_DAYS || '90', 10);
 const TOKEN_EXPIRY = TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 
-// Analytics cache to speed up dashboard loading (30-second TTL)
+// Analytics cache to speed up dashboard loading (5-minute TTL)
 const analyticsCache = new Map<string, { data: any; timestamp: number }>();
-const ANALYTICS_CACHE_TTL = 30 * 1000; // 30 seconds
+const ANALYTICS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 function getCachedAnalytics(cacheKey: string): any | null {
   const cached = analyticsCache.get(cacheKey);
@@ -5389,41 +5389,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 2. Revenue by Department
       const getDepartmentRevenue = async (visitType: string) => {
-        const todayRevenue = await db
-          .select({
-            total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
-          })
-          .from(crmInvoices)
-          .innerJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
-          .where(and(
-            eq(crmWorkOrders.visitType, visitType),
-            eq(crmInvoices.status, "paid"),
-            sql`${crmInvoices.paidAt} >= ${today}`
-          ));
-
-        const mtdRevenue = await db
-          .select({
-            total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
-          })
-          .from(crmInvoices)
-          .innerJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
-          .where(and(
-            eq(crmWorkOrders.visitType, visitType),
-            eq(crmInvoices.status, "paid"),
-            sql`${crmInvoices.paidAt} >= ${startOfMonth}`
-          ));
-
-        const ytdRevenue = await db
-          .select({
-            total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
-          })
-          .from(crmInvoices)
-          .innerJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
-          .where(and(
-            eq(crmWorkOrders.visitType, visitType),
-            eq(crmInvoices.status, "paid"),
-            sql`${crmInvoices.paidAt} >= ${startOfYear}`
-          ));
+        const [todayRevenue, mtdRevenue, ytdRevenue] = await Promise.all([
+          db
+            .select({
+              total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
+            })
+            .from(crmInvoices)
+            .innerJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
+            .where(and(
+              eq(crmWorkOrders.visitType, visitType),
+              eq(crmInvoices.status, "paid"),
+              sql`${crmInvoices.paidAt} >= ${today}`
+            )),
+          db
+            .select({
+              total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
+            })
+            .from(crmInvoices)
+            .innerJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
+            .where(and(
+              eq(crmWorkOrders.visitType, visitType),
+              eq(crmInvoices.status, "paid"),
+              sql`${crmInvoices.paidAt} >= ${startOfMonth}`
+            )),
+          db
+            .select({
+              total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
+            })
+            .from(crmInvoices)
+            .innerJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
+            .where(and(
+              eq(crmWorkOrders.visitType, visitType),
+              eq(crmInvoices.status, "paid"),
+              sql`${crmInvoices.paidAt} >= ${startOfYear}`
+            )),
+        ]);
 
         return {
           today: parseFloat(todayRevenue[0]?.total || "0"),
@@ -5432,9 +5432,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       };
 
-      const serviceRevenue = await getDepartmentRevenue("SERVICE");
-      const installRevenue = await getDepartmentRevenue("INSTALL");
-      const maintenanceRevenue = await getDepartmentRevenue("MAINTENANCE");
+      const [serviceRevenue, installRevenue, maintenanceRevenue] = await Promise.all([
+        getDepartmentRevenue("SERVICE"),
+        getDepartmentRevenue("INSTALL"),
+        getDepartmentRevenue("MAINTENANCE"),
+      ]);
 
       const departmentGoals = {
         SERVICE: currentMonthlyGoals ? parseFloat(currentMonthlyGoals.monthlyServiceGoal || "0") : 0,
@@ -5542,117 +5544,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
-      // 4. Monthly Revenue for Area Chart (last 12 months)
+      // 4. Monthly Revenue for Area Chart (last 12 months) — single GROUP BY query
+      const rolling12MonthStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+      const monthlyRevenueRows = await db
+        .select({
+          month: sql<string>`TO_CHAR(DATE_TRUNC('month', ${crmInvoices.paidAt}), 'Mon')`,
+          year:  sql<number>`EXTRACT(YEAR  FROM DATE_TRUNC('month', ${crmInvoices.paidAt}))`,
+          mo:    sql<number>`EXTRACT(MONTH FROM DATE_TRUNC('month', ${crmInvoices.paidAt}))`,
+          total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
+        })
+        .from(crmInvoices)
+        .where(and(
+          eq(crmInvoices.status, "paid"),
+          sql`${crmInvoices.paidAt} >= ${rolling12MonthStart}`,
+          sql`${crmInvoices.paidAt} IS NOT NULL`
+        ))
+        .groupBy(sql`DATE_TRUNC('month', ${crmInvoices.paidAt})`)
+        .orderBy(sql`DATE_TRUNC('month', ${crmInvoices.paidAt})`);
+
+      // Build complete 12-slot array filling in zero for months with no data
+      const revenueByMonthKey = new Map(
+        monthlyRevenueRows.map(r => [`${r.year}-${String(r.mo).padStart(2, "0")}`, { month: r.month, revenue: parseFloat(r.total || "0") }])
+      );
       const monthlyRevenue: Array<{ month: string; revenue: number }> = [];
       for (let i = 11; i >= 0; i--) {
-        const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
-        const monthName = monthStart.toLocaleDateString("en-US", { month: "short" });
-        
-        const monthRevenue = await db
-          .select({
-            total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
-          })
-          .from(crmInvoices)
-          .where(and(
-            eq(crmInvoices.status, "paid"),
-            sql`${crmInvoices.paidAt} >= ${monthStart}`,
-            sql`${crmInvoices.paidAt} <= ${monthEnd}`
-          ));
-        
-        monthlyRevenue.push({
-          month: monthName,
-          revenue: parseFloat(monthRevenue[0]?.total || "0"),
-        });
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        const label = d.toLocaleDateString("en-US", { month: "short" });
+        monthlyRevenue.push(revenueByMonthKey.get(key) ?? { month: label, revenue: 0 });
       }
 
-      // 5. Projects Overview (last 30 days)
+      // 5–7. Projects / Work Orders / Invoices overview — all fired in parallel
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      
-      const openProjectsCount = await db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(crmProjects)
-        .where(inArray(crmProjects.status, ["lead", "proposal_sent", "approved", "in_progress"]));
-      
-      const completedProjectsCount = await db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(crmProjects)
-        .where(and(
-          eq(crmProjects.status, "completed"),
-          sql`${crmProjects.updatedAt} >= ${thirtyDaysAgo}`
-        ));
-      
-      const recentProjects = await db
-        .select({
-          id: crmProjects.id,
-          name: crmProjects.title,
-          status: crmProjects.status,
-          projectType: crmProjects.projectType,
-          createdAt: crmProjects.createdAt,
-        })
-        .from(crmProjects)
-        .orderBy(desc(crmProjects.createdAt))
-        .limit(5);
 
-      // 6. Work Orders Overview (last 30 days)
-      const scheduledWoCount = await db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(crmWorkOrders)
-        .where(inArray(crmWorkOrders.status, ["scheduled", "dispatched"]));
-      
-      const completedWoCount = await db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(crmWorkOrders)
-        .where(and(
-          eq(crmWorkOrders.status, "completed"),
-          sql`COALESCE(${crmWorkOrders.completedAt}, ${crmWorkOrders.updatedAt}) >= ${thirtyDaysAgo}`
-        ));
-      
-      const recentWorkOrders = await db
-        .select({
-          id: crmWorkOrders.id,
-          visitType: crmWorkOrders.visitType,
-          status: crmWorkOrders.status,
-          scheduledStart: crmWorkOrders.scheduledStart,
-          createdAt: crmWorkOrders.createdAt,
-        })
-        .from(crmWorkOrders)
-        .orderBy(desc(crmWorkOrders.createdAt))
-        .limit(5);
-
-      // 7. Invoices Overview (last 30 days)
-      const createdInvoicesCount = await db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(crmInvoices)
-        .where(sql`${crmInvoices.createdAt} >= ${thirtyDaysAgo}`);
-      
-      const sentInvoicesCount = await db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(crmInvoices)
-        .where(and(
-          eq(crmInvoices.status, "sent"),
-          sql`${crmInvoices.createdAt} >= ${thirtyDaysAgo}`
-        ));
-      
-      const pendingInvoicesCount = await db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(crmInvoices)
-        .where(and(
-          eq(crmInvoices.status, "draft"),
-          sql`${crmInvoices.createdAt} >= ${thirtyDaysAgo}`
-        ));
-      
-      const recentInvoices = await db
-        .select({
-          id: crmInvoices.id,
-          invoiceNumber: crmInvoices.invoiceNumber,
-          total: crmInvoices.total,
-          status: crmInvoices.status,
-          createdAt: crmInvoices.createdAt,
-        })
-        .from(crmInvoices)
-        .orderBy(desc(crmInvoices.createdAt))
-        .limit(5);
+      const [
+        openProjectsCount,
+        completedProjectsCount,
+        recentProjects,
+        scheduledWoCount,
+        completedWoCount,
+        recentWorkOrders,
+        createdInvoicesCount,
+        sentInvoicesCount,
+        pendingInvoicesCount,
+        recentInvoices,
+      ] = await Promise.all([
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(crmProjects)
+          .where(inArray(crmProjects.status, ["lead", "proposal_sent", "approved", "in_progress"])),
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(crmProjects)
+          .where(and(
+            eq(crmProjects.status, "completed"),
+            sql`${crmProjects.updatedAt} >= ${thirtyDaysAgo}`
+          )),
+        db
+          .select({
+            id: crmProjects.id,
+            name: crmProjects.title,
+            status: crmProjects.status,
+            projectType: crmProjects.projectType,
+            createdAt: crmProjects.createdAt,
+          })
+          .from(crmProjects)
+          .orderBy(desc(crmProjects.createdAt))
+          .limit(5),
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(crmWorkOrders)
+          .where(inArray(crmWorkOrders.status, ["scheduled", "dispatched"])),
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(crmWorkOrders)
+          .where(and(
+            eq(crmWorkOrders.status, "completed"),
+            sql`COALESCE(${crmWorkOrders.completedAt}, ${crmWorkOrders.updatedAt}) >= ${thirtyDaysAgo}`
+          )),
+        db
+          .select({
+            id: crmWorkOrders.id,
+            visitType: crmWorkOrders.visitType,
+            status: crmWorkOrders.status,
+            scheduledStart: crmWorkOrders.scheduledStart,
+            createdAt: crmWorkOrders.createdAt,
+          })
+          .from(crmWorkOrders)
+          .orderBy(desc(crmWorkOrders.createdAt))
+          .limit(5),
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(crmInvoices)
+          .where(sql`${crmInvoices.createdAt} >= ${thirtyDaysAgo}`),
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(crmInvoices)
+          .where(and(
+            eq(crmInvoices.status, "sent"),
+            sql`${crmInvoices.createdAt} >= ${thirtyDaysAgo}`
+          )),
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(crmInvoices)
+          .where(and(
+            eq(crmInvoices.status, "draft"),
+            sql`${crmInvoices.createdAt} >= ${thirtyDaysAgo}`
+          )),
+        db
+          .select({
+            id: crmInvoices.id,
+            invoiceNumber: crmInvoices.invoiceNumber,
+            total: crmInvoices.total,
+            status: crmInvoices.status,
+            createdAt: crmInvoices.createdAt,
+          })
+          .from(crmInvoices)
+          .orderBy(desc(crmInvoices.createdAt))
+          .limit(5),
+      ]);
 
       // 8. Sales Team Performance
       const salesUsers = await db
