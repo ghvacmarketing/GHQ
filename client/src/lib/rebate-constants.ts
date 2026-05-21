@@ -159,7 +159,12 @@ export const PRIORITY_COLORS: Record<RebatePriority, string> = {
 export const DOCUMENT_CATEGORY_LABELS: Record<RebateDocumentCategory, string> = {
   rebate_request: "Rebate Request",
   head_of_household: "Head of Household",
-  scope_of_work: "Scope of Work",
+  scope_of_work: "Scope of Work — Heat Pump Photos",
+  electrical_wiring_pre_retrofit: "Electrical Wiring Pre-Retrofit Photos",
+  ahri_certificate: "Specification Sheets / ENERGY STAR / AHRI Certificate",
+  snugg_pro_pdf: "SnuggPro PDF",
+  fuel_switching_calculator: "Heat Pump Fuel-Switching Calculator",
+  manual_j_report: "Manual J Report",
   contractor_pre_approval: "Contractor Pre-Approval",
   project_completion: "Project Completion",
   completion_attestations: "Completion Attestations",

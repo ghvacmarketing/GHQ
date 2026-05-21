@@ -48,6 +48,7 @@ type CaseDetail = RebateCase & {
 
 const DOC_CATEGORIES: RebateDocumentCategory[] = [
   "rebate_request","head_of_household","scope_of_work","electrical_wiring_pre_retrofit",
+  "ahri_certificate","snugg_pro_pdf","fuel_switching_calculator","manual_j_report",
   "contractor_pre_approval","project_completion","completion_attestations","reservation_summary","other",
 ];
 
@@ -469,12 +470,16 @@ function RebatePhotoUploader({
   onInvalidate,
   category,
   label,
+  accept = "image/*",
+  required = false,
 }: {
   caseId: string;
   photos: RebateCaseDocument[];
   onInvalidate: () => void;
   category: RebateDocumentCategory;
   label: string;
+  accept?: string;
+  required?: boolean;
 }) {
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
@@ -516,11 +521,11 @@ function RebatePhotoUploader({
     setUploading(true);
     try {
       for (const f of Array.from(files)) {
-        if (!f.type.startsWith("image/")) continue;
+        if (accept === "image/*" && !f.type.startsWith("image/")) continue;
         await uploadOne(f);
       }
       onInvalidate();
-      toast({ title: "Photos uploaded" });
+      toast({ title: "Uploaded" });
     } catch (err: any) {
       toast({ title: err?.message ?? "Upload failed", variant: "destructive" });
     } finally {
@@ -550,6 +555,7 @@ function RebatePhotoUploader({
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm font-medium text-slate-700">
           {label}
+          {required && <span className="ml-1 text-[#711419]">*Required</span>}
         </div>
         <Button
           type="button"
@@ -565,7 +571,7 @@ function RebatePhotoUploader({
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
+          accept={accept}
           multiple
           className="hidden"
           onChange={e => handleFiles(e.target.files)}
@@ -1995,32 +2001,107 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
         </div>
       </FormCard>
 
-      <FormCard title="Estimated Project Financials">
-        <div className="space-y-5">
-          <div className={fRow}>
-            <div>
-              <label className={fLabel}>Final Total Project External Rebate</label>
-              <input className={fInput} placeholder="$ 0.00" value={vals.totalExternalRebate} onChange={e => set("totalExternalRebate", e.target.value)} />
-            </div>
-            <div>
-              <label className={fLabel}><span className={fCode}>C.21.</span> Total Estimated Project Costs</label>
-              <input className={fInput} placeholder="$ 0.00" value={vals.totalEstimatedProjectCost} onChange={e => set("totalEstimatedProjectCost", e.target.value)} />
-            </div>
-          </div>
-          <div className={fRow}>
-            <div>
-              <label className={fLabel}>Estimated Rebate at 50%</label>
-              <input className={fInput} placeholder="$ 0.00" value={vals.estimatedRebate50Pct} onChange={e => set("estimatedRebate50Pct", e.target.value)} />
-            </div>
-            <div>
-              <label className={fLabel}>Estimated Rebate at 100%</label>
-              <input className={fInput} placeholder="$ 0.00" value={vals.estimatedRebate100Pct} onChange={e => set("estimatedRebate100Pct", e.target.value)} />
-            </div>
-          </div>
+      <FormCard title="Documentation">
+        <p className="text-sm text-slate-600 mb-4">
+          Please upload specification sheets, ENERGY STAR Certification or AHRI Certificate of the potential upgrade — Required for heat pump, water heater, clothes dryer, and electric stove/cooktop/range/oven upgrades (Please note if product changes during installation and no longer meets program requirements, rebate will not be paid)
+        </p>
+        <div className="space-y-3">
+          <RebatePhotoUploader
+            caseId={caseId}
+            photos={(caseData.documents ?? []).filter(d => d.category === "ahri_certificate")}
+            onInvalidate={onInvalidate}
+            category="ahri_certificate"
+            label="Specification sheets, ENERGY STAR Certification, or AHRI Certificate — Required for heat pump, water heater, clothes dryer, and electric stove/cooktop/range/oven upgrades"
+            accept="*/*"
+          />
+          <RebatePhotoUploader
+            caseId={caseId}
+            photos={(caseData.documents ?? []).filter(d => d.category === "snugg_pro_pdf")}
+            onInvalidate={onInvalidate}
+            category="snugg_pro_pdf"
+            label="SnuggPro-PDF — Required for insulation, air sealing, and ventilation projects, if project started in the HER program"
+            accept="application/pdf,.pdf"
+          />
+          {vals.scopeIncludesHeatPump && (
+            <>
+              <RebatePhotoUploader
+                caseId={caseId}
+                photos={(caseData.documents ?? []).filter(d => d.category === "fuel_switching_calculator")}
+                onInvalidate={onInvalidate}
+                category="fuel_switching_calculator"
+                label="Heat Pump Fuel-Switching Calculator — Required for heat pump for space heating and cooling projects"
+                accept="*/*"
+                required
+              />
+              <RebatePhotoUploader
+                caseId={caseId}
+                photos={(caseData.documents ?? []).filter(d => d.category === "manual_j_report")}
+                onInvalidate={onInvalidate}
+                category="manual_j_report"
+                label="Manual J Report — Required for heat pump for space heating and cooling projects"
+                accept="application/pdf,.pdf"
+              />
+            </>
+          )}
         </div>
       </FormCard>
 
-      <StickySaveBar dirty={dirty} saving={saving} onSave={() => onPatch(vals as any)} type="button" />
+      <FormCard title="Estimated Project Financials">
+        {(() => {
+          const num = (v: string) => parseFloat((v ?? "").replace(/[^0-9.]/g, "")) || 0;
+          const fmt = (n: number) => `$ ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          const hpTotal = num(vals.hpMaterialCost) + num(vals.hpInstallCost);
+          const wiringTotal = num(vals.wiringMaterialCost) + num(vals.wiringInstallCost);
+          const subTotals = hpTotal + wiringTotal;
+          const propTotal = num(vals.installCost);
+          const totalProjectCost = Math.max(subTotals, propTotal);
+          const externalRebate = num(vals.totalExternalRebate);
+          const eligibleBase = Math.max(totalProjectCost - externalRebate, 0);
+          const rebate50 = eligibleBase * 0.5;
+          const rebate100 = eligibleBase;
+          return (
+            <div className="space-y-5">
+              <div>
+                <label className={fLabel}>Final Total Project External Rebate</label>
+                <input className={fInput} placeholder="$ 0.00" value={vals.totalExternalRebate} onChange={e => set("totalExternalRebate", e.target.value)} />
+              </div>
+              <div>
+                <label className={fLabel}><span className={fCode}>C.21.</span> Total Estimated Project Costs</label>
+                <input className={`${fInput} bg-slate-100 text-slate-600`} readOnly value={totalProjectCost > 0 ? fmt(totalProjectCost) : ""} placeholder="$ 0.00" />
+              </div>
+              <div className={fRow}>
+                <div>
+                  <label className={fLabel}>Estimated Rebate at 50%</label>
+                  <input className={`${fInput} bg-slate-100 text-slate-600`} readOnly value={eligibleBase > 0 ? fmt(rebate50) : ""} placeholder="$ 0.00" />
+                </div>
+                <div>
+                  <label className={fLabel}>Estimated Rebate at 100%</label>
+                  <input className={`${fInput} bg-slate-100 text-slate-600`} readOnly value={eligibleBase > 0 ? fmt(rebate100) : ""} placeholder="$ 0.00" />
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </FormCard>
+
+      <StickySaveBar dirty={dirty} saving={saving} onSave={() => {
+        const num = (v: string) => parseFloat((v ?? "").replace(/[^0-9.]/g, "")) || 0;
+        const fmt = (n: number) => `$ ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const hpTotal = num(vals.hpMaterialCost) + num(vals.hpInstallCost);
+        const wiringTotal = num(vals.wiringMaterialCost) + num(vals.wiringInstallCost);
+        const subTotals = hpTotal + wiringTotal;
+        const propTotal = num(vals.installCost);
+        const totalProjectCost = Math.max(subTotals, propTotal);
+        const externalRebate = num(vals.totalExternalRebate);
+        const eligibleBase = Math.max(totalProjectCost - externalRebate, 0);
+        const computed = {
+          ...vals,
+          totalEstimatedProjectCost: totalProjectCost > 0 ? fmt(totalProjectCost) : "",
+          estimatedRebate50Pct: eligibleBase > 0 ? fmt(eligibleBase * 0.5) : "",
+          estimatedRebate100Pct: eligibleBase > 0 ? fmt(eligibleBase) : "",
+        };
+        onPatch(computed as any);
+      }} type="button" />
     </div>
   );
 }
