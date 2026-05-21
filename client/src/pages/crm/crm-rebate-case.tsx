@@ -328,50 +328,46 @@ function SummaryTab({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Quick Edit</CardTitle></CardHeader>
-        <CardContent className="pt-0 space-y-3">
-          <div>
-            <label className="text-xs text-slate-500 mb-1 block">Status</label>
-            <Select value={caseData.applicationStatus} onValueChange={v => onPatch({ applicationStatus: v as any })}>
-              <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {APPLICATION_STATUS_OPTIONS.map(s => (
-                  <SelectItem key={s} value={s}>{APPLICATION_STATUS_LABELS[s]}</SelectItem>
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium text-slate-700">HEAR Program — Maximum Rebate Amounts</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="border border-slate-200 rounded-sm overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-[#1e3a5f] text-white">
+                  <th className="px-3 py-2.5 text-left font-semibold">Energy Star™ Qualified Measures</th>
+                  <th className="px-3 py-2.5 text-center font-semibold whitespace-nowrap">Maximum Rebate</th>
+                  <th className="px-3 py-2.5 text-center font-semibold whitespace-nowrap">Installation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { measure: "Heat Pump Water Heater*", amount: "$1,750" },
+                  { measure: "Heat Pump for Space Heating or Cooling", amount: "$8,000" },
+                  { measure: "Electric Stove, Cooktop, Range, Oven, Heat Pump Clothes Dryer", amount: "$840" },
+                  { measure: "Electric Load Service Center", amount: "$4,000" },
+                  { measure: "Insulation, Air Sealing, and Ventilation", amount: "$1,600" },
+                  { measure: "Electric Wiring", amount: "$2,500" },
+                ].map((row, i) => (
+                  <tr key={row.measure} className={i % 2 === 0 ? "bg-slate-50" : "bg-white"}>
+                    <td className="px-3 py-2.5 text-slate-700 border-t border-slate-100">{row.measure}</td>
+                    <td className="px-3 py-2.5 text-slate-800 font-medium text-center border-t border-slate-100 whitespace-nowrap">{row.amount}</td>
+                    <td className="px-3 py-2.5 text-slate-600 text-center border-t border-slate-100 whitespace-nowrap">Approved Contractor</td>
+                  </tr>
                 ))}
-              </SelectContent>
-            </Select>
+                <tr className="bg-slate-100 font-semibold">
+                  <td className="px-3 py-2.5 text-slate-800 border-t-2 border-slate-300">Maximum Rebate</td>
+                  <td className="px-3 py-2.5 text-slate-900 text-center border-t-2 border-slate-300 whitespace-nowrap">$14,000</td>
+                  <td className="px-3 py-2.5 border-t-2 border-slate-300"></td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-          <div>
-            <label className="text-xs text-slate-500 mb-1 block">Assigned To</label>
-            <Select value={caseData.assignedToUserId ?? "unassigned"} onValueChange={v => onPatch({ assignedToUserId: v === "unassigned" ? null : v })}>
-              <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="unassigned">Unassigned</SelectItem>
-                {users.filter(u => u.isActive).map(u => (
-                  <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label className="text-xs text-slate-500 mb-1 block">Rebate Amount</label>
-            <Input
-              className="h-8 text-sm"
-              defaultValue={caseData.rebateAmount ?? ""}
-              onBlur={e => { if (e.target.value !== (caseData.rebateAmount ?? "")) onPatch({ rebateAmount: e.target.value || null }); }}
-              placeholder="e.g. $4,000"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-slate-500 mb-1 block">Notes</label>
-            <Textarea
-              className="text-sm min-h-[80px] resize-none"
-              defaultValue={caseData.notes ?? ""}
-              onBlur={e => { if (e.target.value !== (caseData.notes ?? "")) onPatch({ notes: e.target.value || null }); }}
-              placeholder="Internal notes..."
-            />
-          </div>
+          <p className="text-[11px] text-slate-400 mt-2 italic">
+            * Heat Pump Water Heater rebate amount subject to program guidelines.
+          </p>
         </CardContent>
       </Card>
     </div>
