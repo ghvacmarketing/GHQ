@@ -47,8 +47,8 @@ type CaseDetail = RebateCase & {
 
 
 const DOC_CATEGORIES: RebateDocumentCategory[] = [
-  "rebate_request","head_of_household","scope_of_work","contractor_pre_approval",
-  "project_completion","completion_attestations","reservation_summary","other",
+  "rebate_request","head_of_household","scope_of_work","electrical_wiring_pre_retrofit",
+  "contractor_pre_approval","project_completion","completion_attestations","reservation_summary","other",
 ];
 
 export default function CrmRebateCase() {
@@ -463,14 +463,18 @@ function StickySaveBar({ dirty, saving, onSave, type = "submit" }: { dirty: bool
   );
 }
 
-function HeatPumpPhotoUploader({
+function RebatePhotoUploader({
   caseId,
   photos,
   onInvalidate,
+  category,
+  label,
 }: {
   caseId: string;
   photos: RebateCaseDocument[];
   onInvalidate: () => void;
+  category: RebateDocumentCategory;
+  label: string;
 }) {
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
@@ -499,7 +503,7 @@ function HeatPumpPhotoUploader({
         name: file.name,
         url: uploadURL,
         objectPath,
-        category: "scope_of_work",
+        category,
         contentType: file.type,
         size: file.size,
       }),
@@ -545,7 +549,7 @@ function HeatPumpPhotoUploader({
     <div className="rounded-md border border-slate-200 bg-slate-50/60 p-3 space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm font-medium text-slate-700">
-          Upload geotagged photo(s) of heat pump for space heating and cooling pre-retrofit
+          {label}
         </div>
         <Button
           type="button"
@@ -1651,10 +1655,12 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
                 </div>
               </div>
 
-              <HeatPumpPhotoUploader
+              <RebatePhotoUploader
                 caseId={caseId}
                 photos={(caseData.documents ?? []).filter(d => d.category === "scope_of_work" && (d.contentType ?? "").startsWith("image/"))}
                 onInvalidate={onInvalidate}
+                category="scope_of_work"
+                label="Upload geotagged photo(s) of heat pump for space heating and cooling pre-retrofit"
               />
 
               {caseData.constructionType && (
@@ -1923,6 +1929,14 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
                   />
                 </div>
               </div>
+
+              <RebatePhotoUploader
+                caseId={caseId}
+                photos={(caseData.documents ?? []).filter(d => d.category === "electrical_wiring_pre_retrofit" && (d.contentType ?? "").startsWith("image/"))}
+                onInvalidate={onInvalidate}
+                category="electrical_wiring_pre_retrofit"
+                label="Upload geotagged photo(s) of Electrical Wiring Pre-Retrofit"
+              />
             </NestedPanel>
           )}
 

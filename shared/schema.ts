@@ -3564,6 +3564,7 @@ export const rebateDocumentCategoryEnum = [
   "rebate_request",
   "head_of_household",
   "scope_of_work",
+  "electrical_wiring_pre_retrofit",
   "contractor_pre_approval",
   "project_completion",
   "completion_attestations",
