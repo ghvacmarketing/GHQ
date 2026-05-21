@@ -333,10 +333,10 @@ function SummaryTab({
           <CardTitle className="text-sm font-medium text-slate-700">HEAR Program — Maximum Rebate Amounts</CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
-          <div className="border border-slate-200 rounded-sm overflow-hidden">
+          <div className="border border-[#711419]/20 rounded-sm overflow-hidden">
             <table className="w-full text-xs">
               <thead>
-                <tr className="bg-[#1e3a5f] text-white">
+                <tr className="bg-[#711419] text-white">
                   <th className="px-3 py-2.5 text-left font-semibold">Energy Star™ Qualified Measures</th>
                   <th className="px-3 py-2.5 text-center font-semibold whitespace-nowrap">Maximum Rebate</th>
                   <th className="px-3 py-2.5 text-center font-semibold whitespace-nowrap">Installation</th>
@@ -351,16 +351,16 @@ function SummaryTab({
                   { measure: "Insulation, Air Sealing, and Ventilation", amount: "$1,600" },
                   { measure: "Electric Wiring", amount: "$2,500" },
                 ].map((row, i) => (
-                  <tr key={row.measure} className={i % 2 === 0 ? "bg-slate-50" : "bg-white"}>
-                    <td className="px-3 py-2.5 text-slate-700 border-t border-slate-100">{row.measure}</td>
-                    <td className="px-3 py-2.5 text-slate-800 font-medium text-center border-t border-slate-100 whitespace-nowrap">{row.amount}</td>
-                    <td className="px-3 py-2.5 text-slate-600 text-center border-t border-slate-100 whitespace-nowrap">Approved Contractor</td>
+                  <tr key={row.measure} className={i % 2 === 0 ? "bg-[#711419]/[0.04]" : "bg-white"}>
+                    <td className="px-3 py-2.5 text-slate-700 border-t border-[#711419]/10">{row.measure}</td>
+                    <td className="px-3 py-2.5 text-slate-800 font-medium text-center border-t border-[#711419]/10 whitespace-nowrap">{row.amount}</td>
+                    <td className="px-3 py-2.5 text-slate-600 text-center border-t border-[#711419]/10 whitespace-nowrap">Approved Contractor</td>
                   </tr>
                 ))}
-                <tr className="bg-slate-100 font-semibold">
-                  <td className="px-3 py-2.5 text-slate-800 border-t-2 border-slate-300">Maximum Rebate</td>
-                  <td className="px-3 py-2.5 text-slate-900 text-center border-t-2 border-slate-300 whitespace-nowrap">$14,000</td>
-                  <td className="px-3 py-2.5 border-t-2 border-slate-300"></td>
+                <tr className="bg-[#711419]/10 font-semibold">
+                  <td className="px-3 py-2.5 text-[#711419] border-t-2 border-[#711419]/30">Maximum Rebate</td>
+                  <td className="px-3 py-2.5 text-[#711419] text-center border-t-2 border-[#711419]/30 whitespace-nowrap">$14,000</td>
+                  <td className="px-3 py-2.5 border-t-2 border-[#711419]/30"></td>
                 </tr>
               </tbody>
             </table>
