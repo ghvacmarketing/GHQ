@@ -446,7 +446,7 @@ function RebateRequestTab({ caseData, onPatch, saving }: { caseData: CaseDetail;
   const codeCls = "font-semibold text-slate-800";
 
   return (
-    <form onSubmit={handleSave} className="max-w-3xl mx-auto pb-24">
+    <form onSubmit={handleSave} className="max-w-5xl mx-auto pb-24">
       <header className="mb-6">
         <h2 className="text-xl font-semibold text-slate-900 mb-1">A. Rebate Request</h2>
         <p className="text-sm text-slate-500">
@@ -1150,7 +1150,7 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
   const GA_COUNTIES = ["Appling","Atkinson","Bacon","Baker","Baldwin","Banks","Barrow","Bartow","Ben Hill","Berrien","Bibb","Bleckley","Brantley","Brooks","Bryan","Bulloch","Burke","Butts","Calhoun","Camden","Candler","Carroll","Catoosa","Charlton","Chatham","Chattahoochee","Chattooga","Cherokee","Clarke","Clay","Clayton","Clinch","Cobb","Coffee","Colquitt","Columbia","Cook","Coweta","Crawford","Crisp","Dade","Dawson","Decatur","DeKalb","Dodge","Dooly","Dougherty","Douglas","Early","Echols","Effingham","Elbert","Emanuel","Evans","Fannin","Fayette","Floyd","Forsyth","Franklin","Fulton","Gilmer","Glascock","Glynn","Gordon","Grady","Greene","Gwinnett","Habersham","Hall","Hancock","Haralson","Harris","Hart","Heard","Henry","Houston","Irwin","Jackson","Jasper","Jeff Davis","Jefferson","Jenkins","Johnson","Jones","Lamar","Lanier","Laurens","Lee","Liberty","Lincoln","Long","Lowndes","Lumpkin","Macon","Madison","Marion","McDuffie","McIntosh","Meriwether","Miller","Mitchell","Monroe","Montgomery","Morgan","Murray","Muscogee","Newton","Oconee","Oglethorpe","Paulding","Peach","Pickens","Pierce","Pike","Polk","Pulaski","Putnam","Quitman","Rabun","Randolph","Richmond","Rockdale","Schley","Screven","Seminole","Spalding","Stephens","Stewart","Sumter","Talbot","Taliaferro","Tattnall","Taylor","Telfair","Terrell","Thomas","Tift","Toombs","Towns","Treutlen","Troup","Turner","Twiggs","Union","Upson","Walker","Walton","Ware","Warren","Washington","Wayne","Webster","Wheeler","White","Whitfield","Wilcox","Wilkes","Wilkinson","Worth"];
 
   return (
-    <div className="max-w-3xl mx-auto pb-24 space-y-8">
+    <div className="max-w-5xl mx-auto pb-24 space-y-8">
       <header>
         <h2 className="text-xl font-semibold text-slate-900 mb-1">C. Scope of Work</h2>
         <p className="text-sm text-slate-500">
