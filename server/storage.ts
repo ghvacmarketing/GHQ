@@ -2881,23 +2881,55 @@ export class DatabaseStorage implements IStorage {
     const cases = await this.getRebateCases(filters);
     if (cases.length === 0) return [];
     const ids = cases.map((c) => c.id);
-    const steps = await db.select().from(rebateCaseWorkflowSteps)
-      .where(inArray(rebateCaseWorkflowSteps.caseId, ids));
-    const byCase = new Map<string, RebateCaseWorkflowStep[]>();
-    for (const s of steps) {
-      const arr = byCase.get(s.caseId) || [];
-      arr.push(s);
-      byCase.set(s.caseId, arr);
-    }
+    // Fetch any checked scope-checklist items to count toward Scope of Work completion
+    const checkedScope = await db.select({ caseId: rebateCaseScopeChecklist.caseId })
+      .from(rebateCaseScopeChecklist)
+      .where(and(inArray(rebateCaseScopeChecklist.caseId, ids), eq(rebateCaseScopeChecklist.isChecked, true)));
+    const casesWithScopeItem = new Set(checkedScope.map((r) => r.caseId));
+
+    // Step order must match WORKFLOW_STEPS_ORDER on the client.
+    const STEP_ORDER: RebateWorkflowStep[] = [
+      "program_overview",
+      "rebate_request",
+      "head_of_household",
+      "scope_of_work",
+      "contractor_pre_approval",
+      "project_completion",
+      "completion_attestations",
+      "reservation_summary",
+    ];
+
     return cases.map((c) => {
-      const list = (byCase.get(c.id) || []).sort((a, b) => a.sortOrder - b.sortOrder);
-      const completed = list.filter((s) => s.status === "complete").length;
-      const current = list.find((s) => s.status !== "complete") || list[list.length - 1];
+      const done = new Set<RebateWorkflowStep>();
+      // Program Overview: case exists -> acknowledged
+      done.add("program_overview");
+      if (c.clientFirstName && c.clientLastName && c.propertyAddress && c.propertyCity) {
+        done.add("rebate_request");
+      }
+      if (c.hohConfirmed) done.add("head_of_household");
+      const hasScopeItem =
+        casesWithScopeItem.has(c.id) ||
+        c.scopeIncludesHeatPump || c.scopeIncludesWaterHeater || c.scopeIncludesStove ||
+        c.scopeIncludesDryer || c.scopeIncludesPanel || c.scopeIncludesWiring ||
+        c.scopeIncludesInsulation;
+      if (hasScopeItem) done.add("scope_of_work");
+      if (c.preApprovalStatus === "approved" || c.preApprovalApprovedDate) {
+        done.add("contractor_pre_approval");
+      }
+      if (c.installCompletedDate) done.add("project_completion");
+      if (c.customerAttestationSigned && c.contractorAttestationSigned) {
+        done.add("completion_attestations");
+      }
+      if (c.reservationNumber || c.caseCloseoutDate) {
+        done.add("reservation_summary");
+      }
+      // Current step = first step in order that is not yet complete (or last if all done)
+      const current = STEP_ORDER.find((s) => !done.has(s)) || STEP_ORDER[STEP_ORDER.length - 1];
       return {
         ...c,
-        workflowCompleted: completed,
-        workflowTotal: list.length,
-        currentStep: current?.step || null,
+        workflowCompleted: done.size,
+        workflowTotal: STEP_ORDER.length,
+        currentStep: current,
       };
     });
   }
