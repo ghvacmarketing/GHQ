@@ -3679,6 +3679,8 @@ export const rebateCases = pgTable("rebate_cases", {
   electricAccountCertified: boolean("electric_account_certified").default(false),
   hasGas: boolean("has_gas"),
   gasCertifiedNoGas: boolean("gas_certified_no_gas").default(false),
+  gasProviderType: text("gas_provider_type"),
+  gasLocalDistCompany: text("gas_local_dist_company"),
   gasCompanyName: text("gas_company_name"),
   gasMeterNumber: text("gas_meter_number"),
   gasAccountNumberScope: text("gas_account_number_scope"),

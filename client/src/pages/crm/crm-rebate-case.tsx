@@ -1024,6 +1024,8 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
     electricAccountCertified: boolean;
     hasGas: boolean | null;
     gasCertifiedNoGas: boolean;
+    gasProviderType: string;
+    gasLocalDistCompany: string;
     gasCompanyName: string;
     gasMeterNumber: string;
     gasAccountNumberScope: string;
@@ -1108,6 +1110,8 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
     electricAccountCertified: d.electricAccountCertified ?? false,
     hasGas: d.hasGas ?? null,
     gasCertifiedNoGas: d.gasCertifiedNoGas ?? false,
+    gasProviderType: d.gasProviderType ?? "",
+    gasLocalDistCompany: d.gasLocalDistCompany ?? "",
     gasCompanyName: d.gasCompanyName ?? "",
     gasMeterNumber: d.gasMeterNumber ?? "",
     gasAccountNumberScope: d.gasAccountNumberScope ?? "",
@@ -1307,7 +1311,36 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
             {vals.hasGas === true && (
               <NestedPanel>
                 <div>
-                  <label className={fLabel}>Gas Company Name</label>
+                  <label className={fLabel}><span className={fCode}>C.4a.</span> Type of Gas Utility Provider</label>
+                  <select
+                    className={fInput}
+                    value={vals.gasProviderType}
+                    onChange={e => set("gasProviderType", e.target.value)}
+                  >
+                    <option value="">Select…</option>
+                    <option value="Local Distribution">Local Distribution</option>
+                    <option value="Natural Gas Marketer">Natural Gas Marketer</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                {vals.gasProviderType === "Local Distribution" && (
+                  <div>
+                    <label className={fLabel}><span className={fCode}>C.4b.</span> Local Distribution Natural Gas Company</label>
+                    <select
+                      className={fInput}
+                      value={vals.gasLocalDistCompany}
+                      onChange={e => set("gasLocalDistCompany", e.target.value)}
+                    >
+                      <option value="">Select…</option>
+                      <option value="Atlanta Gas Light Company">Atlanta Gas Light Company</option>
+                      <option value="Liberty Utilities">Liberty Utilities</option>
+                      <option value="Municipal Gas Authority of Georgia">Municipal Gas Authority of Georgia</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <label className={fLabel}>Natural gas utility company name</label>
                   <input className={fInput} value={vals.gasCompanyName} onChange={e => set("gasCompanyName", e.target.value)} />
                 </div>
                 <div className={fRow}>
