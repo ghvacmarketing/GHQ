@@ -1187,6 +1187,64 @@ function ProjectCompletionTab({ caseData, onPatch, saving, caseId, onInvalidate 
                 )} />
               </CardContent>
             </Card>
+            <Card>
+              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Electrical Wiring — Post-Installation Information</CardTitle></CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                <FormField control={form.control} name="postElecCount" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">Count</FormLabel>
+                    <FormControl><Input className="h-8 text-sm" type="number" min="1" placeholder="1" {...field} value={field.value ?? ""} /></FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="postElecModelNumber" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">Model Number</FormLabel>
+                    <FormControl><Input className="h-8 text-sm" placeholder="n/a" {...field} value={field.value ?? ""} /></FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="postElecExternalRebates" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">Are there any External Rebates (i.e. GA Power, WAP, etc.) that will apply to this measure's installation?</FormLabel>
+                    <FormControl>
+                      <div className="flex gap-5 mt-1">
+                        {[{ label: "Yes", val: true }, { label: "No", val: false }].map(o => (
+                          <label key={String(o.val)} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+                            <input type="radio" checked={field.value === o.val} onChange={() => field.onChange(o.val)} className="accent-[#711419]" />
+                            {o.label}
+                          </label>
+                        ))}
+                      </div>
+                    </FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="postElecFinalMaterialCost" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">Final material electrical wiring costs</FormLabel>
+                    <FormControl><Input className="h-8 text-sm" placeholder="$ 0.00" {...field} value={field.value ?? ""} /></FormControl>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="postElecFinalInstallCost" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs text-slate-500">Final Installation electrical wiring costs</FormLabel>
+                    <FormControl><Input className="h-8 text-sm" placeholder="$ 0.00" {...field} value={field.value ?? ""} /></FormControl>
+                  </FormItem>
+                )} />
+                <FormItem>
+                  <FormLabel className="text-xs text-slate-500">Final Total electrical wiring costs</FormLabel>
+                  <Input className="h-8 text-sm bg-slate-100 text-slate-600" readOnly value={postElecTotal > 0 ? fmt(postElecTotal) : ""} placeholder="Auto-calculated" />
+                </FormItem>
+                <div className="pt-2">
+                  <RebatePhotoUploader
+                    caseId={caseId}
+                    photos={(caseData.documents ?? []).filter(d => d.category === "quality_install_elec_wiring_post_retrofit")}
+                    onInvalidate={onInvalidate}
+                    category="quality_install_elec_wiring_post_retrofit"
+                    label="Quality Install — Electric Wiring Post-Retrofit"
+                    required
+                  />
+                </div>
+              </CardContent>
+            </Card>
           </div>
           <div className="space-y-4">
             <Card>
@@ -1309,64 +1367,6 @@ function ProjectCompletionTab({ caseData, onPatch, saving, caseId, onInvalidate 
                     onInvalidate={onInvalidate}
                     category="quality_install_hp_post_retrofit"
                     label="Quality Install — Heat Pump for Space Heating and Cooling Post-Retrofit"
-                    required
-                  />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Electrical Wiring — Post-Installation Information</CardTitle></CardHeader>
-              <CardContent className="pt-0 space-y-3">
-                <FormField control={form.control} name="postElecCount" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-500">Count</FormLabel>
-                    <FormControl><Input className="h-8 text-sm" type="number" min="1" placeholder="1" {...field} value={field.value ?? ""} /></FormControl>
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="postElecModelNumber" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-500">Model Number</FormLabel>
-                    <FormControl><Input className="h-8 text-sm" placeholder="n/a" {...field} value={field.value ?? ""} /></FormControl>
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="postElecExternalRebates" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-500">Are there any External Rebates (i.e. GA Power, WAP, etc.) that will apply to this measure's installation?</FormLabel>
-                    <FormControl>
-                      <div className="flex gap-5 mt-1">
-                        {[{ label: "Yes", val: true }, { label: "No", val: false }].map(o => (
-                          <label key={String(o.val)} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
-                            <input type="radio" checked={field.value === o.val} onChange={() => field.onChange(o.val)} className="accent-[#711419]" />
-                            {o.label}
-                          </label>
-                        ))}
-                      </div>
-                    </FormControl>
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="postElecFinalMaterialCost" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-500">Final material electrical wiring costs</FormLabel>
-                    <FormControl><Input className="h-8 text-sm" placeholder="$ 0.00" {...field} value={field.value ?? ""} /></FormControl>
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="postElecFinalInstallCost" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-500">Final Installation electrical wiring costs</FormLabel>
-                    <FormControl><Input className="h-8 text-sm" placeholder="$ 0.00" {...field} value={field.value ?? ""} /></FormControl>
-                  </FormItem>
-                )} />
-                <FormItem>
-                  <FormLabel className="text-xs text-slate-500">Final Total electrical wiring costs</FormLabel>
-                  <Input className="h-8 text-sm bg-slate-100 text-slate-600" readOnly value={postElecTotal > 0 ? fmt(postElecTotal) : ""} placeholder="Auto-calculated" />
-                </FormItem>
-                <div className="pt-2">
-                  <RebatePhotoUploader
-                    caseId={caseId}
-                    photos={(caseData.documents ?? []).filter(d => d.category === "quality_install_elec_wiring_post_retrofit")}
-                    onInvalidate={onInvalidate}
-                    category="quality_install_elec_wiring_post_retrofit"
-                    label="Quality Install — Electric Wiring Post-Retrofit"
                     required
                   />
                 </div>
