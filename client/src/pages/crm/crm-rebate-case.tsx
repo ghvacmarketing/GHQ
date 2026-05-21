@@ -46,37 +46,29 @@ type CaseDetail = RebateCase & {
 };
 
 // Derive completion of each workflow step from case data (client-side, instant).
+// Steps are chronological: a step only counts as complete when its own data is
+// present AND every prior step in WORKFLOW_STEPS_ORDER is also complete.
 function computeCompletedSteps(c: CaseDetail | undefined): Set<string> {
   const done = new Set<string>();
   if (!c) return done;
-  // Program Overview: case exists -> overview acknowledged
-  done.add("program_overview");
-  // Rebate Request: minimum identifying + property info
-  if (c.clientFirstName && c.clientLastName && c.propertyAddress && c.propertyCity) {
-    done.add("rebate_request");
-  }
-  // Head of Household: confirmed by user
-  if (c.hohConfirmed) done.add("head_of_household");
-  // Scope of Work: at least one scope item selected
-  const hasScopeItem =
-    (c.scopeChecklist ?? []).some((s) => s.isChecked) ||
-    c.scopeIncludesHeatPump || c.scopeIncludesWaterHeater || c.scopeIncludesStove ||
-    c.scopeIncludesDryer || c.scopeIncludesPanel || c.scopeIncludesWiring ||
-    c.scopeIncludesInsulation;
-  if (hasScopeItem) done.add("scope_of_work");
-  // Contractor Pre-Approval: approved status or approved date present
-  if (c.preApprovalStatus === "approved" || c.preApprovalApprovedDate) {
-    done.add("contractor_pre_approval");
-  }
-  // Project Completion: install completion date recorded
-  if (c.installCompletedDate) done.add("project_completion");
-  // Completion Attestations: both signatures
-  if (c.customerAttestationSigned && c.contractorAttestationSigned) {
-    done.add("completion_attestations");
-  }
-  // Reservation Summary: reservation number or closeout date set
-  if (c.reservationNumber || c.caseCloseoutDate) {
-    done.add("reservation_summary");
+  const checks: Array<[string, boolean]> = [
+    ["program_overview", true],
+    ["rebate_request", Boolean(c.clientFirstName && c.clientLastName && c.propertyAddress && c.propertyCity)],
+    ["head_of_household", Boolean(c.hohConfirmed)],
+    ["scope_of_work", Boolean(
+      (c.scopeChecklist ?? []).some((s) => s.isChecked) ||
+      c.scopeIncludesHeatPump || c.scopeIncludesWaterHeater || c.scopeIncludesStove ||
+      c.scopeIncludesDryer || c.scopeIncludesPanel || c.scopeIncludesWiring ||
+      c.scopeIncludesInsulation
+    )],
+    ["contractor_pre_approval", c.preApprovalStatus === "approved" || Boolean(c.preApprovalApprovedDate)],
+    ["project_completion", Boolean(c.installCompletedDate)],
+    ["completion_attestations", Boolean(c.customerAttestationSigned && c.contractorAttestationSigned)],
+    ["reservation_summary", Boolean(c.reservationNumber || c.caseCloseoutDate)],
+  ];
+  for (const [key, ok] of checks) {
+    if (!ok) break; // chronological — stop at first incomplete step
+    done.add(key);
   }
   return done;
 }

@@ -2900,28 +2900,25 @@ export class DatabaseStorage implements IStorage {
     ];
 
     return cases.map((c) => {
+      const checks: Array<[RebateWorkflowStep, boolean]> = [
+        ["program_overview", true],
+        ["rebate_request", Boolean(c.clientFirstName && c.clientLastName && c.propertyAddress && c.propertyCity)],
+        ["head_of_household", Boolean(c.hohConfirmed)],
+        ["scope_of_work", Boolean(
+          casesWithScopeItem.has(c.id) ||
+          c.scopeIncludesHeatPump || c.scopeIncludesWaterHeater || c.scopeIncludesStove ||
+          c.scopeIncludesDryer || c.scopeIncludesPanel || c.scopeIncludesWiring ||
+          c.scopeIncludesInsulation
+        )],
+        ["contractor_pre_approval", c.preApprovalStatus === "approved" || Boolean(c.preApprovalApprovedDate)],
+        ["project_completion", Boolean(c.installCompletedDate)],
+        ["completion_attestations", Boolean(c.customerAttestationSigned && c.contractorAttestationSigned)],
+        ["reservation_summary", Boolean(c.reservationNumber || c.caseCloseoutDate)],
+      ];
       const done = new Set<RebateWorkflowStep>();
-      // Program Overview: case exists -> acknowledged
-      done.add("program_overview");
-      if (c.clientFirstName && c.clientLastName && c.propertyAddress && c.propertyCity) {
-        done.add("rebate_request");
-      }
-      if (c.hohConfirmed) done.add("head_of_household");
-      const hasScopeItem =
-        casesWithScopeItem.has(c.id) ||
-        c.scopeIncludesHeatPump || c.scopeIncludesWaterHeater || c.scopeIncludesStove ||
-        c.scopeIncludesDryer || c.scopeIncludesPanel || c.scopeIncludesWiring ||
-        c.scopeIncludesInsulation;
-      if (hasScopeItem) done.add("scope_of_work");
-      if (c.preApprovalStatus === "approved" || c.preApprovalApprovedDate) {
-        done.add("contractor_pre_approval");
-      }
-      if (c.installCompletedDate) done.add("project_completion");
-      if (c.customerAttestationSigned && c.contractorAttestationSigned) {
-        done.add("completion_attestations");
-      }
-      if (c.reservationNumber || c.caseCloseoutDate) {
-        done.add("reservation_summary");
+      for (const [key, ok] of checks) {
+        if (!ok) break; // chronological — stop at first incomplete step
+        done.add(key);
       }
       // Current step = first step in order that is not yet complete (or last if all done)
       const current = STEP_ORDER.find((s) => !done.has(s)) || STEP_ORDER[STEP_ORDER.length - 1];
