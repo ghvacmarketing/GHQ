@@ -1666,208 +1666,210 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
                 </div>
               )}
 
-              {caseData.constructionType === "Existing Construction" && (
-                <div className="pt-2 space-y-4">
-                  <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
-                    Existing Constructions require a limited assessment for heat pumps. Please complete the limited assessment questions below.
-                  </div>
-                  <h5 className="font-semibold text-slate-800">Limited Assessment</h5>
-
-                  <div className={fRow}>
-                    <div>
-                      <label className={fLabel}>Assessment Date</label>
-                      <input type="date" className={fInput} value={vals.assessmentDate} onChange={e => set("assessmentDate", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className={fLabel}>What year was the home built?</label>
-                      <input className={fInput} placeholder="e.g. 1971" value={vals.assessmentYearBuilt} onChange={e => set("assessmentYearBuilt", e.target.value)} />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className={fLabel}>Is ceiling insulation R-value known?</label>
-                    <RadioGroup value={vals.ceilingInsulationKnown} onChange={v => set("ceilingInsulationKnown", v)} />
-                  </div>
-
-                  {vals.ceilingInsulationKnown && (
-                    <div className={fRow}>
-                      <div>
-                        <label className={fLabel}>Ceiling Insulation R-Value</label>
-                        <input className={fInput} placeholder="e.g. 28" value={vals.ceilingInsulationRValue} onChange={e => set("ceilingInsulationRValue", e.target.value)} />
-                      </div>
-                      <div>
-                        <label className={fLabel}>Ceiling insulation type</label>
-                        <select className={fInput} value={vals.ceilingInsulationType} onChange={e => set("ceilingInsulationType", e.target.value)}>
-                          <option value="">Select…</option>
-                          <option value="Batt insulation">Batt insulation</option>
-                          <option value="Blown-in insulation">Blown-in insulation</option>
-                          <option value="Spray foam">Spray foam</option>
-                          <option value="Rigid board">Rigid board</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className={fTriplet}>
-                    <div>
-                      <label className={fLabel}>Are the air ducts insulated?</label>
-                      <select className={fInput} value={vals.ductsInsulated} onChange={e => set("ductsInsulated", e.target.value)}>
-                        <option value="">Select…</option>
-                        <option value="Yes">Yes</option>
-                        <option value="No">No</option>
-                        <option value="Unknown">Unknown</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className={fLabel}>Are the air ducts sealed?</label>
-                      <select className={fInput} value={vals.ductsSealed} onChange={e => set("ductsSealed", e.target.value)}>
-                        <option value="">Select…</option>
-                        <option value="Yes">Yes</option>
-                        <option value="No">No</option>
-                        <option value="Unknown">Unknown</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className={fLabel}>Is envelope professionally air sealed?</label>
-                      <select className={fInput} value={vals.envelopeAirSealed} onChange={e => set("envelopeAirSealed", e.target.value)}>
-                        <option value="">Select…</option>
-                        <option value="Yes">Yes</option>
-                        <option value="No">No</option>
-                        <option value="Unknown">Unknown</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className={fLabel}>Is whole home ventilation system rated flow CFM (cubic feet per minute) known?</label>
-                    <RadioGroup value={vals.ventilationCfmKnown} onChange={v => set("ventilationCfmKnown", v)} />
-                  </div>
-
-                  <div className={fRow}>
-                    {vals.ventilationCfmKnown && (
-                      <div>
-                        <label className={fLabel}>Whole home ventilation system rated flow CFM</label>
-                        <input className={fInput} placeholder="e.g. 1" value={vals.ventilationCfm} onChange={e => set("ventilationCfm", e.target.value)} />
-                      </div>
-                    )}
-                    <div>
-                      <label className={fLabel}><span className={fCode}>b.</span> Whole home ventilation system type</label>
-                      <select className={fInput} value={vals.ventilationSystemType} onChange={e => set("ventilationSystemType", e.target.value)}>
-                        <option value="">Select…</option>
-                        <option value="None">None</option>
-                        <option value="HRV (Heat Recovery Ventilator)">HRV (Heat Recovery Ventilator)</option>
-                        <option value="ERV (Energy Recovery Ventilator)">ERV (Energy Recovery Ventilator)</option>
-                        <option value="Exhaust-only">Exhaust-only</option>
-                        <option value="Supply-only">Supply-only</option>
-                        <option value="Balanced (no heat recovery)">Balanced (no heat recovery)</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className={fLabel}><span className={fCode}>c.</span> Cooling system type</label>
-                    <select className={fInput} value={vals.coolingSystemType} onChange={e => set("coolingSystemType", e.target.value)}>
-                      <option value="">Select…</option>
-                      <option value="Heat pump">Heat pump</option>
-                      <option value="Central air conditioner">Central air conditioner</option>
-                      <option value="Mini-split">Mini-split</option>
-                      <option value="Window unit(s)">Window unit(s)</option>
-                      <option value="No cooling">No cooling</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-
-                  <SubGroup title="Cooling Systems">
-                    <div className={fRow}>
-                      <div>
-                        <label className={fLabel}>Is efficiency known?</label>
-                        <RadioGroup value={vals.coolingEfficiencyKnown} onChange={v => set("coolingEfficiencyKnown", v)} />
-                      </div>
-                      {vals.coolingEfficiencyKnown && (
-                        <div>
-                          <label className={fLabel}>Efficiency SEER (Seasonal Energy Efficiency Ratio)</label>
-                          <input className={fInput} placeholder="e.g. 16" value={vals.coolingEfficiencySeer} onChange={e => set("coolingEfficiencySeer", e.target.value)} />
-                        </div>
-                      )}
-                    </div>
-                    <div className={fRow}>
-                      <div>
-                        <label className={fLabel}>Is the percent of floor area served by cooling system known?</label>
-                        <RadioGroup value={vals.coolingFloorAreaKnown} onChange={v => set("coolingFloorAreaKnown", v)} />
-                      </div>
-                      {vals.coolingFloorAreaKnown && (
-                        <div>
-                          <label className={fLabel}>Percent of floor area served by cooling system</label>
-                          <div className="flex items-center gap-2">
-                            <input className={fInput} placeholder="100" value={vals.coolingFloorAreaPct} onChange={e => set("coolingFloorAreaPct", e.target.value)} />
-                            <span className="text-sm text-slate-500 flex-shrink-0">%</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </SubGroup>
-
-                  <SubGroup title="Heating System">
-                    <div className={fRow}>
-                      <div>
-                        <label className={fLabel}>Fuel and system type</label>
-                        <select className={fInput} value={vals.heatingSystemFuelType} onChange={e => set("heatingSystemFuelType", e.target.value)}>
-                          <option value="">Select…</option>
-                          <option value="Gas Propane Furnace">Gas Propane Furnace</option>
-                          <option value="Natural Gas Furnace">Natural Gas Furnace</option>
-                          <option value="Electric Furnace">Electric Furnace</option>
-                          <option value="Heat Pump">Heat Pump</option>
-                          <option value="Oil Furnace">Oil Furnace</option>
-                          <option value="Electric Baseboard">Electric Baseboard</option>
-                          <option value="No heating">No heating</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className={fLabel}>Is efficiency known?</label>
-                        <RadioGroup value={vals.heatingEfficiencyKnown} onChange={v => set("heatingEfficiencyKnown", v)} />
-                      </div>
-                    </div>
-                    {vals.heatingEfficiencyKnown && (
-                      <div className={fRow}>
-                        <div>
-                          <label className={fLabel}>Heating Seasonal Performance Factor (HSPF)</label>
-                          <input className={fInput} placeholder="e.g. 8.5" value={vals.heatingHspf} onChange={e => set("heatingHspf", e.target.value)} />
-                        </div>
-                        <div>
-                          <label className={fLabel}>Annual Fuel Utilization Efficiency (AFUE)</label>
-                          <input className={fInput} placeholder="e.g. 0.80" value={vals.heatingAfue} onChange={e => set("heatingAfue", e.target.value)} />
-                        </div>
-                      </div>
-                    )}
-                    <div className={fRow}>
-                      <div>
-                        <label className={fLabel}>Is percent of floor area served by the heating system known?</label>
-                        <RadioGroup value={vals.heatingFloorAreaKnown} onChange={v => set("heatingFloorAreaKnown", v)} />
-                      </div>
-                      {vals.heatingFloorAreaKnown && (
-                        <div>
-                          <label className={fLabel}>Percent of floor area served by heating system</label>
-                          <div className="flex items-center gap-2">
-                            <input className={fInput} placeholder="100" value={vals.heatingFloorAreaPct} onChange={e => set("heatingFloorAreaPct", e.target.value)} />
-                            <span className="text-sm text-slate-500 flex-shrink-0">%</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="sm:max-w-xs">
-                      <label className={fLabel}>Electrical panel max amps</label>
-                      <input className={fInput} placeholder="e.g. 200" value={vals.electricalPanelAmps} onChange={e => set("electricalPanelAmps", e.target.value)} />
-                    </div>
-                  </SubGroup>
-                </div>
-              )}
             </NestedPanel>
           )}
         </div>
       </FormCard>
+
+      {caseData.constructionType === "Existing Construction" && vals.scopeIncludesHeatPump && (
+        <FormCard title="Limited Assessment">
+          <div className="space-y-5">
+            <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
+              Existing Constructions require a limited assessment for heat pumps. Please complete the limited assessment questions below.
+            </div>
+
+            <div className={fRow}>
+              <div>
+                <label className={fLabel}>Assessment Date</label>
+                <input type="date" className={fInput} value={vals.assessmentDate} onChange={e => set("assessmentDate", e.target.value)} />
+              </div>
+              <div>
+                <label className={fLabel}>What year was the home built?</label>
+                <input className={fInput} placeholder="e.g. 1971" value={vals.assessmentYearBuilt} onChange={e => set("assessmentYearBuilt", e.target.value)} />
+              </div>
+            </div>
+
+            <div>
+              <label className={fLabel}>Is ceiling insulation R-value known?</label>
+              <RadioGroup value={vals.ceilingInsulationKnown} onChange={v => set("ceilingInsulationKnown", v)} />
+            </div>
+
+            {vals.ceilingInsulationKnown && (
+              <div className={fRow}>
+                <div>
+                  <label className={fLabel}>Ceiling Insulation R-Value</label>
+                  <input className={fInput} placeholder="e.g. 28" value={vals.ceilingInsulationRValue} onChange={e => set("ceilingInsulationRValue", e.target.value)} />
+                </div>
+                <div>
+                  <label className={fLabel}>Ceiling insulation type</label>
+                  <select className={fInput} value={vals.ceilingInsulationType} onChange={e => set("ceilingInsulationType", e.target.value)}>
+                    <option value="">Select…</option>
+                    <option value="Batt insulation">Batt insulation</option>
+                    <option value="Blown-in insulation">Blown-in insulation</option>
+                    <option value="Spray foam">Spray foam</option>
+                    <option value="Rigid board">Rigid board</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <div className={fTriplet}>
+              <div>
+                <label className={fLabel}>Are the air ducts insulated?</label>
+                <select className={fInput} value={vals.ductsInsulated} onChange={e => set("ductsInsulated", e.target.value)}>
+                  <option value="">Select…</option>
+                  <option value="Yes">Yes</option>
+                  <option value="No">No</option>
+                  <option value="Unknown">Unknown</option>
+                </select>
+              </div>
+              <div>
+                <label className={fLabel}>Are the air ducts sealed?</label>
+                <select className={fInput} value={vals.ductsSealed} onChange={e => set("ductsSealed", e.target.value)}>
+                  <option value="">Select…</option>
+                  <option value="Yes">Yes</option>
+                  <option value="No">No</option>
+                  <option value="Unknown">Unknown</option>
+                </select>
+              </div>
+              <div>
+                <label className={fLabel}>Is envelope professionally air sealed?</label>
+                <select className={fInput} value={vals.envelopeAirSealed} onChange={e => set("envelopeAirSealed", e.target.value)}>
+                  <option value="">Select…</option>
+                  <option value="Yes">Yes</option>
+                  <option value="No">No</option>
+                  <option value="Unknown">Unknown</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className={fLabel}>Is whole home ventilation system rated flow CFM (cubic feet per minute) known?</label>
+              <RadioGroup value={vals.ventilationCfmKnown} onChange={v => set("ventilationCfmKnown", v)} />
+            </div>
+
+            <div className={fRow}>
+              {vals.ventilationCfmKnown && (
+                <div>
+                  <label className={fLabel}>Whole home ventilation system rated flow CFM</label>
+                  <input className={fInput} placeholder="e.g. 1" value={vals.ventilationCfm} onChange={e => set("ventilationCfm", e.target.value)} />
+                </div>
+              )}
+              <div>
+                <label className={fLabel}><span className={fCode}>b.</span> Whole home ventilation system type</label>
+                <select className={fInput} value={vals.ventilationSystemType} onChange={e => set("ventilationSystemType", e.target.value)}>
+                  <option value="">Select…</option>
+                  <option value="None">None</option>
+                  <option value="HRV (Heat Recovery Ventilator)">HRV (Heat Recovery Ventilator)</option>
+                  <option value="ERV (Energy Recovery Ventilator)">ERV (Energy Recovery Ventilator)</option>
+                  <option value="Exhaust-only">Exhaust-only</option>
+                  <option value="Supply-only">Supply-only</option>
+                  <option value="Balanced (no heat recovery)">Balanced (no heat recovery)</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className={fLabel}><span className={fCode}>c.</span> Cooling system type</label>
+              <select className={fInput} value={vals.coolingSystemType} onChange={e => set("coolingSystemType", e.target.value)}>
+                <option value="">Select…</option>
+                <option value="Heat pump">Heat pump</option>
+                <option value="Central air conditioner">Central air conditioner</option>
+                <option value="Mini-split">Mini-split</option>
+                <option value="Window unit(s)">Window unit(s)</option>
+                <option value="No cooling">No cooling</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <SubGroup title="Cooling Systems">
+              <div className={fRow}>
+                <div>
+                  <label className={fLabel}>Is efficiency known?</label>
+                  <RadioGroup value={vals.coolingEfficiencyKnown} onChange={v => set("coolingEfficiencyKnown", v)} />
+                </div>
+                {vals.coolingEfficiencyKnown && (
+                  <div>
+                    <label className={fLabel}>Efficiency SEER (Seasonal Energy Efficiency Ratio)</label>
+                    <input className={fInput} placeholder="e.g. 16" value={vals.coolingEfficiencySeer} onChange={e => set("coolingEfficiencySeer", e.target.value)} />
+                  </div>
+                )}
+              </div>
+              <div className={fRow}>
+                <div>
+                  <label className={fLabel}>Is the percent of floor area served by cooling system known?</label>
+                  <RadioGroup value={vals.coolingFloorAreaKnown} onChange={v => set("coolingFloorAreaKnown", v)} />
+                </div>
+                {vals.coolingFloorAreaKnown && (
+                  <div>
+                    <label className={fLabel}>Percent of floor area served by cooling system</label>
+                    <div className="flex items-center gap-2">
+                      <input className={fInput} placeholder="100" value={vals.coolingFloorAreaPct} onChange={e => set("coolingFloorAreaPct", e.target.value)} />
+                      <span className="text-sm text-slate-500 flex-shrink-0">%</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </SubGroup>
+
+            <SubGroup title="Heating System">
+              <div className={fRow}>
+                <div>
+                  <label className={fLabel}>Fuel and system type</label>
+                  <select className={fInput} value={vals.heatingSystemFuelType} onChange={e => set("heatingSystemFuelType", e.target.value)}>
+                    <option value="">Select…</option>
+                    <option value="Gas Propane Furnace">Gas Propane Furnace</option>
+                    <option value="Natural Gas Furnace">Natural Gas Furnace</option>
+                    <option value="Electric Furnace">Electric Furnace</option>
+                    <option value="Heat Pump">Heat Pump</option>
+                    <option value="Oil Furnace">Oil Furnace</option>
+                    <option value="Electric Baseboard">Electric Baseboard</option>
+                    <option value="No heating">No heating</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={fLabel}>Is efficiency known?</label>
+                  <RadioGroup value={vals.heatingEfficiencyKnown} onChange={v => set("heatingEfficiencyKnown", v)} />
+                </div>
+              </div>
+              {vals.heatingEfficiencyKnown && (
+                <div className={fRow}>
+                  <div>
+                    <label className={fLabel}>Heating Seasonal Performance Factor (HSPF)</label>
+                    <input className={fInput} placeholder="e.g. 8.5" value={vals.heatingHspf} onChange={e => set("heatingHspf", e.target.value)} />
+                  </div>
+                  <div>
+                    <label className={fLabel}>Annual Fuel Utilization Efficiency (AFUE)</label>
+                    <input className={fInput} placeholder="e.g. 0.80" value={vals.heatingAfue} onChange={e => set("heatingAfue", e.target.value)} />
+                  </div>
+                </div>
+              )}
+              <div className={fRow}>
+                <div>
+                  <label className={fLabel}>Is percent of floor area served by the heating system known?</label>
+                  <RadioGroup value={vals.heatingFloorAreaKnown} onChange={v => set("heatingFloorAreaKnown", v)} />
+                </div>
+                {vals.heatingFloorAreaKnown && (
+                  <div>
+                    <label className={fLabel}>Percent of floor area served by heating system</label>
+                    <div className="flex items-center gap-2">
+                      <input className={fInput} placeholder="100" value={vals.heatingFloorAreaPct} onChange={e => set("heatingFloorAreaPct", e.target.value)} />
+                      <span className="text-sm text-slate-500 flex-shrink-0">%</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="sm:max-w-xs">
+                <label className={fLabel}>Electrical panel max amps</label>
+                <input className={fInput} placeholder="e.g. 200" value={vals.electricalPanelAmps} onChange={e => set("electricalPanelAmps", e.target.value)} />
+              </div>
+            </SubGroup>
+          </div>
+        </FormCard>
+      )}
 
       <FormCard title="Electrical Upgrades">
         <div className="space-y-5">
