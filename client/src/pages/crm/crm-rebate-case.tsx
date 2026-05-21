@@ -1373,6 +1373,43 @@ function ProjectCompletionTab({ caseData, onPatch, saving, caseId, onInvalidate 
             </Card>
           </div>
         </div>
+        {(() => {
+          const hpOn = !!caseData.scopeIncludesHeatPump;
+          const elecOn = !!caseData.scopeIncludesWiring;
+          const hpMat = hpOn ? num(watchMat) : 0;
+          const hpInst = hpOn ? num(watchInst) : 0;
+          const elecMat = elecOn ? num(watchElecMat) : 0;
+          const elecInst = elecOn ? num(watchElecInst) : 0;
+          const finalEquip = hpMat + elecMat;
+          const finalInstall = hpInst + elecInst;
+          const externalRebate = num(caseData.totalExternalRebate ?? "");
+          const finalTotal = finalEquip + finalInstall - externalRebate;
+          const totalRebate = num(caseData.estimatedRebate100Pct ?? "");
+          const ReadOnlyRow = ({ code, label, value }: { code?: string; label: string; value: number }) => (
+            <div>
+              <div className="text-xs text-slate-500 mb-1">
+                {code && <span className="font-mono text-slate-400 mr-1">{code}</span>}{label}
+              </div>
+              <Input className="h-8 text-sm bg-slate-100 text-slate-700 text-right" readOnly value={fmt(value)} />
+            </div>
+          );
+          return (
+            <div className="mt-4">
+              <div className="bg-[#1e3a5f] text-white text-xs font-semibold uppercase tracking-wider px-3 py-2 rounded-t">
+                Project Financial Totals
+              </div>
+              <Card className="rounded-t-none border-t-0">
+                <CardContent className="pt-4 space-y-3">
+                  <ReadOnlyRow code="D.18." label="Final Total Equipment and Material Cost" value={finalEquip} />
+                  <ReadOnlyRow code="D.19." label="Final Total Installation Costs (Contractor Installed Only)" value={finalInstall} />
+                  <ReadOnlyRow code="D.20." label="Final Total Project External Rebate" value={externalRebate} />
+                  <ReadOnlyRow code="D.21." label="Final Total Project Cost" value={finalTotal} />
+                  <ReadOnlyRow label="Total Rebate Amount" value={totalRebate} />
+                </CardContent>
+              </Card>
+            </div>
+          );
+        })()}
         <div className="mt-3">
           <SaveBar onSave={form.handleSubmit(onSubmit)} saving={saving} dirty={form.formState.isDirty} />
         </div>
