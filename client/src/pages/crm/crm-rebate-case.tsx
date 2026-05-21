@@ -1587,20 +1587,20 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
                 </div>
               </div>
 
-              <div className={fTriplet}>
-                <div>
-                  <label className={fLabel}><span className={fCode}>d.</span> Heating load this system covers <span className="text-slate-400 font-normal">(choose closest)</span></label>
+              <div className={`${fTriplet} items-end`}>
+                <div className="flex flex-col">
+                  <label className={`${fLabel} min-h-10`}><span className={fCode}>d.</span> Heating load this system covers <span className="text-slate-400 font-normal">(choose closest)</span></label>
                   <div className="flex items-center gap-2">
                     <input className={fInput} placeholder="100" value={vals.hpHeatingLoadPercent} onChange={e => set("hpHeatingLoadPercent", e.target.value)} />
                     <span className="text-sm text-slate-500 flex-shrink-0">%</span>
                   </div>
                 </div>
-                <div>
-                  <label className={fLabel}><span className={fCode}>e.</span> Heating capacity <span className="text-slate-400 font-normal">(BTU/hr)</span></label>
+                <div className="flex flex-col">
+                  <label className={`${fLabel} min-h-10`}><span className={fCode}>e.</span> Heating capacity <span className="text-slate-400 font-normal">(BTU/hr)</span></label>
                   <input className={fInput} placeholder="e.g. 20043" value={vals.hpHeatingCapacityBtu} onChange={e => set("hpHeatingCapacityBtu", e.target.value)} />
                 </div>
-                <div>
-                  <label className={fLabel}><span className={fCode}>f.</span> Cooling capacity <span className="text-slate-400 font-normal">(BTU/hr)</span></label>
+                <div className="flex flex-col">
+                  <label className={`${fLabel} min-h-10`}><span className={fCode}>f.</span> Cooling capacity <span className="text-slate-400 font-normal">(BTU/hr)</span></label>
                   <input className={fInput} placeholder="e.g. 32000" value={vals.hpCoolingCapacityBtu} onChange={e => set("hpCoolingCapacityBtu", e.target.value)} />
                 </div>
               </div>
@@ -1627,17 +1627,17 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
                 </div>
               </div>
 
-              <div className={fTriplet}>
-                <div>
-                  <label className={fLabel}>Estimated HVAC Heat Pump Material Costs</label>
+              <div className={`${fTriplet} items-end`}>
+                <div className="flex flex-col">
+                  <label className={`${fLabel} min-h-10`}>Estimated HVAC Heat Pump Material Costs</label>
                   <input className={fInput} placeholder="$ 0.00" value={vals.hpMaterialCost} onChange={e => set("hpMaterialCost", e.target.value)} />
                 </div>
-                <div>
-                  <label className={fLabel}>Estimated HVAC Heat Pump Install Costs</label>
+                <div className="flex flex-col">
+                  <label className={`${fLabel} min-h-10`}>Estimated HVAC Heat Pump Install Costs</label>
                   <input className={fInput} placeholder="$ 0.00" value={vals.hpInstallCost} onChange={e => set("hpInstallCost", e.target.value)} />
                 </div>
-                <div>
-                  <label className={fLabel}>Estimated HVAC Heat Pump Total Cost</label>
+                <div className="flex flex-col">
+                  <label className={`${fLabel} min-h-10`}>Estimated HVAC Heat Pump Total Cost</label>
                   <input
                     className={`${fInput} bg-slate-100 text-slate-500`}
                     readOnly
