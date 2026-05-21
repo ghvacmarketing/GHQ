@@ -1520,6 +1520,9 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
     gasAccountCertified: boolean;
     hasDeliveredFuel: boolean | null;
     deliveredFuelCompany: string;
+    deliveredFuelType: string;
+    deliveredFuelAccountNumber: string;
+    deliveredFuelAccountCertified: boolean;
     // C.6–C.9 appliances
     scopeIncludesStove: boolean;
     scopeIncludesDryer: boolean;
@@ -1607,6 +1610,9 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
     gasAccountCertified: d.gasAccountCertified ?? false,
     hasDeliveredFuel: d.hasDeliveredFuel ?? null,
     deliveredFuelCompany: d.deliveredFuelCompany ?? "",
+    deliveredFuelType: d.deliveredFuelType ?? "",
+    deliveredFuelAccountNumber: d.deliveredFuelAccountNumber ?? "",
+    deliveredFuelAccountCertified: d.deliveredFuelAccountCertified ?? false,
     scopeIncludesStove: d.scopeIncludesStove ?? false,
     scopeIncludesDryer: d.scopeIncludesDryer ?? false,
     scopeIncludesWaterHeater: d.scopeIncludesWaterHeater ?? false,
@@ -1841,10 +1847,31 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
               <RadioGroup value={vals.hasDeliveredFuel} onChange={v => set("hasDeliveredFuel", v)} />
             </div>
             {vals.hasDeliveredFuel === true && (
-              <div>
-                <label className={fLabel}>Delivered Fuel Company Name</label>
-                <input className={fInput} value={vals.deliveredFuelCompany} onChange={e => set("deliveredFuelCompany", e.target.value)} />
-              </div>
+              <NestedPanel>
+                <div>
+                  <label className={fLabel}><span className={fCode}>C.5a.</span> Delivered fuel company name</label>
+                  <input className={fInput} value={vals.deliveredFuelCompany} onChange={e => set("deliveredFuelCompany", e.target.value)} />
+                </div>
+                <div>
+                  <label className={fLabel}><span className={fCode}>C.5b.</span> Fuel Type</label>
+                  <select className={fInput} value={vals.deliveredFuelType} onChange={e => set("deliveredFuelType", e.target.value)}>
+                    <option value="">Select fuel type...</option>
+                    <option value="Propane">Propane</option>
+                    <option value="Heating Oil">Heating Oil</option>
+                    <option value="Kerosene">Kerosene</option>
+                    <option value="Wood">Wood</option>
+                    <option value="Wood Pellets">Wood Pellets</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={fLabel}><span className={fCode}>C.5c.</span> Account Number <span className="text-slate-400 italic font-normal">(20 character limit)</span></label>
+                  <input className={fInput} maxLength={20} value={vals.deliveredFuelAccountNumber} onChange={e => set("deliveredFuelAccountNumber", e.target.value)} />
+                </div>
+                <Certify checked={vals.deliveredFuelAccountCertified} onChange={v => set("deliveredFuelAccountCertified", v)}>
+                  I certify the above account number is correct and acknowledge incorrect information may lead to delays in processing. <span className="text-[#711419]">*Required</span>
+                </Certify>
+              </NestedPanel>
             )}
           </SubGroup>
         </div>

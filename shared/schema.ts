@@ -3697,6 +3697,9 @@ export const rebateCases = pgTable("rebate_cases", {
   gasAccountCertified: boolean("gas_account_certified").default(false),
   hasDeliveredFuel: boolean("has_delivered_fuel"),
   deliveredFuelCompany: text("delivered_fuel_company"),
+  deliveredFuelType: text("delivered_fuel_type"),
+  deliveredFuelAccountNumber: text("delivered_fuel_account_number"),
+  deliveredFuelAccountCertified: boolean("delivered_fuel_account_certified").default(false),
 
   // Project Details — Appliances (C.6–C.9)
   scopeIncludesStove: boolean("scope_includes_stove").default(false),
