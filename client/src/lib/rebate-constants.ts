@@ -167,6 +167,7 @@ export const DOCUMENT_CATEGORY_LABELS: Record<RebateDocumentCategory, string> = 
   manual_j_report: "Manual J Report",
   quality_install_address_photo: "Quality Install — Property Address Photo",
   quality_install_hp_post_retrofit: "Quality Install — Heat Pump Post-Retrofit Photos",
+  quality_install_elec_wiring_post_retrofit: "Quality Install — Electric Wiring Post-Retrofit Photos",
   contractor_pre_approval: "Contractor Pre-Approval",
   project_completion: "Project Completion",
   completion_attestations: "Completion Attestations",

@@ -3571,6 +3571,7 @@ export const rebateDocumentCategoryEnum = [
   "manual_j_report",
   "quality_install_address_photo",
   "quality_install_hp_post_retrofit",
+  "quality_install_elec_wiring_post_retrofit",
   "contractor_pre_approval",
   "project_completion",
   "completion_attestations",
@@ -3792,6 +3793,11 @@ export const rebateCases = pgTable("rebate_cases", {
   postHpExternalRebates: boolean("post_hp_external_rebates"),
   postHpFinalMaterialCost: text("post_hp_final_material_cost"),
   postHpFinalInstallCost: text("post_hp_final_install_cost"),
+  postElecCount: integer("post_elec_count"),
+  postElecModelNumber: text("post_elec_model_number"),
+  postElecExternalRebates: boolean("post_elec_external_rebates"),
+  postElecFinalMaterialCost: text("post_elec_final_material_cost"),
+  postElecFinalInstallCost: text("post_elec_final_install_cost"),
 
   // Completion attestations
   customerAttestationSigned: boolean("customer_attestation_signed").default(false),
