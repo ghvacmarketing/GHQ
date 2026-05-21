@@ -917,112 +917,196 @@ function HeadOfHouseholdTab({ caseData, onPatch, saving }: { caseData: CaseDetai
 // ─── Contractor Pre-Approval Tab ───────────────────────────────────────────────
 
 function ContractorPreApprovalTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onPatch: (d: Partial<RebateCase>) => void; saving: boolean }) {
-  const form = useForm({
-    defaultValues: {
-      contractorName: caseData.contractorName ?? "",
-      contractorLicenseNumber: caseData.contractorLicenseNumber ?? "",
-      preApprovalStatus: caseData.preApprovalStatus ?? "",
-      preApprovalSubmittedDate: caseData.preApprovalSubmittedDate ? format(new Date(caseData.preApprovalSubmittedDate), "yyyy-MM-dd") : "",
-      preApprovalApprovedDate: caseData.preApprovalApprovedDate ? format(new Date(caseData.preApprovalApprovedDate), "yyyy-MM-dd") : "",
-      preApprovalNotes: caseData.preApprovalNotes ?? "",
-      existingHeatingType: caseData.existingHeatingType ?? "",
-      existingHeatingAge: caseData.existingHeatingAge ?? "",
-      existingCoolingType: caseData.existingCoolingType ?? "",
-      existingCoolingAge: caseData.existingCoolingAge ?? "",
-      existingWaterHeaterType: caseData.existingWaterHeaterType ?? "",
-      existingWaterHeaterAge: caseData.existingWaterHeaterAge ?? "",
-    },
-  });
-  const onSubmit = (v: any) => {
-    const cleaned: any = { ...v };
-    ["existingHeatingAge","existingCoolingAge","existingWaterHeaterAge"].forEach(k => {
-      cleaned[k] = v[k] ? Number(v[k]) : null;
-    });
-    onPatch(cleaned);
+  const fmtDate = (d: string | null | undefined) => d ? format(new Date(d), "yyyy-MM-dd") : "";
+
+  const [submitted, setSubmitted] = useState<boolean>(caseData.preApprovalStatus === "submitted" || caseData.preApprovalStatus === "under_review" || caseData.preApprovalStatus === "approved");
+  const [submittedDate, setSubmittedDate] = useState<string>(fmtDate(caseData.preApprovalSubmittedDate));
+  const [approved, setApproved] = useState<boolean>(caseData.preApprovalStatus === "approved");
+  const [approvedDate, setApprovedDate] = useState<string>(fmtDate(caseData.preApprovalApprovedDate));
+  const [notes, setNotes] = useState<string>(caseData.preApprovalNotes ?? "");
+
+  useEffect(() => {
+    setSubmitted(caseData.preApprovalStatus === "submitted" || caseData.preApprovalStatus === "under_review" || caseData.preApprovalStatus === "approved");
+    setSubmittedDate(fmtDate(caseData.preApprovalSubmittedDate));
+    setApproved(caseData.preApprovalStatus === "approved");
+    setApprovedDate(fmtDate(caseData.preApprovalApprovedDate));
+    setNotes(caseData.preApprovalNotes ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseData.id]);
+
+  const savedState = {
+    submitted: caseData.preApprovalStatus === "submitted" || caseData.preApprovalStatus === "under_review" || caseData.preApprovalStatus === "approved",
+    submittedDate: fmtDate(caseData.preApprovalSubmittedDate),
+    approved: caseData.preApprovalStatus === "approved",
+    approvedDate: fmtDate(caseData.preApprovalApprovedDate),
+    notes: caseData.preApprovalNotes ?? "",
   };
+  const dirty = submitted !== savedState.submitted || submittedDate !== savedState.submittedDate || approved !== savedState.approved || approvedDate !== savedState.approvedDate || notes !== savedState.notes;
+
+  const handleSubmittedToggle = (checked: boolean) => {
+    setSubmitted(checked);
+    if (checked && !submittedDate) setSubmittedDate(new Date().toISOString().split("T")[0]);
+    if (!checked) {
+      setSubmittedDate("");
+      setApproved(false);
+      setApprovedDate("");
+    }
+  };
+  const handleApprovedToggle = (checked: boolean) => {
+    setApproved(checked);
+    if (checked) {
+      if (!approvedDate) setApprovedDate(new Date().toISOString().split("T")[0]);
+      if (!submitted) {
+        setSubmitted(true);
+        if (!submittedDate) setSubmittedDate(new Date().toISOString().split("T")[0]);
+      }
+    } else {
+      setApprovedDate("");
+    }
+  };
+
+  const handleSave = () => {
+    const status = approved ? "approved" : submitted ? "submitted" : "not_submitted";
+    onPatch({
+      preApprovalStatus: status,
+      preApprovalSubmittedDate: submittedDate || null,
+      preApprovalApprovedDate: approvedDate || null,
+      preApprovalNotes: notes || null,
+    } as any);
+  };
+
+  const contractor = caseData.contractorName || "The contractor";
+
+  let bannerColor = "amber";
+  let bannerIcon = <Clock className="w-5 h-5 text-amber-500" />;
+  let bannerTitle = "Awaiting Pre-Approval Submission";
+  let bannerSub = `Waiting for ${contractor} to submit the pre-approval package in Neighborly.`;
+  if (approved) {
+    bannerColor = "green";
+    bannerIcon = <CheckCircle2 className="w-5 h-5 text-green-600" />;
+    bannerTitle = "Pre-Approval Approved";
+    bannerSub = `${contractor} received pre-approval${approvedDate ? ` on ${approvedDate}` : ""}.`;
+  } else if (submitted) {
+    bannerColor = "blue";
+    bannerIcon = <Clock className="w-5 h-5 text-blue-500" />;
+    bannerTitle = "Submitted — Awaiting Approval";
+    bannerSub = `${contractor} submitted the pre-approval package${submittedDate ? ` on ${submittedDate}` : ""}. Waiting on Neighborly's response.`;
+  }
+  const bannerClasses: Record<string, string> = {
+    amber: "bg-amber-50 border-amber-200 text-amber-800",
+    blue: "bg-blue-50 border-blue-200 text-blue-800",
+    green: "bg-green-50 border-green-200 text-green-800",
+  };
+  const bannerCircle: Record<string, string> = {
+    amber: "bg-amber-100",
+    blue: "bg-blue-100",
+    green: "bg-green-100",
+  };
+  const bannerSubColor: Record<string, string> = {
+    amber: "text-amber-600",
+    blue: "text-blue-600",
+    green: "text-green-600",
+  };
+
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Contractor Information</CardTitle></CardHeader>
-            <CardContent className="pt-0 space-y-3">
-              {[
-                { name: "contractorName", label: "Contractor / Company Name" },
-                { name: "contractorLicenseNumber", label: "License Number" },
-              ].map(({ name, label }) => (
-                <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
-                    <FormControl><Input className="h-8 text-sm" {...field} value={field.value ?? ""} /></FormControl>
-                  </FormItem>
-                )} />
-              ))}
-              <Separator />
-              <FormField control={form.control} name="preApprovalStatus" render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs text-slate-500">Pre-Approval Status</FormLabel>
-                  <FormControl>
-                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select status…" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="not_submitted">Not Submitted</SelectItem>
-                        <SelectItem value="submitted">Submitted</SelectItem>
-                        <SelectItem value="under_review">Under Review</SelectItem>
-                        <SelectItem value="approved">Approved</SelectItem>
-                        <SelectItem value="denied">Denied</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                </FormItem>
-              )} />
-              {[
-                { name: "preApprovalSubmittedDate", label: "Submission Date" },
-                { name: "preApprovalApprovedDate", label: "Approval Date" },
-              ].map(({ name, label }) => (
-                <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
-                    <FormControl><Input className="h-8 text-sm" type="date" {...field} value={field.value ?? ""} /></FormControl>
-                  </FormItem>
-                )} />
-              ))}
-              <FormField control={form.control} name="preApprovalNotes" render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs text-slate-500">Notes</FormLabel>
-                  <FormControl>
-                    <Textarea className="text-sm min-h-[80px] resize-none" placeholder="Pre-approval package notes…" {...field} value={field.value ?? ""} />
-                  </FormControl>
-                </FormItem>
-              )} />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Existing Equipment (for approval package)</CardTitle></CardHeader>
-            <CardContent className="pt-0 space-y-3">
-              {[
-                { name: "existingHeatingType", label: "Heating Type", type: "text" },
-                { name: "existingHeatingAge", label: "Heating Age (years)", type: "number" },
-                { name: "existingCoolingType", label: "Cooling Type", type: "text" },
-                { name: "existingCoolingAge", label: "Cooling Age (years)", type: "number" },
-                { name: "existingWaterHeaterType", label: "Water Heater Type", type: "text" },
-                { name: "existingWaterHeaterAge", label: "Water Heater Age (years)", type: "number" },
-              ].map(({ name, label, type }) => (
-                <FormField key={name} control={form.control} name={name as any} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs text-slate-500">{label}</FormLabel>
-                    <FormControl><Input className="h-8 text-sm" type={type} {...field} value={field.value ?? ""} /></FormControl>
-                  </FormItem>
-                )} />
-              ))}
-            </CardContent>
-          </Card>
+    <div className="max-w-2xl mx-auto pb-24">
+      <header className="mb-6">
+        <h2 className="text-xl font-semibold text-slate-900 mb-1">Contractor Pre-Approval</h2>
+        <p className="text-sm text-slate-500">
+          This section tracks whether the contractor has submitted the pre-approval package in Neighborly and whether Neighborly has approved it. No data entry from us — toggle the steps as they happen.
+        </p>
+      </header>
+
+      {/* Status Banner */}
+      <div className={`flex items-center gap-3 rounded-lg px-5 py-4 mb-6 border ${bannerClasses[bannerColor]}`}>
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${bannerCircle[bannerColor]}`}>
+          {bannerIcon}
         </div>
-        <div className="mt-3">
-          <SaveBar onSave={form.handleSubmit(onSubmit)} saving={saving} dirty={form.formState.isDirty} />
+        <div>
+          <p className="text-sm font-semibold">{bannerTitle}</p>
+          <p className={`text-xs mt-0.5 ${bannerSubColor[bannerColor]}`}>{bannerSub}</p>
         </div>
-      </form>
-    </Form>
+      </div>
+
+      {/* Submitted Toggle */}
+      <div className="bg-white border border-slate-200 rounded-lg p-5 mb-3">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={submitted}
+            onChange={e => handleSubmittedToggle(e.target.checked)}
+            className="mt-0.5 w-5 h-5 accent-[#711419] cursor-pointer"
+          />
+          <div>
+            <p className="text-sm font-semibold text-slate-800">Pre-approval package submitted in Neighborly</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Check this once the contractor has completed the Neighborly checklist and submitted the pre-approval package.
+            </p>
+          </div>
+        </label>
+        {submitted && (
+          <div className="mt-4 ml-8">
+            <label className="block text-sm text-slate-700 mb-1 font-medium">Date submitted</label>
+            <input
+              type="date"
+              value={submittedDate}
+              onChange={e => setSubmittedDate(e.target.value)}
+              className="h-9 px-3 rounded-md bg-slate-50 border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-[#711419] focus:ring-1 focus:ring-[#711419]/30"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Approved Toggle */}
+      <div className="bg-white border border-slate-200 rounded-lg p-5 mb-5">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={approved}
+            onChange={e => handleApprovedToggle(e.target.checked)}
+            className="mt-0.5 w-5 h-5 accent-[#711419] cursor-pointer"
+          />
+          <div>
+            <p className="text-sm font-semibold text-slate-800">Pre-approval received from Neighborly</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Check this once Neighborly has approved the pre-approval package and the project can proceed.
+            </p>
+          </div>
+        </label>
+        {approved && (
+          <div className="mt-4 ml-8">
+            <label className="block text-sm text-slate-700 mb-1 font-medium">Date approved</label>
+            <input
+              type="date"
+              value={approvedDate}
+              onChange={e => setApprovedDate(e.target.value)}
+              className="h-9 px-3 rounded-md bg-slate-50 border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-[#711419] focus:ring-1 focus:ring-[#711419]/30"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Notes */}
+      <div className="bg-white border border-slate-200 rounded-lg p-5">
+        <label className="block text-sm font-semibold text-slate-800 mb-2">Notes</label>
+        <textarea
+          rows={4}
+          placeholder="Any notes about the pre-approval submission or Neighborly correspondence…"
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          className="w-full px-3 py-2 rounded-md bg-slate-50 border border-slate-300 text-sm text-slate-800 resize-none focus:outline-none focus:border-[#711419] focus:ring-1 focus:ring-[#711419]/30"
+        />
+      </div>
+
+      {dirty && (
+        <div className="sticky bottom-0 left-0 right-0 mt-6 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-white border-t border-slate-200 flex justify-end shadow-[0_-2px_8px_rgba(0,0,0,0.04)]">
+          <Button onClick={handleSave} disabled={saving} size="sm" className="bg-[#711419] hover:bg-[#5a1014]">
+            {saving ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : null}
+            Save Changes
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 
