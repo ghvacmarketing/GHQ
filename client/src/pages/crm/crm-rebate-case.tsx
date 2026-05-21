@@ -463,6 +463,143 @@ function StickySaveBar({ dirty, saving, onSave, type = "submit" }: { dirty: bool
   );
 }
 
+function HeatPumpPhotoUploader({
+  caseId,
+  photos,
+  onInvalidate,
+}: {
+  caseId: string;
+  photos: RebateCaseDocument[];
+  onInvalidate: () => void;
+}) {
+  const { toast } = useToast();
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const uploadOne = async (file: File) => {
+    const urlRes = await fetch("/api/uploads/request-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+    });
+    if (!urlRes.ok) throw new Error("Failed to get upload URL");
+    const { uploadURL, objectPath } = await urlRes.json();
+    const putRes = await fetch(uploadURL, {
+      method: "PUT",
+      headers: { "Content-Type": file.type },
+      body: file,
+    });
+    if (!putRes.ok) throw new Error("Upload failed");
+    const metaRes = await fetch(`/api/crm/rebate-cases/${caseId}/documents`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        name: file.name,
+        url: uploadURL,
+        objectPath,
+        category: "scope_of_work",
+        contentType: file.type,
+        size: file.size,
+      }),
+    });
+    if (!metaRes.ok) throw new Error("Failed to save document");
+  };
+
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    try {
+      for (const f of Array.from(files)) {
+        if (!f.type.startsWith("image/")) continue;
+        await uploadOne(f);
+      }
+      onInvalidate();
+      toast({ title: "Photos uploaded" });
+    } catch (err: any) {
+      toast({ title: err?.message ?? "Upload failed", variant: "destructive" });
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  const deletePhoto = async (docId: string) => {
+    try {
+      await apiRequest("DELETE", `/api/crm/rebate-cases/${caseId}/documents/${docId}`);
+      onInvalidate();
+    } catch {
+      toast({ title: "Delete failed", variant: "destructive" });
+    }
+  };
+
+  const fmtSize = (b?: number | null) => {
+    if (!b) return "";
+    if (b < 1024) return `${b} B`;
+    if (b < 1024 * 1024) return `${Math.round(b / 1024)} KB`;
+    return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50/60 p-3 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm font-medium text-slate-700">
+          Upload geotagged photo(s) of heat pump for space heating and cooling pre-retrofit
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={uploading}
+          onClick={() => inputRef.current?.click()}
+          className="border-[#711419] text-[#711419] hover:bg-[#711419]/5"
+        >
+          {uploading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Upload className="w-3.5 h-3.5 mr-1.5" />}
+          {uploading ? "Uploading…" : "Upload Photos"}
+        </Button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={e => handleFiles(e.target.files)}
+        />
+      </div>
+
+      {photos.length === 0 ? (
+        <div className="text-xs text-slate-500 italic">No photos uploaded yet.</div>
+      ) : (
+        <ul className="divide-y divide-slate-200 bg-white rounded border border-slate-200">
+          {photos.map(p => (
+            <li key={p.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+              <FileText className="w-4 h-4 text-slate-400 shrink-0" />
+              <a
+                href={p.url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[#711419] hover:underline truncate flex-1"
+              >
+                {p.name}
+              </a>
+              <span className="text-xs text-slate-500 shrink-0">{fmtSize(p.size)}</span>
+              <button
+                type="button"
+                onClick={() => deletePhoto(p.id)}
+                className="text-slate-400 hover:text-red-600 shrink-0"
+                aria-label="Delete photo"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function RebateRequestTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onPatch: (d: Partial<RebateCase>) => void; saving: boolean }) {
   type FormState = {
     initiatorType: string;
@@ -1513,6 +1650,12 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
                   />
                 </div>
               </div>
+
+              <HeatPumpPhotoUploader
+                caseId={caseId}
+                photos={(caseData.documents ?? []).filter(d => d.category === "scope_of_work" && (d.contentType ?? "").startsWith("image/"))}
+                onInvalidate={onInvalidate}
+              />
 
               {caseData.constructionType && (
                 <div className="sm:max-w-md">
