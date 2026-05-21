@@ -121,10 +121,10 @@ export default function CrmRebateCase() {
     ) : (
     <div className="space-y-6">
       {/* Header row — matches customer profile style */}
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={() => navigate("/crm/rebate-programs")}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
+      <div className="flex items-center justify-between gap-2">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/crm/rebate-programs")}>
+          <ArrowLeft className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Back</span>
         </Button>
         <div className="flex items-center gap-1">
           {!isClosed && (
@@ -135,8 +135,8 @@ export default function CrmRebateCase() {
               onClick={() => { if (confirm("Close this case?")) closeCase.mutate(); }}
               disabled={closeCase.isPending}
             >
-              <Lock className="h-3.5 w-3.5 mr-1.5" />
-              Close Case
+              <Lock className="h-3.5 w-3.5 sm:mr-1.5" />
+              <span className="hidden sm:inline">Close Case</span>
             </Button>
           )}
           <Button
@@ -146,8 +146,8 @@ export default function CrmRebateCase() {
             onClick={() => { if (confirm("Delete this case? This cannot be undone.")) deleteCase.mutate(); }}
             disabled={deleteCase.isPending}
           >
-            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-            Delete
+            <Trash2 className="h-3.5 w-3.5 sm:mr-1.5" />
+            <span className="hidden sm:inline">Delete</span>
           </Button>
         </div>
       </div>
@@ -181,29 +181,32 @@ export default function CrmRebateCase() {
 
       {/* Tabs — underline style matching customer profile */}
       <Tabs defaultValue="program_overview">
-        <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 flex-wrap">
-          {[
-            { value: "program_overview",       label: "Program Overview",        icon: Star },
-            { value: "rebate_request",          label: "Rebate Request",          icon: FileText },
-            { value: "head_of_household",       label: "Head of Household",       icon: User },
-            { value: "scope_of_work",           label: "Scope of Work",           icon: ClipboardList },
-            { value: "contractor_pre_approval", label: "Contractor Pre-Approval", icon: CheckCircle2 },
-            { value: "project_completion",      label: "Project Completion",      icon: Wrench },
-            { value: "completion_attestations", label: "Completion Attestations", icon: Activity },
-            { value: "reservation_summary",     label: "Reservation Summary",     icon: Calendar },
-            { value: "documents",               label: "Documents",               icon: FolderOpen },
-            { value: "activity",                label: "Activity Log",            icon: Activity },
-          ].map(({ value, label, icon: Icon }) => (
-            <TabsTrigger
-              key={value}
-              value={value}
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
-            >
-              <Icon className="h-4 w-4 mr-2" />
-              {label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        {/* Scrollable tab bar — never wraps, scrolls horizontally on small screens */}
+        <div className="overflow-x-auto overflow-y-hidden border-b border-slate-200 -mx-4 sm:mx-0 px-4 sm:px-0">
+          <TabsList className="min-w-max w-auto flex justify-start rounded-none bg-transparent h-auto p-0">
+            {[
+              { value: "program_overview",       label: "Program Overview",        icon: Star },
+              { value: "rebate_request",          label: "Rebate Request",          icon: FileText },
+              { value: "head_of_household",       label: "Head of Household",       icon: User },
+              { value: "scope_of_work",           label: "Scope of Work",           icon: ClipboardList },
+              { value: "contractor_pre_approval", label: "Contractor Pre-Approval", icon: CheckCircle2 },
+              { value: "project_completion",      label: "Project Completion",      icon: Wrench },
+              { value: "completion_attestations", label: "Completion Attestations", icon: Activity },
+              { value: "reservation_summary",     label: "Reservation Summary",     icon: Calendar },
+              { value: "documents",               label: "Documents",               icon: FolderOpen },
+              { value: "activity",                label: "Activity Log",            icon: Activity },
+            ].map(({ value, label, icon: Icon }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-2.5 sm:px-3.5 md:px-4 py-2 text-xs sm:text-sm whitespace-nowrap flex items-center gap-1.5"
+              >
+                <Icon className="h-3.5 w-3.5 hidden md:block flex-shrink-0" />
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
 
         <div className="mt-6">
           <TabsContent value="program_overview">
