@@ -566,7 +566,7 @@ function RebatePhotoUploader({
           className="border-[#711419] text-[#711419] hover:bg-[#711419]/5"
         >
           {uploading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Upload className="w-3.5 h-3.5 mr-1.5" />}
-          {uploading ? "Uploading…" : "Upload Photos"}
+          {uploading ? "Uploading…" : "Upload Files"}
         </Button>
         <input
           ref={inputRef}
@@ -1952,6 +1952,7 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
             category="ahri_certificate"
             label="Specification sheets, ENERGY STAR Certification, or AHRI Certificate — Required for heat pump, water heater, clothes dryer, and electric stove/cooktop/range/oven upgrades"
             accept="*/*"
+            required
           />
           <RebatePhotoUploader
             caseId={caseId}
@@ -1979,6 +1980,7 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
                 category="manual_j_report"
                 label="Manual J Report — Required for heat pump for space heating and cooling projects"
                 accept="application/pdf,.pdf"
+                required
               />
             </>
           )}
