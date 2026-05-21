@@ -380,6 +380,89 @@ function FieldLabel({ code, label, required }: { code: string; label: string; re
   );
 }
 
+// ─── Shared form layout helpers (used by Rebate Request and Scope tabs) ──────
+
+const fInput = "w-full h-10 px-3 rounded-md bg-white border border-slate-300 text-sm text-slate-800 transition-colors focus:outline-none focus:border-[#711419] focus:ring-2 focus:ring-[#711419]/15 disabled:bg-slate-100 disabled:text-slate-500";
+const fLabel = "block text-sm font-medium text-slate-700 mb-1.5";
+const fCode = "font-semibold text-slate-900";
+const fRow = "grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4";
+const fTriplet = "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-4";
+
+function FormCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+      <header className="bg-[#711419] px-4 sm:px-5 py-3">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-white">{title}</h3>
+      </header>
+      <div className="p-4 sm:p-5">{children}</div>
+    </section>
+  );
+}
+
+function SubGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-4">
+      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200 pb-2">{title}</h4>
+      {children}
+    </div>
+  );
+}
+
+function NestedPanel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-md bg-slate-50/60 border border-slate-200 border-l-4 border-l-[#711419] p-4 sm:p-5 space-y-5">
+      {children}
+    </div>
+  );
+}
+
+function YesNo({ value, onChange }: { value: boolean | null; onChange: (v: boolean) => void }) {
+  return (
+    <div className="flex gap-6 mt-1.5">
+      {[{ label: "Yes", val: true }, { label: "No", val: false }].map(o => (
+        <label key={String(o.val)} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+          <input type="radio" checked={value === o.val} onChange={() => onChange(o.val)} className="w-4 h-4 accent-[#711419]" />
+          {o.label}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function RadioRow({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-x-6 gap-y-2 mt-1.5">
+      {options.map(opt => (
+        <label key={opt} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+          <input type="radio" checked={value === opt} onChange={() => onChange(opt)} className="w-4 h-4 accent-[#711419]" />
+          {opt}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function Certify({ checked, onChange, children }: { checked: boolean; onChange: (v: boolean) => void; children: React.ReactNode }) {
+  return (
+    <label className="flex items-start gap-2 mt-1 cursor-pointer">
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#711419]" />
+      <span className="text-sm text-slate-700">{children} <span className="text-red-500 font-medium">*Required</span></span>
+    </label>
+  );
+}
+
+function StickySaveBar({ dirty, saving, onSave, type = "submit" }: { dirty: boolean; saving: boolean; onSave?: () => void; type?: "submit" | "button" }) {
+  if (!dirty) return null;
+  return (
+    <div className="sticky bottom-0 left-0 right-0 mt-6 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-white border-t border-slate-200 flex justify-end shadow-[0_-2px_8px_rgba(0,0,0,0.04)]">
+      <Button type={type} onClick={onSave} disabled={saving} size="sm" className="bg-[#711419] hover:bg-[#5a1014]">
+        {saving ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : null}
+        Save Changes
+      </Button>
+    </div>
+  );
+}
+
 function RebateRequestTab({ caseData, onPatch, saving }: { caseData: CaseDetail; onPatch: (d: Partial<RebateCase>) => void; saving: boolean }) {
   type FormState = {
     initiatorType: string;
@@ -441,161 +524,138 @@ function RebateRequestTab({ caseData, onPatch, saving }: { caseData: CaseDetail;
     onPatch(values as Partial<RebateCase>);
   };
 
-  const inputCls = "w-full h-9 px-3 rounded-md bg-slate-50 border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-[#711419] focus:ring-1 focus:ring-[#711419]/30";
-  const labelCls = "block text-sm text-slate-700 mb-1";
-  const codeCls = "font-semibold text-slate-800";
-
   return (
-    <form onSubmit={handleSave} className="max-w-5xl mx-auto pb-24">
-      <header className="mb-6">
+    <form onSubmit={handleSave} className="max-w-5xl mx-auto pb-24 space-y-5">
+      <header>
         <h2 className="text-xl font-semibold text-slate-900 mb-1">A. Rebate Request</h2>
         <p className="text-sm text-slate-500">
           Contractor companies should use this page to fill out information about their organization and their proposed project. All fields are required.
         </p>
       </header>
 
-      {/* CONTRACTOR / INITIATOR INFORMATION */}
-      <div className="bg-[#711419] text-white px-4 py-2.5 rounded-sm mb-4">
-        <span className="text-xs font-bold uppercase tracking-wide">Contractor / Initiator Information</span>
-      </div>
-      <div className="space-y-5 mb-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <div>
-            <label className={labelCls}><span className={codeCls}>A.1.</span> Who is initiating the energy rebate request?</label>
-            <select className={inputCls} value={values.initiatorType} onChange={e => set("initiatorType", e.target.value)}>
-              <option value="Contractor/Installer">Contractor/Installer</option>
-              <option value="Customer/Homeowner">Customer/Homeowner</option>
-              <option value="Utility">Utility</option>
-            </select>
-          </div>
-          <div>
-            <label className={labelCls}><span className={codeCls}>A.2.</span> Company Name Starting the Application</label>
-            <select className={inputCls} value={values.initiatorCompanyName} onChange={e => set("initiatorCompanyName", e.target.value)}>
-              <option value="Giesbrecht HVAC">Giesbrecht HVAC</option>
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <p className="text-sm mb-3"><span className={codeCls}>A.3.</span> Primary Initiator Contact Name</p>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-5 gap-y-4">
+      <FormCard title="Contractor / Initiator Information">
+        <div className="space-y-5">
+          <div className={fRow}>
             <div>
-              <label className={labelCls}><span className={codeCls}>A.3a.</span> First Name</label>
-              <input className={inputCls} value={values.initiatorFirstName} onChange={e => set("initiatorFirstName", e.target.value)} />
-            </div>
-            <div>
-              <label className={labelCls}><span className={codeCls}>A.3c.</span> Phone Number</label>
-              <input className={inputCls} value={values.initiatorPhone} onChange={e => set("initiatorPhone", e.target.value)} />
-            </div>
-            <div>
-              <label className={labelCls}><span className={codeCls}>A.3b.</span> Last Name</label>
-              <input className={inputCls} value={values.initiatorLastName} onChange={e => set("initiatorLastName", e.target.value)} />
-            </div>
-            <div>
-              <label className={labelCls}><span className={codeCls}>A.3d.</span> Email</label>
-              <input type="email" className={inputCls} value={values.initiatorEmail} onChange={e => set("initiatorEmail", e.target.value)} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* PROPERTY AND BUILDING INFORMATION */}
-      <div className="bg-[#711419] text-white px-4 py-2.5 rounded-sm mb-4">
-        <span className="text-xs font-bold uppercase tracking-wide">Property and Building Information</span>
-      </div>
-      <div className="space-y-5">
-        <div>
-          <label className={labelCls}><span className={codeCls}>A.4.</span> Project Home Address</label>
-          <div className="space-y-2">
-            <input className={inputCls} placeholder="Address Line 1" value={values.propertyAddress} onChange={e => set("propertyAddress", e.target.value)} />
-            <input className={inputCls} placeholder="Address Line 2" value={values.propertyAddressLine2} onChange={e => set("propertyAddressLine2", e.target.value)} />
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-              <input className={`${inputCls} col-span-3 sm:col-span-2`} placeholder="City" value={values.propertyCity} onChange={e => set("propertyCity", e.target.value)} />
-              <select className={`${inputCls} col-span-1`} value={values.propertyState} onChange={e => set("propertyState", e.target.value)}>
-                {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+              <label className={fLabel}><span className={fCode}>A.1.</span> Who is initiating the energy rebate request?</label>
+              <select className={fInput} value={values.initiatorType} onChange={e => set("initiatorType", e.target.value)}>
+                <option value="Contractor/Installer">Contractor/Installer</option>
+                <option value="Customer/Homeowner">Customer/Homeowner</option>
+                <option value="Utility">Utility</option>
               </select>
-              <input className={`${inputCls} col-span-2 sm:col-span-2`} placeholder="ZIP" value={values.propertyZip} onChange={e => set("propertyZip", e.target.value)} />
+            </div>
+            <div>
+              <label className={fLabel}><span className={fCode}>A.2.</span> Company Name Starting the Application</label>
+              <select className={fInput} value={values.initiatorCompanyName} onChange={e => set("initiatorCompanyName", e.target.value)}>
+                <option value="Giesbrecht HVAC">Giesbrecht HVAC</option>
+              </select>
             </div>
           </div>
-          <label className="flex items-center gap-2 mt-3 cursor-pointer">
-            <input type="checkbox" checked={values.addressCertified} onChange={e => set("addressCertified", e.target.checked)} className="w-4 h-4 accent-[#711419]" />
-            <span className="text-sm text-slate-700">I certify the above address is complete and correct. <span className="text-red-500 font-medium">*Required</span></span>
-          </label>
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <div>
-            <label className={labelCls}><span className={codeCls}>A.5.</span> Is the building new or existing construction?</label>
-            <select className={inputCls} value={values.constructionType} onChange={e => set("constructionType", e.target.value)}>
-              <option value="">Select...</option>
-              <option value="Existing Construction">Existing Construction</option>
-              <option value="New Construction">New Construction</option>
-            </select>
+            <p className="text-sm font-medium text-slate-700 mb-3"><span className={fCode}>A.3.</span> Primary Initiator Contact Name</p>
+            <div className={fRow}>
+              <div>
+                <label className={fLabel}><span className={fCode}>A.3a.</span> First Name</label>
+                <input className={fInput} value={values.initiatorFirstName} onChange={e => set("initiatorFirstName", e.target.value)} />
+              </div>
+              <div>
+                <label className={fLabel}><span className={fCode}>A.3b.</span> Last Name</label>
+                <input className={fInput} value={values.initiatorLastName} onChange={e => set("initiatorLastName", e.target.value)} />
+              </div>
+              <div>
+                <label className={fLabel}><span className={fCode}>A.3c.</span> Phone Number</label>
+                <input className={fInput} value={values.initiatorPhone} onChange={e => set("initiatorPhone", e.target.value)} />
+              </div>
+              <div>
+                <label className={fLabel}><span className={fCode}>A.3d.</span> Email</label>
+                <input type="email" className={fInput} value={values.initiatorEmail} onChange={e => set("initiatorEmail", e.target.value)} />
+              </div>
+            </div>
           </div>
+        </div>
+      </FormCard>
+
+      <FormCard title="Property and Building Information">
+        <div className="space-y-5">
           <div>
-            <label className={labelCls}><span className={codeCls}>A.6.</span> What is the building type?</label>
-            <select className={inputCls} value={values.buildingType} onChange={e => set("buildingType", e.target.value)}>
-              <option value="">Select...</option>
-              <option value="Single Family">Single Family</option>
-              <option value="Multi-Family">Multi-Family</option>
-              <option value="Mobile Home">Mobile Home</option>
-              <option value="Commercial">Commercial</option>
-            </select>
+            <label className={fLabel}><span className={fCode}>A.4.</span> Project Home Address</label>
+            <div className="space-y-2">
+              <input className={fInput} placeholder="Address Line 1" value={values.propertyAddress} onChange={e => set("propertyAddress", e.target.value)} />
+              <input className={fInput} placeholder="Address Line 2 (optional)" value={values.propertyAddressLine2} onChange={e => set("propertyAddressLine2", e.target.value)} />
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                <input className={`${fInput} col-span-3 sm:col-span-3`} placeholder="City" value={values.propertyCity} onChange={e => set("propertyCity", e.target.value)} />
+                <select className={`${fInput} col-span-1`} value={values.propertyState} onChange={e => set("propertyState", e.target.value)}>
+                  {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <input className={`${fInput} col-span-2`} placeholder="ZIP" value={values.propertyZip} onChange={e => set("propertyZip", e.target.value)} />
+              </div>
+            </div>
+            <Certify checked={values.addressCertified} onChange={v => set("addressCertified", v)}>
+              I certify the above address is complete and correct.
+            </Certify>
           </div>
-        </div>
 
-        {values.buildingType === "Single Family" && (
-          <div className="max-w-sm">
-            <label className={labelCls}><span className={codeCls}>A.6a.</span> Single Family Building Type Details</label>
-            <select className={inputCls} value={values.buildingSubtype} onChange={e => set("buildingSubtype", e.target.value)}>
-              <option value="">Select...</option>
-              <option value="Single Family Attached">Single Family Attached</option>
-              <option value="Single Family Detached">Single Family Detached</option>
-              <option value="Townhouse">Townhouse</option>
-              <option value="Manufactured Home">Manufactured Home</option>
-            </select>
+          <div className={fRow}>
+            <div>
+              <label className={fLabel}><span className={fCode}>A.5.</span> Is the building new or existing construction?</label>
+              <select className={fInput} value={values.constructionType} onChange={e => set("constructionType", e.target.value)}>
+                <option value="">Select...</option>
+                <option value="Existing Construction">Existing Construction</option>
+                <option value="New Construction">New Construction</option>
+              </select>
+            </div>
+            <div>
+              <label className={fLabel}><span className={fCode}>A.6.</span> What is the building type?</label>
+              <select className={fInput} value={values.buildingType} onChange={e => set("buildingType", e.target.value)}>
+                <option value="">Select...</option>
+                <option value="Single Family">Single Family</option>
+                <option value="Multi-Family">Multi-Family</option>
+                <option value="Mobile Home">Mobile Home</option>
+                <option value="Commercial">Commercial</option>
+              </select>
+            </div>
           </div>
-        )}
 
-        <div>
-          <label className={labelCls}><span className={codeCls}>A.7.</span> Is the building rented?</label>
-          <div className="flex flex-col gap-1.5 mt-1">
-            {[{ label: "Yes", value: true }, { label: "No", value: false }].map(opt => (
-              <label key={String(opt.value)} className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" checked={values.isRented === opt.value} onChange={() => set("isRented", opt.value)} className="accent-[#711419]" />
-                <span className="text-sm text-slate-700">{opt.label}</span>
-              </label>
-            ))}
-          </div>
-        </div>
+          {values.buildingType === "Single Family" && (
+            <div className="sm:max-w-md">
+              <label className={fLabel}><span className={fCode}>A.6a.</span> Single Family Building Type Details</label>
+              <select className={fInput} value={values.buildingSubtype} onChange={e => set("buildingSubtype", e.target.value)}>
+                <option value="">Select...</option>
+                <option value="Single Family Attached">Single Family Attached</option>
+                <option value="Single Family Detached">Single Family Detached</option>
+                <option value="Townhouse">Townhouse</option>
+                <option value="Manufactured Home">Manufactured Home</option>
+              </select>
+            </div>
+          )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <div>
-            <label className={labelCls}><span className={codeCls}>A.8.</span> Total Number of Bedrooms</label>
-            <input type="number" min={0} className={`${inputCls} text-right`} value={values.bedroomCount ?? ""} onChange={e => set("bedroomCount", e.target.value ? Number(e.target.value) : null)} />
+            <label className={fLabel}><span className={fCode}>A.7.</span> Is the building rented?</label>
+            <YesNo value={values.isRented} onChange={v => set("isRented", v)} />
           </div>
-          <div>
-            <label className={labelCls}><span className={codeCls}>A.9.</span> Conditioned square footage of single family home:</label>
-            <select className={inputCls} value={values.sqftRange} onChange={e => set("sqftRange", e.target.value)}>
-              <option value="">Select range...</option>
-              <option value="500 - 1,500 sq ft">500 – 1,500 sq ft</option>
-              <option value="1,501 - 2,500 sq ft">1,501 – 2,500 sq ft</option>
-              <option value="2,501 - 3,500 sq ft">2,501 – 3,500 sq ft</option>
-              <option value="3,501 - 5,000 sq ft">3,501 – 5,000 sq ft</option>
-              <option value="5,001+ sq ft">5,001+ sq ft</option>
-            </select>
-          </div>
-        </div>
-      </div>
 
-      {dirty && (
-        <div className="sticky bottom-0 left-0 right-0 mt-8 -mx-4 lg:-mx-6 px-4 lg:px-6 py-3 bg-white border-t border-slate-200 flex justify-end shadow-[0_-2px_8px_rgba(0,0,0,0.04)]">
-          <Button type="submit" disabled={saving} size="sm" className="bg-[#711419] hover:bg-[#5a1014]">
-            {saving ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : null}
-            Save Changes
-          </Button>
+          <div className={fRow}>
+            <div>
+              <label className={fLabel}><span className={fCode}>A.8.</span> Total Number of Bedrooms</label>
+              <input type="number" min={0} className={fInput} value={values.bedroomCount ?? ""} onChange={e => set("bedroomCount", e.target.value ? Number(e.target.value) : null)} />
+            </div>
+            <div>
+              <label className={fLabel}><span className={fCode}>A.9.</span> Conditioned square footage of single family home</label>
+              <select className={fInput} value={values.sqftRange} onChange={e => set("sqftRange", e.target.value)}>
+                <option value="">Select range...</option>
+                <option value="500 - 1,500 sq ft">500 – 1,500 sq ft</option>
+                <option value="1,501 - 2,500 sq ft">1,501 – 2,500 sq ft</option>
+                <option value="2,501 - 3,500 sq ft">2,501 – 3,500 sq ft</option>
+                <option value="3,501 - 5,000 sq ft">3,501 – 5,000 sq ft</option>
+                <option value="5,001+ sq ft">5,001+ sq ft</option>
+              </select>
+            </div>
+          </div>
         </div>
-      )}
+      </FormCard>
+
+      <StickySaveBar dirty={dirty} saving={saving} type="submit" />
     </form>
   );
 }
@@ -696,7 +756,7 @@ function HeadOfHouseholdTab({ caseData, onPatch, saving }: { caseData: CaseDetai
       </div>
 
       {dirty && (
-        <div className="sticky bottom-0 left-0 right-0 mt-6 -mx-4 lg:-mx-6 px-4 lg:px-6 py-3 bg-white border-t border-slate-200 flex justify-end shadow-[0_-2px_8px_rgba(0,0,0,0.04)]">
+        <div className="sticky bottom-0 left-0 right-0 mt-6 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-white border-t border-slate-200 flex justify-end shadow-[0_-2px_8px_rgba(0,0,0,0.04)]">
           <Button onClick={handleSave} disabled={saving} size="sm" className="bg-[#711419] hover:bg-[#5a1014]">
             {saving ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : null}
             Save Changes
@@ -1132,10 +1192,6 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
   const checkedItems = (caseData.scopeChecklist ?? []).filter(i => i.isChecked);
   const allItems = [...(caseData.scopeChecklist ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
 
-  const inp = "w-full h-9 px-3 rounded-md bg-slate-50 border border-slate-300 text-sm text-slate-800 focus:outline-none focus:border-[#711419] focus:ring-1 focus:ring-[#711419]/30";
-  const lbl = "block text-sm text-slate-700 mb-1";
-  const cod = "font-semibold text-slate-800";
-
   const RadioGroup = ({ value, onChange }: { value: boolean | null; onChange: (v: boolean) => void }) => (
     <div className="flex gap-5 mt-1">
       {[{ label: "Yes", val: true }, { label: "No", val: false }].map(o => (
@@ -1150,7 +1206,7 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
   const GA_COUNTIES = ["Appling","Atkinson","Bacon","Baker","Baldwin","Banks","Barrow","Bartow","Ben Hill","Berrien","Bibb","Bleckley","Brantley","Brooks","Bryan","Bulloch","Burke","Butts","Calhoun","Camden","Candler","Carroll","Catoosa","Charlton","Chatham","Chattahoochee","Chattooga","Cherokee","Clarke","Clay","Clayton","Clinch","Cobb","Coffee","Colquitt","Columbia","Cook","Coweta","Crawford","Crisp","Dade","Dawson","Decatur","DeKalb","Dodge","Dooly","Dougherty","Douglas","Early","Echols","Effingham","Elbert","Emanuel","Evans","Fannin","Fayette","Floyd","Forsyth","Franklin","Fulton","Gilmer","Glascock","Glynn","Gordon","Grady","Greene","Gwinnett","Habersham","Hall","Hancock","Haralson","Harris","Hart","Heard","Henry","Houston","Irwin","Jackson","Jasper","Jeff Davis","Jefferson","Jenkins","Johnson","Jones","Lamar","Lanier","Laurens","Lee","Liberty","Lincoln","Long","Lowndes","Lumpkin","Macon","Madison","Marion","McDuffie","McIntosh","Meriwether","Miller","Mitchell","Monroe","Montgomery","Morgan","Murray","Muscogee","Newton","Oconee","Oglethorpe","Paulding","Peach","Pickens","Pierce","Pike","Polk","Pulaski","Putnam","Quitman","Rabun","Randolph","Richmond","Rockdale","Schley","Screven","Seminole","Spalding","Stephens","Stewart","Sumter","Talbot","Taliaferro","Tattnall","Taylor","Telfair","Terrell","Thomas","Tift","Toombs","Towns","Treutlen","Troup","Turner","Twiggs","Union","Upson","Walker","Walton","Ware","Warren","Washington","Wayne","Webster","Wheeler","White","Whitfield","Wilcox","Wilkes","Wilkinson","Worth"];
 
   return (
-    <div className="max-w-5xl mx-auto pb-24 space-y-8">
+    <div className="max-w-5xl mx-auto pb-24 space-y-5">
       <header>
         <h2 className="text-xl font-semibold text-slate-900 mb-1">C. Scope of Work</h2>
         <p className="text-sm text-slate-500">
@@ -1163,289 +1219,257 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
         )}
       </header>
 
-      {/* PROJECT INFORMATION */}
-      <div>
-        <div className="bg-[#711419] text-white px-4 py-2.5 rounded-sm mb-4">
-          <span className="text-xs font-bold uppercase tracking-wide">Project Information</span>
-        </div>
+      <FormCard title="Project Information">
         <div className="space-y-5">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className={fRow}>
             <div>
-              <label className={lbl}><span className={cod}>County</span></label>
-              <select className={inp} value={vals.scopeCounty} onChange={e => set("scopeCounty", e.target.value)}>
+              <label className={fLabel}><span className={fCode}>County</span></label>
+              <select className={fInput} value={vals.scopeCounty} onChange={e => set("scopeCounty", e.target.value)}>
                 <option value="">Select county…</option>
                 {GA_COUNTIES.map(c => <option key={c} value={c}>{c} County</option>)}
               </select>
             </div>
             <div>
-              <label className={lbl}><span className={cod}>C.1.</span> Expected completion date</label>
-              <input type="date" className={inp} value={vals.scopeExpectedCompletionDate} onChange={e => set("scopeExpectedCompletionDate", e.target.value)} />
+              <label className={fLabel}><span className={fCode}>C.1.</span> Expected completion date</label>
+              <input type="date" className={fInput} value={vals.scopeExpectedCompletionDate} onChange={e => set("scopeExpectedCompletionDate", e.target.value)} />
             </div>
           </div>
           <div>
-            <label className={lbl}><span className={cod}>C.2.</span> Is this a DIY (homeowner/tenant) rebate?</label>
+            <label className={fLabel}><span className={fCode}>C.2.</span> Is this a DIY (homeowner/tenant) rebate?</label>
             <RadioGroup value={vals.scopeIsDiy} onChange={v => set("scopeIsDiy", v)} />
           </div>
-          <div>
-            <label className={lbl}>Is this project associated with another HER application at this address?</label>
-            <RadioGroup value={vals.scopeAssociatedHerApp} onChange={v => set("scopeAssociatedHerApp", v)} />
-          </div>
-          <div>
-            <label className={lbl}>Is this project associated with another DIY application at this address?</label>
-            <RadioGroup value={vals.scopeAssociatedDiyApp} onChange={v => set("scopeAssociatedDiyApp", v)} />
-          </div>
-        </div>
-      </div>
-
-      {/* UTILITY INFORMATION */}
-      <div>
-        <div className="bg-[#711419] text-white px-4 py-2.5 rounded-sm mb-4">
-          <span className="text-xs font-bold uppercase tracking-wide">Utility Information</span>
-        </div>
-
-        {/* Electric */}
-        <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">Electric Information</p>
-        <div className="space-y-4 mb-6">
-          <div>
-            <label className={lbl}><span className={cod}>C.3.</span> Type of Electric Utility Provider</label>
-            <select className={inp} value={vals.electricUtilityType} onChange={e => set("electricUtilityType", e.target.value)}>
-              <option value="">Select…</option>
-              <option value="Municipal Utility">Municipal Utility</option>
-              <option value="Electric Membership Cooperative">Electric Membership Cooperative</option>
-              <option value="Investor-Owned Utility">Investor-Owned Utility</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-          {vals.electricUtilityType === "Municipal Utility" && (
+          <div className={fRow}>
             <div>
-              <label className={lbl}><span className={cod}>C.3b.</span> Municipal Utility Provider</label>
-              <select className={inp} value={vals.electricMunicipalProvider} onChange={e => set("electricMunicipalProvider", e.target.value)}>
+              <label className={fLabel}>Is this project associated with another HER application at this address?</label>
+              <RadioGroup value={vals.scopeAssociatedHerApp} onChange={v => set("scopeAssociatedHerApp", v)} />
+            </div>
+            <div>
+              <label className={fLabel}>Is this project associated with another DIY application at this address?</label>
+              <RadioGroup value={vals.scopeAssociatedDiyApp} onChange={v => set("scopeAssociatedDiyApp", v)} />
+            </div>
+          </div>
+        </div>
+      </FormCard>
+
+      <FormCard title="Utility Information">
+        <div className="space-y-6">
+          <SubGroup title="Electric Information">
+            <div>
+              <label className={fLabel}><span className={fCode}>C.3.</span> Type of Electric Utility Provider</label>
+              <select className={fInput} value={vals.electricUtilityType} onChange={e => set("electricUtilityType", e.target.value)}>
                 <option value="">Select…</option>
+                <option value="Municipal Utility">Municipal Utility</option>
+                <option value="Electric Membership Cooperative">Electric Membership Cooperative</option>
+                <option value="Investor-Owned Utility">Investor-Owned Utility</option>
                 <option value="Other">Other</option>
-                <option value="Georgia Power">Georgia Power</option>
-                <option value="Snapping Shoals EMC">Snapping Shoals EMC</option>
               </select>
             </div>
-          )}
-          <div>
-            <label className={lbl}>Electric Utility Company Name</label>
-            <input className={inp} value={vals.electricCompanyName} onChange={e => set("electricCompanyName", e.target.value)} placeholder="e.g. Georgia Power" />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div>
-              <label className={lbl}><span className={cod}>C.3b.</span> Meter Number <span className="font-normal text-slate-400 text-xs">(20 char limit)</span></label>
-              <input className={inp} maxLength={20} value={vals.electricMeterNumber} onChange={e => set("electricMeterNumber", e.target.value)} />
-            </div>
-            <div>
-              <label className={lbl}><span className={cod}>C.3c.</span> Account Number <span className="font-normal text-slate-400 text-xs">(20 char limit)</span></label>
-              <input className={inp} maxLength={20} value={vals.electricAccountNumber} onChange={e => set("electricAccountNumber", e.target.value)} />
-            </div>
-          </div>
-          <label className="flex items-start gap-2 cursor-pointer">
-            <input type="checkbox" checked={vals.electricAccountCertified} onChange={e => set("electricAccountCertified", e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#711419]" />
-            <span className="text-sm text-slate-700">I certify the above account and meter numbers are correct. <span className="text-red-500 font-medium">*Required</span></span>
-          </label>
-        </div>
-
-        {/* Gas */}
-        <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">Gas Utility Information</p>
-        <div className="space-y-4 mb-6">
-          <div>
-            <label className={lbl}><span className={cod}>C.4.</span> Do you have gas as a utility?</label>
-            <RadioGroup value={vals.hasGas} onChange={v => set("hasGas", v)} />
-          </div>
-          {vals.hasGas === false && (
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input type="checkbox" checked={vals.gasCertifiedNoGas} onChange={e => set("gasCertifiedNoGas", e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#711419]" />
-              <span className="text-sm text-slate-700">I certify that I DO NOT have a gas utility or bill. <span className="text-red-500 font-medium">*Required</span></span>
-            </label>
-          )}
-          {vals.hasGas === true && (
-            <div className="space-y-4">
+            {vals.electricUtilityType === "Municipal Utility" && (
               <div>
-                <label className={lbl}>Gas Company Name</label>
-                <input className={inp} value={vals.gasCompanyName} onChange={e => set("gasCompanyName", e.target.value)} />
+                <label className={fLabel}><span className={fCode}>C.3b.</span> Municipal Utility Provider</label>
+                <select className={fInput} value={vals.electricMunicipalProvider} onChange={e => set("electricMunicipalProvider", e.target.value)}>
+                  <option value="">Select…</option>
+                  <option value="Other">Other</option>
+                  <option value="Georgia Power">Georgia Power</option>
+                  <option value="Snapping Shoals EMC">Snapping Shoals EMC</option>
+                </select>
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div>
-                  <label className={lbl}>Meter Number</label>
-                  <input className={inp} maxLength={20} value={vals.gasMeterNumber} onChange={e => set("gasMeterNumber", e.target.value)} />
-                </div>
-                <div>
-                  <label className={lbl}>Account Number</label>
-                  <input className={inp} maxLength={20} value={vals.gasAccountNumberScope} onChange={e => set("gasAccountNumberScope", e.target.value)} />
-                </div>
-              </div>
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" checked={vals.gasAccountCertified} onChange={e => set("gasAccountCertified", e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#711419]" />
-                <span className="text-sm text-slate-700">I certify the above gas account and meter numbers are correct. <span className="text-red-500 font-medium">*Required</span></span>
-              </label>
-            </div>
-          )}
-        </div>
-
-        {/* Delivered Fuel */}
-        <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-3">Delivered Fuel Company Information</p>
-        <div className="space-y-4">
-          <div>
-            <label className={lbl}><span className={cod}>C.5.</span> Do you have a delivered fuel company?</label>
-            <RadioGroup value={vals.hasDeliveredFuel} onChange={v => set("hasDeliveredFuel", v)} />
-          </div>
-          {vals.hasDeliveredFuel === true && (
+            )}
             <div>
-              <label className={lbl}>Delivered Fuel Company Name</label>
-              <input className={inp} value={vals.deliveredFuelCompany} onChange={e => set("deliveredFuelCompany", e.target.value)} />
+              <label className={fLabel}>Electric Utility Company Name</label>
+              <input className={fInput} value={vals.electricCompanyName} onChange={e => set("electricCompanyName", e.target.value)} placeholder="e.g. Georgia Power" />
             </div>
-          )}
+            <div className={fRow}>
+              <div>
+                <label className={fLabel}><span className={fCode}>C.3b.</span> Meter Number <span className="font-normal text-slate-400 text-xs">(20 char limit)</span></label>
+                <input className={fInput} maxLength={20} value={vals.electricMeterNumber} onChange={e => set("electricMeterNumber", e.target.value)} />
+              </div>
+              <div>
+                <label className={fLabel}><span className={fCode}>C.3c.</span> Account Number <span className="font-normal text-slate-400 text-xs">(20 char limit)</span></label>
+                <input className={fInput} maxLength={20} value={vals.electricAccountNumber} onChange={e => set("electricAccountNumber", e.target.value)} />
+              </div>
+            </div>
+            <Certify checked={vals.electricAccountCertified} onChange={v => set("electricAccountCertified", v)}>
+              I certify the above account and meter numbers are correct.
+            </Certify>
+          </SubGroup>
+
+          <SubGroup title="Gas Utility Information">
+            <div>
+              <label className={fLabel}><span className={fCode}>C.4.</span> Do you have gas as a utility?</label>
+              <RadioGroup value={vals.hasGas} onChange={v => set("hasGas", v)} />
+            </div>
+            {vals.hasGas === false && (
+              <Certify checked={vals.gasCertifiedNoGas} onChange={v => set("gasCertifiedNoGas", v)}>
+                I certify that I DO NOT have a gas utility or bill.
+              </Certify>
+            )}
+            {vals.hasGas === true && (
+              <NestedPanel>
+                <div>
+                  <label className={fLabel}>Gas Company Name</label>
+                  <input className={fInput} value={vals.gasCompanyName} onChange={e => set("gasCompanyName", e.target.value)} />
+                </div>
+                <div className={fRow}>
+                  <div>
+                    <label className={fLabel}>Meter Number</label>
+                    <input className={fInput} maxLength={20} value={vals.gasMeterNumber} onChange={e => set("gasMeterNumber", e.target.value)} />
+                  </div>
+                  <div>
+                    <label className={fLabel}>Account Number</label>
+                    <input className={fInput} maxLength={20} value={vals.gasAccountNumberScope} onChange={e => set("gasAccountNumberScope", e.target.value)} />
+                  </div>
+                </div>
+                <Certify checked={vals.gasAccountCertified} onChange={v => set("gasAccountCertified", v)}>
+                  I certify the above gas account and meter numbers are correct.
+                </Certify>
+              </NestedPanel>
+            )}
+          </SubGroup>
+
+          <SubGroup title="Delivered Fuel Company Information">
+            <div>
+              <label className={fLabel}><span className={fCode}>C.5.</span> Do you have a delivered fuel company?</label>
+              <RadioGroup value={vals.hasDeliveredFuel} onChange={v => set("hasDeliveredFuel", v)} />
+            </div>
+            {vals.hasDeliveredFuel === true && (
+              <div>
+                <label className={fLabel}>Delivered Fuel Company Name</label>
+                <input className={fInput} value={vals.deliveredFuelCompany} onChange={e => set("deliveredFuelCompany", e.target.value)} />
+              </div>
+            )}
+          </SubGroup>
         </div>
-      </div>
+      </FormCard>
 
-      {/* PROJECT DETAILS — APPLIANCES */}
-      <div>
-        <div className="bg-[#711419] text-white px-4 py-2.5 rounded-sm mb-4">
-          <span className="text-xs font-bold uppercase tracking-wide">Project Details</span>
-        </div>
-        <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-4">Appliances</p>
-        <div className="space-y-6">
-
-          {/* C.6 */}
-          <div>
-            <label className={lbl}><span className={cod}>C.6.</span> Will the upgrades include an electric <strong>stove/cooktop/range/oven</strong>?</label>
-            <RadioGroup value={vals.scopeIncludesStove ? true : vals.scopeIncludesStove === false ? false : null} onChange={v => set("scopeIncludesStove", v)} />
+      <FormCard title="Project Details — Appliances">
+        <div className="space-y-5">
+          <div className={fRow}>
+            <div>
+              <label className={fLabel}><span className={fCode}>C.6.</span> Will the upgrades include an electric <strong>stove/cooktop/range/oven</strong>?</label>
+              <RadioGroup value={vals.scopeIncludesStove ? true : vals.scopeIncludesStove === false ? false : null} onChange={v => set("scopeIncludesStove", v)} />
+            </div>
+            <div>
+              <label className={fLabel}><span className={fCode}>C.7.</span> Will the upgrades include a <strong>heat pump clothes dryer</strong>?</label>
+              <RadioGroup value={vals.scopeIncludesDryer ? true : vals.scopeIncludesDryer === false ? false : null} onChange={v => set("scopeIncludesDryer", v)} />
+            </div>
+            <div>
+              <label className={fLabel}><span className={fCode}>C.8.</span> Will the upgrades include a <strong>heat pump water heater</strong>?</label>
+              <RadioGroup value={vals.scopeIncludesWaterHeater ? true : vals.scopeIncludesWaterHeater === false ? false : null} onChange={v => set("scopeIncludesWaterHeater", v)} />
+            </div>
+            <div>
+              <label className={fLabel}><span className={fCode}>C.9.</span> Will the upgrades include a <strong>heat pump for space heating or cooling</strong>?</label>
+              <RadioGroup value={vals.scopeIncludesHeatPump ? true : vals.scopeIncludesHeatPump === false ? false : null} onChange={v => set("scopeIncludesHeatPump", v)} />
+            </div>
           </div>
 
-          {/* C.7 */}
-          <div>
-            <label className={lbl}><span className={cod}>C.7.</span> Will the upgrades include a <strong>heat pump clothes dryer</strong>?</label>
-            <RadioGroup value={vals.scopeIncludesDryer ? true : vals.scopeIncludesDryer === false ? false : null} onChange={v => set("scopeIncludesDryer", v)} />
-          </div>
-
-          {/* C.8 */}
-          <div>
-            <label className={lbl}><span className={cod}>C.8.</span> Will the upgrades include a <strong>heat pump water heater</strong>?</label>
-            <RadioGroup value={vals.scopeIncludesWaterHeater ? true : vals.scopeIncludesWaterHeater === false ? false : null} onChange={v => set("scopeIncludesWaterHeater", v)} />
-          </div>
-
-          {/* C.9 */}
-          <div>
-            <label className={lbl}><span className={cod}>C.9.</span> Will the upgrades include a <strong>heat pump for space heating or cooling</strong>?</label>
-            <RadioGroup value={vals.scopeIncludesHeatPump ? true : vals.scopeIncludesHeatPump === false ? false : null} onChange={v => set("scopeIncludesHeatPump", v)} />
-          </div>
-
-          {/* C.9 sub-questions */}
           {vals.scopeIncludesHeatPump && (
-            <div className="ml-4 pl-4 border-l-2 border-[#711419]/20 space-y-5">
-
-              <div>
-                <label className={lbl}>Who will be receiving the rebate on this measure?</label>
-                <div className="flex gap-5 mt-1">
-                  {["Contractor", "Distributor"].map(opt => (
-                    <label key={opt} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
-                      <input type="radio" checked={vals.hpRebateRecipient === opt} onChange={() => set("hpRebateRecipient", opt)} className="accent-[#711419]" />
-                      {opt}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className={lbl}><span className={cod}>a.</span> What type of heat pump will be installed?</label>
-                <select className={inp} value={vals.hpType} onChange={e => set("hpType", e.target.value)}>
-                  <option value="">Select…</option>
-                  <option value="Central system with backup">Central system with backup</option>
-                  <option value="Central system without backup">Central system without backup</option>
-                  <option value="Mini-split">Mini-split</option>
-                  <option value="Ground source heat pump">Ground source heat pump</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label className={lbl}>Will the new heat pump for space heating and cooling be ducted or non-ducted?</label>
-                <div className="flex gap-5 mt-1">
-                  {["Ducted", "Non-Ducted"].map(opt => (
-                    <label key={opt} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
-                      <input type="radio" checked={vals.hpDucted === opt} onChange={() => set("hpDucted", opt)} className="accent-[#711419]" />
-                      {opt}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className={lbl}>Will the heat pump system serve as the primary heating and cooling source?</label>
-                <RadioGroup value={vals.hpPrimarySource} onChange={v => set("hpPrimarySource", v)} />
-              </div>
-
-              <div>
-                <label className={lbl}><span className={cod}>b.</span> What is the primary heating and cooling distribution type of the existing system?</label>
-                <select className={inp} value={vals.hpExistingDistributionType} onChange={e => set("hpExistingDistributionType", e.target.value)}>
-                  <option value="">Select…</option>
-                  <option value="None">None</option>
-                  <option value="Forced air (ducts)">Forced air (ducts)</option>
-                  <option value="Hydronic (radiators/baseboards)">Hydronic (radiators/baseboards)</option>
-                  <option value="Radiant floor">Radiant floor</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label className={lbl}><span className={cod}>c.</span> Does the new heat pump meet ENERGY STAR™ requirements for cold climate heat pumps?</label>
-                <select className={inp} value={vals.hpEnergyStarColdClimate} onChange={e => set("hpEnergyStarColdClimate", e.target.value)}>
-                  <option value="">Select…</option>
-                  <option value="Yes">Yes</option>
-                  <option value="No">No</option>
-                  <option value="Unknown">Unknown</option>
-                </select>
-              </div>
-
-              <div className="max-w-xs">
-                <label className={lbl}><span className={cod}>d.</span> What percent of the heating load will this system cover? <span className="text-slate-400 font-normal">(choose closest)</span></label>
-                <div className="flex items-center gap-2">
-                  <input className={inp} placeholder="100" value={vals.hpHeatingLoadPercent} onChange={e => set("hpHeatingLoadPercent", e.target.value)} />
-                  <span className="text-sm text-slate-500 flex-shrink-0">%</span>
-                </div>
-              </div>
-
-              <div>
-                <label className={lbl}><span className={cod}>e.</span> What is the heating capacity of new heat pump system? <span className="text-slate-400 font-normal">(BTU/hr)</span></label>
-                <input className={inp} placeholder="e.g. 20043" value={vals.hpHeatingCapacityBtu} onChange={e => set("hpHeatingCapacityBtu", e.target.value)} />
-              </div>
-
-              <div>
-                <label className={lbl}><span className={cod}>f.</span> What is the cooling capacity of the new heat pump system? <span className="text-slate-400 font-normal">(BTU/hr)</span></label>
-                <input className={inp} placeholder="e.g. 32000" value={vals.hpCoolingCapacityBtu} onChange={e => set("hpCoolingCapacityBtu", e.target.value)} />
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <NestedPanel>
+              <div className={fRow}>
                 <div>
-                  <label className={lbl}>Make</label>
-                  <input className={inp} placeholder="e.g. Trane" value={vals.hpMake} onChange={e => set("hpMake", e.target.value)} />
+                  <label className={fLabel}>Who will be receiving the rebate on this measure?</label>
+                  <RadioRow options={["Contractor", "Distributor"]} value={vals.hpRebateRecipient} onChange={v => set("hpRebateRecipient", v)} />
                 </div>
                 <div>
-                  <label className={lbl}>Model</label>
-                  <input className={inp} placeholder="e.g. 5TWR7036A1000" value={vals.hpModel} onChange={e => set("hpModel", e.target.value)} />
+                  <label className={fLabel}>Will the new heat pump for space heating and cooling be ducted or non-ducted?</label>
+                  <RadioRow options={["Ducted", "Non-Ducted"]} value={vals.hpDucted} onChange={v => set("hpDucted", v)} />
                 </div>
               </div>
 
-              <div>
-                <label className={lbl}><span className={cod}>g.</span> Are there any External Rebates (i.e. GA Power, WAP, etc.) that will apply to this measure's installation?</label>
-                <RadioGroup value={vals.hpExternalRebates} onChange={v => set("hpExternalRebates", v)} />
+              <div className={fRow}>
+                <div>
+                  <label className={fLabel}><span className={fCode}>a.</span> What type of heat pump will be installed?</label>
+                  <select className={fInput} value={vals.hpType} onChange={e => set("hpType", e.target.value)}>
+                    <option value="">Select…</option>
+                    <option value="Central system with backup">Central system with backup</option>
+                    <option value="Central system without backup">Central system without backup</option>
+                    <option value="Mini-split">Mini-split</option>
+                    <option value="Ground source heat pump">Ground source heat pump</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={fLabel}><span className={fCode}>b.</span> Primary heating and cooling distribution type of the existing system</label>
+                  <select className={fInput} value={vals.hpExistingDistributionType} onChange={e => set("hpExistingDistributionType", e.target.value)}>
+                    <option value="">Select…</option>
+                    <option value="None">None</option>
+                    <option value="Forced air (ducts)">Forced air (ducts)</option>
+                    <option value="Hydronic (radiators/baseboards)">Hydronic (radiators/baseboards)</option>
+                    <option value="Radiant floor">Radiant floor</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className={fRow}>
                 <div>
-                  <label className={lbl}>Estimated HVAC Heat Pump Material Costs</label>
-                  <input className={inp} placeholder="$ 0.00" value={vals.hpMaterialCost} onChange={e => set("hpMaterialCost", e.target.value)} />
+                  <label className={fLabel}>Will the heat pump system serve as the primary heating and cooling source?</label>
+                  <RadioGroup value={vals.hpPrimarySource} onChange={v => set("hpPrimarySource", v)} />
                 </div>
                 <div>
-                  <label className={lbl}>Estimated HVAC Heat Pump Install Costs</label>
-                  <input className={inp} placeholder="$ 0.00" value={vals.hpInstallCost} onChange={e => set("hpInstallCost", e.target.value)} />
+                  <label className={fLabel}><span className={fCode}>c.</span> Does the new heat pump meet ENERGY STAR™ requirements for cold climate heat pumps?</label>
+                  <select className={fInput} value={vals.hpEnergyStarColdClimate} onChange={e => set("hpEnergyStarColdClimate", e.target.value)}>
+                    <option value="">Select…</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                    <option value="Unknown">Unknown</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className={fTriplet}>
+                <div>
+                  <label className={fLabel}><span className={fCode}>d.</span> Heating load this system covers <span className="text-slate-400 font-normal">(choose closest)</span></label>
+                  <div className="flex items-center gap-2">
+                    <input className={fInput} placeholder="100" value={vals.hpHeatingLoadPercent} onChange={e => set("hpHeatingLoadPercent", e.target.value)} />
+                    <span className="text-sm text-slate-500 flex-shrink-0">%</span>
+                  </div>
                 </div>
                 <div>
-                  <label className={lbl}>Estimated HVAC Heat Pump Total Cost</label>
+                  <label className={fLabel}><span className={fCode}>e.</span> Heating capacity <span className="text-slate-400 font-normal">(BTU/hr)</span></label>
+                  <input className={fInput} placeholder="e.g. 20043" value={vals.hpHeatingCapacityBtu} onChange={e => set("hpHeatingCapacityBtu", e.target.value)} />
+                </div>
+                <div>
+                  <label className={fLabel}><span className={fCode}>f.</span> Cooling capacity <span className="text-slate-400 font-normal">(BTU/hr)</span></label>
+                  <input className={fInput} placeholder="e.g. 32000" value={vals.hpCoolingCapacityBtu} onChange={e => set("hpCoolingCapacityBtu", e.target.value)} />
+                </div>
+              </div>
+
+              <div className={fRow}>
+                <div>
+                  <label className={fLabel}>Make</label>
+                  <input className={fInput} placeholder="e.g. Trane" value={vals.hpMake} onChange={e => set("hpMake", e.target.value)} />
+                </div>
+                <div>
+                  <label className={fLabel}>Model</label>
+                  <input className={fInput} placeholder="e.g. 5TWR7036A1000" value={vals.hpModel} onChange={e => set("hpModel", e.target.value)} />
+                </div>
+              </div>
+
+              <div className={fRow}>
+                <div>
+                  <label className={fLabel}><span className={fCode}>g.</span> Are there any External Rebates (i.e. GA Power, WAP, etc.) that will apply to this measure's installation?</label>
+                  <RadioGroup value={vals.hpExternalRebates} onChange={v => set("hpExternalRebates", v)} />
+                </div>
+                <div>
+                  <label className={fLabel}>Will the upgrades include fuel-switching?</label>
+                  <RadioGroup value={vals.hpFuelSwitching} onChange={v => set("hpFuelSwitching", v)} />
+                </div>
+              </div>
+
+              <div className={fTriplet}>
+                <div>
+                  <label className={fLabel}>Estimated HVAC Heat Pump Material Costs</label>
+                  <input className={fInput} placeholder="$ 0.00" value={vals.hpMaterialCost} onChange={e => set("hpMaterialCost", e.target.value)} />
+                </div>
+                <div>
+                  <label className={fLabel}>Estimated HVAC Heat Pump Install Costs</label>
+                  <input className={fInput} placeholder="$ 0.00" value={vals.hpInstallCost} onChange={e => set("hpInstallCost", e.target.value)} />
+                </div>
+                <div>
+                  <label className={fLabel}>Estimated HVAC Heat Pump Total Cost</label>
                   <input
-                    className={`${inp} bg-slate-100 text-slate-500`}
+                    className={`${fInput} bg-slate-100 text-slate-500`}
                     readOnly
                     value={
                       vals.hpMaterialCost && vals.hpInstallCost
@@ -1457,110 +1481,103 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
                 </div>
               </div>
 
-              <div>
-                <label className={lbl}>Will the upgrades include fuel-switching?</label>
-                <RadioGroup value={vals.hpFuelSwitching} onChange={v => set("hpFuelSwitching", v)} />
-              </div>
-
-              {/* Construction Type read-only */}
               {caseData.constructionType && (
-                <div>
-                  <label className={lbl}>Construction Type</label>
-                  <div className="w-full h-9 px-3 flex items-center rounded-md bg-slate-100 border border-slate-300 text-sm text-slate-600">
+                <div className="sm:max-w-md">
+                  <label className={fLabel}>Construction Type</label>
+                  <div className={`${fInput} bg-slate-100 text-slate-600 flex items-center`}>
                     {caseData.constructionType}
                   </div>
                 </div>
               )}
 
-              {/* Limited Assessment — shown for Existing Construction */}
               {caseData.constructionType === "Existing Construction" && (
-                <div className="mt-2">
-                  <p className="text-sm text-slate-600 mb-3">
+                <div className="pt-2 space-y-4">
+                  <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
                     Existing Constructions require a limited assessment for heat pumps. Please complete the limited assessment questions below.
-                  </p>
-                  <p className="font-semibold text-slate-800 mb-4">Limited Assessment</p>
-                  <div className="space-y-5">
+                  </div>
+                  <h5 className="font-semibold text-slate-800">Limited Assessment</h5>
 
+                  <div className={fRow}>
                     <div>
-                      <label className={lbl}>Assessment Date</label>
-                      <input type="date" className={inp} value={vals.assessmentDate} onChange={e => set("assessmentDate", e.target.value)} />
+                      <label className={fLabel}>Assessment Date</label>
+                      <input type="date" className={fInput} value={vals.assessmentDate} onChange={e => set("assessmentDate", e.target.value)} />
                     </div>
-
                     <div>
-                      <label className={lbl}>What year was the home built?</label>
-                      <input className={inp} placeholder="e.g. 1971" value={vals.assessmentYearBuilt} onChange={e => set("assessmentYearBuilt", e.target.value)} />
+                      <label className={fLabel}>What year was the home built?</label>
+                      <input className={fInput} placeholder="e.g. 1971" value={vals.assessmentYearBuilt} onChange={e => set("assessmentYearBuilt", e.target.value)} />
                     </div>
+                  </div>
 
-                    <div>
-                      <label className={lbl}>Is ceiling insulation R-value known?</label>
-                      <RadioGroup value={vals.ceilingInsulationKnown} onChange={v => set("ceilingInsulationKnown", v)} />
+                  <div>
+                    <label className={fLabel}>Is ceiling insulation R-value known?</label>
+                    <RadioGroup value={vals.ceilingInsulationKnown} onChange={v => set("ceilingInsulationKnown", v)} />
+                  </div>
+
+                  {vals.ceilingInsulationKnown && (
+                    <div className={fRow}>
+                      <div>
+                        <label className={fLabel}>Ceiling Insulation R-Value</label>
+                        <input className={fInput} placeholder="e.g. 28" value={vals.ceilingInsulationRValue} onChange={e => set("ceilingInsulationRValue", e.target.value)} />
+                      </div>
+                      <div>
+                        <label className={fLabel}>Ceiling insulation type</label>
+                        <select className={fInput} value={vals.ceilingInsulationType} onChange={e => set("ceilingInsulationType", e.target.value)}>
+                          <option value="">Select…</option>
+                          <option value="Batt insulation">Batt insulation</option>
+                          <option value="Blown-in insulation">Blown-in insulation</option>
+                          <option value="Spray foam">Spray foam</option>
+                          <option value="Rigid board">Rigid board</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
                     </div>
+                  )}
 
-                    {vals.ceilingInsulationKnown && (
-                      <>
-                        <div className="max-w-xs">
-                          <label className={lbl}>Ceiling Insulation R-Value</label>
-                          <input className={inp} placeholder="e.g. 28" value={vals.ceilingInsulationRValue} onChange={e => set("ceilingInsulationRValue", e.target.value)} />
-                        </div>
-                        <div>
-                          <label className={lbl}>Ceiling insulation type</label>
-                          <select className={inp} value={vals.ceilingInsulationType} onChange={e => set("ceilingInsulationType", e.target.value)}>
-                            <option value="">Select…</option>
-                            <option value="Batt insulation">Batt insulation</option>
-                            <option value="Blown-in insulation">Blown-in insulation</option>
-                            <option value="Spray foam">Spray foam</option>
-                            <option value="Rigid board">Rigid board</option>
-                            <option value="Other">Other</option>
-                          </select>
-                        </div>
-                      </>
-                    )}
-
+                  <div className={fTriplet}>
                     <div>
-                      <label className={lbl}>Are the air ducts insulated?</label>
-                      <select className={inp} value={vals.ductsInsulated} onChange={e => set("ductsInsulated", e.target.value)}>
+                      <label className={fLabel}>Are the air ducts insulated?</label>
+                      <select className={fInput} value={vals.ductsInsulated} onChange={e => set("ductsInsulated", e.target.value)}>
                         <option value="">Select…</option>
                         <option value="Yes">Yes</option>
                         <option value="No">No</option>
                         <option value="Unknown">Unknown</option>
                       </select>
                     </div>
-
                     <div>
-                      <label className={lbl}>Are the air ducts sealed?</label>
-                      <select className={inp} value={vals.ductsSealed} onChange={e => set("ductsSealed", e.target.value)}>
+                      <label className={fLabel}>Are the air ducts sealed?</label>
+                      <select className={fInput} value={vals.ductsSealed} onChange={e => set("ductsSealed", e.target.value)}>
                         <option value="">Select…</option>
                         <option value="Yes">Yes</option>
                         <option value="No">No</option>
                         <option value="Unknown">Unknown</option>
                       </select>
                     </div>
-
                     <div>
-                      <label className={lbl}>Is envelope professionally air sealed?</label>
-                      <select className={inp} value={vals.envelopeAirSealed} onChange={e => set("envelopeAirSealed", e.target.value)}>
+                      <label className={fLabel}>Is envelope professionally air sealed?</label>
+                      <select className={fInput} value={vals.envelopeAirSealed} onChange={e => set("envelopeAirSealed", e.target.value)}>
                         <option value="">Select…</option>
                         <option value="Yes">Yes</option>
                         <option value="No">No</option>
                         <option value="Unknown">Unknown</option>
                       </select>
                     </div>
+                  </div>
 
-                    <div>
-                      <label className={lbl}>Is whole home ventilation system rated flow CFM (cubic feet per minute) known?</label>
-                      <RadioGroup value={vals.ventilationCfmKnown} onChange={v => set("ventilationCfmKnown", v)} />
-                    </div>
+                  <div>
+                    <label className={fLabel}>Is whole home ventilation system rated flow CFM (cubic feet per minute) known?</label>
+                    <RadioGroup value={vals.ventilationCfmKnown} onChange={v => set("ventilationCfmKnown", v)} />
+                  </div>
 
+                  <div className={fRow}>
                     {vals.ventilationCfmKnown && (
-                      <div className="max-w-xs">
-                        <label className={lbl}>Whole home ventilation system rated flow CFM</label>
-                        <input className={inp} placeholder="e.g. 1" value={vals.ventilationCfm} onChange={e => set("ventilationCfm", e.target.value)} />
+                      <div>
+                        <label className={fLabel}>Whole home ventilation system rated flow CFM</label>
+                        <input className={fInput} placeholder="e.g. 1" value={vals.ventilationCfm} onChange={e => set("ventilationCfm", e.target.value)} />
                       </div>
                     )}
-
                     <div>
-                      <label className={lbl}><span className={cod}>b.</span> Whole home ventilation system type</label>
-                      <select className={inp} value={vals.ventilationSystemType} onChange={e => set("ventilationSystemType", e.target.value)}>
+                      <label className={fLabel}><span className={fCode}>b.</span> Whole home ventilation system type</label>
+                      <select className={fInput} value={vals.ventilationSystemType} onChange={e => set("ventilationSystemType", e.target.value)}>
                         <option value="">Select…</option>
                         <option value="None">None</option>
                         <option value="HRV (Heat Recovery Ventilator)">HRV (Heat Recovery Ventilator)</option>
@@ -1571,150 +1588,146 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
                         <option value="Other">Other</option>
                       </select>
                     </div>
-
-                    <div>
-                      <label className={lbl}><span className={cod}>c.</span> Cooling system type</label>
-                      <select className={inp} value={vals.coolingSystemType} onChange={e => set("coolingSystemType", e.target.value)}>
-                        <option value="">Select…</option>
-                        <option value="Heat pump">Heat pump</option>
-                        <option value="Central air conditioner">Central air conditioner</option>
-                        <option value="Mini-split">Mini-split</option>
-                        <option value="Window unit(s)">Window unit(s)</option>
-                        <option value="No cooling">No cooling</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
-
-                    {/* Cooling Systems */}
-                    <div className="pt-2">
-                      <p className="font-semibold text-slate-800 mb-4">Cooling Systems</p>
-                      <div className="space-y-5">
-                        <div>
-                          <label className={lbl}>Is efficiency known?</label>
-                          <RadioGroup value={vals.coolingEfficiencyKnown} onChange={v => set("coolingEfficiencyKnown", v)} />
-                        </div>
-                        {vals.coolingEfficiencyKnown && (
-                          <div>
-                            <label className={lbl}>Efficiency SEER (Seasonal Energy Efficiency Ratio)</label>
-                            <input className={inp} placeholder="e.g. 16" value={vals.coolingEfficiencySeer} onChange={e => set("coolingEfficiencySeer", e.target.value)} />
-                          </div>
-                        )}
-                        <div>
-                          <label className={lbl}>Is the percent of floor area served by cooling system known?</label>
-                          <RadioGroup value={vals.coolingFloorAreaKnown} onChange={v => set("coolingFloorAreaKnown", v)} />
-                        </div>
-                        {vals.coolingFloorAreaKnown && (
-                          <div className="max-w-xs">
-                            <label className={lbl}>Percent of floor area served by cooling system</label>
-                            <div className="flex items-center gap-2">
-                              <input className={inp} placeholder="100" value={vals.coolingFloorAreaPct} onChange={e => set("coolingFloorAreaPct", e.target.value)} />
-                              <span className="text-sm text-slate-500 flex-shrink-0">%</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Heating System */}
-                    <div className="pt-2">
-                      <p className="font-semibold text-slate-800 mb-4">Heating System</p>
-                      <div className="space-y-5">
-                        <div>
-                          <label className={lbl}>Fuel and system type</label>
-                          <select className={inp} value={vals.heatingSystemFuelType} onChange={e => set("heatingSystemFuelType", e.target.value)}>
-                            <option value="">Select…</option>
-                            <option value="Gas Propane Furnace">Gas Propane Furnace</option>
-                            <option value="Natural Gas Furnace">Natural Gas Furnace</option>
-                            <option value="Electric Furnace">Electric Furnace</option>
-                            <option value="Heat Pump">Heat Pump</option>
-                            <option value="Oil Furnace">Oil Furnace</option>
-                            <option value="Electric Baseboard">Electric Baseboard</option>
-                            <option value="No heating">No heating</option>
-                            <option value="Other">Other</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className={lbl}>Is efficiency known?</label>
-                          <RadioGroup value={vals.heatingEfficiencyKnown} onChange={v => set("heatingEfficiencyKnown", v)} />
-                        </div>
-                        {vals.heatingEfficiencyKnown && (
-                          <>
-                            <div>
-                              <label className={lbl}>Heating Seasonal Performance Factor (HSPF)</label>
-                              <input className={inp} placeholder="e.g. 8.5" value={vals.heatingHspf} onChange={e => set("heatingHspf", e.target.value)} />
-                            </div>
-                            <div>
-                              <label className={lbl}>Annual Fuel Utilization Efficiency (AFUE)</label>
-                              <input className={inp} placeholder="e.g. 0.80" value={vals.heatingAfue} onChange={e => set("heatingAfue", e.target.value)} />
-                            </div>
-                          </>
-                        )}
-                        <div>
-                          <label className={lbl}>Is percent of floor area served by the heating system known?</label>
-                          <RadioGroup value={vals.heatingFloorAreaKnown} onChange={v => set("heatingFloorAreaKnown", v)} />
-                        </div>
-                        {vals.heatingFloorAreaKnown && (
-                          <div className="max-w-xs">
-                            <label className={lbl}>Percent of floor area served by heating system</label>
-                            <div className="flex items-center gap-2">
-                              <input className={inp} placeholder="100" value={vals.heatingFloorAreaPct} onChange={e => set("heatingFloorAreaPct", e.target.value)} />
-                              <span className="text-sm text-slate-500 flex-shrink-0">%</span>
-                            </div>
-                          </div>
-                        )}
-                        <div className="max-w-xs">
-                          <label className={lbl}>Electrical panel max amps</label>
-                          <input className={inp} placeholder="e.g. 200" value={vals.electricalPanelAmps} onChange={e => set("electricalPanelAmps", e.target.value)} />
-                        </div>
-                      </div>
-                    </div>
-
                   </div>
+
+                  <div>
+                    <label className={fLabel}><span className={fCode}>c.</span> Cooling system type</label>
+                    <select className={fInput} value={vals.coolingSystemType} onChange={e => set("coolingSystemType", e.target.value)}>
+                      <option value="">Select…</option>
+                      <option value="Heat pump">Heat pump</option>
+                      <option value="Central air conditioner">Central air conditioner</option>
+                      <option value="Mini-split">Mini-split</option>
+                      <option value="Window unit(s)">Window unit(s)</option>
+                      <option value="No cooling">No cooling</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  <SubGroup title="Cooling Systems">
+                    <div className={fRow}>
+                      <div>
+                        <label className={fLabel}>Is efficiency known?</label>
+                        <RadioGroup value={vals.coolingEfficiencyKnown} onChange={v => set("coolingEfficiencyKnown", v)} />
+                      </div>
+                      {vals.coolingEfficiencyKnown && (
+                        <div>
+                          <label className={fLabel}>Efficiency SEER (Seasonal Energy Efficiency Ratio)</label>
+                          <input className={fInput} placeholder="e.g. 16" value={vals.coolingEfficiencySeer} onChange={e => set("coolingEfficiencySeer", e.target.value)} />
+                        </div>
+                      )}
+                    </div>
+                    <div className={fRow}>
+                      <div>
+                        <label className={fLabel}>Is the percent of floor area served by cooling system known?</label>
+                        <RadioGroup value={vals.coolingFloorAreaKnown} onChange={v => set("coolingFloorAreaKnown", v)} />
+                      </div>
+                      {vals.coolingFloorAreaKnown && (
+                        <div>
+                          <label className={fLabel}>Percent of floor area served by cooling system</label>
+                          <div className="flex items-center gap-2">
+                            <input className={fInput} placeholder="100" value={vals.coolingFloorAreaPct} onChange={e => set("coolingFloorAreaPct", e.target.value)} />
+                            <span className="text-sm text-slate-500 flex-shrink-0">%</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </SubGroup>
+
+                  <SubGroup title="Heating System">
+                    <div className={fRow}>
+                      <div>
+                        <label className={fLabel}>Fuel and system type</label>
+                        <select className={fInput} value={vals.heatingSystemFuelType} onChange={e => set("heatingSystemFuelType", e.target.value)}>
+                          <option value="">Select…</option>
+                          <option value="Gas Propane Furnace">Gas Propane Furnace</option>
+                          <option value="Natural Gas Furnace">Natural Gas Furnace</option>
+                          <option value="Electric Furnace">Electric Furnace</option>
+                          <option value="Heat Pump">Heat Pump</option>
+                          <option value="Oil Furnace">Oil Furnace</option>
+                          <option value="Electric Baseboard">Electric Baseboard</option>
+                          <option value="No heating">No heating</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className={fLabel}>Is efficiency known?</label>
+                        <RadioGroup value={vals.heatingEfficiencyKnown} onChange={v => set("heatingEfficiencyKnown", v)} />
+                      </div>
+                    </div>
+                    {vals.heatingEfficiencyKnown && (
+                      <div className={fRow}>
+                        <div>
+                          <label className={fLabel}>Heating Seasonal Performance Factor (HSPF)</label>
+                          <input className={fInput} placeholder="e.g. 8.5" value={vals.heatingHspf} onChange={e => set("heatingHspf", e.target.value)} />
+                        </div>
+                        <div>
+                          <label className={fLabel}>Annual Fuel Utilization Efficiency (AFUE)</label>
+                          <input className={fInput} placeholder="e.g. 0.80" value={vals.heatingAfue} onChange={e => set("heatingAfue", e.target.value)} />
+                        </div>
+                      </div>
+                    )}
+                    <div className={fRow}>
+                      <div>
+                        <label className={fLabel}>Is percent of floor area served by the heating system known?</label>
+                        <RadioGroup value={vals.heatingFloorAreaKnown} onChange={v => set("heatingFloorAreaKnown", v)} />
+                      </div>
+                      {vals.heatingFloorAreaKnown && (
+                        <div>
+                          <label className={fLabel}>Percent of floor area served by heating system</label>
+                          <div className="flex items-center gap-2">
+                            <input className={fInput} placeholder="100" value={vals.heatingFloorAreaPct} onChange={e => set("heatingFloorAreaPct", e.target.value)} />
+                            <span className="text-sm text-slate-500 flex-shrink-0">%</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="sm:max-w-xs">
+                      <label className={fLabel}>Electrical panel max amps</label>
+                      <input className={fInput} placeholder="e.g. 200" value={vals.electricalPanelAmps} onChange={e => set("electricalPanelAmps", e.target.value)} />
+                    </div>
+                  </SubGroup>
                 </div>
               )}
-            </div>
+            </NestedPanel>
           )}
         </div>
-      </div>
+      </FormCard>
 
-      {/* ELECTRICAL UPGRADES */}
-      <div>
-        <div className="bg-[#711419] text-white px-4 py-2.5 rounded-sm mb-4">
-          <span className="text-xs font-bold uppercase tracking-wide">Electrical Upgrades</span>
-        </div>
-        <div className="space-y-6">
-          <div>
-            <label className={lbl}><span className={cod}>C.10.</span> Will the upgrades include an <strong>electrical panel</strong>?</label>
-            <RadioGroup value={vals.scopeIncludesPanel ? true : vals.scopeIncludesPanel === false ? false : null} onChange={v => set("scopeIncludesPanel", v)} />
-          </div>
-
-          <div>
-            <label className={lbl}><span className={cod}>C.11.</span> Will the upgrades include <strong>electrical wiring</strong>?</label>
-            <RadioGroup value={vals.scopeIncludesWiring ? true : vals.scopeIncludesWiring === false ? false : null} onChange={v => set("scopeIncludesWiring", v)} />
+      <FormCard title="Electrical Upgrades">
+        <div className="space-y-5">
+          <div className={fRow}>
+            <div>
+              <label className={fLabel}><span className={fCode}>C.10.</span> Will the upgrades include an <strong>electrical panel</strong>?</label>
+              <RadioGroup value={vals.scopeIncludesPanel ? true : vals.scopeIncludesPanel === false ? false : null} onChange={v => set("scopeIncludesPanel", v)} />
+            </div>
+            <div>
+              <label className={fLabel}><span className={fCode}>C.11.</span> Will the upgrades include <strong>electrical wiring</strong>?</label>
+              <RadioGroup value={vals.scopeIncludesWiring ? true : vals.scopeIncludesWiring === false ? false : null} onChange={v => set("scopeIncludesWiring", v)} />
+            </div>
           </div>
 
           {vals.scopeIncludesWiring && (
-            <div className="ml-4 pl-4 border-l-2 border-[#711419]/20 space-y-5">
-              <p className="text-sm font-semibold text-red-600">
+            <NestedPanel>
+              <p className="text-sm font-semibold text-[#711419]">
                 Please note: Electrical wiring must be paired with either another HEAR update or HER project.
               </p>
               <div>
-                <label className={lbl}><span className={cod}>a.</span> Are there any External Rebates (i.e. GA Power, WAP, etc.) that will apply to this measure's installation?</label>
+                <label className={fLabel}><span className={fCode}>a.</span> Are there any External Rebates (i.e. GA Power, WAP, etc.) that will apply to this measure's installation?</label>
                 <RadioGroup value={vals.wiringExternalRebates} onChange={v => set("wiringExternalRebates", v)} />
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className={fTriplet}>
                 <div>
-                  <label className={lbl}>Estimated Electrical wiring Material Costs</label>
-                  <input className={inp} placeholder="$ 0.00" value={vals.wiringMaterialCost} onChange={e => set("wiringMaterialCost", e.target.value)} />
+                  <label className={fLabel}>Estimated Electrical wiring Material Costs</label>
+                  <input className={fInput} placeholder="$ 0.00" value={vals.wiringMaterialCost} onChange={e => set("wiringMaterialCost", e.target.value)} />
                 </div>
                 <div>
-                  <label className={lbl}>Estimated Electrical wiring Install Costs</label>
-                  <input className={inp} placeholder="$ 0.00" value={vals.wiringInstallCost} onChange={e => set("wiringInstallCost", e.target.value)} />
+                  <label className={fLabel}>Estimated Electrical wiring Install Costs</label>
+                  <input className={fInput} placeholder="$ 0.00" value={vals.wiringInstallCost} onChange={e => set("wiringInstallCost", e.target.value)} />
                 </div>
                 <div>
-                  <label className={lbl}>Estimated Electrical wiring Total Cost</label>
+                  <label className={fLabel}>Estimated Electrical wiring Total Cost</label>
                   <input
-                    className={`${inp} bg-slate-100 text-slate-500`}
+                    className={`${fInput} bg-slate-100 text-slate-500`}
                     readOnly
                     value={
                       vals.wiringMaterialCost && vals.wiringInstallCost
@@ -1725,23 +1738,19 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
                   />
                 </div>
               </div>
-            </div>
+            </NestedPanel>
           )}
 
           <div>
-            <label className={lbl}>Will the project include <strong>insulation, air sealing, or ventilation upgrades</strong>?</label>
+            <label className={fLabel}>Will the project include <strong>insulation, air sealing, or ventilation upgrades</strong>?</label>
             <RadioGroup value={vals.scopeIncludesInsulation} onChange={v => set("scopeIncludesInsulation", v)} />
           </div>
         </div>
-      </div>
+      </FormCard>
 
-      {/* ELECTRIFICATION MEASURES */}
-      <div>
-        <div className="bg-[#711419] text-white px-4 py-2.5 rounded-sm mb-4">
-          <span className="text-xs font-bold uppercase tracking-wide">Electrification Measures</span>
-        </div>
-        <p className="text-sm text-slate-600 mb-4"><span className={cod}>D.1.</span> Select all measures included in the proposed scope of work:</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <FormCard title="Electrification Measures">
+        <p className="text-sm text-slate-600 mb-4"><span className={fCode}>D.1.</span> Select all measures included in the proposed scope of work:</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
           {[...(caseData.scopeChecklist ?? [])].sort((a, b) => a.sortOrder - b.sortOrder).map(item => (
             <button
               key={item.id}
@@ -1766,66 +1775,53 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
           </div>
         )}
         {allItems.length === 0 && <p className="text-sm text-slate-400 py-4 text-center">No measures configured.</p>}
-      </div>
+      </FormCard>
 
-      {/* SCOPE DESCRIPTION & COST */}
-      <div>
-        <div className="bg-[#711419] text-white px-4 py-2.5 rounded-sm mb-4">
-          <span className="text-xs font-bold uppercase tracking-wide">Scope Description &amp; Cost</span>
-        </div>
+      <FormCard title="Scope Description & Cost">
         <div className="space-y-5">
           <div>
-            <label className={lbl}><span className={cod}>D.2.</span> Describe the proposed scope of work</label>
+            <label className={fLabel}><span className={fCode}>D.2.</span> Describe the proposed scope of work</label>
             <textarea
               rows={4}
-              className="w-full px-3 py-2 rounded-md bg-slate-50 border border-slate-300 text-sm text-slate-800 resize-none focus:outline-none focus:border-[#711419] focus:ring-1 focus:ring-[#711419]/30"
+              className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 text-sm text-slate-800 resize-none focus:outline-none focus:border-[#711419] focus:ring-2 focus:ring-[#711419]/15"
               placeholder="Describe all work to be performed, equipment to be installed, and any additional measures..."
               value={vals.scopeSummary}
               onChange={e => set("scopeSummary", e.target.value)}
             />
           </div>
-          <div className="max-w-xs">
-            <label className={lbl}><span className={cod}>D.3.</span> Total Proposed Project Cost</label>
-            <input className={inp} placeholder="e.g. $12,500" value={vals.installCost} onChange={e => set("installCost", e.target.value)} />
+          <div className="sm:max-w-xs">
+            <label className={fLabel}><span className={fCode}>D.3.</span> Total Proposed Project Cost</label>
+            <input className={fInput} placeholder="e.g. $12,500" value={vals.installCost} onChange={e => set("installCost", e.target.value)} />
           </div>
         </div>
-      </div>
+      </FormCard>
 
-      {/* ESTIMATED PROJECT FINANCIALS */}
-      <div>
-        <div className="bg-[#711419] text-white px-4 py-2.5 rounded-sm mb-5">
-          <span className="text-xs font-bold uppercase tracking-wide">Estimated Project Financials</span>
-        </div>
+      <FormCard title="Estimated Project Financials">
         <div className="space-y-5">
-          <div>
-            <label className={lbl}>Final Total Project External Rebate</label>
-            <input className={inp} placeholder="$ 0.00" value={vals.totalExternalRebate} onChange={e => set("totalExternalRebate", e.target.value)} />
-          </div>
-          <div>
-            <label className={lbl}><span className={cod}>C.21.</span> Total Estimated Project Costs</label>
-            <input className={inp} placeholder="$ 0.00" value={vals.totalEstimatedProjectCost} onChange={e => set("totalEstimatedProjectCost", e.target.value)} />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className={fRow}>
             <div>
-              <label className={lbl}>Estimated Rebate at 50%</label>
-              <input className={inp} placeholder="$ 0.00" value={vals.estimatedRebate50Pct} onChange={e => set("estimatedRebate50Pct", e.target.value)} />
+              <label className={fLabel}>Final Total Project External Rebate</label>
+              <input className={fInput} placeholder="$ 0.00" value={vals.totalExternalRebate} onChange={e => set("totalExternalRebate", e.target.value)} />
             </div>
             <div>
-              <label className={lbl}>Estimated Rebate at 100%</label>
-              <input className={inp} placeholder="$ 0.00" value={vals.estimatedRebate100Pct} onChange={e => set("estimatedRebate100Pct", e.target.value)} />
+              <label className={fLabel}><span className={fCode}>C.21.</span> Total Estimated Project Costs</label>
+              <input className={fInput} placeholder="$ 0.00" value={vals.totalEstimatedProjectCost} onChange={e => set("totalEstimatedProjectCost", e.target.value)} />
+            </div>
+          </div>
+          <div className={fRow}>
+            <div>
+              <label className={fLabel}>Estimated Rebate at 50%</label>
+              <input className={fInput} placeholder="$ 0.00" value={vals.estimatedRebate50Pct} onChange={e => set("estimatedRebate50Pct", e.target.value)} />
+            </div>
+            <div>
+              <label className={fLabel}>Estimated Rebate at 100%</label>
+              <input className={fInput} placeholder="$ 0.00" value={vals.estimatedRebate100Pct} onChange={e => set("estimatedRebate100Pct", e.target.value)} />
             </div>
           </div>
         </div>
-      </div>
+      </FormCard>
 
-      {dirty && (
-        <div className="sticky bottom-0 left-0 right-0 -mx-4 lg:-mx-6 px-4 lg:px-6 py-3 bg-white border-t border-slate-200 flex justify-end shadow-[0_-2px_8px_rgba(0,0,0,0.04)]">
-          <Button onClick={() => onPatch(vals as any)} disabled={saving} size="sm" className="bg-[#711419] hover:bg-[#5a1014]">
-            {saving ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : null}
-            Save Changes
-          </Button>
-        </div>
-      )}
+      <StickySaveBar dirty={dirty} saving={saving} onSave={() => onPatch(vals as any)} type="button" />
     </div>
   );
 }
