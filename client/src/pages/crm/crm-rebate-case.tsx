@@ -393,19 +393,22 @@ const fTriplet = "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-5 gap-y-4
 
 function FormCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium text-slate-700">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0">{children}</CardContent>
-    </Card>
+    <section className="bg-white rounded-lg overflow-hidden shadow-sm border border-slate-200 border-l-4 border-l-[#711419]">
+      <header className="bg-gradient-to-r from-[#711419]/5 to-transparent px-4 sm:px-5 py-3 border-b border-slate-200/70">
+        <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#711419]" />
+          {title}
+        </h3>
+      </header>
+      <div className="p-4 sm:p-5">{children}</div>
+    </section>
   );
 }
 
 function SubGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-4">
-      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200 pb-2">{title}</h4>
+      <h4 className="text-xs font-bold uppercase tracking-wider text-[#711419]/80 border-b border-[#711419]/20 pb-2">{title}</h4>
       {children}
     </div>
   );
@@ -1159,9 +1162,8 @@ function ProjectCompletionTab({ caseData, onPatch, saving, caseId, onInvalidate 
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="space-y-4">
-            <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Project Information</CardTitle></CardHeader>
-              <CardContent className="pt-0 space-y-4">
+            <FormCard title="Project Information">
+              <div className="space-y-4">
                 <div>
                   <p className="text-xs text-slate-600 mb-2">Upload a photo of the Property Address including the Building Number</p>
                   <RebatePhotoUploader
@@ -1185,11 +1187,10 @@ function ProjectCompletionTab({ caseData, onPatch, saving, caseId, onInvalidate 
                     <FormControl><Input className="h-8 text-sm" type="date" {...field} value={field.value ?? ""} /></FormControl>
                   </FormItem>
                 )} />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Electrical Wiring — Post-Installation Information</CardTitle></CardHeader>
-              <CardContent className="pt-0 space-y-3">
+              </div>
+            </FormCard>
+            <FormCard title="Electrical Wiring — Post-Installation Information">
+              <div className="space-y-3">
                 <FormField control={form.control} name="postElecCount" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs text-slate-500">Count</FormLabel>
@@ -1243,13 +1244,12 @@ function ProjectCompletionTab({ caseData, onPatch, saving, caseId, onInvalidate 
                     required
                   />
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </FormCard>
           </div>
           <div className="space-y-4">
-            <Card>
-              <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Post-Installation Information</CardTitle></CardHeader>
-              <CardContent className="pt-0 space-y-3">
+            <FormCard title="Post-Installation Information">
+              <div className="space-y-3">
                 <FormField control={form.control} name="postHpType" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-xs text-slate-500">What type of heat pump was installed?</FormLabel>
@@ -1370,8 +1370,8 @@ function ProjectCompletionTab({ caseData, onPatch, saving, caseId, onInvalidate 
                     required
                   />
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </FormCard>
           </div>
         </div>
         {(() => {
@@ -1395,44 +1395,38 @@ function ProjectCompletionTab({ caseData, onPatch, saving, caseId, onInvalidate 
             </div>
           );
           return (
-            <div className="mt-4">
-              <div className="bg-[#1e3a5f] text-white text-xs font-semibold uppercase tracking-wider px-3 py-2 rounded-t">
+            <div className="mt-4 rounded-lg overflow-hidden shadow-sm border border-slate-200 border-l-4 border-l-[#1e3a5f]">
+              <div className="bg-[#1e3a5f] text-white text-xs font-semibold uppercase tracking-wider px-4 py-2.5">
                 Project Financial Totals
               </div>
-              <Card className="rounded-t-none border-t-0">
-                <CardContent className="pt-4 space-y-3">
-                  <ReadOnlyRow code="D.18." label="Final Total Equipment and Material Cost" value={finalEquip} />
-                  <ReadOnlyRow code="D.19." label="Final Total Installation Costs (Contractor Installed Only)" value={finalInstall} />
-                  <ReadOnlyRow code="D.20." label="Final Total Project External Rebate" value={externalRebate} />
-                  <ReadOnlyRow code="D.21." label="Final Total Project Cost" value={finalTotal} />
-                  <ReadOnlyRow label="Total Rebate Amount" value={totalRebate} />
-                </CardContent>
-              </Card>
+              <div className="bg-white p-4 sm:p-5 space-y-3">
+                <ReadOnlyRow code="D.18." label="Final Total Equipment and Material Cost" value={finalEquip} />
+                <ReadOnlyRow code="D.19." label="Final Total Installation Costs (Contractor Installed Only)" value={finalInstall} />
+                <ReadOnlyRow code="D.20." label="Final Total Project External Rebate" value={externalRebate} />
+                <ReadOnlyRow code="D.21." label="Final Total Project Cost" value={finalTotal} />
+                <ReadOnlyRow label="Total Rebate Amount" value={totalRebate} />
+              </div>
             </div>
           );
         })()}
         <div className="mt-4 space-y-4">
-          <Card>
-            <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Upload Required Documents</CardTitle></CardHeader>
-            <CardContent className="pt-0 space-y-2">
-              <div>
-                <p className="text-xs font-semibold text-slate-700"><span className="font-mono text-slate-400 mr-1">D.23.</span>Project Invoices</p>
-                <p className="text-xs text-slate-600 mt-0.5 mb-2">Note: Please be sure to include an invoice signed by the owner/property manager/tenant.</p>
-                <RebatePhotoUploader
-                  caseId={caseId}
-                  photos={(caseData.documents ?? []).filter(d => d.category === "project_invoices_post")}
-                  onInvalidate={onInvalidate}
-                  category="project_invoices_post"
-                  label="Project Invoices"
-                  accept="application/pdf,image/*"
-                  required
-                />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Upload Additional Documents</CardTitle></CardHeader>
-            <CardContent className="pt-0 space-y-2">
+          <FormCard title="Upload Required Documents">
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-slate-700"><span className="font-mono text-slate-400 mr-1">D.23.</span>Project Invoices</p>
+              <p className="text-xs text-slate-600 mt-0.5 mb-2">Note: Please be sure to include an invoice signed by the owner/property manager/tenant.</p>
+              <RebatePhotoUploader
+                caseId={caseId}
+                photos={(caseData.documents ?? []).filter(d => d.category === "project_invoices_post")}
+                onInvalidate={onInvalidate}
+                category="project_invoices_post"
+                label="Project Invoices"
+                accept="application/pdf,image/*"
+                required
+              />
+            </div>
+          </FormCard>
+          <FormCard title="Upload Additional Documents">
+            <div className="space-y-2">
               <p className="text-xs text-slate-600">Permit, if required by local code</p>
               <RebatePhotoUploader
                 caseId={caseId}
@@ -1442,8 +1436,8 @@ function ProjectCompletionTab({ caseData, onPatch, saving, caseId, onInvalidate 
                 label="Permit Upload"
                 accept="application/pdf,image/*"
               />
-            </CardContent>
-          </Card>
+            </div>
+          </FormCard>
         </div>
         <div className="mt-3">
           <SaveBar onSave={form.handleSubmit(onSubmit)} saving={saving} dirty={form.formState.isDirty} />
