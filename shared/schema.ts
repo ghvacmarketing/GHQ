@@ -3572,6 +3572,8 @@ export const rebateDocumentCategoryEnum = [
   "quality_install_address_photo",
   "quality_install_hp_post_retrofit",
   "quality_install_elec_wiring_post_retrofit",
+  "project_invoices_post",
+  "permit_post",
   "contractor_pre_approval",
   "project_completion",
   "completion_attestations",

@@ -50,6 +50,7 @@ const DOC_CATEGORIES: RebateDocumentCategory[] = [
   "rebate_request","head_of_household","scope_of_work","electrical_wiring_pre_retrofit",
   "ahri_certificate","snugg_pro_pdf","fuel_switching_calculator","manual_j_report",
   "quality_install_address_photo","quality_install_hp_post_retrofit","quality_install_elec_wiring_post_retrofit",
+  "project_invoices_post","permit_post",
   "contractor_pre_approval","project_completion","completion_attestations","reservation_summary","other",
 ];
 
@@ -1410,6 +1411,40 @@ function ProjectCompletionTab({ caseData, onPatch, saving, caseId, onInvalidate 
             </div>
           );
         })()}
+        <div className="mt-4 space-y-4">
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Upload Required Documents</CardTitle></CardHeader>
+            <CardContent className="pt-0 space-y-2">
+              <div>
+                <p className="text-xs font-semibold text-slate-700"><span className="font-mono text-slate-400 mr-1">D.23.</span>Project Invoices</p>
+                <p className="text-xs text-slate-600 mt-0.5 mb-2">Note: Please be sure to include an invoice signed by the owner/property manager/tenant.</p>
+                <RebatePhotoUploader
+                  caseId={caseId}
+                  photos={(caseData.documents ?? []).filter(d => d.category === "project_invoices_post")}
+                  onInvalidate={onInvalidate}
+                  category="project_invoices_post"
+                  label="Project Invoices"
+                  accept="application/pdf,image/*"
+                  required
+                />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-sm font-medium text-slate-700">Upload Additional Documents</CardTitle></CardHeader>
+            <CardContent className="pt-0 space-y-2">
+              <p className="text-xs text-slate-600">Permit, if required by local code</p>
+              <RebatePhotoUploader
+                caseId={caseId}
+                photos={(caseData.documents ?? []).filter(d => d.category === "permit_post")}
+                onInvalidate={onInvalidate}
+                category="permit_post"
+                label="Permit Upload"
+                accept="application/pdf,image/*"
+              />
+            </CardContent>
+          </Card>
+        </div>
         <div className="mt-3">
           <SaveBar onSave={form.handleSubmit(onSubmit)} saving={saving} dirty={form.formState.isDirty} />
         </div>
