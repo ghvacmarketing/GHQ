@@ -1333,16 +1333,6 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
   const dirty = JSON.stringify(vals) !== JSON.stringify(savedRef.current);
   const set = <K extends keyof ScopeForm>(k: K, v: ScopeForm[K]) => setVals(p => ({ ...p, [k]: v }));
 
-  const toggleItem = useMutation({
-    mutationFn: ({ itemId, isChecked }: { itemId: string; isChecked: boolean }) =>
-      apiRequest("PATCH", `/api/crm/rebate-cases/${caseId}/scope-items/${itemId}`, { isChecked }),
-    onSuccess: onInvalidate,
-    onError: () => toast({ title: "Failed to update item", variant: "destructive" }),
-  });
-
-  const checkedItems = (caseData.scopeChecklist ?? []).filter(i => i.isChecked);
-  const allItems = [...(caseData.scopeChecklist ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
-
   const RadioGroup = ({ value, onChange }: { value: boolean | null; onChange: (v: boolean) => void }) => (
     <div className="flex gap-5 mt-1">
       {[{ label: "Yes", val: true }, { label: "No", val: false }].map(o => (
@@ -1949,54 +1939,6 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
           <div>
             <label className={fLabel}>Will the project include <strong>insulation, air sealing, or ventilation upgrades</strong>?</label>
             <RadioGroup value={vals.scopeIncludesInsulation} onChange={v => set("scopeIncludesInsulation", v)} />
-          </div>
-        </div>
-      </FormCard>
-
-      <FormCard title="Electrification Measures">
-        <p className="text-sm text-slate-600 mb-4"><span className={fCode}>D.1.</span> Select all measures included in the proposed scope of work:</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
-          {[...(caseData.scopeChecklist ?? [])].sort((a, b) => a.sortOrder - b.sortOrder).map(item => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => toggleItem.mutate({ itemId: item.id, isChecked: !item.isChecked })}
-              disabled={toggleItem.isPending}
-              className={`flex items-center gap-3 p-3 rounded-md border text-sm text-left transition-all ${
-                item.isChecked ? "border-[#711419] bg-red-50 text-slate-800" : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white"
-              }`}
-            >
-              <div className={`w-4 h-4 rounded flex-shrink-0 border-2 flex items-center justify-center transition-colors ${item.isChecked ? "border-[#711419] bg-[#711419]" : "border-slate-300 bg-white"}`}>
-                {item.isChecked && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 10 10"><path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
-              </div>
-              <span className="font-medium">{item.itemName}</span>
-            </button>
-          ))}
-        </div>
-        {checkedItems.length > 0 && (
-          <div className="mt-3 flex items-center gap-2 text-sm text-[#711419] font-medium">
-            <CheckCircle2 className="w-4 h-4" />
-            {checkedItems.length} measure{checkedItems.length !== 1 ? "s" : ""} selected
-          </div>
-        )}
-        {allItems.length === 0 && <p className="text-sm text-slate-400 py-4 text-center">No measures configured.</p>}
-      </FormCard>
-
-      <FormCard title="Scope Description & Cost">
-        <div className="space-y-5">
-          <div>
-            <label className={fLabel}><span className={fCode}>D.2.</span> Describe the proposed scope of work</label>
-            <textarea
-              rows={4}
-              className="w-full px-3 py-2 rounded-md bg-white border border-slate-300 text-sm text-slate-800 resize-none focus:outline-none focus:border-[#711419] focus:ring-2 focus:ring-[#711419]/15"
-              placeholder="Describe all work to be performed, equipment to be installed, and any additional measures..."
-              value={vals.scopeSummary}
-              onChange={e => set("scopeSummary", e.target.value)}
-            />
-          </div>
-          <div className="sm:max-w-xs">
-            <label className={fLabel}><span className={fCode}>D.3.</span> Total Proposed Project Cost</label>
-            <input className={fInput} placeholder="e.g. $12,500" value={vals.installCost} onChange={e => set("installCost", e.target.value)} />
           </div>
         </div>
       </FormCard>
