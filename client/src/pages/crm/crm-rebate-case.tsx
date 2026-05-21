@@ -1784,6 +1784,13 @@ function ScopeTab({ caseData, caseId, onPatch, saving, onInvalidate }: {
               </select>
             </div>
 
+          </div>
+        </FormCard>
+      )}
+
+      {caseData.constructionType === "Existing Construction" && vals.scopeIncludesHeatPump && (
+        <FormCard title="Heating and Cooling System">
+          <div className="space-y-5">
             <SubGroup title="Cooling Systems">
               <div className={fRow}>
                 <div>
