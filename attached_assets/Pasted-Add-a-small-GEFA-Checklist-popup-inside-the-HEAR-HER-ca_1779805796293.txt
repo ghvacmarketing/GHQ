@@ -1,0 +1,74 @@
+Add a small “GEFA Checklist” popup inside the HEAR/HER case workflow on the Project Completion tab.
+
+Purpose:
+Users should be able to click a small button/icon and quickly view the required project completion checklist without leaving the tab.
+
+Placement:
+Add a small button near the top of the Project Completion tab content.
+Button label: “GEFA Checklist” or use a clipboard/info icon.
+
+Behavior:
+When clicked, open a compact popup/modal/drawer.
+Include a close button.
+Do not change the existing Project Completion form fields.
+
+Popup Title:
+GEFA Project Completion Checklist
+
+Checklist Sections:
+
+1. Invoice Requirements
+- Invoice must be clearly separated into Labor/Install and Materials.
+- Show GEFA Rebate Amount.
+- Show Client Pays Amount.
+- Required formula: Labor + Materials = Rebate Amount + Client Pays Amount.
+
+2. Wiring Upgrade, If Needed
+- Separate wiring/electrical work from heat pump work.
+- Include Electrical Labor.
+- Include Electrical Materials.
+- Include Permit Fees if applicable.
+- Required formula: Heat Pump Labor + Heat Pump Materials + Electrical Labor + Electrical Materials + Permit Fees = Rebate Amount + Client Pays Amount.
+
+3. Required Photos
+- Geotagged outdoor unit data plate photo.
+- Geotagged indoor unit data plate photo.
+- Outdoor unit installed location photo.
+- Indoor unit installed location photo.
+- Property address photo.
+- Mailbox or house number photo.
+- Wide photo showing the property/address connection.
+
+4. Permit Requirements
+- Confirm if HVAC permit is required.
+- Confirm if electrical permit is required.
+- Upload permit documentation if required.
+- Confirm inspection requirements before closing the project.
+
+5. Final Review
+- Invoice uploaded.
+- Labor and materials separated.
+- Rebate amount listed.
+- Client pays amount listed.
+- Invoice totals balance correctly.
+- Wiring upgrade separated if applicable.
+- Permit uploaded if required.
+- Required equipment photos uploaded.
+- Required property/address photos uploaded.
+- Install start date completed.
+- Date completed entered.
+- Model number entered.
+- Serial number entered.
+- Heating capacity entered.
+- Cooling capacity entered.
+- ENERGY STAR/cold climate question answered.
+- Heating load coverage percentage entered.
+
+UI Requirements:
+- Make each checklist item have a checkbox.
+- Use collapsible sections if easy.
+- Match current GHQ style: white card, soft border, rounded corners, dark navy headings, maroon/red accents.
+- Checkboxes do not need to save permanently unless easy to store locally.
+
+Bottom Note:
+Internal Rule: Do not submit the project completion section until the invoice totals, required photos, and permit documents are verified.

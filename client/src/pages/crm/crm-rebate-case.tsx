@@ -9,8 +9,11 @@ import {
   ArrowLeft, CheckCircle2, Circle, ChevronDown, ChevronUp,
   FileText, Trash2, Upload, Plus, User, Calendar, ClipboardList,
   Activity, Settings2, Zap, Home, Droplets, Wrench, Star, FolderOpen,
-  AlertCircle, Loader2, Lock, BookOpen, Clock
+  AlertCircle, Loader2, Lock, BookOpen, Clock, ClipboardCheck, X
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1147,9 +1150,150 @@ function ContractorPreApprovalTab({ caseData, onPatch, saving }: { caseData: Cas
   );
 }
 
+// ─── GEFA Project Completion Checklist (popup) ─────────────────────────────────
+
+const GEFA_CHECKLIST_SECTIONS: Array<{ id: string; title: string; items: string[]; footer?: string }> = [
+  {
+    id: "invoice",
+    title: "1. Invoice Requirements",
+    items: [
+      "Invoice must be clearly separated into Labor/Install and Materials.",
+      "Show GEFA Rebate Amount.",
+      "Show Client Pays Amount.",
+    ],
+    footer: "Required formula: Labor + Materials = Rebate Amount + Client Pays Amount.",
+  },
+  {
+    id: "wiring",
+    title: "2. Wiring Upgrade, If Needed",
+    items: [
+      "Separate wiring/electrical work from heat pump work.",
+      "Include Electrical Labor.",
+      "Include Electrical Materials.",
+      "Include Permit Fees if applicable.",
+    ],
+    footer: "Required formula: Heat Pump Labor + Heat Pump Materials + Electrical Labor + Electrical Materials + Permit Fees = Rebate Amount + Client Pays Amount.",
+  },
+  {
+    id: "photos",
+    title: "3. Required Photos",
+    items: [
+      "Geotagged outdoor unit data plate photo.",
+      "Geotagged indoor unit data plate photo.",
+      "Outdoor unit installed location photo.",
+      "Indoor unit installed location photo.",
+      "Property address photo.",
+      "Mailbox or house number photo.",
+      "Wide photo showing the property/address connection.",
+    ],
+  },
+  {
+    id: "permits",
+    title: "4. Permit Requirements",
+    items: [
+      "Confirm if HVAC permit is required.",
+      "Confirm if electrical permit is required.",
+      "Upload permit documentation if required.",
+      "Confirm inspection requirements before closing the project.",
+    ],
+  },
+  {
+    id: "review",
+    title: "5. Final Review",
+    items: [
+      "Invoice uploaded.",
+      "Labor and materials separated.",
+      "Rebate amount listed.",
+      "Client pays amount listed.",
+      "Invoice totals balance correctly.",
+      "Wiring upgrade separated if applicable.",
+      "Permit uploaded if required.",
+      "Required equipment photos uploaded.",
+      "Required property/address photos uploaded.",
+      "Install start date completed.",
+      "Date completed entered.",
+      "Model number entered.",
+      "Serial number entered.",
+      "Heating capacity entered.",
+      "Cooling capacity entered.",
+      "ENERGY STAR/cold climate question answered.",
+      "Heating load coverage percentage entered.",
+    ],
+  },
+];
+
+function GefaChecklistDialog({ open, onOpenChange, caseId }: { open: boolean; onOpenChange: (o: boolean) => void; caseId: string }) {
+  const storageKey = `gefa-checklist:${caseId}`;
+  const [checked, setChecked] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(localStorage.getItem(storageKey) || "{}"); } catch { return {}; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(storageKey, JSON.stringify(checked)); } catch {}
+  }, [checked, storageKey]);
+  const toggle = (k: string) => setChecked(c => ({ ...c, [k]: !c[k] }));
+  const totalItems = GEFA_CHECKLIST_SECTIONS.reduce((n, s) => n + s.items.length, 0);
+  const doneCount = Object.values(checked).filter(Boolean).length;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto p-0 gap-0">
+        <DialogHeader className="px-5 py-4 border-b border-slate-100 bg-white sticky top-0 z-10">
+          <DialogTitle className="text-base font-semibold text-[#1e3a5f] flex items-center gap-2">
+            <ClipboardCheck className="w-4 h-4 text-[#711419]" />
+            GEFA Project Completion Checklist
+          </DialogTitle>
+          <p className="text-xs text-slate-500 mt-1">{doneCount} of {totalItems} items checked</p>
+        </DialogHeader>
+        <div className="px-5 py-4">
+          <Accordion type="multiple" defaultValue={GEFA_CHECKLIST_SECTIONS.map(s => s.id)} className="space-y-2">
+            {GEFA_CHECKLIST_SECTIONS.map(section => (
+              <AccordionItem key={section.id} value={section.id} className="border border-slate-200 rounded-md px-3">
+                <AccordionTrigger className="text-sm font-semibold text-[#1e3a5f] hover:no-underline py-3">
+                  {section.title}
+                </AccordionTrigger>
+                <AccordionContent className="pb-3">
+                  <ul className="space-y-2">
+                    {section.items.map((item, i) => {
+                      const key = `${section.id}-${i}`;
+                      return (
+                        <li key={key} className="flex items-start gap-2.5">
+                          <Checkbox
+                            id={key}
+                            checked={!!checked[key]}
+                            onCheckedChange={() => toggle(key)}
+                            className="mt-0.5 data-[state=checked]:bg-[#711419] data-[state=checked]:border-[#711419]"
+                          />
+                          <label htmlFor={key} className={`text-xs leading-relaxed cursor-pointer flex-1 ${checked[key] ? "text-slate-400 line-through" : "text-slate-700"}`}>
+                            {item}
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {section.footer && (
+                    <div className="mt-3 px-3 py-2 bg-[#711419]/[0.04] border-l-2 border-[#711419] rounded-sm">
+                      <p className="text-[11px] text-[#711419] font-medium">{section.footer}</p>
+                    </div>
+                  )}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-sm">
+            <p className="text-[11px] text-amber-800">
+              <span className="font-semibold">Internal Rule:</span> Do not submit the project completion section until the invoice totals, required photos, and permit documents are verified.
+            </p>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Project Completion Tab ─────────────────────────────────────────────────────
 
 function ProjectCompletionTab({ caseData, onPatch, saving, caseId, onInvalidate }: { caseData: CaseDetail; onPatch: (d: Partial<RebateCase>) => void; saving: boolean; caseId: string; onInvalidate: () => void }) {
+  const [checklistOpen, setChecklistOpen] = useState(false);
   const form = useForm({
     defaultValues: {
       installDate: caseData.installDate ? format(new Date(caseData.installDate), "yyyy-MM-dd") : "",
@@ -1192,6 +1336,20 @@ function ProjectCompletionTab({ caseData, onPatch, saving, caseId, onInvalidate 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
+        <div className="flex justify-end mb-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setChecklistOpen(true)}
+            className="h-8 text-xs border-[#711419]/30 text-[#711419] hover:bg-[#711419]/[0.04] hover:text-[#711419]"
+            data-testid="button-gefa-checklist"
+          >
+            <ClipboardCheck className="w-3.5 h-3.5 mr-1.5" />
+            GEFA Checklist
+          </Button>
+        </div>
+        <GefaChecklistDialog open={checklistOpen} onOpenChange={setChecklistOpen} caseId={caseId} />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="space-y-4">
             <FormCard title="Project Information">
