@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1234,54 +1233,109 @@ function GefaChecklistDialog({ open, onOpenChange, caseId }: { open: boolean; on
   const toggle = (k: string) => setChecked(c => ({ ...c, [k]: !c[k] }));
   const totalItems = GEFA_CHECKLIST_SECTIONS.reduce((n, s) => n + s.items.length, 0);
   const doneCount = Object.values(checked).filter(Boolean).length;
+  const pct = totalItems > 0 ? Math.round((doneCount / totalItems) * 100) : 0;
+
+  const sectionStats = (s: typeof GEFA_CHECKLIST_SECTIONS[number]) => {
+    const done = s.items.filter((_, i) => checked[`${s.id}-${i}`]).length;
+    return { done, total: s.items.length, complete: done === s.items.length };
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto p-0 gap-0">
-        <DialogHeader className="px-5 py-4 border-b border-slate-100 bg-white sticky top-0 z-10">
-          <DialogTitle className="text-base font-semibold text-[#1e3a5f] flex items-center gap-2">
-            <ClipboardCheck className="w-4 h-4 text-[#711419]" />
-            GEFA Project Completion Checklist
-          </DialogTitle>
-          <p className="text-xs text-slate-500 mt-1">{doneCount} of {totalItems} items checked</p>
+      <DialogContent className="max-w-2xl max-h-[88vh] overflow-hidden p-0 gap-0 bg-white">
+        {/* Header */}
+        <DialogHeader className="px-6 pt-5 pb-4 border-b border-slate-100 bg-white sticky top-0 z-10">
+          <div className="flex items-start gap-3">
+            <div className="h-9 w-9 rounded-md bg-[#711419]/10 flex items-center justify-center shrink-0">
+              <ClipboardCheck className="w-[18px] h-[18px] text-[#711419]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <DialogTitle className="text-[15px] font-semibold text-slate-900 leading-tight">
+                GEFA Project Completion Checklist
+              </DialogTitle>
+              <p className="text-xs text-slate-500 mt-0.5">Verify each requirement before submitting this case.</p>
+            </div>
+          </div>
+          {/* Progress */}
+          <div className="mt-4 flex items-center gap-3">
+            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[#711419] transition-all duration-300 rounded-full"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <span className="text-[11px] font-medium text-slate-600 tabular-nums whitespace-nowrap">
+              {doneCount}/{totalItems} <span className="text-slate-400">· {pct}%</span>
+            </span>
+          </div>
         </DialogHeader>
-        <div className="px-5 py-4">
-          <Accordion type="multiple" defaultValue={GEFA_CHECKLIST_SECTIONS.map(s => s.id)} className="space-y-2">
-            {GEFA_CHECKLIST_SECTIONS.map(section => (
-              <AccordionItem key={section.id} value={section.id} className="border border-slate-200 rounded-md px-3">
-                <AccordionTrigger className="text-sm font-semibold text-[#1e3a5f] hover:no-underline py-3">
-                  {section.title}
-                </AccordionTrigger>
-                <AccordionContent className="pb-3">
-                  <ul className="space-y-2">
-                    {section.items.map((item, i) => {
-                      const key = `${section.id}-${i}`;
-                      return (
-                        <li key={key} className="flex items-start gap-2.5">
+
+        {/* Body */}
+        <div className="overflow-y-auto max-h-[calc(88vh-180px)] px-6 py-5 space-y-6">
+          {GEFA_CHECKLIST_SECTIONS.map(section => {
+            const stats = sectionStats(section);
+            return (
+              <section key={section.id} data-testid={`section-${section.id}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-[13px] font-semibold text-slate-900 tracking-tight">
+                    {section.title}
+                  </h3>
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full tabular-nums ${
+                    stats.complete
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-slate-100 text-slate-500"
+                  }`}>
+                    {stats.complete ? "✓ " : ""}{stats.done}/{stats.total}
+                  </span>
+                </div>
+                <ul className="space-y-1.5">
+                  {section.items.map((item, i) => {
+                    const key = `${section.id}-${i}`;
+                    const isChecked = !!checked[key];
+                    return (
+                      <li key={key}>
+                        <label
+                          htmlFor={key}
+                          className={`flex items-start gap-3 py-1.5 px-2 -mx-2 rounded-md cursor-pointer transition-colors hover:bg-slate-50 ${
+                            isChecked ? "opacity-60" : ""
+                          }`}
+                        >
                           <Checkbox
                             id={key}
-                            checked={!!checked[key]}
+                            checked={isChecked}
                             onCheckedChange={() => toggle(key)}
-                            className="mt-0.5 data-[state=checked]:bg-[#711419] data-[state=checked]:border-[#711419]"
+                            className="mt-[2px] h-4 w-4 rounded border-slate-300 data-[state=checked]:bg-[#711419] data-[state=checked]:border-[#711419]"
                           />
-                          <label htmlFor={key} className={`text-xs leading-relaxed cursor-pointer flex-1 ${checked[key] ? "text-slate-400 line-through" : "text-slate-700"}`}>
+                          <span className={`text-[13px] leading-snug flex-1 ${
+                            isChecked ? "text-slate-400 line-through" : "text-slate-700"
+                          }`}>
                             {item}
-                          </label>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  {section.footer && (
-                    <div className="mt-3 px-3 py-2 bg-[#711419]/[0.04] border-l-2 border-[#711419] rounded-sm">
-                      <p className="text-[11px] text-[#711419] font-medium">{section.footer}</p>
-                    </div>
-                  )}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-sm">
-            <p className="text-[11px] text-amber-800">
-              <span className="font-semibold">Internal Rule:</span> Do not submit the project completion section until the invoice totals, required photos, and permit documents are verified.
+                          </span>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {section.footer && (
+                  <div className="mt-3 ml-2 pl-3 border-l-2 border-[#711419]/30">
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      <span className="font-semibold text-[#711419]">Formula: </span>
+                      {section.footer.replace(/^Required formula:\s*/, "")}
+                    </p>
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
+
+        {/* Footer note */}
+        <div className="border-t border-slate-100 px-6 py-3.5 bg-slate-50/60">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-600 mt-[1px] shrink-0" />
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              <span className="font-semibold text-slate-800">Internal Rule: </span>
+              Do not submit the project completion section until the invoice totals, required photos, and permit documents are verified.
             </p>
           </div>
         </div>
