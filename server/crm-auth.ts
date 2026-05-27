@@ -201,18 +201,31 @@ export function getCrmSessionToken(req: Request): string | null {
 export async function getCurrentCrmUser(req: Request): Promise<CrmUser | null> {
   if (req.crmUser) return req.crmUser;
 
-  const sessionToken = getCrmSessionToken(req);
-  if (!sessionToken) return null;
+  // Try Bearer token first, then fall back to cookie if Bearer is invalid.
+  // This prevents a stale localStorage token from blocking a valid cookie
+  // session (e.g. after Google OAuth, which can only set the cookie).
+  const authHeader = req.headers.authorization;
+  const bearerToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.replace("Bearer ", "")
+    : null;
+  const cookieToken = req.cookies?.[CRM_SESSION_COOKIE] || null;
 
-  const session = await validateCrmSession(sessionToken);
-  if (!session) return null;
+  const tokensToTry: string[] = [];
+  if (bearerToken) tokensToTry.push(bearerToken);
+  if (cookieToken && cookieToken !== bearerToken) tokensToTry.push(cookieToken);
+  if (tokensToTry.length === 0) return null;
 
-  const user = await getCrmUserById(session.userId);
-  if (!user || !user.isActive) return null;
+  for (const token of tokensToTry) {
+    const session = await validateCrmSession(token);
+    if (!session) continue;
+    const user = await getCrmUserById(session.userId);
+    if (!user || !user.isActive) continue;
+    req.crmSession = session;
+    req.crmUser = user;
+    return user;
+  }
 
-  req.crmSession = session;
-  req.crmUser = user;
-  return user;
+  return null;
 }
 
 export function requireCrmAuth(req: Request, res: Response, next: NextFunction) {
