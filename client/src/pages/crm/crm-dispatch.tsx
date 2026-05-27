@@ -1512,25 +1512,10 @@ function ScheduleRowTimeline({
     onPreviewTimeChange?.(clampedHour);
   }, [isDragActive, onPreviewTimeChange, totalHours, dragClickHourOffset, previewDurationHours]);
 
-<<<<<<< HEAD
   const handlePointerLeave = useCallback(() => {
     setLocalPreviewLeft(null);
     onPreviewTimeChange?.(null);
   }, [onPreviewTimeChange]);
-=======
-  const handleMouseLeave = useCallback(() => {
-    setPreviewLeft(null);
-    // During an active drag, keep the preview hour in previewHourByTechRef
-    // so the drop handler can use it even if the cursor briefly exits the
-    // timeline (e.g. moves to the tech-name column or jitters during
-    // pointer-up).  The hour value is keyed by techId, so stale entries
-    // from other rows don't interfere — the drop handler only looks up
-    // the row being dropped on.  Outside of a drag we clear immediately.
-    if (!isDragActive) {
-      onPreviewTimeChange?.(null);
-    }
-  }, [onPreviewTimeChange, isDragActive]);
->>>>>>> 5071578556b320b2fefa119e5e72a603045144fa
 
   return (
     <div
@@ -3581,27 +3566,11 @@ export default function CrmDispatch() {
             (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR) - duration,
           ));
         } else {
-<<<<<<< HEAD
           const timelineNode = techTimelineNodesRef.current[newTechId];
           if (timelineNode) {
             const timelineRect = timelineNode.getBoundingClientRect();
             const snappedHourOffset = computeDropHourOffset(lastPointerXRef.current ?? 0, timelineRect, dragClickHourOffsetRef.current, duration);
             newStartHour = SCHEDULE_START_HOUR + snappedHourOffset;
-=======
-          // Fallback: use the same snap helper as the preview so the result
-          // is identical even if the cursor position differs by a few pixels.
-          const overAny = over as any;
-          const droppableNode = overAny.node?.current ?? overAny.node;
-          const timelineRect = droppableNode instanceof HTMLElement
-            ? droppableNode.getBoundingClientRect()
-            : over.rect;
-          const timelineWidth = timelineRect.width;
-          if (timelineWidth > 0) {
-            const cardLeftX = lastPointerXRef.current - dragOffsetXRef.current;
-            const relativeX = cardLeftX - timelineRect.left;
-            const snappedHour = snapHourOffsetFromTimeline(relativeX, timelineWidth, duration);
-            newStartHour = SCHEDULE_START_HOUR + snappedHour;
->>>>>>> 5071578556b320b2fefa119e5e72a603045144fa
           }
         }
         const newEndHour = newStartHour + duration;
