@@ -1,0 +1,387 @@
+You are helping me build a custom CRM module for my internal operations system.
+
+PROJECT GOAL:
+Build a fully custom HEAR / HER rebate program workflow module inside my CRM. This module should help my team manage every Neighborly rebate application from start to finish.
+
+The module should live under the sidebar section:
+
+Operations > Rebate Programs
+
+The purpose is to replace our current spreadsheet with a structured case-management system.
+
+--------------------------------------------------
+MAIN FEATURE: REBATE PROGRAM CASE BANK
+--------------------------------------------------
+
+Create a main dashboard/table called “Rebate Program Cases.”
+
+Each row represents one HEAR or HER application.
+
+The table should include these columns:
+
+1. Case Number
+2. Client Name
+3. Property Address
+4. Program Type
+   - HEAR
+   - HER
+5. Application Status
+6. Current Workflow Step
+7. Course of Action / Next Step
+8. Assigned To
+9. Priority
+10. Last Updated
+11. Expected Completion Date
+12. Notes
+
+Add a “Create New Case” button.
+
+When creating a case, the user should select:
+
+- Program Type: HEAR or HER
+- Client Name
+- Property Address
+- Phone Number
+- Email Address
+- Case Number, if already known
+- Assigned User
+
+--------------------------------------------------
+STATUS OPTIONS
+--------------------------------------------------
+
+Application Status should be a dropdown with these options:
+
+- Not Started
+- In Progress
+- Waiting on Client
+- Waiting on Internal Info
+- Scope of Work Needed
+- Scope of Work Submitted
+- Returned for More Information
+- Approved for Reservation
+- Permit Needed
+- Install Scheduled
+- Project Complete
+- Completion Submitted
+- Rebate Reservation Summary Received
+- Paid / Closed
+- Declined
+- Client Not Interested
+
+--------------------------------------------------
+COLOR CODING
+--------------------------------------------------
+
+Color code each case row based on status:
+
+- Gray = Not Started
+- Blue = In Progress
+- Orange = Waiting on Client, Waiting on Internal Info, Returned for More Information, Approved for Reservation but still needs action
+- Red = Urgent, Missing Required Info, or critical action needed
+- Purple = Scope of Work Submitted
+- Green = Approved, Project Complete, Paid / Closed
+- Black = Declined or Client Not Interested
+
+--------------------------------------------------
+CASE DETAIL PAGE
+--------------------------------------------------
+
+When a user clicks a case, open a full case detail page.
+
+Use tabs or sections:
+
+1. Case Summary
+2. Client / Property Info
+3. Utility Information
+4. Existing System Information
+5. New System Information
+6. Scope of Work
+7. Neighborly Workflow Checklist
+8. Documents / Uploads
+9. Internal Notes
+10. Activity Log
+
+--------------------------------------------------
+CASE SUMMARY FIELDS
+--------------------------------------------------
+
+Include these fields:
+
+- Case Number
+- Program Type: HEAR or HER
+- Client Name
+- Property Address
+- Phone Number
+- Email Address
+- Application Status
+- Current Workflow Step
+- Course of Action / Next Step
+- Assigned To
+- Priority
+- Expected Completion Date
+- Internal Notes
+
+--------------------------------------------------
+CLIENT / PROPERTY INFO FIELDS
+--------------------------------------------------
+
+Include these fields:
+
+- Property Address
+- Name
+- Email Address
+- Phone Number
+- New or Existing Construction
+- Family Building Type
+- Building Rented
+- Number of Bedrooms
+- Building Square Footage
+- Year Home Built
+- Assessment Date
+
+--------------------------------------------------
+UTILITY INFORMATION FIELDS
+--------------------------------------------------
+
+Include these fields:
+
+- Electric Provider
+- Type of Electric Utility
+- Electric Meter Number
+- Electric Account Number
+- Gas Utility
+- Gas Provider
+- Gas Meter Number
+- Gas Account Number
+- Delivered Fuel Company
+
+--------------------------------------------------
+EXISTING SYSTEM INFORMATION FIELDS
+--------------------------------------------------
+
+Include these fields:
+
+- Existing System
+- Type of Heat Pump
+- Fuel Switching
+- Existing Max Amps
+- Electrical Panel Max Amps
+- Electrical Panel Upgrade Required
+- Existing System Notes
+
+--------------------------------------------------
+NEW SYSTEM INFORMATION FIELDS
+--------------------------------------------------
+
+Include these fields:
+
+- New System Make
+- New System Model
+- New System Heating Capacity
+- New System Cooling Capacity
+- Energy Star Cold Climate Rating
+- AHRI / Energy Star Rating Needed
+- Heating Load Percentage
+- Material Cost
+- Labor Cost
+- Total Project Cost
+
+--------------------------------------------------
+SCOPE OF WORK SECTION
+--------------------------------------------------
+
+Create a dedicated Scope of Work section.
+
+Fields:
+
+- Scope of Work Status
+- Scope Description
+- Equipment Being Installed
+- Work Included
+- Electrical Work Required
+- Ductwork Required
+- Permit Required
+- Photos Needed
+- Documents Needed
+- Submitted Date
+- Returned for Correction Date
+- Approval Date
+
+Scope of Work checklist:
+
+- Confirm property address
+- Confirm homeowner/applicant name
+- Confirm program type
+- Confirm existing system
+- Confirm new system equipment
+- Confirm AHRI / Energy Star rating
+- Confirm material cost
+- Confirm labor cost
+- Confirm total project cost
+- Upload required images
+- Submit scope of work in Neighborly
+- Mark scope submitted in CRM
+
+--------------------------------------------------
+NEIGHBORLY WORKFLOW CHECKLIST
+--------------------------------------------------
+
+Build a guided checklist that follows the Neighborly process.
+
+Main workflow steps:
+
+1. Program Overview
+2. A. Rebate Request
+3. B. Primary / Head of Household Member Confirmation
+4. C. Scope of Work
+5. Contractor Pre-Approval Attestations
+6. D. Project Completion
+7. Project Completion Attestations
+8. Rebate Reservation Summary
+
+Each workflow step should have:
+
+- Completion checkbox
+- Status
+- Notes
+- Date completed
+- Completed by
+- Required documents
+- Required fields
+
+The system should show progress visually, such as:
+
+“4 of 8 steps completed”
+
+--------------------------------------------------
+DOCUMENTS / UPLOADS
+--------------------------------------------------
+
+Each case should allow file uploads.
+
+Document categories:
+
+- Scope of Work PDF
+- Invoice
+- Permit
+- AHRI Certificate
+- Energy Star Certificate
+- Existing Equipment Photos
+- New Equipment Photos
+- Address / Mailbox Photo
+- Electrical Panel Photo
+- Utility Bill
+- Completion Photos
+- Neighborly Screenshots
+- Other Documents
+
+Each upload should track:
+
+- File name
+- File type/category
+- Uploaded by
+- Upload date
+- Notes
+
+--------------------------------------------------
+FILTERS
+--------------------------------------------------
+
+Add dashboard filters:
+
+- Program Type
+- Application Status
+- Assigned User
+- Priority
+- Current Workflow Step
+- Cases Needing Action
+- Cases Waiting on Client
+- Cases Returned for More Information
+- Cases Approved for Reservation
+- Cases with Scope Submitted
+- Declined / Closed Cases
+
+--------------------------------------------------
+ACTIVITY LOG
+--------------------------------------------------
+
+Each case should have an activity log that automatically records:
+
+- Case created
+- Status changed
+- Workflow step completed
+- Document uploaded
+- Note added
+- Assigned user changed
+- Expected completion date changed
+- Scope of work submitted
+- Case closed
+
+Each activity log entry should show:
+
+- Date/time
+- User
+- Action taken
+- Previous value, if applicable
+- New value, if applicable
+
+--------------------------------------------------
+TASKS / NEXT ACTIONS
+--------------------------------------------------
+
+Each case should support tasks.
+
+Task fields:
+
+- Task title
+- Description
+- Assigned To
+- Due Date
+- Priority
+- Status
+- Related Workflow Step
+
+Task statuses:
+
+- Not Started
+- In Progress
+- Waiting
+- Complete
+
+--------------------------------------------------
+USER EXPERIENCE GOAL
+--------------------------------------------------
+
+The goal is that anyone on my team can open a case and immediately understand:
+
+- What program this is for
+- Where we are in the Neighborly process
+- What has already been completed
+- What is missing
+- What documents are still needed
+- Who is responsible
+- What the next action is
+- Whether the case is stuck, approved, declined, or ready for project completion
+
+--------------------------------------------------
+DESIGN REQUIREMENTS
+--------------------------------------------------
+
+Use a clean, modern operations-dashboard design.
+
+The dashboard should feel similar to a spreadsheet but more structured.
+
+Use:
+
+- Sidebar navigation
+- Search bar
+- Filters
+- Status badges
+- Color-coded rows
+- Case cards or full detail pages
+- Tabs for case detail sections
+- Progress indicators
+- Clear save/edit buttons
+
+Make this module scalable so we can later add more detailed checklists inside each Neighborly step.

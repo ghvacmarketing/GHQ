@@ -47,6 +47,8 @@ import {
   Zap,
   CalendarIcon,
   Settings2,
+  Info,
+  Building2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
@@ -182,6 +184,7 @@ export default function CrmInvoiceCreate() {
 
   const urlParams = new URLSearchParams(window.location.search);
   const workOrderIdFromUrl = urlParams.get("workOrderId");
+  const customerIdFromUrl = urlParams.get("customerId");
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -216,13 +219,25 @@ export default function CrmInvoiceCreate() {
   });
 
   const { data: quotes, isLoading: quotesLoading } = useQuery<{ quotes: QuoteWithItems[] }>({
-    queryKey: ["/api/crm/quotes", "accepted"],
+    queryKey: ["/api/crm/quotes", "accepted", customerIdFromUrl],
     queryFn: async () => {
-      const res = await fetch("/api/crm/quotes?status=accepted", { credentials: "include" });
+      const params = new URLSearchParams({ status: "accepted" });
+      if (customerIdFromUrl) params.set("customerId", customerIdFromUrl);
+      const res = await fetch(`/api/crm/quotes?${params.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch quotes");
       return res.json();
     },
     enabled: !!currentUser && formData.mode === "from-quote",
+  });
+
+  const { data: allCustomerQuotes } = useQuery<{ quotes: QuoteWithItems[] }>({
+    queryKey: ["/api/crm/quotes", "all-for-customer", customerIdFromUrl],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/quotes?customerId=${customerIdFromUrl}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch quotes");
+      return res.json();
+    },
+    enabled: !!currentUser && formData.mode === "from-quote" && !!customerIdFromUrl,
   });
 
   const { data: crmItems } = useQuery<CrmItem[]>({
@@ -284,6 +299,18 @@ export default function CrmInvoiceCreate() {
   });
 
   const newWOProjects = projectsResponse?.projects || [];
+
+  // Fetch parent customer for billing-to-parent banner (when selected WO customer bills to parent)
+  const woCustomer = selectedWorkOrder?.customer;
+  const { data: parentCustomerForBanner } = useQuery<CrmCustomer>({
+    queryKey: ["/api/crm/customers", woCustomer?.parentCustomerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${woCustomer!.parentCustomerId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch parent customer");
+      return res.json();
+    },
+    enabled: !!woCustomer?.parentCustomerId && !!woCustomer?.billToParent,
+  });
 
   // Fetch maintenance subtypes (includes custom agreement types) when MAINTENANCE is selected
   useEffect(() => {
@@ -352,6 +379,12 @@ export default function CrmInvoiceCreate() {
       return res.json();
     },
     onSuccess: (data) => {
+      // Optimistically inject the new invoice into the list cache so it shows immediately
+      queryClient.setQueriesData({ queryKey: ["/api/crm/invoices"] }, (old: any) => {
+        if (!old?.invoices) return old;
+        if (old.invoices.some((inv: any) => inv.id === data.id)) return old;
+        return { ...old, invoices: [data, ...old.invoices] };
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       if (formData.workOrderId) {
@@ -379,6 +412,11 @@ export default function CrmInvoiceCreate() {
       return res.json();
     },
     onSuccess: (data) => {
+      queryClient.setQueriesData({ queryKey: ["/api/crm/invoices"] }, (old: any) => {
+        if (!old?.invoices) return old;
+        if (old.invoices.some((inv: any) => inv.id === data.id)) return old;
+        return { ...old, invoices: [data, ...old.invoices] };
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       if (formData.workOrderId) {
@@ -620,6 +658,10 @@ export default function CrmInvoiceCreate() {
   };
 
   const filteredWorkOrders = workOrders?.workOrders?.filter(wo => {
+    if (customerIdFromUrl) {
+      const woCustomerId = wo.customerId || wo.customer?.id;
+      if (woCustomerId !== customerIdFromUrl) return false;
+    }
     if (!workOrderSearch) return true;
     const search = workOrderSearch.toLowerCase();
     return (
@@ -631,6 +673,9 @@ export default function CrmInvoiceCreate() {
   }) || [];
 
   const filteredQuotes = quotes?.quotes?.filter(q => {
+    if (customerIdFromUrl) {
+      if (q.customerId !== customerIdFromUrl) return false;
+    }
     if (!quoteSearch) return true;
     const search = quoteSearch.toLowerCase();
     return (
@@ -682,7 +727,13 @@ export default function CrmInvoiceCreate() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => window.history.back()}
+            onClick={() => {
+              if (customerIdFromUrl) {
+                navigate(`/crm/customers/${customerIdFromUrl}?tab=invoices`);
+              } else {
+                navigate("/crm/invoices");
+              }
+            }}
             data-testid="button-back"
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
@@ -826,6 +877,19 @@ export default function CrmInvoiceCreate() {
                           Linked from Work Order
                         </div>
                       </div>
+                      {/* Billing-to-parent notice */}
+                      {woCustomer?.billToParent && (
+                        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                          <Info className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm text-amber-800">
+                            <span className="font-medium">Billing to parent: </span>
+                            {parentCustomerForBanner
+                              ? parentCustomerForBanner.name
+                              : "parent account"}
+                            {" — invoices for this sub-account go to the parent."}
+                          </p>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <>
@@ -868,7 +932,9 @@ export default function CrmInvoiceCreate() {
                         ) : filteredWorkOrders.length === 0 ? (
                           <div className="p-8 text-center text-slate-500">
                             <ClipboardList className="h-8 w-8 mx-auto mb-2 text-slate-400" />
-                            No work orders found
+                            {customerIdFromUrl
+                              ? "This customer has no work orders. Create a work order first before creating an invoice."
+                              : "No work orders found"}
                           </div>
                         ) : (
                           <div className="divide-y">
@@ -970,7 +1036,11 @@ export default function CrmInvoiceCreate() {
                     ) : filteredQuotes.length === 0 ? (
                       <div className="p-8 text-center text-slate-500">
                         <FileText className="h-8 w-8 mx-auto mb-2 text-slate-400" />
-                        No accepted quotes found
+                        {customerIdFromUrl
+                          ? (allCustomerQuotes?.quotes && allCustomerQuotes.quotes.length > 0
+                            ? "This customer has no accepted quotes. A quote must be in \"Accepted\" status before you can create an invoice from it."
+                            : "This customer has no quotes. Create a quote for this customer first.")
+                          : "No accepted quotes found"}
                       </div>
                     ) : (
                       <div className="divide-y">
@@ -1469,7 +1539,14 @@ export default function CrmInvoiceCreate() {
                       </div>
                     ) : (
                       <div className="divide-y">
-                        {customerSearchResults?.customers?.map((customer) => (
+                        {[...(customerSearchResults?.customers || [])].sort((a, b) => {
+                          const t = newWOCustomerSearch.trim().toLowerCase();
+                          const aName = (a.name || "").toLowerCase();
+                          const bName = (b.name || "").toLowerCase();
+                          if ((aName === t) !== (bName === t)) return (aName === t) ? -1 : 1;
+                          if (aName.startsWith(t) !== bName.startsWith(t)) return aName.startsWith(t) ? -1 : 1;
+                          return 0;
+                        }).map((customer) => (
                           <button
                             key={customer.id}
                             onClick={() => {
@@ -1529,7 +1606,6 @@ export default function CrmInvoiceCreate() {
                   <SelectItem value="low">Low</SelectItem>
                   <SelectItem value="normal">Normal</SelectItem>
                   <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
                 </SelectContent>
               </Select>
             </div>

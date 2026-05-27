@@ -7,6 +7,7 @@ import { getStripeSync } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
 import { startBackgroundSyncScheduler } from "./services/quickbooksService";
 import { fieldEdgeCustomerService } from "./services/fieldedge-customers";
+import { scheduleBookingReminders } from "./services/bookingEmail";
 
 const app = express();
 
@@ -145,7 +146,102 @@ import path from "path";
 const assetsPath = path.resolve(import.meta.dirname, "..", "attached_assets");
 app.use("/assets", express.static(assetsPath));
 
+// Serve converted salesbook page images
+const salesbookPagesPath = path.resolve(import.meta.dirname, "..", "public", "salesbook-pages");
+app.use("/salesbook-pages", express.static(salesbookPagesPath, { maxAge: '30d' }));
+
+async function runTaggedCommentMigrations() {
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`ALTER TABLE crm_tagged_comments ADD COLUMN IF NOT EXISTS author_dismissed boolean NOT NULL DEFAULT false`);
+    await db.execute(sql`ALTER TABLE crm_tagged_comment_recipients ADD COLUMN IF NOT EXISTS resolved_by_id varchar`);
+    await db.execute(sql`ALTER TABLE crm_tagged_comment_recipients ADD COLUMN IF NOT EXISTS dismissed boolean NOT NULL DEFAULT false`);
+  } catch (err) {
+    console.error("Tagged comment migration error (non-fatal):", err);
+  }
+}
+
+async function runSalesbookMigrations() {
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS salesbook_bookmarks (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        label text NOT NULL,
+        page_number integer NOT NULL,
+        sort_order integer NOT NULL DEFAULT 0,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+  } catch (err) {
+    console.error("Salesbook migration error (non-fatal):", err);
+  }
+}
+
+async function runProposalTemplateMigrations() {
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS proposal_templates (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        name text NOT NULL,
+        body text NOT NULL,
+        is_default boolean NOT NULL DEFAULT false,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    const { DEFAULT_TEMPLATE_NAME, DEFAULT_TEMPLATE_BODY } = await import("@shared/default-template");
+    const countResult = await db.execute(sql`SELECT count(*)::int as cnt FROM proposal_templates`);
+    const rows = countResult.rows ?? countResult;
+    const count = Number(Array.isArray(rows) && rows.length > 0 ? (rows[0] as Record<string, unknown>).cnt : 0);
+    if (count === 0) {
+      await db.execute(sql`
+        INSERT INTO proposal_templates (id, name, body, is_default)
+        VALUES (gen_random_uuid(), ${DEFAULT_TEMPLATE_NAME}, ${DEFAULT_TEMPLATE_BODY}, true)
+      `);
+      console.log("[ProposalTemplates] Seeded default Installation Agreement template");
+    }
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS proposal_template_images (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        name text NOT NULL,
+        url text NOT NULL,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS customer_files (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        customer_id varchar NOT NULL,
+        name text NOT NULL,
+        url text NOT NULL,
+        object_path text,
+        content_type text,
+        size integer,
+        uploaded_by varchar,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+  } catch (err) {
+    console.error("Proposal template migration error (non-fatal):", err);
+  }
+}
+
 (async () => {
+  await runTaggedCommentMigrations();
+  await runSalesbookMigrations();
+  await runProposalTemplateMigrations();
+  try {
+    const { ensureSalesbookConverted } = await import("./services/salesbook-converter");
+    ensureSalesbookConverted();
+  } catch (err) {
+    console.error("Salesbook conversion error (non-fatal):", err);
+  }
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -186,6 +282,9 @@ app.use("/assets", express.static(assetsPath));
     
     // Start QuickBooks background sync scheduler
     startBackgroundSyncScheduler();
+
+    // Start booking email reminder scheduler (checks every 30 min for 2-hour reminders)
+    scheduleBookingReminders();
     
     // Start FieldEdge customer cache with 5-minute refresh
     fieldEdgeCustomerService.startAutoRefresh(5);

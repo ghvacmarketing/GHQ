@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Sparkles, Download, Save, X, MapPin, Cog, Shield, Plus, FileEdit, Pencil } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, ShoppingCart, Trash2, FileText, Copy, Package, Thermometer, Zap, Award, Filter, Wrench, CheckCircle2, Search, Loader2, Crown, Droplets, Download, Save, X, MapPin, Cog, Shield, Plus, FileEdit, Pencil } from "lucide-react";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, Table, TableRow, TableCell, WidthType } from "docx";
 import { saveAs } from "file-saver";
 import { jsPDF } from "jspdf";
@@ -26,6 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { Skeleton } from "@/components/ui/skeleton";
+import ProposalEditor from "@/components/proposal-editor";
 import redlogo from "@assets/redlogo.webp";
 import componentsData from "@assets/pricebook-components.json";
 import type { Customer, CrmUser, CrmCustomer, QuotePart } from "@shared/schema";
@@ -86,6 +87,12 @@ const COMPANY_INFO = {
   documentTitle: "COMPREHENSIVE HOME COMFORT PROPOSAL",
   footer: "Thank you for considering GHVAC!",
   termsFooter: "This proposal is valid for 30 days. Prices subject to change. Financing terms subject to credit approval.",
+};
+
+const getAssetUrl = (path: string | undefined | null): string => {
+  if (!path) return '';
+  if (path.startsWith('http') || path.startsWith('/')) return path;
+  return `/assets/${path}`;
 };
 
 // Brand colors for PDF
@@ -652,7 +659,7 @@ function EquipmentImageGrid({
       {imageItems.map(item => (
         <div key={item.key} className="flex flex-col items-center">
           <img 
-            src={`/assets/${item.url}`}
+            src={getAssetUrl(item.url)}
             alt={item.label}
             className={`${imgSize} object-contain rounded bg-gray-50 dark:bg-gray-800`}
             loading="lazy"
@@ -791,6 +798,7 @@ export default function CrmProposalBuilder() {
   usePageTitle("Proposal Builder");
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const routeParams = useParams<{ customerId?: string }>();
   
   const { data: currentUser, isLoading: isLoadingUser } = useQuery<CrmUser>({
     queryKey: ["/api/crm/auth/me"],
@@ -865,30 +873,8 @@ export default function CrmProposalBuilder() {
   const [customerName, setCustomerName] = useState(() => loadCustomerFromStorage().name);
   const [customerAddress, setCustomerAddress] = useState(() => loadCustomerFromStorage().address);
   const [customerNotes, setCustomerNotes] = useState(() => loadCustomerFromStorage().notes);
-  const [generatedQuote, setGeneratedQuote] = useState<string | null>(null);
-  const [aiGeneratedQuote, setAiGeneratedQuote] = useState<{
-    quote_title: string;
-    package_description: string;
-    whats_included: { category: string; items: string[] }[];
-    best_for: string;
-    line_items: { name: string; qty: number; price: number; description: string }[];
-    subtotal: number;
-    elite_discount_active: boolean;
-    elite_discount_percent: number;
-    elite_discount_amount: number;
-    elite_warning: string;
-    discount_percent: number;
-    discount_amount: number;
-    total: number;
-    savings_note: string;
-    financing_text: string;
-    warranties_and_terms: string[];
-    next_steps: string[];
-    additional_enhancements: { name: string; price: number; description: string; whats_included: string[]; recommended_for: string }[];
-  } | null>(null);
-  const [isGeneratingQuote, setIsGeneratingQuote] = useState(false);
-  const [quoteInstructions, setQuoteInstructions] = useState("");
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [proposalNotes, setProposalNotes] = useState<string>("");
+  const [isNavigatingAway, setIsNavigatingAway] = useState(false);
   
   // Quote mode: "single" = one combined quote, "options" = each package is a separate option
   const [quoteMode, setQuoteMode] = useState<"single" | "options">("options");
@@ -916,11 +902,6 @@ export default function CrmProposalBuilder() {
   const [preloadedProjectId, setPreloadedProjectId] = useState<string | null>(null);
   const [preloadedWorkOrderId, setPreloadedWorkOrderId] = useState<string | null>(null);
   
-  // Edit dialogs for financing and warranties
-  const [editFinancingOpen, setEditFinancingOpen] = useState(false);
-  const [editFinancingText, setEditFinancingText] = useState("");
-  const [editWarrantiesOpen, setEditWarrantiesOpen] = useState(false);
-  const [editWarrantiesText, setEditWarrantiesText] = useState("");
   const [preloadedPropertyId, setPreloadedPropertyId] = useState<string | null>(null);
   
   // Customer properties for site selection
@@ -933,11 +914,12 @@ export default function CrmProposalBuilder() {
   
   // Parse URL parameters on mount and pre-fill customer if provided
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const customerId = params.get("customerId");
-    const projectId = params.get("projectId");
-    const workOrderId = params.get("workOrderId");
-    const propertyId = params.get("propertyId");
+    const queryParams = new URLSearchParams(window.location.search);
+    // Prefer wouter route param (:customerId), fall back to query string (?customerId=)
+    const customerId = routeParams.customerId || queryParams.get("customerId");
+    const projectId = queryParams.get("projectId");
+    const workOrderId = queryParams.get("workOrderId");
+    const propertyId = queryParams.get("propertyId");
     
     if (projectId) setPreloadedProjectId(projectId);
     if (workOrderId) setPreloadedWorkOrderId(workOrderId);
@@ -958,7 +940,7 @@ export default function CrmProposalBuilder() {
         })
         .catch(console.error);
     }
-  }, []);
+  }, [routeParams.customerId]);
 
   // Sync cart image URLs with fresh package data when packages are loaded
   useEffect(() => {
@@ -1127,10 +1109,10 @@ export default function CrmProposalBuilder() {
   });
 
   const handleSaveProposal = () => {
-    if (!aiGeneratedQuote) {
+    if (cart.length === 0) {
       toast({
-        title: "No Quote",
-        description: "Please generate a quote first.",
+        title: "Empty Cart",
+        description: "Please add equipment to the cart first.",
         variant: "destructive",
       });
       return;
@@ -1230,20 +1212,19 @@ export default function CrmProposalBuilder() {
       }
     });
 
-    // Combine AI quote with cart items
-    const fullQuoteData = {
-      ...aiGeneratedQuote,
-      cartItems: cartItemsForSave,
-    };
+    const quoteTitle = cart.length > 0
+      ? (isHvacPackage(cart[0]) ? `${cart[0].packageLevel} Package Proposal` : "Equipment Proposal")
+      : "Equipment Proposal";
+    const fullQuoteData = { cartItems: cartItemsForSave, proposalNotes };
     
     saveProposalMutation.mutate({
       customerName: customerNameToUse,
       customerAddress: customerAddress || undefined,
       customerPhone: selectedCustomer?.phone || undefined,
       customerEmail: selectedCustomer?.email || undefined,
-      quoteTitle: aiGeneratedQuote.quote_title,
-      packageDescription: aiGeneratedQuote.package_description || undefined,
-      total: String(aiGeneratedQuote.total),
+      quoteTitle,
+      packageDescription: undefined,
+      total: String(cartTotalAfterDiscount.high),
       quoteData: JSON.stringify(fullQuoteData),
     });
   };
@@ -1267,7 +1248,6 @@ export default function CrmProposalBuilder() {
         imageUrl?: string;
       }>;
       status?: string;
-      aiGeneratedQuote?: object;
       quoteMode?: string;
       quoteType?: string;
       assignedToId?: string;
@@ -1280,11 +1260,22 @@ export default function CrmProposalBuilder() {
         title: "Saved to CRM!",
         description: `Quote ${data.quote?.quoteNumber || ''} created successfully.`,
       });
+      if (data.quote) {
+        queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+          if (!old?.quotes) return old;
+          return { ...old, quotes: [data.quote, ...old.quotes] };
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       setQuoteDialogOpen(false);
       if (data.quote?.id) {
-        setLocation(`/crm/quotes/${data.quote.id}`);
+        // Unmount TipTap editor first so ProseMirror can clean up DOM references
+        // before React tears down the page, preventing getComputedStyle crash
+        setIsNavigatingAway(true);
+        setTimeout(() => {
+          setLocation(`/crm/quotes/${data.quote.id}`);
+        }, 150);
       }
     },
     onError: (error) => {
@@ -1298,10 +1289,10 @@ export default function CrmProposalBuilder() {
   });
 
   const handleSaveToCrm = () => {
-    if (!aiGeneratedQuote) {
+    if (cart.length === 0) {
       toast({
-        title: "No Quote",
-        description: "Please generate a quote first.",
+        title: "Empty Cart",
+        description: "Please add equipment to the cart first.",
         variant: "destructive",
       });
       return;
@@ -1418,17 +1409,20 @@ export default function CrmProposalBuilder() {
     const finalPropertyId = isValidProperty ? propertyIdToUse : 
       (customerProperties.length === 1 ? customerProperties[0].id : undefined);
 
+    const crmTitle = cart.length > 0
+      ? (isHvacPackage(cart[0]) ? `${cart[0].packageLevel} Package Proposal` : "Equipment Proposal")
+      : "Equipment Proposal";
+
     saveToCrmMutation.mutate({
       customerId: selectedCustomer.id,
       propertyId: finalPropertyId || undefined,
       projectId: preloadedProjectId || undefined,
       workOrderId: preloadedWorkOrderId || undefined,
-      title: aiGeneratedQuote.quote_title || "Equipment Proposal",
-      description: aiGeneratedQuote.package_description || undefined,
+      title: crmTitle,
+      description: (proposalNotes && proposalNotes !== '<p></p>') ? proposalNotes : undefined,
       notes: customerNotes || undefined,
       lineItems,
       status: "draft",
-      aiGeneratedQuote: aiGeneratedQuote,
       quoteMode: quoteMode,
       quoteType: "proposal",
       assignedToId: assignedToId || undefined,
@@ -2229,939 +2223,399 @@ export default function CrmProposalBuilder() {
     });
   };
 
-  const openQuoteDialog = async () => {
+  const openQuoteDialog = () => {
     if (cart.length === 0) return;
-    setAiGeneratedQuote(null);
-    setQuoteInstructions("");
-    setConversationId(null);
-    setQuoteDialogOpen(true);
-    
-    // Create a new conversation for memory tracking
-    if (customerName) {
-      try {
-        const response = await fetch('/api/quotes/conversations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customerName,
-            cartSnapshot: { itemCount: cart.length },
-          }),
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setConversationId(data.conversationId);
-        }
-      } catch (error) {
-        console.error('Failed to create conversation:', error);
-      }
-    }
+    const returnUrl = routeParams.customerId
+      ? `/crm/quotes/proposal/${routeParams.customerId}`
+      : "/crm/quotes/proposal";
+    const previewState = {
+      cart,
+      selectedCustomer,
+      quoteMode,
+      customerNotes,
+      proposalNotes,
+      assignedToId,
+      selectedPropertyId,
+      preloadedPropertyId,
+      preloadedProjectId,
+      preloadedWorkOrderId,
+      customerProperties,
+      assignableUsers: assignableUsers || [],
+      returnUrl,
+      computedTotals: {
+        cartSubtotalPreDiscount,
+        cartEliteDiscountAmount,
+        cartTotalAfterDiscount,
+        cartMonthlyTotalRange,
+        hasEstimatedItems,
+      },
+    };
+    sessionStorage.setItem("ghvac-proposal-preview-state", JSON.stringify(previewState));
+    setLocation("/crm/proposal-preview");
   };
 
-  const generateQuote = async () => {
-    if (cart.length === 0) return;
-    
-    setIsGeneratingQuote(true);
-    
-    try {
-      const cartItems = cart.map(item => {
-        if (isCrawlspaceItem(item)) {
-          const basePrice = item.pricingBreakdown.totalPrice;
-          const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
-          return {
-            type: 'crawlspace' as const,
-            name: `Crawlspace Encapsulation - ${item.tier.name} (${item.pricingBreakdown.bandSqft.toLocaleString()} sqft)`,
-            description: `${item.tier.milThickness} Mil Vapor Barrier - ${item.tier.description}`,
-            basePrice: basePrice,
-            finalPrice: finalPrice,
-            quantity: item.quantity,
-            isElite: !!item.eliteData,
-            eliteIncludes: item.eliteData ? CRAWLSPACE_ELITE_BUNDLES.map(b => b.name) : undefined,
-            eliteSavings: item.eliteData?.discountAmount,
-            pricingBreakdown: item.pricingBreakdown,
-            packageTag: item.tier.name, // Use tier name as the option label
-          };
-        } else if (isCustomBuild(item)) {
-          const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
-          return {
-            type: 'custom' as const,
-            name: `Custom Build - ${item.tonnage} System`,
-            description: [
-              item.outdoorUnit ? `${item.outdoorUnit.brand} ${item.outdoorUnit.unitName}` : null,
-              item.indoorUnit ? `${item.indoorUnit.brand} ${item.indoorUnit.unitName}` : null,
-              item.thermostat ? `${item.thermostat.brand} ${item.thermostat.unitName}` : null,
-            ].filter(Boolean).join(', '),
-            basePrice: estimate.high,
-            finalPrice: estimate.high,
-            quantity: item.quantity,
-            isElite: false,
-            packageTag: 'Custom Build', // Label for custom builds
-          };
-        } else {
-          const unitTypeName = UNIT_TYPE_INFO[item.unitType]?.name || item.unitType;
-          const basePrice = parseFloat(item.totalInvestment) || 0;
-          const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
-          const eliteIncludes = item.eliteData ? [
-            ...HVAC_ELITE_CORE_BUNDLES.map(b => b.name),
-            HVAC_ELITE_AIRFLOW_OPTIONS.find(o => o.id === item.eliteData!.selectedAirflowOptionId)?.name
-          ].filter(Boolean) as string[] : undefined;
-          return {
-            type: 'hvac' as const,
-            name: `${item.packageLevel} Package - ${item.extractedTonnage}`,
-            description: `${unitTypeName} (${item.tier}) - ${item.outdoorBrand} ${item.outdoorName}`,
-            basePrice: basePrice,
-            finalPrice: finalPrice,
-            quantity: item.quantity,
-            isElite: !!item.eliteData,
-            eliteIncludes,
-            eliteSavings: item.eliteData?.discountAmount,
-            packageTag: item.packageLevel, // Use package level (Good, Better, Best) as the option label
-          };
-        }
-      });
-      
-      const response = await fetch('/api/quotes/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          conversationId: conversationId || undefined,
-          customerName,
-          customerAddress,
-          customerNotes,
-          customInstructions: quoteInstructions || undefined,
-          cartItems,
-          quoteMode, // "single" = combined total, "options" = individual pricing per package
-          totals: {
-            subtotal: cartSubtotalPreDiscount.high,
-            eliteSavings: cartEliteDiscountAmount,
-            grandTotal: cartTotalAfterDiscount.high,
-            monthlyPayment: cartMonthlyTotalRange.high,
-          },
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to generate quote');
-      }
-      
-      const aiQuote = await response.json();
-      setAiGeneratedQuote(aiQuote);
-      
-      let quoteText = `${aiQuote.quote_title}\n${'='.repeat(40)}\n\n`;
-      quoteText += `${aiQuote.package_description}\n\n`;
-      if (aiQuote.whats_included && aiQuote.whats_included.length > 0) {
-        quoteText += `WHAT'S INCLUDED:\n`;
-        aiQuote.whats_included.forEach((category: { category: string; items: string[] }) => {
-          quoteText += `\n${category.category}:\n`;
-          category.items.forEach((item: string) => {
-            quoteText += `  • ${item}\n`;
-          });
-        });
-        quoteText += `\n`;
-      }
-      if (aiQuote.best_for) {
-        quoteText += `Best For: ${aiQuote.best_for}\n\n`;
-      }
-      if (aiQuote.line_items && aiQuote.line_items.length > 0) {
-        quoteText += `LINE ITEMS:\n`;
-        aiQuote.line_items.forEach((item: { name: string; qty: number; price: number; description: string }) => {
-          quoteText += `- ${item.name} (x${item.qty}): $${item.price.toLocaleString()}\n  ${item.description}\n`;
-        });
-      }
-      quoteText += `\nSubtotal: $${aiQuote.subtotal.toLocaleString()}\n`;
-      if (aiQuote.elite_discount_active && aiQuote.elite_discount_amount > 0) {
-        quoteText += `Elite Bundle Discount (${aiQuote.elite_discount_percent}%): -$${aiQuote.elite_discount_amount.toLocaleString()}\n`;
-      }
-      if (aiQuote.elite_warning) {
-        quoteText += `Note: ${aiQuote.elite_warning}\n`;
-      }
-      if (aiQuote.discount_amount > 0 && !aiQuote.elite_discount_active) {
-        quoteText += `Discount (${aiQuote.discount_percent}%): -$${aiQuote.discount_amount.toLocaleString()}\n`;
-      }
-      quoteText += `Total: $${aiQuote.total.toLocaleString()}\n`;
-      if (aiQuote.savings_note) quoteText += `\n${aiQuote.savings_note}\n`;
-      if (aiQuote.financing_text) quoteText += `${aiQuote.financing_text}\n`;
-      quoteText += `\nWarranties & Terms:\n`;
-      aiQuote.warranties_and_terms.forEach((term: string) => {
-        quoteText += `• ${term}\n`;
-      });
-      if (aiQuote.next_steps && aiQuote.next_steps.length > 0) {
-        quoteText += `\nNext Steps:\n`;
-        aiQuote.next_steps.forEach((step: string) => {
-          quoteText += `• ${step}\n`;
-        });
-      }
-      if (aiQuote.additional_enhancements && aiQuote.additional_enhancements.length > 0) {
-        quoteText += `\nADDITIONAL ENHANCEMENTS:\n`;
-        aiQuote.additional_enhancements.forEach((enh: { name: string; price: number; description: string; whats_included: string[]; recommended_for: string }) => {
-          quoteText += `\n${enh.name} - $${enh.price.toLocaleString()}\n`;
-          quoteText += `  ${enh.description}\n`;
-          if (enh.whats_included && enh.whats_included.length > 0) {
-            quoteText += `  Includes: ${enh.whats_included.join(', ')}\n`;
-          }
-          if (enh.recommended_for) {
-            quoteText += `  Recommended for: ${enh.recommended_for}\n`;
-          }
-        });
-      }
-      setGeneratedQuote(quoteText);
-      
-    } catch (error) {
-      console.error('Error generating quote:', error);
-      toast({
-        title: "Quote Generation Failed",
-        description: "Could not generate AI quote. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGeneratingQuote(false);
-    }
+  const htmlToPlainText = (html: string): string => {
+    return html
+      .replace(/<h[1-6][^>]*>(.*?)<\/h[1-6]>/gi, '\n$1\n')
+      .replace(/<li[^>]*>(.*?)<\/li>/gi, '\u2022 $1\n')
+      .replace(/<ul[^>]*>|<\/ul>|<ol[^>]*>|<\/ol>/gi, '')
+      .replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '$1')
+      .replace(/<em[^>]*>(.*?)<\/em>/gi, '$1')
+      .replace(/<u[^>]*>(.*?)<\/u>/gi, '$1')
+      .replace(/<[^>]*>/g, '')
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
   };
 
-  const copyQuoteToClipboard = async () => {
-    if (!generatedQuote) return;
-    try {
-      await navigator.clipboard.writeText(generatedQuote);
-      toast({
-        title: "Copied!",
-        description: "Quote copied to clipboard.",
-      });
-    } catch (err) {
-      toast({
-        title: "Copy Failed",
-        description: "Please select and copy the text manually.",
-        variant: "destructive",
-      });
-    }
+  const buildCartLineItems = () => {
+    return cart.map(item => {
+      if (isCrawlspaceItem(item)) {
+        const unitPrice = item.eliteData ? item.eliteData.finalTotal : item.pricingBreakdown.totalPrice;
+        return {
+          name: `Crawlspace Encapsulation — ${item.tier.name}`,
+          description: `${item.tier.milThickness} Mil, ${item.pricingBreakdown.bandSqft.toLocaleString()} sq ft`,
+          qty: item.quantity,
+          price: unitPrice * item.quantity,
+        };
+      } else if (isCustomBuild(item)) {
+        const estimate = calculateCustomBuildEstimate(item.outdoorUnit, item.coil, item.indoorUnit, item.thermostat);
+        return {
+          name: `Custom Build — ${item.tonnage} System`,
+          description: [
+            item.outdoorUnit ? `${item.outdoorUnit.brand} ${item.outdoorUnit.unitName}` : null,
+            item.thermostat ? `Thermostat: ${item.thermostat.brand} ${item.thermostat.unitName}` : null,
+          ].filter(Boolean).join(', '),
+          qty: item.quantity,
+          price: estimate.high * item.quantity,
+        };
+      } else if (isCrawlspaceServicesItem(item)) {
+        return {
+          name: 'Crawlspace Services',
+          description: `${item.selections.sqft?.toLocaleString() ?? ''} sq ft`,
+          qty: item.quantity,
+          price: item.totalPrice * item.quantity,
+        };
+      } else {
+        const unitTypeName = UNIT_TYPE_INFO[item.unitType]?.name || item.unitType;
+        const basePrice = parseFloat(item.totalInvestment) || 0;
+        const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
+        return {
+          name: `${unitTypeName} — ${item.packageLevel} ${item.extractedTonnage}`,
+          description: `${item.tier} | ${item.outdoorBrand} ${item.outdoorName}${item.eliteData ? ' | Elite Package' : ''}`,
+          qty: item.quantity,
+          price: finalPrice * item.quantity,
+        };
+      }
+    });
   };
 
   const downloadQuoteAsDoc = async () => {
-    if (!aiGeneratedQuote) return;
-    
+    if (cart.length === 0) return;
     try {
       const paragraphs: Paragraph[] = [];
-      
-      // === HEADER SECTION ===
-      // Company Name
-      paragraphs.push(
-        new Paragraph({
-          children: [new TextRun({ text: COMPANY_INFO.name, bold: true, size: 36 })],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 40 },
-        })
-      );
-      // Tagline
-      paragraphs.push(
-        new Paragraph({
-          children: [new TextRun({ text: COMPANY_INFO.tagline, italics: true, size: 24 })],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 80 },
-        })
-      );
-      // Contact info
-      paragraphs.push(
-        new Paragraph({
-          children: [new TextRun({ text: `${COMPANY_INFO.address} | Phone: ${COMPANY_INFO.phone} | ${COMPANY_INFO.email}`, size: 20 })],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 200 },
-        })
-      );
-      // Proposal title
-      paragraphs.push(
-        new Paragraph({
-          children: [new TextRun({ text: COMPANY_INFO.documentTitle, bold: true, size: 28 })],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 200 },
-        })
-      );
-      // Customer info
-      paragraphs.push(
-        new Paragraph({
+      const lineItems = buildCartLineItems();
+
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: COMPANY_INFO.name, bold: true, size: 36 })],
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 40 },
+      }));
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: COMPANY_INFO.tagline, italics: true, size: 24 })],
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 80 },
+      }));
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: `${COMPANY_INFO.address} | Phone: ${COMPANY_INFO.phone} | ${COMPANY_INFO.email}`, size: 20 })],
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 200 },
+      }));
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: COMPANY_INFO.documentTitle, bold: true, size: 28 })],
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 200 },
+      }));
+
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: 'Prepared for: ', bold: true }), new TextRun({ text: customerName || 'Valued Customer' })],
+        spacing: { after: 40 },
+      }));
+      if (customerAddress) {
+        paragraphs.push(new Paragraph({ children: [new TextRun({ text: customerAddress })], spacing: { after: 80 } }));
+      }
+      paragraphs.push(new Paragraph({
+        border: { bottom: { color: 'auto', space: 1, style: BorderStyle.SINGLE, size: 6 } },
+        spacing: { after: 200 },
+        children: [],
+      }));
+
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: 'Equipment & Services', bold: true, size: 26 })],
+        spacing: { after: 120 },
+      }));
+
+      lineItems.forEach(item => {
+        paragraphs.push(new Paragraph({
           children: [
-            new TextRun({ text: "Prepared for: ", bold: true }),
-            new TextRun({ text: customerName || "Valued Customer" }),
+            new TextRun({ text: `${item.name}`, bold: true }),
+            new TextRun({ text: `  (Qty: ${item.qty})  —  $${item.price.toLocaleString()}` }),
           ],
           spacing: { after: 40 },
-        })
-      );
-      if (customerAddress) {
-        paragraphs.push(
-          new Paragraph({
-            children: [new TextRun({ text: customerAddress })],
+        }));
+        if (item.description) {
+          paragraphs.push(new Paragraph({
+            children: [new TextRun({ text: item.description, italics: true, color: '555555' })],
             spacing: { after: 80 },
-          })
-        );
-      }
-      // Separator line
-      paragraphs.push(
-        new Paragraph({
-          border: {
-            bottom: { color: "000000", space: 1, style: BorderStyle.SINGLE, size: 12 },
-          },
-          spacing: { after: 300 },
-        })
-      );
-
-      // === QUOTE TITLE (Bold, Centered) ===
-      paragraphs.push(
-        new Paragraph({
-          children: [new TextRun({ text: aiGeneratedQuote.quote_title, bold: true, size: 32 })],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 200 },
-        })
-      );
-
-      // === PACKAGE DESCRIPTION ===
-      if (aiGeneratedQuote.package_description) {
-        paragraphs.push(
-          new Paragraph({
-            children: [new TextRun({ text: aiGeneratedQuote.package_description })],
-            spacing: { after: 200 },
-          })
-        );
-      }
-
-      // === WHAT'S INCLUDED SECTION ===
-      if (aiGeneratedQuote.whats_included && aiGeneratedQuote.whats_included.length > 0) {
-        paragraphs.push(
-          new Paragraph({
-            children: [new TextRun({ text: "What's Included", bold: true, size: 26 })],
-            spacing: { before: 200, after: 120 },
-          })
-        );
-        
-        aiGeneratedQuote.whats_included.forEach((category) => {
-          // Category name in bold
-          paragraphs.push(
-            new Paragraph({
-              children: [new TextRun({ text: category.category, bold: true })],
-              spacing: { before: 120, after: 60 },
-            })
-          );
-          // Category items as bullets
-          category.items.forEach((item) => {
-            paragraphs.push(
-              new Paragraph({
-                children: [new TextRun({ text: `• ${item}` })],
-                indent: { left: 360 },
-                spacing: { after: 40 },
-              })
-            );
-          });
-        });
-      }
-
-      // === BEST FOR SECTION ===
-      if (aiGeneratedQuote.best_for) {
-        paragraphs.push(
-          new Paragraph({
-            children: [
-              new TextRun({ text: "Best For: ", bold: true }),
-              new TextRun({ text: aiGeneratedQuote.best_for }),
-            ],
-            spacing: { before: 200, after: 200 },
-          })
-        );
-      }
-
-      // === PRICING SECTION ===
-      paragraphs.push(
-        new Paragraph({
-          children: [new TextRun({ text: "Pricing", bold: true, size: 26 })],
-          spacing: { before: 200, after: 120 },
-        })
-      );
-
-      // Line Items
-      if (aiGeneratedQuote.line_items && aiGeneratedQuote.line_items.length > 0) {
-        aiGeneratedQuote.line_items.forEach((item) => {
-          paragraphs.push(
-            new Paragraph({
-              children: [
-                new TextRun({ text: `• ${item.name}` }),
-                new TextRun({ text: ` (x${item.qty}): $${item.price.toLocaleString()}` }),
-              ],
-              indent: { left: 360 },
-              spacing: { after: 40 },
-            })
-          );
-          if (item.description) {
-            paragraphs.push(
-              new Paragraph({
-                children: [new TextRun({ text: item.description, size: 20, color: "666666" })],
-                indent: { left: 720 },
-                spacing: { after: 60 },
-              })
-            );
-          }
-        });
-      }
-
-      // Subtotal
-      paragraphs.push(
-        new Paragraph({
-          children: [new TextRun({ text: `Subtotal: $${aiGeneratedQuote.subtotal.toLocaleString()}`, bold: true })],
-          spacing: { before: 120, after: 60 },
-        })
-      );
-
-      // Elite Discount (if active)
-      if (aiGeneratedQuote.elite_discount_active && aiGeneratedQuote.elite_discount_amount > 0) {
-        paragraphs.push(
-          new Paragraph({
-            children: [new TextRun({ text: `Elite Package Discount (${aiGeneratedQuote.elite_discount_percent}%): -$${aiGeneratedQuote.elite_discount_amount.toLocaleString()}`, bold: true, color: "228B22" })],
-            spacing: { after: 60 },
-          })
-        );
-      }
-
-      // Elite Warning (if any)
-      if (aiGeneratedQuote.elite_warning) {
-        paragraphs.push(
-          new Paragraph({
-            children: [new TextRun({ text: `Note: ${aiGeneratedQuote.elite_warning}`, italics: true, color: "B22222" })],
-            spacing: { after: 60 },
-          })
-        );
-      }
-
-      // Non-elite discount
-      if (aiGeneratedQuote.discount_amount > 0 && !aiGeneratedQuote.elite_discount_active) {
-        paragraphs.push(
-          new Paragraph({
-            children: [new TextRun({ text: `Discount (${aiGeneratedQuote.discount_percent}%): -$${aiGeneratedQuote.discount_amount.toLocaleString()}`, bold: true })],
-            spacing: { after: 60 },
-          })
-        );
-      }
-
-      // Total
-      paragraphs.push(
-        new Paragraph({
-          children: [new TextRun({ text: `Total: $${aiGeneratedQuote.total.toLocaleString()}`, bold: true, size: 28 })],
-          spacing: { before: 80, after: 120 },
-        })
-      );
-
-      // Savings note
-      if (aiGeneratedQuote.savings_note) {
-        paragraphs.push(
-          new Paragraph({
-            children: [new TextRun({ text: aiGeneratedQuote.savings_note, italics: true, color: "228B22" })],
-            spacing: { after: 80 },
-          })
-        );
-      }
-
-      // Financing text
-      if (aiGeneratedQuote.financing_text) {
-        paragraphs.push(
-          new Paragraph({
-            children: [new TextRun({ text: aiGeneratedQuote.financing_text })],
-            spacing: { after: 200 },
-          })
-        );
-      }
-
-      // === WARRANTIES & TERMS SECTION ===
-      if (aiGeneratedQuote.warranties_and_terms && aiGeneratedQuote.warranties_and_terms.length > 0) {
-        paragraphs.push(
-          new Paragraph({
-            children: [new TextRun({ text: "Warranties & Terms", bold: true, size: 26 })],
-            spacing: { before: 200, after: 120 },
-          })
-        );
-        
-        aiGeneratedQuote.warranties_and_terms.forEach((term) => {
-          paragraphs.push(
-            new Paragraph({
-              children: [new TextRun({ text: `• ${term}` })],
-              indent: { left: 360 },
-              spacing: { after: 40 },
-            })
-          );
-        });
-      }
-
-      // === NEXT STEPS SECTION ===
-      if (aiGeneratedQuote.next_steps && aiGeneratedQuote.next_steps.length > 0) {
-        paragraphs.push(
-          new Paragraph({
-            children: [new TextRun({ text: "Next Steps", bold: true, size: 26 })],
-            spacing: { before: 200, after: 120 },
-          })
-        );
-        
-        aiGeneratedQuote.next_steps.forEach((step) => {
-          paragraphs.push(
-            new Paragraph({
-              children: [new TextRun({ text: `• ${step}` })],
-              indent: { left: 360 },
-              spacing: { after: 40 },
-            })
-          );
-        });
-      }
-
-      // === ADDITIONAL ENHANCEMENTS SECTION ===
-      if (aiGeneratedQuote.additional_enhancements && aiGeneratedQuote.additional_enhancements.length > 0) {
-        paragraphs.push(
-          new Paragraph({
-            children: [new TextRun({ text: "Additional Enhancements", bold: true, size: 26 })],
-            spacing: { before: 300, after: 120 },
-          })
-        );
-        
-        aiGeneratedQuote.additional_enhancements.forEach((enh) => {
-          // Enhancement name and price
-          paragraphs.push(
-            new Paragraph({
-              children: [
-                new TextRun({ text: enh.name, bold: true }),
-                new TextRun({ text: ` - $${enh.price.toLocaleString()}`, bold: true }),
-              ],
-              spacing: { before: 120, after: 60 },
-            })
-          );
-          // Description
-          if (enh.description) {
-            paragraphs.push(
-              new Paragraph({
-                children: [new TextRun({ text: enh.description })],
-                indent: { left: 360 },
-                spacing: { after: 40 },
-              })
-            );
-          }
-          // What's included
-          if (enh.whats_included && enh.whats_included.length > 0) {
-            paragraphs.push(
-              new Paragraph({
-                children: [
-                  new TextRun({ text: "Includes: ", bold: true }),
-                  new TextRun({ text: enh.whats_included.join(", ") }),
-                ],
-                indent: { left: 360 },
-                spacing: { after: 40 },
-              })
-            );
-          }
-          // Recommended for
-          if (enh.recommended_for) {
-            paragraphs.push(
-              new Paragraph({
-                children: [
-                  new TextRun({ text: "Recommended For: ", bold: true }),
-                  new TextRun({ text: enh.recommended_for }),
-                ],
-                indent: { left: 360 },
-                spacing: { after: 80 },
-              })
-            );
-          }
-        });
-      }
-
-      // === FOOTER ===
-      paragraphs.push(
-        new Paragraph({
-          border: {
-            top: { color: "000000", space: 1, style: BorderStyle.SINGLE, size: 6 },
-          },
-          spacing: { before: 400 },
-        })
-      );
-      paragraphs.push(
-        new Paragraph({
-          children: [new TextRun({ text: COMPANY_INFO.footer, bold: true, italics: true, size: 24 })],
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 200, after: 100 },
-        })
-      );
-
-      const doc = new Document({
-        sections: [{
-          properties: {},
-          children: paragraphs,
-        }],
+          }));
+        }
       });
 
+      paragraphs.push(new Paragraph({
+        border: { bottom: { color: 'auto', space: 1, style: BorderStyle.SINGLE, size: 6 } },
+        spacing: { after: 120 },
+        children: [],
+      }));
+
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: 'Pricing Summary', bold: true, size: 26 })],
+        spacing: { after: 120 },
+      }));
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: 'Subtotal: ' }), new TextRun({ text: `$${cartSubtotalPreDiscount.high.toLocaleString()}`, bold: true })],
+        spacing: { after: 40 },
+      }));
+      if (cartEliteDiscountAmount > 0) {
+        paragraphs.push(new Paragraph({
+          children: [new TextRun({ text: 'Elite Bundle Discount: ' }), new TextRun({ text: `-$${cartEliteDiscountAmount.toLocaleString()}`, bold: true, color: '16a34a' })],
+          spacing: { after: 40 },
+        }));
+      }
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: 'Total Investment: ' }), new TextRun({ text: `$${cartTotalAfterDiscount.high.toLocaleString()}`, bold: true, size: 28 })],
+        spacing: { after: 40 },
+      }));
+      if (cartMonthlyTotalRange.high > 0) {
+        paragraphs.push(new Paragraph({
+          children: [new TextRun({ text: `Estimated Monthly: $${cartMonthlyTotalRange.high.toLocaleString()}/mo (financing, OAC)`, italics: true })],
+          spacing: { after: 120 },
+        }));
+      }
+
+      if (proposalNotes && proposalNotes !== '<p></p>') {
+        paragraphs.push(new Paragraph({
+          border: { bottom: { color: 'auto', space: 1, style: BorderStyle.SINGLE, size: 6 } },
+          spacing: { after: 120 },
+          children: [],
+        }));
+        paragraphs.push(new Paragraph({
+          children: [new TextRun({ text: 'Proposal Notes', bold: true, size: 26 })],
+          spacing: { after: 120 },
+        }));
+        const notesText = htmlToPlainText(proposalNotes);
+        notesText.split('\n').forEach(line => {
+          paragraphs.push(new Paragraph({
+            children: [new TextRun({ text: line })],
+            spacing: { after: 40 },
+          }));
+        });
+      }
+
+      paragraphs.push(new Paragraph({
+        border: { bottom: { color: 'auto', space: 1, style: BorderStyle.SINGLE, size: 6 } },
+        spacing: { after: 120 },
+        children: [],
+      }));
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: 'Warranties & Terms', bold: true, size: 26 })],
+        spacing: { after: 80 },
+      }));
+      [
+        '10-Year Parts & Labor Warranty on all HVAC equipment',
+        'Licensed & Insured — HVAC Contractor License',
+        'All work performed to manufacturer and local code standards',
+        'Proposal valid for 30 days from date of issue',
+      ].forEach(term => {
+        paragraphs.push(new Paragraph({
+          children: [new TextRun({ text: `• ${term}` })],
+          spacing: { after: 40 },
+        }));
+      });
+
+      const doc = new Document({ sections: [{ children: paragraphs }] });
       const blob = await Packer.toBlob(doc);
-      const customerNameForFile = selectedCustomer?.name?.replace(/[^a-zA-Z0-9]/g, '_') || customerName?.replace(/[^a-zA-Z0-9]/g, '_') || 'Customer';
-      const date = new Date().toISOString().split('T')[0];
-      saveAs(blob, `GHVAC_Quote_${customerNameForFile}_${date}.docx`);
-      
-      toast({
-        title: "Downloaded!",
-        description: "Quote saved as Word document.",
-      });
-    } catch (err) {
-      console.error('Error generating document:', err);
-      toast({
-        title: "Download Failed",
-        description: "Could not generate the document. Please try again.",
-        variant: "destructive",
-      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${customerName || 'Proposal'}_Quote.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: 'Document Downloaded', description: 'Proposal saved as a Word document.' });
+    } catch (error) {
+      console.error('Error generating document:', error);
+      toast({ title: 'Download Failed', description: 'Could not generate the document. Please try again.', variant: 'destructive' });
     }
   };
 
   const downloadQuoteAsPDF = async () => {
-    if (!aiGeneratedQuote) return;
-
+    if (cart.length === 0) return;
     try {
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
+      const lineItems = buildCartLineItems();
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
+      const pageW = doc.internal.pageSize.getWidth();
       const margin = 20;
-      const contentWidth = pageWidth - (margin * 2);
-      let y = 20;
+      const contentW = pageW - margin * 2;
+      let y = margin;
 
-      const addHeader = () => {
-        doc.setFillColor(...BRAND_COLORS.primary);
-        doc.rect(0, 0, pageWidth, 35, 'F');
-        doc.setFontSize(20);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(...BRAND_COLORS.white);
-        doc.text(COMPANY_INFO.name, pageWidth / 2, 15, { align: 'center' });
-        doc.setFontSize(11);
-        doc.setFont("helvetica", "italic");
-        doc.text(COMPANY_INFO.tagline, pageWidth / 2, 23, { align: 'center' });
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(230, 230, 230);
-        doc.text(`${COMPANY_INFO.phone} | ${COMPANY_INFO.email} | ${COMPANY_INFO.website}`, pageWidth / 2, 30, { align: 'center' });
-      };
-
-      const addFooter = (pageNum: number, totalPages: number) => {
-        doc.setDrawColor(...BRAND_COLORS.primary);
-        doc.setLineWidth(0.5);
-        doc.line(margin, pageHeight - 25, pageWidth - margin, pageHeight - 25);
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "italic");
-        doc.setTextColor(...BRAND_COLORS.text);
-        doc.text(COMPANY_INFO.footer, pageWidth / 2, pageHeight - 18, { align: 'center' });
-        doc.setFontSize(7);
-        doc.setTextColor(...BRAND_COLORS.muted);
-        doc.text(COMPANY_INFO.termsFooter, pageWidth / 2, pageHeight - 12, { align: 'center' });
-        doc.text(`Page ${pageNum} of ${totalPages}`, pageWidth / 2, pageHeight - 7, { align: 'center' });
-      };
-
-      const checkPageBreak = (neededSpace: number) => {
-        if (y + neededSpace > pageHeight - 35) {
+      const checkPage = (needed: number) => {
+        if (y + needed > doc.internal.pageSize.getHeight() - margin) {
           doc.addPage();
-          addHeader();
-          y = 45;
+          y = margin;
         }
       };
 
-      addHeader();
-      y = 45;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.text(COMPANY_INFO.name, pageW / 2, y, { align: 'center' });
+      y += 7;
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(10);
+      doc.text(COMPANY_INFO.tagline, pageW / 2, y, { align: 'center' });
+      y += 6;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text(`${COMPANY_INFO.address} | ${COMPANY_INFO.phone} | ${COMPANY_INFO.email}`, pageW / 2, y, { align: 'center' });
+      y += 10;
+      doc.setDrawColor(180, 180, 180);
+      doc.line(margin, y, pageW - margin, y);
+      y += 8;
 
-      doc.setFontSize(16);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...BRAND_COLORS.primary);
-      doc.text(COMPANY_INFO.documentTitle, pageWidth / 2, y, { align: 'center' });
-      y += 12;
-
-      doc.setDrawColor(...BRAND_COLORS.primary);
-      doc.setLineWidth(1);
-      doc.line(margin, y, pageWidth - margin, y);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text(COMPANY_INFO.documentTitle, pageW / 2, y, { align: 'center' });
       y += 10;
 
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...BRAND_COLORS.text);
-      doc.text("Prepared for:", margin, y);
-      doc.setFont("helvetica", "normal");
-      doc.text(customerName || "Valued Customer", margin + 28, y);
+      doc.setFontSize(11);
+      doc.text('Prepared for:', margin, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(customerName || 'Valued Customer', margin + 32, y);
       y += 6;
-
       if (customerAddress) {
         doc.text(customerAddress, margin, y);
         y += 6;
       }
+      y += 4;
+      doc.line(margin, y, pageW - margin, y);
+      y += 8;
 
-      const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-      doc.text(`Date: ${date}`, margin, y);
-      y += 12;
-
+      doc.setFont('helvetica', 'bold');
       doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...BRAND_COLORS.primary);
-      const titleLines = doc.splitTextToSize(aiGeneratedQuote.quote_title, contentWidth);
-      titleLines.forEach((line: string) => {
-        doc.text(line, margin, y);
-        y += 5;
-      });
-      y += 5;
+      doc.text('Equipment & Services', margin, y);
+      y += 7;
 
-      if (aiGeneratedQuote.package_description) {
-        checkPageBreak(20);
+      lineItems.forEach(item => {
+        checkPage(20);
+        doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(...BRAND_COLORS.text);
-        const descLines = doc.splitTextToSize(aiGeneratedQuote.package_description, contentWidth);
-        doc.text(descLines, margin, y);
-        y += descLines.length * 5 + 8;
-      }
-
-      if (aiGeneratedQuote.whats_included && aiGeneratedQuote.whats_included.length > 0) {
-        checkPageBreak(20);
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(...BRAND_COLORS.primary);
-        doc.text("What's Included", margin, y);
-        y += 8;
-
-        aiGeneratedQuote.whats_included.forEach((category: { category: string; items: string[] }) => {
-          checkPageBreak(15);
-          doc.setFontSize(10);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(...BRAND_COLORS.text);
-          const catLines = doc.splitTextToSize(category.category, contentWidth - 10);
-          catLines.forEach((line: string) => {
-            doc.text(line, margin + 5, y);
-            y += 4;
-          });
-          y += 1;
-
-          doc.setFont("helvetica", "normal");
-          category.items.forEach((item: string) => {
-            checkPageBreak(6);
-            const itemLines = doc.splitTextToSize(`• ${item}`, contentWidth - 15);
-            doc.text(itemLines, margin + 10, y);
-            y += itemLines.length * 4 + 2;
-          });
-          y += 3;
-        });
-      }
-
-      checkPageBreak(50);
-      y += 5;
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...BRAND_COLORS.primary);
-      doc.text("Pricing Details", margin, y);
-      y += 8;
-
-      const tableStartX = margin;
-      const col1Width = contentWidth * 0.55;
-      const col2Width = contentWidth * 0.15;
-      const col3Width = contentWidth * 0.30;
-
-      doc.setFillColor(...BRAND_COLORS.primary);
-      doc.rect(tableStartX, y, contentWidth, 8, 'F');
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...BRAND_COLORS.white);
-      doc.text("Item", tableStartX + 3, y + 5.5);
-      doc.text("Qty", tableStartX + col1Width + 3, y + 5.5);
-      doc.text("Price", tableStartX + col1Width + col2Width + col3Width - 3, y + 5.5, { align: 'right' });
-      y += 8;
-
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...BRAND_COLORS.text);
-      let rowIndex = 0;
-
-      if (aiGeneratedQuote.line_items && aiGeneratedQuote.line_items.length > 0) {
-        aiGeneratedQuote.line_items.forEach((item: { name: string; qty: number; price: number; description: string }) => {
+        const priceStr = `Qty: ${item.qty}  —  $${item.price.toLocaleString()}`;
+        doc.text(item.name, margin, y);
+        doc.setFont('helvetica', 'normal');
+        doc.text(priceStr, pageW - margin, y, { align: 'right' });
+        y += 5;
+        if (item.description) {
           doc.setFontSize(9);
-          const nameLines = doc.splitTextToSize(item.name, col1Width - 6);
-          const descLines = item.description ? doc.splitTextToSize(item.description, col1Width - 6) : [];
-          const nameHeight = nameLines.length * 4;
-          const descHeight = descLines.length * 3.5;
-          const rowHeight = Math.max(12, nameHeight + descHeight + 6);
-          
-          checkPageBreak(rowHeight + 2);
-          if (rowIndex % 2 === 0) {
-            doc.setFillColor(...BRAND_COLORS.lightGray);
-            doc.rect(tableStartX, y, contentWidth, rowHeight, 'F');
-          }
-          
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(...BRAND_COLORS.text);
-          let textY = y + 5;
-          nameLines.forEach((line: string) => {
-            doc.text(line, tableStartX + 3, textY);
-            textY += 4;
-          });
-          
-          doc.setFont("helvetica", "normal");
-          doc.text(item.qty.toString(), tableStartX + col1Width + 3, y + 5);
-          doc.text(`$${item.price.toLocaleString()}`, tableStartX + col1Width + col2Width + col3Width - 3, y + 5, { align: 'right' });
-          
-          if (descLines.length > 0) {
-            doc.setFontSize(7);
-            doc.setTextColor(...BRAND_COLORS.muted);
-            descLines.forEach((line: string) => {
-              doc.text(line, tableStartX + 3, textY);
-              textY += 3.5;
-            });
-            doc.setTextColor(...BRAND_COLORS.text);
-          }
-          
-          y += rowHeight;
-          rowIndex++;
-        });
-      }
+          doc.setTextColor(100, 100, 100);
+          const descLines = doc.splitTextToSize(item.description, contentW);
+          doc.text(descLines, margin + 4, y);
+          y += descLines.length * 4.5 + 2;
+          doc.setTextColor(0, 0, 0);
+        }
+        y += 2;
+      });
 
-      doc.setDrawColor(...BRAND_COLORS.primary);
-      doc.setLineWidth(0.5);
-      doc.line(tableStartX, y, tableStartX + contentWidth, y);
+      y += 2;
+      doc.line(margin, y, pageW - margin, y);
+      y += 8;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('Pricing Summary', margin, y);
+      y += 7;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Subtotal:', margin, y);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`$${cartSubtotalPreDiscount.high.toLocaleString()}`, pageW - margin, y, { align: 'right' });
       y += 6;
-
-      // Only show Subtotal/Total in single mode - hidden in options mode since each package is a separate choice
-      if (quoteMode !== "options") {
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        doc.text("Subtotal:", tableStartX + col1Width, y);
-        doc.text(`$${aiGeneratedQuote.subtotal.toLocaleString()}`, tableStartX + contentWidth - 3, y, { align: 'right' });
+      if (cartEliteDiscountAmount > 0) {
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(22, 163, 74);
+        doc.text('Elite Bundle Discount:', margin, y);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`-$${cartEliteDiscountAmount.toLocaleString()}`, pageW - margin, y, { align: 'right' });
+        doc.setTextColor(0, 0, 0);
         y += 6;
-
-        if (aiGeneratedQuote.elite_discount_active && aiGeneratedQuote.elite_discount_amount > 0) {
-          checkPageBreak(14);
-          doc.setFillColor(220, 255, 220);
-          doc.rect(tableStartX, y - 4, contentWidth, 12, 'F');
-          doc.setDrawColor(...BRAND_COLORS.eliteGreen);
-          doc.setLineWidth(1);
-          doc.rect(tableStartX, y - 4, contentWidth, 12, 'S');
-          doc.setFontSize(10);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(...BRAND_COLORS.eliteGreen);
-          doc.text(`Elite Package Discount (${aiGeneratedQuote.elite_discount_percent}%):`, tableStartX + col1Width, y + 2);
-          doc.text(`-$${aiGeneratedQuote.elite_discount_amount.toLocaleString()}`, tableStartX + contentWidth - 3, y + 2, { align: 'right' });
-          y += 14;
-          doc.setTextColor(...BRAND_COLORS.text);
-        }
-
-        if (aiGeneratedQuote.discount_amount > 0 && !aiGeneratedQuote.elite_discount_active) {
-          doc.setFont("helvetica", "normal");
-          doc.text(`Discount (${aiGeneratedQuote.discount_percent}%):`, tableStartX + col1Width, y);
-          doc.text(`-$${aiGeneratedQuote.discount_amount.toLocaleString()}`, tableStartX + contentWidth - 3, y, { align: 'right' });
-          y += 6;
-        }
-
-        checkPageBreak(12);
-        doc.setFillColor(...BRAND_COLORS.primary);
-        doc.rect(tableStartX, y, contentWidth, 10, 'F');
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(...BRAND_COLORS.white);
-        doc.text("TOTAL:", tableStartX + col1Width, y + 7);
-        doc.text(`$${aiGeneratedQuote.total.toLocaleString()}`, tableStartX + contentWidth - 3, y + 7, { align: 'right' });
-        y += 16;
-        doc.setTextColor(...BRAND_COLORS.text);
       }
-
-      if (aiGeneratedQuote.elite_warning) {
-        checkPageBreak(8);
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "italic");
-        doc.setTextColor(178, 34, 34);
-        const warnLines = doc.splitTextToSize(`Note: ${aiGeneratedQuote.elite_warning}`, contentWidth);
-        doc.text(warnLines, margin, y);
-        y += warnLines.length * 4 + 4;
-        doc.setTextColor(...BRAND_COLORS.text);
-      }
-
-      if (aiGeneratedQuote.savings_note) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('Total Investment:', margin, y);
+      doc.text(`$${cartTotalAfterDiscount.high.toLocaleString()}`, pageW - margin, y, { align: 'right' });
+      y += 6;
+      if (cartMonthlyTotalRange.high > 0) {
+        doc.setFont('helvetica', 'italic');
         doc.setFontSize(9);
-        doc.setFont("helvetica", "italic");
-        doc.setTextColor(...BRAND_COLORS.eliteGreen);
-        doc.text(aiGeneratedQuote.savings_note, margin, y);
+        doc.text(`Estimated Monthly: $${cartMonthlyTotalRange.high.toLocaleString()}/mo (financing, OAC)`, margin, y);
         y += 6;
-        doc.setTextColor(...BRAND_COLORS.text);
       }
 
-      if (aiGeneratedQuote.financing_text) {
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "normal");
-        doc.text(aiGeneratedQuote.financing_text, margin, y);
-        y += 10;
-      }
-
-      if (aiGeneratedQuote.warranties_and_terms && aiGeneratedQuote.warranties_and_terms.length > 0) {
-        checkPageBreak(25);
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(...BRAND_COLORS.primary);
-        doc.text("Warranties & Terms", margin, y);
-        y += 7;
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(...BRAND_COLORS.text);
-        aiGeneratedQuote.warranties_and_terms.forEach((term: string) => {
-          checkPageBreak(6);
-          const termLines = doc.splitTextToSize(`• ${term}`, contentWidth - 10);
-          doc.text(termLines, margin + 5, y);
-          y += termLines.length * 4 + 2;
-        });
-        y += 5;
-      }
-
-      if (aiGeneratedQuote.next_steps && aiGeneratedQuote.next_steps.length > 0) {
-        checkPageBreak(25);
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(...BRAND_COLORS.primary);
-        doc.text("Next Steps", margin, y);
-        y += 7;
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(...BRAND_COLORS.text);
-        aiGeneratedQuote.next_steps.forEach((step: string) => {
-          checkPageBreak(6);
-          const stepLines = doc.splitTextToSize(`• ${step}`, contentWidth - 10);
-          doc.text(stepLines, margin + 5, y);
-          y += stepLines.length * 4 + 2;
-        });
-        y += 5;
-      }
-
-      if (aiGeneratedQuote.additional_enhancements && aiGeneratedQuote.additional_enhancements.length > 0) {
-        checkPageBreak(30);
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(...BRAND_COLORS.primary);
-        doc.text("Additional Enhancements Available", margin, y);
+      if (proposalNotes && proposalNotes !== '<p></p>') {
+        checkPage(20);
+        y += 4;
+        doc.line(margin, y, pageW - margin, y);
         y += 8;
-        aiGeneratedQuote.additional_enhancements.forEach((enh: { name: string; price: number; description: string; whats_included: string[]; recommended_for: string }) => {
-          checkPageBreak(20);
-          doc.setFontSize(10);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(...BRAND_COLORS.text);
-          doc.text(`${enh.name} - $${enh.price.toLocaleString()}`, margin + 5, y);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text('Proposal Notes', margin, y);
+        y += 7;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        const notesText = htmlToPlainText(proposalNotes);
+        const noteLines = doc.splitTextToSize(notesText, contentW);
+        noteLines.forEach((line: string) => {
+          checkPage(6);
+          doc.text(line, margin, y);
           y += 5;
-          if (enh.description) {
-            doc.setFontSize(8);
-            doc.setFont("helvetica", "normal");
-            const enhDescLines = doc.splitTextToSize(enh.description, contentWidth - 15);
-            doc.text(enhDescLines, margin + 10, y);
-            y += enhDescLines.length * 4 + 3;
-          }
         });
       }
 
-      const totalPages = doc.getNumberOfPages();
-      for (let i = 1; i <= totalPages; i++) {
-        doc.setPage(i);
-        addFooter(i, totalPages);
-      }
-
-      const customerNameForFile = selectedCustomer?.name?.replace(/[^a-zA-Z0-9]/g, '_') || customerName?.replace(/[^a-zA-Z0-9]/g, '_') || 'Customer';
-      const dateForFile = new Date().toISOString().split('T')[0];
-      doc.save(`GHVAC_Quote_${customerNameForFile}_${dateForFile}.pdf`);
-
-      toast({
-        title: "Downloaded!",
-        description: "Quote saved as branded PDF.",
+      checkPage(40);
+      y += 4;
+      doc.line(margin, y, pageW - margin, y);
+      y += 8;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('Warranties & Terms', margin, y);
+      y += 7;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      [
+        '10-Year Parts & Labor Warranty on all HVAC equipment',
+        'Licensed & Insured — HVAC Contractor License',
+        'All work performed to manufacturer and local code standards',
+        'Proposal valid for 30 days from date of issue',
+      ].forEach(term => {
+        checkPage(6);
+        doc.text(`• ${term}`, margin, y);
+        y += 5;
       });
-    } catch (err) {
-      console.error('Error generating PDF:', err);
-      toast({
-        title: "Download Failed",
-        description: "Could not generate the PDF. Please try again.",
-        variant: "destructive",
-      });
+
+      doc.save(`${customerName || 'Proposal'}_Quote.pdf`);
+      toast({ title: 'PDF Downloaded', description: 'Proposal saved as a PDF.' });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({ title: 'Download Failed', description: 'Could not generate the PDF. Please try again.', variant: 'destructive' });
     }
   };
 
@@ -3318,7 +2772,18 @@ export default function CrmProposalBuilder() {
         <div className="flex flex-col gap-4 pb-4 mb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => window.history.back()} data-testid="button-back-to-quotes">
+              <Button variant="ghost" size="sm" onClick={() => {
+                const queryParams = new URLSearchParams(window.location.search);
+                const projectId = queryParams.get("projectId");
+                const customerId = routeParams.customerId;
+                if (projectId) {
+                  setLocation(`/crm/projects/${projectId}`);
+                } else if (customerId) {
+                  setLocation(`/crm/customers/${customerId}`);
+                } else {
+                  setLocation("/crm/quotes");
+                }
+              }} data-testid="button-back-to-quotes">
                 <ArrowLeft className="h-4 w-4 mr-1" />
                 Back
               </Button>
@@ -3688,15 +3153,15 @@ export default function CrmProposalBuilder() {
             </div>
           </div>
           
-          {/* Customer Selection Section - REQUIRED FIRST STEP */}
-          <Card className={`border-2 ${selectedCustomer ? 'bg-green-50 dark:bg-green-950 border-green-300 dark:border-green-700' : 'bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-700'}`}>
+          {/* Customer Selection Section */}
+          <Card className={`border-2 ${selectedCustomer ? 'bg-green-50 dark:bg-green-950 border-green-300 dark:border-green-700' : 'border-muted'}`}>
             <CardContent className="py-4 px-5">
               {selectedCustomer ? (
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-full text-sm font-medium">
                       <CheckCircle2 className="h-4 w-4" />
-                      Step 1 Complete
+                      Customer
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-lg">{selectedCustomer.name}</span>
@@ -3745,16 +3210,8 @@ export default function CrmProposalBuilder() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 bg-amber-600 text-white px-3 py-1.5 rounded-full text-sm font-medium">
-                      <span className="font-bold">1</span>
-                      Step 1: Select Customer
-                    </div>
-                    <span className="text-amber-800 dark:text-amber-200 text-sm font-medium">
-                      Search and select a customer to continue
-                    </span>
-                  </div>
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">Search and attach a customer to this proposal (optional)</p>
                   <div className="max-w-lg">
                     <Popover open={isCustomerPopoverOpen} onOpenChange={setIsCustomerPopoverOpen}>
                       <PopoverTrigger asChild>
@@ -3806,7 +3263,14 @@ export default function CrmProposalBuilder() {
                               No customers found for "{debouncedCustomerSearch}"
                             </div>
                           )}
-                          {customerSearchResults.map((customer) => (
+                          {[...customerSearchResults].sort((a, b) => {
+                            const t = debouncedCustomerSearch.trim().toLowerCase();
+                            const aName = (a.name || "").toLowerCase();
+                            const bName = (b.name || "").toLowerCase();
+                            if ((aName === t) !== (bName === t)) return (aName === t) ? -1 : 1;
+                            if (aName.startsWith(t) !== bName.startsWith(t)) return aName.startsWith(t) ? -1 : 1;
+                            return 0;
+                          }).map((customer) => (
                             <div
                               key={customer.id}
                               className="p-3 hover:bg-muted cursor-pointer border-b last:border-0"
@@ -5437,7 +4901,7 @@ export default function CrmProposalBuilder() {
                             {components.map((comp, i) => (
                               <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center border border-gray-100 dark:border-gray-700">
                                 {comp.image ? (
-                                  <img src={comp.image} alt={comp.label} className="w-12 h-12 mx-auto object-contain mb-1" loading="lazy" />
+                                  <img src={getAssetUrl(comp.image)} alt={comp.label} className="w-12 h-12 mx-auto object-contain mb-1" loading="lazy" />
                                 ) : (
                                   <div className="w-12 h-12 mx-auto bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center mb-1">
                                     <Package className="h-6 w-6 text-gray-400" />
@@ -5558,7 +5022,7 @@ export default function CrmProposalBuilder() {
                             {components.map((comp, i) => (
                               <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-2 text-center border border-gray-100 dark:border-gray-700">
                                 {comp.image ? (
-                                  <img src={comp.image} alt={comp.label} className="w-12 h-12 mx-auto object-contain mb-1" loading="lazy" />
+                                  <img src={getAssetUrl(comp.image)} alt={comp.label} className="w-12 h-12 mx-auto object-contain mb-1" loading="lazy" />
                                 ) : (
                                   <div className="w-12 h-12 mx-auto bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center mb-1">
                                     <Package className="h-6 w-6 text-gray-400" />
@@ -5626,260 +5090,13 @@ export default function CrmProposalBuilder() {
               </div>
             </div>
 
-            {/* AI Quote Chat Section */}
-            <div className="my-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950 dark:to-blue-950 border border-purple-200 dark:border-purple-800 rounded-lg">
-              <h3 className="text-sm font-semibold text-purple-800 dark:text-purple-200 mb-3 flex items-center gap-2">
-                <Sparkles className="h-4 w-4" />
-                AI QUOTE GENERATOR
-              </h3>
-              <p className="text-xs text-muted-foreground mb-3">
-                Type instructions to customize your quote (e.g., "give 10% discount", "emphasize warranty", "make it more formal")
-              </p>
-              <div className="flex gap-2">
-                <Input
-                  value={quoteInstructions}
-                  onChange={(e) => setQuoteInstructions(e.target.value)}
-                  placeholder="Enter custom instructions for the AI..."
-                  className="flex-1"
-                  data-testid="input-quote-instructions"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !isGeneratingQuote) {
-                      generateQuote();
-                    }
-                  }}
-                />
-                <Button
-                  onClick={generateQuote}
-                  disabled={isGeneratingQuote}
-                  className="bg-purple-600 hover:bg-purple-700"
-                  data-testid="button-generate-ai-quote"
-                >
-                  {isGeneratingQuote ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-4 w-4" />
-                  )}
-                  <span className="ml-2 hidden sm:inline">Generate</span>
-                </Button>
+              {/* Proposal Notes */}
+              <div className="my-6">
+                <h3 className="text-sm font-semibold mb-3 text-foreground">Proposal Notes</h3>
+                {!isNavigatingAway && (
+                  <ProposalEditor value={proposalNotes} onChange={setProposalNotes} placeholder="Add proposal notes..." />
+                )}
               </div>
-              {aiGeneratedQuote && (
-                <div className="mt-4 p-4 bg-white dark:bg-gray-900 rounded-lg border">
-                  <h4 className="font-bold text-lg text-foreground mb-2">{aiGeneratedQuote.quote_title}</h4>
-                  <p className="text-sm text-muted-foreground mb-4">{aiGeneratedQuote.package_description}</p>
-                  
-                  {/* What's Included - Categorized bullets */}
-                  {aiGeneratedQuote.whats_included && aiGeneratedQuote.whats_included.length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-xs font-semibold text-muted-foreground mb-2">WHAT'S INCLUDED</p>
-                      <div className="space-y-3">
-                        {aiGeneratedQuote.whats_included.map((category, idx) => (
-                          <div key={idx}>
-                            <p className="text-sm font-medium text-foreground">{category.category}</p>
-                            <ul className="text-xs text-muted-foreground mt-1 space-y-0.5 ml-3">
-                              {category.items.map((item, itemIdx) => (
-                                <li key={itemIdx}>• {item}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Best For */}
-                  {aiGeneratedQuote.best_for && (
-                    <p className="text-sm text-muted-foreground mb-4 italic">
-                      <span className="font-medium not-italic">Best For:</span> {aiGeneratedQuote.best_for}
-                    </p>
-                  )}
-                  
-                  {/* Line Items Table */}
-                  {aiGeneratedQuote.line_items && aiGeneratedQuote.line_items.length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-xs font-semibold text-muted-foreground mb-2">LINE ITEMS</p>
-                      <div className="border rounded-lg overflow-hidden">
-                        <table className="w-full text-sm">
-                          <thead className="bg-muted/50">
-                            <tr>
-                              <th className="text-left py-2 px-3 font-medium">Item</th>
-                              <th className="text-center py-2 px-2 font-medium w-12">Qty</th>
-                              <th className="text-right py-2 px-3 font-medium">Price</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {aiGeneratedQuote.line_items.map((item, idx) => (
-                              <tr key={idx} className="border-t">
-                                <td className="py-2 px-3">
-                                  <span className="font-medium">{item.name}</span>
-                                  <p className="text-xs text-muted-foreground">{item.description}</p>
-                                </td>
-                                <td className="py-2 px-2 text-center">{item.qty}</td>
-                                <td className="py-2 px-3 text-right font-medium">{formatPrice(item.price)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Pricing Breakdown Table - Hidden in Options mode since each package is a separate choice */}
-                  {quoteMode !== "options" && (
-                    <div className="border rounded-lg overflow-hidden mb-4">
-                      <table className="w-full text-sm">
-                        <tbody>
-                          {/* Subtotal */}
-                          <tr className="border-b">
-                            <td className="py-2 px-3 text-muted-foreground">Subtotal</td>
-                            <td className="py-2 px-3 text-right">{formatPrice(aiGeneratedQuote.subtotal)}</td>
-                          </tr>
-                          
-                          {/* Elite Bundle Discount - Subtle green row */}
-                          {aiGeneratedQuote.elite_discount_active && aiGeneratedQuote.elite_discount_amount > 0 && (
-                            <tr className="border-b bg-green-50 dark:bg-green-950/30">
-                              <td className="py-2 px-3 text-green-700 dark:text-green-400">
-                                Elite Bundle Discount ({aiGeneratedQuote.elite_discount_percent}%)
-                              </td>
-                              <td className="py-2 px-3 text-right text-green-700 dark:text-green-400">
-                                –{formatPrice(aiGeneratedQuote.elite_discount_amount)}
-                              </td>
-                            </tr>
-                          )}
-                          
-                          {/* Other discounts (non-Elite) */}
-                          {aiGeneratedQuote.discount_amount > 0 && !aiGeneratedQuote.elite_discount_active && (
-                            <tr className="border-b bg-green-50 dark:bg-green-950/30">
-                              <td className="py-2 px-3 text-green-700 dark:text-green-400">
-                                Discount ({aiGeneratedQuote.discount_percent}%)
-                              </td>
-                              <td className="py-2 px-3 text-right text-green-700 dark:text-green-400">
-                                –{formatPrice(aiGeneratedQuote.discount_amount)}
-                              </td>
-                            </tr>
-                          )}
-                          
-                          {/* Total */}
-                          <tr className="bg-muted/50 font-bold">
-                            <td className="py-3 px-3">Total</td>
-                            <td className="py-3 px-3 text-right text-primary text-lg">{formatPrice(aiGeneratedQuote.total)}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  
-                  {/* Elite Warning */}
-                  {aiGeneratedQuote.elite_warning && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 italic mb-3">
-                      {aiGeneratedQuote.elite_warning}
-                    </p>
-                  )}
-                  
-                  {/* Savings note */}
-                  {aiGeneratedQuote.savings_note && (
-                    <p className="text-xs text-muted-foreground italic mb-3">
-                      {aiGeneratedQuote.savings_note}
-                    </p>
-                  )}
-                  
-                  {/* Financing text - Editable */}
-                  {aiGeneratedQuote.financing_text !== undefined && (
-                    <div className="mb-4">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs font-semibold text-muted-foreground">ESTIMATED PAYMENT</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 text-xs"
-                          data-testid="button-edit-financing"
-                          onClick={() => {
-                            setEditFinancingText(aiGeneratedQuote.financing_text || "");
-                            setEditFinancingOpen(true);
-                          }}
-                        >
-                          <Pencil className="h-3 w-3 mr-1" />
-                          Edit
-                        </Button>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {aiGeneratedQuote.financing_text || "(No financing text)"}
-                      </p>
-                    </div>
-                  )}
-                  
-                  {/* Warranties & Terms - Editable */}
-                  {aiGeneratedQuote.warranties_and_terms && (
-                    <div className="pt-3 border-t">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-semibold text-muted-foreground">WARRANTIES & TERMS</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 text-xs"
-                          data-testid="button-edit-warranties"
-                          onClick={() => {
-                            setEditWarrantiesText(aiGeneratedQuote.warranties_and_terms?.join("\n") || "");
-                            setEditWarrantiesOpen(true);
-                          }}
-                        >
-                          <Pencil className="h-3 w-3 mr-1" />
-                          Edit
-                        </Button>
-                      </div>
-                      {aiGeneratedQuote.warranties_and_terms.length > 0 ? (
-                        <ul className="text-xs text-muted-foreground space-y-1">
-                          {aiGeneratedQuote.warranties_and_terms.map((term, idx) => (
-                            <li key={idx}>• {term}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-xs text-muted-foreground italic">(No terms added)</p>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* Next Steps */}
-                  {aiGeneratedQuote.next_steps && aiGeneratedQuote.next_steps.length > 0 && (
-                    <div className="mt-4 pt-3 border-t">
-                      <p className="text-xs font-semibold text-muted-foreground mb-2">NEXT STEPS</p>
-                      <ul className="text-xs text-muted-foreground space-y-1">
-                        {aiGeneratedQuote.next_steps.map((step, idx) => (
-                          <li key={idx}>• {step}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  
-                  {/* Additional Enhancements */}
-                  {aiGeneratedQuote.additional_enhancements && aiGeneratedQuote.additional_enhancements.length > 0 && (
-                    <div className="mt-4 pt-3 border-t">
-                      <p className="text-xs font-semibold text-muted-foreground mb-2">ADDITIONAL ENHANCEMENTS</p>
-                      <div className="space-y-3">
-                        {aiGeneratedQuote.additional_enhancements.map((enh, idx) => (
-                          <div key={idx} className="p-3 bg-muted/30 rounded-lg">
-                            <div className="flex justify-between items-start mb-1">
-                              <span className="font-medium text-sm">{enh.name}</span>
-                              <span className="font-medium text-sm text-primary">{formatPrice(enh.price)}</span>
-                            </div>
-                            <p className="text-xs text-muted-foreground mb-2">{enh.description}</p>
-                            {enh.whats_included && enh.whats_included.length > 0 && (
-                              <div className="text-xs text-muted-foreground">
-                                <span className="font-medium">Includes:</span> {enh.whats_included.join(', ')}
-                              </div>
-                            )}
-                            {enh.recommended_for && (
-                              <p className="text-xs text-muted-foreground italic mt-1">
-                                Recommended for: {enh.recommended_for}
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
 
             <Separator className="my-6" />
 
@@ -5989,20 +5206,19 @@ export default function CrmProposalBuilder() {
             </div>
           </ScrollArea>
           
-          <div className="border-t p-4 bg-card shrink-0 flex-none">
-            <div className="flex flex-col sm:flex-row gap-2">
+          <div className="border-t border-slate-100 bg-white px-6 py-4 shrink-0 flex-none rounded-b-2xl">
+            <div className="flex gap-3">
               <Button
                 variant="outline"
                 onClick={() => setQuoteDialogOpen(false)}
-                className="flex-1 min-h-[44px]"
+                className="flex-1 h-11 rounded-xl border-slate-200 text-slate-700 hover:bg-slate-50"
               >
                 Close
               </Button>
               <Button
-                variant="default"
                 onClick={handleSaveToCrm}
-                disabled={!aiGeneratedQuote || !selectedCustomer || saveToCrmMutation.isPending}
-                className="flex-1 min-h-[44px] bg-blue-600 hover:bg-blue-700"
+                disabled={cart.length === 0 || !selectedCustomer || saveToCrmMutation.isPending}
+                className="flex-1 h-11 rounded-xl bg-[#711419] hover:bg-[#5a1014] text-white"
                 data-testid="button-save-to-crm"
               >
                 {saveToCrmMutation.isPending ? (
@@ -6012,88 +5228,11 @@ export default function CrmProposalBuilder() {
                 )}
                 Save to CRM
               </Button>
-              <Button
-                onClick={downloadQuoteAsPDF}
-                className="flex-1 min-h-[44px]"
-                data-testid="button-download-quote"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download PDF
-              </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
       
-      {/* Edit Financing Text Dialog */}
-      <Dialog open={editFinancingOpen} onOpenChange={setEditFinancingOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Financing Text</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Textarea
-              value={editFinancingText}
-              onChange={(e) => setEditFinancingText(e.target.value)}
-              placeholder="Enter financing payment information..."
-              className="min-h-[100px]"
-              data-testid="input-financing-text"
-            />
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditFinancingOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  if (aiGeneratedQuote) {
-                    setAiGeneratedQuote({ ...aiGeneratedQuote, financing_text: editFinancingText });
-                  }
-                  setEditFinancingOpen(false);
-                }}
-                data-testid="button-save-financing"
-              >
-                Save
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-      
-      {/* Edit Warranties & Terms Dialog */}
-      <Dialog open={editWarrantiesOpen} onOpenChange={setEditWarrantiesOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Edit Warranties & Terms</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Enter each warranty or term on a separate line:</p>
-            <Textarea
-              value={editWarrantiesText}
-              onChange={(e) => setEditWarrantiesText(e.target.value)}
-              placeholder="Equipment warranties are per manufacturer terms...&#10;Standard installation includes start-up...&#10;Any required permits may affect scope..."
-              className="min-h-[200px]"
-              data-testid="input-warranties-text"
-            />
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setEditWarrantiesOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  if (aiGeneratedQuote) {
-                    const termsArray = editWarrantiesText.split("\n").filter(t => t.trim());
-                    setAiGeneratedQuote({ ...aiGeneratedQuote, warranties_and_terms: termsArray });
-                  }
-                  setEditWarrantiesOpen(false);
-                }}
-                data-testid="button-save-warranties"
-              >
-                Save
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
       </div>
     </CrmLayout>
   );

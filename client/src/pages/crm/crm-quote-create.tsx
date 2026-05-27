@@ -39,6 +39,8 @@ import {
   User,
   Loader2,
   Package,
+  Info,
+  Building2,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { cn } from "@/lib/utils";
@@ -147,6 +149,17 @@ export default function CrmQuoteCreate() {
   const [itemsCatalogOpen, setItemsCatalogOpen] = useState(false);
   const [itemSearch, setItemSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<"all" | "install" | "service" | "maintenance" | "discount">("all");
+
+  // Fetch parent customer when selected customer has billToParent
+  const { data: parentCustomerForBanner } = useQuery<CrmCustomer>({
+    queryKey: ["/api/crm/customers", selectedCustomer?.parentCustomerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${selectedCustomer!.parentCustomerId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch parent customer");
+      return res.json();
+    },
+    enabled: !!selectedCustomer?.parentCustomerId && !!selectedCustomer?.billToParent,
+  });
 
   // Customer search query
   const { data: customerSearchResults, isLoading: isSearchingCustomers } = useQuery<CrmCustomer[]>({
@@ -528,7 +541,13 @@ export default function CrmQuoteCreate() {
 
       const data = await response.json();
       
-      // Invalidate quotes cache for instant sync
+      // Add new quote to cache immediately for instant list appearance
+      if (data.quote) {
+        queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+          if (!old?.quotes) return old;
+          return { ...old, quotes: [data.quote, ...old.quotes] };
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       if (projectIdFromUrl) {
         queryClient.invalidateQueries({ queryKey: ["/api/crm/projects", projectIdFromUrl, "quotes"] });
@@ -687,7 +706,14 @@ export default function CrmQuoteCreate() {
                           </div>
                         ) : customerSearchResults && customerSearchResults.length > 0 ? (
                           <div className="divide-y">
-                            {customerSearchResults.map((customer) => (
+                            {[...customerSearchResults].sort((a, b) => {
+                              const t = customerSearch.trim().toLowerCase();
+                              const aName = (a.name || "").toLowerCase();
+                              const bName = (b.name || "").toLowerCase();
+                              if ((aName === t) !== (bName === t)) return (aName === t) ? -1 : 1;
+                              if (aName.startsWith(t) !== bName.startsWith(t)) return aName.startsWith(t) ? -1 : 1;
+                              return 0;
+                            }).map((customer) => (
                               <button
                                 key={customer.id}
                                 type="button"
@@ -726,36 +752,51 @@ export default function CrmQuoteCreate() {
                   </div>
                 ) : (
                   /* Selected Customer Display */
-                  <div className="border-2 border-[#d3b07d] bg-[#faf6ef] rounded-lg p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 bg-[#d3b07d] rounded-full">
-                          <User className="h-5 w-5 text-white" />
+                  <div className="space-y-2">
+                    <div className="border-2 border-[#d3b07d] bg-[#faf6ef] rounded-lg p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 bg-[#d3b07d] rounded-full">
+                            <User className="h-5 w-5 text-white" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-900">{selectedCustomer.name}</p>
+                            {selectedCustomer.phone && (
+                              <p className="text-sm text-slate-600">{selectedCustomer.phone}</p>
+                            )}
+                            {selectedCustomer.email && (
+                              <p className="text-sm text-slate-600">{selectedCustomer.email}</p>
+                            )}
+                            {selectedCustomer.fullAddress && (
+                              <p className="text-sm text-slate-500 mt-1">{selectedCustomer.fullAddress}</p>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-semibold text-slate-900">{selectedCustomer.name}</p>
-                          {selectedCustomer.phone && (
-                            <p className="text-sm text-slate-600">{selectedCustomer.phone}</p>
-                          )}
-                          {selectedCustomer.email && (
-                            <p className="text-sm text-slate-600">{selectedCustomer.email}</p>
-                          )}
-                          {selectedCustomer.fullAddress && (
-                            <p className="text-sm text-slate-500 mt-1">{selectedCustomer.fullAddress}</p>
-                          )}
-                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={clearCustomer}
+                          className="text-slate-500 hover:text-slate-700"
+                          data-testid="button-clear-customer"
+                        >
+                          Change
+                        </Button>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={clearCustomer}
-                        className="text-slate-500 hover:text-slate-700"
-                        data-testid="button-clear-customer"
-                      >
-                        Change
-                      </Button>
                     </div>
+                    {/* Billing-to-parent notice */}
+                    {selectedCustomer.billToParent && (
+                      <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                        <Info className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                        <p className="text-sm text-amber-800">
+                          <span className="font-medium">Billing to parent: </span>
+                          {parentCustomerForBanner
+                            ? parentCustomerForBanner.name
+                            : "parent account"}
+                          {" — invoices for this sub-account go to the parent."}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

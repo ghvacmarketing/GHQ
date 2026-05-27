@@ -5,6 +5,7 @@ import type { SmsNotificationType, InsertCrmMessagingMessage } from "@shared/sch
 const DEFAULT_TEMPLATES: Record<string, string> = {
   sms_template_quote: "Hi {customerName}! Your quote #{quoteNumber} for {totalAmount} is ready. View it here: {viewLink}\n\n- GHVAC",
   sms_template_invoice_send: "Hi {customerName}! Your invoice #{invoiceNumber} for {amount} is ready. Pay here: {paymentLink}\n\n- GHVAC",
+  sms_template_invoice_paid: "Hi {customerName}! Your invoice #{invoiceNumber} for {amount} has been paid in full. Thank you! View your receipt here: {viewLink}\n\n- GHVAC",
 };
 
 const templateCache: Map<string, { value: string; timestamp: number }> = new Map();
@@ -167,6 +168,7 @@ export interface SendInvoiceSmsParams {
   invoiceNumber: string;
   amount: string | number;
   paymentLink: string;
+  isPaid?: boolean;
 }
 
 export interface SendInvoiceSmsResult {
@@ -185,19 +187,22 @@ export async function sendInvoiceSms(params: SendInvoiceSmsParams): Promise<Send
     invoiceNumber,
     amount,
     paymentLink,
+    isPaid,
   } = params;
 
   try {
-    let template = await getDocumentSmsTemplate("sms_template_invoice_send");
+    const templateKey = isPaid ? "sms_template_invoice_paid" : "sms_template_invoice_send";
+    let template = await getDocumentSmsTemplate(templateKey);
     if (!template) {
-      template = DEFAULT_TEMPLATES.sms_template_invoice_send;
+      template = DEFAULT_TEMPLATES[templateKey];
     }
 
     const messageBody = template
       .replace("{customerName}", customerName)
       .replace("{invoiceNumber}", invoiceNumber)
       .replace("{amount}", formatCurrency(amount))
-      .replace("{paymentLink}", paymentLink);
+      .replace("{paymentLink}", paymentLink)
+      .replace("{viewLink}", paymentLink);
 
     const adapter = getMessagingAdapter();
     

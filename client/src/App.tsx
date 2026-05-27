@@ -11,9 +11,9 @@ import QuoteGenerator from "@/pages/quote-generator";
 import QuoteEdit from "@/pages/quote-edit";
 import QuotesHistory from "@/pages/quotes-history";
 import ProcessesSystems from "@/pages/processes-systems";
+const PublicSalesbook = lazy(() => import("@/pages/price-book"));
 import ProcessBuilderManual from "@/pages/process-builder-manual";
 import ProcessBuilderVoice from "@/pages/process-builder-voice";
-import PriceBook from "@/pages/price-book";
 import SalesProspects from "@/pages/sales-prospects";
 import CreateLeadPage from "@/pages/create-lead";
 import Installation from "@/pages/installation";
@@ -57,11 +57,15 @@ const CrmMarketing = lazy(() => import("@/pages/crm/crm-marketing"));
 const CrmItems = lazy(() => import("@/pages/crm/crm-items"));
 const CrmInstallWorksheet = lazy(() => import("@/pages/crm/crm-install-worksheet"));
 const CrmProposalBuilder = lazy(() => import("@/pages/crm/crm-proposal-builder"));
+const CrmProposalPreview = lazy(() => import("@/pages/crm/crm-proposal-preview"));
 const CrmPhone = lazy(() => import("@/pages/crm/crm-phone"));
 const CrmChecklists = lazy(() => import("@/pages/crm/crm-checklists"));
+const CrmRebatePrograms = lazy(() => import("@/pages/crm/crm-rebate-programs"));
+const CrmRebateCase = lazy(() => import("@/pages/crm/crm-rebate-case"));
 const CrmSettings = lazy(() => import("@/pages/crm/crm-settings"));
 const CrmSettingsUsers = lazy(() => import("@/pages/crm/crm-settings-users"));
 const CrmSettingsSubtypes = lazy(() => import("@/pages/crm/crm-settings-subtypes"));
+const CrmSettingsSalesbook = lazy(() => import("@/pages/crm/crm-settings-salesbook"));
 const CrmSettingsLeadTypes = lazy(() => import("@/pages/crm/crm-settings-lead-types"));
 const CrmSettingsLeadClassification = lazy(() => import("@/pages/crm/crm-settings-lead-classification"));
 const CrmSettingsTime = lazy(() => import("@/pages/crm/crm-settings-time"));
@@ -72,12 +76,14 @@ const CrmSettingsImport = lazy(() => import("@/pages/crm/crm-settings-import"));
 const CrmSettingsFleet = lazy(() => import("@/pages/crm/crm-settings-fleet"));
 const CrmSettingsPackages = lazy(() => import("@/pages/crm/crm-settings-packages"));
 const CrmSettingsMaterialsCatalog = lazy(() => import("@/pages/crm/crm-settings-materials-catalog"));
+const CrmSettingsProposalTemplates = lazy(() => import("@/pages/crm/crm-settings-proposal-templates"));
 const CrmBusinessDashboard = lazy(() => import("@/pages/crm/crm-business-dashboard"));
 const CrmGoalsTracker = lazy(() => import("@/pages/crm/crm-goals-tracker"));
 const CrmMessaging = lazy(() => import("@/pages/crm/crm-messaging"));
 const CrmNotifications = lazy(() => import("@/pages/crm/crm-notifications"));
 const CrmMyTasks = lazy(() => import("@/pages/crm/crm-my-tasks"));
 const CrmTaskBoard = lazy(() => import("@/pages/crm/crm-task-board"));
+const CrmSalesbook = lazy(() => import("@/pages/crm/crm-salesbook"));
 
 // Lazy-load Mobile pages to reduce initial bundle size
 const MobileAgenda = lazy(() => import("@/pages/mobile/mobile-agenda"));
@@ -238,7 +244,8 @@ function Router() {
       <Route path="/quote" component={QuoteGenerator} />
       <Route path="/quote/edit/:id" component={QuoteEdit} />
       <Route path="/history" component={QuotesHistory} />
-      <Route path="/price-book" component={PriceBook} />
+      <Route path="/salesbook">{() => <Suspense fallback={<GlobalLoader />}><PublicSalesbook /></Suspense>}</Route>
+      <Route path="/price-book">{() => { window.location.replace("/salesbook"); return <GlobalLoader />; }}</Route>
       <Route path="/processes" component={ProcessesSystems} />
       <Route path="/processes/new" component={ProcessBuilderManual} />
       <Route path="/processes/new/voice" component={ProcessBuilderVoice} />
@@ -255,6 +262,8 @@ function Router() {
       <Route path="/employee-portal" component={EmployeePortal} />
       <Route path="/crm/login">{() => <CrmWrapper><CrmLogin /></CrmWrapper>}</Route>
       <Route path="/crm/dispatch">{() => <ProtectedCrmWrapper><CrmDispatch /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/rebate-programs/:id">{() => <ProtectedCrmWrapper><CrmRebateCase /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/rebate-programs">{() => <ProtectedCrmWrapper><CrmRebatePrograms /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/work-orders/:id">{() => <ProtectedCrmWrapper><CrmWorkOrderDetail /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/work-orders">{() => <ProtectedCrmWrapper><CrmWorkOrders /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/accounts/new">{() => <ProtectedCrmWrapper><CrmAccountCreate /></ProtectedCrmWrapper>}</Route>
@@ -267,6 +276,7 @@ function Router() {
       <Route path="/crm/quotes/install-worksheet/:id">{() => <ProtectedCrmWrapper><CrmInstallWorksheet /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/quotes/proposal/:customerId">{() => <ProtectedCrmWrapper><CrmProposalBuilder /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/quotes/proposal">{() => <ProtectedCrmWrapper><CrmProposalBuilder /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/proposal-preview">{() => <ProtectedCrmWrapper><CrmProposalPreview /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/quotes/new">{() => <ProtectedCrmWrapper><CrmQuoteCreate /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/quotes/:id">{() => <ProtectedCrmWrapper><CrmQuoteDetail /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/quotes">{() => <ProtectedCrmWrapper><CrmQuotes /></ProtectedCrmWrapper>}</Route>
@@ -282,6 +292,7 @@ function Router() {
       <Route path="/crm/checklists">{() => <ProtectedCrmWrapper><CrmChecklists /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/users">{() => <ProtectedCrmWrapper><CrmSettingsUsers /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/subtypes">{() => <ProtectedCrmWrapper><CrmSettingsSubtypes /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/settings/salesbook">{() => <ProtectedCrmWrapper><CrmSettingsSalesbook /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/lead-types">{() => <ProtectedCrmWrapper><CrmSettingsLeadTypes /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/lead-classification">{() => <ProtectedCrmWrapper><CrmSettingsLeadClassification /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/time-logs">{() => <ProtectedCrmWrapper><CrmSettingsTime /></ProtectedCrmWrapper>}</Route>
@@ -292,11 +303,13 @@ function Router() {
       <Route path="/crm/settings/fleet">{() => <ProtectedCrmWrapper><CrmSettingsFleet /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/packages">{() => <ProtectedCrmWrapper><CrmSettingsPackages /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/materials-catalog">{() => <ProtectedCrmWrapper><CrmSettingsMaterialsCatalog /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/settings/proposal-templates">{() => <ProtectedCrmWrapper><CrmSettingsProposalTemplates /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings">{() => <ProtectedCrmWrapper><CrmSettings /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/dashboard">{() => <ProtectedCrmWrapper><CrmBusinessDashboard /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/reports">{() => <ProtectedCrmWrapper><CrmGoalsTracker /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/messaging">{() => <ProtectedCrmWrapper><CrmMessaging /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/notifications">{() => <ProtectedCrmWrapper><CrmNotifications /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/salesbook">{() => <ProtectedCrmWrapper><CrmSalesbook /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/tasks/board">{() => <ProtectedCrmWrapper><CrmTaskBoard /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/tasks/mine">{() => <ProtectedCrmWrapper><CrmMyTasks /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm">{() => <ProtectedCrmWrapper><CrmBusinessDashboard /></ProtectedCrmWrapper>}</Route>

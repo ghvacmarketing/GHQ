@@ -200,11 +200,10 @@ const priorityColors: Record<string, { bg: string; text: string; border: string 
   low: { bg: "bg-slate-100", text: "text-slate-600", border: "border-slate-200" },
   normal: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
   high: { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-200" },
-  urgent: { bg: "bg-red-100", text: "text-red-700", border: "border-red-200" },
 };
 
 const PROJECT_TYPES = ["INSTALL", "DUCT", "COMMERCIAL", "CRAWLSPACE", "MAJOR_REPAIR"] as const;
-const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+const PRIORITIES = ["low", "normal", "high"] as const;
 
 type ProjectStatus = "lead" | "proposal_sent" | "approved" | "in_progress" | "completed";
 const KANBAN_STAGES: ProjectStatus[] = ["lead", "proposal_sent", "approved", "in_progress", "completed"];
@@ -367,8 +366,8 @@ function ProjectCard({ project, onClick, isDragging: isDraggingProp }: ProjectCa
   };
 
   const statusStyle = statusColors[project.status] || statusColors.lead;
-  const priorityStyle = priorityColors[project.priority || "normal"];
-  const showPriority = project.priority === "high" || project.priority === "urgent";
+  const priorityStyle = priorityColors[project.priority || "normal"] || priorityColors.normal;
+  const showPriority = project.priority === "high";
 
   return (
     <Card
@@ -1287,7 +1286,7 @@ export default function CrmProjects() {
           </Button>
         </div>
 
-        <div className="flex overflow-x-auto border-b border-slate-200">
+        <div className="flex overflow-x-auto overflow-y-hidden border-b border-slate-200">
           <button
             onClick={() => setMainViewTab("overview")}
             className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-2 ${
@@ -1540,7 +1539,7 @@ export default function CrmProjects() {
                 <p className="text-sm text-slate-500">Total: {total}</p>
               </div>
 
-              <div className="flex overflow-x-auto border-b border-slate-200">
+              <div className="flex overflow-x-auto overflow-y-hidden border-b border-slate-200">
                 {(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => (
                   <button
                     key={tab}
@@ -1589,7 +1588,7 @@ export default function CrmProjects() {
                       {projects.map((project) => {
                         const status = project.status || "lead";
                         const statusStyle = statusColors[status] || statusColors.lead;
-                        const priorityStyle = priorityColors[project.priority || "normal"];
+                        const priorityStyle = priorityColors[project.priority || "normal"] || priorityColors.normal;
 
                         return (
                           <TableRow
@@ -1652,25 +1651,23 @@ export default function CrmProjects() {
                     {Math.min(page * ITEMS_PER_PAGE, total)} of {total}
                   </p>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    <button
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
                       disabled={page <= 1}
+                      className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
                     <span className="text-sm text-slate-600">
                       Page {page} of {totalPages}
                     </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    <button
                       onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                       disabled={page >= totalPages}
+                      className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
                   </div>
                 </div>
               )}
@@ -1682,9 +1679,7 @@ export default function CrmProjects() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    <button
                       onClick={() => {
                         if (calendarView === "month") {
                           setCalendarMonth(subMonths(calendarMonth, 1));
@@ -1696,9 +1691,10 @@ export default function CrmProjects() {
                           setCalendarMonth(subDays(calendarMonth, 1));
                         }
                       }}
+                      className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors"
                     >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
                     <h2 className="text-lg font-semibold min-w-[180px] text-center">
                       {calendarView === "month" 
                         ? format(calendarMonth, "MMMM yyyy")
@@ -1709,9 +1705,7 @@ export default function CrmProjects() {
                         : format(calendarMonth, "EEEE, MMM d, yyyy")
                       }
                     </h2>
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    <button
                       onClick={() => {
                         if (calendarView === "month") {
                           setCalendarMonth(addMonths(calendarMonth, 1));
@@ -1723,9 +1717,10 @@ export default function CrmProjects() {
                           setCalendarMonth(addDays(calendarMonth, 1));
                         }
                       }}
+                      className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors"
                     >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
                     <Button
                       variant="ghost"
                       size="sm"

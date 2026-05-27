@@ -56,6 +56,37 @@ function esc(s: string | null | undefined): string {
     .replace(/'/g, "&#39;");
 }
 
+function descriptionToEmailSafeHtml(description: string): string {
+  return description
+    .replace(/<h1([^>]*)>/gi, '<h1$1 style="text-align:center;font-size:20px;font-weight:700;color:#1e293b;margin:16px 0 8px 0;font-family:Arial,sans-serif;">')
+    .replace(/<h2([^>]*)>/gi, '<h2$1 style="font-size:16px;font-weight:700;color:#711419;border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin:18px 0 8px 0;font-family:Arial,sans-serif;">')
+    .replace(/<h3([^>]*)>/gi, '<h3$1 style="font-size:14px;font-weight:700;color:#1e293b;margin:14px 0 6px 0;font-family:Arial,sans-serif;">')
+    .replace(/<p([^>]*)>/gi, '<p$1 style="font-size:14px;color:#374151;line-height:1.6;margin:8px 0;font-family:Arial,sans-serif;">')
+    .replace(/<ul([^>]*)>/gi, '<ul$1 style="margin:8px 0;padding-left:24px;">')
+    .replace(/<ol([^>]*)>/gi, '<ol$1 style="margin:8px 0;padding-left:24px;">')
+    .replace(/<li([^>]*)>/gi, '<li$1 style="font-size:14px;color:#374151;line-height:1.7;margin:3px 0;font-family:Arial,sans-serif;">')
+    .replace(/<hr([^>]*)>/gi, '<hr$1 style="border:none;border-top:1px solid #e2e8f0;margin:16px 0;">')
+    .replace(/<strong([^>]*)>/gi, '<strong$1 style="font-weight:700;">')
+    .replace(/<b([^>]*)>/gi, '<b$1 style="font-weight:700;">');
+}
+
+function stripHtmlTags(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<\/h[1-6]>/gi, "\n")
+    .replace(/<hr[^>]*>/gi, "\n---\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export interface CrmQuoteEmailResult {
   success: boolean;
   error?: string;
@@ -72,6 +103,7 @@ export interface CrmQuoteEmailOptions {
   senderName?: string;
   quoteViewUrl?: string;
   replyToEmail?: string;
+  isManual?: boolean;
 }
 
 export async function sendCrmQuoteEmail(
@@ -82,10 +114,12 @@ export async function sendCrmQuoteEmail(
   sentBy?: string,
   options?: CrmQuoteEmailOptions
 ): Promise<CrmQuoteEmailResult> {
-  const emailSetting = await storage.getSetting("automated_email_enabled");
-  if (emailSetting && emailSetting.value === "false") {
-    console.log("[CRM Email] Automated emails are disabled");
-    return { success: false, error: "Automated emails are disabled" };
+  if (!options?.isManual) {
+    const emailSetting = await storage.getSetting("automated_email_enabled");
+    if (emailSetting && emailSetting.value === "false") {
+      console.log("[CRM Email] Automated emails are disabled (skipped for manual sends)");
+      return { success: false, error: "Automated emails are disabled" };
+    }
   }
 
   const apiKey = process.env.RESEND_API_KEY;

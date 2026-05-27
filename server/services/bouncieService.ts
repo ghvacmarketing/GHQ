@@ -1,6 +1,7 @@
 import { db } from "../db";
 import { bouncieSettings, bouncieVehicles } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { isAppActive } from "../activity-tracker";
 
 const BOUNCIE_AUTH_URL = "https://auth.bouncie.com/dialog/authorize";
 const BOUNCIE_TOKEN_URL = "https://auth.bouncie.com/oauth/token";
@@ -323,7 +324,7 @@ export function startBouncieBackgroundSync(intervalMinutes: number = 5) {
   if (bouncieRefreshInterval) {
     clearInterval(bouncieRefreshInterval);
   }
-  
+
   console.log(`[Bouncie] Starting background sync every ${intervalMinutes} minutes`);
   
   // Run initial sync after 30 seconds to let the app start up
@@ -341,6 +342,10 @@ export function startBouncieBackgroundSync(intervalMinutes: number = 5) {
   
   // Then run periodically
   bouncieRefreshInterval = setInterval(async () => {
+    if (!isAppActive()) {
+      console.log("[Bouncie] App idle, skipping location refresh");
+      return;
+    }
     try {
       if (bouncieService.isConfigured()) {
         console.log("[Bouncie] Running background location refresh...");

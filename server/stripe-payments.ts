@@ -40,9 +40,18 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
     }
 
     // Get the quote
-    const [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, quoteId));
+    let [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, quoteId));
     if (!quote) {
       return res.status(404).json({ error: "Quote not found" });
+    }
+
+    // Ensure the quote has a viewToken — it may be null if the quote was never emailed.
+    // Without it the Stripe return URL would be /q/null and the customer gets "Not Found".
+    if (!quote.viewToken) {
+      const { nanoid } = await import("nanoid");
+      const newToken = nanoid(8);
+      await db.update(crmQuotes).set({ viewToken: newToken }).where(eq(crmQuotes.id, quoteId));
+      quote = { ...quote, viewToken: newToken };
     }
 
     // Get client IP for signature tracking
@@ -89,9 +98,9 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
       return res.status(400).json({ error: "Quote total must be greater than 0" });
     }
 
-    // Calculate deposit amount
+    // Calculate deposit amount (minimum 50 cents per Stripe's requirement)
     const depositPct = depositOverride || await getDepositPercentage();
-    const depositAmount = Math.round((total * depositPct / 100) * 100); // Convert to cents
+    const depositAmount = Math.max(50, Math.round((total * depositPct / 100) * 100)); // Convert to cents
 
     const stripe = await getUncachableStripeClient();
 
@@ -190,7 +199,7 @@ router.post("/api/stripe/invoice/:invoiceId/payment-link", async (req, res) => {
               name: `Invoice #${invoice.invoiceNumber}`,
               description: `Payment for HVAC Service Invoice`,
             },
-            unit_amount: Math.round(amountDue * 100), // Convert to cents
+            unit_amount: Math.max(50, Math.round(amountDue * 100)), // Convert to cents, minimum $0.50
           },
           quantity: 1,
         },

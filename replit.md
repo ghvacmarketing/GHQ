@@ -13,7 +13,7 @@ Preferred communication style: Simple, everyday language.
 -   **Backend**: Node.js, Express.js (TypeScript, ES modules).
 -   **Database**: PostgreSQL with Drizzle ORM (Neon Database).
 -   **API**: RESTful.
--   **Authentication**: SMS Magic Link via Twilio, developer backdoor, Employee Portal with username/password (scrypt-hashed).
+-   **Authentication**: SMS Magic Link via Twilio, developer backdoor, Employee Portal with username/password (scrypt-hashed). CRM staff can additionally sign in with Google OAuth — the verified Google email is matched against the active `crm_users` allowlist (no auto-provisioning). New authorized emails are added under Settings → Users & Roles; leaving the password blank creates a Google-only account. Endpoints: `GET /api/crm/auth/google` (start) and `GET /api/crm/auth/google/callback` (callback). Google sign-ins are recorded in `crm_audit_log` with `method: "google"`.
 
 ### Key Design Decisions
 -   **Monorepo**: Shared TypeScript types and Zod schemas.
@@ -40,6 +40,19 @@ Preferred communication style: Simple, everyday language.
 -   **Automated SMS Notifications**: System for sending automated SMS alerts to customers via Textline for maintenance reminders, invoice payments, and work order status updates.
 -   **Time Tracking System**: Technicians clock in/out from the mobile app, with entries stored and editable by Admins.
 -   **QuickBooks Online Integration**: Full bidirectional OAuth 2.0 sync for customers, invoices, and payments, featuring a hierarchical class assignment system based on customer and property types, and an admin UI for managing classes and chart of accounts.
+-   **Customer Files & Photos**: Upload and manage files/photos per customer via object storage presigned URLs. Files split into Photos (image grid with preview lightbox) and Documents (list with download). Uploaded files also appear in the customer timeline as `file` entries with image thumbnails.
+    -   Table: `customer_files`
+    -   API: `/api/crm/customers/:id/files` (GET/POST), `/api/crm/customers/:id/files/:fileId` (DELETE)
+    -   Component: `CustomerFilesTab` in `crm-customer-detail.tsx`
+-   **Tagged Comments System**: Directed internal notes that can be left on any CRM page. Users tag one or more team members; only tagged users and the author see the comment. Comments appear as floating bubbles on the relevant page with a resolve flow. Integrates with the notification system (type: "tagged_comment"). Accessed via the floating tool menu (wrench icon) in bottom-right corner, which also provides access to Search and Ask AI.
+    -   Tables: `crm_tagged_comments`, `crm_tagged_comment_recipients`
+    -   API: `/api/crm/tagged-comments` (POST, GET), `/api/crm/tagged-comments/count`, `/api/crm/tagged-comments/:commentId/resolve`, `/api/crm/tagged-comments/lookup/:commentId`
+-   **Dynamic Salesbook Flipbook**: Self-hosted flipbook viewer using `react-pageflip` with two sections: (1) static Chandler intro pages 1–12 as optimized JPEGs from `public/salesbook-pages/`, and (2) dynamic product pages rendered live from `pricebook_packages` DB data. Dynamic pages cover all unit types (SGA, SHP, STA, GP, PHP, Mini-Split, Ducting), Elite upgrade bundles, and Crawlspace services. Each unit type gets a category divider, tier overview with pricing matrix, and per-tonnage product detail pages showing all package levels (Best/Better/Good/Budget) with equipment images, model info, and pricing (monthly + total). TOC auto-generated from section dividers.
+    -   Tables: `salesbook_bookmarks`, `pricebook_packages`, `crawlspace_tiers`
+    -   API: `/api/salesbook/data` (GET — returns static pages + live packages + crawlspace tiers), `/api/salesbook/bookmarks` (GET/POST/PATCH/DELETE), `/api/salesbook/pages`
+    -   Components: `client/src/components/salesbook-pages.tsx` (all dynamic page components + section builder)
+    -   Pages: `client/src/pages/price-book.tsx` (public flipbook viewer at `/salesbook`), `client/src/pages/crm/crm-salesbook.tsx` (CRM-embedded viewer at `/crm/salesbook`), `client/src/pages/crm/crm-settings-salesbook.tsx` (bookmark admin)
+    -   Public link: `/salesbook` — no login required, full flipbook with TOC, zoom, fullscreen. Changes in the CRM auto-update here since it uses the same data API.
 
 ## External Dependencies
 -   **Google Sheets API**: Parts pricing, application settings, customer data sync.

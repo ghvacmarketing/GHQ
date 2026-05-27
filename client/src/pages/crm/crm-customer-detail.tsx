@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { useLocation, useParams, Link } from "wouter";
+import { useLocation, useParams, useSearch, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,6 +62,12 @@ import {
   Clipboard,
   ClipboardCheck,
   Link2,
+  GitBranch,
+  Search,
+  ChevronRight,
+  Info,
+  Upload,
+  ImageIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -79,7 +85,6 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { CommentComposer } from "@/components/crm/comment-composer";
-import { CommentThread } from "@/components/crm/comment-thread";
 import { EntityTasksTab } from "@/components/crm/entity-tasks-tab";
 import type { CrmUser, CrmCustomer, CrmJob, CrmCustomerNote, CrmProject, CrmWorkOrder, CrmProperty, CrmQuote, ChecklistQuestion } from "@shared/schema";
 import { workOrderVisitTypeEnum, type WorkOrderVisitType, projectTypeEnum, type ProjectType, projectStatusEnum, type ProjectStatus, workOrderStatusEnum, type WorkOrderStatus, type WorkSubtype, type WorkOrderSubtype } from "@shared/schema";
@@ -88,7 +93,7 @@ import { format, formatDistanceToNow, differenceInCalendarDays } from "date-fns"
 import { cn } from "@/lib/utils";
 
 const JOB_TYPES = ["SERVICE", "INSTALL", "MAINTENANCE", "SALES"] as const;
-const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+const PRIORITIES = ["low", "normal", "high"] as const;
 
 type DispatchResponse = {
   technicians: Array<{
@@ -119,7 +124,6 @@ const priorityColors: Record<string, { bg: string; text: string }> = {
   low: { bg: "bg-slate-100", text: "text-slate-600" },
   normal: { bg: "bg-blue-100", text: "text-blue-600" },
   high: { bg: "bg-amber-100", text: "text-amber-600" },
-  urgent: { bg: "bg-red-100", text: "text-red-600" },
 };
 
 const workOrderStatusColors: Record<string, { bg: string; text: string; border: string }> = {
@@ -691,15 +695,290 @@ const visitStatusColors: Record<string, { bg: string; text: string }> = {
   cancelled: { bg: "bg-red-100", text: "text-red-700" },
 };
 
+interface CustomerFileData {
+  id: string;
+  customerId: string;
+  name: string;
+  url: string;
+  objectPath?: string | null;
+  contentType?: string | null;
+  size?: number | null;
+  uploadedBy?: string | null;
+  createdAt?: string | null;
+}
+
+function CustomerFilesTab({ customerId }: { customerId: string }) {
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [viewImage, setViewImage] = useState<string | null>(null);
+  const [deleteFileId, setDeleteFileId] = useState<string | null>(null);
+
+  const { data: files = [], isLoading } = useQuery<CustomerFileData[]>({
+    queryKey: ['/api/crm/customers', customerId, 'files'],
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (fileId: string) => {
+      await apiRequest("DELETE", `/api/crm/customers/${customerId}/files/${fileId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/customers', customerId, 'files'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/customers', customerId, 'timeline'] });
+      setDeleteFileId(null);
+      toast({ title: "File deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete file", variant: "destructive" });
+    },
+  });
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files;
+    if (!selectedFiles || selectedFiles.length === 0) return;
+
+    setUploading(true);
+    try {
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+
+        const presignRes = await apiRequest("POST", "/api/uploads/request-url", {
+          name: file.name,
+          size: file.size,
+          contentType: file.type,
+        });
+        const { uploadURL, objectPath } = await presignRes.json();
+
+        await fetch(uploadURL, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type },
+        });
+
+        const fileUrl = `/objects/${objectPath}`;
+        await apiRequest("POST", `/api/crm/customers/${customerId}/files`, {
+          name: file.name,
+          url: fileUrl,
+          objectPath,
+          contentType: file.type,
+          size: file.size,
+        });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/customers', customerId, 'files'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/customers', customerId, 'timeline'] });
+      toast({ title: `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} uploaded` });
+    } catch (err) {
+      console.error("Upload error:", err);
+      toast({ title: "Upload failed", variant: "destructive" });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const images = files.filter(f => f.contentType?.startsWith('image/'));
+  const docs = files.filter(f => !f.contentType?.startsWith('image/'));
+
+  const formatSize = (bytes?: number | null) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  return (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={handleUpload}
+        accept="image/jpeg,image/png,image/gif,image/webp,.pdf,.doc,.docx,.xlsx"
+      />
+
+      <Card data-testid="card-files">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-[#711419]" />
+            Files & Photos
+            {files.length > 0 && (
+              <Badge variant="secondary" className="ml-1">{files.length}</Badge>
+            )}
+          </CardTitle>
+          <Button
+            size="sm"
+            className="bg-[#711419] hover:bg-[#5a1014] text-white"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            data-testid="button-upload-file"
+          >
+            {uploading ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Upload className="h-4 w-4 mr-1" />
+            )}
+            {uploading ? "Uploading..." : "Upload File"}
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map(i => (
+                <Skeleton key={i} className="h-32 rounded-lg" />
+              ))}
+            </div>
+          ) : files.length === 0 ? (
+            <div className="text-center py-8">
+              <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 mb-2">No files or photos yet</p>
+              <p className="text-sm text-slate-400">
+                Upload documents, photos, and other files related to this customer.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {images.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-1.5">
+                    <ImageIcon className="h-4 w-4" />
+                    Photos ({images.length})
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {images.map(file => (
+                      <div key={file.id} className="group relative rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                        <img
+                          src={file.url}
+                          alt={file.name}
+                          className="w-full h-32 object-cover cursor-pointer"
+                          onClick={() => setViewImage(file.url)}
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                          <button
+                            className="p-1.5 bg-white rounded-full shadow"
+                            onClick={() => setViewImage(file.url)}
+                          >
+                            <Eye className="h-4 w-4 text-slate-700" />
+                          </button>
+                          <a
+                            href={file.url}
+                            download={file.name}
+                            className="p-1.5 bg-white rounded-full shadow"
+                          >
+                            <Download className="h-4 w-4 text-slate-700" />
+                          </a>
+                          <button
+                            className="p-1.5 bg-white rounded-full shadow"
+                            onClick={() => setDeleteFileId(file.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </button>
+                        </div>
+                        <div className="p-2">
+                          <p className="text-xs text-slate-600 truncate">{file.name}</p>
+                          {file.size && (
+                            <p className="text-xs text-slate-400">{formatSize(file.size)}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {docs.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-1.5">
+                    <FileText className="h-4 w-4" />
+                    Documents ({docs.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {docs.map(file => (
+                      <div key={file.id} className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 group">
+                        <div className="p-2 bg-slate-100 rounded">
+                          <FileText className="h-5 w-5 text-slate-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-700 truncate">{file.name}</p>
+                          <p className="text-xs text-slate-400">
+                            {formatSize(file.size)}
+                            {file.createdAt && ` · ${new Date(file.createdAt).toLocaleDateString()}`}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <a
+                            href={file.url}
+                            download={file.name}
+                            className="p-1.5 hover:bg-slate-100 rounded"
+                          >
+                            <Download className="h-4 w-4 text-slate-500" />
+                          </a>
+                          <button
+                            className="p-1.5 hover:bg-red-50 rounded"
+                            onClick={() => setDeleteFileId(file.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {viewImage && (
+        <Dialog open={!!viewImage} onOpenChange={() => setViewImage(null)}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Photo Preview</DialogTitle>
+            </DialogHeader>
+            <img src={viewImage} alt="Preview" className="w-full h-auto rounded-lg" />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      <Dialog open={!!deleteFileId} onOpenChange={() => setDeleteFileId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete File</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this file? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteFileId(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={() => deleteFileId && deleteMutation.mutate(deleteFileId)}
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 interface TimelineEntry {
   id: string;
-  type: 'work_order' | 'project' | 'agreement' | 'quote' | 'invoice' | 'note' | 'payment';
+  type: 'work_order' | 'project' | 'agreement' | 'quote' | 'invoice' | 'note' | 'payment' | 'file';
   title: string;
   description: string;
   timestamp: string;
   status?: string;
   amount?: string;
   linkUrl?: string;
+  signatureImage?: string;
+  signerName?: string;
+  fileUrl?: string;
+  contentType?: string;
 }
 
 const timelineTypeConfig: Record<TimelineEntry['type'], { icon: any; bgColor: string; textColor: string; borderColor: string; label: string }> = {
@@ -710,11 +989,12 @@ const timelineTypeConfig: Record<TimelineEntry['type'], { icon: any; bgColor: st
   invoice: { icon: Receipt, bgColor: "bg-slate-100", textColor: "text-slate-700", borderColor: "border-slate-200", label: "Invoice" },
   note: { icon: MessageSquare, bgColor: "bg-gray-100", textColor: "text-gray-700", borderColor: "border-gray-200", label: "Note" },
   payment: { icon: DollarSign, bgColor: "bg-emerald-100", textColor: "text-emerald-700", borderColor: "border-emerald-200", label: "Payment" },
+  file: { icon: Upload, bgColor: "bg-teal-100", textColor: "text-teal-700", borderColor: "border-teal-200", label: "File" },
 };
 
 function TimelineTabContent({ customerId }: { customerId: string }) {
   const [, navigate] = useLocation();
-  const allTypes: TimelineEntry['type'][] = ['work_order', 'project', 'agreement', 'quote', 'invoice', 'note', 'payment'];
+  const allTypes: TimelineEntry['type'][] = ['work_order', 'project', 'agreement', 'quote', 'invoice', 'note', 'payment', 'file'];
   const [activeFilters, setActiveFilters] = useState<Set<TimelineEntry['type']>>(() => new Set(allTypes));
   
   const { data: timeline, isLoading, isError, error } = useQuery<TimelineEntry[]>({
@@ -737,6 +1017,22 @@ function TimelineTabContent({ customerId }: { customerId: string }) {
       return newFilters;
     });
   };
+
+  const { toast } = useToast();
+  const deleteCommentMutation = useMutation({
+    mutationFn: async (commentId: string) => {
+      const response = await apiRequest("DELETE", `/api/crm/comments/${commentId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/customers', customerId, 'timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/comments', 'customer', customerId] });
+      toast({ title: "Comment deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete comment", variant: "destructive" });
+    },
+  });
 
   const filteredTimeline = timeline?.filter(entry => activeFilters.has(entry.type)) || [];
 
@@ -904,13 +1200,81 @@ function TimelineTabContent({ customerId }: { customerId: string }) {
                             )}
                           </div>
                           <h4 className="font-medium text-slate-900">{entry.title}</h4>
-                          <p className="text-sm text-slate-500 mt-1 line-clamp-2">{entry.description}</p>
+                          {entry.type !== 'quote' && (
+                            <p className="text-sm text-slate-500 mt-1 line-clamp-2">{entry.description}</p>
+                          )}
+                          {entry.type === 'quote' && entry.signatureImage && (
+                            <div className="mt-2 space-y-1">
+                              {entry.signerName && (
+                                <p className="text-xs text-slate-500">Signed by: <span className="font-medium">{entry.signerName}</span></p>
+                              )}
+                              <div className="border border-slate-200 rounded-md bg-slate-50 p-1 inline-block">
+                                <img
+                                  src={entry.signatureImage}
+                                  alt="Client signature"
+                                  className="h-12 w-auto max-w-[200px] object-contain"
+                                />
+                              </div>
+                            </div>
+                          )}
+                          {entry.type === 'file' && entry.fileUrl && (
+                            <div className="mt-2">
+                              {entry.contentType?.startsWith('image/') ? (
+                                <a href={entry.fileUrl} target="_blank" rel="noopener noreferrer">
+                                  <img
+                                    src={entry.fileUrl}
+                                    alt={entry.description}
+                                    className="h-20 w-auto max-w-[200px] object-cover rounded-md border border-slate-200"
+                                  />
+                                </a>
+                              ) : (
+                                <a
+                                  href={entry.fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-sm text-[#711419] hover:underline"
+                                >
+                                  <Download className="h-3 w-3" />
+                                  Download
+                                </a>
+                              )}
+                            </div>
+                          )}
                         </div>
-                        {entry.amount && (
-                          <div className="text-right flex-shrink-0">
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {entry.amount && (
                             <p className="font-semibold text-slate-900">{entry.amount}</p>
-                          </div>
-                        )}
+                          )}
+                          {entry.type === 'note' && entry.id.startsWith('comment-') && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <button
+                                  className="p-1.5 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete comment?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This comment will be permanently removed from the timeline.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-red-600 hover:bg-red-700"
+                                    onClick={() => deleteCommentMutation.mutate(entry.id.replace('comment-', ''))}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </div>
                       </div>
                       {entry.linkUrl && (
                         <div className="mt-2 flex items-center text-xs text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1391,9 +1755,54 @@ function CustomerTabbedView({
   activeTab,
   setActiveTab,
 }: CustomerTabbedViewProps) {
+  const [, navigate] = useLocation();
   const completedJobs = jobs?.filter(j => ["completed", "invoiced", "paid"].includes(j.status)) || [];
   const customerType = (customer.customerType || "residential").toLowerCase();
-  
+
+  // Sub-accounts of this customer
+  interface SubAccountSummary {
+    id: string;
+    name: string;
+    companyName: string | null;
+    customerType: string | null;
+    customerStatus: string | null;
+    email: string | null;
+    phone: string | null;
+    fullAddress: string | null;
+    parentCustomerId: string | null;
+    billToParent: boolean | null;
+  }
+  const { data: subAccounts = [] } = useQuery<SubAccountSummary[]>({
+    queryKey: ["/api/crm/customers", customer.id, "sub-accounts"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${customer.id}/sub-accounts`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch sub-accounts");
+      return res.json();
+    },
+  });
+
+  // Parent customer data (when this customer IS a sub-account)
+  const { data: parentCustomer, isLoading: parentCustomerLoading } = useQuery<CrmCustomer>({
+    queryKey: ["/api/crm/customers", customer.parentCustomerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${customer.parentCustomerId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch parent customer");
+      return res.json();
+    },
+    enabled: !!customer.parentCustomerId,
+    retry: 1,
+  });
+
+  // Mutation to directly update billToParent without opening the full edit dialog
+  const updateBillingMutation = useMutation({
+    mutationFn: async (billToParent: boolean) => {
+      return apiRequest("PATCH", `/api/crm/customers/${customer.id}`, { billToParent });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customer.id] });
+    },
+  });
+
   const { data: overviewTimeline, isLoading: timelineLoading } = useQuery<TimelineEntry[]>({
     queryKey: ['/api/crm/customers', customer.id, 'timeline'],
     queryFn: async () => {
@@ -1420,10 +1829,9 @@ function CustomerTabbedView({
       entries.push({
         id: note.id,
         type: 'note',
-        title: 'Note',
+        title: note.userName || 'Note',
         description: note.body,
         timestamp: new Date(note.createdAt || Date.now()),
-        userName: note.userName || undefined,
       });
     });
     
@@ -1565,6 +1973,28 @@ function CustomerTabbedView({
           <ClipboardList className="h-4 w-4 mr-2" />
           Settings
         </TabsTrigger>
+        {/* Sub-Account tab — only shown when this customer IS a sub-account */}
+        {customer?.parentCustomerId && (
+          <TabsTrigger
+            value="sub-account"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+            data-testid="tab-sub-account"
+          >
+            <GitBranch className="h-4 w-4 mr-2" />
+            Sub-Account
+          </TabsTrigger>
+        )}
+        {/* Sub-Accounts tab — only shown when this customer HAS sub-accounts */}
+        {subAccounts.length > 0 && (
+          <TabsTrigger
+            value="sub-accounts"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+            data-testid="tab-sub-accounts"
+          >
+            <Users className="h-4 w-4 mr-2" />
+            Sub-Accounts ({subAccounts.length})
+          </TabsTrigger>
+        )}
       </TabsList>
 
       {/* Overview Tab */}
@@ -1603,6 +2033,18 @@ function CustomerTabbedView({
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Status</p>
                   <Badge variant="outline" className="text-xs">{customer.customerStatus || "Active"}</Badge>
                 </div>
+                {customer.parentCustomerId && parentCustomer && (
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Parent Account</p>
+                    <Link href={`/crm/customers/${customer.parentCustomerId}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                      <Building2 className="h-3.5 w-3.5" />
+                      {parentCustomer.name}
+                    </Link>
+                    {customer.billToParent && (
+                      <Badge variant="outline" className="text-xs mt-1 border-amber-300 text-amber-700 bg-amber-50">Bills to Parent</Badge>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="space-y-4">
                 <div>
@@ -1627,50 +2069,27 @@ function CustomerTabbedView({
                     <p className="text-sm text-slate-400">No email</p>
                   )}
                 </div>
+                {subAccounts.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Sub-Accounts</p>
+                    <div className="space-y-1">
+                      {subAccounts.slice(0, 3).map(sub => (
+                        <button key={sub.id} onClick={() => navigate(`/crm/customers/${sub.id}`)} className="text-sm text-blue-600 hover:underline flex items-center gap-1 w-full text-left">
+                          <ChevronRight className="h-3 w-3" />
+                          {sub.name}
+                        </button>
+                      ))}
+                      {subAccounts.length > 3 && (
+                        <p className="text-xs text-slate-400">+{subAccounts.length - 3} more</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Quick Actions */}
-        <Card className="border shadow-sm" data-testid="card-quick-actions">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium text-slate-800">Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="flex flex-wrap gap-3">
-              <Button 
-                size="sm"
-                onClick={onCreateProject}
-                className="bg-[#711419] hover:bg-[#5a1014] text-white"
-                data-testid="button-quick-create-project"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                New Project
-              </Button>
-              <Button 
-                size="sm"
-                onClick={onScheduleVisit}
-                variant="outline"
-                className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
-                data-testid="button-quick-create-work-order"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                New Work Order
-              </Button>
-              <Button 
-                size="sm"
-                onClick={onCreateLead}
-                variant="outline"
-                className="border-amber-600 text-amber-600 hover:bg-amber-50"
-                data-testid="button-quick-create-lead"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                New Lead
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Setup Checklist Card - Only for Property Managers */}
         {isPropertyManager && (
@@ -1807,11 +2226,6 @@ function CustomerTabbedView({
                 placeholder="Add a comment about this customer..."
               />
 
-              <CommentThread
-                entityType="customer"
-                entityId={customer.id}
-              />
-
               {timelineLoading || notesLoading ? (
                 <div className="space-y-3 py-4">
                   <Skeleton className="h-16 w-full" />
@@ -1849,14 +2263,14 @@ function CustomerTabbedView({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <span className="font-medium text-sm text-slate-700 truncate">
-                              {entry.type === 'note' ? (entry.userName || 'Unknown User') : entry.title}
+                              {entry.title}
                             </span>
                             <span className="text-xs text-slate-400 flex-shrink-0">
                               {format(entry.timestamp, "MMM d, yyyy 'at' h:mm a")}
                             </span>
                           </div>
                           <p className="text-sm text-slate-600 line-clamp-2">
-                            {entry.description}
+                            {entry.description?.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()}
                           </p>
                         </div>
                       </div>
@@ -2298,6 +2712,12 @@ function CustomerTabbedView({
               <Receipt className="h-5 w-5 text-[#711419]" />
               Invoices ({crmInvoices?.length || 0})
             </CardTitle>
+            <Link href={`/crm/invoices/new?customerId=${customer.id}`}>
+              <Button size="sm" className="bg-[#711419] hover:bg-[#5a1014] text-white">
+                <Plus className="h-4 w-4 mr-1" />
+                Create Invoice
+              </Button>
+            </Link>
           </CardHeader>
           <CardContent>
             {invoicesLoading ? (
@@ -2392,33 +2812,9 @@ function CustomerTabbedView({
         </Card>
       </TabsContent>
 
-      {/* Files / Photos Tab - Placeholder */}
+      {/* Files / Photos Tab */}
       <TabsContent value="files" className="space-y-6" data-testid="tab-content-files">
-        <Card data-testid="card-files">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-[#711419]" />
-              Files & Photos
-            </CardTitle>
-            <Button 
-              size="sm"
-              className="bg-[#711419] hover:bg-[#5a1014] text-white"
-              data-testid="button-upload-file"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Upload File
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-8">
-              <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 mb-2">No files or photos yet</p>
-              <p className="text-sm text-slate-400">
-                Upload documents, photos, and other files related to this customer.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <CustomerFilesTab customerId={customer.id} />
       </TabsContent>
 
       {/* Tasks Tab */}
@@ -2461,6 +2857,148 @@ function CustomerTabbedView({
           </CardContent>
         </Card>
       </TabsContent>
+
+      {/* Sub-Account Tab — visible only when this customer is a sub-account */}
+      {customer.parentCustomerId && (
+        <TabsContent value="sub-account" className="space-y-4" data-testid="tab-content-sub-account">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <GitBranch className="h-5 w-5 text-[#711419]" />
+                Sub-Account Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {/* Parent account row */}
+              <div className="flex items-center justify-between gap-4 p-4 bg-slate-50 rounded-lg border">
+                <div className="space-y-1 min-w-0">
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Parent Account</p>
+                  {parentCustomerLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-slate-400">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Loading...
+                    </div>
+                  ) : parentCustomer ? (
+                    <>
+                      <Link
+                        href={`/crm/customers/${customer.parentCustomerId}`}
+                        className="text-base font-medium text-blue-600 hover:underline flex items-center gap-1.5"
+                      >
+                        <Building2 className="h-4 w-4" />
+                        {parentCustomer.name}
+                      </Link>
+                      <div className="flex flex-wrap gap-3 mt-1">
+                        {parentCustomer.phone && (
+                          <a href={`tel:${parentCustomer.phone}`} className="text-sm text-slate-500 flex items-center gap-1 hover:text-slate-700">
+                            <Phone className="h-3.5 w-3.5" />{parentCustomer.phone}
+                          </a>
+                        )}
+                        {parentCustomer.email && (
+                          <a href={`mailto:${parentCustomer.email}`} className="text-sm text-slate-500 flex items-center gap-1 hover:text-slate-700">
+                            <Mail className="h-3.5 w-3.5" />{parentCustomer.email}
+                          </a>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <Link
+                      href={`/crm/customers/${customer.parentCustomerId}`}
+                      className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                    >
+                      <Building2 className="h-3.5 w-3.5" />
+                      View parent account
+                    </Link>
+                  )}
+                </div>
+              </div>
+
+              {/* Billing preference — inline toggle */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-slate-700">Billing Preference</p>
+                <div className="flex rounded-lg border overflow-hidden">
+                  <button
+                    className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
+                      !customer.billToParent
+                        ? "bg-[#711419] text-white"
+                        : "bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                    onClick={() => !customer.billToParent ? null : updateBillingMutation.mutate(false)}
+                    disabled={updateBillingMutation.isPending}
+                  >
+                    Bill to this account
+                  </button>
+                  <button
+                    className={`flex-1 px-4 py-2.5 text-sm font-medium border-l transition-colors ${
+                      customer.billToParent
+                        ? "bg-[#711419] text-white"
+                        : "bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                    onClick={() => customer.billToParent ? null : updateBillingMutation.mutate(true)}
+                    disabled={updateBillingMutation.isPending}
+                  >
+                    Bill to parent
+                    {parentCustomer && <span className="ml-1 opacity-75 text-xs">({parentCustomer.name})</span>}
+                  </button>
+                </div>
+                {updateBillingMutation.isPending && (
+                  <p className="text-xs text-slate-400 flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Saving...
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      )}
+
+      {/* Sub-Accounts Tab — visible only when this customer has sub-accounts */}
+      {subAccounts.length > 0 && (
+        <TabsContent value="sub-accounts" className="space-y-6" data-testid="tab-content-sub-accounts">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-[#711419]" />
+                Sub-Accounts ({subAccounts.length})
+              </CardTitle>
+              <button
+                onClick={() => navigate(`/crm/accounts/new?parentId=${customer.id}`)}
+                className="flex items-center gap-1 text-xs text-slate-500 hover:text-[#711419] transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add Sub-Account
+              </button>
+            </CardHeader>
+            <CardContent>
+              <div className="divide-y">
+                {subAccounts.map(sub => (
+                  <div
+                    key={sub.id}
+                    className="flex items-center justify-between py-3 first:pt-0 last:pb-0 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded transition-colors"
+                    onClick={() => navigate(`/crm/customers/${sub.id}`)}
+                  >
+                    <div className="space-y-0.5">
+                      <p className="text-sm font-medium text-blue-600 flex items-center gap-1">
+                        {sub.name}
+                      </p>
+                      <div className="flex items-center gap-3 text-xs text-slate-500">
+                        {sub.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{sub.phone}</span>}
+                        {sub.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{sub.email}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {sub.billToParent ? (
+                        <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50">Bills to Parent</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs border-green-300 text-green-700 bg-green-50">Bills Here</Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      )}
     </Tabs>
   );
 }
@@ -2468,9 +3006,23 @@ function CustomerTabbedView({
 export default function CrmCustomerDetail() {
   usePageTitle("Customer Detail");
   const [, navigate] = useLocation();
+  const searchString = useSearch();
   const params = useParams<{ id: string }>();
   const customerId = params.id;
-  const [activeTab, setActiveTab] = useState("overview");
+
+  const backHref = (() => {
+    const p = new URLSearchParams(searchString);
+    const from = p.get("from");
+    const q = p.get("q");
+    if (from === "customers" && q) return `/crm/customers?search=${encodeURIComponent(q)}`;
+    return null;
+  })();
+  const goBack = () => backHref ? navigate(backHref) : window.history.back();
+  const [activeTab, setActiveTab] = useState(() => {
+    const tabParam = new URLSearchParams(window.location.search).get("tab");
+    const validTabs = ["overview", "locations", "work-orders", "projects", "quotes", "invoices", "files", "tasks", "agreements", "timeline", "settings", "sub-accounts"];
+    return tabParam && validTabs.includes(tabParam) ? tabParam : "overview";
+  });
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [scheduleVisitDialogOpen, setScheduleVisitDialogOpen] = useState(false);
   const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
@@ -2498,6 +3050,10 @@ export default function CrmCustomerDetail() {
   const [editEmail, setEditEmail] = useState("");
   const [editFullAddress, setEditFullAddress] = useState("");
   const [editLeadSource, setEditLeadSource] = useState("");
+  const [editParentCustomerId, setEditParentCustomerId] = useState<string | null>(null);
+  const [editBillToParent, setEditBillToParent] = useState(false);
+  const [parentSearch, setParentSearch] = useState("");
+  const [showParentDropdown, setShowParentDropdown] = useState(false);
 
   // Form state for New Job dialog
   const [jobType, setJobType] = useState<string>("SERVICE");
@@ -2851,6 +3407,39 @@ export default function CrmCustomerDetail() {
   });
   const crmInvoices = crmInvoicesData?.invoices || [];
 
+  // Fetch sub-accounts (also used in CustomerTabbedView — TanStack Query deduplicates the request)
+  const { data: subAccountsForPicker = [] } = useQuery<{ id: string }[]>({
+    queryKey: ["/api/crm/customers", customerId, "sub-accounts"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${customerId}/sub-accounts`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch sub-accounts");
+      return res.json();
+    },
+    enabled: !!currentUser && !!customerId,
+  });
+
+  // Fetch all customers for the parent account picker (only when edit dialog is open)
+  const { data: allCustomersForPicker = [] } = useQuery<CrmCustomer[]>({
+    queryKey: ["/api/crm/customers", "picker"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers?limit=500`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch customers");
+      const data = await res.json();
+      return data.customers || [];
+    },
+    enabled: editDialogOpen,
+  });
+
+  // Filtered parent candidates: exclude self and own sub-accounts to prevent circular hierarchy
+  const subAccountIdsForPicker = subAccountsForPicker.map(s => s.id);
+  const parentPickerOptions = allCustomersForPicker.filter(c =>
+    c.id !== customerId &&
+    !subAccountIdsForPicker.includes(c.id) &&
+    (parentSearch.trim() === "" ||
+      c.name.toLowerCase().includes(parentSearch.toLowerCase()) ||
+      (c.companyName || "").toLowerCase().includes(parentSearch.toLowerCase()))
+  );
+
   // Fetch maintenance subtypes (includes custom agreement types) when MAINTENANCE is selected or dialog opens
   useEffect(() => {
     if (!scheduleVisitDialogOpen) return;
@@ -2994,13 +3583,26 @@ export default function CrmCustomerDetail() {
       }
       return res.json();
     },
+    onMutate: async () => {
+      const idToUpdate = selectedQuoteId;
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/quotes"] });
+      const snapshots = queryClient.getQueriesData({ queryKey: ["/api/crm/quotes"] });
+      queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+        if (!old?.quotes) return old;
+        return { ...old, quotes: old.quotes.map((q: any) => q.id === idToUpdate ? { ...q, status: "declined" } : q) };
+      });
+      return { snapshots };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", selectedQuoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Quote declined", description: "Quote status updated to declined." });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _vars, context: any) => {
+      context?.snapshots?.forEach(([key, data]: [any, any]) => {
+        queryClient.setQueryData(key, data);
+      });
       toast({ title: "Failed to decline quote", description: error.message, variant: "destructive" });
     },
   });
@@ -3014,13 +3616,27 @@ export default function CrmCustomerDetail() {
       }
       return res.json();
     },
+    onMutate: async () => {
+      const idToDelete = selectedQuoteId;
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/quotes"] });
+      const snapshots = queryClient.getQueriesData({ queryKey: ["/api/crm/quotes"] });
+      queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+        if (!old?.quotes) return old;
+        return { ...old, quotes: old.quotes.filter((q: any) => q.id !== idToDelete) };
+      });
+      setSelectedQuoteId(null);
+      setShowQuoteDeleteConfirm(false);
+      return { snapshots };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Quote deleted", description: "The quote has been permanently deleted." });
-      setSelectedQuoteId(null);
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _vars, context: any) => {
+      context?.snapshots?.forEach(([key, data]: [any, any]) => {
+        queryClient.setQueryData(key, data);
+      });
       toast({ title: "Failed to delete quote", description: error.message, variant: "destructive" });
     },
   });
@@ -3858,8 +4474,10 @@ export default function CrmCustomerDetail() {
     onSuccess: (data) => {
       const action = data.action === "archived" ? "archived" : "deleted";
       toast({ title: `Customer ${action} successfully` });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
-      navigate("/crm/customers");
+      queryClient.removeQueries({ queryKey: ["/api/crm/customers"] });
+      queryClient.removeQueries({ queryKey: ["/api/crm/customers/merged"] });
+      queryClient.removeQueries({ queryKey: ["/api/crm/customers/stats"] });
+      navigate(backHref ?? "/crm/customers");
     },
     onError: (error: Error) => {
       toast({
@@ -3942,6 +4560,10 @@ export default function CrmCustomerDetail() {
       setEditEmail(customer.email || "");
       setEditFullAddress(customer.fullAddress || "");
       setEditLeadSource((customer as any).leadSource || "");
+      setEditParentCustomerId(customer.parentCustomerId || null);
+      setEditBillToParent(customer.billToParent || false);
+      setParentSearch("");
+      setShowParentDropdown(false);
       setEditDialogOpen(true);
     }
   };
@@ -3955,6 +4577,10 @@ export default function CrmCustomerDetail() {
     setEditEmail("");
     setEditFullAddress("");
     setEditLeadSource("");
+    setEditParentCustomerId(null);
+    setEditBillToParent(false);
+    setParentSearch("");
+    setShowParentDropdown(false);
   };
 
   const canChangeCustomerType = currentUser && ["admin", "owner"].includes(currentUser.role);
@@ -3969,6 +4595,8 @@ export default function CrmCustomerDetail() {
         email: editEmail.trim(),
         fullAddress: editFullAddress.trim(),
         leadSource: editLeadSource.trim(),
+        parentCustomerId: editParentCustomerId || null,
+        billToParent: editBillToParent,
       });
       if (!res.ok) {
         const error = await res.json();
@@ -3979,6 +4607,7 @@ export default function CrmCustomerDetail() {
     onSuccess: () => {
       toast({ title: "Customer updated successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "sub-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
       resetEditForm();
     },
@@ -4217,7 +4846,7 @@ export default function CrmCustomerDetail() {
     return (
       <CrmLayout currentUser={currentUser}>
         <div className="space-y-6">
-          <Button variant="ghost" onClick={() => window.history.back()} data-testid="button-back">
+          <Button variant="ghost" onClick={goBack} data-testid="button-back">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
@@ -4239,25 +4868,27 @@ export default function CrmCustomerDetail() {
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={() => window.history.back()} data-testid="button-back">
+          <Button variant="ghost" onClick={goBack} data-testid="button-back">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1">
             {(customer as any).source !== 'fieldedge' && (
-              <Button 
-                variant="outline"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={openEditDialog}
+                className="text-slate-600 hover:text-slate-900"
                 data-testid="button-edit-customer"
               >
-                <Pencil className="h-4 w-4 mr-2" />
-                Edit Customer
+                <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                Edit
               </Button>
             )}
             {currentUser && ["admin", "owner", "sales"].includes(currentUser.role) && (customer as any).source !== 'fieldedge' && (
-              <div className="flex items-center gap-3 border rounded-lg px-3 py-1.5">
-                <span className="text-sm text-muted-foreground">Customer Portal</span>
+              <div className="flex items-center gap-2 px-2">
+                <span className="text-xs text-slate-400">Portal</span>
                 <Switch
                   checked={customer.portalEnabled}
                   onCheckedChange={(checked) => togglePortalMutation.mutate(checked)}
@@ -4265,33 +4896,32 @@ export default function CrmCustomerDetail() {
                   data-testid="switch-portal-access"
                 />
                 {customer.portalEnabled && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                  <button
                     onClick={() => generatePortalLinkMutation.mutate()}
                     disabled={generatePortalLinkMutation.isPending}
-                    className="h-7 px-2"
+                    className="text-slate-400 hover:text-slate-600 transition-colors"
                     data-testid="button-generate-portal-link"
+                    title="Copy portal link"
                   >
                     {generatePortalLinkMutation.isPending ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <Link2 className="h-3 w-3" />
+                      <Link2 className="h-3.5 w-3.5" />
                     )}
-                    <span className="ml-1 text-xs">Copy Link</span>
-                  </Button>
+                  </button>
                 )}
               </div>
             )}
             {canDeleteCustomer && (customer as any).source !== 'fieldedge' && (
-              <Button 
-                variant="outline"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setDeleteDialogOpen(true)}
-                className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+                className="text-red-400 hover:text-red-600 hover:bg-red-50"
                 data-testid="button-delete-customer"
               >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Customer
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                Delete
               </Button>
             )}
           </div>
@@ -5229,6 +5859,98 @@ export default function CrmCustomerDetail() {
                   data-testid="input-edit-lead-source"
                 />
               </div>
+
+              {/* Parent Account Selector */}
+              <div className="space-y-2">
+                <Label>Parent Account</Label>
+                <div className="relative">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                      <Input
+                        placeholder={editParentCustomerId
+                          ? (allCustomersForPicker.find(c => c.id === editParentCustomerId)?.name ?? "Parent selected")
+                          : "Search for parent account..."}
+                        value={parentSearch}
+                        onChange={(e) => {
+                          setParentSearch(e.target.value);
+                          setShowParentDropdown(true);
+                        }}
+                        onFocus={() => setShowParentDropdown(true)}
+                        className="pl-8"
+                        data-testid="input-parent-search"
+                      />
+                    </div>
+                    {editParentCustomerId && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-slate-400 hover:text-red-500 px-2"
+                        onClick={() => {
+                          setEditParentCustomerId(null);
+                          setEditBillToParent(false);
+                          setParentSearch("");
+                          setShowParentDropdown(false);
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  {showParentDropdown && parentSearch.trim().length >= 1 && parentPickerOptions.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                      {parentPickerOptions.slice(0, 10).map(c => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
+                          onClick={() => {
+                            setEditParentCustomerId(c.id);
+                            setParentSearch("");
+                            setShowParentDropdown(false);
+                          }}
+                        >
+                          <Building2 className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                          <span>{c.name}</span>
+                          {c.companyName && c.companyName !== c.name && (
+                            <span className="text-slate-400">— {c.companyName}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {editParentCustomerId && (
+                  <div className="flex items-center justify-between rounded-md border px-3 py-2 bg-slate-50">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-3.5 w-3.5 text-slate-500" />
+                      <span className="text-sm text-slate-700">
+                        {allCustomersForPicker.find(c => c.id === editParentCustomerId)?.name ?? "Parent account"}
+                      </span>
+                    </div>
+                    <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">Parent</Badge>
+                  </div>
+                )}
+              </div>
+
+              {/* Bill to Parent toggle (only shown when a parent is selected) */}
+              {editParentCustomerId && (
+                <div className="flex items-center justify-between rounded-md border px-3 py-2.5">
+                  <div>
+                    <Label htmlFor="edit-bill-to-parent" className="text-sm font-medium cursor-pointer">
+                      Bill to Parent Account
+                    </Label>
+                    <p className="text-xs text-slate-500 mt-0.5">Send invoices to the parent instead of this account</p>
+                  </div>
+                  <Switch
+                    id="edit-bill-to-parent"
+                    checked={editBillToParent}
+                    onCheckedChange={setEditBillToParent}
+                    data-testid="switch-edit-bill-to-parent"
+                  />
+                </div>
+              )}
             </div>
 
             <DialogFooter>

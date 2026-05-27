@@ -410,3 +410,97 @@ HVAC system sizing by tonnage:
 ### Geoapify
 - Address autocomplete
 - Reverse geocoding
+
+---
+
+## Online Booking
+
+### Booking URL
+The online booking page is at **{your-domain}/book** — simply append "/book" to the app's domain. There is **no settings page** for this. The URL works automatically with no configuration.
+
+### What the form collects
+- Name, phone, email, service address
+- Service type and preferred time
+
+### Where bookings go
+- Creates a Work Order (status: Scheduled)
+- Lands in **Dispatch Board → Unassigned Queue → "Needs Scheduling"**
+- No auto-assignment — must be manually assigned on the Dispatch Board
+
+---
+
+## Dispatch Board
+
+### Access
+Sidebar → Dispatch Board → /crm/dispatch
+
+### Views
+Day, Week, Month, Trucks
+
+### Day View
+- Timeline grid: 6 AM to 10 PM, 30-minute slots
+- Each row = one technician
+- **Unassigned Queue** sits below the timeline — all work orders with no assigned tech
+- Drag cards from the queue onto a technician row to assign them
+- Click a card → detail side panel opens on the right; the board shrinks to make room
+
+### Side Panel Status Colors
+- Amber = Pending/Scheduled
+- Blue = Dispatched/En Route/Traveling
+- Green = On Site/Working
+- Slate = Completed
+- Rose = Cancelled
+
+### No auto-dispatch
+There is no automatic assignment, round-robin, or auto-dispatch. All assignment is manual.
+
+---
+
+## CRM Navigation
+
+### Sidebar pages (complete list)
+| Page | URL |
+|------|-----|
+| Dashboard | /crm/dashboard |
+| Dispatch Board | /crm/dispatch |
+| Phone | /crm/phone |
+| Messaging | /crm/messaging |
+| Notifications | /crm/notifications |
+| Customers | /crm/customers |
+| Agreements | /crm/agreements |
+| Quotes | /crm/quotes |
+| Invoices | /crm/invoices |
+| Work Orders | /crm/work-orders |
+| Projects | /crm/projects |
+| Mobile View | /crm/mobile |
+| Settings | /crm/settings |
+
+### Settings sub-sections (real list)
+- Users & Roles
+- Time Logs
+- Checklists
+- Pricebook
+- Packages
+- Materials Catalog
+- Payment Settings
+- Import Data
+- Fleet Tracking
+- System
+
+### Public pages (no login)
+- Booking form: {domain}/book
+- Customer portal: {domain}/portal (magic link)
+- Quote viewer: {domain}/quote/{id}
+- Invoice viewer: {domain}/invoice/{id}
+
+---
+
+## Features That Do NOT Exist
+
+The following do not exist in this CRM — do not direct users to them:
+- No "Settings → Online Booking" or "Settings → Customer Portal" page
+- No "Settings → Auto-assignment" or "Settings → Dispatch Rules" page
+- No "Settings → Widgets" page
+- No "Public booking URL" field in settings
+- No auto-assignment, round-robin, or auto-dispatch of work orders
+- The booking link requires no configuration — it is always {domain}/book

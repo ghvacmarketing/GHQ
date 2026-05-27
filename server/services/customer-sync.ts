@@ -1,6 +1,7 @@
 import { createHmac } from "crypto";
 import { storage } from "../storage";
 import { InsertCustomer } from "@shared/schema";
+import { isAppActive, onBecomeActive } from "../activity-tracker";
 
 interface SyncResult {
   created: number;
@@ -38,6 +39,7 @@ class CustomerSyncService {
   private sheetId: string;
   private baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
   private autoSyncInterval: NodeJS.Timeout | null = null;
+  private unsubscribeResumeListener: (() => void) | null = null;
   private statusLoaded: boolean = false;
   
   private syncStatus: SyncStatus = {
@@ -335,13 +337,23 @@ class CustomerSyncService {
     this.syncCustomersFromSheet().catch(err => {
       console.error('Initial customer sync failed:', err);
     });
-    
-    this.autoSyncInterval = setInterval(async () => {
-      try {
-        await this.syncCustomersFromSheet();
-      } catch (err) {
-        console.error('Scheduled customer sync failed:', err);
+
+    // Persistent listener: fires an immediate sync on every idle→active transition
+    this.unsubscribeResumeListener = onBecomeActive(() => {
+      console.log('[CustomerSync] App became active, running immediate sync');
+      this.syncCustomersFromSheet().catch(err => {
+        console.error('Resume customer sync failed:', err);
+      });
+    });
+
+    this.autoSyncInterval = setInterval(() => {
+      if (!isAppActive()) {
+        console.log('[CustomerSync] App idle, skipping sync');
+        return;
       }
+      this.syncCustomersFromSheet().catch(err => {
+        console.error('Scheduled customer sync failed:', err);
+      });
     }, intervalMs);
   }
 
@@ -350,6 +362,10 @@ class CustomerSyncService {
       clearInterval(this.autoSyncInterval);
       this.autoSyncInterval = null;
       console.log('Customer auto-sync stopped');
+    }
+    if (this.unsubscribeResumeListener) {
+      this.unsubscribeResumeListener();
+      this.unsubscribeResumeListener = null;
     }
   }
 }

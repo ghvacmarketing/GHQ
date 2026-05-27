@@ -14,19 +14,19 @@ import {
 } from "@/components/ui/select";
 import {
   Bell,
-  X,
-  CheckCheck,
   AtSign,
   ClipboardList,
   Settings,
   AlertCircle,
   Inbox,
+  Trash2,
+  MessageSquare,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 interface Notification {
   id: string;
-  type: "mention" | "task_assigned" | "task_due" | "comment" | "status_change" | "system";
+  type: "mention" | "task_assigned" | "task_due" | "comment" | "status_change" | "system" | "tagged_comment";
   title: string;
   preview: string | null;
   entityType: string | null;
@@ -58,6 +58,8 @@ function getEntityUrl(entityType: string | null, entityId: string | null): strin
       return `/crm/phone?log=${entityId}`;
     case "call_log_task":
       return `/crm/phone?task=${entityId}`;
+    case "tagged_comment":
+      return null;
     default:
       return null;
   }
@@ -74,27 +76,40 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
   queryParams.set("limit", "50");
 
   const { data: notifications, isLoading, refetch } = useQuery<Notification[]>({
-    queryKey: [`/api/crm/notifications?${queryParams.toString()}`],
+    queryKey: ["/api/crm/notifications", tab, typeFilter],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/notifications?${queryParams.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    refetchInterval: 20000,
+    staleTime: 15000,
   });
+
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
+  };
 
   const markAsReadMutation = useMutation({
     mutationFn: async (notificationId: string) => {
       await apiRequest("PATCH", `/api/crm/notifications/${notificationId}/read`);
     },
-    onSuccess: () => {
-      refetch();
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
-    },
+    onSuccess: invalidateAll,
   });
 
   const markAllReadMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", "/api/crm/notifications/mark-all-read");
     },
-    onSuccess: () => {
-      refetch();
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
+    onSuccess: invalidateAll,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (notificationId: string) => {
+      await apiRequest("DELETE", `/api/crm/notifications/${notificationId}`);
     },
+    onSuccess: invalidateAll,
   });
 
   const getIcon = (type: Notification["type"]) => {
@@ -106,6 +121,8 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
         return <ClipboardList className="h-4 w-4 text-green-500" />;
       case "comment":
         return <Bell className="h-4 w-4 text-purple-500" />;
+      case "tagged_comment":
+        return <MessageSquare className="h-4 w-4 text-amber-500" />;
       case "status_change":
         return <AlertCircle className="h-4 w-4 text-yellow-500" />;
       case "system":
@@ -115,11 +132,28 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
     }
   };
 
-  const handleNotificationClick = (notification: Notification) => {
+  const handleNotificationClick = async (notification: Notification) => {
     if (!notification.isRead) {
       markAsReadMutation.mutate(notification.id);
     }
     
+    if (notification.entityType === "tagged_comment" && notification.entityId) {
+      try {
+        const res = await fetch(`/api/crm/tagged-comments/lookup/${notification.entityId}`, { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.pageRoute) {
+            onClose();
+            const separator = data.pageRoute.includes("?") ? "&" : "?";
+            window.location.href = `${data.pageRoute}${separator}highlightComment=${notification.entityId}`;
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Failed to lookup tagged comment route:", err);
+      }
+    }
+
     const url = getEntityUrl(notification.entityType, notification.entityId);
     if (url) {
       onClose();
@@ -133,21 +167,6 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between p-4 border-b">
         <h2 className="text-lg font-semibold">Notifications</h2>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-xs"
-            onClick={() => markAllReadMutation.mutate()}
-            disabled={markAllReadMutation.isPending}
-          >
-            <CheckCheck className="h-4 w-4 mr-1" />
-            Mark all read
-          </Button>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
       </div>
 
       <div className="p-4 border-b space-y-3">
@@ -166,6 +185,7 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
             <SelectItem value="all">All Types</SelectItem>
             <SelectItem value="mention">Mentions</SelectItem>
             <SelectItem value="task_assigned">Tasks Assigned</SelectItem>
+            <SelectItem value="tagged_comment">Tagged Notes</SelectItem>
             <SelectItem value="comment">Comments</SelectItem>
             <SelectItem value="system">System</SelectItem>
           </SelectContent>
@@ -187,7 +207,7 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
             {filteredNotifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`p-4 cursor-pointer transition-colors hover:bg-muted ${
+                className={`p-4 cursor-pointer transition-colors hover:bg-muted group ${
                   !notification.isRead ? "border-l-4 border-l-primary bg-primary/5" : ""
                 }`}
                 onClick={() => handleNotificationClick(notification)}
@@ -216,6 +236,13 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
                       )}
                     </div>
                   </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(notification.id); }}
+                    className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-50 text-muted-foreground hover:text-red-500"
+                    title="Delete notification"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             ))}

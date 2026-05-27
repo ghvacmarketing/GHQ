@@ -195,8 +195,7 @@ const invoiceStatusColors: Record<string, { bg: string; text: string; border: st
 const priorityColors: Record<string, { bg: string; text: string }> = {
   low: { bg: "bg-slate-100", text: "text-slate-600" },
   normal: { bg: "bg-blue-100", text: "text-blue-700" },
-  high: { bg: "bg-orange-100", text: "text-orange-700" },
-  urgent: { bg: "bg-red-100", text: "text-red-700" },
+  high: { bg: "bg-red-100", text: "text-red-700" },
 };
 
 const visitTypeLabels: Record<string, string> = {
@@ -206,7 +205,7 @@ const visitTypeLabels: Record<string, string> = {
   SALES: "Sales",
 };
 
-const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+const PRIORITIES = ["low", "normal", "high"] as const;
 
 const WORK_SUBTYPE_TO_SERVICE_TYPE: Record<string, string> = {
   "No Heat": "NO_HEAT",
@@ -1336,7 +1335,6 @@ export default function CrmProjectDetail() {
                     <SelectItem value="low">Low</SelectItem>
                     <SelectItem value="normal">Normal</SelectItem>
                     <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

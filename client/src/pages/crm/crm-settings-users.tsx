@@ -229,8 +229,8 @@ export default function CrmSettingsUsers() {
   };
 
   const handleAddUser = () => {
-    if (!formData.name || !formData.email || !formData.password) {
-      toast({ title: "Error", description: "Name, email, and password are required.", variant: "destructive" });
+    if (!formData.name || !formData.email) {
+      toast({ title: "Error", description: "Name and email are required.", variant: "destructive" });
       return;
     }
     createUserMutation.mutate(formData);
@@ -465,15 +465,18 @@ export default function CrmSettingsUsers() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Password (optional)</Label>
               <Input
                 id="password"
                 type="password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="Enter password"
+                placeholder="Leave blank for Google sign-in only"
                 data-testid="input-user-password"
               />
+              <p className="text-xs text-slate-500">
+                Leave blank to require this user to sign in with Google.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone (optional)</Label>

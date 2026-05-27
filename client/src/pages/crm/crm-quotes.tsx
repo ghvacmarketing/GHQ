@@ -289,7 +289,11 @@ export default function CrmQuotes() {
       });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+        if (!old?.quotes) return old;
+        return { ...old, quotes: [data, ...old.quotes] };
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       setShowCreateDialog(false);
@@ -302,16 +306,31 @@ export default function CrmQuotes() {
   });
 
   const deleteQuoteMutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id }: { id: string; customerId?: string | null }) => {
       await apiRequest("DELETE", `/api/crm/quotes/${id}`);
     },
-    onSuccess: () => {
+    onMutate: async ({ id }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/quotes"] });
+      const snapshots = queryClient.getQueriesData({ queryKey: ["/api/crm/quotes"] });
+      queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+        if (!old?.quotes) return old;
+        return { ...old, quotes: old.quotes.filter((q: any) => q.id !== id) };
+      });
+      setSelectedQuote(null);
+      return { snapshots };
+    },
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
-      setSelectedQuote(null);
+      if (variables.customerId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", { customerId: variables.customerId }] });
+      }
       toast({ title: "Quote deleted successfully" });
     },
-    onError: () => {
+    onError: (_err, _vars, context: any) => {
+      context?.snapshots?.forEach(([key, data]: [any, any]) => {
+        queryClient.setQueryData(key, data);
+      });
       toast({ title: "Failed to delete quote", variant: "destructive" });
     },
   });
@@ -588,7 +607,7 @@ export default function CrmQuotes() {
 
         {/* Tab Filters with Quote Type dropdown on right */}
         <div className="flex items-center justify-between border-b border-slate-200">
-          <div className="flex overflow-x-auto">
+          <div className="flex overflow-x-auto overflow-y-hidden">
             {tabFilters.map((tab) => {
               const count = tab.key !== "all" ? statusCounts[tab.key as keyof typeof statusCounts] : null;
               
@@ -792,26 +811,22 @@ export default function CrmQuotes() {
                 Page {page} of {totalPages}
               </p>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
+                <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
                   data-testid="button-prev-page"
+                  className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
                   data-testid="button-next-page"
+                  className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
+                  <ChevronRight className="h-5 w-5" />
+                </button>
               </div>
             </div>
           )}
@@ -844,7 +859,7 @@ export default function CrmQuotes() {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => deleteQuoteMutation.mutate(selectedQuote.id)}
+                    onClick={() => deleteQuoteMutation.mutate({ id: selectedQuote.id, customerId: selectedQuote.customerId })}
                     disabled={deleteQuoteMutation.isPending}
                     className="text-red-600 hover:text-red-700"
                     data-testid="button-delete-quote"

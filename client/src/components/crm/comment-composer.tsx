@@ -2,11 +2,10 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react";
+import { Loader2, Send } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface CommentComposerProps {
@@ -89,7 +88,7 @@ export function CommentComposer({
   entityType,
   entityId,
   onCommentPosted,
-  placeholder = "Write a comment… Use @ to mention a teammate.",
+  placeholder = "Add a note…",
 }: CommentComposerProps) {
   const [value, setValue] = useState("");
   const [showMentionPicker, setShowMentionPicker] = useState(false);
@@ -97,7 +96,7 @@ export function CommentComposer({
   const [mentionStartIndex, setMentionStartIndex] = useState<number | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [insertedMentions, setInsertedMentions] = useState<Map<string, string>>(new Map());
-  
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
 
@@ -120,6 +119,7 @@ export function CommentComposer({
       setValue("");
       setInsertedMentions(new Map());
       queryClient.invalidateQueries({ queryKey: ["/api/crm/comments", entityType, entityId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", entityId, "timeline"] });
       onCommentPosted?.();
     },
   });
@@ -128,6 +128,11 @@ export function CommentComposer({
     const newValue = e.target.value;
     const cursorPos = e.target.selectionStart;
     setValue(newValue);
+
+    // Auto-resize
+    const el = e.target;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
 
     const textBeforeCursor = newValue.slice(0, cursorPos);
     const atIndex = textBeforeCursor.lastIndexOf("@");
@@ -175,6 +180,11 @@ export function CommentComposer({
   }, [mentionStartIndex, mentionQuery, value]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey && !showMentionPicker) {
+      e.preventDefault();
+      if (value.trim()) postCommentMutation.mutate(value);
+      return;
+    }
     if (!showMentionPicker) return;
 
     switch (e.key) {
@@ -205,7 +215,7 @@ export function CommentComposer({
         }
         break;
     }
-  }, [showMentionPicker, users, selectedIndex, insertMention]);
+  }, [showMentionPicker, users, selectedIndex, insertMention, value, postCommentMutation]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -234,40 +244,28 @@ export function CommentComposer({
     postCommentMutation.mutate(value);
   };
 
-  const renderDisplayValue = () => {
-    if (!value) return null;
-    const mentions = Array.from(insertedMentions.entries()).map(([userId, userName]) => ({
-      userId,
-      userName,
-    }));
-    return renderCommentBody(value, mentions);
-  };
-
   const isButtonDisabled = !value.trim() || postCommentMutation.isPending;
 
   return (
     <div className="relative">
-      <div className="space-y-3">
-        {insertedMentions.size > 0 && value && (
-          <div className="p-3 bg-muted/50 rounded-md border text-sm whitespace-pre-wrap">
-            <div className="text-xs text-muted-foreground mb-1">Preview:</div>
-            {renderDisplayValue()}
-          </div>
-        )}
-        <div className="relative">
-          <Textarea
+      {/* Single-row pill: input + send button in one bordered container */}
+      <div className="flex items-center rounded-lg border border-input bg-background focus-within:ring-1 focus-within:ring-ring overflow-hidden">
+        <div className="relative flex-1">
+          <textarea
             ref={textareaRef}
             value={value}
             onChange={handleTextareaChange}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
-            className="min-h-[100px] resize-none"
+            rows={1}
+            className="w-full resize-none bg-transparent px-3 py-2 text-sm leading-relaxed placeholder:text-muted-foreground focus:outline-none overflow-hidden"
+            style={{ minHeight: "38px", maxHeight: "120px" }}
           />
 
           {showMentionPicker && (
             <Card
               ref={pickerRef}
-              className="absolute left-0 right-0 top-full mt-1 z-50 max-h-[200px] overflow-y-auto shadow-lg"
+              className="absolute left-0 right-0 bottom-full mb-1 z-50 max-h-[200px] overflow-y-auto shadow-lg"
             >
               {isSearching ? (
                 <div className="flex items-center justify-center p-4">
@@ -289,15 +287,13 @@ export function CommentComposer({
                       onClick={() => insertMention(user)}
                       onMouseEnter={() => setSelectedIndex(index)}
                     >
-                      <Avatar className="h-8 w-8">
+                      <Avatar className="h-6 w-6">
                         <AvatarFallback className="text-xs">
                           {getInitials(user.name)}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm truncate">{user.name}</div>
-                      </div>
-                      <Badge variant={getRoleBadgeVariant(user.role)} className="text-xs capitalize">
+                      <span className="font-medium text-sm truncate">{user.name}</span>
+                      <Badge variant={getRoleBadgeVariant(user.role)} className="text-xs capitalize ml-auto">
                         {user.role}
                       </Badge>
                     </button>
@@ -308,30 +304,26 @@ export function CommentComposer({
           )}
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="text-xs text-muted-foreground">
-            {insertedMentions.size > 0 && (
-              <span>
-                Mentioning: {Array.from(insertedMentions.values()).join(", ")}
-              </span>
-            )}
-          </div>
-          <Button
-            onClick={handlePost}
-            disabled={isButtonDisabled}
-            size="sm"
-          >
-            {postCommentMutation.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                Posting...
-              </>
-            ) : (
-              "Post"
-            )}
-          </Button>
-        </div>
+        {/* Send button — sits flush at the right edge of the pill, vertically centred */}
+        <button
+          type="button"
+          onClick={handlePost}
+          disabled={isButtonDisabled}
+          className="self-center mr-2 flex-shrink-0 rounded-md p-1.5 text-[#711419] hover:bg-[#711419]/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          {postCommentMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
+        </button>
       </div>
+
+      {insertedMentions.size > 0 && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Mentioning: {Array.from(insertedMentions.values()).join(", ")}
+        </p>
+      )}
     </div>
   );
 }

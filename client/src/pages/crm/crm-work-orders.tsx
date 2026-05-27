@@ -80,7 +80,7 @@ import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, isToday, isThisWe
 import { createLocalDateTime, formatLocalDateTime } from "@/lib/timezone";
 import type { CrmUser, CrmWorkOrder, CrmJob, CrmCustomer, CrmProperty, CrmProject } from "@shared/schema";
 
-const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+const PRIORITIES = ["low", "normal", "high"] as const;
 
 const WORK_SUBTYPE_TO_SERVICE_TYPE: Record<string, string> = {
   "No Heat": "NO_HEAT",
@@ -177,17 +177,16 @@ const visitTypeLabels: Record<string, string> = {
 };
 
 const visitTypeColors: Record<string, { bg: string; text: string }> = {
-  SERVICE: { bg: "bg-blue-50", text: "text-blue-700" },
-  INSTALL: { bg: "bg-green-50", text: "text-green-700" },
-  MAINTENANCE: { bg: "bg-amber-50", text: "text-amber-700" },
-  SALES: { bg: "bg-purple-50", text: "text-purple-700" },
+  SERVICE: { bg: "bg-sky-50", text: "text-sky-700" },
+  INSTALL: { bg: "bg-blue-50", text: "text-blue-700" },
+  MAINTENANCE: { bg: "bg-emerald-50", text: "text-emerald-700" },
+  SALES: { bg: "bg-indigo-50", text: "text-indigo-700" },
 };
 
 const priorityColors: Record<string, { bg: string; text: string }> = {
   low: { bg: "bg-slate-100", text: "text-slate-600" },
   normal: { bg: "bg-blue-100", text: "text-blue-700" },
   high: { bg: "bg-orange-100", text: "text-orange-700" },
-  urgent: { bg: "bg-red-100", text: "text-red-700" },
 };
 
 type FilterTab = "all" | "scheduled" | "in_progress" | "completed" | "ready_to_invoice" | "invoiced" | "closed" | "cancelled" | "unassigned";
@@ -708,6 +707,16 @@ export default function CrmWorkOrders() {
         const woNumber = wo.workOrderNumber?.toLowerCase().includes(searchLower);
         return titleMatch || descMatch || customerMatch || woNumber;
       });
+      // Exact/starts-with matches first
+      orders = [...orders].sort((a, b) => {
+        const aTitle = (a.title || "").toLowerCase();
+        const bTitle = (b.title || "").toLowerCase();
+        const aCust = (a.customer?.name || "").toLowerCase();
+        const bCust = (b.customer?.name || "").toLowerCase();
+        const aScore = aTitle === searchLower ? 0 : aCust === searchLower ? 1 : aTitle.startsWith(searchLower) ? 2 : aCust.startsWith(searchLower) ? 3 : 4;
+        const bScore = bTitle === searchLower ? 0 : bCust === searchLower ? 1 : bTitle.startsWith(searchLower) ? 2 : bCust.startsWith(searchLower) ? 3 : 4;
+        return aScore - bScore;
+      });
     }
     
     // Apply category filter
@@ -750,10 +759,16 @@ export default function CrmWorkOrders() {
       );
     }
     
+    const now = Date.now();
     return orders.sort((a, b) => {
       const dateA = a.scheduledStart ? new Date(a.scheduledStart).getTime() : 0;
       const dateB = b.scheduledStart ? new Date(b.scheduledStart).getTime() : 0;
-      return dateA - dateB;
+      const aUpcoming = dateA >= now;
+      const bUpcoming = dateB >= now;
+      if (aUpcoming && !bUpcoming) return -1;
+      if (!aUpcoming && bUpcoming) return 1;
+      if (aUpcoming && bUpcoming) return dateA - dateB;
+      return dateB - dateA;
     });
   }, [workOrdersData, activeTab, debouncedSearch, visitTypeFilter]);
 
@@ -1257,7 +1272,7 @@ export default function CrmWorkOrders() {
         </div>
 
         {/* Tabs styled like projects/customers page - underline style */}
-        <div className="flex overflow-x-auto border-b border-slate-200">
+        <div className="flex overflow-x-auto overflow-y-hidden border-b border-slate-200">
           {(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => (
             <button
               key={tab}
@@ -1856,7 +1871,15 @@ export default function CrmWorkOrders() {
                           <CommandEmpty>No customers found.</CommandEmpty>
                         ) : (
                           <CommandGroup>
-                            {customers.map((customer) => (
+                            {[...customers].sort((a, b) => {
+                              const t = debouncedCustomerSearch.trim().toLowerCase();
+                              if (!t) return 0;
+                              const aName = (a.name || "").toLowerCase();
+                              const bName = (b.name || "").toLowerCase();
+                              if ((aName === t) !== (bName === t)) return (aName === t) ? -1 : 1;
+                              if (aName.startsWith(t) !== bName.startsWith(t)) return aName.startsWith(t) ? -1 : 1;
+                              return 0;
+                            }).map((customer) => (
                               <CommandItem
                                 key={customer.id}
                                 value={customer.id}

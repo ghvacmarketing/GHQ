@@ -498,7 +498,15 @@ export default function CrmAgreementCreate() {
                                 const displayList = selectedCustomer && !selectedInList 
                                   ? [selectedCustomer, ...customerList]
                                   : customerList;
-                                return displayList.map((customer) => (
+                                const sortedList = debouncedCustomerSearch.trim() ? [...displayList].sort((a, b) => {
+                                  const t = debouncedCustomerSearch.trim().toLowerCase();
+                                  const aName = (a.name || "").toLowerCase();
+                                  const bName = (b.name || "").toLowerCase();
+                                  if ((aName === t) !== (bName === t)) return (aName === t) ? -1 : 1;
+                                  if (aName.startsWith(t) !== bName.startsWith(t)) return aName.startsWith(t) ? -1 : 1;
+                                  return 0;
+                                }) : displayList;
+                                return sortedList.map((customer) => (
                                 <div
                                   key={customer.id}
                                   className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-slate-100 ${

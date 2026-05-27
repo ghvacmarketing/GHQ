@@ -216,6 +216,15 @@ export default function CrmAccountCreate() {
   }>>([]);
   const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
 
+  // Pre-populate parentAccountId from URL param (e.g. when coming from "Add Sub-Account" button)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const parentId = params.get("parentId");
+    if (parentId) {
+      setFormData(prev => ({ ...prev, parentAccountId: parentId }));
+    }
+  }, []);
+
   // Auto-focus first input when step changes
   useEffect(() => {
     setTimeout(() => {

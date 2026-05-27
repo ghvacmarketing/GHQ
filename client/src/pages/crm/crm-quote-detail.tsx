@@ -69,6 +69,7 @@ import {
   Package,
   Search,
   Tag,
+  Star,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -97,6 +98,8 @@ import { PaymentLinkButton } from "@/components/stripe-payment-link-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import RichTextEditor, { RichTextDisplay } from "@/components/rich-text-editor";
 import ghvacLogo from "@assets/ghvac-logo.png";
+import { generateContractTemplate, applyTemplateVariables } from "@/lib/contract-template";
+import type { ProposalTemplate } from "@shared/schema";
 import {
   BRAND_COLOR,
   COMPANY_INFO,
@@ -176,7 +179,7 @@ export default function CrmQuoteDetail() {
     if (fromCustomer && customerIdParam) {
       navigate(`/crm/customers/${customerIdParam}?tab=${tabParam || "quotes"}`);
     } else {
-      window.history.back();
+      navigate("/crm/quotes");
     }
   };
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -212,6 +215,8 @@ export default function CrmQuoteDetail() {
   const [presentationName, setPresentationName] = useState("");
   const [presentationAgreed, setPresentationAgreed] = useState(false);
   const [presentationSelectedOption, setPresentationSelectedOption] = useState<string | null>(null);
+  const [isPresentationEditingDesc, setIsPresentationEditingDesc] = useState(false);
+  const [presentationDescDraft, setPresentationDescDraft] = useState("");
   const [showWhatsIncludedDialog, setShowWhatsIncludedDialog] = useState(false);
   const [editingWhatsIncluded, setEditingWhatsIncluded] = useState<Array<{ category: string; items: string[] }>>([]);
   const [showWarrantiesDialog, setShowWarrantiesDialog] = useState(false);
@@ -224,6 +229,20 @@ export default function CrmQuoteDetail() {
   const [editingLineItemData, setEditingLineItemData] = useState<{ description: string; quantity: string; unitPrice: string }>({ description: "", quantity: "", unitPrice: "" });
   const [isAddingNewLineItem, setIsAddingNewLineItem] = useState(false);
   const [newLineItemData, setNewLineItemData] = useState<{ description: string; quantity: string; unitPrice: string }>({ description: "", quantity: "1", unitPrice: "" });
+  const [newItemOptionTag, setNewItemOptionTag] = useState<string>("");
+  const [newItemOptionTagCreating, setNewItemOptionTagCreating] = useState(false);
+  const [catalogItemOptionTag, setCatalogItemOptionTag] = useState<string>("");
+  const [catalogItemOptionTagCreating, setCatalogItemOptionTagCreating] = useState(false);
+
+  const [showManualSignatureDialog, setShowManualSignatureDialog] = useState(false);
+  const [manualSignature, setManualSignature] = useState("");
+  const [manualSignerName, setManualSignerName] = useState("");
+  const [pendingManualOption, setPendingManualOption] = useState<string | null>(null);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+
+  const { data: proposalTemplates = [], isLoading: templatesLoading } = useQuery<ProposalTemplate[]>({
+    queryKey: ["/api/crm/proposal-templates"],
+  });
 
   // Items catalog state
   const [showItemsCatalogDialog, setShowItemsCatalogDialog] = useState(false);
@@ -271,8 +290,15 @@ export default function CrmQuoteDetail() {
       return res.json();
     },
     enabled: !!quoteId && !!currentUser,
-    staleTime: 2 * 60 * 1000, // Cache for 2 minutes for better performance
-    refetchInterval: 60000, // Only refresh every 60 seconds instead of 10
+    staleTime: 2 * 60 * 1000,
+    refetchInterval: (query) => {
+      const data = query.state.data as QuoteWithLines | undefined;
+      // Poll every 3 seconds when a Stripe payment link is open and deposit hasn't landed yet
+      if (data?.stripePaymentLinkId && !data?.depositPaidAt && data?.status !== "accepted") {
+        return 3000;
+      }
+      return 60000;
+    },
   });
 
   const { data: emailLogs = [], isLoading: emailLogsLoading } = useQuery<QuoteEmailLog[]>({
@@ -338,13 +364,24 @@ export default function CrmQuoteDetail() {
       }
       return res.json();
     },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      const prev = queryClient.getQueryData(["/api/crm/quotes", quoteId]);
+      queryClient.setQueryData(["/api/crm/quotes", quoteId], (old: any) => old ? { ...old, status: "sent" } : old);
+      queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+        if (!old?.quotes) return old;
+        return { ...old, quotes: old.quotes.map((q: any) => q.id === quoteId ? { ...q, status: "sent" } : q) };
+      });
+      return { prev };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Quote sent", description: "Quote status updated to sent." });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _vars, context: any) => {
+      if (context?.prev) queryClient.setQueryData(["/api/crm/quotes", quoteId], context.prev);
       toast({ title: "Failed to send quote", description: error.message, variant: "destructive" });
     },
   });
@@ -362,6 +399,16 @@ export default function CrmQuoteDetail() {
         throw new Error(result.error || result.message || "Failed to send quote");
       }
       return result as { success: boolean; successCount: number; totalCount: number; emailSent?: boolean; smsSent?: boolean };
+    },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      const prev = queryClient.getQueryData(["/api/crm/quotes", quoteId]);
+      queryClient.setQueryData(["/api/crm/quotes", quoteId], (old: any) => old ? { ...old, status: "sent" } : old);
+      queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+        if (!old?.quotes) return old;
+        return { ...old, quotes: old.quotes.map((q: any) => q.id === quoteId ? { ...q, status: "sent" } : q) };
+      });
+      return { prev };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
@@ -386,7 +433,8 @@ export default function CrmQuoteDetail() {
       }
       toast({ title: "Quote sent!", description });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _vars, context: any) => {
+      if (context?.prev) queryClient.setQueryData(["/api/crm/quotes", quoteId], context.prev);
       toast({ title: "Failed to send quote", description: error.message, variant: "destructive" });
     },
   });
@@ -405,6 +453,16 @@ export default function CrmQuoteDetail() {
       }
       return result;
     },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      const prev = queryClient.getQueryData(["/api/crm/quotes", quoteId]);
+      queryClient.setQueryData(["/api/crm/quotes", quoteId], (old: any) => old ? { ...old, status: "sent" } : old);
+      queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+        if (!old?.quotes) return old;
+        return { ...old, quotes: old.quotes.map((q: any) => q.id === quoteId ? { ...q, status: "sent" } : q) };
+      });
+      return { prev };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
@@ -414,7 +472,8 @@ export default function CrmQuoteDetail() {
       setMarkSentNote("");
       toast({ title: "Quote marked as sent", description: "The quote status has been updated to sent." });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _vars, context: any) => {
+      if (context?.prev) queryClient.setQueryData(["/api/crm/quotes", quoteId], context.prev);
       toast({ title: "Failed to mark as sent", description: error.message, variant: "destructive" });
     },
   });
@@ -463,6 +522,7 @@ export default function CrmQuoteDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       setIsEditingDescription(false);
+      setIsPresentationEditingDesc(false);
       toast({ title: "Description updated", description: "The quote description has been saved." });
     },
     onError: (error: Error) => {
@@ -696,7 +756,7 @@ export default function CrmQuoteDetail() {
   });
 
   const addLineItemMutation = useMutation({
-    mutationFn: async (data: { description: string; quantity: string; unitPrice: string; lineTotal: string }) => {
+    mutationFn: async (data: { description: string; quantity: string; unitPrice: string; lineTotal: string; optionTag?: string }) => {
       const res = await fetch(`/api/crm/quotes/${quoteId}/line-items`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -706,6 +766,7 @@ export default function CrmQuoteDetail() {
           quantity: data.quantity,
           unitPrice: data.unitPrice,
           lineTotal: data.lineTotal,
+          ...(data.optionTag ? { optionTag: data.optionTag } : {}),
         }),
       });
       const result = await res.json();
@@ -718,6 +779,8 @@ export default function CrmQuoteDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       setIsAddingNewLineItem(false);
       setNewLineItemData({ description: "", quantity: "1", unitPrice: "" });
+      setNewItemOptionTag("");
+      setNewItemOptionTagCreating(false);
       toast({ title: "Line item added", description: "The new line item has been added to the quote." });
     },
     onError: (error: Error) => {
@@ -744,7 +807,7 @@ export default function CrmQuoteDetail() {
   });
 
   const addFromCatalogMutation = useMutation({
-    mutationFn: async (item: CrmItem) => {
+    mutationFn: async ({ item, optionTag }: { item: CrmItem; optionTag?: string }) => {
       const price = parseFloat(item.rate || "0");
       const res = await apiRequest("POST", `/api/crm/quotes/${quoteId}/line-items`, {
         description: item.name,
@@ -753,6 +816,7 @@ export default function CrmQuoteDetail() {
         lineTotal: price.toString(),
         lineType: item.category || "install",
         itemId: item.id,
+        ...(optionTag ? { optionTag } : {}),
       });
       return res.json();
     },
@@ -761,6 +825,8 @@ export default function CrmQuoteDetail() {
       setShowItemsCatalogDialog(false);
       setItemSearch("");
       setCategoryFilter("all");
+      setCatalogItemOptionTag("");
+      setCatalogItemOptionTagCreating(false);
       toast({ title: "Item added from catalog" });
     },
     onError: (error: any) => {
@@ -903,12 +969,15 @@ export default function CrmQuoteDetail() {
       quantity: quantity.toString(),
       unitPrice: unitPrice.toString(),
       lineTotal: lineTotal.toString(),
+      optionTag: newItemOptionTag || undefined,
     });
   };
 
   const handleCancelAddLineItem = () => {
     setIsAddingNewLineItem(false);
     setNewLineItemData({ description: "", quantity: "1", unitPrice: "" });
+    setNewItemOptionTag("");
+    setNewItemOptionTagCreating(false);
   };
 
   const calculateLineItemsSubtotal = () => {
@@ -959,6 +1028,10 @@ export default function CrmQuoteDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId, "email-logs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
+      const customerId = quote?.customerId || quote?.accountId;
+      if (customerId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "timeline"] });
+      }
       setShowPresentation(false);
       setPresentationSignature("");
       setPresentationName("");
@@ -1098,12 +1171,26 @@ export default function CrmQuoteDetail() {
       }
       return data;
     },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      const prev = queryClient.getQueryData(["/api/crm/quotes", quoteId]);
+      queryClient.setQueryData(["/api/crm/quotes", quoteId], (old: any) => old ? { ...old, status: "accepted" } : old);
+      queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+        if (!old?.quotes) return old;
+        return { ...old, quotes: old.quotes.map((q: any) => q.id === quoteId ? { ...q, status: "accepted" } : q) };
+      });
+      return { prev };
+    },
     onSuccess: (data) => {
       setShowAcceptOptionSelection(false);
       setSelectedOption("");
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
+      const acceptCustomerId = quote?.customerId || quote?.accountId;
+      if (acceptCustomerId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", acceptCustomerId, "timeline"] });
+      }
       toast({ title: "Quote accepted", description: "Quote status updated to accepted." });
 
       if (data.requiresFollowUpChoice && data.followUpContext) {
@@ -1137,7 +1224,8 @@ export default function CrmQuoteDetail() {
         setShowCreateProjectPrompt(true);
       }
     },
-    onError: (error: { message?: string; requiresOptionSelection?: boolean; availableOptions?: string[] } | Error) => {
+    onError: (error: { message?: string; requiresOptionSelection?: boolean; availableOptions?: string[] } | Error, _vars: any, context: any) => {
+      if (context?.prev) queryClient.setQueryData(["/api/crm/quotes", quoteId], context.prev);
       if ('requiresOptionSelection' in error && error.requiresOptionSelection && error.availableOptions) {
         setAvailableOptions(error.availableOptions);
         setShowAcceptOptionSelection(true);
@@ -1268,13 +1356,24 @@ export default function CrmQuoteDetail() {
       }
       return res.json();
     },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      const prev = queryClient.getQueryData(["/api/crm/quotes", quoteId]);
+      queryClient.setQueryData(["/api/crm/quotes", quoteId], (old: any) => old ? { ...old, status: "declined" } : old);
+      queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+        if (!old?.quotes) return old;
+        return { ...old, quotes: old.quotes.map((q: any) => q.id === quoteId ? { ...q, status: "declined" } : q) };
+      });
+      return { prev };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Quote declined", description: "Quote status updated to declined." });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _vars, context: any) => {
+      if (context?.prev) queryClient.setQueryData(["/api/crm/quotes", quoteId], context.prev);
       toast({ title: "Failed to decline quote", description: error.message, variant: "destructive" });
     },
   });
@@ -1318,8 +1417,26 @@ export default function CrmQuoteDetail() {
     markAsSentMutation.mutate({ note: markSentNote.trim() || undefined });
   };
 
+  const DEPOSIT_QUOTE_TYPES = ["custom_install", "proposal", "custom_service"];
+
   const handleApprove = () => {
-    acceptMutation.mutate({});
+    const isDepositType = DEPOSIT_QUOTE_TYPES.includes(quote?.quoteType?.toLowerCase() || "");
+    if (isDepositType) {
+      if (quote?.quoteMode === "options") {
+        const opts = [...new Set(
+          (quote?.lineItems || [])
+            .map((li: any) => li.optionTag)
+            .filter((tag: any): tag is string => !!tag)
+        )];
+        setAvailableOptions(opts);
+      } else {
+        setAvailableOptions([]);
+      }
+      setPendingManualOption(null);
+      setShowManualSignatureDialog(true);
+    } else {
+      acceptMutation.mutate({});
+    }
   };
 
   const handleConfirmAcceptOption = () => {
@@ -1328,6 +1445,26 @@ export default function CrmQuoteDetail() {
       return;
     }
     acceptMutation.mutate({ selectedOption });
+  };
+
+  const handleConfirmManualSignature = () => {
+    if (!manualSignature) {
+      toast({ title: "Signature required", description: "Please have the client sign before accepting.", variant: "destructive" });
+      return;
+    }
+    if (!manualSignerName.trim()) {
+      toast({ title: "Name required", description: "Please enter the client's printed name.", variant: "destructive" });
+      return;
+    }
+    acceptInPersonMutation.mutate({
+      signatureImage: manualSignature,
+      signerName: manualSignerName.trim(),
+      selectedOption: pendingManualOption || undefined,
+    });
+    setShowManualSignatureDialog(false);
+    setManualSignature("");
+    setManualSignerName("");
+    setPendingManualOption(null);
   };
 
   const handleDecline = () => {
@@ -1343,13 +1480,25 @@ export default function CrmQuoteDetail() {
       }
       return res.json();
     },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/quotes"] });
+      const snapshots = queryClient.getQueriesData({ queryKey: ["/api/crm/quotes"] });
+      queryClient.setQueriesData({ queryKey: ["/api/crm/quotes"] }, (old: any) => {
+        if (!old?.quotes) return old;
+        return { ...old, quotes: old.quotes.filter((q: any) => q.id !== quoteId) };
+      });
+      navigate("/crm/quotes");
+      return { snapshots };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Quote deleted", description: "The quote has been permanently deleted." });
-      navigate("/crm/quotes");
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _vars, context: any) => {
+      context?.snapshots?.forEach(([key, data]: [any, any]) => {
+        queryClient.setQueryData(key, data);
+      });
       toast({ title: "Failed to delete quote", description: error.message, variant: "destructive" });
     },
   });
@@ -1565,8 +1714,47 @@ export default function CrmQuoteDetail() {
     }
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!quote) return;
+
+    // Load logo, recolor every opaque pixel to white (so it sits directly on the
+    // dark-red bar without any background box), and capture the aspect ratio.
+    let logoDataUrl: string | null = null;
+    let logoAspect = 4; // fallback width:height ratio
+    try {
+      const whiteLogoDataUrl = await new Promise<string>((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext("2d")!;
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const d = imageData.data;
+          for (let i = 0; i < d.length; i += 4) {
+            if (d[i + 3] > 10) { // non-transparent pixel → make it white
+              d[i] = 255; d[i + 1] = 255; d[i + 2] = 255;
+            }
+          }
+          ctx.putImageData(imageData, 0, 0);
+          resolve(canvas.toDataURL("image/png"));
+        };
+        img.onerror = reject;
+        img.src = ghvacLogo;
+      });
+      logoDataUrl = whiteLogoDataUrl;
+      // Measure natural dimensions so we don't squish the image
+      logoAspect = await new Promise<number>((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img.naturalWidth / img.naturalHeight);
+        img.onerror = () => resolve(4);
+        img.src = ghvacLogo;
+      });
+    } catch {
+      // Fall back to plain text if canvas recoloring fails
+    }
 
     try {
       const doc = new jsPDF();
@@ -1586,35 +1774,37 @@ export default function CrmQuoteDetail() {
 
       const addPageHeader = () => {
         doc.setFillColor(...brandColor);
-        doc.roundedRect(margin, y, contentWidth, 28, 3, 3, 'F');
-        
-        doc.setFontSize(20);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(255, 255, 255);
-        doc.text("Giesbrecht HVAC", margin + 8, y + 12);
-        
+        doc.roundedRect(margin, y, contentWidth, 22, 3, 3, 'F');
+
+        // Left side: logo directly on the dark red bar, sized by natural aspect ratio
+        if (logoDataUrl) {
+          const logoH = 14; // mm — fits comfortably in the 22 mm bar
+          const logoW = logoH * logoAspect;
+          doc.addImage(logoDataUrl, 'PNG', margin + 4, y + 4, logoW, logoH);
+        } else {
+          doc.setFontSize(16);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(255, 255, 255);
+          doc.text("Giesbrecht HVAC", margin + 6, y + 13);
+        }
+
+        // Right side: phone only (minimal)
         doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(220, 220, 220);
-        doc.text("PO Box 917, Wrens, GA 30833", margin + 8, y + 20);
-
-        doc.setFontSize(9);
-        doc.text("(706) 826-0644", pageWidth - margin - 8, y + 10, { align: 'right' });
-        doc.text("chandler@ghvacinc.com", pageWidth - margin - 8, y + 15, { align: 'right' });
-        doc.text("www.ghvacinc.com", pageWidth - margin - 8, y + 20, { align: 'right' });
+        doc.text("(706) 826-0644", pageWidth - margin - 6, y + 10, { align: 'right' });
+        doc.text("chandler@ghvacinc.com", pageWidth - margin - 6, y + 16, { align: 'right' });
       };
 
       const checkPageBreak = (neededSpace: number) => {
         if (y + neededSpace > pageHeight - 45) {
           doc.addPage();
           y = margin;
-          addPageHeader();
-          y += 35;
         }
       };
 
       addPageHeader();
-      y += 35;
+      y += 28;
 
       // Add diagonal APPROVED stamp across all pages if quote is accepted or converted
       const addApprovedStampToAllPages = () => {
@@ -1990,6 +2180,265 @@ export default function CrmQuoteDetail() {
         }
 
         y += boxHeight + 8;
+
+        // Description/notes section (for proposal and custom_install quotes)
+        if (quote.description) {
+          // Detect contract template so we can render it with styled formatting
+          const isContractTemplate =
+            quote.description.includes("GIESBRECHT HVAC") &&
+            quote.description.includes("INSTALLATION AGREEMENT");
+
+          // ── Helpers ─────────────────────────────────────────────────────────
+          const decodeEntities = (s: string) =>
+            s.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+             .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').trim();
+          const stripTags = (s: string) => s.replace(/<[^>]*>/g, '');
+          const plainText = (raw: string) => decodeEntities(stripTags(raw));
+
+          // Parse inline HTML into bold/normal text segments
+          type Seg = { text: string; bold: boolean };
+          const parseInline = (html: string): Seg[] => {
+            const dec = (s: string) =>
+              s.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+               .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+               .replace(/\n/g, ' ');
+            const marked = html
+              .replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, '\x01$1\x01')
+              .replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, '\x01$1\x01')
+              .replace(/<[^>]*>/g, '');
+            return marked.split('\x01')
+              .map((part, i) => ({ text: dec(part), bold: i % 2 === 1 }))
+              .filter(s => s.text.length > 0);
+          };
+
+          // Render inline segments using (and modifying) outer y
+          // Handles both uniform and mixed-bold content with word-wrap
+          type PdfRenderOpts = { x: number; maxW: number; fs: number };
+          const renderSegs = (segs: Seg[], opts: PdfRenderOpts): void => {
+            if (segs.length === 0) return;
+            const { x, maxW, fs } = opts;
+            const lh = fs * 0.42 + 1.5;
+            doc.setFontSize(fs);
+            const pb = () => { if (y + lh > pageHeight - 45) { doc.addPage(); y = margin; } };
+            // All same weight → use splitTextToSize for perfect wrapping
+            if (segs.every(s => s.bold === segs[0].bold)) {
+              doc.setFont("helvetica", segs[0].bold ? "bold" : "normal");
+              const txt = segs.map(s => s.text).join('');
+              doc.splitTextToSize(txt, maxW).forEach((ln: string) => {
+                pb(); doc.text(ln, x, y); y += lh;
+              });
+              return;
+            }
+            // Mixed bold → word-by-word tracking
+            let cx = x;
+            for (const seg of segs) {
+              doc.setFont("helvetica", seg.bold ? "bold" : "normal");
+              for (const tok of seg.text.split(/(\s+)/)) {
+                if (!tok) continue;
+                const tw = doc.getTextWidth(tok);
+                const isWS = /^\s+$/.test(tok);
+                if (!isWS && cx + tw > x + maxW && cx > x) {
+                  cx = x; y += lh; pb();
+                }
+                if (!(isWS && cx === x)) { doc.text(tok, cx, y); cx += tw; }
+              }
+            }
+            y += lh;
+          };
+
+          // ── Block parser ─────────────────────────────────────────────────────
+          type PdfBlock = {
+            type: 'h1' | 'h2' | 'h3' | 'p' | 'li' | 'ol_li' | 'hr';
+            text: string; rawHtml: string; number?: number;
+          };
+          const parseHtmlBlocks = (html: string): PdfBlock[] => {
+            const blocks: PdfBlock[] = [];
+            let olNum = 0, inOl = false;
+            const proc = html
+              .replace(/<hr\s*\/?>/gi, '\x00HR\x00')
+              .replace(/<ol[^>]*>/gi, '\x00OLSTART\x00')
+              .replace(/<\/ol>/gi, '\x00OLEND\x00')
+              .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, (_, c) => `\x00H1:${c}\x00`)
+              .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, (_, c) => `\x00H2:${c}\x00`)
+              .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, (_, c) => `\x00H3:${c}\x00`)
+              .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (_, c) => `\x00LI:${c}\x00`)
+              .replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, (_, c) => `\x00PP:${c}\x00`);
+            for (const part of proc.split('\x00').filter(p => p.trim())) {
+              if (part === 'HR') { blocks.push({ type: 'hr', text: '', rawHtml: '' }); }
+              else if (part === 'OLSTART') { inOl = true; olNum = 0; }
+              else if (part === 'OLEND')   { inOl = false; olNum = 0; }
+              else if (part.startsWith('H1:')) { const r = part.slice(3); blocks.push({ type: 'h1', text: plainText(r), rawHtml: r }); }
+              else if (part.startsWith('H2:')) { const r = part.slice(3); blocks.push({ type: 'h2', text: plainText(r), rawHtml: r }); }
+              else if (part.startsWith('H3:')) { const r = part.slice(3); blocks.push({ type: 'h3', text: plainText(r), rawHtml: r }); }
+              else if (part.startsWith('LI:')) {
+                const r = part.slice(3); const t = plainText(r);
+                if (t) {
+                  if (inOl) { olNum++; blocks.push({ type: 'ol_li', text: t, rawHtml: r, number: olNum }); }
+                  else       { blocks.push({ type: 'li',    text: t, rawHtml: r }); }
+                }
+              }
+              else if (part.startsWith('PP:')) {
+                const r = part.slice(3);
+                blocks.push({ type: 'p', text: plainText(r), rawHtml: r });
+              }
+            }
+            return blocks;
+          };
+
+          // ── Render ───────────────────────────────────────────────────────────
+          const blocks = parseHtmlBlocks(quote.description);
+          if (blocks.length > 0) {
+            if (!isContractTemplate) {
+              doc.setFontSize(11);
+              doc.setFont("helvetica", "bold");
+              doc.setTextColor(...textColor);
+              doc.text("Description", margin, y);
+              y += 6;
+            }
+
+            for (const block of blocks) {
+
+              // ── HR ───────────────────────────────────────────────────────────
+              if (block.type === 'hr') {
+                if (isContractTemplate) {
+                  y += 2;
+                  doc.setDrawColor(210, 210, 210);
+                  doc.setLineWidth(0.25);
+                  doc.line(margin, y, pageWidth - margin, y);
+                  y += 4;
+                }
+                continue;
+              }
+
+              // ── H1 ───────────────────────────────────────────────────────────
+              if (block.type === 'h1') {
+                checkPageBreak(12);
+                y += 2;
+                if (isContractTemplate) {
+                  doc.setFontSize(13);
+                  doc.setFont("helvetica", "bold");
+                  doc.setTextColor(...textColor);
+                  doc.splitTextToSize(block.text, contentWidth).forEach((ln: string) => {
+                    checkPageBreak(8); doc.text(ln, pageWidth / 2, y, { align: 'center' }); y += 8;
+                  });
+                } else {
+                  doc.setFontSize(9);
+                  doc.setFont("helvetica", "bold");
+                  doc.setTextColor(...textColor);
+                  doc.splitTextToSize(block.text, contentWidth).forEach((ln: string) => {
+                    checkPageBreak(5); doc.text(ln, margin, y); y += 4.5;
+                  });
+                }
+                y += 2;
+                continue;
+              }
+
+              // ── H2 ───────────────────────────────────────────────────────────
+              if (block.type === 'h2') {
+                checkPageBreak(10);
+                if (isContractTemplate) {
+                  y += 4;
+                  doc.setFontSize(10);
+                  doc.setFont("helvetica", "bold");
+                  doc.setTextColor(...brandColor);
+                  const lines = doc.splitTextToSize(block.text, contentWidth);
+                  lines.forEach((ln: string) => { checkPageBreak(6); doc.text(ln, margin, y); y += 6; });
+                  // Thin brand-color underline
+                  doc.setDrawColor(...brandColor);
+                  doc.setLineWidth(0.4);
+                  doc.line(margin, y - 1.5, margin + Math.min(doc.getTextWidth(lines[0]) + 2, contentWidth * 0.8), y - 1.5);
+                  y += 2;
+                } else {
+                  y += 2;
+                  doc.setFontSize(9);
+                  doc.setFont("helvetica", "bold");
+                  doc.setTextColor(...textColor);
+                  doc.splitTextToSize(block.text, contentWidth).forEach((ln: string) => {
+                    checkPageBreak(5); doc.text(ln, margin, y); y += 4.5;
+                  });
+                  y += 1;
+                }
+                continue;
+              }
+
+              // ── H3 ───────────────────────────────────────────────────────────
+              if (block.type === 'h3') {
+                checkPageBreak(6);
+                y += 1;
+                doc.setFontSize(9);
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(...textColor);
+                doc.splitTextToSize(block.text, contentWidth).forEach((ln: string) => {
+                  checkPageBreak(5); doc.text(ln, margin, y); y += 4.5;
+                });
+                y += 1;
+                continue;
+              }
+
+              // ── Bullet list item ─────────────────────────────────────────────
+              if (block.type === 'li') {
+                checkPageBreak(5);
+                doc.setFontSize(9);
+                if (isContractTemplate) {
+                  doc.setTextColor(...textColor);
+                  doc.setFont("helvetica", "normal");
+                  doc.text("•", margin + 2, y);
+                  renderSegs(parseInline(block.rawHtml), { x: margin + 7, maxW: contentWidth - 7, fs: 9 });
+                } else {
+                  doc.setFont("helvetica", "normal");
+                  doc.setTextColor(...mutedColor);
+                  doc.splitTextToSize(`• ${block.text}`, contentWidth - 4).forEach((ln: string, i: number) => {
+                    checkPageBreak(5); doc.text(i === 0 ? ln : `  ${ln}`, margin + 2, y); y += 4;
+                  });
+                }
+                continue;
+              }
+
+              // ── Ordered list item ────────────────────────────────────────────
+              if (block.type === 'ol_li') {
+                checkPageBreak(5);
+                doc.setFontSize(9);
+                if (isContractTemplate) {
+                  doc.setTextColor(...textColor);
+                  const numStr = `${block.number}.  `;
+                  doc.setFont("helvetica", "bold");
+                  doc.text(numStr, margin + 2, y);
+                  const nw = doc.getTextWidth(numStr);
+                  renderSegs(parseInline(block.rawHtml), { x: margin + 2 + nw, maxW: contentWidth - 2 - nw, fs: 9 });
+                } else {
+                  doc.setFont("helvetica", "normal");
+                  doc.setTextColor(...mutedColor);
+                  doc.splitTextToSize(`${block.number}. ${block.text}`, contentWidth - 4).forEach((ln: string, i: number) => {
+                    checkPageBreak(5); doc.text(i === 0 ? ln : `    ${ln}`, margin + 2, y); y += 4;
+                  });
+                }
+                continue;
+              }
+
+              // ── Paragraph ────────────────────────────────────────────────────
+              if (block.type === 'p') {
+                const isEmpty = !block.rawHtml.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim();
+                if (isEmpty) {
+                  if (isContractTemplate) y += 3;
+                  continue;
+                }
+                doc.setFontSize(9);
+                if (isContractTemplate) {
+                  doc.setTextColor(...textColor);
+                  renderSegs(parseInline(block.rawHtml), { x: margin, maxW: contentWidth, fs: 9 });
+                } else {
+                  doc.setFont("helvetica", "normal");
+                  doc.setTextColor(...mutedColor);
+                  doc.splitTextToSize(block.text, contentWidth).forEach((ln: string) => {
+                    checkPageBreak(5); doc.text(ln, margin, y); y += 4;
+                  });
+                  y += 1;
+                }
+              }
+            }
+            y += 6;
+          }
+        }
 
         addTableHeader();
 
@@ -2496,6 +2945,7 @@ export default function CrmQuoteDetail() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Description</TableHead>
+                  {quote.quoteMode === "options" && <TableHead className="w-24">Option</TableHead>}
                   <TableHead className="text-right w-24">Qty</TableHead>
                   <TableHead className="text-right w-32">Unit Price</TableHead>
                   <TableHead className="text-right w-32">Total</TableHead>
@@ -2518,6 +2968,15 @@ export default function CrmQuoteDetail() {
                               data-testid={`input-line-item-description-${item.id}`}
                             />
                           </TableCell>
+                          {quote.quoteMode === "options" && (
+                            <TableCell>
+                              {item.optionTag && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#711419]/10 text-[#711419]">
+                                  {item.optionTag}
+                                </span>
+                              )}
+                            </TableCell>
+                          )}
                           <TableCell>
                             <Input
                               type="number"
@@ -2577,6 +3036,19 @@ export default function CrmQuoteDetail() {
                       ) : (
                         <>
                           <TableCell><div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: item.description || "—" }} /></TableCell>
+                          {quote.quoteMode === "options" && (
+                            <TableCell>
+                              {item.optionTag ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#711419]/10 text-[#711419]">
+                                  {item.optionTag}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                                  Untagged
+                                </span>
+                              )}
+                            </TableCell>
+                          )}
                           <TableCell className="text-right">{item.quantity}</TableCell>
                           <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
                           <TableCell className="text-right">{formatCurrency(item.lineTotal)}</TableCell>
@@ -2612,7 +3084,7 @@ export default function CrmQuoteDetail() {
                   ))
                 ) : !isAddingNewLineItem ? (
                   <TableRow>
-                    <TableCell colSpan={canEditLineItems ? 5 : 4} className="text-center text-slate-500 py-8">
+                    <TableCell colSpan={canEditLineItems ? (quote.quoteMode === "options" ? 6 : 5) : (quote.quoteMode === "options" ? 5 : 4)} className="text-center text-slate-500 py-8">
                       No line items
                     </TableCell>
                   </TableRow>
@@ -2631,6 +3103,61 @@ export default function CrmQuoteDetail() {
                         data-testid="input-new-line-item-description"
                       />
                     </TableCell>
+                    {quote.quoteMode === "options" && (
+                      <TableCell>
+                        {(() => {
+                          const existingTags = [...new Set(
+                            (quote.lineItems || [])
+                              .map(li => li.optionTag)
+                              .filter((t): t is string => !!t)
+                          )];
+                          if (existingTags.length > 0 && !newItemOptionTagCreating) {
+                            return (
+                              <Select
+                                value={newItemOptionTag}
+                                onValueChange={(v) => {
+                                  if (v === "__new__") {
+                                    setNewItemOptionTagCreating(true);
+                                    setNewItemOptionTag("");
+                                  } else {
+                                    setNewItemOptionTag(v);
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="w-28 h-8 text-xs">
+                                  <SelectValue placeholder="Option" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {existingTags.map(tag => (
+                                    <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                                  ))}
+                                  <SelectItem value="__new__" className="text-blue-600 font-medium">+ New option…</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            );
+                          }
+                          return (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                value={newItemOptionTag}
+                                onChange={(e) => setNewItemOptionTag(e.target.value)}
+                                placeholder="Option name"
+                                className="w-24 h-8 text-xs"
+                                autoFocus={newItemOptionTagCreating}
+                              />
+                              {newItemOptionTagCreating && existingTags.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => { setNewItemOptionTagCreating(false); setNewItemOptionTag(""); }}
+                                  className="text-slate-400 hover:text-slate-600 text-xs"
+                                  title="Back to list"
+                                >✕</button>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Input
                         type="number"
@@ -2719,6 +3246,8 @@ export default function CrmQuoteDetail() {
           if (!open) {
             setItemSearch("");
             setCategoryFilter("all");
+            setCatalogItemOptionTag("");
+            setCatalogItemOptionTagCreating(false);
           }
         }}>
           <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col">
@@ -2754,6 +3283,65 @@ export default function CrmQuoteDetail() {
                 </Select>
               </div>
 
+              {/* Option selector — only shown for options-mode quotes */}
+              {quote?.quoteMode === "options" && (() => {
+                const existingTags = [...new Set(
+                  (quote.lineItems || [])
+                    .map(li => li.optionTag)
+                    .filter((t): t is string => !!t)
+                )];
+                return (
+                  <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+                    <Tag className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                    <span className="text-amber-800 font-medium whitespace-nowrap">Add to option:</span>
+                    {existingTags.length > 0 && !catalogItemOptionTagCreating ? (
+                      <Select
+                        value={catalogItemOptionTag}
+                        onValueChange={(v) => {
+                          if (v === "__new__") {
+                            setCatalogItemOptionTagCreating(true);
+                            setCatalogItemOptionTag("");
+                          } else {
+                            setCatalogItemOptionTag(v);
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-7 text-xs flex-1 max-w-[180px]">
+                          <SelectValue placeholder="Select option" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {existingTags.map(tag => (
+                            <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                          ))}
+                          <SelectItem value="__new__" className="text-blue-600 font-medium">+ New option…</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="flex items-center gap-1 flex-1 max-w-[200px]">
+                        <Input
+                          value={catalogItemOptionTag}
+                          onChange={(e) => setCatalogItemOptionTag(e.target.value)}
+                          placeholder="Option name"
+                          className="h-7 text-xs flex-1"
+                          autoFocus={catalogItemOptionTagCreating}
+                        />
+                        {catalogItemOptionTagCreating && existingTags.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => { setCatalogItemOptionTagCreating(false); setCatalogItemOptionTag(""); }}
+                            className="text-slate-400 hover:text-slate-600 text-xs flex-shrink-0"
+                            title="Back to list"
+                          >✕</button>
+                        )}
+                      </div>
+                    )}
+                    {!catalogItemOptionTag && (
+                      <span className="text-amber-600 text-xs">Items without an option won't appear in the presentation.</span>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div className="border rounded-lg overflow-hidden flex-1 overflow-y-auto min-h-[300px] max-h-[400px]">
                 {isSearchingItems ? (
                   <div className="p-8 text-center text-slate-500">
@@ -2766,7 +3354,7 @@ export default function CrmQuoteDetail() {
                       <button
                         key={item.id}
                         type="button"
-                        onClick={() => addFromCatalogMutation.mutate(item)}
+                        onClick={() => addFromCatalogMutation.mutate({ item, optionTag: catalogItemOptionTag || undefined })}
                         disabled={addFromCatalogMutation.isPending}
                         className="w-full p-4 text-left hover:bg-slate-50 transition-colors disabled:opacity-50"
                       >
@@ -2938,25 +3526,69 @@ export default function CrmQuoteDetail() {
           </DialogContent>
         </Dialog>
 
-        {/* Editable Description for custom install quotes */}
-        {quote.quoteType === "custom_install" && (
+        {/* Editable Description for custom install quotes and proposal quotes */}
+        {(quote.quoteType === "custom_install" || quote.quoteType === "proposal") && (
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
               <CardTitle className="text-base">Description</CardTitle>
-              {!isEditingDescription && (
+              <div className="flex items-center gap-2">
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
+                  disabled={templatesLoading}
                   onClick={() => {
-                    setEditedDescription(quote.description || "");
-                    setIsEditingDescription(true);
+                    const isEmpty = (s: string | undefined | null) =>
+                      !s || s.trim() === "" || s.trim() === "<p></p>";
+                    if (proposalTemplates.length > 0) {
+                      const currentContent = isEditingDescription ? editedDescription : quote.description;
+                      if (!isEmpty(currentContent) && !window.confirm("Replace current description with a template?")) return;
+                      setTemplatePickerOpen(true);
+                    } else {
+                      const buildTemplate = () => {
+                        const lineDescriptions = (quote.lineItems || [])
+                          .map(li => li.description)
+                          .filter(Boolean)
+                          .join("; ");
+                        const totalStr = quote.total
+                          ? "$" + parseFloat(quote.total.toString()).toLocaleString()
+                          : undefined;
+                        return generateContractTemplate({
+                          customerName: quote.customer?.name || quote.customerName || undefined,
+                          address: quote.serviceAddress || undefined,
+                          equipmentSummary: lineDescriptions || undefined,
+                          totalPrice: totalStr,
+                        });
+                      };
+                      if (!isEditingDescription) {
+                        if (!isEmpty(quote.description) && !window.confirm("Replace current description with the contract template?")) return;
+                        setEditedDescription(buildTemplate());
+                        setIsEditingDescription(true);
+                      } else {
+                        if (!isEmpty(editedDescription) && !window.confirm("Replace current description with the contract template?")) return;
+                        setEditedDescription(buildTemplate());
+                      }
+                    }
                   }}
-                  data-testid="button-edit-description"
+                  className="text-slate-700"
                 >
-                  <Edit className="h-4 w-4 mr-1" />
-                  Edit
+                  <ClipboardList className="h-4 w-4 mr-1" />
+                  Load Template
                 </Button>
-              )}
+                {!isEditingDescription && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setEditedDescription(quote.description || "");
+                      setIsEditingDescription(true);
+                    }}
+                    data-testid="button-edit-description"
+                  >
+                    <Edit className="h-4 w-4 mr-1" />
+                    Edit
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {isEditingDescription ? (
@@ -3542,6 +4174,103 @@ export default function CrmQuoteDetail() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <Dialog
+        open={showManualSignatureDialog}
+        onOpenChange={(open) => {
+          setShowManualSignatureDialog(open);
+          if (!open) {
+            setManualSignature("");
+            setManualSignerName("");
+            setPendingManualOption(null);
+            setAvailableOptions([]);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Accept Quote</DialogTitle>
+            <DialogDescription>
+              {availableOptions.length > 0
+                ? "Select the customer's choice and capture their signature."
+                : "Have the client sign below to confirm they accept this quote."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {availableOptions.length > 0 && (
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-2">
+                  Customer's Choice
+                </label>
+                <div className="space-y-2">
+                  {availableOptions.map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => setPendingManualOption(option)}
+                      className={`w-full p-3 text-left rounded-lg border-2 transition-colors ${
+                        pendingManualOption === option
+                          ? "border-[#711419] bg-[#711419]/5"
+                          : "border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      <span className={`font-medium ${pendingManualOption === option ? "text-[#711419]" : ""}`}>
+                        {option}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <PresentationSignaturePad onSignatureChange={setManualSignature} />
+            <div>
+              <label className="text-sm font-medium text-slate-700 block mb-1">
+                Printed Name
+              </label>
+              <Input
+                placeholder="Client's full name"
+                value={manualSignerName}
+                onChange={(e) => setManualSignerName(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowManualSignatureDialog(false);
+                setManualSignature("");
+                setManualSignerName("");
+                setPendingManualOption(null);
+                setAvailableOptions([]);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmManualSignature}
+              disabled={
+                (availableOptions.length > 0 && !pendingManualOption) ||
+                !manualSignature ||
+                !manualSignerName.trim() ||
+                acceptInPersonMutation.isPending
+              }
+              className="bg-[#711419] hover:bg-[#711419]/90 text-white"
+            >
+              {acceptInPersonMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Accepting...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Accept Quote
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={showAcceptOptionSelection} onOpenChange={setShowAcceptOptionSelection}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -3868,8 +4597,8 @@ export default function CrmQuoteDetail() {
           setShowPresentation(open);
         }}
       >
-        <DialogContent className="max-w-full w-full h-full max-h-screen m-0 p-0 rounded-none overflow-auto">
-          <div className="min-h-screen bg-white">
+        <DialogContent className="max-w-full w-full h-full max-h-screen m-0 p-0 rounded-none overflow-auto !bg-gray-100">
+          <div className="min-h-screen bg-gray-100">
             {/* Exit button */}
             <div className="fixed top-4 right-4 z-50">
               <Button
@@ -3898,7 +4627,7 @@ export default function CrmQuoteDetail() {
               </div>
 
               {/* Quote Header Card */}
-              <Card className="shadow-lg mb-6 bg-white border-0">
+              <Card className="shadow-lg mb-6 bg-gray-100 border-0">
                 <CardHeader className="border-b" style={{ backgroundColor: BRAND_COLOR }}>
                   <div className="flex items-center justify-between text-white">
                     <div className="flex items-center gap-2">
@@ -3908,15 +4637,73 @@ export default function CrmQuoteDetail() {
                     <span className="text-sm opacity-90">{formatPresentationDate(quote.createdAt)}</span>
                   </div>
                 </CardHeader>
-                <CardContent className="py-6 space-y-6 bg-white">
+                <CardContent className="py-6 space-y-6 bg-gray-100">
                   {/* Customer Info */}
-                  <div className="bg-white rounded-lg p-4">
+                  <div className="bg-gray-200 rounded-lg p-4">
                     <h3 className="font-semibold text-slate-700 mb-2">Prepared For</h3>
                     <p className="font-medium text-slate-900">{quote.customerName || quote.customer?.name}</p>
                     {quote.serviceAddress && (
                       <p className="text-slate-600 text-sm">{quote.serviceAddress}</p>
                     )}
                   </div>
+
+                  {/* Description / Contract Template */}
+                  {(quote.description || quote.status === "draft") && (
+                    <div className="border-t pt-4">
+                      {isPresentationEditingDesc ? (
+                        <div className="space-y-3">
+                          <RichTextEditor
+                            content={presentationDescDraft}
+                            onChange={setPresentationDescDraft}
+                            placeholder="Enter contract description..."
+                            minHeight="min-h-[300px]"
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => updateDescriptionMutation.mutate(presentationDescDraft)}
+                              disabled={updateDescriptionMutation.isPending}
+                            >
+                              {updateDescriptionMutation.isPending ? "Saving..." : "Save"}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setIsPresentationEditingDesc(false)}
+                              disabled={updateDescriptionMutation.isPending}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {quote.status === "draft" && (
+                            <div className="flex justify-end mb-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1.5 text-slate-500 hover:text-slate-700"
+                                onClick={() => {
+                                  setPresentationDescDraft(quote.description || "");
+                                  setIsPresentationEditingDesc(true);
+                                }}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                {quote.description ? "Edit" : "Add Description"}
+                              </Button>
+                            </div>
+                          )}
+                          {quote.description && (
+                            <div
+                              className="contract-description"
+                              dangerouslySetInnerHTML={{ __html: quote.description }}
+                            />
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
 
                   {/* Quote Content - Options Mode */}
                   {quote.quoteMode === "options" && quote.lineItems ? (
@@ -3939,7 +4726,7 @@ export default function CrmQuoteDetail() {
                             <div 
                               key={option.tag} 
                               onClick={() => setPresentationSelectedOption(option.tag)}
-                              className={`border-2 rounded-lg overflow-hidden cursor-pointer transition-all bg-white ${
+                              className={`border-2 rounded-lg overflow-hidden cursor-pointer transition-all bg-gray-50 ${
                                 isSelected 
                                   ? "border-[#711419] ring-2 ring-[#711419]/20 shadow-md" 
                                   : "border-slate-200 hover:border-slate-400"
@@ -3957,7 +4744,7 @@ export default function CrmQuoteDetail() {
                                 </div>
                                 <span className="text-lg sm:text-xl font-bold" style={{ color: BRAND_COLOR }}>{formatPresentationCurrency(option.total)}</span>
                               </div>
-                              <div className="p-3 sm:p-4 bg-white">
+                              <div className="p-3 sm:p-4 bg-gray-50">
                                 {/* Show AI-generated category title if available */}
                                 {whatsIncluded.categoryTitle && (
                                   <div className="mb-3 pb-2 border-b border-slate-200">
@@ -4083,8 +4870,8 @@ export default function CrmQuoteDetail() {
 
               {/* Signature Section or Already Approved Message */}
               {quote.status === "accepted" ? (
-                <Card className="shadow-lg bg-white border-0">
-                  <CardContent className="py-12 text-center bg-white">
+                <Card className="shadow-lg bg-gray-50 border-0">
+                  <CardContent className="py-12 text-center bg-gray-50">
                     <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
                       <CheckCircle className="h-10 w-10 text-green-600" />
                     </div>
@@ -4099,11 +4886,11 @@ export default function CrmQuoteDetail() {
                   </CardContent>
                 </Card>
               ) : (
-                <Card className="shadow-lg bg-white border-0">
-                  <CardHeader className="bg-white">
+                <Card className="shadow-lg bg-gray-50 border-0">
+                  <CardHeader className="bg-gray-50">
                     <CardTitle className="text-lg">Accept Quote</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-6 bg-white">
+                  <CardContent className="space-y-6 bg-gray-50">
                     <PresentationSignaturePad onSignatureChange={setPresentationSignature} />
 
                     <div className="space-y-2">
@@ -4439,7 +5226,6 @@ export default function CrmQuoteDetail() {
                     <SelectItem value="low">Low</SelectItem>
                     <SelectItem value="normal">Normal</SelectItem>
                     <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -4528,7 +5314,7 @@ export default function CrmQuoteDetail() {
               <div className="flex flex-col items-start text-left">
                 <span className="font-semibold">Parts Needed</span>
                 <span className="text-sm text-muted-foreground font-normal">
-                  Create urgent work order in the Parts Needed queue
+                  Create high-priority work order in the Parts Needed queue
                 </span>
               </div>
             </Button>
@@ -4551,6 +5337,54 @@ export default function CrmQuoteDetail() {
               Skip for now
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={templatePickerOpen} onOpenChange={setTemplatePickerOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Choose a Template</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+            {[...proposalTemplates].sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0)).map((tmpl) => (
+              <button
+                key={tmpl.id}
+                className="w-full text-left p-3 rounded-lg border hover:bg-slate-50 transition-colors flex items-center gap-3"
+                onClick={() => {
+                  const lineDescriptions = (quote.lineItems || [])
+                    .map(li => li.description)
+                    .filter(Boolean)
+                    .join("; ");
+                  const totalStr = quote.total
+                    ? "$" + parseFloat(quote.total.toString()).toLocaleString()
+                    : undefined;
+                  const html = applyTemplateVariables(tmpl.body, {
+                    customerName: quote.customer?.name || quote.customerName || undefined,
+                    address: quote.serviceAddress || undefined,
+                    equipmentSummary: lineDescriptions || undefined,
+                    totalPrice: totalStr,
+                  });
+                  setEditedDescription(html);
+                  if (!isEditingDescription) setIsEditingDescription(true);
+                  setTemplatePickerOpen(false);
+                }}
+              >
+                <FileText className="h-5 w-5 text-slate-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm">{tmpl.name}</div>
+                  <div className="text-xs text-slate-400 truncate">
+                    {tmpl.body.replace(/<[^>]*>/g, " ").slice(0, 100)}...
+                  </div>
+                </div>
+                {tmpl.isDefault && (
+                  <Badge className="bg-amber-100 text-amber-700 border-amber-200 flex-shrink-0 text-xs">
+                    <Star className="h-3 w-3 mr-1" />
+                    Default
+                  </Badge>
+                )}
+              </button>
+            ))}
+          </div>
         </DialogContent>
       </Dialog>
     </CrmLayout>

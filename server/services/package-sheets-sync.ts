@@ -286,13 +286,35 @@ export async function syncPricebookPackages(): Promise<{ updated: number; insert
           .limit(1);
 
         if (existing.length > 0) {
-          // Update existing package - ONLY update data fields, NEVER touch image URLs
+          // Google Sheets is the master price source.
+          // Store sheet prices as base prices, then recompute final prices using
+          // the package's stored cumulative adjustment (adjustmentBasisPoints).
+          const row = existing[0];
+
+          const newBaseMonthly = pkg.monthlyPayment;
+          const newBaseTotal = pkg.totalInvestment;
+          const pricesValid = newBaseMonthly > 0 && newBaseTotal > 0 &&
+            !isNaN(newBaseMonthly) && !isNaN(newBaseTotal);
+
+          if (!pricesValid) {
+            errors.push(`Skipping price update for ${pkg.unitType}/${pkg.tonnage}/${pkg.packageLevel}: sheet returned 0 or invalid price`);
+          }
+
+          const basisPoints = row.adjustmentBasisPoints ?? 0;
+          const multiplier = 1 + basisPoints / 10000;
+
           const updates: Record<string, any> = {};
-          
-          // Always update pricing fields (these are required)
-          if (pkg.monthlyPayment !== undefined) updates.monthlyPayment = pkg.monthlyPayment;
-          if (pkg.totalInvestment !== undefined) updates.totalInvestment = pkg.totalInvestment;
-          
+
+          if (pricesValid) {
+            // Base prices always come from the sheet; final = base × multiplier
+            const newMonthly = Math.round(newBaseMonthly * multiplier);
+            const newTotal = Math.round(newBaseTotal * multiplier);
+            updates.baseMonthlyPayment = newBaseMonthly;
+            updates.baseTotalInvestment = newBaseTotal;
+            updates.monthlyPayment = newMonthly;
+            updates.totalInvestment = newTotal;
+          }
+
           // Update equipment fields if they have actual values in the sheet
           if (pkg.outdoorBrand) updates.outdoorBrand = pkg.outdoorBrand;
           if (pkg.outdoorModel) updates.outdoorModel = pkg.outdoorModel;
@@ -304,30 +326,27 @@ export async function syncPricebookPackages(): Promise<{ updated: number; insert
           if (pkg.thermostatModel) updates.thermostatModel = pkg.thermostatModel;
           if (pkg.thermostatName) updates.thermostatName = pkg.thermostatName;
           if (pkg.accessoryModels) updates.accessoryModels = pkg.accessoryModels;
-          
+
           // IMPORTANT: NEVER update image URLs - they are managed separately in the CRM
           // outdoorImageUrl, thermostatImageUrl, furnaceImageUrl, coilImageUrl are EXCLUDED
-          
-          // Filter out any undefined values
-          const cleanUpdates = Object.fromEntries(
-            Object.entries(updates).filter(([_, value]) => value !== undefined)
-          );
-          
-          if (Object.keys(cleanUpdates).length > 0) {
-            await db.update(pricebookPackages)
-              .set(cleanUpdates)
-              .where(eq(pricebookPackages.id, existing[0].id));
-          }
+
+          await db.update(pricebookPackages)
+            .set(updates)
+            .where(eq(pricebookPackages.id, row.id));
+
           updatedCount++;
         } else {
-          // Insert new package from sheet - new packages get NO images (can be set later in CRM)
+          // Insert new package from sheet — base prices = sheet prices, no adjustment yet
           await db.insert(pricebookPackages).values({
             unitType: pkg.unitType,
             tier: pkg.tier,
             tonnage: pkg.tonnage,
             packageLevel: pkg.packageLevel,
+            baseMonthlyPayment: pkg.monthlyPayment,
+            baseTotalInvestment: pkg.totalInvestment,
             monthlyPayment: pkg.monthlyPayment,
             totalInvestment: pkg.totalInvestment,
+            adjustmentBasisPoints: 0,
             outdoorBrand: pkg.outdoorBrand || null,
             outdoorModel: pkg.outdoorModel || null,
             outdoorName: pkg.outdoorName || null,

@@ -1,0 +1,176 @@
+export default function GHQSettingsRedesign() {
+  const sections = [
+    {
+      title: "Workspace & Team",
+      description: "Manage people, permissions, and day-to-day operating defaults.",
+      items: [
+        { name: "Users & Roles", desc: "Access levels, permissions, technician roles, and office staff setup.", badge: "12 users" },
+        { name: "Time Logs", desc: "Clock-in rules, edit approvals, overtime visibility, and payroll prep.", badge: "Live" },
+        { name: "Office Defaults", desc: "Business hours, service areas, call availability, and dispatch settings.", badge: "Core" },
+      ],
+    },
+    {
+      title: "Sales & Operations",
+      description: "Control how leads, work orders, pricing, and proposals flow through GHQ.",
+      items: [
+        { name: "Lead Types", desc: "Configure opportunity types, funnels, and conversion paths.", badge: "Sales" },
+        { name: "Lead Classification", desc: "Set hot/warm/cold rules, drivers, and urgency indicators.", badge: "Rules" },
+        { name: "Work Order Subtypes", desc: "Organize service, maintenance, install, and IAQ visit types.", badge: "Ops" },
+        { name: "Service Checklists", desc: "Build intake forms and technician field checklists.", badge: "Mobile" },
+        { name: "Package Pricing", desc: "Tune HVAC and crawlspace package percentages and pricing logic.", badge: "Pricing" },
+      ],
+    },
+    {
+      title: "Financial Controls",
+      description: "Set deposits, materials, integrations, and job costing structure.",
+      items: [
+        { name: "Payment Settings", desc: "Default deposit percentages, payment links, financing, and receipts.", badge: "Money" },
+        { name: "Materials Catalog", desc: "Manage inventory items, cost basis, markup rules, and vendor mapping.", badge: "Catalog" },
+        { name: "QuickBooks Integration", desc: "Sync customers, invoices, payments, and chart-of-accounts mapping.", badge: "Connected" },
+      ],
+    },
+    {
+      title: "Data & System",
+      description: "Import records, connect tools, and run maintenance actions for admins.",
+      items: [
+        { name: "Import Data", desc: "Upload customers, agreements, equipment records, and legacy CRM data.", badge: "CSV" },
+        { name: "Fleet Tracking", desc: "Manage Bouncie vehicles, status visibility, and driver assignment.", badge: "GPS" },
+        { name: "System Tools", desc: "Scheduled jobs, maintenance utilities, sync health, and admin controls.", badge: "Admin" },
+      ],
+    },
+  ];
+
+  const quickActions = [
+    "Add user",
+    "Update deposit %",
+    "Edit package pricing",
+    "Run sync health check",
+  ];
+
+  return (
+    <div className="min-h-screen bg-[#f7f7f5] text-slate-900 p-6 md:p-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <div className="flex flex-col gap-4 rounded-[24px] border border-slate-200 bg-white px-5 py-5 shadow-sm md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="text-xs uppercase tracking-[0.22em] text-slate-400">GHQ Management System</div>
+            <h1 className="mt-1 text-2xl md:text-3xl font-semibold tracking-tight text-slate-900">Settings & Configuration</h1>
+            <p className="mt-1 max-w-2xl text-sm text-slate-500">
+              Manage access, pricing rules, integrations, and operational controls.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 md:flex md:flex-wrap">
+            {quickActions.map((action) => (
+              <button
+                key={action}
+                className="rounded-2xl border border-slate-200 bg-[#f7f7f5] px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-[#7b0f16]/20 hover:bg-[#fff7f7] hover:text-[#7b0f16]"
+              >
+                {action}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="space-y-4">
+            <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="text-sm font-semibold">Settings Navigation</div>
+              <div className="mt-4 space-y-2">
+                {sections.map((section) => (
+                  <button
+                    key={section.title}
+                    className="w-full rounded-2xl border border-transparent bg-[#f7f7f5] px-4 py-3 text-left transition hover:border-[#7b0f16]/20 hover:bg-[#fff7f7]"
+                  >
+                    <div className="text-sm font-medium text-slate-900">{section.title}</div>
+                    <div className="mt-1 text-xs text-slate-500">{section.items.length} modules</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold">System Status</div>
+                  <div className="text-xs text-slate-500 mt-1">Quick visibility for admin items</div>
+                </div>
+                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">Healthy</span>
+              </div>
+              <div className="mt-4 space-y-3 text-sm text-slate-600">
+                <div className="flex items-center justify-between rounded-2xl bg-[#f7f7f5] px-4 py-3">
+                  <span>QuickBooks Sync</span>
+                  <span className="font-medium text-slate-900">Connected</span>
+                </div>
+                <div className="flex items-center justify-between rounded-2xl bg-[#f7f7f5] px-4 py-3">
+                  <span>Fleet API</span>
+                  <span className="font-medium text-slate-900">Online</span>
+                </div>
+                <div className="flex items-center justify-between rounded-2xl bg-[#f7f7f5] px-4 py-3">
+                  <span>Last Backup</span>
+                  <span className="font-medium text-slate-900">2:14 AM</span>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <main className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Configured Modules</div>
+                <div className="mt-2 text-3xl font-semibold">14</div>
+                <div className="mt-1 text-sm text-slate-500">Active admin sections available</div>
+              </div>
+              <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Users with Access</div>
+                <div className="mt-2 text-3xl font-semibold">12</div>
+                <div className="mt-1 text-sm text-slate-500">Owners, office staff, sales, and techs</div>
+              </div>
+              <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Pending Attention</div>
+                <div className="mt-2 text-3xl font-semibold">3</div>
+                <div className="mt-1 text-sm text-slate-500">Imports, sync review, pricing updates</div>
+              </div>
+            </div>
+
+            {sections.map((section) => (
+              <section key={section.title} className="rounded-[28px] border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
+                <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold tracking-tight">{section.title}</h2>
+                    <p className="mt-1 text-sm text-slate-500 max-w-2xl">{section.description}</p>
+                  </div>
+                  <button className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium hover:bg-slate-50 w-fit">
+                    View All
+                  </button>
+                </div>
+
+                <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  {section.items.map((item) => (
+                    <button
+                      key={item.name}
+                      className="group rounded-[24px] border border-slate-200 bg-[#fcfcfb] p-5 text-left transition hover:-translate-y-0.5 hover:border-[#7b0f16]/25 hover:bg-white hover:shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <div className="text-base font-semibold tracking-tight text-slate-900">{item.name}</div>
+                          <p className="mt-2 text-sm leading-6 text-slate-500">{item.desc}</p>
+                        </div>
+                        <span className="rounded-full bg-[#fff4f4] px-3 py-1 text-xs font-medium text-[#8f171c]">
+                          {item.badge}
+                        </span>
+                      </div>
+                      <div className="mt-4 flex items-center justify-between text-sm">
+                        <span className="text-slate-400">Open configuration</span>
+                        <span className="font-medium text-[#8f171c] group-hover:translate-x-0.5 transition">→</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </main>
+        </div>
+      </div>
+    </div>
+  );
+}

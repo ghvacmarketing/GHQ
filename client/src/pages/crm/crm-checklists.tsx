@@ -475,13 +475,13 @@ export default function CrmChecklists() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="flex h-[calc(100vh-4rem)] lg:h-screen">
-        <div className="w-80 border-r bg-slate-50 flex flex-col">
-          <div className="p-4 border-b bg-white">
+      <div className="flex h-[calc(100vh-4rem)] lg:h-screen bg-slate-50/50">
+        <div className="w-80 border-r border-slate-200 bg-white flex flex-col">
+          <div className="px-5 pt-5 pb-4">
             <Button
               variant="ghost"
               size="sm"
-              className="mb-3 -ml-2 text-muted-foreground hover:text-foreground"
+              className="mb-4 -ml-2 h-8 text-muted-foreground hover:text-foreground"
               onClick={() => navigate("/crm/settings")}
               data-testid="button-back-to-settings"
             >
@@ -489,17 +489,21 @@ export default function CrmChecklists() {
               Back to Settings
             </Button>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <ClipboardList className="h-5 w-5 text-[#711419]" />
-                Checklists
-              </h2>
+              <div>
+                <h2 className="text-xl font-semibold tracking-tight text-slate-900">
+                  Checklists
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {checklists.length} total
+                </p>
+              </div>
               <Button
                 size="sm"
                 onClick={() => {
                   resetChecklistForm();
                   setShowCreateChecklistDialog(true);
                 }}
-                className="bg-[#711419] hover:bg-[#8a1a1f]"
+                className="bg-[#711419] hover:bg-[#8a1a1f] h-8"
                 data-testid="button-create-checklist"
               >
                 <Plus className="h-4 w-4 mr-1" />
@@ -507,74 +511,84 @@ export default function CrmChecklists() {
               </Button>
             </div>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input
                 placeholder="Search checklists..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                className="pl-9"
+                className="pl-9 h-9 bg-slate-50 border-slate-200 focus-visible:bg-white"
                 data-testid="input-search-checklists"
               />
             </div>
           </div>
 
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 border-t border-slate-100">
             {checklistsLoading ? (
-              <div className="p-4 space-y-4">
+              <div className="p-4 space-y-3">
                 {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-20 w-full" />
+                  <Skeleton key={i} className="h-14 w-full rounded-md" />
                 ))}
               </div>
             ) : (
-              <div className="p-2">
+              <div className="px-3 py-3">
                 {checklistVisitTypeEnum.map((visitType) => {
                   const typeChecklists = groupedChecklists[visitType];
                   if (typeChecklists.length === 0) return null;
 
                   return (
-                    <div key={visitType} className="mb-4">
-                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    <div key={visitType} className="mb-5 last:mb-0">
+                      <div className="px-2 mb-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-[0.08em]">
                         {VISIT_TYPE_LABELS[visitType]}
                       </div>
-                      {typeChecklists.map((checklist) => (
-                        <div
-                          key={checklist.id}
-                          onClick={() => setSelectedChecklist(checklist)}
-                          className={`p-3 rounded-lg cursor-pointer mb-1 transition-colors ${
-                            selectedChecklist?.id === checklist.id
-                              ? "bg-[#711419] text-white"
-                              : "hover:bg-slate-100"
-                          }`}
-                          data-testid={`checklist-item-${checklist.id}`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="font-medium truncate">{checklist.name}</span>
-                              <Badge variant="secondary" className="text-xs shrink-0">
-                                {SUBTYPE_LABELS[checklist.serviceType] || checklist.serviceType}
-                              </Badge>
-                            </div>
-                            {!checklist.isActive && (
-                              <Badge variant="outline" className="text-xs ml-2 shrink-0">
-                                Inactive
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 mt-1 text-sm opacity-75">
-                            <FileQuestion className="h-3 w-3" />
-                            <span>{checklist.questions?.length || 0} questions</span>
-                          </div>
-                        </div>
-                      ))}
+                      <div className="space-y-0.5">
+                        {typeChecklists.map((checklist) => {
+                          const isSelected = selectedChecklist?.id === checklist.id;
+                          return (
+                            <button
+                              key={checklist.id}
+                              onClick={() => setSelectedChecklist(checklist)}
+                              className={`w-full text-left px-3 py-2.5 rounded-md transition-all relative group ${
+                                isSelected
+                                  ? "bg-[#711419]/5 text-slate-900"
+                                  : "hover:bg-slate-50 text-slate-700"
+                              }`}
+                              data-testid={`checklist-item-${checklist.id}`}
+                            >
+                              {isSelected && (
+                                <span className="absolute left-0 top-2 bottom-2 w-0.5 bg-[#711419] rounded-r-full" />
+                              )}
+                              <div className="flex items-center justify-between gap-2">
+                                <span className={`text-sm truncate ${isSelected ? "font-semibold" : "font-medium"}`}>
+                                  {checklist.name}
+                                </span>
+                                {!checklist.isActive && (
+                                  <Badge variant="outline" className="text-[10px] h-4 px-1.5 shrink-0 border-slate-300 text-slate-500">
+                                    Inactive
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
+                                <span className="truncate">
+                                  {SUBTYPE_LABELS[checklist.serviceType] || checklist.serviceType}
+                                </span>
+                                <span className="text-slate-300">·</span>
+                                <span>{checklist.questions?.length || 0} {checklist.questions?.length === 1 ? "question" : "questions"}</span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 })}
 
                 {Object.values(groupedChecklists).every((g) => g.length === 0) && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <ClipboardList className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                    <p>No checklists found</p>
-                    <p className="text-sm">Create a new checklist to get started</p>
+                  <div className="text-center py-12 px-4 text-muted-foreground">
+                    <div className="mx-auto mb-3 h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center">
+                      <ClipboardList className="h-5 w-5 text-slate-400" />
+                    </div>
+                    <p className="text-sm font-medium text-slate-700">No checklists found</p>
+                    <p className="text-xs mt-1">Create a new checklist to get started</p>
                   </div>
                 )}
               </div>
@@ -582,166 +596,185 @@ export default function CrmChecklists() {
           </ScrollArea>
         </div>
 
-        <div className="flex-1 overflow-auto bg-white">
+        <div className="flex-1 overflow-auto">
           {selectedChecklist ? (
-            <div className="p-6">
-              <div className="flex items-start justify-between mb-6">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <h1
-                      className="text-2xl font-bold text-slate-900"
-                      data-testid="text-checklist-name"
-                    >
-                      {selectedChecklist.name}
-                    </h1>
-                    <Badge variant="outline" className="bg-slate-100 text-slate-700">
+            <div className="max-w-4xl mx-auto px-8 py-8">
+              <div className="flex items-start justify-between mb-8 gap-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
+                    <span>
                       {VISIT_TYPE_LABELS[((selectedChecklist as any).visitType || "SERVICE") as ChecklistVisitType]}
-                    </Badge>
-                    <Badge className={SERVICE_TYPE_COLORS[selectedChecklist.serviceType] || "bg-gray-100 text-gray-700"}>
+                    </span>
+                    <span className="text-slate-300">·</span>
+                    <span>
                       {SUBTYPE_LABELS[selectedChecklist.serviceType] || selectedChecklist.serviceType}
-                    </Badge>
+                    </span>
                     {!selectedChecklist.isActive && (
-                      <Badge variant="outline">Inactive</Badge>
+                      <>
+                        <span className="text-slate-300">·</span>
+                        <span className="text-amber-600">Inactive</span>
+                      </>
                     )}
                   </div>
+                  <h1
+                    className="text-2xl font-semibold tracking-tight text-slate-900"
+                    data-testid="text-checklist-name"
+                  >
+                    {selectedChecklist.name}
+                  </h1>
                   {selectedChecklist.description && (
-                    <p className="text-muted-foreground">{selectedChecklist.description}</p>
+                    <p className="text-sm text-muted-foreground mt-2 max-w-2xl">{selectedChecklist.description}</p>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-1.5 shrink-0">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={openEditChecklistDialog}
+                    className="h-8 border-slate-200"
                     data-testid="button-edit-checklist"
                   >
-                    <Pencil className="h-4 w-4 mr-1" />
+                    <Pencil className="h-3.5 w-3.5 mr-1.5" />
                     Edit
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setShowDeleteChecklistDialog(true)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    className="h-8 border-slate-200 text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-200"
                     data-testid="button-delete-checklist"
+                    aria-label="Delete checklist"
+                    title="Delete checklist"
                   >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Delete
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </div>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between py-4">
-                  <CardTitle className="text-lg">Questions</CardTitle>
+              <div className="rounded-xl border border-slate-200 bg-white">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-900">Questions</h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {selectedChecklist.questions.length} {selectedChecklist.questions.length === 1 ? "question" : "questions"} in this checklist
+                    </p>
+                  </div>
                   <Button
                     size="sm"
                     onClick={openAddQuestionDialog}
-                    className="bg-[#711419] hover:bg-[#8a1a1f]"
+                    className="bg-[#711419] hover:bg-[#8a1a1f] h-8"
                     data-testid="button-add-question"
                   >
                     <Plus className="h-4 w-4 mr-1" />
                     Add Question
                   </Button>
-                </CardHeader>
-                <CardContent>
-                  {selectedChecklist.questions.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <FileQuestion className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                      <p>No questions yet</p>
-                      <p className="text-sm">Add questions to this checklist</p>
+                </div>
+                {selectedChecklist.questions.length === 0 ? (
+                  <div className="text-center py-16 px-4 text-muted-foreground">
+                    <div className="mx-auto mb-3 h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center">
+                      <FileQuestion className="h-5 w-5 text-slate-400" />
                     </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {[...selectedChecklist.questions]
-                        .sort((a, b) => a.sortOrder - b.sortOrder)
-                        .map((question, index, arr) => (
-                          <div
-                            key={question.id}
-                            className="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50"
-                            data-testid={`question-item-${question.id}`}
-                          >
-                            <div className="flex flex-col gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                disabled={index === 0}
-                                onClick={() => handleMoveQuestion(question, "up")}
-                                data-testid={`button-move-up-${question.id}`}
-                              >
-                                <ChevronUp className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                disabled={index === arr.length - 1}
-                                onClick={() => handleMoveQuestion(question, "down")}
-                                data-testid={`button-move-down-${question.id}`}
-                              >
-                                <ChevronDown className="h-4 w-4" />
-                              </Button>
-                            </div>
+                    <p className="text-sm font-medium text-slate-700">No questions yet</p>
+                    <p className="text-xs mt-1">Add a question to start building this checklist</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {[...selectedChecklist.questions]
+                      .sort((a, b) => a.sortOrder - b.sortOrder)
+                      .map((question, index, arr) => (
+                        <div
+                          key={question.id}
+                          className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50/60 group focus-within:bg-slate-50/60 transition-colors"
+                          data-testid={`question-item-${question.id}`}
+                        >
+                          <div className="flex flex-col -my-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 text-slate-400 hover:text-slate-700"
+                              disabled={index === 0}
+                              onClick={() => handleMoveQuestion(question, "up")}
+                              data-testid={`button-move-up-${question.id}`}
+                            >
+                              <ChevronUp className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 text-slate-400 hover:text-slate-700"
+                              disabled={index === arr.length - 1}
+                              onClick={() => handleMoveQuestion(question, "down")}
+                              data-testid={`button-move-down-${question.id}`}
+                            >
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
 
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">{question.question}</span>
-                                {question.isRequired && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    Required
-                                  </Badge>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                                <span className="flex items-center gap-1">
-                                  {QUESTION_TYPE_ICONS[question.questionType]}
-                                  {QUESTION_TYPE_LABELS[question.questionType]}
+                          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 text-slate-500 shrink-0">
+                            {QUESTION_TYPE_ICONS[question.questionType]}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-slate-900 truncate">{question.question}</span>
+                              {question.isRequired && (
+                                <span className="text-[10px] font-semibold text-[#711419] uppercase tracking-wide shrink-0">
+                                  Required
                                 </span>
-                                {question.questionType === "select" && question.options && (
-                                  <span className="text-xs">
-                                    ({question.options.length} options)
-                                  </span>
-                                )}
-                              </div>
+                              )}
                             </div>
-
-                            <div className="flex gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => openEditQuestionDialog(question)}
-                                data-testid={`button-edit-question-${question.id}`}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                onClick={() => {
-                                  setDeletingQuestion(question);
-                                  setShowDeleteQuestionDialog(true);
-                                }}
-                                data-testid={`button-delete-question-${question.id}`}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                            <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
+                              <span>{QUESTION_TYPE_LABELS[question.questionType]}</span>
+                              {question.questionType === "select" && question.options && (
+                                <>
+                                  <span className="text-slate-300">·</span>
+                                  <span>{question.options.length} options</span>
+                                </>
+                              )}
                             </div>
                           </div>
-                        ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+
+                          <div className="flex gap-0.5 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 transition-opacity">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-slate-500 hover:text-slate-900"
+                              onClick={() => openEditQuestionDialog(question)}
+                              data-testid={`button-edit-question-${question.id}`}
+                              aria-label="Edit question"
+                              title="Edit question"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-slate-500 hover:text-red-600 hover:bg-red-50"
+                              onClick={() => {
+                                setDeletingQuestion(question);
+                                setShowDeleteQuestionDialog(true);
+                              }}
+                              data-testid={`button-delete-question-${question.id}`}
+                              aria-label="Delete question"
+                              title="Delete question"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <div className="flex items-center justify-center h-full text-muted-foreground">
               <div className="text-center">
-                <ClipboardList className="h-16 w-16 mx-auto mb-4 opacity-30" />
-                <p className="text-lg font-medium">Select a checklist</p>
-                <p className="text-sm">Choose a checklist from the left to view and edit</p>
+                <div className="mx-auto mb-4 h-14 w-14 rounded-2xl bg-white border border-slate-200 flex items-center justify-center shadow-sm">
+                  <ClipboardList className="h-6 w-6 text-slate-400" />
+                </div>
+                <p className="text-sm font-medium text-slate-700">Select a checklist</p>
+                <p className="text-xs mt-1">Choose one from the left to view and edit</p>
               </div>
             </div>
           )}

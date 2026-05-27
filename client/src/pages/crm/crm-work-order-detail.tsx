@@ -219,8 +219,7 @@ const visitTypeLabels: Record<string, string> = {
 const priorityColors: Record<string, { bg: string; text: string }> = {
   low: { bg: "bg-slate-100", text: "text-slate-600" },
   normal: { bg: "bg-blue-100", text: "text-blue-700" },
-  high: { bg: "bg-orange-100", text: "text-orange-700" },
-  urgent: { bg: "bg-red-100", text: "text-red-700" },
+  high: { bg: "bg-red-100", text: "text-red-700" },
 };
 
 // Generate 30-minute interval time options from 8:00 AM to 8:00 PM
@@ -555,9 +554,9 @@ export default function CrmWorkOrderDetail() {
     },
     onSuccess: () => {
       toast({ title: "Work order deleted" });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders/list"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch/work-orders"] });
+      queryClient.removeQueries({ queryKey: ["/api/crm/work-orders/list"] });
+      queryClient.removeQueries({ queryKey: ["/api/crm/work-orders"] });
+      queryClient.removeQueries({ queryKey: ["/api/crm/dispatch/work-orders"] });
       navigate("/crm/work-orders");
     },
     onError: (error: Error) => {
@@ -1798,16 +1797,15 @@ export default function CrmWorkOrderDetail() {
           </TabsContent>
 
           <TabsContent value="edit" className="mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Customer & Location Card */}
-              <Card className="shadow-sm">
-                <CardHeader className="pb-3 border-b bg-slate-50/50">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                    <User className="h-4 w-4 text-[#711419]" />
+              <Card className="border-slate-200">
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Customer & Location
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-4 space-y-4">
+                <CardContent className="px-4 pb-4 pt-1 space-y-4">
                   <div className="space-y-2">
                     <Label className="text-xs text-slate-500 uppercase tracking-wide">Customer</Label>
                     <div className="flex items-center justify-between">
@@ -1996,14 +1994,13 @@ export default function CrmWorkOrderDetail() {
               </Card>
 
               {/* Status & Assignment Card */}
-              <Card className="shadow-sm">
-                <CardHeader className="pb-3 border-b bg-slate-50/50">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                    <Clock className="h-4 w-4 text-[#711419]" />
+              <Card className="border-slate-200">
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Status & Assignment
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-4 space-y-4">
+                <CardContent className="px-4 pb-4 pt-1 space-y-4">
                   <div className="space-y-2">
                     <Label className="text-xs text-slate-500 uppercase tracking-wide">Status</Label>
                     <div className="flex items-center gap-2">
@@ -2020,9 +2017,11 @@ export default function CrmWorkOrderDetail() {
                         </SelectContent>
                       </Select>
                       <Button
+                        variant="outline"
                         size="sm"
                         onClick={handleUpdateStatus}
                         disabled={updateWorkOrderMutation.isPending || newStatus === workOrder.status}
+                        className="text-slate-700 hover:bg-slate-100 shrink-0"
                         data-testid="button-update-status"
                       >
                         Update
@@ -2047,9 +2046,11 @@ export default function CrmWorkOrderDetail() {
                         </SelectContent>
                       </Select>
                       <Button
+                        variant="outline"
                         size="sm"
                         onClick={handleReassignTech}
                         disabled={updateWorkOrderMutation.isPending}
+                        className="text-slate-700 hover:bg-slate-100 shrink-0"
                         data-testid="button-assign-tech"
                       >
                         Assign
@@ -2120,9 +2121,11 @@ export default function CrmWorkOrderDetail() {
                       </div>
                     </div>
                     <Button
+                      variant="outline"
                       size="sm"
                       onClick={handleReschedule}
                       disabled={updateWorkOrderMutation.isPending || !rescheduleDate || !rescheduleStartTime || !rescheduleEndTime}
+                      className="text-slate-700 hover:bg-slate-100"
                       data-testid="button-reschedule"
                     >
                       Reschedule
@@ -2133,16 +2136,15 @@ export default function CrmWorkOrderDetail() {
             </div>
 
             {/* Work Details & Billing Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
               {/* Work Details Card */}
-              <Card className="shadow-sm">
-                <CardHeader className="pb-3 border-b bg-slate-50/50">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                    <ClipboardList className="h-4 w-4 text-[#711419]" />
+              <Card className="border-slate-200">
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Work Details
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-4 space-y-4">
+                <CardContent className="px-4 pb-4 pt-1 space-y-4">
                   <div className="space-y-2">
                     <Label className="text-xs text-slate-500 uppercase tracking-wide">Checklist</Label>
                     <div className="space-y-2">
@@ -2189,9 +2191,11 @@ export default function CrmWorkOrderDetail() {
                       </Button>
                     </div>
                     <Button
+                      variant="outline"
                       size="sm"
                       onClick={handleSaveChecklist}
                       disabled={updateWorkOrderMutation.isPending}
+                      className="text-slate-700 hover:bg-slate-100"
                       data-testid="button-save-checklist"
                     >
                       Save Checklist
@@ -2210,9 +2214,11 @@ export default function CrmWorkOrderDetail() {
                       data-testid="textarea-edit-tech-notes"
                     />
                     <Button
+                      variant="outline"
                       size="sm"
                       onClick={handleSaveTechNotes}
                       disabled={updateWorkOrderMutation.isPending}
+                      className="text-slate-700 hover:bg-slate-100"
                       data-testid="button-save-notes"
                     >
                       Save Notes
@@ -2222,14 +2228,13 @@ export default function CrmWorkOrderDetail() {
               </Card>
 
               {/* Billing Card */}
-              <Card className="shadow-sm">
-                <CardHeader className="pb-3 border-b bg-slate-50/50">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                    <DollarSign className="h-4 w-4 text-[#711419]" />
+              <Card className="border-slate-200">
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Billing
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-4 space-y-4">
+                <CardContent className="px-4 pb-4 pt-1 space-y-4">
                   <div className="space-y-2">
                     <Label className="text-xs text-slate-500 uppercase tracking-wide">Disposition</Label>
                     <Select value={billingDisposition} onValueChange={setBillingDisposition}>
@@ -2257,9 +2262,11 @@ export default function CrmWorkOrderDetail() {
                   </div>
 
                   <Button
+                    variant="outline"
                     size="sm"
                     onClick={handleSaveBilling}
                     disabled={updateWorkOrderMutation.isPending}
+                    className="text-slate-700 hover:bg-slate-100"
                     data-testid="button-save-billing"
                   >
                     Save Billing Info

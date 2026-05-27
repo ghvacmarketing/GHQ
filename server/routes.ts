@@ -10,7 +10,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, crmNotifications, crmComments, crmCommentMentions, insertCrmNotificationSchema, insertCrmCommentSchema, insertCrmCommentMentionSchema, type CrmNotification, type InsertCrmNotification, type CrmComment, type InsertCrmComment, type CrmCommentMention, type InsertCrmCommentMention, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry, crmLeads, crmLeadTypes, insertCrmLeadSchema, insertCrmLeadTypeSchema, type CrmLead, type CrmLeadType, type InsertCrmLead, type InsertCrmLeadType, crmLeadTempOptions, crmLeadDriverOptions, insertCrmLeadTempOptionSchema, insertCrmLeadDriverOptionSchema, type CrmLeadTempOption, type CrmLeadDriverOption, type InsertCrmLeadTempOption, type InsertCrmLeadDriverOption, tasks, taskTypes, taskActivity, insertTaskSchema, insertTaskTypeSchema, insertTaskActivitySchema, type Task, type TaskType, type TaskActivity, type InsertTask, type InsertTaskType, type InsertTaskActivity } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, crmNotifications, crmComments, crmCommentMentions, insertCrmNotificationSchema, insertCrmCommentSchema, insertCrmCommentMentionSchema, type CrmNotification, type InsertCrmNotification, type CrmComment, type InsertCrmComment, type CrmCommentMention, type InsertCrmCommentMention, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry, crmLeads, crmLeadTypes, insertCrmLeadSchema, insertCrmLeadTypeSchema, type CrmLead, type CrmLeadType, type InsertCrmLead, type InsertCrmLeadType, crmLeadTempOptions, crmLeadDriverOptions, insertCrmLeadTempOptionSchema, insertCrmLeadDriverOptionSchema, type CrmLeadTempOption, type CrmLeadDriverOption, type InsertCrmLeadTempOption, type InsertCrmLeadDriverOption, tasks, taskTypes, taskActivity, insertTaskSchema, insertTaskTypeSchema, insertTaskActivitySchema, type Task, type TaskType, type TaskActivity, type InsertTask, type InsertTaskType, type InsertTaskActivity, crmTaggedComments, crmTaggedCommentRecipients, salesbookBookmarks, insertSalesbookBookmarkSchema, customerFiles, insertCustomerFileSchema, type CustomerFile, rebateCases, insertRebateCaseSchema, type RebateCase, type InsertRebateCase, insertRebateCaseDocumentSchema, insertRebateCaseScopeChecklistSchema, rebateProgramTypeEnum, rebateApplicationStatusEnum, rebateWorkflowStepStatusEnum, rebateDocumentCategoryEnum } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
@@ -29,7 +29,6 @@ import { randomUUID, createHmac } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import { syncCustomersFromSheet, getCustomerSyncStatus, resetSyncHash, startAutoSync } from "./services/customer-sync";
-import { generateQuoteWithAI, createQuoteConversation, getConversationHistory, type QuoteGenerationInput } from "./services/quote-generation";
 import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorStore, getOrCreateVectorStore, seedVectorStoreWithSalesBook, uploadCRMKnowledgeBase } from "./services/vector-store";
 import { refreshWeather, scheduleWeatherRefresh, getWeatherData } from "./weather-service";
 import { startBouncieBackgroundSync } from "./services/bouncieService";
@@ -41,7 +40,9 @@ import { runFullFieldEdgeImport } from "./services/fieldEdgeImport";
 import { fieldEdgeCustomerService, type FieldEdgeCustomer } from "./services/fieldedge-customers";
 import { sendAutomatedSms, hasNotificationBeenSent, getWorkOrderEnRouteTemplate, getWorkOrderOnSiteTemplate, getInvoiceSmsTemplate } from "./services/smsNotificationService";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
+import { recordUserActivity } from "./activity-tracker";
 import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword, isSupervisor } from "./crm-auth";
+import { startGoogleOAuth, handleGoogleOAuthCallback, isGoogleOAuthConfigured } from "./crm-google-auth";
 import cookieParser from "cookie-parser";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import stripePaymentsRouter from "./stripe-payments";
@@ -55,9 +56,9 @@ const adminTokens = new Map<string, { createdAt: number }>();
 const TOKEN_EXPIRY_DAYS = parseInt(process.env.ADMIN_TOKEN_EXPIRY_DAYS || '90', 10);
 const TOKEN_EXPIRY = TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 
-// Analytics cache to speed up dashboard loading (30-second TTL)
+// Analytics cache to speed up dashboard loading (5-minute TTL)
 const analyticsCache = new Map<string, { data: any; timestamp: number }>();
-const ANALYTICS_CACHE_TTL = 30 * 1000; // 30 seconds
+const ANALYTICS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 function getCachedAnalytics(cacheKey: string): any | null {
   const cached = analyticsCache.get(cacheKey);
@@ -308,7 +309,7 @@ async function createFollowUpWorkOrder(
     title: `Follow-up: ${quote.title || quote.quoteNumber}`,
     description: quote.description || `Follow-up work order for accepted quote ${quote.quoteNumber}`,
     status: "scheduled",
-    priority: "urgent",
+    priority: "high",
     dispatchQueueStage: options.dispatchQueueStage,
   }).returning();
 
@@ -361,6 +362,12 @@ async function hasServiceItems(quoteId: string): Promise<boolean> {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Trust proxy for Replit's infrastructure
   app.set('trust proxy', 1);
+
+  // Record user activity on every API request to drive the activity gate
+  app.use((req, _res, next) => {
+    if (req.path.startsWith('/api/')) recordUserActivity();
+    next();
+  });
 
   // Add compression middleware for better performance
   app.use(compression());
@@ -1433,75 +1440,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Generate quote with AI (OpenAI) - with conversation memory support
-  app.post("/api/quotes/generate", async (req, res) => {
-    try {
-      const input: QuoteGenerationInput = req.body;
-      
-      if (!input.cartItems || input.cartItems.length === 0) {
-        return res.status(400).json({ message: "Cart items are required" });
-      }
-      
-      const generatedQuote = await generateQuoteWithAI(input);
-      res.json(generatedQuote);
-    } catch (error) {
-      console.error('Error generating quote with AI:', error);
-      res.status(500).json({ 
-        message: "Failed to generate quote", 
-        error: error instanceof Error ? error.message : "Unknown error" 
-      });
-    }
-  });
-
-  // Create a new quote conversation (AI memory)
-  app.post("/api/quotes/conversations", async (req, res) => {
-    try {
-      const { customerName, customerId, cartSnapshot } = req.body;
-      
-      if (!customerName) {
-        return res.status(400).json({ message: "Customer name is required" });
-      }
-      
-      const conversationId = await createQuoteConversation(
-        customerName, 
-        customerId, 
-        cartSnapshot
-      );
-      
-      res.json({ conversationId });
-    } catch (error) {
-      console.error('Error creating quote conversation:', error);
-      res.status(500).json({ 
-        message: "Failed to create conversation", 
-        error: error instanceof Error ? error.message : "Unknown error" 
-      });
-    }
-  });
-
-  // Get conversation history
-  app.get("/api/quotes/conversations/:id", async (req, res) => {
-    try {
-      const conversation = await storage.getQuoteConversation(req.params.id);
-      
-      if (!conversation) {
-        return res.status(404).json({ message: "Conversation not found" });
-      }
-      
-      const messages = await getConversationHistory(req.params.id);
-      
-      res.json({ 
-        conversation,
-        messages 
-      });
-    } catch (error) {
-      console.error('Error fetching conversation:', error);
-      res.status(500).json({ 
-        message: "Failed to fetch conversation", 
-        error: error instanceof Error ? error.message : "Unknown error" 
-      });
-    }
-  });
-
   // Update quote (status or full quote data)
   app.patch("/api/quotes/:id", async (req, res) => {
     try {
@@ -1898,13 +1836,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/crm/help", requireCrmAuth, async (req, res) => {
     try {
-      const { question } = req.body;
+      const { question, conversationHistory } = req.body;
       if (!question || typeof question !== "string") {
         return res.status(400).json({ message: "Question is required" });
       }
       
       const { askCrmHelp } = await import("./services/crmHelpAI");
-      const result = await askCrmHelp(question);
+      const result = await askCrmHelp(question, Array.isArray(conversationHistory) ? conversationHistory : undefined);
       res.json(result);
     } catch (error) {
       console.error("Error in CRM help:", error);
@@ -5190,6 +5128,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/auth/google - Start Google OAuth flow
+  app.get("/api/crm/auth/google", (req, res) => {
+    void startGoogleOAuth(req, res);
+  });
+
+  // GET /api/crm/auth/google/callback - Handle Google OAuth callback
+  app.get("/api/crm/auth/google/callback", (req, res) => {
+    void handleGoogleOAuthCallback(req, res);
+  });
+
+  // GET /api/crm/auth/google/status - Whether the Google sign-in button should appear
+  app.get("/api/crm/auth/google/status", (_req, res) => {
+    res.json({ enabled: isGoogleOAuthConfigured() });
+  });
+
   // POST /api/crm/auth/logout - Destroy session
   app.post("/api/crm/auth/logout", async (req, res) => {
     try {
@@ -5452,41 +5405,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 2. Revenue by Department
       const getDepartmentRevenue = async (visitType: string) => {
-        const todayRevenue = await db
-          .select({
-            total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
-          })
-          .from(crmInvoices)
-          .innerJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
-          .where(and(
-            eq(crmWorkOrders.visitType, visitType),
-            eq(crmInvoices.status, "paid"),
-            sql`${crmInvoices.paidAt} >= ${today}`
-          ));
-
-        const mtdRevenue = await db
-          .select({
-            total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
-          })
-          .from(crmInvoices)
-          .innerJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
-          .where(and(
-            eq(crmWorkOrders.visitType, visitType),
-            eq(crmInvoices.status, "paid"),
-            sql`${crmInvoices.paidAt} >= ${startOfMonth}`
-          ));
-
-        const ytdRevenue = await db
-          .select({
-            total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
-          })
-          .from(crmInvoices)
-          .innerJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
-          .where(and(
-            eq(crmWorkOrders.visitType, visitType),
-            eq(crmInvoices.status, "paid"),
-            sql`${crmInvoices.paidAt} >= ${startOfYear}`
-          ));
+        const [todayRevenue, mtdRevenue, ytdRevenue] = await Promise.all([
+          db
+            .select({
+              total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
+            })
+            .from(crmInvoices)
+            .innerJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
+            .where(and(
+              eq(crmWorkOrders.visitType, visitType),
+              eq(crmInvoices.status, "paid"),
+              sql`${crmInvoices.paidAt} >= ${today}`
+            )),
+          db
+            .select({
+              total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
+            })
+            .from(crmInvoices)
+            .innerJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
+            .where(and(
+              eq(crmWorkOrders.visitType, visitType),
+              eq(crmInvoices.status, "paid"),
+              sql`${crmInvoices.paidAt} >= ${startOfMonth}`
+            )),
+          db
+            .select({
+              total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
+            })
+            .from(crmInvoices)
+            .innerJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
+            .where(and(
+              eq(crmWorkOrders.visitType, visitType),
+              eq(crmInvoices.status, "paid"),
+              sql`${crmInvoices.paidAt} >= ${startOfYear}`
+            )),
+        ]);
 
         return {
           today: parseFloat(todayRevenue[0]?.total || "0"),
@@ -5495,9 +5448,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       };
 
-      const serviceRevenue = await getDepartmentRevenue("SERVICE");
-      const installRevenue = await getDepartmentRevenue("INSTALL");
-      const maintenanceRevenue = await getDepartmentRevenue("MAINTENANCE");
+      const [serviceRevenue, installRevenue, maintenanceRevenue] = await Promise.all([
+        getDepartmentRevenue("SERVICE"),
+        getDepartmentRevenue("INSTALL"),
+        getDepartmentRevenue("MAINTENANCE"),
+      ]);
 
       const departmentGoals = {
         SERVICE: currentMonthlyGoals ? parseFloat(currentMonthlyGoals.monthlyServiceGoal || "0") : 0,
@@ -5605,117 +5560,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
-      // 4. Monthly Revenue for Area Chart (last 12 months)
+      // 4. Monthly Revenue for Area Chart (last 12 months) — single GROUP BY query
+      const rolling12MonthStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+      const monthlyRevenueRows = await db
+        .select({
+          month: sql<string>`TO_CHAR(DATE_TRUNC('month', ${crmInvoices.paidAt}), 'Mon')`,
+          year:  sql<number>`EXTRACT(YEAR  FROM DATE_TRUNC('month', ${crmInvoices.paidAt}))`,
+          mo:    sql<number>`EXTRACT(MONTH FROM DATE_TRUNC('month', ${crmInvoices.paidAt}))`,
+          total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
+        })
+        .from(crmInvoices)
+        .where(and(
+          eq(crmInvoices.status, "paid"),
+          sql`${crmInvoices.paidAt} >= ${rolling12MonthStart}`,
+          sql`${crmInvoices.paidAt} IS NOT NULL`
+        ))
+        .groupBy(sql`DATE_TRUNC('month', ${crmInvoices.paidAt})`)
+        .orderBy(sql`DATE_TRUNC('month', ${crmInvoices.paidAt})`);
+
+      // Build complete 12-slot array filling in zero for months with no data
+      const revenueByMonthKey = new Map(
+        monthlyRevenueRows.map(r => [`${r.year}-${String(r.mo).padStart(2, "0")}`, { month: r.month, revenue: parseFloat(r.total || "0") }])
+      );
       const monthlyRevenue: Array<{ month: string; revenue: number }> = [];
       for (let i = 11; i >= 0; i--) {
-        const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
-        const monthName = monthStart.toLocaleDateString("en-US", { month: "short" });
-        
-        const monthRevenue = await db
-          .select({
-            total: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
-          })
-          .from(crmInvoices)
-          .where(and(
-            eq(crmInvoices.status, "paid"),
-            sql`${crmInvoices.paidAt} >= ${monthStart}`,
-            sql`${crmInvoices.paidAt} <= ${monthEnd}`
-          ));
-        
-        monthlyRevenue.push({
-          month: monthName,
-          revenue: parseFloat(monthRevenue[0]?.total || "0"),
-        });
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        const label = d.toLocaleDateString("en-US", { month: "short" });
+        monthlyRevenue.push(revenueByMonthKey.get(key) ?? { month: label, revenue: 0 });
       }
 
-      // 5. Projects Overview (last 30 days)
+      // 5–7. Projects / Work Orders / Invoices overview — all fired in parallel
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      
-      const openProjectsCount = await db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(crmProjects)
-        .where(inArray(crmProjects.status, ["lead", "proposal_sent", "approved", "in_progress"]));
-      
-      const completedProjectsCount = await db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(crmProjects)
-        .where(and(
-          eq(crmProjects.status, "completed"),
-          sql`${crmProjects.updatedAt} >= ${thirtyDaysAgo}`
-        ));
-      
-      const recentProjects = await db
-        .select({
-          id: crmProjects.id,
-          name: crmProjects.title,
-          status: crmProjects.status,
-          projectType: crmProjects.projectType,
-          createdAt: crmProjects.createdAt,
-        })
-        .from(crmProjects)
-        .orderBy(desc(crmProjects.createdAt))
-        .limit(5);
 
-      // 6. Work Orders Overview (last 30 days)
-      const scheduledWoCount = await db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(crmWorkOrders)
-        .where(inArray(crmWorkOrders.status, ["scheduled", "dispatched"]));
-      
-      const completedWoCount = await db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(crmWorkOrders)
-        .where(and(
-          eq(crmWorkOrders.status, "completed"),
-          sql`COALESCE(${crmWorkOrders.completedAt}, ${crmWorkOrders.updatedAt}) >= ${thirtyDaysAgo}`
-        ));
-      
-      const recentWorkOrders = await db
-        .select({
-          id: crmWorkOrders.id,
-          visitType: crmWorkOrders.visitType,
-          status: crmWorkOrders.status,
-          scheduledStart: crmWorkOrders.scheduledStart,
-          createdAt: crmWorkOrders.createdAt,
-        })
-        .from(crmWorkOrders)
-        .orderBy(desc(crmWorkOrders.createdAt))
-        .limit(5);
-
-      // 7. Invoices Overview (last 30 days)
-      const createdInvoicesCount = await db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(crmInvoices)
-        .where(sql`${crmInvoices.createdAt} >= ${thirtyDaysAgo}`);
-      
-      const sentInvoicesCount = await db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(crmInvoices)
-        .where(and(
-          eq(crmInvoices.status, "sent"),
-          sql`${crmInvoices.createdAt} >= ${thirtyDaysAgo}`
-        ));
-      
-      const pendingInvoicesCount = await db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(crmInvoices)
-        .where(and(
-          eq(crmInvoices.status, "draft"),
-          sql`${crmInvoices.createdAt} >= ${thirtyDaysAgo}`
-        ));
-      
-      const recentInvoices = await db
-        .select({
-          id: crmInvoices.id,
-          invoiceNumber: crmInvoices.invoiceNumber,
-          total: crmInvoices.total,
-          status: crmInvoices.status,
-          createdAt: crmInvoices.createdAt,
-        })
-        .from(crmInvoices)
-        .orderBy(desc(crmInvoices.createdAt))
-        .limit(5);
+      const [
+        openProjectsCount,
+        completedProjectsCount,
+        recentProjects,
+        scheduledWoCount,
+        completedWoCount,
+        recentWorkOrders,
+        createdInvoicesCount,
+        sentInvoicesCount,
+        pendingInvoicesCount,
+        recentInvoices,
+      ] = await Promise.all([
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(crmProjects)
+          .where(inArray(crmProjects.status, ["lead", "proposal_sent", "approved", "in_progress"])),
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(crmProjects)
+          .where(and(
+            eq(crmProjects.status, "completed"),
+            sql`${crmProjects.updatedAt} >= ${thirtyDaysAgo}`
+          )),
+        db
+          .select({
+            id: crmProjects.id,
+            name: crmProjects.title,
+            status: crmProjects.status,
+            projectType: crmProjects.projectType,
+            createdAt: crmProjects.createdAt,
+          })
+          .from(crmProjects)
+          .orderBy(desc(crmProjects.createdAt))
+          .limit(5),
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(crmWorkOrders)
+          .where(inArray(crmWorkOrders.status, ["scheduled", "dispatched"])),
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(crmWorkOrders)
+          .where(and(
+            eq(crmWorkOrders.status, "completed"),
+            sql`COALESCE(${crmWorkOrders.completedAt}, ${crmWorkOrders.updatedAt}) >= ${thirtyDaysAgo}`
+          )),
+        db
+          .select({
+            id: crmWorkOrders.id,
+            visitType: crmWorkOrders.visitType,
+            status: crmWorkOrders.status,
+            scheduledStart: crmWorkOrders.scheduledStart,
+            createdAt: crmWorkOrders.createdAt,
+          })
+          .from(crmWorkOrders)
+          .orderBy(desc(crmWorkOrders.createdAt))
+          .limit(5),
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(crmInvoices)
+          .where(sql`${crmInvoices.createdAt} >= ${thirtyDaysAgo}`),
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(crmInvoices)
+          .where(and(
+            eq(crmInvoices.status, "sent"),
+            sql`${crmInvoices.createdAt} >= ${thirtyDaysAgo}`
+          )),
+        db
+          .select({ count: sql<number>`COUNT(*)` })
+          .from(crmInvoices)
+          .where(and(
+            eq(crmInvoices.status, "draft"),
+            sql`${crmInvoices.createdAt} >= ${thirtyDaysAgo}`
+          )),
+        db
+          .select({
+            id: crmInvoices.id,
+            invoiceNumber: crmInvoices.invoiceNumber,
+            total: crmInvoices.total,
+            status: crmInvoices.status,
+            createdAt: crmInvoices.createdAt,
+          })
+          .from(crmInvoices)
+          .orderBy(desc(crmInvoices.createdAt))
+          .limit(5),
+      ]);
 
       // 8. Sales Team Performance
       const salesUsers = await db
@@ -5972,27 +5935,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Uses caching (60s) and optimized single query to reduce database load
   app.get("/api/crm/customers/stats", requireCrmAuth, async (req, res) => {
     try {
-      const cacheKey = "crm:customer:stats";
-      const cached = getCachedAnalytics(cacheKey);
-      if (cached) {
-        return res.json(cached);
+      const { search } = req.query as Record<string, string | undefined>;
+      const searchTerm = search?.trim().toLowerCase() || "";
+
+      if (!searchTerm) {
+        const cacheKey = "crm:customer:stats";
+        const cached = getCachedAnalytics(cacheKey);
+        if (cached) {
+          return res.json(cached);
+        }
+
+        const [result] = await db
+          .select({
+            total: sql<number>`count(*)`,
+            prospects: sql<number>`count(*) FILTER (WHERE LOWER(customer_status) = 'prospect')`,
+            customers: sql<number>`count(*) FILTER (WHERE LOWER(customer_status) = 'customer')`,
+          })
+          .from(crmCustomers);
+
+        const [withAgreementsResult] = await db
+          .select({ count: sql<number>`count(DISTINCT ${crmCustomers.id})` })
+          .from(crmCustomers)
+          .innerJoin(crmAgreements, eq(crmAgreements.customerId, crmCustomers.id));
+
+        const stats = {
+          prospects: Number(result?.prospects || 0),
+          customers: Number(result?.customers || 0),
+          total: Number(result?.total || 0),
+          withAgreements: Number(withAgreementsResult?.count || 0),
+        };
+
+        setCachedAnalytics(cacheKey, stats);
+        return res.json(stats);
       }
 
-      // Single optimized query with conditional counting (avoids 4 separate queries)
-      // Using LOWER() to handle mixed-case status values
+      const searchWords = searchTerm.split(/\s+/).filter(w => w.length > 0);
+      let searchCondition;
+      if (searchWords.length > 1) {
+        const wordConditions = searchWords.map(word => {
+          const wordPattern = `%${word}%`;
+          return sql`(LOWER(${crmCustomers.name}) LIKE ${wordPattern} OR LOWER(${crmCustomers.fullAddress}) LIKE ${wordPattern})`;
+        });
+        searchCondition = sql`(${sql.join(wordConditions, sql` AND `)})`;
+      } else {
+        const searchPattern = `%${searchTerm}%`;
+        searchCondition = sql`(LOWER(${crmCustomers.name}) LIKE ${searchPattern} OR LOWER(${crmCustomers.email}) LIKE ${searchPattern} OR ${crmCustomers.phone} LIKE ${searchPattern} OR LOWER(${crmCustomers.fullAddress}) LIKE ${searchPattern})`;
+      }
+
       const [result] = await db
         .select({
           total: sql<number>`count(*)`,
           prospects: sql<number>`count(*) FILTER (WHERE LOWER(customer_status) = 'prospect')`,
           customers: sql<number>`count(*) FILTER (WHERE LOWER(customer_status) = 'customer')`,
         })
-        .from(crmCustomers);
+        .from(crmCustomers)
+        .where(searchCondition);
 
-      // Count customers with at least one agreement (separate query since it needs JOIN)
       const [withAgreementsResult] = await db
         .select({ count: sql<number>`count(DISTINCT ${crmCustomers.id})` })
         .from(crmCustomers)
-        .innerJoin(crmAgreements, eq(crmAgreements.customerId, crmCustomers.id));
+        .innerJoin(crmAgreements, eq(crmAgreements.customerId, crmCustomers.id))
+        .where(searchCondition);
 
       const stats = {
         prospects: Number(result?.prospects || 0),
@@ -6001,7 +6004,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         withAgreements: Number(withAgreementsResult?.count || 0),
       };
 
-      setCachedAnalytics(cacheKey, stats);
       return res.json(stats);
     } catch (error) {
       console.error("Error fetching customer stats:", error);
@@ -6022,7 +6024,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         search,
         customerType,
         customerStatus,
+        hasAgreement,
         source,
+        accountRole,
         page = "1",
         limit = "25",
       } = req.query as Record<string, string | undefined>;
@@ -6058,6 +6062,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         crmConditions.push(sql`LOWER(${crmCustomers.customerStatus}) = LOWER(${customerStatus})`);
       }
 
+      if (hasAgreement === "true") {
+        crmConditions.push(
+          sql`EXISTS (SELECT 1 FROM crm_agreements WHERE crm_agreements.customer_id = ${crmCustomers.id})`
+        );
+      }
+
+      // accountRole filter: "parent" = accounts that have sub-accounts, "sub" = accounts with a parent
+      if (accountRole === "sub") {
+        crmConditions.push(isNotNull(crmCustomers.parentCustomerId));
+      } else if (accountRole === "parent") {
+        crmConditions.push(
+          sql`${crmCustomers.id} IN (SELECT DISTINCT parent_customer_id FROM crm_customers WHERE parent_customer_id IS NOT NULL)`
+        );
+      }
+
       const whereClause = crmConditions.length > 0 ? and(...crmConditions) : undefined;
 
       // Get all CRM customers (we'll paginate the merged list)
@@ -6066,6 +6085,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(crmCustomers)
         .where(whereClause)
         .orderBy(desc(crmCustomers.createdAt));
+
+      // When searching, also pull in parent accounts of any matching sub-accounts
+      // so the parent always appears above its child in results
+      if (searchTerm && accountRole !== "sub") {
+        const matchingSubIds = crmResults
+          .filter(c => c.parentCustomerId)
+          .map(c => c.parentCustomerId as string);
+        const existingIds = new Set(crmResults.map(c => c.id));
+        const missingParentIds = matchingSubIds.filter(id => !existingIds.has(id));
+        if (missingParentIds.length > 0) {
+          const parents = await db
+            .select()
+            .from(crmCustomers)
+            .where(sql`${crmCustomers.id} = ANY(ARRAY[${sql.join(missingParentIds.map(id => sql`${id}`), sql`, `)}]::text[])`);
+          crmResults.push(...parents);
+        }
+      }
 
       // Transform CRM customers with source tag
       const crmCustomerList = crmResults.map(c => ({
@@ -7376,7 +7412,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: crmUsers.role,
         isActive: crmUsers.isActive,
         createdAt: crmUsers.createdAt,
-      }).from(crmUsers).orderBy(desc(crmUsers.createdAt));
+      }).from(crmUsers).where(eq(crmUsers.isActive, true)).orderBy(crmUsers.name);
       return res.json(users);
     } catch (error) {
       console.error("Error fetching CRM users:", error);
@@ -7390,8 +7426,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentUser = await getCurrentCrmUser(req);
       const { name, email, password, role, phone } = req.body;
 
-      if (!name || !email || !password) {
-        return res.status(400).json({ message: "name, email, and password are required" });
+      if (!name || !email) {
+        return res.status(400).json({ message: "name and email are required" });
       }
 
       const existing = await getCrmUserByEmail(email);
@@ -7399,7 +7435,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "User with this email already exists" });
       }
 
-      const passwordHash = await hashCrmPassword(password);
+      // Password is optional — when omitted, the user can only sign in with Google.
+      // Store an unusable random hash so the password column stays non-null and
+      // password login cannot succeed for this account.
+      const effectivePassword =
+        typeof password === "string" && password.length > 0
+          ? password
+          : `!google-only:${(await import("crypto")).randomBytes(32).toString("hex")}`;
+      const passwordHash = await hashCrmPassword(effectivePassword);
       const [user] = await db.insert(crmUsers).values({
         name,
         email: email.toLowerCase(),
@@ -7755,7 +7798,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       if (type) {
-        conditions.push(eq(crmNotifications.type, type as any));
+        const types = (type as string).split(",").map(t => t.trim()).filter(Boolean);
+        if (types.length === 1) {
+          conditions.push(eq(crmNotifications.type, types[0] as any));
+        } else if (types.length > 1) {
+          conditions.push(inArray(crmNotifications.type, types as any[]));
+        }
       }
 
       const notifications = await db.select({
@@ -7865,6 +7913,484 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error marking all notifications as read:", error);
       return res.status(500).json({ message: "Failed to mark all notifications as read" });
+    }
+  });
+
+  // DELETE /api/crm/notifications/:id - Delete a single notification
+  app.delete("/api/crm/notifications/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { id } = req.params;
+
+      const [notif] = await db.select({
+        id: crmNotifications.id,
+        type: crmNotifications.type,
+        entityId: crmNotifications.entityId,
+        userId: crmNotifications.userId,
+      }).from(crmNotifications).where(
+        and(
+          eq(crmNotifications.id, id),
+          eq(crmNotifications.userId, currentUser.id)
+        )
+      );
+
+      if (!notif) {
+        return res.json({ deleted: 0 });
+      }
+
+      if (notif.type === "tagged_comment" && notif.entityId) {
+        await db.delete(crmNotifications).where(
+          and(
+            eq(crmNotifications.type, "tagged_comment"),
+            eq(crmNotifications.entityId, notif.entityId)
+          )
+        );
+
+        await db.delete(crmTaggedCommentRecipients).where(
+          eq(crmTaggedCommentRecipients.commentId, notif.entityId)
+        );
+
+        await db.delete(crmTaggedComments).where(
+          eq(crmTaggedComments.id, notif.entityId)
+        );
+
+        return res.json({ deleted: 1 });
+      }
+
+      const result = await db.delete(crmNotifications).where(eq(crmNotifications.id, id));
+
+      return res.json({ deleted: result.rowCount || 0 });
+    } catch (error) {
+      console.error("Error deleting notification:", error);
+      return res.status(500).json({ message: "Failed to delete notification" });
+    }
+  });
+
+  // ============================================
+  // TAGGED COMMENTS ENDPOINTS
+  // ============================================
+
+  app.post("/api/crm/tagged-comments", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) return res.status(401).json({ message: "Unauthorized" });
+
+      const { body, pageRoute, taggedUserIds } = req.body;
+      if (!body || typeof body !== "string" || !body.trim()) {
+        return res.status(400).json({ message: "body is required" });
+      }
+      if (!pageRoute || typeof pageRoute !== "string" || !pageRoute.startsWith("/crm")) {
+        return res.status(400).json({ message: "pageRoute must be a valid CRM route" });
+      }
+      if (!Array.isArray(taggedUserIds) || taggedUserIds.length === 0) {
+        return res.status(400).json({ message: "taggedUserIds must be a non-empty array" });
+      }
+
+      const uniqueUserIds = [...new Set((taggedUserIds as unknown[]).filter((id): id is string => typeof id === "string" && id.length > 0))];
+      if (uniqueUserIds.length === 0) {
+        return res.status(400).json({ message: "At least one valid user ID is required" });
+      }
+
+      const validUsers = await db.select({ id: crmUsers.id })
+        .from(crmUsers)
+        .where(inArray(crmUsers.id, uniqueUserIds));
+      const validUserIds = validUsers.map(u => u.id);
+      if (validUserIds.length === 0) {
+        return res.status(400).json({ message: "No valid users found in taggedUserIds" });
+      }
+
+      const trimmedBody = body.trim();
+      const previewText = trimmedBody.length > 100 ? trimmedBody.slice(0, 100) + "…" : trimmedBody;
+
+      const result = await db.transaction(async (tx) => {
+        const [comment] = await tx.insert(crmTaggedComments).values({
+          authorId: currentUser.id,
+          pageRoute,
+          body: trimmedBody,
+        }).returning();
+
+        for (const userId of validUserIds) {
+          const [notification] = await tx.insert(crmNotifications).values({
+            userId,
+            type: "tagged_comment",
+            title: `${currentUser.name} left you a note`,
+            preview: previewText,
+            entityType: "tagged_comment",
+            entityId: comment.id,
+            actorId: currentUser.id,
+            isRead: false,
+          }).returning();
+
+          await tx.insert(crmTaggedCommentRecipients).values({
+            commentId: comment.id,
+            userId,
+            resolved: false,
+            notificationId: notification.id,
+          });
+        }
+
+        return comment;
+      });
+
+      return res.json(result);
+    } catch (error) {
+      console.error("Error creating tagged comment:", error);
+      return res.status(500).json({ message: "Failed to create tagged comment" });
+    }
+  });
+
+  app.get("/api/crm/tagged-comments", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) return res.status(401).json({ message: "Unauthorized" });
+
+      const { pageRoute, includeResolved } = req.query;
+      if (!pageRoute) return res.status(400).json({ message: "pageRoute is required" });
+
+      const baseRoute = (pageRoute as string).split("?")[0];
+      const pageRouteMatch = sql`split_part(${crmTaggedComments.pageRoute}, '?', 1) = ${baseRoute}`;
+
+      const conditions = [
+        eq(crmTaggedCommentRecipients.userId, currentUser.id),
+        pageRouteMatch,
+      ];
+      if (includeResolved !== "true") {
+        conditions.push(eq(crmTaggedCommentRecipients.resolved, false));
+      }
+
+      const recipientResults = await db.select({
+        id: crmTaggedComments.id,
+        body: crmTaggedComments.body,
+        pageRoute: crmTaggedComments.pageRoute,
+        authorId: crmTaggedComments.authorId,
+        authorName: crmUsers.name,
+        createdAt: crmTaggedComments.createdAt,
+        recipientId: crmTaggedCommentRecipients.id,
+        resolved: crmTaggedCommentRecipients.resolved,
+        resolvedAt: crmTaggedCommentRecipients.resolvedAt,
+        isAuthor: sql<boolean>`false`.as("is_author"),
+        resolvedByName: sql<string | null>`null`.as("resolved_by_name"),
+      })
+      .from(crmTaggedCommentRecipients)
+      .innerJoin(crmTaggedComments, eq(crmTaggedCommentRecipients.commentId, crmTaggedComments.id))
+      .innerJoin(crmUsers, eq(crmTaggedComments.authorId, crmUsers.id))
+      .where(and(...conditions))
+      .orderBy(desc(crmTaggedComments.createdAt));
+
+      const authorConditions = [
+        eq(crmTaggedComments.authorId, currentUser.id),
+        pageRouteMatch,
+        eq(crmTaggedComments.authorDismissed, false),
+      ];
+
+      const authorResults = await db.select({
+        id: crmTaggedComments.id,
+        body: crmTaggedComments.body,
+        pageRoute: crmTaggedComments.pageRoute,
+        authorId: crmTaggedComments.authorId,
+        authorName: crmUsers.name,
+        createdAt: crmTaggedComments.createdAt,
+      })
+      .from(crmTaggedComments)
+      .innerJoin(crmUsers, eq(crmTaggedComments.authorId, crmUsers.id))
+      .where(and(...authorConditions))
+      .orderBy(desc(crmTaggedComments.createdAt));
+
+      const seenIds = new Set(recipientResults.map(r => r.id));
+      type MergedComment = typeof recipientResults[number];
+      const merged: MergedComment[] = [...recipientResults];
+
+      for (const ac of authorResults) {
+        if (!seenIds.has(ac.id)) {
+          const recipientRows = await db.select({
+            resolved: crmTaggedCommentRecipients.resolved,
+            resolvedAt: crmTaggedCommentRecipients.resolvedAt,
+            resolvedByName: crmUsers.name,
+          })
+          .from(crmTaggedCommentRecipients)
+          .leftJoin(crmUsers, eq(crmTaggedCommentRecipients.resolvedById, crmUsers.id))
+          .where(eq(crmTaggedCommentRecipients.commentId, ac.id));
+
+          const allResolved = recipientRows.length > 0 && recipientRows.every(r => r.resolved);
+          const firstResolved = recipientRows.find(r => r.resolved);
+
+          merged.push({
+            ...ac,
+            recipientId: null,
+            resolved: allResolved,
+            resolvedAt: firstResolved?.resolvedAt ?? null,
+            isAuthor: true,
+            resolvedByName: firstResolved?.resolvedByName ?? null,
+          });
+        }
+      }
+      merged.sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
+
+      return res.json(merged);
+    } catch (error) {
+      console.error("Error fetching tagged comments:", error);
+      return res.status(500).json({ message: "Failed to fetch tagged comments" });
+    }
+  });
+
+  app.get("/api/crm/tagged-comments/count", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) return res.status(401).json({ message: "Unauthorized" });
+
+      const { pageRoute } = req.query;
+      const conditions = [
+        eq(crmTaggedCommentRecipients.userId, currentUser.id),
+        eq(crmTaggedCommentRecipients.resolved, false),
+      ];
+      if (pageRoute) {
+        const baseRoute = (pageRoute as string).split("?")[0];
+        conditions.push(sql`split_part(${crmTaggedComments.pageRoute}, '?', 1) = ${baseRoute}`);
+      }
+
+      const [result] = await db.select({ count: count() })
+        .from(crmTaggedCommentRecipients)
+        .innerJoin(crmTaggedComments, eq(crmTaggedCommentRecipients.commentId, crmTaggedComments.id))
+        .where(and(...conditions));
+
+      return res.json({ count: result?.count || 0 });
+    } catch (error) {
+      console.error("Error counting tagged comments:", error);
+      return res.status(500).json({ message: "Failed to count tagged comments" });
+    }
+  });
+
+  app.patch("/api/crm/tagged-comments/:commentId/resolve", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) return res.status(401).json({ message: "Unauthorized" });
+
+      const { commentId } = req.params;
+
+      const [recipient] = await db.select()
+        .from(crmTaggedCommentRecipients)
+        .where(and(
+          eq(crmTaggedCommentRecipients.commentId, commentId),
+          eq(crmTaggedCommentRecipients.userId, currentUser.id),
+        ));
+
+      if (!recipient) {
+        return res.status(404).json({ message: "Comment not found for this user" });
+      }
+
+      await db.update(crmTaggedCommentRecipients)
+        .set({ resolved: true, resolvedAt: new Date(), resolvedById: currentUser.id })
+        .where(eq(crmTaggedCommentRecipients.id, recipient.id));
+
+      if (recipient.notificationId) {
+        await db.update(crmNotifications)
+          .set({ isRead: true, readAt: new Date() })
+          .where(eq(crmNotifications.id, recipient.notificationId));
+      }
+
+      const [comment] = await db.select({
+        authorId: crmTaggedComments.authorId,
+        body: crmTaggedComments.body,
+        pageRoute: crmTaggedComments.pageRoute,
+      })
+        .from(crmTaggedComments)
+        .where(eq(crmTaggedComments.id, commentId))
+        .limit(1);
+
+      if (comment && comment.authorId !== currentUser.id) {
+        const previewText = comment.body.length > 80 ? comment.body.slice(0, 80) + "…" : comment.body;
+        await db.insert(crmNotifications).values({
+          userId: comment.authorId,
+          type: "tagged_comment",
+          title: `${currentUser.name} resolved your note`,
+          preview: previewText,
+          entityType: "tagged_comment",
+          entityId: commentId,
+          actorId: currentUser.id,
+          isRead: false,
+        });
+      }
+
+      return res.json({ resolved: true });
+    } catch (error) {
+      console.error("Error resolving tagged comment:", error);
+      return res.status(500).json({ message: "Failed to resolve tagged comment" });
+    }
+  });
+
+  app.delete("/api/crm/tagged-comments/:commentId", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) return res.status(401).json({ message: "Unauthorized" });
+
+      const { commentId } = req.params;
+
+      const [comment] = await db.select()
+        .from(crmTaggedComments)
+        .where(eq(crmTaggedComments.id, commentId));
+
+      if (!comment) {
+        return res.status(404).json({ message: "Comment not found" });
+      }
+
+      const isAuthor = comment.authorId === currentUser.id;
+      const [isRecipient] = await db.select({ id: crmTaggedCommentRecipients.id })
+        .from(crmTaggedCommentRecipients)
+        .where(and(
+          eq(crmTaggedCommentRecipients.commentId, commentId),
+          eq(crmTaggedCommentRecipients.userId, currentUser.id)
+        ));
+
+      if (!isAuthor && !isRecipient) {
+        return res.status(403).json({ message: "Not authorized to delete this comment" });
+      }
+
+      await db.delete(crmNotifications).where(
+        and(
+          eq(crmNotifications.type, "tagged_comment"),
+          eq(crmNotifications.entityId, commentId)
+        )
+      );
+
+      await db.delete(crmTaggedCommentRecipients).where(
+        eq(crmTaggedCommentRecipients.commentId, commentId)
+      );
+
+      await db.delete(crmTaggedComments).where(
+        eq(crmTaggedComments.id, commentId)
+      );
+
+      return res.json({ deleted: true });
+    } catch (error) {
+      console.error("Error deleting tagged comment:", error);
+      return res.status(500).json({ message: "Failed to delete tagged comment" });
+    }
+  });
+
+  app.get("/api/crm/tagged-comments/history", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) return res.status(401).json({ message: "Unauthorized" });
+
+      const receivedRows = await db.select({
+        id: crmTaggedComments.id,
+        body: crmTaggedComments.body,
+        pageRoute: crmTaggedComments.pageRoute,
+        authorId: crmTaggedComments.authorId,
+        authorName: crmUsers.name,
+        createdAt: crmTaggedComments.createdAt,
+        resolved: crmTaggedCommentRecipients.resolved,
+        resolvedAt: crmTaggedCommentRecipients.resolvedAt,
+        role: sql<string>`'recipient'`.as("role"),
+      })
+      .from(crmTaggedCommentRecipients)
+      .innerJoin(crmTaggedComments, eq(crmTaggedCommentRecipients.commentId, crmTaggedComments.id))
+      .innerJoin(crmUsers, eq(crmTaggedComments.authorId, crmUsers.id))
+      .where(and(
+        eq(crmTaggedCommentRecipients.userId, currentUser.id),
+        eq(crmTaggedCommentRecipients.dismissed, false)
+      ))
+      .orderBy(desc(crmTaggedComments.createdAt))
+      .limit(100);
+
+      const sentRows = await db.select({
+        id: crmTaggedComments.id,
+        body: crmTaggedComments.body,
+        pageRoute: crmTaggedComments.pageRoute,
+        authorId: crmTaggedComments.authorId,
+        authorName: crmUsers.name,
+        createdAt: crmTaggedComments.createdAt,
+      })
+      .from(crmTaggedComments)
+      .innerJoin(crmUsers, eq(crmTaggedComments.authorId, crmUsers.id))
+      .where(and(
+        eq(crmTaggedComments.authorId, currentUser.id),
+        eq(crmTaggedComments.authorDismissed, false)
+      ))
+      .orderBy(desc(crmTaggedComments.createdAt))
+      .limit(100);
+
+      const seenIds = new Set(receivedRows.map(r => r.id));
+      const results: Array<{
+        id: string;
+        body: string;
+        pageRoute: string;
+        authorId: string;
+        authorName: string | null;
+        createdAt: Date | null;
+        resolved: boolean;
+        resolvedAt: Date | null;
+        role: string;
+      }> = receivedRows.map(r => ({
+        ...r,
+        authorName: r.authorName,
+      }));
+
+      for (const s of sentRows) {
+        if (!seenIds.has(s.id)) {
+          const recipientStatuses = await db.select({
+            resolved: crmTaggedCommentRecipients.resolved,
+            resolvedAt: crmTaggedCommentRecipients.resolvedAt,
+          })
+          .from(crmTaggedCommentRecipients)
+          .where(eq(crmTaggedCommentRecipients.commentId, s.id));
+
+          const allResolved = recipientStatuses.length > 0 && recipientStatuses.every(r => r.resolved);
+          const firstResolved = recipientStatuses.find(r => r.resolved);
+
+          results.push({
+            ...s,
+            authorName: s.authorName,
+            resolved: allResolved,
+            resolvedAt: firstResolved?.resolvedAt ?? null,
+            role: "author",
+          });
+        }
+      }
+
+      results.sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
+      return res.json(results);
+    } catch (error) {
+      console.error("Error fetching tagged comment history:", error);
+      return res.status(500).json({ message: "Failed to fetch tagged comment history" });
+    }
+  });
+
+  app.get("/api/crm/tagged-comments/lookup/:commentId", requireCrmAuth, async (req, res) => {
+    try {
+      const currentUser = await getCurrentCrmUser(req);
+      if (!currentUser) return res.status(401).json({ message: "Unauthorized" });
+
+      const { commentId } = req.params;
+      const [comment] = await db.select({
+        pageRoute: crmTaggedComments.pageRoute,
+        authorId: crmTaggedComments.authorId,
+      })
+        .from(crmTaggedComments)
+        .where(eq(crmTaggedComments.id, commentId))
+        .limit(1);
+
+      if (!comment) return res.status(404).json({ message: "Comment not found" });
+
+      if (comment.authorId !== currentUser.id) {
+        const [recipient] = await db.select({ id: crmTaggedCommentRecipients.id })
+          .from(crmTaggedCommentRecipients)
+          .where(and(
+            eq(crmTaggedCommentRecipients.commentId, commentId),
+            eq(crmTaggedCommentRecipients.userId, currentUser.id),
+          ))
+          .limit(1);
+        if (!recipient) return res.status(403).json({ message: "Access denied" });
+      }
+
+      return res.json({ pageRoute: comment.pageRoute });
+    } catch (error) {
+      console.error("Error looking up tagged comment:", error);
+      return res.status(500).json({ message: "Failed to lookup tagged comment" });
     }
   });
 
@@ -10787,13 +11313,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       interface TimelineEntry {
         id: string;
-        type: 'work_order' | 'project' | 'agreement' | 'quote' | 'invoice' | 'note' | 'payment';
+        type: 'work_order' | 'project' | 'agreement' | 'quote' | 'invoice' | 'note' | 'payment' | 'file';
         title: string;
         description: string;
         timestamp: string;
         status?: string;
         amount?: string;
         linkUrl?: string;
+        signatureImage?: string;
+        signerName?: string;
+        fileUrl?: string;
+        contentType?: string;
       }
       
       const timeline: TimelineEntry[] = [];
@@ -10861,6 +11391,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: quote.status || undefined,
           amount: quote.total ? `$${parseFloat(quote.total).toLocaleString()}` : undefined,
           linkUrl: `/crm/quotes/${quote.id}`,
+          signatureImage: quote.signatureImage || undefined,
+          signerName: quote.signerName || undefined,
         });
       }
       
@@ -10904,6 +11436,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
           timestamp: toISOTimestamp(note.createdAt),
         });
       }
+
+      // Query customer files
+      const files = await storage.getCustomerFiles(customerId);
+      for (const file of files) {
+        const isImage = file.contentType?.startsWith('image/');
+        timeline.push({
+          id: `file-${file.id}`,
+          type: 'file',
+          title: isImage ? 'Photo Uploaded' : 'File Uploaded',
+          description: file.name,
+          timestamp: toISOTimestamp(file.createdAt),
+          fileUrl: file.url,
+          contentType: file.contentType || undefined,
+        });
+      }
+
+      // Query customer comments (posted via the timeline comment box)
+      const comments = await db
+        .select({
+          id: crmComments.id,
+          body: crmComments.body,
+          createdAt: crmComments.createdAt,
+          authorName: crmUsers.name,
+        })
+        .from(crmComments)
+        .leftJoin(crmUsers, eq(crmComments.authorId, crmUsers.id))
+        .where(and(eq(crmComments.entityType, 'customer'), eq(crmComments.entityId, customerId)));
+      for (const comment of comments) {
+        timeline.push({
+          id: `comment-${comment.id}`,
+          type: 'note',
+          title: comment.authorName || 'Note',
+          description: (comment.body || '').replace(/@\[[^\]]+\]/g, '').trim().substring(0, 100),
+          timestamp: toISOTimestamp(comment.createdAt),
+        });
+      }
       
       // Sort by timestamp descending (newest first)
       timeline.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -10912,6 +11480,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching customer timeline:", error);
       return res.status(500).json({ message: "Failed to fetch timeline" });
+    }
+  });
+
+  // GET /api/crm/customers/:id/files - Get all files for a customer
+  app.get("/api/crm/customers/:id/files", requireCrmAuth, async (req, res) => {
+    try {
+      const files = await storage.getCustomerFiles(req.params.id);
+      return res.json(files);
+    } catch (error) {
+      console.error("Error fetching customer files:", error);
+      return res.status(500).json({ message: "Failed to fetch files" });
+    }
+  });
+
+  // POST /api/crm/customers/:id/files - Save file metadata after upload
+  app.post("/api/crm/customers/:id/files", requireCrmAuth, async (req, res) => {
+    try {
+      const { name, url, objectPath, contentType, size } = req.body;
+      if (!name || !url) {
+        return res.status(400).json({ message: "name and url are required" });
+      }
+      const file = await storage.createCustomerFile({
+        customerId: req.params.id,
+        name,
+        url,
+        objectPath: objectPath || null,
+        contentType: contentType || null,
+        size: size || null,
+        uploadedBy: (req as any).crmUser?.id || null,
+      });
+      return res.json(file);
+    } catch (error) {
+      console.error("Error creating customer file:", error);
+      return res.status(500).json({ message: "Failed to save file" });
+    }
+  });
+
+  // DELETE /api/crm/customers/:id/files/:fileId - Delete a customer file
+  app.delete("/api/crm/customers/:id/files/:fileId", requireCrmAuth, async (req, res) => {
+    try {
+      const deleted = await storage.deleteCustomerFile(req.params.fileId, req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "File not found" });
+      }
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting customer file:", error);
+      return res.status(500).json({ message: "Failed to delete file" });
     }
   });
 
@@ -11494,15 +12110,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Convert date strings to Date objects before validation
-      // Use fromZonedTime to properly convert local time strings to UTC
-      // (the client sends times in EST without timezone suffix)
+      // The client sends UTC ISO strings (already converted via createLocalDateTime)
       const bodyWithDates = {
         ...req.body,
         scheduledStart: req.body.scheduledStart 
-          ? fromZonedTime(new Date(req.body.scheduledStart), APP_TIMEZONE)
+          ? new Date(req.body.scheduledStart)
           : undefined,
         scheduledEnd: req.body.scheduledEnd 
-          ? fromZonedTime(new Date(req.body.scheduledEnd), APP_TIMEZONE)
+          ? new Date(req.body.scheduledEnd)
           : undefined,
         startedAt: req.body.startedAt ? new Date(req.body.startedAt) : undefined,
         completedAt: req.body.completedAt ? new Date(req.body.completedAt) : undefined,
@@ -16483,6 +17098,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("[Invoice SMS] Sending to:", phoneNumber);
         
         const balanceDue = parseFloat(invoice.balanceDue || invoice.total || "0");
+        const total = parseFloat(invoice.total || "0");
+        const isPaid = invoice.status === "paid" || balanceDue <= 0;
+        const smsAmount = isPaid ? total : balanceDue;
         
         smsResult = await sendInvoiceSms({
           customerId: invoice.customerId || "",
@@ -16490,8 +17108,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerName,
           invoiceId: invoice.id,
           invoiceNumber: invoice.invoiceNumber,
-          amount: balanceDue,
+          amount: smsAmount,
           paymentLink,
+          isPaid,
         });
         
         smsSent = smsResult.success;
@@ -17657,7 +18276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/quotes/quick - Create standalone quick quote
-  app.post("/api/crm/quotes/quick", requireCrmSalesOrAbove, async (req, res) => {
+  app.post("/api/crm/quotes/quick", requireCrmTechOrAbove, async (req, res) => {
     try {
       const user = getCurrentCrmUser(req);
       if (!user) {
@@ -18633,6 +19252,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             senderName: sentByName,
             quoteViewUrl,
             replyToEmail,
+            isManual: true,
           });
 
           await db.insert(quoteEmailLogs).values({
@@ -22138,6 +22758,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     { key: "sms_template_work_order_en_route", description: "Technician En Route", defaultValue: "Your GHVAC technician is on the way! They should arrive shortly." },
     { key: "sms_template_work_order_on_site", description: "Technician On Site", defaultValue: "Your GHVAC technician has arrived and is ready to help!" },
     { key: "sms_template_invoice", description: "Invoice Payment (uses {invoiceNumber} and {paymentLink} placeholders)", defaultValue: "Your invoice #{invoiceNumber} is ready. Pay online: {paymentLink}\n\n- GHVAC" },
+    { key: "sms_template_invoice_send", description: "Invoice Send (unpaid - uses {customerName}, {invoiceNumber}, {amount}, {paymentLink})", defaultValue: "Hi {customerName}! Your invoice #{invoiceNumber} for {amount} is ready. Pay here: {paymentLink}\n\n- GHVAC" },
+    { key: "sms_template_invoice_paid", description: "Invoice Send (paid - uses {customerName}, {invoiceNumber}, {amount}, {viewLink})", defaultValue: "Hi {customerName}! Your invoice #{invoiceNumber} for {amount} has been paid in full. Thank you! View your receipt here: {viewLink}\n\n- GHVAC" },
+    { key: "sms_template_quote", description: "Quote Send (uses {customerName}, {quoteNumber}, {totalAmount}, {viewLink})", defaultValue: "Hi {customerName}! Your quote #{quoteNumber} for {totalAmount} is ready. View it here: {viewLink}\n\n- GHVAC" },
   ];
 
   // GET /api/admin/settings/sms-templates - Get all SMS templates
@@ -22222,6 +22845,11 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     { key: "email_template_invoice_subject", description: "Invoice Email Subject", defaultValue: "Your Invoice from {brand_name} - {invoice_number}", placeholders: "{brand_name}, {invoice_number}, {customer_name}, {balance_due}, {due_date}" },
     { key: "email_template_invoice_intro", description: "Invoice Email Introduction", defaultValue: "Please find your invoice details below. Thank you for your business.", placeholders: "{brand_name}, {invoice_number}, {customer_name}, {balance_due}, {due_date}" },
     { key: "email_template_invoice_signature", description: "Invoice Email Signature", defaultValue: "Thank you for choosing {brand_name}. We appreciate your business!", placeholders: "{brand_name}, {invoice_number}, {customer_name}, {balance_due}, {due_date}" },
+    { key: "email_template_booking_confirm_subject", description: "Booking Confirmation Subject", defaultValue: "Booking Confirmed — {brand_name} #{work_order_number}", placeholders: "{brand_name}, {work_order_number}, {customer_name}, {service_type}" },
+    { key: "email_template_booking_confirm_intro", description: "Booking Confirmation Introduction", defaultValue: "Thanks for booking with {brand_name}. Here's a summary of your appointment request. Our team will reach out shortly to confirm the final time.", placeholders: "{brand_name}, {work_order_number}, {customer_name}, {service_type}" },
+    { key: "email_template_booking_confirm_next_steps", description: "Booking Confirmation — What Happens Next", defaultValue: "Our scheduling team will call or text you within 1 business day to confirm your appointment time. Please have your system make/model handy if possible.", placeholders: "{brand_name}, {customer_name}, {service_type}" },
+    { key: "email_template_booking_remind_subject", description: "Booking Reminder Subject", defaultValue: "Reminder: Your appointment is today — {brand_name}", placeholders: "{brand_name}, {customer_name}, {service_type}, {time_window}" },
+    { key: "email_template_booking_remind_intro", description: "Booking Reminder Introduction", defaultValue: "Hi {customer_first_name}, just a friendly reminder that your {brand_name} technician is scheduled to arrive during your time window today.", placeholders: "{brand_name}, {customer_name}, {customer_first_name}, {service_type}, {time_window}" },
   ];
 
   // GET /api/admin/settings/email-templates - Get all email templates
@@ -24409,9 +25037,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       const duration = parseInt(durationMinutes) || 60;
       const slotsNeeded = Math.ceil(duration / 30); // How many 30-min slots needed
 
-      // Constants matching dispatch board (8am to 8pm)
-      const START_HOUR = 8;
-      const END_HOUR = 20;
+      // Constants matching dispatch board (6am to 10pm)
+      const START_HOUR = 6;
+      const END_HOUR = 22;
       const STEP_MINUTES = 30;
 
       // Parse the date properly - add T00:00:00 to avoid UTC interpretation
@@ -25971,29 +26599,138 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         ? `${cleanPhone.slice(0,3)}-${cleanPhone.slice(3,6)}-${cleanPhone.slice(6)}`
         : phone;
 
-      // Try to find existing customer by phone or email
+      // ---------------------------------------------------------------------------
+      // Helper: normalize an address string for fuzzy comparison
+      // Lowercases, strips punctuation, and collapses common abbreviations so that
+      // "215 Neal Street" and "215 neal st." both reduce to "215 neal st"
+      // ---------------------------------------------------------------------------
+      const normalizeAddr = (a: string): string =>
+        a.toLowerCase()
+          .replace(/\./g, '')
+          .replace(/,/g, '')
+          .replace(/\bstreet\b/g, 'st')
+          .replace(/\bavenue\b/g, 'ave')
+          .replace(/\bdrive\b/g, 'dr')
+          .replace(/\blane\b/g, 'ln')
+          .replace(/\broad\b/g, 'rd')
+          .replace(/\bboulevard\b/g, 'blvd')
+          .replace(/\bplace\b/g, 'pl')
+          .replace(/\bcourt\b/g, 'ct')
+          .replace(/\bcircle\b/g, 'cir')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+      // Levenshtein edit distance — handles single-character typos in street names
+      // (e.g., "Main" vs "Mian", "Neal" vs "Neel")
+      const levenshtein = (a: string, b: string): number => {
+        if (a === b) return 0;
+        if (a.length === 0) return b.length;
+        if (b.length === 0) return a.length;
+        const matrix: number[][] = [];
+        for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+        for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+        for (let i = 1; i <= b.length; i++) {
+          for (let j = 1; j <= a.length; j++) {
+            matrix[i][j] = b[i - 1] === a[j - 1]
+              ? matrix[i - 1][j - 1]
+              : 1 + Math.min(matrix[i - 1][j - 1], matrix[i][j - 1], matrix[i - 1][j]);
+          }
+        }
+        return matrix[b.length][a.length];
+      };
+
+      // Returns true if two tokens are "close enough" — exact match OR edit distance
+      // of 1 for tokens longer than 4 chars (avoids false positives on short words).
+      const tokenMatch = (t1: string, t2: string): boolean => {
+        if (t1 === t2) return true;
+        const maxLen = Math.max(t1.length, t2.length);
+        if (maxLen <= 4) return false; // short tokens need exact match
+        return levenshtein(t1, t2) <= 1;
+      };
+
+      // Returns true if two address strings refer to the same physical location.
+      // Strategy (house number is checked FIRST — no shortcuts that bypass it):
+      //   1. Exact normalized match → true.
+      //   2. Extract house numbers; if either is present they MUST match exactly.
+      //   3. Compare street-name tokens with fuzzy (Levenshtein) tolerance:
+      //      ≥ 70% of the smaller token set must have a close match in the larger.
+      //   4. If neither address has a house number, require all tokens to match
+      //      (stricter because we have less signal).
+      const addressesMatch = (a: string, b: string): boolean => {
+        const n1 = normalizeAddr(a);
+        const n2 = normalizeAddr(b);
+        if (n1 === n2) return true;
+
+        const num1 = n1.match(/^\d+/)?.[0];
+        const num2 = n2.match(/^\d+/)?.[0];
+
+        // If either address has a house number, they must match exactly.
+        // This prevents "123 Main St" from matching "23 Main St" via substring.
+        if (num1 || num2) {
+          if (!num1 || !num2) return false; // one has a number, the other doesn't
+          if (num1 !== num2) return false;  // different house numbers — definite mismatch
+        }
+
+        // Compare street-name tokens (portion after the house number)
+        const street1 = num1 ? n1.slice(num1.length).trim() : n1;
+        const street2 = num2 ? n2.slice(num2.length).trim() : n2;
+
+        // Quick containment check on just the street portion (house numbers already validated)
+        if (street1 === street2) return true;
+        if (street1.includes(street2) || street2.includes(street1)) return true;
+
+        const tokens1 = street1.split(/\s+/).filter(Boolean);
+        const tokens2 = street2.split(/\s+/).filter(Boolean);
+        if (tokens1.length === 0 && tokens2.length === 0) return true;
+        if (tokens1.length === 0 || tokens2.length === 0) return true; // only house number given
+
+        const [smaller, larger] = tokens1.length <= tokens2.length
+          ? [tokens1, tokens2]
+          : [tokens2, tokens1];
+        const matched = smaller.filter(t => larger.some(u => tokenMatch(t, u))).length;
+        const threshold = (num1 && num2) ? 0.7 : 1.0; // stricter when no house number
+        return matched / smaller.length >= threshold;
+      };
+
+      // ---------------------------------------------------------------------------
+      // Multi-signal customer matching: search phone AND email in parallel, then
+      // pick the best match.
+      //   • Both signals → same record  = strong match (use it)
+      //   • Both signals → diff records = conflict (prefer phone)
+      //   • One signal only             = use that match
+      //   • No signal                   = new customer
+      // ---------------------------------------------------------------------------
       let customerId: string | null = null;
       let propertyId: string | null = null;
       let existingCustomer: typeof crmCustomers.$inferSelect | null = null;
+      let newPropertyCreatedForExisting = false;
 
-      const existingByPhone = await db.select()
-        .from(crmCustomers)
-        .where(ilike(crmCustomers.phone, `%${cleanPhone.slice(-10)}%`))
-        .limit(1);
+      const [byPhoneResults, byEmailResults] = await Promise.all([
+        cleanPhone.length >= 10
+          ? db.select().from(crmCustomers)
+              .where(ilike(crmCustomers.phone, `%${cleanPhone.slice(-10)}%`))
+              .limit(5)
+          : Promise.resolve([] as (typeof crmCustomers.$inferSelect)[]),
+        normalizedEmail
+          ? db.select().from(crmCustomers)
+              .where(ilike(crmCustomers.email, normalizedEmail))
+              .limit(5)
+          : Promise.resolve([] as (typeof crmCustomers.$inferSelect)[]),
+      ]);
 
-      if (existingByPhone.length > 0) {
-        customerId = existingByPhone[0].id;
-        existingCustomer = existingByPhone[0];
-      } else {
-        const existingByEmail = await db.select()
-          .from(crmCustomers)
-          .where(ilike(crmCustomers.email, email))
-          .limit(1);
+      if (byPhoneResults.length > 0 && byEmailResults.length > 0) {
+        // Try to find a record that satisfies both signals
+        const overlap = byPhoneResults.find(p => byEmailResults.some(e => e.id === p.id));
+        existingCustomer = overlap ?? byPhoneResults[0]; // prefer phone on conflict
+      } else if (byPhoneResults.length > 0) {
+        existingCustomer = byPhoneResults[0];
+      } else if (byEmailResults.length > 0) {
+        existingCustomer = byEmailResults[0];
+      }
 
-        if (existingByEmail.length > 0) {
-          customerId = existingByEmail[0].id;
-          existingCustomer = existingByEmail[0];
-        }
+      if (existingCustomer) {
+        customerId = existingCustomer.id;
+        console.log(`[OnlineBooking] Matched existing customer "${existingCustomer.name}" (id=${customerId})`);
       }
 
       // If existing customer found, update their name if it looks like an address
@@ -26024,24 +26761,69 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           leadSource: "Online Booking",
         }).returning();
         customerId = newCustomer.id;
+        console.log(`[OnlineBooking] Created new customer "${customerName}" (id=${customerId})`);
 
-        // Create property for new customer
+        // Create property for new customer using correct separate columns
         const [newProperty] = await db.insert(crmProperties).values({
           customerId: customerId,
-          name: "Primary",
-          address: fullAddress,
+          address1: address,
+          city: city,
+          state: "GA",
+          zip: zipCode || "",
           propertyType: "residential",
         }).returning();
         propertyId = newProperty.id;
+        console.log(`[OnlineBooking] Created new property for new customer (id=${propertyId})`);
       } else {
-        // Get existing property
-        const existingProperty = await db.select()
+        // ---------------------------------------------------------------------------
+        // Fuzzy property matching: fetch ALL properties for this customer and find
+        // the one that best matches the address the customer typed on the booking form.
+        // If none match, create a new property so the work order goes to the right place.
+        // ---------------------------------------------------------------------------
+        const allProperties = await db.select()
           .from(crmProperties)
-          .where(eq(crmProperties.customerId, customerId))
-          .limit(1);
-        
-        if (existingProperty.length > 0) {
-          propertyId = existingProperty[0].id;
+          .where(eq(crmProperties.customerId, customerId));
+
+        // Build a single string from the booking address for comparison
+        const bookingAddrStr = `${address} ${city}`;
+
+        for (const prop of allProperties) {
+          const propAddrStr = `${prop.address1 || ''} ${prop.city || ''}`;
+          if (addressesMatch(bookingAddrStr, propAddrStr)) {
+            propertyId = prop.id;
+            console.log(`[OnlineBooking] Matched existing property "${prop.address1}, ${prop.city}" (id=${propertyId})`);
+            break;
+          }
+        }
+
+        if (!propertyId) {
+          if (allProperties.length === 0) {
+            // Customer exists but has no properties at all — create first property
+            const [newProperty] = await db.insert(crmProperties).values({
+              customerId: customerId,
+              address1: address,
+              city: city,
+              state: "GA",
+              zip: zipCode || "",
+              propertyType: "residential",
+            }).returning();
+            propertyId = newProperty.id;
+            newPropertyCreatedForExisting = true;
+            console.log(`[OnlineBooking] Created first property for existing customer (id=${propertyId})`);
+          } else {
+            // Customer has properties but none match — create new location for them
+            const [newProperty] = await db.insert(crmProperties).values({
+              customerId: customerId,
+              address1: address,
+              city: city,
+              state: "GA",
+              zip: zipCode || "",
+              propertyType: "residential",
+            }).returning();
+            propertyId = newProperty.id;
+            newPropertyCreatedForExisting = true;
+            console.log(`[OnlineBooking] New address "${address}, ${city}" — created new property for existing customer (id=${propertyId})`);
+          }
         }
       }
 
@@ -26103,6 +26885,24 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         day: 'numeric' 
       });
 
+      // Calculate scheduledStart from selectedDate + time slot start hour
+      // Time slot format: "09:00-11:00" — use start of window
+      let scheduledStart: Date | null = null;
+      try {
+        const slotStart = (selectedTimeSlot || "").split("-")[0]; // e.g. "09:00"
+        const [slotHour, slotMin] = slotStart.split(":").map(Number);
+        const dateBase = new Date(selectedDate);
+        scheduledStart = new Date(
+          dateBase.getFullYear(),
+          dateBase.getMonth(),
+          dateBase.getDate(),
+          isNaN(slotHour) ? 9 : slotHour,
+          isNaN(slotMin) ? 0 : slotMin,
+        );
+      } catch {
+        scheduledStart = null;
+      }
+
       // Create work order with NeedsScheduling status and online booking source
       const [workOrder] = await db.insert(crmWorkOrders).values({
         customerId,
@@ -26117,12 +26917,25 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         dispatchQueueStage: "NeedsScheduling",
         bookingSource: "online",
         preferredTimeSlot: `${formattedDate} ${preferredTimeDisplay}`,
-        dispatchNotes: `ONLINE BOOKING - Preferred time: ${formattedDate} ${preferredTimeDisplay}`,
+        dispatchNotes: `ONLINE BOOKING - Preferred time: ${formattedDate} ${preferredTimeDisplay}${newPropertyCreatedForExisting ? ` | ⚠ New address added from online booking (${address}, ${city}) — please verify with customer` : ""}`,
+        scheduledStart: scheduledStart ?? undefined,
       }).returning();
 
       console.log(`[OnlineBooking] Created work order #${nextWoNumber} for ${customerName} (${email})`);
 
-      // TODO: Send confirmation email to customer
+      // Send booking confirmation email (non-blocking)
+      import("./services/bookingEmail").then(({ sendBookingConfirmation }) => {
+        sendBookingConfirmation({
+          workOrderId: workOrder.id,
+          workOrderNumber: nextWoNumber,
+          customerName,
+          email,
+          serviceType: serviceType === "consultation" ? "Comfort Consultation" : "HVAC Service Call",
+          preferredDate: formattedDate,
+          preferredTimeSlot: preferredTimeDisplay,
+          address: fullAddress,
+        }).catch(err => console.error("[OnlineBooking] Confirmation email error:", err));
+      }).catch(err => console.error("[OnlineBooking] Failed to import bookingEmail:", err));
 
       res.json({
         success: true,
@@ -26442,7 +27255,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(400).json({ message: "percentageChange must be a number" });
       }
 
-      const multiplier = 1 + percentageChange / 100;
+      const newBasisPoints = Math.round(percentageChange * 100); // e.g. 5% → 500 bps
       let packagesAffected = 0;
       const crmUser = getCurrentCrmUser(req);
 
@@ -26462,14 +27275,27 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           .from(pricebookPackages)
           .where(and(...conditions));
 
-        // Update each package
+        // Update each package using base prices + cumulative adjustment basis points.
+        // If base prices are not yet set (rows predating this feature), fall back to
+        // treating the current stored price as the base at 0% adjustment.
         for (const pkg of matchingPackages) {
-          const newMonthlyPayment = Math.round(pkg.monthlyPayment * multiplier);
-          const newTotalInvestment = Math.round(pkg.totalInvestment * multiplier);
+          const cumulativeBps = (pkg.adjustmentBasisPoints ?? 0) + newBasisPoints;
+          const multiplier = 1 + cumulativeBps / 10000;
+
+          // Determine base prices: use stored base or fall back to current price
+          const baseMonthly = pkg.baseMonthlyPayment ?? pkg.monthlyPayment;
+          const baseTotal = pkg.baseTotalInvestment ?? pkg.totalInvestment;
+
+          const newMonthlyPayment = Math.round(baseMonthly * multiplier);
+          const newTotalInvestment = Math.round(baseTotal * multiplier);
 
           await db
             .update(pricebookPackages)
             .set({
+              adjustmentBasisPoints: cumulativeBps,
+              // Ensure base prices are set in case this is the first adjustment
+              baseMonthlyPayment: baseMonthly,
+              baseTotalInvestment: baseTotal,
               monthlyPayment: newMonthlyPayment,
               totalInvestment: newTotalInvestment,
               updatedAt: new Date(),
@@ -26738,13 +27564,10 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       if (limit) filters.limit = parseInt(limit as string);
       if (offset) filters.offset = parseInt(offset as string);
       
-      // Role-based filtering: Techs/Sales can only see tasks assigned to them or created by them
-      if (!isSupervisor(user.role)) {
-        // If assignedTo filter is not set, show tasks assigned to user OR created by user
-        if (!filters.assignedToUserId) {
-          filters.assignedToUserId = user.id;
-          filters.createdByUserId = user.id;
-        }
+      // Role-based filtering: Only desktop CRM users (sales+) see all tasks; techs see only their own
+      if (!isSalesOrAbove(user.role)) {
+        filters.assignedToUserId = user.id;
+        filters.createdByUserId = user.id;
       }
       
       const fetchedTasks = await storage.getTasks(filters);
@@ -26769,8 +27592,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Task not found" });
       }
 
-      // Role-based access: Non-supervisors can only view tasks assigned to them or created by them
-      if (!isSupervisor(user.role)) {
+      // Role-based access: Only desktop CRM users (sales+) can view all tasks
+      if (!isSalesOrAbove(user.role)) {
         if (task.assignedToUserId !== user.id && task.createdByUserId !== user.id) {
           return res.status(403).json({ message: "Access denied" });
         }
@@ -26802,6 +27625,16 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(400).json({ message: "Invalid task data", errors: parsed.error.errors });
       }
 
+      // Reject past due dates
+      if (parsed.data.dueAt) {
+        const due = new Date(parsed.data.dueAt);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (due < today) {
+          return res.status(400).json({ message: "Due date cannot be in the past" });
+        }
+      }
+
       const task = await storage.createTask(parsed.data);
 
       // Log activity
@@ -26811,6 +27644,20 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         action: "created",
         afterJson: JSON.stringify(task),
       });
+
+      // Notify the assignee (including self-assignment)
+      if (task.assignedToUserId) {
+        await db.insert(crmNotifications).values({
+          userId: task.assignedToUserId,
+          type: "task_assigned" as any,
+          title: `${user.name} assigned you a task`,
+          preview: task.title || null,
+          entityType: "task",
+          entityId: task.id,
+          actorId: user.id,
+          isRead: false,
+        });
+      }
 
       res.status(201).json(task);
     } catch (error) {
@@ -26833,14 +27680,32 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Task not found" });
       }
 
-      // Role-based access: Non-supervisors can only update tasks assigned to them or created by them
-      if (!isSupervisor(user.role)) {
+      // Role-based access: Only desktop CRM users (sales+) can update all tasks
+      if (!isSalesOrAbove(user.role)) {
         if (existingTask.assignedToUserId !== user.id && existingTask.createdByUserId !== user.id) {
           return res.status(403).json({ message: "Access denied" });
         }
       }
 
-      const updatedTask = await storage.updateTask(id, req.body);
+      // Reject past due dates on update
+      if (req.body.dueAt) {
+        const due = new Date(req.body.dueAt);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (due < today) {
+          return res.status(400).json({ message: "Due date cannot be in the past" });
+        }
+      }
+
+      console.log("[TaskUpdate] id:", id, "body keys:", Object.keys(req.body));
+      let updatedTask: any;
+      try {
+        updatedTask = await storage.updateTask(id, req.body);
+      } catch (updateErr) {
+        const msg = updateErr instanceof Error ? updateErr.message : String(updateErr);
+        console.error("[TaskUpdate] updateTask failed:", msg);
+        return res.status(500).json({ message: msg || "Error updating task" });
+      }
       if (!updatedTask) {
         return res.status(404).json({ message: "Task not found" });
       }
@@ -26867,10 +27732,26 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         afterJson: JSON.stringify(updatedTask),
       });
 
+      // Notify the new assignee when the task is reassigned
+      const newAssigneeId = req.body.assignedToUserId;
+      if (newAssigneeId && newAssigneeId !== existingTask.assignedToUserId) {
+        await db.insert(crmNotifications).values({
+          userId: newAssigneeId,
+          type: "task_assigned" as any,
+          title: `${user.name} assigned you a task`,
+          preview: updatedTask.title || existingTask.title || null,
+          entityType: "task",
+          entityId: id,
+          actorId: user.id,
+          isRead: false,
+        });
+      }
+
       res.json(updatedTask);
     } catch (error) {
-      console.error("Error updating task:", error);
-      res.status(500).json({ message: "Error updating task" });
+      const errMsg = error instanceof Error ? error.message : String(error);
+      console.error("Error updating task - details:", errMsg, JSON.stringify(error));
+      res.status(500).json({ message: errMsg || "Error updating task" });
     }
   });
 
@@ -26888,8 +27769,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Task not found" });
       }
 
-      // Role-based access: Non-supervisors can only delete tasks they created
-      if (!isSupervisor(user.role)) {
+      // Role-based access: Only desktop CRM users (sales+) can delete all tasks
+      if (!isSalesOrAbove(user.role)) {
         if (existingTask.createdByUserId !== user.id) {
           return res.status(403).json({ message: "Access denied - only task creator or admin can delete" });
         }
@@ -26899,6 +27780,14 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       if (!deleted) {
         return res.status(404).json({ message: "Task not found" });
       }
+
+      // Remove any notifications linked to this task
+      await db.delete(crmNotifications).where(
+        and(
+          eq(crmNotifications.entityType, "task"),
+          eq(crmNotifications.entityId, id)
+        )
+      );
 
       res.json({ message: "Task deleted successfully" });
     } catch (error) {
@@ -26921,8 +27810,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Task not found" });
       }
 
-      // Role-based access: Non-supervisors can only view activity for tasks assigned to them or created by them
-      if (!isSupervisor(user.role)) {
+      // Role-based access: Only desktop CRM users (sales+) can view all task activity
+      if (!isSalesOrAbove(user.role)) {
         if (task.assignedToUserId !== user.id && task.createdByUserId !== user.id) {
           return res.status(403).json({ message: "Access denied" });
         }
@@ -26941,7 +27830,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     try {
       const { customerId } = req.params;
       const taskList = await storage.getTasksByCustomer(customerId);
-      res.json({ tasks: fetchedTasks, total: fetchedTasks.length });
+      res.json({ tasks: taskList, total: taskList.length });
     } catch (error) {
       console.error("Error fetching customer tasks:", error);
       res.status(500).json({ message: "Error fetching customer tasks" });
@@ -26953,7 +27842,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     try {
       const { entityType, entityId } = req.params;
       const taskList = await storage.getTasksByRelatedEntity(entityType, entityId);
-      res.json({ tasks: fetchedTasks, total: fetchedTasks.length });
+      res.json({ tasks: taskList, total: taskList.length });
     } catch (error) {
       console.error("Error fetching entity tasks:", error);
       res.status(500).json({ message: "Error fetching entity tasks" });
@@ -27052,6 +27941,622 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   });
 
 
+
+  // ============================================
+  // SALESBOOK BOOKMARKS API
+  // ============================================
+
+  app.get("/api/salesbook/bookmarks", async (req, res) => {
+    try {
+      const bookmarks = await db.select().from(salesbookBookmarks).orderBy(asc(salesbookBookmarks.sortOrder));
+      return res.json(bookmarks);
+    } catch (error) {
+      console.error("Error fetching salesbook bookmarks:", error);
+      return res.status(500).json({ message: "Failed to fetch bookmarks" });
+    }
+  });
+
+  app.post("/api/salesbook/bookmarks", requireCrmAdmin, async (req, res) => {
+    try {
+      const result = insertSalesbookBookmarkSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: "Invalid bookmark data", errors: result.error.flatten().fieldErrors });
+      }
+      const [bookmark] = await db.insert(salesbookBookmarks).values(result.data).returning();
+      return res.json(bookmark);
+    } catch (error) {
+      console.error("Error creating salesbook bookmark:", error);
+      return res.status(500).json({ message: "Failed to create bookmark" });
+    }
+  });
+
+  const bookmarkUpdateSchema = z.object({
+    label: z.string().min(1).optional(),
+    pageNumber: z.number().int().min(1).optional(),
+    sortOrder: z.number().int().min(0).optional(),
+  }).refine(data => Object.keys(data).length > 0, { message: "At least one field must be provided" });
+
+  app.patch("/api/salesbook/bookmarks/:id", requireCrmAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = bookmarkUpdateSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: "Invalid update data", errors: result.error.flatten().fieldErrors });
+      }
+      const [updated] = await db.update(salesbookBookmarks).set(result.data).where(eq(salesbookBookmarks.id, id)).returning();
+      if (!updated) return res.status(404).json({ message: "Bookmark not found" });
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error updating salesbook bookmark:", error);
+      return res.status(500).json({ message: "Failed to update bookmark" });
+    }
+  });
+
+  const reorderSchema = z.object({ order: z.array(z.string().min(1)) });
+
+  app.put("/api/salesbook/bookmarks/reorder", requireCrmAdmin, async (req, res) => {
+    try {
+      const result = reorderSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ message: "order must be an array of bookmark ids" });
+      }
+      const { order } = result.data;
+      for (let i = 0; i < order.length; i++) {
+        await db.update(salesbookBookmarks).set({ sortOrder: i }).where(eq(salesbookBookmarks.id, order[i]));
+      }
+      const bookmarks = await db.select().from(salesbookBookmarks).orderBy(asc(salesbookBookmarks.sortOrder));
+      return res.json(bookmarks);
+    } catch (error) {
+      console.error("Error reordering salesbook bookmarks:", error);
+      return res.status(500).json({ message: "Failed to reorder bookmarks" });
+    }
+  });
+
+  app.delete("/api/salesbook/bookmarks/:id", requireCrmAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await db.delete(salesbookBookmarks).where(eq(salesbookBookmarks.id, id));
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting salesbook bookmark:", error);
+      return res.status(500).json({ message: "Failed to delete bookmark" });
+    }
+  });
+
+  app.get("/api/salesbook/pages", async (req, res) => {
+    try {
+      const { ensureSalesbookConverted } = await import("./services/salesbook-converter");
+      const info = ensureSalesbookConverted();
+      return res.json(info);
+    } catch (error) {
+      console.error("Error getting salesbook pages:", error);
+      return res.status(500).json({ message: "Failed to load salesbook pages" });
+    }
+  });
+  let salesbookDataCache: { data: any; timestamp: number } | null = null;
+  const SALESBOOK_CACHE_TTL = 5 * 60 * 1000;
+
+  app.get("/api/salesbook/data", async (req, res) => {
+    try {
+      if (salesbookDataCache && (Date.now() - salesbookDataCache.timestamp) < SALESBOOK_CACHE_TTL) {
+        return res.json(salesbookDataCache.data);
+      }
+      const packages = await db.select().from(pricebookPackages)
+        .where(eq(pricebookPackages.isActive, true))
+        .orderBy(asc(pricebookPackages.unitType), asc(pricebookPackages.tier), asc(pricebookPackages.tonnage));
+
+      const tiers = await db.select().from(crawlspaceTiers)
+        .where(eq(crawlspaceTiers.isActive, true))
+        .orderBy(asc(crawlspaceTiers.milThickness));
+
+      const { ensureSalesbookConverted } = await import("./services/salesbook-converter");
+      const pageInfo = ensureSalesbookConverted();
+
+      const eliteCoreBundles = [
+        {
+          id: "10yr-labor",
+          name: "10-Year Labor Warranty",
+          description: "Full labor coverage for repairs and service",
+          fixedPrice: 1000,
+          benefits: ["All labor costs covered", "No service call fees", "Factory-trained technicians", "Peace of mind protection"]
+        },
+        {
+          id: "10yr-maintenance",
+          name: "10-Year Maintenance Plan",
+          description: "Comprehensive annual maintenance for 10 years",
+          fixedPrice: 2290,
+          benefits: ["Annual system tune-ups", "Priority scheduling", "Filter replacements", "Performance optimization"]
+        },
+        {
+          id: "install-upgrade",
+          name: "Install Upgrade Bundle",
+          description: "Premium installation with Lineset + Drain + Low Voltage",
+          priceByTonnage: { "1.5": 1000, "2": 1500, "2.5": 2000, "3": 2500, "3.5": 3000, "4": 4000, "5": 5000 },
+          benefits: ["New copper lineset", "Proper condensate drainage", "Low voltage wiring upgrade", "Professional installation"]
+        }
+      ];
+
+      const eliteAirflowOptions = [
+        {
+          id: "new-ducting",
+          name: "New Ducting System",
+          description: "Complete duct system replacement with 10-year warranty",
+          priceByTonnage: { "1.5": 7527, "2": 9353, "2.5": 11179, "3": 13005, "3.5": 14831, "4": 16657, "5": 20309 }
+        },
+        {
+          id: "cleaning-return-insulation",
+          name: "Duct Cleaning + Return + Insulation",
+          description: "Duct cleaning, new return, and attic re-insulation",
+          priceByTonnage: { "1.5": 2245, "2": 2345, "2.5": 2850, "3": 2995, "3.5": 3450, "4": 3650, "5": 4450 }
+        }
+      ];
+      const responseData = {
+        staticPages: pageInfo.pages.slice(0, 12),
+        pageWidth: pageInfo.pageWidth,
+        pageHeight: pageInfo.pageHeight,
+        packages,
+        crawlspaceTiers: tiers,
+        eliteCoreBundles,
+        eliteAirflowOptions,
+      };
+      salesbookDataCache = { data: responseData, timestamp: Date.now() };
+      return res.json(responseData);
+    } catch (error) {
+      console.error("Error getting salesbook data:", error);
+      return res.status(500).json({ message: "Failed to load salesbook data" });
+    }
+  });
+
+  // ============================================
+  // PROPOSAL TEMPLATE ROUTES
+  // ============================================
+  app.get("/api/crm/proposal-templates", requireCrmAuth, async (req, res) => {
+    try {
+      const templates = await storage.getAllProposalTemplates();
+      res.json(templates);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/crm/proposal-templates/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const template = await storage.getProposalTemplate(req.params.id);
+      if (!template) return res.status(404).json({ message: "Template not found" });
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/crm/proposal-templates", requireCrmAuth, async (req, res) => {
+    try {
+      const { name, body, isDefault } = req.body;
+      if (!name || !body) return res.status(400).json({ message: "Name and body are required" });
+      const template = await storage.createProposalTemplate({ name, body, isDefault: isDefault || false });
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/crm/proposal-templates/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const template = await storage.updateProposalTemplate(req.params.id, req.body);
+      if (!template) return res.status(404).json({ message: "Template not found" });
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/crm/proposal-templates/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const ok = await storage.deleteProposalTemplate(req.params.id);
+      if (!ok) return res.status(404).json({ message: "Template not found" });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/crm/proposal-templates/seed-default", requireCrmAuth, async (req, res) => {
+    try {
+      const existing = await storage.getAllProposalTemplates();
+      if (existing.length > 0) return res.json({ message: "Templates already exist", seeded: false });
+      const { DEFAULT_TEMPLATE_BODY } = await import("@shared/default-template");
+      const template = await storage.createProposalTemplate({
+        name: "Installation Agreement",
+        body: DEFAULT_TEMPLATE_BODY,
+        isDefault: true,
+      });
+      res.json({ message: "Default template seeded", seeded: true, template });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/crm/proposal-template-images", requireCrmAuth, async (req, res) => {
+    try {
+      const images = await storage.getAllProposalTemplateImages();
+      res.json(images);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/crm/proposal-template-images", requireCrmAuth, async (req, res) => {
+    try {
+      const { name, url } = req.body;
+      if (!name || !url) return res.status(400).json({ message: "name and url are required" });
+      const image = await storage.createProposalTemplateImage({ name, url });
+      res.json(image);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/crm/proposal-template-images/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const deleted = await storage.deleteProposalTemplateImage(req.params.id);
+      if (!deleted) return res.status(404).json({ message: "Image not found" });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============================================================================
+  // Rebate Programs (HEAR/HER case management)
+  // ============================================================================
+
+  // GET /api/crm/rebate-cases - list cases
+  app.get("/api/crm/rebate-cases", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const { search, status, programType, assignedToUserId } = req.query;
+      const cases = await storage.getRebateCasesWithProgress({
+        search: search as string | undefined,
+        status: status as string | undefined,
+        programType: programType as string | undefined,
+        assignedToUserId: assignedToUserId as string | undefined,
+      });
+      res.json(cases);
+    } catch (error: any) {
+      console.error("Failed to list rebate cases:", error);
+      res.status(500).json({ message: error.message || "Failed to list rebate cases" });
+    }
+  });
+
+  // GET /api/crm/rebate-cases/:id - single case with related data
+  app.get("/api/crm/rebate-cases/:id", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const rebateCase = await storage.getRebateCase(id);
+      if (!rebateCase) {
+        return res.status(404).json({ message: "Rebate case not found" });
+      }
+      const [workflowSteps, scopeChecklist, documents, activity] = await Promise.all([
+        storage.getRebateCaseWorkflowSteps(id),
+        storage.getRebateCaseScopeChecklist(id),
+        storage.getRebateCaseDocuments(id),
+        storage.getRebateCaseActivity(id),
+      ]);
+      res.json({ ...rebateCase, workflowSteps, scopeChecklist, documents, activity });
+    } catch (error: any) {
+      console.error("Failed to fetch rebate case:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch rebate case" });
+    }
+  });
+
+  // POST /api/crm/rebate-cases - create
+  app.post("/api/crm/rebate-cases", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const body = { ...req.body };
+      // Convenience: split a single "customerName" string into first/last
+      if (body.customerName && !body.clientFirstName && !body.clientLastName) {
+        const parts = String(body.customerName).trim().split(/\s+/);
+        body.clientFirstName = parts.shift() || null;
+        body.clientLastName = parts.join(" ") || null;
+      }
+      delete body.customerName;
+      const validation = insertRebateCaseSchema.safeParse({
+        ...body,
+        createdByUserId: user?.id,
+      });
+      if (!validation.success) {
+        return res.status(400).json({ message: "Validation error", errors: validation.error.errors });
+      }
+      const created = await storage.createRebateCase(validation.data);
+      await storage.logRebateCaseActivity({
+        caseId: created.id,
+        userId: user?.id || null,
+        action: "case_created",
+        description: `Case created (${created.programType})`,
+      });
+      res.status(201).json(created);
+    } catch (error: any) {
+      console.error("Failed to create rebate case:", error);
+      res.status(500).json({ message: error.message || "Failed to create rebate case" });
+    }
+  });
+
+  // PATCH /api/crm/rebate-cases/:id - update
+  app.patch("/api/crm/rebate-cases/:id", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const { id } = req.params;
+      const existing = await storage.getRebateCase(id);
+      if (!existing) {
+        return res.status(404).json({ message: "Rebate case not found" });
+      }
+      const updateSchema = insertRebateCaseSchema.partial();
+      const validation = updateSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Validation error", errors: validation.error.errors });
+      }
+      const updated = await storage.updateRebateCase(id, validation.data as any);
+      const d = validation.data as any;
+      let loggedSomething = false;
+      // Status change
+      if (d.applicationStatus && d.applicationStatus !== existing.applicationStatus) {
+        await storage.logRebateCaseActivity({
+          caseId: id,
+          userId: user?.id || null,
+          action: "status_changed",
+          description: `Status changed from "${existing.applicationStatus}" to "${d.applicationStatus}"`,
+          metadata: { from: existing.applicationStatus, to: d.applicationStatus },
+        });
+        loggedSomething = true;
+        // Case closed (terminal statuses)
+        if (["closed", "paid", "declined", "not_interested"].includes(d.applicationStatus)) {
+          await storage.logRebateCaseActivity({
+            caseId: id,
+            userId: user?.id || null,
+            action: "case_closed",
+            description: `Case closed (${d.applicationStatus})`,
+          });
+        }
+      }
+      // Assignee change
+      if ("assignedToUserId" in d && d.assignedToUserId !== existing.assignedToUserId) {
+        await storage.logRebateCaseActivity({
+          caseId: id,
+          userId: user?.id || null,
+          action: "assignee_changed",
+          description: d.assignedToUserId ? `Assigned to user ${d.assignedToUserId}` : "Unassigned",
+          metadata: { from: existing.assignedToUserId, to: d.assignedToUserId },
+        });
+        loggedSomething = true;
+      }
+      // Expected-date changes (reservation/approval/install dates)
+      const dateFields = ["reservationDate", "approvalDate", "installCompletedDate", "paidDate"] as const;
+      for (const f of dateFields) {
+        if (f in d) {
+          const oldVal = (existing as any)[f];
+          const newVal = (d as any)[f];
+          const oldStr = oldVal ? new Date(oldVal).toISOString() : null;
+          const newStr = newVal ? new Date(newVal).toISOString() : null;
+          if (oldStr !== newStr) {
+            await storage.logRebateCaseActivity({
+              caseId: id,
+              userId: user?.id || null,
+              action: "date_changed",
+              description: `${f} changed${newStr ? ` to ${newStr.slice(0, 10)}` : " (cleared)"}`,
+              metadata: { field: f, from: oldStr, to: newStr },
+            });
+            loggedSomething = true;
+          }
+        }
+      }
+      if (!loggedSomething) {
+        await storage.logRebateCaseActivity({
+          caseId: id,
+          userId: user?.id || null,
+          action: "case_updated",
+          description: "Case details updated",
+        });
+      }
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to update rebate case:", error);
+      res.status(500).json({ message: error.message || "Failed to update rebate case" });
+    }
+  });
+
+  // DELETE /api/crm/rebate-cases/:id
+  app.delete("/api/crm/rebate-cases/:id", requireCrmAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const ok = await storage.deleteRebateCase(id);
+      if (!ok) return res.status(404).json({ message: "Rebate case not found" });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete rebate case:", error);
+      res.status(500).json({ message: error.message || "Failed to delete rebate case" });
+    }
+  });
+
+  // PATCH /api/crm/rebate-cases/:id/workflow-steps/:stepId
+  app.patch("/api/crm/rebate-cases/:id/workflow-steps/:stepId", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const { id, stepId } = req.params;
+      const allowed = ["status", "notes", "completedAt", "completedByUserId"] as const;
+      const updateData: any = {};
+      for (const key of allowed) {
+        if (key in req.body) updateData[key] = req.body[key];
+      }
+      if (updateData.status && !rebateWorkflowStepStatusEnum.includes(updateData.status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+      if (updateData.status === "complete" && !updateData.completedAt) {
+        updateData.completedAt = new Date();
+        updateData.completedByUserId = user?.id || null;
+      }
+      const updated = await storage.updateRebateCaseWorkflowStep(stepId, id, updateData);
+      if (!updated) return res.status(404).json({ message: "Workflow step not found" });
+      await storage.logRebateCaseActivity({
+        caseId: id,
+        userId: user?.id || null,
+        action: updated.status === "complete" ? "workflow_step_complete" : "workflow_step_updated",
+        description: `Step "${updated.step}" updated to "${updated.status}"`,
+      });
+      // Special-case: scope submitted
+      if (updated.step === "scope_of_work" && updated.status === "complete") {
+        await storage.logRebateCaseActivity({
+          caseId: id,
+          userId: user?.id || null,
+          action: "scope_submitted",
+          description: "Scope of Work submitted",
+        });
+      }
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to update workflow step:", error);
+      res.status(500).json({ message: error.message || "Failed to update workflow step" });
+    }
+  });
+
+  // POST /api/crm/rebate-cases/:id/scope-items
+  app.post("/api/crm/rebate-cases/:id/scope-items", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validation = insertRebateCaseScopeChecklistSchema.safeParse({
+        ...req.body,
+        caseId: id,
+      });
+      if (!validation.success) {
+        return res.status(400).json({ message: "Validation error", errors: validation.error.errors });
+      }
+      const item = await storage.createRebateScopeItem(validation.data);
+      res.status(201).json(item);
+    } catch (error: any) {
+      console.error("Failed to add scope item:", error);
+      res.status(500).json({ message: error.message || "Failed to add scope item" });
+    }
+  });
+
+  // PATCH /api/crm/rebate-cases/:id/scope-items/:itemId
+  app.patch("/api/crm/rebate-cases/:id/scope-items/:itemId", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const { id, itemId } = req.params;
+      const allowed = ["itemName", "isChecked", "notes", "sortOrder"] as const;
+      const updateData: any = {};
+      for (const key of allowed) {
+        if (key in req.body) updateData[key] = req.body[key];
+      }
+      if (updateData.isChecked === true) {
+        updateData.completedAt = new Date();
+        updateData.completedByUserId = user?.id || null;
+      } else if (updateData.isChecked === false) {
+        updateData.completedAt = null;
+        updateData.completedByUserId = null;
+      }
+      const updated = await storage.updateRebateScopeItem(itemId, id, updateData);
+      if (!updated) return res.status(404).json({ message: "Scope item not found" });
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Failed to update scope item:", error);
+      res.status(500).json({ message: error.message || "Failed to update scope item" });
+    }
+  });
+
+  // DELETE /api/crm/rebate-cases/:id/scope-items/:itemId
+  app.delete("/api/crm/rebate-cases/:id/scope-items/:itemId", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const { id, itemId } = req.params;
+      const ok = await storage.deleteRebateScopeItem(itemId, id);
+      if (!ok) return res.status(404).json({ message: "Scope item not found" });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete scope item:", error);
+      res.status(500).json({ message: error.message || "Failed to delete scope item" });
+    }
+  });
+
+  // POST /api/crm/rebate-cases/:id/documents
+  app.post("/api/crm/rebate-cases/:id/documents", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const { id } = req.params;
+      const { ObjectStorageService } = await import("./replit_integrations/object_storage/objectStorage");
+      const objectStorageService = new ObjectStorageService();
+      const rawUrl = req.body.url || req.body.uploadURL;
+      let normalizedPath = rawUrl;
+      if (rawUrl && rawUrl.startsWith("https://")) {
+        normalizedPath = objectStorageService.normalizeObjectEntityPath(rawUrl);
+      }
+      const validation = insertRebateCaseDocumentSchema.safeParse({
+        caseId: id,
+        category: (req.body.category || "other") as any,
+        name: req.body.name,
+        url: normalizedPath,
+        objectPath: normalizedPath,
+        contentType: req.body.contentType || null,
+        size: req.body.size || null,
+        notes: req.body.notes || null,
+        uploadedByUserId: user?.id || null,
+      });
+      if (!validation.success) {
+        return res.status(400).json({ message: "Validation error", errors: validation.error.errors });
+      }
+      const doc = await storage.createRebateCaseDocument(validation.data);
+      await storage.logRebateCaseActivity({
+        caseId: id,
+        userId: user?.id || null,
+        action: "document_uploaded",
+        description: `Document "${doc.name}" uploaded (${doc.category})`,
+      });
+      res.status(201).json(doc);
+    } catch (error: any) {
+      console.error("Failed to add document:", error);
+      res.status(500).json({ message: error.message || "Failed to add document" });
+    }
+  });
+
+  // DELETE /api/crm/rebate-cases/:id/documents/:docId
+  app.delete("/api/crm/rebate-cases/:id/documents/:docId", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const { id, docId } = req.params;
+      const ok = await storage.deleteRebateCaseDocument(docId, id);
+      if (!ok) return res.status(404).json({ message: "Document not found" });
+      await storage.logRebateCaseActivity({
+        caseId: id,
+        userId: user?.id || null,
+        action: "document_deleted",
+        description: "Document deleted",
+      });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete document:", error);
+      res.status(500).json({ message: error.message || "Failed to delete document" });
+    }
+  });
+
+  // POST /api/crm/rebate-cases/:id/activity - manual note
+  app.post("/api/crm/rebate-cases/:id/activity", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const { id } = req.params;
+      const description = (req.body.description || "").toString().trim();
+      if (!description) {
+        return res.status(400).json({ message: "Description is required" });
+      }
+      const entry = await storage.logRebateCaseActivity({
+        caseId: id,
+        userId: user?.id || null,
+        action: "note_added",
+        description,
+      });
+      res.status(201).json(entry);
+    } catch (error: any) {
+      console.error("Failed to add activity:", error);
+      res.status(500).json({ message: error.message || "Failed to add activity" });
+    }
+  });
 
   const httpServer = createServer(app);
   // Defer expensive startup operations to run after server is ready (allows health checks to pass)

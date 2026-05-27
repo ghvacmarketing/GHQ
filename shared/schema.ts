@@ -1075,7 +1075,7 @@ export const crmJobs = pgTable("crm_jobs", {
   siteId: varchar("site_id").references(() => crmSites.id),
   jobType: text("job_type").notNull(),
   status: text("status").$type<CrmJobStatus>().notNull().default("new"),
-  priority: text("priority").$type<"low" | "normal" | "high" | "urgent">().default("normal"),
+  priority: text("priority").$type<"low" | "normal" | "high">().default("normal"),
   description: text("description"),
   scheduledStart: timestamp("scheduled_start"),
   scheduledEnd: timestamp("scheduled_end"),
@@ -1113,7 +1113,7 @@ export const crmProjects = pgTable("crm_projects", {
   description: text("description"),
   expectedValue: decimal("expected_value", { precision: 10, scale: 2 }),
   actualValue: decimal("actual_value", { precision: 10, scale: 2 }),
-  priority: text("priority").$type<"low" | "normal" | "high" | "urgent">().default("normal"),
+  priority: text("priority").$type<"low" | "normal" | "high">().default("normal"),
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
   equipmentInfo: text("equipment_info"),
@@ -1258,7 +1258,7 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   scheduledStart: timestamp("scheduled_start"),
   scheduledEnd: timestamp("scheduled_end"),
   status: text("status").$type<WorkOrderStatus>().notNull().default("scheduled"),
-  priority: text("priority").$type<"low" | "normal" | "high" | "urgent">().default("normal"),
+  priority: text("priority").$type<"low" | "normal" | "high">().default("normal"),
   dispatchQueueStage: text("dispatch_queue_stage").$type<DispatchQueueStage>(),
   checklist: json("checklist").$type<{ item: string; completed: boolean }[]>(),
   partsUsed: json("parts_used").$type<{ partId: string; name: string; qty: number; price: number }[]>(),
@@ -1284,6 +1284,8 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   fieldEdgeWoNumber: text("field_edge_wo_number"),
   bookingSource: text("booking_source").$type<"phone" | "online" | "walk_in" | "referral">(),
   preferredTimeSlot: text("preferred_time_slot"),
+  bookingConfirmationSentAt: timestamp("booking_confirmation_sent_at"),
+  bookingReminderSentAt: timestamp("booking_reminder_sent_at"),
   immediateAction: text("immediate_action").$type<ImmediateAction>(),
   dueDate: timestamp("due_date"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -3108,6 +3110,11 @@ export const pricebookPackages = pgTable("pricebook_packages", {
   coilImageUrl: text("coil_image_url"),
   thermostatImageUrl: text("thermostat_image_url"),
   furnaceImageUrl: text("furnace_image_url"),
+  // Base prices from Google Sheets (master source). NULL until first sync after migration.
+  baseMonthlyPayment: integer("base_monthly_payment"),
+  baseTotalInvestment: integer("base_total_investment"),
+  // Cumulative adjustment in basis points (500 = +5%, -200 = -2%). Default 0 = no adjustment.
+  adjustmentBasisPoints: integer("adjustment_basis_points").default(0),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -3220,7 +3227,7 @@ export type InsertProjectLaborEntry = z.infer<typeof insertProjectLaborEntrySche
 export type ProjectLaborEntry = typeof projectLaborEntries.$inferSelect;
 
 // CRM Notifications - User notifications for mentions, assignments, etc.
-export const notificationTypeEnum = ["mention", "task_assigned", "task_due", "comment", "status_change", "system"] as const;
+export const notificationTypeEnum = ["mention", "task_assigned", "task_due", "comment", "status_change", "system", "tagged_comment"] as const;
 export type NotificationType = typeof notificationTypeEnum[number];
 
 export const crmNotifications = pgTable("crm_notifications", {
@@ -3255,11 +3262,11 @@ export const taskStatusEnum = ["pending", "in_progress", "completed", "cancelled
 export type TaskStatus = typeof taskStatusEnum[number];
 
 // Task Priority Enum
-export const taskPriorityEnum = ["low", "normal", "high", "urgent"] as const;
+export const taskPriorityEnum = ["low", "normal", "high"] as const;
 export type TaskPriority = typeof taskPriorityEnum[number];
 
 // Task Related Entity Type Enum
-export const taskRelatedEntityTypeEnum = ["customer", "lead", "project", "work_order", "invoice", "none"] as const;
+export const taskRelatedEntityTypeEnum = ["customer", "lead", "project", "work_order", "invoice", "rebate_case", "none"] as const;
 export type TaskRelatedEntityType = typeof taskRelatedEntityTypeEnum[number];
 
 // Task List Enum - Google Tasks-style columns
@@ -3272,7 +3279,7 @@ export const taskTypes = pgTable("task_types", {
   name: text("name").notNull(),
   icon: text("icon"),
   defaultDurationMinutes: integer("default_duration_minutes"),
-  defaultPriority: text("default_priority").$type<"low" | "normal" | "high" | "urgent">(),
+  defaultPriority: text("default_priority").$type<"low" | "normal" | "high">(),
   isCustomerActionable: boolean("is_customer_actionable").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -3397,3 +3404,521 @@ export const insertCrmCommentMentionSchema = createInsertSchema(crmCommentMentio
 
 export type InsertCrmCommentMention = z.infer<typeof insertCrmCommentMentionSchema>;
 export type CrmCommentMention = typeof crmCommentMentions.$inferSelect;
+
+export const crmTaggedComments = pgTable("crm_tagged_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  authorId: varchar("author_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  pageRoute: text("page_route").notNull(),
+  body: text("body").notNull(),
+  authorDismissed: boolean("author_dismissed").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const crmTaggedCommentRecipients = pgTable("crm_tagged_comment_recipients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  commentId: varchar("comment_id").notNull().references(() => crmTaggedComments.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  resolved: boolean("resolved").notNull().default(false),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedById: varchar("resolved_by_id"),
+  dismissed: boolean("dismissed").notNull().default(false),
+  notificationId: varchar("notification_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCrmTaggedCommentSchema = createInsertSchema(crmTaggedComments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCrmTaggedCommentRecipientSchema = createInsertSchema(crmTaggedCommentRecipients).omit({
+  id: true,
+  createdAt: true,
+  resolvedAt: true,
+});
+
+export type InsertCrmTaggedComment = z.infer<typeof insertCrmTaggedCommentSchema>;
+export type CrmTaggedComment = typeof crmTaggedComments.$inferSelect;
+export type InsertCrmTaggedCommentRecipient = z.infer<typeof insertCrmTaggedCommentRecipientSchema>;
+export type CrmTaggedCommentRecipient = typeof crmTaggedCommentRecipients.$inferSelect;
+
+export const salesbookBookmarks = pgTable("salesbook_bookmarks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  label: text("label").notNull(),
+  pageNumber: integer("page_number").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSalesbookBookmarkSchema = createInsertSchema(salesbookBookmarks).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSalesbookBookmark = z.infer<typeof insertSalesbookBookmarkSchema>;
+export type SalesbookBookmark = typeof salesbookBookmarks.$inferSelect;
+
+export const proposalTemplates = pgTable("proposal_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  body: text("body").notNull(),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertProposalTemplateSchema = createInsertSchema(proposalTemplates).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertProposalTemplate = z.infer<typeof insertProposalTemplateSchema>;
+export type ProposalTemplate = typeof proposalTemplates.$inferSelect;
+
+export const proposalTemplateImages = pgTable("proposal_template_images", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertProposalTemplateImageSchema = createInsertSchema(proposalTemplateImages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertProposalTemplateImage = z.infer<typeof insertProposalTemplateImageSchema>;
+export type ProposalTemplateImage = typeof proposalTemplateImages.$inferSelect;
+
+export const customerFiles = pgTable("customer_files", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").notNull(),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  objectPath: text("object_path"),
+  contentType: text("content_type"),
+  size: integer("size"),
+  uploadedBy: varchar("uploaded_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCustomerFileSchema = createInsertSchema(customerFiles).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCustomerFile = z.infer<typeof insertCustomerFileSchema>;
+export type CustomerFile = typeof customerFiles.$inferSelect;
+
+// ============================================================================
+// Rebate Programs Module (HEAR / HER case management)
+// ============================================================================
+
+export const rebateProgramTypeEnum = ["HEAR", "HER"] as const;
+export type RebateProgramType = typeof rebateProgramTypeEnum[number];
+
+export const rebateApplicationStatusEnum = [
+  "not_started",
+  "in_progress",
+  "waiting_on_customer",
+  "waiting_on_neighborly",
+  "waiting_on_utility",
+  "scope_needed",
+  "scope_submitted",
+  "scope_approved",
+  "completion_submitted",
+  "completion_approved",
+  "approved",
+  "paid",
+  "declined",
+  "not_interested",
+  "on_hold",
+  "closed",
+] as const;
+export type RebateApplicationStatus = typeof rebateApplicationStatusEnum[number];
+
+export const rebateWorkflowStepEnum = [
+  "program_overview",
+  "rebate_request",
+  "head_of_household",
+  "scope_of_work",
+  "contractor_pre_approval",
+  "project_completion",
+  "completion_attestations",
+  "reservation_summary",
+] as const;
+export type RebateWorkflowStep = typeof rebateWorkflowStepEnum[number];
+
+export const rebateWorkflowStepStatusEnum = [
+  "not_started",
+  "in_progress",
+  "complete",
+  "waiting",
+  "blocked",
+] as const;
+export type RebateWorkflowStepStatus = typeof rebateWorkflowStepStatusEnum[number];
+
+export const rebatePriorityEnum = ["low", "normal", "high", "urgent"] as const;
+export type RebatePriority = typeof rebatePriorityEnum[number];
+
+export const rebateDocumentCategoryEnum = [
+  "rebate_request",
+  "head_of_household",
+  "scope_of_work",
+  "electrical_wiring_pre_retrofit",
+  "ahri_certificate",
+  "snugg_pro_pdf",
+  "fuel_switching_calculator",
+  "manual_j_report",
+  "quality_install_address_photo",
+  "quality_install_hp_post_retrofit",
+  "quality_install_elec_wiring_post_retrofit",
+  "project_invoices_post",
+  "permit_post",
+  "contractor_pre_approval",
+  "project_completion",
+  "completion_attestations",
+  "reservation_summary",
+  "other",
+] as const;
+export type RebateDocumentCategory = typeof rebateDocumentCategoryEnum[number];
+
+// Main rebate case record
+export const rebateCases = pgTable("rebate_cases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+
+  // Summary
+  caseNumber: text("case_number"),
+  programType: text("program_type").$type<RebateProgramType>().notNull().default("HEAR"),
+  applicationStatus: text("application_status").$type<RebateApplicationStatus>().notNull().default("not_started"),
+  priority: text("priority").$type<RebatePriority>().notNull().default("normal"),
+  assignedToUserId: varchar("assigned_to_user_id").references(() => crmUsers.id, { onDelete: "set null" }),
+  customerId: varchar("customer_id").references(() => crmCustomers.id, { onDelete: "set null" }),
+  applicationDate: timestamp("application_date"),
+  reservationDate: timestamp("reservation_date"),
+  approvalDate: timestamp("approval_date"),
+  paidDate: timestamp("paid_date"),
+  rebateAmount: text("rebate_amount"),
+  notes: text("notes"),
+
+  // Client
+  clientFirstName: text("client_first_name"),
+  clientLastName: text("client_last_name"),
+  clientEmail: text("client_email"),
+  clientPhone: text("client_phone"),
+  clientDob: text("client_dob"),
+  householdSize: integer("household_size"),
+  householdIncome: text("household_income"),
+  amiBracket: text("ami_bracket"),
+
+  // Rebate Request — Section A: Contractor/Initiator Info (Neighborly form fields)
+  initiatorType: text("initiator_type"),           // A.1 Who is initiating
+  initiatorCompanyName: text("initiator_company_name"), // A.2 Company name
+  initiatorFirstName: text("initiator_first_name"), // A.3a
+  initiatorLastName: text("initiator_last_name"),   // A.3b
+  initiatorPhone: text("initiator_phone"),           // A.3c
+  initiatorEmail: text("initiator_email"),           // A.3d
+
+  // Property
+  propertyAddress: text("property_address"),
+  propertyAddressLine2: text("property_address_line2"), // A.4 line 2
+  propertyCity: text("property_city"),
+  propertyState: text("property_state"),
+  propertyZip: text("property_zip"),
+  addressCertified: boolean("address_certified").default(false), // A.4 certification
+  constructionType: text("construction_type"),      // A.5 new/existing
+  buildingType: text("building_type"),              // A.6 building type
+  buildingSubtype: text("building_subtype"),        // A.6a single family subtype
+  isRented: boolean("is_rented"),                   // A.7
+  bedroomCount: integer("bedroom_count"),           // A.8
+  sqftRange: text("sqft_range"),                    // A.9 conditioned sqft range
+  propertyType: text("property_type"),
+  ownershipStatus: text("ownership_status"),
+  yearBuilt: integer("year_built"),
+  squareFootage: integer("square_footage"),
+
+  // Utility
+  electricUtility: text("electric_utility"),
+  electricAccountNumber: text("electric_account_number"),
+  gasUtility: text("gas_utility"),
+  gasAccountNumber: text("gas_account_number"),
+
+  // Existing equipment
+  existingHeatingType: text("existing_heating_type"),
+  existingHeatingAge: integer("existing_heating_age"),
+  existingCoolingType: text("existing_cooling_type"),
+  existingCoolingAge: integer("existing_cooling_age"),
+  existingWaterHeaterType: text("existing_water_heater_type"),
+  existingWaterHeaterAge: integer("existing_water_heater_age"),
+
+  // New equipment
+  newHeatingType: text("new_heating_type"),
+  newHeatingBrand: text("new_heating_brand"),
+  newHeatingModel: text("new_heating_model"),
+  newHeatingSerial: text("new_heating_serial"),
+  newHeatingSeer: text("new_heating_seer"),
+  newHeatingHspf: text("new_heating_hspf"),
+  newCoolingType: text("new_cooling_type"),
+  newCoolingBrand: text("new_cooling_brand"),
+  newCoolingModel: text("new_cooling_model"),
+  newCoolingSerial: text("new_cooling_serial"),
+  newWaterHeaterType: text("new_water_heater_type"),
+  newWaterHeaterBrand: text("new_water_heater_brand"),
+  newWaterHeaterModel: text("new_water_heater_model"),
+
+  // Scope summary
+  scopeSummary: text("scope_summary"),
+  installCost: text("install_cost"),
+  installDate: timestamp("install_date"),
+  installCompletedDate: timestamp("install_completed_date"),
+
+  // Rebate request
+  utilityRebateAmount: text("utility_rebate_amount"),
+  federalRebateAmount: text("federal_rebate_amount"),
+  rebateRequestNotes: text("rebate_request_notes"),
+
+  // Scope of Work — Section C fields
+  scopeCounty: text("scope_county"),
+  scopeExpectedCompletionDate: text("scope_expected_completion_date"),
+  scopeIsDiy: boolean("scope_is_diy").default(false),
+  scopeAssociatedHerApp: boolean("scope_associated_her_app").default(false),
+  scopeAssociatedDiyApp: boolean("scope_associated_diy_app").default(false),
+  electricUtilityType: text("electric_utility_type"),
+  electricMunicipalProvider: text("electric_municipal_provider"),
+  electricCompanyName: text("electric_company_name"),
+  electricMeterNumber: text("electric_meter_number"),
+  electricAccountCertified: boolean("electric_account_certified").default(false),
+  hasGas: boolean("has_gas"),
+  gasCertifiedNoGas: boolean("gas_certified_no_gas").default(false),
+  gasProviderType: text("gas_provider_type"),
+  gasLocalDistCompany: text("gas_local_dist_company"),
+  gasCompanyName: text("gas_company_name"),
+  gasMeterNumber: text("gas_meter_number"),
+  gasAccountNumberScope: text("gas_account_number_scope"),
+  gasAccountCertified: boolean("gas_account_certified").default(false),
+  hasDeliveredFuel: boolean("has_delivered_fuel"),
+  deliveredFuelCompany: text("delivered_fuel_company"),
+  deliveredFuelType: text("delivered_fuel_type"),
+  deliveredFuelAccountNumber: text("delivered_fuel_account_number"),
+  deliveredFuelAccountCertified: boolean("delivered_fuel_account_certified").default(false),
+
+  // Project Details — Appliances (C.6–C.9)
+  scopeIncludesStove: boolean("scope_includes_stove").default(false),
+  scopeIncludesDryer: boolean("scope_includes_dryer").default(false),
+  scopeIncludesWaterHeater: boolean("scope_includes_water_heater").default(false),
+  scopeIncludesHeatPump: boolean("scope_includes_heat_pump").default(false),
+
+  // Heat Pump details (C.9 sub-questions)
+  hpRebateRecipient: text("hp_rebate_recipient"),
+  hpType: text("hp_type"),
+  hpDucted: text("hp_ducted"),
+  hpPrimarySource: boolean("hp_primary_source"),
+  hpExistingDistributionType: text("hp_existing_distribution_type"),
+  hpEnergyStarColdClimate: text("hp_energy_star_cold_climate"),
+  hpHeatingLoadPercent: text("hp_heating_load_percent"),
+  hpHeatingCapacityBtu: text("hp_heating_capacity_btu"),
+  hpCoolingCapacityBtu: text("hp_cooling_capacity_btu"),
+  hpMake: text("hp_make"),
+  hpModel: text("hp_model"),
+  hpExternalRebates: boolean("hp_external_rebates"),
+  hpMaterialCost: text("hp_material_cost"),
+  hpInstallCost: text("hp_install_cost"),
+  hpFuelSwitching: boolean("hp_fuel_switching"),
+
+  // Limited Assessment (existing construction heat pump)
+  assessmentDate: text("assessment_date"),
+  assessmentYearBuilt: text("assessment_year_built"),
+  ceilingInsulationKnown: boolean("ceiling_insulation_known"),
+  ceilingInsulationRValue: text("ceiling_insulation_r_value"),
+  ceilingInsulationType: text("ceiling_insulation_type"),
+  ductsInsulated: text("ducts_insulated"),
+  ductsSealed: text("ducts_sealed"),
+  envelopeAirSealed: text("envelope_air_sealed"),
+  ventilationCfmKnown: boolean("ventilation_cfm_known"),
+  ventilationCfm: text("ventilation_cfm"),
+  ventilationSystemType: text("ventilation_system_type"),
+  coolingSystemType: text("cooling_system_type"),
+
+  // Cooling Systems (limited assessment)
+  coolingEfficiencyKnown: boolean("cooling_efficiency_known"),
+  coolingEfficiencySeer: text("cooling_efficiency_seer"),
+  coolingFloorAreaKnown: boolean("cooling_floor_area_known"),
+  coolingFloorAreaPct: text("cooling_floor_area_pct"),
+
+  // Heating System (limited assessment)
+  heatingSystemFuelType: text("heating_system_fuel_type"),
+  heatingEfficiencyKnown: boolean("heating_efficiency_known"),
+  heatingHspf: text("heating_hspf"),
+  heatingAfue: text("heating_afue"),
+  heatingFloorAreaKnown: boolean("heating_floor_area_known"),
+  heatingFloorAreaPct: text("heating_floor_area_pct"),
+  electricalPanelAmps: text("electrical_panel_amps"),
+
+  // Electrical Upgrades (C.10–C.11)
+  scopeIncludesPanel: boolean("scope_includes_panel").default(false),
+  scopeIncludesWiring: boolean("scope_includes_wiring").default(false),
+  wiringExternalRebates: boolean("wiring_external_rebates"),
+  wiringMaterialCost: text("wiring_material_cost"),
+  wiringInstallCost: text("wiring_install_cost"),
+
+  // Insulation / air sealing / ventilation
+  scopeIncludesInsulation: boolean("scope_includes_insulation"),
+
+  // Estimated Project Financials
+  totalExternalRebate: text("total_external_rebate"),
+  totalEstimatedProjectCost: text("total_estimated_project_cost"),
+  estimatedRebate50Pct: text("estimated_rebate_50_pct"),
+  estimatedRebate100Pct: text("estimated_rebate_100_pct"),
+
+  // Head of Household confirmation
+  hohConfirmed: boolean("hoh_confirmed").default(false),
+  hohConfirmedDate: text("hoh_confirmed_date"),
+  hohNotes: text("hoh_notes"),
+
+  // Contractor pre-approval
+  contractorName: text("contractor_name"),
+  contractorLicenseNumber: text("contractor_license_number"),
+  preApprovalStatus: text("pre_approval_status"),
+  preApprovalSubmittedDate: timestamp("pre_approval_submitted_date"),
+  preApprovalApprovedDate: timestamp("pre_approval_approved_date"),
+  preApprovalNotes: text("pre_approval_notes"),
+
+  // Project completion
+  completionNotes: text("completion_notes"),
+
+  // Post-Installation Information (heat pump)
+  postHpType: text("post_hp_type"),
+  postHpEnergyStarColdClimate: text("post_hp_energy_star_cold_climate"),
+  postHpHeatingLoadPercent: text("post_hp_heating_load_percent"),
+  postHpHeatingCapacityBtu: text("post_hp_heating_capacity_btu"),
+  postHpCoolingCapacityBtu: text("post_hp_cooling_capacity_btu"),
+  postHpModelNumber: text("post_hp_model_number"),
+  postHpCount: integer("post_hp_count"),
+  postHpSerialNumber: text("post_hp_serial_number"),
+  postHpMake: text("post_hp_make"),
+  postHpExternalRebates: boolean("post_hp_external_rebates"),
+  postHpFinalMaterialCost: text("post_hp_final_material_cost"),
+  postHpFinalInstallCost: text("post_hp_final_install_cost"),
+  postElecCount: integer("post_elec_count"),
+  postElecModelNumber: text("post_elec_model_number"),
+  postElecExternalRebates: boolean("post_elec_external_rebates"),
+  postElecFinalMaterialCost: text("post_elec_final_material_cost"),
+  postElecFinalInstallCost: text("post_elec_final_install_cost"),
+
+  // Completion attestations
+  customerAttestationSigned: boolean("customer_attestation_signed").default(false),
+  customerAttestationDate: timestamp("customer_attestation_date"),
+  contractorAttestationSigned: boolean("contractor_attestation_signed").default(false),
+  contractorAttestationDate: timestamp("contractor_attestation_date"),
+  attestationNotes: text("attestation_notes"),
+
+  // Reservation summary
+  reservationNumber: text("reservation_number"),
+  paymentReleaseAmount: text("payment_release_amount"),
+  caseCloseoutDate: timestamp("case_closeout_date"),
+  caseCloseoutNotes: text("case_closeout_notes"),
+
+  createdByUserId: varchar("created_by_user_id").references(() => crmUsers.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+const coerceRebateDate = z.union([
+  z.string().transform((val) => val ? new Date(val) : null),
+  z.date(),
+  z.null(),
+]).nullable().optional();
+
+export const insertRebateCaseSchema = createInsertSchema(rebateCases)
+  .omit({ id: true, createdAt: true, updatedAt: true })
+  .extend({
+    applicationDate: coerceRebateDate,
+    reservationDate: coerceRebateDate,
+    approvalDate: coerceRebateDate,
+    paidDate: coerceRebateDate,
+    installDate: coerceRebateDate,
+    installCompletedDate: coerceRebateDate,
+    preApprovalSubmittedDate: coerceRebateDate,
+    preApprovalApprovedDate: coerceRebateDate,
+    customerAttestationDate: coerceRebateDate,
+    contractorAttestationDate: coerceRebateDate,
+    caseCloseoutDate: coerceRebateDate,
+  });
+export type InsertRebateCase = z.infer<typeof insertRebateCaseSchema>;
+export type RebateCase = typeof rebateCases.$inferSelect;
+
+// Workflow steps - 8 seeded per case
+export const rebateCaseWorkflowSteps = pgTable("rebate_case_workflow_steps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").notNull().references(() => rebateCases.id, { onDelete: "cascade" }),
+  step: text("step").$type<RebateWorkflowStep>().notNull(),
+  status: text("status").$type<RebateWorkflowStepStatus>().notNull().default("not_started"),
+  notes: text("notes"),
+  completedAt: timestamp("completed_at"),
+  completedByUserId: varchar("completed_by_user_id").references(() => crmUsers.id, { onDelete: "set null" }),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertRebateCaseWorkflowStepSchema = createInsertSchema(rebateCaseWorkflowSteps).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type InsertRebateCaseWorkflowStep = z.infer<typeof insertRebateCaseWorkflowStepSchema>;
+export type RebateCaseWorkflowStep = typeof rebateCaseWorkflowSteps.$inferSelect;
+
+// Scope checklist - 12 seeded items per case
+export const rebateCaseScopeChecklist = pgTable("rebate_case_scope_checklist", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").notNull().references(() => rebateCases.id, { onDelete: "cascade" }),
+  itemName: text("item_name").notNull(),
+  isChecked: boolean("is_checked").notNull().default(false),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  completedAt: timestamp("completed_at"),
+  completedByUserId: varchar("completed_by_user_id").references(() => crmUsers.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertRebateCaseScopeChecklistSchema = createInsertSchema(rebateCaseScopeChecklist).omit({
+  id: true, createdAt: true,
+});
+export type InsertRebateCaseScopeChecklist = z.infer<typeof insertRebateCaseScopeChecklistSchema>;
+export type RebateCaseScopeChecklist = typeof rebateCaseScopeChecklist.$inferSelect;
+
+// Documents
+export const rebateCaseDocuments = pgTable("rebate_case_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").notNull().references(() => rebateCases.id, { onDelete: "cascade" }),
+  category: text("category").$type<RebateDocumentCategory>().notNull().default("other"),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  objectPath: text("object_path"),
+  contentType: text("content_type"),
+  size: integer("size"),
+  notes: text("notes"),
+  uploadedByUserId: varchar("uploaded_by_user_id").references(() => crmUsers.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertRebateCaseDocumentSchema = createInsertSchema(rebateCaseDocuments).omit({
+  id: true, createdAt: true,
+});
+export type InsertRebateCaseDocument = z.infer<typeof insertRebateCaseDocumentSchema>;
+export type RebateCaseDocument = typeof rebateCaseDocuments.$inferSelect;
+
+// Activity log (timeline per case)
+export const rebateCaseActivityLog = pgTable("rebate_case_activity_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").notNull().references(() => rebateCases.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => crmUsers.id, { onDelete: "set null" }),
+  action: text("action").notNull(),
+  description: text("description"),
+  metadata: json("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertRebateCaseActivityLogSchema = createInsertSchema(rebateCaseActivityLog).omit({
+  id: true, createdAt: true,
+});
+export type InsertRebateCaseActivityLog = z.infer<typeof insertRebateCaseActivityLogSchema>;
+export type RebateCaseActivityLog = typeof rebateCaseActivityLog.$inferSelect;

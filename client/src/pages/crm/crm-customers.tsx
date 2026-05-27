@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { useLocation, Link } from "wouter";
+import { useLocation, useSearch, Link } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn, queryClient as globalQueryClient } from "@/lib/queryClient";
 
@@ -76,12 +76,20 @@ function useDebounce<T>(value: T, delay: number): T {
 export default function CrmCustomers() {
   usePageTitle("Customers");
   const [, navigate] = useLocation();
+  const searchString = useSearch();
   const queryClient = useQueryClient();
-  const [searchInput, setSearchInput] = useState("");
+
+  const initialSearch = useMemo(() => {
+    const p = new URLSearchParams(searchString);
+    return p.get("search") || "";
+  }, []);
+
+  const [searchInput, setSearchInput] = useState(initialSearch);
   const [customerType, setCustomerType] = useState("all");
   const [statusTab, setStatusTab] = useState("all");
   const [hasAgreement, setHasAgreement] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<"all" | "crm" | "fieldedge">("all");
+  const [accountRole, setAccountRole] = useState<"all" | "parent" | "sub">("all");
   const [page, setPage] = useState(1);
 
   const debouncedSearch = useDebounce(searchInput, 300);
@@ -108,7 +116,7 @@ export default function CrmCustomers() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, customerType, statusTab, hasAgreement, sourceFilter]);
+  }, [debouncedSearch, customerType, statusTab, hasAgreement, sourceFilter, accountRole]);
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
@@ -129,10 +137,13 @@ export default function CrmCustomers() {
     if (sourceFilter !== "all") {
       params.set("source", sourceFilter);
     }
+    if (accountRole !== "all") {
+      params.set("accountRole", accountRole);
+    }
     params.set("page", String(page));
     params.set("limit", String(ITEMS_PER_PAGE));
     return params.toString();
-  }, [debouncedSearch, customerType, statusTab, hasAgreement, sourceFilter, page]);
+  }, [debouncedSearch, customerType, statusTab, hasAgreement, sourceFilter, accountRole, page]);
 
   // Debug: Check cache before query runs
   useEffect(() => {
@@ -176,9 +187,11 @@ export default function CrmCustomers() {
   });
 
   const { data: statsData } = useQuery<{ prospects: number; customers: number; total: number; withAgreements: number }>({
-    queryKey: ["/api/crm/customers/stats"],
+    queryKey: ["/api/crm/customers/stats", debouncedSearch],
     queryFn: async () => {
-      const res = await fetch("/api/crm/customers/stats", { credentials: "include" });
+      const params = new URLSearchParams();
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      const res = await fetch(`/api/crm/customers/stats?${params.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch stats");
       return res.json();
     },
@@ -223,7 +236,23 @@ export default function CrmCustomers() {
 
   // Organize customers with sub-accounts grouped under parents
   const organizedCustomers = useMemo(() => {
-    const customers = customersData?.customers || [];
+    let customers = customersData?.customers || [];
+
+    // Sort exact/starts-with name matches to top when searching
+    if (debouncedSearch.trim()) {
+      const term = debouncedSearch.trim().toLowerCase();
+      customers = [...customers].sort((a, b) => {
+        const aName = (a.name || "").toLowerCase();
+        const bName = (b.name || "").toLowerCase();
+        const aExact = aName === term;
+        const bExact = bName === term;
+        const aStarts = aName.startsWith(term);
+        const bStarts = bName.startsWith(term);
+        if (aExact !== bExact) return aExact ? -1 : 1;
+        if (aStarts !== bStarts) return aStarts ? -1 : 1;
+        return 0;
+      });
+    }
     
     // Separate main accounts (no parent) and sub-accounts (have parent)
     const mainAccounts = customers.filter(c => !c.parentCustomerId);
@@ -416,11 +445,11 @@ export default function CrmCustomers() {
         </div>
 
         {/* Tabs styled like projects page - underline style */}
-        <div className="flex overflow-x-auto border-b border-slate-200">
+        <div className="flex overflow-x-auto overflow-y-hidden border-b border-slate-200 scrollbar-hide">
           <button
-            onClick={() => { setStatusTab("all"); setCustomerType("all"); setHasAgreement(false); setSourceFilter("all"); }}
+            onClick={() => { setStatusTab("all"); setCustomerType("all"); setHasAgreement(false); setSourceFilter("all"); setAccountRole("all"); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              statusTab === "all" && customerType === "all" && !hasAgreement && sourceFilter === "all"
+              statusTab === "all" && customerType === "all" && !hasAgreement && sourceFilter === "all" && accountRole === "all"
                 ? "border-[#711419] text-[#711419]"
                 : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
@@ -429,9 +458,9 @@ export default function CrmCustomers() {
             All ({statsData?.total?.toLocaleString() || 0})
           </button>
           <button
-            onClick={() => { setStatusTab("prospects"); setCustomerType("all"); setHasAgreement(false); setSourceFilter("all"); }}
+            onClick={() => { setStatusTab("prospects"); setCustomerType("all"); setHasAgreement(false); setSourceFilter("all"); setAccountRole("all"); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              statusTab === "prospects" && !hasAgreement && sourceFilter === "all"
+              statusTab === "prospects" && !hasAgreement && sourceFilter === "all" && accountRole === "all"
                 ? "border-[#711419] text-[#711419]"
                 : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
@@ -440,9 +469,9 @@ export default function CrmCustomers() {
             Leads ({statsData?.prospects?.toLocaleString() || 0})
           </button>
           <button
-            onClick={() => { setStatusTab("customers"); setCustomerType("all"); setHasAgreement(false); setSourceFilter("all"); }}
+            onClick={() => { setStatusTab("customers"); setCustomerType("all"); setHasAgreement(false); setSourceFilter("all"); setAccountRole("all"); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              statusTab === "customers" && !hasAgreement && sourceFilter === "all"
+              statusTab === "customers" && !hasAgreement && sourceFilter === "all" && accountRole === "all"
                 ? "border-[#711419] text-[#711419]"
                 : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
@@ -452,9 +481,9 @@ export default function CrmCustomers() {
           </button>
           <div className="border-l border-slate-200 mx-2" />
           <button
-            onClick={() => { setCustomerType("Residential"); setStatusTab("all"); setHasAgreement(false); setSourceFilter("all"); }}
+            onClick={() => { setCustomerType("Residential"); setStatusTab("all"); setHasAgreement(false); setSourceFilter("all"); setAccountRole("all"); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              customerType === "Residential" && !hasAgreement && sourceFilter === "all"
+              customerType === "Residential" && !hasAgreement && sourceFilter === "all" && accountRole === "all"
                 ? "border-[#711419] text-[#711419]"
                 : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
@@ -463,9 +492,9 @@ export default function CrmCustomers() {
             Residential
           </button>
           <button
-            onClick={() => { setCustomerType("Commercial"); setStatusTab("all"); setHasAgreement(false); setSourceFilter("all"); }}
+            onClick={() => { setCustomerType("Commercial"); setStatusTab("all"); setHasAgreement(false); setSourceFilter("all"); setAccountRole("all"); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              customerType === "Commercial" && !hasAgreement && sourceFilter === "all"
+              customerType === "Commercial" && !hasAgreement && sourceFilter === "all" && accountRole === "all"
                 ? "border-[#711419] text-[#711419]"
                 : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
@@ -474,9 +503,9 @@ export default function CrmCustomers() {
             Commercial
           </button>
           <button
-            onClick={() => { setCustomerType("Property Manager"); setStatusTab("all"); setHasAgreement(false); setSourceFilter("all"); }}
+            onClick={() => { setCustomerType("Property Manager"); setStatusTab("all"); setHasAgreement(false); setSourceFilter("all"); setAccountRole("all"); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              customerType === "Property Manager" && !hasAgreement && sourceFilter === "all"
+              customerType === "Property Manager" && !hasAgreement && sourceFilter === "all" && accountRole === "all"
                 ? "border-[#711419] text-[#711419]"
                 : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
@@ -486,15 +515,38 @@ export default function CrmCustomers() {
           </button>
           <div className="border-l border-slate-200 mx-2" />
           <button
-            onClick={() => { setHasAgreement(true); setCustomerType("all"); setStatusTab("all"); setSourceFilter("all"); }}
+            onClick={() => { setHasAgreement(true); setCustomerType("all"); setStatusTab("all"); setSourceFilter("all"); setAccountRole("all"); }}
             className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              hasAgreement
+              hasAgreement && accountRole === "all"
                 ? "border-[#711419] text-[#711419]"
                 : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
             }`}
             data-testid="tab-has-agreements"
           >
             Agreements ({statsData?.withAgreements?.toLocaleString() || 0})
+          </button>
+          <div className="border-l border-slate-200 mx-2" />
+          <button
+            onClick={() => { setAccountRole("parent"); setCustomerType("all"); setStatusTab("all"); setHasAgreement(false); setSourceFilter("all"); }}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+              accountRole === "parent"
+                ? "border-[#711419] text-[#711419]"
+                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+            }`}
+            data-testid="tab-role-parent"
+          >
+            Parent Accounts
+          </button>
+          <button
+            onClick={() => { setAccountRole("sub"); setCustomerType("all"); setStatusTab("all"); setHasAgreement(false); setSourceFilter("all"); }}
+            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+              accountRole === "sub"
+                ? "border-[#711419] text-[#711419]"
+                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+            }`}
+            data-testid="tab-role-sub"
+          >
+            Sub Accounts
           </button>
         </div>
 
@@ -544,7 +596,8 @@ export default function CrmCustomers() {
                           onMouseEnter={() => prefetchCustomer(customer.id)}
                           onTouchStart={() => prefetchCustomer(customer.id)}
                           onClick={() => {
-                            navigate(`/crm/customers/${customer.id}`);
+                            const q = debouncedSearch.trim();
+                            navigate(`/crm/customers/${customer.id}${q ? `?from=customers&q=${encodeURIComponent(q)}` : ""}`);
                           }}
                         >
                           <TableCell className="font-medium text-slate-900">
@@ -651,29 +704,25 @@ export default function CrmCustomers() {
                 {Math.min(page * ITEMS_PER_PAGE, total)} of {total.toLocaleString()} customers
               </p>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
+                <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
                   data-testid="button-prev-page"
+                  className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Previous
-                </Button>
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
                 <span className="text-sm text-slate-600 px-2">
                   Page {page} of {totalPages}
                 </span>
-                <Button
-                  variant="outline"
-                  size="sm"
+                <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
                   data-testid="button-next-page"
+                  className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
+                  <ChevronRight className="h-5 w-5" />
+                </button>
               </div>
             </div>
           )}

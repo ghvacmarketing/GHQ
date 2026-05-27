@@ -660,7 +660,7 @@ export default function PublicQuoteView() {
           <BrandLogo />
         </div>
 
-        <Card className="shadow-lg mb-6">
+        <Card className="shadow-lg mb-6 bg-slate-50 border-0">
           <CardHeader className="border-b" style={{ backgroundColor: BRAND_COLOR }}>
             <div className="flex items-center justify-between text-white">
               <div className="flex items-center gap-2">
@@ -670,14 +670,22 @@ export default function PublicQuoteView() {
               <span className="text-sm opacity-90">{formatDate(quoteData.createdAt)}</span>
             </div>
           </CardHeader>
-          <CardContent className="py-6 space-y-6">
-            <div className="bg-slate-50 rounded-lg p-4">
+          <CardContent className="py-6 space-y-6 bg-slate-50">
+            <div className="bg-slate-100 rounded-lg p-4">
               <h3 className="font-semibold text-slate-700 mb-2">Prepared For</h3>
               <p className="font-medium text-slate-900" data-testid="text-customer-name">{quoteData.customerName}</p>
               {quoteData.serviceAddress && (
                 <p className="text-slate-600 text-sm" data-testid="text-service-address">{quoteData.serviceAddress}</p>
               )}
             </div>
+
+            {/* Description / contract template content */}
+            {quoteData.description && (
+              <div
+                className="contract-description border-t pt-4"
+                dangerouslySetInnerHTML={{ __html: quoteData.description }}
+              />
+            )}
 
             {/* Option-based quotes: show intro explaining this is a multi-option proposal */}
             {quoteData.quoteMode === "options" ? (
@@ -736,7 +744,7 @@ export default function PublicQuoteView() {
                                     <div className="flex-shrink-0">
                                       <EquipmentImageGrid images={equipmentImages} />
                                     </div>
-                                  ) : item.imageUrl && (
+                                  ) : item.imageUrl ? (
                                     <div className="flex-shrink-0">
                                       <img 
                                         src={item.imageUrl} 
@@ -744,6 +752,10 @@ export default function PublicQuoteView() {
                                         className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg border border-slate-200"
                                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                       />
+                                    </div>
+                                  ) : (
+                                    <div className="flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center">
+                                      <span className="text-xs text-slate-400 text-center leading-tight px-1">No Image</span>
                                     </div>
                                   )}
                                   <div className="flex-1 min-w-0">
@@ -799,11 +811,8 @@ export default function PublicQuoteView() {
               </>
             ) : (
               <>
-                {(quoteData.title || quoteData.description) && (
-                  <div>
-                    {quoteData.title && <h3 className="text-lg font-semibold text-slate-900 mb-1">{quoteData.title}</h3>}
-                    {quoteData.description && <p className="text-slate-600">{quoteData.description}</p>}
-                  </div>
+                {quoteData.title && (
+                  <h3 className="text-lg font-semibold text-slate-900">{quoteData.title}</h3>
                 )}
 
                 <div>

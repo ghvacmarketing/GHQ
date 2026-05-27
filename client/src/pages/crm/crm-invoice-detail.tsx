@@ -262,13 +262,25 @@ export default function CrmInvoiceDetail() {
       }
       return res.json();
     },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/invoices"] });
+      const snapshots = queryClient.getQueriesData({ queryKey: ["/api/crm/invoices"] });
+      queryClient.setQueriesData({ queryKey: ["/api/crm/invoices"] }, (old: any) => {
+        if (!old?.invoices) return old;
+        return { ...old, invoices: old.invoices.filter((inv: any) => inv.id !== invoiceId) };
+      });
+      navigate("/crm/invoices");
+      return { snapshots };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/dashboard/analytics"] });
       toast({ title: "Invoice deleted", description: "Invoice has been deleted." });
-      navigate("/crm/invoices");
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _vars, context: any) => {
+      context?.snapshots?.forEach(([key, data]: [any, any]) => {
+        queryClient.setQueryData(key, data);
+      });
       toast({ title: "Failed to delete invoice", description: error.message, variant: "destructive" });
     },
   });

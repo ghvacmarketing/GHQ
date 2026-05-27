@@ -1,4 +1,5 @@
 import { storage } from "./storage";
+import { isAppActive } from "./activity-tracker";
 
 const WEATHER_LAT = process.env.WEATHER_LAT;
 const WEATHER_LON = process.env.WEATHER_LON;
@@ -74,6 +75,10 @@ export function scheduleWeatherRefresh(): void {
   refreshWeather().catch(console.error);
 
   weatherRefreshInterval = setInterval(() => {
+    if (!isAppActive()) {
+      console.log("[Weather] App idle, skipping refresh");
+      return;
+    }
     refreshWeather().catch(console.error);
   }, 24 * 60 * 60 * 1000);
 

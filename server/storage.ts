@@ -1,7 +1,7 @@
-import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type CallLogTask, type InsertCallLogTask, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, type CrmItem, type InsertCrmItem, type CrmMessagingConversation, type InsertCrmMessagingConversation, type CrmMessagingMessage, type InsertCrmMessagingMessage, type CrmMessagingConversationTag, type InsertCrmMessagingConversationTag, type CrmTimeEntry, type InsertCrmTimeEntry, type SmsNotificationLog, type InsertSmsNotificationLog, type SmsNotificationType, type CrmProjectTask, type InsertCrmProjectTask, type Task, type InsertTask, type TaskType, type InsertTaskType, type TaskActivity, type InsertTaskActivity, type TaskSubtask, type InsertTaskSubtask, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, callLogTasks, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems, crmItems, crmMessagingConversations, crmMessagingMessages, crmMessagingConversationTags, crmCustomers, crmTimeEntries, smsNotificationLog, crmUsers, crmProjectTasks, tasks, taskTypes, taskActivity, taskSubtasks } from "@shared/schema";
+import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type CallLogTask, type InsertCallLogTask, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, type CrmItem, type InsertCrmItem, type CrmMessagingConversation, type InsertCrmMessagingConversation, type CrmMessagingMessage, type InsertCrmMessagingMessage, type CrmMessagingConversationTag, type InsertCrmMessagingConversationTag, type CrmTimeEntry, type InsertCrmTimeEntry, type SmsNotificationLog, type InsertSmsNotificationLog, type SmsNotificationType, type CrmProjectTask, type InsertCrmProjectTask, type Task, type InsertTask, type TaskType, type InsertTaskType, type TaskActivity, type InsertTaskActivity, type TaskSubtask, type InsertTaskSubtask, type ProposalTemplate, type InsertProposalTemplate, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, callLogTasks, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems, crmItems, crmMessagingConversations, crmMessagingMessages, crmMessagingConversationTags, crmCustomers, crmTimeEntries, smsNotificationLog, crmUsers, crmProjectTasks, tasks, taskTypes, taskActivity, taskSubtasks, proposalTemplates, proposalTemplateImages, type ProposalTemplateImage, type InsertProposalTemplateImage, customerFiles, type CustomerFile, type InsertCustomerFile, rebateCases, rebateCaseWorkflowSteps, rebateCaseScopeChecklist, rebateCaseDocuments, rebateCaseActivityLog, type RebateCase, type InsertRebateCase, type RebateCaseWorkflowStep, type InsertRebateCaseWorkflowStep, type RebateCaseScopeChecklist, type InsertRebateCaseScopeChecklist, type RebateCaseDocument, type InsertRebateCaseDocument, type RebateCaseActivityLog, type InsertRebateCaseActivityLog, type RebateWorkflowStep, rebateWorkflowStepEnum } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, or, and, ilike, sql, notInArray, desc, gte, lte, asc, isNull, isNotNull, lt, ne, type SQL } from "drizzle-orm";
+import { eq, or, and, ilike, sql, notInArray, inArray, desc, gte, lte, asc, isNull, isNotNull, lt, ne, type SQL } from "drizzle-orm";
 
 export interface IStorage {
   // Quote operations
@@ -325,6 +325,39 @@ export interface IStorage {
   updateSubtask(id: string, data: Partial<InsertTaskSubtask>): Promise<TaskSubtask | null>;
   deleteSubtask(id: string): Promise<boolean>;
   getSubtasksWithDueDate(startDate: Date, endDate: Date): Promise<(TaskSubtask & { taskTitle: string })[]>;
+
+  // Proposal Template operations
+  getAllProposalTemplates(): Promise<ProposalTemplate[]>;
+  getProposalTemplate(id: string): Promise<ProposalTemplate | undefined>;
+  createProposalTemplate(data: InsertProposalTemplate): Promise<ProposalTemplate>;
+  updateProposalTemplate(id: string, data: Partial<InsertProposalTemplate>): Promise<ProposalTemplate | undefined>;
+  deleteProposalTemplate(id: string): Promise<boolean>;
+  getAllProposalTemplateImages(): Promise<ProposalTemplateImage[]>;
+  createProposalTemplateImage(data: InsertProposalTemplateImage): Promise<ProposalTemplateImage>;
+  deleteProposalTemplateImage(id: string): Promise<boolean>;
+
+  getCustomerFiles(customerId: string): Promise<CustomerFile[]>;
+  createCustomerFile(data: InsertCustomerFile): Promise<CustomerFile>;
+  deleteCustomerFile(id: string, customerId?: string): Promise<boolean>;
+
+  // Rebate Programs
+  getRebateCases(filters?: { search?: string; status?: string; programType?: string; assignedToUserId?: string }): Promise<RebateCase[]>;
+  getRebateCase(id: string): Promise<RebateCase | undefined>;
+  getRebateCasesWithProgress(filters?: { search?: string; status?: string; programType?: string; assignedToUserId?: string }): Promise<Array<RebateCase & { workflowCompleted: number; workflowTotal: number; currentStep: RebateWorkflowStep | null }>>;
+  createRebateCase(data: InsertRebateCase): Promise<RebateCase>;
+  updateRebateCase(id: string, data: Partial<RebateCase>): Promise<RebateCase | undefined>;
+  deleteRebateCase(id: string): Promise<boolean>;
+  getRebateCaseWorkflowSteps(caseId: string): Promise<RebateCaseWorkflowStep[]>;
+  updateRebateCaseWorkflowStep(id: string, caseId: string, data: Partial<RebateCaseWorkflowStep>): Promise<RebateCaseWorkflowStep | undefined>;
+  getRebateCaseScopeChecklist(caseId: string): Promise<RebateCaseScopeChecklist[]>;
+  createRebateScopeItem(data: InsertRebateCaseScopeChecklist): Promise<RebateCaseScopeChecklist>;
+  updateRebateScopeItem(id: string, caseId: string, data: Partial<RebateCaseScopeChecklist>): Promise<RebateCaseScopeChecklist | undefined>;
+  deleteRebateScopeItem(id: string, caseId: string): Promise<boolean>;
+  getRebateCaseDocuments(caseId: string): Promise<RebateCaseDocument[]>;
+  createRebateCaseDocument(data: InsertRebateCaseDocument): Promise<RebateCaseDocument>;
+  deleteRebateCaseDocument(id: string, caseId: string): Promise<boolean>;
+  getRebateCaseActivity(caseId: string): Promise<RebateCaseActivityLog[]>;
+  logRebateCaseActivity(data: InsertRebateCaseActivityLog): Promise<RebateCaseActivityLog>;
 }
 
 // Old MemStorage removed - now using DatabaseStorage with persistent PostgreSQL
@@ -1216,12 +1249,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllVoicemails(): Promise<Voicemail[]> {
-    const allVoicemails = await db.select().from(voicemails).orderBy(voicemails.createdAt);
-    return allVoicemails.reverse();
+    return await db.select().from(voicemails).orderBy(desc(voicemails.receivedAt));
   }
 
   async getVoicemailsByStatus(status: string): Promise<Voicemail[]> {
-    return await db.select().from(voicemails).where(eq(voicemails.status, status)).orderBy(voicemails.createdAt);
+    return await db.select().from(voicemails).where(eq(voicemails.status, status)).orderBy(desc(voicemails.receivedAt));
   }
 
   async getVoicemailByTrelloCardId(trelloCardId: string): Promise<Voicemail | undefined> {
@@ -2552,6 +2584,16 @@ export class DatabaseStorage implements IStorage {
   async updateTask(id: string, data: Partial<InsertTask>): Promise<Task | null> {
     const updateData: Record<string, any> = { ...data, updatedAt: new Date() };
     
+    // Convert date strings to Date objects (Drizzle requires Date for timestamp columns)
+    const dateFields = ['dueAt', 'startAt', 'endAt', 'remindAt'];
+    for (const field of dateFields) {
+      if (field in updateData && updateData[field] !== null && updateData[field] !== undefined) {
+        if (typeof updateData[field] === 'string') {
+          updateData[field] = new Date(updateData[field]);
+        }
+      }
+    }
+    
     if (data.status === 'completed') {
       updateData.completedAt = new Date();
     }
@@ -2708,6 +2750,265 @@ export class DatabaseStorage implements IStorage {
         await this.createCategory(category);
       }
     }
+  }
+
+  async getAllProposalTemplates(): Promise<ProposalTemplate[]> {
+    return await db.select().from(proposalTemplates).orderBy(desc(proposalTemplates.createdAt));
+  }
+
+  async getProposalTemplate(id: string): Promise<ProposalTemplate | undefined> {
+    const [template] = await db.select().from(proposalTemplates).where(eq(proposalTemplates.id, id));
+    return template || undefined;
+  }
+
+  async createProposalTemplate(data: InsertProposalTemplate): Promise<ProposalTemplate> {
+    if (data.isDefault) {
+      await db.update(proposalTemplates).set({ isDefault: false }).where(eq(proposalTemplates.isDefault, true));
+    }
+    const [template] = await db.insert(proposalTemplates).values(data).returning();
+    return template;
+  }
+
+  async updateProposalTemplate(id: string, data: Partial<InsertProposalTemplate>): Promise<ProposalTemplate | undefined> {
+    if (data.isDefault) {
+      await db.update(proposalTemplates).set({ isDefault: false }).where(eq(proposalTemplates.isDefault, true));
+    }
+    const [template] = await db.update(proposalTemplates).set(data).where(eq(proposalTemplates.id, id)).returning();
+    return template || undefined;
+  }
+
+  async deleteProposalTemplate(id: string): Promise<boolean> {
+    const result = await db.delete(proposalTemplates).where(eq(proposalTemplates.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async getAllProposalTemplateImages(): Promise<ProposalTemplateImage[]> {
+    return await db.select().from(proposalTemplateImages).orderBy(desc(proposalTemplateImages.createdAt));
+  }
+
+  async createProposalTemplateImage(data: InsertProposalTemplateImage): Promise<ProposalTemplateImage> {
+    const [image] = await db.insert(proposalTemplateImages).values(data).returning();
+    return image;
+  }
+
+  async deleteProposalTemplateImage(id: string): Promise<boolean> {
+    const result = await db.delete(proposalTemplateImages).where(eq(proposalTemplateImages.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async getCustomerFiles(customerId: string): Promise<CustomerFile[]> {
+    return db.select().from(customerFiles).where(eq(customerFiles.customerId, customerId)).orderBy(desc(customerFiles.createdAt));
+  }
+
+  async createCustomerFile(data: InsertCustomerFile): Promise<CustomerFile> {
+    const [file] = await db.insert(customerFiles).values(data).returning();
+    return file;
+  }
+
+  async deleteCustomerFile(id: string, customerId?: string): Promise<boolean> {
+    const conditions = [eq(customerFiles.id, id)];
+    if (customerId) conditions.push(eq(customerFiles.customerId, customerId));
+    const result = await db.delete(customerFiles).where(and(...conditions));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // ==================== Rebate Programs ====================
+  async getRebateCases(filters: { search?: string; status?: string; programType?: string; assignedToUserId?: string } = {}): Promise<RebateCase[]> {
+    const conds: SQL[] = [];
+    if (filters.status) conds.push(eq(rebateCases.applicationStatus, filters.status as any));
+    if (filters.programType) conds.push(eq(rebateCases.programType, filters.programType as any));
+    if (filters.assignedToUserId) conds.push(eq(rebateCases.assignedToUserId, filters.assignedToUserId));
+    if (filters.search) {
+      const term = `%${filters.search}%`;
+      conds.push(or(
+        ilike(rebateCases.clientFirstName, term),
+        ilike(rebateCases.clientLastName, term),
+        ilike(rebateCases.clientEmail, term),
+        ilike(rebateCases.clientPhone, term),
+        ilike(rebateCases.propertyAddress, term),
+        ilike(rebateCases.caseNumber, term),
+      )!);
+    }
+    const q = conds.length > 0
+      ? db.select().from(rebateCases).where(and(...conds))
+      : db.select().from(rebateCases);
+    return q.orderBy(desc(rebateCases.updatedAt));
+  }
+
+  async getRebateCase(id: string): Promise<RebateCase | undefined> {
+    const [row] = await db.select().from(rebateCases).where(eq(rebateCases.id, id));
+    return row;
+  }
+
+  async createRebateCase(data: InsertRebateCase): Promise<RebateCase> {
+    return db.transaction(async (tx) => {
+      const [row] = await tx.insert(rebateCases).values(data).returning();
+      // Seed 8 workflow steps
+      const steps = rebateWorkflowStepEnum.map((step, idx) => ({
+        caseId: row.id,
+        step: step as RebateWorkflowStep,
+        status: "not_started" as const,
+        sortOrder: idx,
+      }));
+      await tx.insert(rebateCaseWorkflowSteps).values(steps);
+      // Seed scope checklist (12 standard Neighborly items)
+      const scopeItems = [
+        "Heat pump HVAC system",
+        "Heat pump water heater",
+        "Electric stove/cooktop",
+        "Heat pump clothes dryer",
+        "Electrical panel upgrade",
+        "Electric wiring upgrade",
+        "Attic / wall insulation",
+        "Air sealing",
+        "Mechanical ventilation",
+        "Door / window replacement",
+        "Smart thermostat",
+        "Other electrification work",
+      ].map((itemName, idx) => ({
+        caseId: row.id,
+        itemName,
+        isChecked: false,
+        sortOrder: idx,
+      }));
+      await tx.insert(rebateCaseScopeChecklist).values(scopeItems);
+      return row;
+    });
+  }
+
+  // Enriched list with workflow progress for dashboard
+  async getRebateCasesWithProgress(filters: { search?: string; status?: string; programType?: string; assignedToUserId?: string } = {}) {
+    const cases = await this.getRebateCases(filters);
+    if (cases.length === 0) return [];
+    const ids = cases.map((c) => c.id);
+    // Fetch any checked scope-checklist items to count toward Scope of Work completion
+    const checkedScope = await db.select({ caseId: rebateCaseScopeChecklist.caseId })
+      .from(rebateCaseScopeChecklist)
+      .where(and(inArray(rebateCaseScopeChecklist.caseId, ids), eq(rebateCaseScopeChecklist.isChecked, true)));
+    const casesWithScopeItem = new Set(checkedScope.map((r) => r.caseId));
+
+    // Step order must match WORKFLOW_STEPS_ORDER on the client.
+    const STEP_ORDER: RebateWorkflowStep[] = [
+      "program_overview",
+      "rebate_request",
+      "head_of_household",
+      "scope_of_work",
+      "contractor_pre_approval",
+      "project_completion",
+      "completion_attestations",
+      "reservation_summary",
+    ];
+
+    return cases.map((c) => {
+      const checks: Array<[RebateWorkflowStep, boolean]> = [
+        ["program_overview", true],
+        ["rebate_request", Boolean(c.clientFirstName && c.clientLastName && c.propertyAddress && c.propertyCity)],
+        ["head_of_household", Boolean(c.hohConfirmed)],
+        ["scope_of_work", Boolean(
+          casesWithScopeItem.has(c.id) ||
+          c.scopeIncludesHeatPump || c.scopeIncludesWaterHeater || c.scopeIncludesStove ||
+          c.scopeIncludesDryer || c.scopeIncludesPanel || c.scopeIncludesWiring ||
+          c.scopeIncludesInsulation
+        )],
+        ["contractor_pre_approval", c.preApprovalStatus === "approved" || Boolean(c.preApprovalApprovedDate)],
+        ["project_completion", Boolean(c.installCompletedDate)],
+        ["completion_attestations", Boolean(c.customerAttestationSigned && c.contractorAttestationSigned)],
+        ["reservation_summary", Boolean(c.reservationNumber || c.caseCloseoutDate)],
+      ];
+      const done = new Set<RebateWorkflowStep>();
+      for (const [key, ok] of checks) {
+        if (!ok) break; // chronological — stop at first incomplete step
+        done.add(key);
+      }
+      // Current step = first step in order that is not yet complete (or last if all done)
+      const current = STEP_ORDER.find((s) => !done.has(s)) || STEP_ORDER[STEP_ORDER.length - 1];
+      return {
+        ...c,
+        workflowCompleted: done.size,
+        workflowTotal: STEP_ORDER.length,
+        currentStep: current,
+      };
+    });
+  }
+
+  async updateRebateCase(id: string, data: Partial<RebateCase>): Promise<RebateCase | undefined> {
+    const [row] = await db.update(rebateCases)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(rebateCases.id, id))
+      .returning();
+    return row;
+  }
+
+  async deleteRebateCase(id: string): Promise<boolean> {
+    const result = await db.delete(rebateCases).where(eq(rebateCases.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async getRebateCaseWorkflowSteps(caseId: string): Promise<RebateCaseWorkflowStep[]> {
+    return db.select().from(rebateCaseWorkflowSteps)
+      .where(eq(rebateCaseWorkflowSteps.caseId, caseId))
+      .orderBy(asc(rebateCaseWorkflowSteps.sortOrder));
+  }
+
+  async updateRebateCaseWorkflowStep(id: string, caseId: string, data: Partial<RebateCaseWorkflowStep>): Promise<RebateCaseWorkflowStep | undefined> {
+    const [row] = await db.update(rebateCaseWorkflowSteps)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(rebateCaseWorkflowSteps.id, id), eq(rebateCaseWorkflowSteps.caseId, caseId)))
+      .returning();
+    return row;
+  }
+
+  async getRebateCaseScopeChecklist(caseId: string): Promise<RebateCaseScopeChecklist[]> {
+    return db.select().from(rebateCaseScopeChecklist)
+      .where(eq(rebateCaseScopeChecklist.caseId, caseId))
+      .orderBy(asc(rebateCaseScopeChecklist.sortOrder));
+  }
+
+  async createRebateScopeItem(data: InsertRebateCaseScopeChecklist): Promise<RebateCaseScopeChecklist> {
+    const [row] = await db.insert(rebateCaseScopeChecklist).values(data).returning();
+    return row;
+  }
+
+  async updateRebateScopeItem(id: string, caseId: string, data: Partial<RebateCaseScopeChecklist>): Promise<RebateCaseScopeChecklist | undefined> {
+    const [row] = await db.update(rebateCaseScopeChecklist)
+      .set(data)
+      .where(and(eq(rebateCaseScopeChecklist.id, id), eq(rebateCaseScopeChecklist.caseId, caseId)))
+      .returning();
+    return row;
+  }
+
+  async deleteRebateScopeItem(id: string, caseId: string): Promise<boolean> {
+    const result = await db.delete(rebateCaseScopeChecklist)
+      .where(and(eq(rebateCaseScopeChecklist.id, id), eq(rebateCaseScopeChecklist.caseId, caseId)));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async getRebateCaseDocuments(caseId: string): Promise<RebateCaseDocument[]> {
+    return db.select().from(rebateCaseDocuments)
+      .where(eq(rebateCaseDocuments.caseId, caseId))
+      .orderBy(desc(rebateCaseDocuments.createdAt));
+  }
+
+  async createRebateCaseDocument(data: InsertRebateCaseDocument): Promise<RebateCaseDocument> {
+    const [row] = await db.insert(rebateCaseDocuments).values(data as any).returning();
+    return row;
+  }
+
+  async deleteRebateCaseDocument(id: string, caseId: string): Promise<boolean> {
+    const result = await db.delete(rebateCaseDocuments)
+      .where(and(eq(rebateCaseDocuments.id, id), eq(rebateCaseDocuments.caseId, caseId)));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async getRebateCaseActivity(caseId: string): Promise<RebateCaseActivityLog[]> {
+    return db.select().from(rebateCaseActivityLog)
+      .where(eq(rebateCaseActivityLog.caseId, caseId))
+      .orderBy(desc(rebateCaseActivityLog.createdAt));
+  }
+
+  async logRebateCaseActivity(data: InsertRebateCaseActivityLog): Promise<RebateCaseActivityLog> {
+    const [row] = await db.insert(rebateCaseActivityLog).values(data).returning();
+    return row;
   }
 }
 

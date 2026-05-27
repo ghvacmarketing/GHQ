@@ -180,6 +180,9 @@ export function CommentThread({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/comments", entityType, entityId] });
+      if (entityType === "customer") {
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", entityId, "timeline"] });
+      }
       toast({
         title: "Comment deleted",
         description: "Your comment has been deleted.",

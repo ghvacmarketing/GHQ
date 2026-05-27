@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -45,6 +45,7 @@ import {
   Info,
   RefreshCw,
   FileSpreadsheet,
+  DollarSign,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
@@ -65,6 +66,7 @@ export default function CrmSettingsPackages() {
   const [percentageChange, setPercentageChange] = useState<number>(0);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [estimatedCount, setEstimatedCount] = useState<number | null>(null);
+  const [priceTableUnitType, setPriceTableUnitType] = useState<string>("all");
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -181,6 +183,36 @@ export default function CrmSettingsPackages() {
 
   const handleConfirmAdjustment = () => {
     adjustPricesMutation.mutate();
+  };
+
+  const filteredPriceTablePackages = useMemo(() => {
+    if (!packages) return [];
+    return packages.filter((pkg: any) => {
+      if (priceTableUnitType !== "all" && pkg.unitType !== priceTableUnitType) return false;
+      return true;
+    });
+  }, [packages, priceTableUnitType]);
+
+  // Only show the base-price column when at least one package has a base price
+  // that differs from the final price (i.e. an active adjustment exists).
+  const hasBaseData = useMemo(() => {
+    if (!packages) return false;
+    return packages.some(
+      (pkg: any) =>
+        pkg.baseTotalInvestment != null &&
+        pkg.baseTotalInvestment !== pkg.totalInvestment
+    );
+  }, [packages]);
+
+  const formatCents = (cents: number | null | undefined) => {
+    if (cents == null) return "—";
+    return `$${(cents / 100).toLocaleString("en-CA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  };
+
+  const formatAdjBps = (bps: number | null | undefined) => {
+    if (!bps) return null;
+    const pct = bps / 100;
+    return `${pct > 0 ? "+" : ""}${pct.toFixed(pct % 1 === 0 ? 0 : 2)}%`;
   };
 
   const formatFilters = (adjustment: PackagePriceAdjustment) => {
@@ -397,6 +429,91 @@ export default function CrmSettingsPackages() {
                   )}
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5" />
+                Current Package Prices
+              </CardTitle>
+              <CardDescription>
+                Sheet base prices vs. active adjustment and final prices used in proposals
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4">
+                <Select value={priceTableUnitType} onValueChange={setPriceTableUnitType}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="All Unit Types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Unit Types</SelectItem>
+                    {HVAC_UNIT_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {!packages ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ) : filteredPriceTablePackages.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Unit Type</TableHead>
+                        <TableHead>Tier</TableHead>
+                        <TableHead>Tonnage</TableHead>
+                        <TableHead>Level</TableHead>
+                        {hasBaseData && <TableHead className="text-right">Sheet Base</TableHead>}
+                        <TableHead className="text-right">Adj %</TableHead>
+                        <TableHead className="text-right">Final Price</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPriceTablePackages.map((pkg: any) => {
+                        const adjLabel = formatAdjBps(pkg.adjustmentBasisPoints);
+                        return (
+                          <TableRow key={pkg.id}>
+                            <TableCell className="font-medium">{pkg.unitType}</TableCell>
+                            <TableCell>{pkg.tier}</TableCell>
+                            <TableCell>{pkg.tonnage}T</TableCell>
+                            <TableCell>{pkg.packageLevel}</TableCell>
+                            {hasBaseData && (
+                              <TableCell className="text-right text-slate-500">
+                                {formatCents(pkg.baseTotalInvestment)}
+                              </TableCell>
+                            )}
+                            <TableCell className="text-right">
+                              {adjLabel ? (
+                                <span className={(pkg.adjustmentBasisPoints ?? 0) > 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                                  {adjLabel}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {formatCents(pkg.totalInvestment)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="py-8 text-center text-slate-500">
+                  <Package className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+                  <p>No packages found</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 

@@ -25,16 +25,19 @@ import {
   Target,
   Megaphone,
   Package,
+  BookOpen,
   Phone,
   Smartphone,
   MessageSquare,
   Bell,
   ListTodo,
+  Award,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 import ghqLogo from "@assets/redlogo.webp";
 import GhqSearch from "./ghq-search";
 import NotificationsDrawerContent from "./notifications-drawer";
+import TaggedCommentsDisplay from "./tagged-comments-display";
 
 interface CrmLayoutProps {
   children: React.ReactNode;
@@ -81,6 +84,7 @@ const navSections: NavSection[] = [
       { label: "Work Orders", href: "/crm/work-orders", icon: ClipboardList },
       { label: "Projects", href: "/crm/projects", icon: FolderKanban },
       { label: "Tasks", href: "/crm/tasks/board", icon: ListTodo },
+      { label: "Rebate Programs", href: "/crm/rebate-programs", icon: Award },
       { label: "Items", href: "/crm/items", icon: Package },
     ],
   },
@@ -88,6 +92,7 @@ const navSections: NavSection[] = [
     title: "Sales",
     items: [
       { label: "Lead Funnel", href: "/crm/prospect-funnel", icon: FolderKanban },
+      { label: "Salesbook", href: "/crm/salesbook", icon: BookOpen },
     ],
   },
   {
@@ -147,10 +152,16 @@ function SidebarContent({
 }) {
   const [location] = useLocation();
 
-  // Fetch unread message count with polling
   const { data: unreadData } = useQuery<{ unreadCount: number }>({
     queryKey: ["/api/crm/messaging/unread-count"],
-    refetchInterval: 10000, // Poll every 10 seconds
+    refetchInterval: 30000,
+    staleTime: 25000,
+  });
+
+  const { data: notificationCount } = useQuery<{ count: number }>({
+    queryKey: ["/api/crm/notifications/unread-count"],
+    refetchInterval: 30000,
+    staleTime: 25000,
   });
 
   const logoutMutation = useMutation({
@@ -210,10 +221,12 @@ function SidebarContent({
               </p>
               <div className="space-y-1">
                 {section.items.map((item) => {
-                  // Add unread count badge to Messaging nav item
-                  const itemWithBadge = item.label === "Messaging" && unreadData?.unreadCount
-                    ? { ...item, badgeCount: unreadData.unreadCount }
-                    : item;
+                  let itemWithBadge = item;
+                  if (item.label === "Messaging" && unreadData?.unreadCount) {
+                    itemWithBadge = { ...item, badgeCount: unreadData.unreadCount };
+                  } else if (item.label === "Notifications" && notificationCount?.count && notificationCount.count > 0) {
+                    itemWithBadge = { ...item, badgeCount: notificationCount.count };
+                  }
                   return (
                     <NavItemComponent
                       key={item.href}
@@ -298,12 +311,16 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
   
   useCrmPrefetch(!!currentUser);
 
+  // Shared queryKey with SidebarContent — TanStack deduplicates the network call,
+  // only one request fires every 30s. Used here for the top-right bell badge.
   const { data: notificationCount } = useQuery<{ count: number }>({
     queryKey: ["/api/crm/notifications/unread-count"],
+    refetchInterval: 30000,
+    staleTime: 25000,
   });
 
   return (
-    <div className="min-h-screen bg-white flex">
+    <div className="h-screen overflow-hidden bg-white flex">
       <aside className="hidden lg:flex w-60 flex-shrink-0 fixed inset-y-0 left-0 z-40">
         <SidebarContent currentUser={currentUser} />
       </aside>
@@ -316,9 +333,9 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
           onClick={() => setNotificationsOpen(true)}
         >
           <Bell className="h-5 w-5 text-slate-600" />
-          {notificationCount?.count && notificationCount.count > 0 && (
-            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
-              {notificationCount.count > 99 ? "99+" : notificationCount.count}
+          {(notificationCount?.count ?? 0) > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full text-white text-[10px] font-bold flex items-center justify-center px-1" style={{ backgroundColor: "#711419" }}>
+              {notificationCount!.count > 99 ? "99+" : notificationCount!.count}
             </span>
           )}
         </Button>
@@ -365,9 +382,9 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
               onClick={() => setNotificationsOpen(true)}
             >
               <Bell className="h-5 w-5" />
-              {notificationCount?.count && notificationCount.count > 0 && (
-                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
-                  {notificationCount.count > 99 ? "99+" : notificationCount.count}
+              {(notificationCount?.count ?? 0) > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full text-white text-[10px] font-bold flex items-center justify-center px-1" style={{ backgroundColor: "#711419" }}>
+                  {notificationCount!.count > 99 ? "99+" : notificationCount!.count}
                 </span>
               )}
             </Button>
@@ -385,16 +402,17 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
 
       <main className="flex-1 lg:ml-60 overflow-x-hidden">
         {disableScroll ? (
-          <div className="h-screen pt-16 lg:pt-14 overflow-hidden">
-            <div className="h-full p-4 lg:p-6 overflow-hidden">{children}</div>
+          <div className="h-screen pt-16 lg:pt-14 overflow-hidden flex flex-col">
+            <div className="flex-1 min-h-0 p-4 lg:p-6 flex flex-col">{children}</div>
           </div>
         ) : (
-          <div className="h-screen pt-16 lg:pt-14 overflow-y-auto">
-            <div className="p-4 lg:p-6">{children}</div>
+          <div className="h-screen pt-16 lg:pt-14 overflow-y-auto overflow-x-hidden bg-white">
+            <div className="p-4 lg:p-6 overflow-x-hidden">{children}</div>
           </div>
         )}
       </main>
       {!hideGlobalSearch && <GhqSearch />}
+      <TaggedCommentsDisplay />
       <Sheet open={notificationsOpen} onOpenChange={setNotificationsOpen}>
         <SheetContent side="right" className="w-full sm:w-96 p-0">
           <NotificationsDrawerContent onClose={() => setNotificationsOpen(false)} />
