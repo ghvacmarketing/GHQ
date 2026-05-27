@@ -13,7 +13,7 @@ Preferred communication style: Simple, everyday language.
 -   **Backend**: Node.js, Express.js (TypeScript, ES modules).
 -   **Database**: PostgreSQL with Drizzle ORM (Neon Database).
 -   **API**: RESTful.
--   **Authentication**: SMS Magic Link via Twilio, developer backdoor, Employee Portal with username/password (scrypt-hashed).
+-   **Authentication**: SMS Magic Link via Twilio, developer backdoor, Employee Portal with username/password (scrypt-hashed). CRM staff can additionally sign in with Google OAuth — the verified Google email is matched against the active `crm_users` allowlist (no auto-provisioning). New authorized emails are added under Settings → Users & Roles; leaving the password blank creates a Google-only account. Endpoints: `GET /api/crm/auth/google` (start) and `GET /api/crm/auth/google/callback` (callback). Google sign-ins are recorded in `crm_audit_log` with `method: "google"`.
 
 ### Key Design Decisions
 -   **Monorepo**: Shared TypeScript types and Zod schemas.

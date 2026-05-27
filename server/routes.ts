@@ -42,6 +42,7 @@ import { sendAutomatedSms, hasNotificationBeenSent, getWorkOrderEnRouteTemplate,
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
 import { recordUserActivity } from "./activity-tracker";
 import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword, isSupervisor } from "./crm-auth";
+import { startGoogleOAuth, handleGoogleOAuthCallback, isGoogleOAuthConfigured } from "./crm-google-auth";
 import cookieParser from "cookie-parser";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import stripePaymentsRouter from "./stripe-payments";
@@ -5127,6 +5128,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/auth/google - Start Google OAuth flow
+  app.get("/api/crm/auth/google", (req, res) => {
+    void startGoogleOAuth(req, res);
+  });
+
+  // GET /api/crm/auth/google/callback - Handle Google OAuth callback
+  app.get("/api/crm/auth/google/callback", (req, res) => {
+    void handleGoogleOAuthCallback(req, res);
+  });
+
+  // GET /api/crm/auth/google/status - Whether the Google sign-in button should appear
+  app.get("/api/crm/auth/google/status", (_req, res) => {
+    res.json({ enabled: isGoogleOAuthConfigured() });
+  });
+
   // POST /api/crm/auth/logout - Destroy session
   app.post("/api/crm/auth/logout", async (req, res) => {
     try {
@@ -7410,8 +7426,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentUser = await getCurrentCrmUser(req);
       const { name, email, password, role, phone } = req.body;
 
-      if (!name || !email || !password) {
-        return res.status(400).json({ message: "name, email, and password are required" });
+      if (!name || !email) {
+        return res.status(400).json({ message: "name and email are required" });
       }
 
       const existing = await getCrmUserByEmail(email);
@@ -7419,7 +7435,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "User with this email already exists" });
       }
 
-      const passwordHash = await hashCrmPassword(password);
+      // Password is optional — when omitted, the user can only sign in with Google.
+      // Store an unusable random hash so the password column stays non-null and
+      // password login cannot succeed for this account.
+      const effectivePassword =
+        typeof password === "string" && password.length > 0
+          ? password
+          : `!google-only:${(await import("crypto")).randomBytes(32).toString("hex")}`;
+      const passwordHash = await hashCrmPassword(effectivePassword);
       const [user] = await db.insert(crmUsers).values({
         name,
         email: email.toLowerCase(),
