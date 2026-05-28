@@ -198,6 +198,40 @@ export function getCrmSessionToken(req: Request): string | null {
   return req.cookies?.[CRM_SESSION_COOKIE] || null;
 }
 
+// Dev-only auth bypass: when NODE_ENV !== "production", auto-authenticate as
+// the first active owner (falling back to admin) so the CRM is usable without
+// signing in. Disabled automatically in production. Opt out with
+// DISABLE_DEV_AUTH_BYPASS=1.
+let cachedDevBypassUser: CrmUser | null | undefined = undefined;
+async function getDevBypassUser(): Promise<CrmUser | null> {
+  if (process.env.NODE_ENV === "production") return null;
+  if (process.env.DISABLE_DEV_AUTH_BYPASS === "1") return null;
+  if (cachedDevBypassUser !== undefined) return cachedDevBypassUser;
+  try {
+    const [owner] = await db
+      .select()
+      .from(crmUsers)
+      .where(and(eq(crmUsers.role, "owner"), eq(crmUsers.isActive, true)));
+    if (owner) {
+      cachedDevBypassUser = owner;
+      console.log(`[dev-auth-bypass] Auto-authenticating as ${owner.email} (${owner.role})`);
+      return owner;
+    }
+    const [admin] = await db
+      .select()
+      .from(crmUsers)
+      .where(and(eq(crmUsers.role, "admin"), eq(crmUsers.isActive, true)));
+    cachedDevBypassUser = admin || null;
+    if (admin) {
+      console.log(`[dev-auth-bypass] Auto-authenticating as ${admin.email} (${admin.role})`);
+    }
+    return cachedDevBypassUser;
+  } catch (err) {
+    console.error("[dev-auth-bypass] Failed to load dev user:", err);
+    return null;
+  }
+}
+
 export async function getCurrentCrmUser(req: Request): Promise<CrmUser | null> {
   if (req.crmUser) return req.crmUser;
 
@@ -213,7 +247,6 @@ export async function getCurrentCrmUser(req: Request): Promise<CrmUser | null> {
   const tokensToTry: string[] = [];
   if (bearerToken) tokensToTry.push(bearerToken);
   if (cookieToken && cookieToken !== bearerToken) tokensToTry.push(cookieToken);
-  if (tokensToTry.length === 0) return null;
 
   for (const token of tokensToTry) {
     const session = await validateCrmSession(token);
@@ -223,6 +256,13 @@ export async function getCurrentCrmUser(req: Request): Promise<CrmUser | null> {
     req.crmSession = session;
     req.crmUser = user;
     return user;
+  }
+
+  // Dev-only fallback: no valid session, but we're not in production.
+  const devUser = await getDevBypassUser();
+  if (devUser) {
+    req.crmUser = devUser;
+    return devUser;
   }
 
   return null;
