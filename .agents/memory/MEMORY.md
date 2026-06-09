@@ -1,0 +1,2 @@
+- [Salesbook PDF generation](salesbook-pdf.md) — PDF download is server-side (playwright screenshots /salesbook/print + pdf-lib), cached by data hash; not client html2canvas.
+- [PDF rasterization tools](pdf-rasterization-tools.md) — ImageMagick can't read PDFs here (no ghostscript); use poppler pdftoppm/pdftotext/pdfinfo.

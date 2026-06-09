@@ -78,9 +78,7 @@ export default function CrmSalesbook() {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
   const flipBookRef = useRef<FlipBookRef>(null);
-  const exportRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState(0);
 
   const { data: salesbookData, isLoading } = useQuery<SalesbookData>({
     queryKey: ["/api/salesbook/data"],
@@ -291,86 +289,28 @@ export default function CrmSalesbook() {
   pageW = Math.max(Math.floor(pageW), 200);
   pageH = Math.max(Math.floor(pageH), 260);
 
-  const exportH = 800;
-  const exportW = Math.round(exportH / aspectRatio);
-
   const handleDownloadPdf = useCallback(async () => {
-    if (sections.length === 0 || isExporting) return;
+    if (isExporting) return;
     setIsExporting(true);
-    setExportProgress(0);
     try {
-      const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
-        import("jspdf"),
-        import("html2canvas"),
-      ]);
-
-      await new Promise((r) => setTimeout(r, 200));
-      const container = exportRef.current;
-      if (!container) throw new Error("Export container not ready");
-
-      const imgs = Array.from(container.querySelectorAll("img"));
-      imgs.forEach((img) => {
-        img.loading = "eager";
-        if (!img.complete || img.naturalWidth === 0) {
-          const src = img.src;
-          img.src = "";
-          img.src = src;
-        }
-      });
-      await Promise.all(
-        imgs.map((img) =>
-          img.complete && img.naturalWidth > 0
-            ? Promise.resolve()
-            : new Promise<void>((res) => {
-                const t = setTimeout(() => res(), 5000);
-                img.onload = () => {
-                  clearTimeout(t);
-                  res();
-                };
-                img.onerror = () => {
-                  clearTimeout(t);
-                  res();
-                };
-              }),
-        ),
-      );
-
-      const pageEls = Array.from(
-        container.querySelectorAll<HTMLElement>(".export-page"),
-      );
-      const ratio = salesbookData
-        ? salesbookData.pageHeight / salesbookData.pageWidth
-        : 1.294;
-      const pdfW = 612;
-      const pdfH = Math.round(pdfW * ratio);
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "pt",
-        format: [pdfW, pdfH],
-      });
-
-      for (let i = 0; i < pageEls.length; i++) {
-        const canvas = await html2canvas(pageEls[i], {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: "#ffffff",
-          logging: false,
-        });
-        const imgData = canvas.toDataURL("image/jpeg", 0.9);
-        if (i > 0) pdf.addPage([pdfW, pdfH], "portrait");
-        pdf.addImage(imgData, "JPEG", 0, 0, pdfW, pdfH);
-        setExportProgress(Math.round(((i + 1) / pageEls.length) * 100));
-      }
-
-      pdf.save("GHVAC-Sales-Pricebook-2026.pdf");
+      const res = await fetch("/api/salesbook/pdf");
+      if (!res.ok) throw new Error("Failed to generate PDF");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "GHVAC-Sales-Pricebook-2026.pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("PDF export failed:", err);
+      console.error("PDF download failed:", err);
       alert("Sorry, the PDF could not be generated. Please try again.");
     } finally {
       setIsExporting(false);
-      setExportProgress(0);
     }
-  }, [sections, isExporting, salesbookData]);
+  }, [isExporting]);
 
   const renderSection = (section: SalesbookSection) => {
     switch (section.type) {
@@ -510,9 +450,9 @@ export default function CrmSalesbook() {
             <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-neutral-900/85">
               <Loader2 className="h-9 w-9 animate-spin text-amber-400" />
               <p className="text-sm text-neutral-100">
-                Generating PDF… {exportProgress}%
+                Preparing your PDF…
               </p>
-              <p className="text-xs text-neutral-400">This may take a moment.</p>
+              <p className="text-xs text-neutral-400">This only takes a few seconds.</p>
             </div>
           )}
           {showBookmarks && (
@@ -671,34 +611,6 @@ export default function CrmSalesbook() {
           </div>
         </div>
 
-        {isExporting && (
-          <div
-            ref={exportRef}
-            aria-hidden="true"
-            style={{
-              position: "fixed",
-              left: -99999,
-              top: 0,
-              zIndex: -1,
-              pointerEvents: "none",
-            }}
-          >
-            {sections.map((section) => (
-              <div
-                key={`export-${section.pageIndex}`}
-                className="export-page"
-                style={{
-                  width: exportW,
-                  height: exportH,
-                  overflow: "hidden",
-                  background: "#ffffff",
-                }}
-              >
-                {renderSection(section)}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </CrmLayout>
   );

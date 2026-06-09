@@ -272,6 +272,12 @@ async function runProposalTemplateMigrations() {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+
+    if (app.get("env") !== "development") {
+      import("./services/salesbook-pdf")
+        .then(({ prewarmSalesbookPdf }) => prewarmSalesbookPdf())
+        .catch((err) => console.error("Salesbook PDF prewarm import failed:", err));
+    }
     
     // Validate required environment variables after server starts (allows health checks to pass)
     if (!process.env.SESSION_SECRET) {

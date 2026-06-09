@@ -28033,6 +28033,23 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       return res.status(500).json({ message: "Failed to load salesbook pages" });
     }
   });
+
+  app.get("/api/salesbook/pdf", async (_req, res) => {
+    try {
+      const { getSalesbookPdf } = await import("./services/salesbook-pdf");
+      const buf = await getSalesbookPdf();
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        'attachment; filename="GHVAC-Sales-Pricebook-2026.pdf"',
+      );
+      res.setHeader("Content-Length", buf.length.toString());
+      return res.end(buf);
+    } catch (error) {
+      console.error("Error generating salesbook PDF:", error);
+      return res.status(500).json({ message: "Failed to generate salesbook PDF" });
+    }
+  });
   let salesbookDataCache: { data: any; timestamp: number } | null = null;
   const SALESBOOK_CACHE_TTL = 5 * 60 * 1000;
 

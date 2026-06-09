@@ -494,7 +494,7 @@ export const SingleTierDetailPage = forwardRef<HTMLDivElement, {
                 <div style={{ fontSize: 11, fontWeight: 600, color: "#222", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {pkg.outdoorName || `${pkg.packageLevel} System`}
                 </div>
-                <div style={{ fontSize: 9, color: "#888", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div style={{ fontSize: 9, color: "#888", marginTop: 1, lineHeight: 1.35, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                   {pkg.indoorHeatName || pkg.outdoorModel || ""}
                 </div>
               </div>

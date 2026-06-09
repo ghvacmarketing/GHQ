@@ -46,11 +46,23 @@ export function ensureSalesbookConverted(): SalesbookPageInfo {
       return numA - numB;
     });
 
+  // Cache-bust the page image URLs using the newest file's modified time so that
+  // replacing a page (e.g. a new cover) forces browsers to fetch the fresh image
+  // instead of serving the long-cached old version.
+  let version = 0;
+  for (const f of pages) {
+    try {
+      version = Math.max(version, Math.floor(fs.statSync(path.join(OUTPUT_DIR, f)).mtimeMs));
+    } catch {
+      // ignore stat errors
+    }
+  }
+
   cachedInfo = {
     totalPages: pages.length,
     pageWidth: 1275,
     pageHeight: 1650,
-    pages: pages.map((f) => `/salesbook-pages/${f}`),
+    pages: pages.map((f) => `/salesbook-pages/${f}?v=${version}`),
   };
 
   console.log(`[Salesbook] ${cachedInfo.totalPages} pages ready`);
