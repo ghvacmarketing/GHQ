@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "NDQS2ZWKhCL7gVjC1pi7N"
+uri = "file://GHVAC-Sales-Pricebook-2026.pdf"
+type = "pdf"
+title = "GHVAC 2026 Sales Pricebook (91 pages)"
