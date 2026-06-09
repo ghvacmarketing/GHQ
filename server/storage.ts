@@ -1,4 +1,10 @@
 import { type Quote, type InsertQuote, type PartData, type InsertPart, type Technician, type InsertTechnician, type Process, type InsertProcess, type ProcessAttachment, type InsertProcessAttachment, type Category, type InsertCategory, type Setting, type InsertSetting, type PdfFile, type InsertPdfFile, type Announcement, type InsertAnnouncement, type PhoneWhitelist, type InsertPhoneWhitelist, type AuthToken, type InsertAuthToken, type Lead, type InsertLead, type InsertLeadHistory, type LeadHistory, type ImportBatch, type InsertImportBatch, type Customer, type InsertCustomer, type CustomerImportBatch, type InsertCustomerImportBatch, type QuoteConversation, type InsertQuoteConversation, type QuoteMessage, type InsertQuoteMessage, type Voicemail, type InsertVoicemail, type SavedProposal, type InsertSavedProposal, type CallLogDay, type InsertCallLogDay, type CallLog, type InsertCallLog, type CallLogTask, type InsertCallLogTask, type PortalUser, type InsertPortalUser, type EmployeeProfile, type InsertEmployeeProfile, type Compensation, type InsertCompensation, type Paystub, type InsertPaystub, type CompensationAuditLog, type InsertCompensationAuditLog, type EmployeeDocument, type InsertEmployeeDocument, type WeatherCache, type InsertWeatherCache, type CallDaily, type WeatherDaily, type CrmWorkOrder, type InsertCrmWorkOrder, type CrmInvoice, type InsertCrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoiceLineItem, type CrmItem, type InsertCrmItem, type CrmMessagingConversation, type InsertCrmMessagingConversation, type CrmMessagingMessage, type InsertCrmMessagingMessage, type CrmMessagingConversationTag, type InsertCrmMessagingConversationTag, type CrmTimeEntry, type InsertCrmTimeEntry, type SmsNotificationLog, type InsertSmsNotificationLog, type SmsNotificationType, type CrmProjectTask, type InsertCrmProjectTask, type Task, type InsertTask, type TaskType, type InsertTaskType, type TaskActivity, type InsertTaskActivity, type TaskSubtask, type InsertTaskSubtask, type ProposalTemplate, type InsertProposalTemplate, quotes, parts, technicians, processes, processAttachments, categories, settings, pdfFiles, announcements, phoneWhitelist, authTokens, leads, leadHistory, importBatches, customers, customerImportBatches, quoteConversations, quoteMessages, voicemails, savedProposals, callLogDays, callLogs, callLogTasks, portalUsers, employeeProfiles, compensations, paystubs, compensationAuditLog, employeeDocuments, weatherCache, callDaily, weatherDaily, crmWorkOrders, crmInvoices, crmInvoiceLineItems, crmItems, crmMessagingConversations, crmMessagingMessages, crmMessagingConversationTags, crmCustomers, crmTimeEntries, smsNotificationLog, crmUsers, crmProjectTasks, tasks, taskTypes, taskActivity, taskSubtasks, proposalTemplates, proposalTemplateImages, type ProposalTemplateImage, type InsertProposalTemplateImage, customerFiles, type CustomerFile, type InsertCustomerFile, rebateCases, rebateCaseWorkflowSteps, rebateCaseScopeChecklist, rebateCaseDocuments, rebateCaseActivityLog, type RebateCase, type InsertRebateCase, type RebateCaseWorkflowStep, type InsertRebateCaseWorkflowStep, type RebateCaseScopeChecklist, type InsertRebateCaseScopeChecklist, type RebateCaseDocument, type InsertRebateCaseDocument, type RebateCaseActivityLog, type InsertRebateCaseActivityLog, type RebateWorkflowStep, rebateWorkflowStepEnum } from "@shared/schema";
+import {
+  signatureDocuments, signatureRecipients, signatureFields,
+  type SignatureDocument, type InsertSignatureDocument,
+  type SignatureRecipient, type InsertSignatureRecipient,
+  type SignatureField, type InsertSignatureField,
+} from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, or, and, ilike, sql, notInArray, inArray, desc, gte, lte, asc, isNull, isNotNull, lt, ne, type SQL } from "drizzle-orm";
@@ -3009,6 +3015,71 @@ export class DatabaseStorage implements IStorage {
   async logRebateCaseActivity(data: InsertRebateCaseActivityLog): Promise<RebateCaseActivityLog> {
     const [row] = await db.insert(rebateCaseActivityLog).values(data).returning();
     return row;
+  }
+
+  // ===== E-Signature documents =====
+  async createSignatureDocument(data: InsertSignatureDocument): Promise<SignatureDocument> {
+    const [row] = await db.insert(signatureDocuments).values(data).returning();
+    return row;
+  }
+  async getSignatureDocument(id: string): Promise<SignatureDocument | undefined> {
+    const [row] = await db.select().from(signatureDocuments).where(eq(signatureDocuments.id, id));
+    return row || undefined;
+  }
+  async getAllSignatureDocuments(): Promise<SignatureDocument[]> {
+    return db.select().from(signatureDocuments).orderBy(desc(signatureDocuments.createdAt));
+  }
+  async updateSignatureDocument(id: string, patch: Partial<SignatureDocument>): Promise<SignatureDocument | undefined> {
+    const [row] = await db.update(signatureDocuments).set(patch).where(eq(signatureDocuments.id, id)).returning();
+    return row || undefined;
+  }
+  async deleteSignatureDocument(id: string): Promise<boolean> {
+    const res = await db.delete(signatureDocuments).where(eq(signatureDocuments.id, id)).returning();
+    return res.length > 0;
+  }
+
+  // ===== E-Signature recipients =====
+  async createSignatureRecipient(data: InsertSignatureRecipient): Promise<SignatureRecipient> {
+    const [row] = await db.insert(signatureRecipients).values(data).returning();
+    return row;
+  }
+  async getSignatureRecipients(documentId: string): Promise<SignatureRecipient[]> {
+    return db.select().from(signatureRecipients)
+      .where(eq(signatureRecipients.documentId, documentId))
+      .orderBy(asc(signatureRecipients.signingOrder), asc(signatureRecipients.createdAt));
+  }
+  async getSignatureRecipient(id: string): Promise<SignatureRecipient | undefined> {
+    const [row] = await db.select().from(signatureRecipients).where(eq(signatureRecipients.id, id));
+    return row || undefined;
+  }
+  async getSignatureRecipientByToken(token: string): Promise<SignatureRecipient | undefined> {
+    const [row] = await db.select().from(signatureRecipients).where(eq(signatureRecipients.token, token));
+    return row || undefined;
+  }
+  async updateSignatureRecipient(id: string, patch: Partial<SignatureRecipient>): Promise<SignatureRecipient | undefined> {
+    const [row] = await db.update(signatureRecipients).set(patch).where(eq(signatureRecipients.id, id)).returning();
+    return row || undefined;
+  }
+  async deleteSignatureRecipient(id: string): Promise<boolean> {
+    const res = await db.delete(signatureRecipients).where(eq(signatureRecipients.id, id)).returning();
+    return res.length > 0;
+  }
+
+  // ===== E-Signature fields =====
+  async getSignatureFields(documentId: string): Promise<SignatureField[]> {
+    return db.select().from(signatureFields).where(eq(signatureFields.documentId, documentId));
+  }
+  async getSignatureFieldsByRecipient(recipientId: string): Promise<SignatureField[]> {
+    return db.select().from(signatureFields).where(eq(signatureFields.recipientId, recipientId));
+  }
+  async updateSignatureField(id: string, patch: Partial<SignatureField>): Promise<SignatureField | undefined> {
+    const [row] = await db.update(signatureFields).set(patch).where(eq(signatureFields.id, id)).returning();
+    return row || undefined;
+  }
+  async replaceSignatureFields(documentId: string, fields: InsertSignatureField[]): Promise<SignatureField[]> {
+    await db.delete(signatureFields).where(eq(signatureFields.documentId, documentId));
+    if (fields.length === 0) return [];
+    return db.insert(signatureFields).values(fields).returning();
   }
 }
 

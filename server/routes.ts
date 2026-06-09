@@ -45,6 +45,7 @@ import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession,
 import { startGoogleOAuth, handleGoogleOAuthCallback, isGoogleOAuthConfigured } from "./crm-google-auth";
 import cookieParser from "cookie-parser";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { registerEsignRoutes } from "./esign-routes";
 import stripePaymentsRouter from "./stripe-payments";
 import { getMessagingAdapter } from "./services/messaging/adapters";
 import { textlineClient } from "./textlineClient";
@@ -415,6 +416,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register object storage routes for App Storage file uploads
   registerObjectStorageRoutes(app);
+
+  // Register e-signature (DocuSign-like) routes
+  registerEsignRoutes(app);
 
   // Register Stripe payment routes
   app.use(stripePaymentsRouter);

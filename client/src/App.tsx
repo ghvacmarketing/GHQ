@@ -85,6 +85,8 @@ const CrmNotifications = lazy(() => import("@/pages/crm/crm-notifications"));
 const CrmMyTasks = lazy(() => import("@/pages/crm/crm-my-tasks"));
 const CrmTaskBoard = lazy(() => import("@/pages/crm/crm-task-board"));
 const CrmSalesbook = lazy(() => import("@/pages/crm/crm-salesbook"));
+const CrmEsign = lazy(() => import("@/pages/crm/crm-esign"));
+const CrmEsignEditor = lazy(() => import("@/pages/crm/crm-esign-editor"));
 
 // Lazy-load Mobile pages to reduce initial bundle size
 const MobileAgenda = lazy(() => import("@/pages/mobile/mobile-agenda"));
@@ -111,6 +113,7 @@ const PortalServiceHistory = lazy(() => import("@/pages/portal/portal-service-hi
 // Lazy-load Public pages (no auth required)
 const PublicQuoteView = lazy(() => import("@/pages/public/quote-view"));
 const PublicInvoiceView = lazy(() => import("@/pages/public/invoice-view"));
+const PublicSign = lazy(() => import("@/pages/public/sign"));
 
 // Global Error Boundary to prevent blank screens
 class ErrorBoundary extends Component<
@@ -290,6 +293,8 @@ function Router() {
       <Route path="/crm/add-prospect">{() => <ProtectedCrmWrapper><CrmAddProspect /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/marketing">{() => <ProtectedCrmWrapper><CrmMarketing /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/items">{() => <ProtectedCrmWrapper><CrmItems /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/esign/:id">{() => <ProtectedCrmWrapper><CrmEsignEditor /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/esign">{() => <ProtectedCrmWrapper><CrmEsign /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/phone">{() => <ProtectedCrmWrapper><CrmPhone /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/checklists">{() => <ProtectedCrmWrapper><CrmChecklists /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/users">{() => <ProtectedCrmWrapper><CrmSettingsUsers /></ProtectedCrmWrapper>}</Route>
@@ -336,6 +341,7 @@ function Router() {
       <Route path="/quote/:token">{() => <Suspense fallback={<GlobalLoader />}><PublicQuoteView /></Suspense>}</Route>
       <Route path="/q/:token">{() => <Suspense fallback={<GlobalLoader />}><PublicQuoteView /></Suspense>}</Route>
       <Route path="/i/:token">{() => <Suspense fallback={<GlobalLoader />}><PublicInvoiceView /></Suspense>}</Route>
+      <Route path="/sign/:token">{() => <Suspense fallback={<GlobalLoader />}><PublicSign /></Suspense>}</Route>
       <Route component={NotFound} />
     </Switch>
   );

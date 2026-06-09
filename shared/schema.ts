@@ -10,6 +10,7 @@ import {
   json,
   integer,
   date,
+  doublePrecision,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -3922,3 +3923,79 @@ export const insertRebateCaseActivityLogSchema = createInsertSchema(rebateCaseAc
 });
 export type InsertRebateCaseActivityLog = z.infer<typeof insertRebateCaseActivityLogSchema>;
 export type RebateCaseActivityLog = typeof rebateCaseActivityLog.$inferSelect;
+
+// ============================================================
+// E-Signature (DocuSign-like) module
+// ============================================================
+
+// A document to be signed (an uploaded PDF + its workflow state)
+export const signatureDocuments = pgTable("signature_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  status: text("status").notNull().default("draft"), // draft | sent | completed | voided
+  originalObjectPath: text("original_object_path").notNull(), // /objects/... of uploaded pdf
+  signedObjectPath: text("signed_object_path"), // /objects/... of flattened, signed pdf
+  pageCount: integer("page_count").notNull().default(1),
+  message: text("message"), // optional message included in the signing email
+  createdBy: varchar("created_by").references(() => crmUsers.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  sentAt: timestamp("sent_at"),
+  completedAt: timestamp("completed_at"),
+  voidedAt: timestamp("voided_at"),
+});
+
+export const insertSignatureDocumentSchema = createInsertSchema(signatureDocuments).omit({
+  id: true, createdAt: true, sentAt: true, completedAt: true, voidedAt: true,
+});
+export type InsertSignatureDocument = z.infer<typeof insertSignatureDocumentSchema>;
+export type SignatureDocument = typeof signatureDocuments.$inferSelect;
+
+// A person who must sign / fill fields on a document
+export const signatureRecipients = pgTable("signature_recipients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  documentId: varchar("document_id").notNull().references(() => signatureDocuments.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  signingOrder: integer("signing_order").notNull().default(0),
+  status: text("status").notNull().default("pending"), // pending | sent | viewed | signed
+  token: varchar("token"), // unique public signing token (set on send)
+  color: text("color").notNull().default("#711419"), // UI color for this recipient's fields
+  viewedAt: timestamp("viewed_at"),
+  signedAt: timestamp("signed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  tokenIdx: uniqueIndex("signature_recipients_token_idx").on(table.token),
+  docIdx: index("signature_recipients_doc_idx").on(table.documentId),
+}));
+
+export const insertSignatureRecipientSchema = createInsertSchema(signatureRecipients).omit({
+  id: true, createdAt: true, viewedAt: true, signedAt: true, token: true, status: true,
+});
+export type InsertSignatureRecipient = z.infer<typeof insertSignatureRecipientSchema>;
+export type SignatureRecipient = typeof signatureRecipients.$inferSelect;
+
+// A field placed on the document, assigned to a recipient.
+// Coordinates are fractions (0..1) of the page size, measured from the TOP-LEFT.
+export const signatureFields = pgTable("signature_fields", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  documentId: varchar("document_id").notNull().references(() => signatureDocuments.id, { onDelete: "cascade" }),
+  recipientId: varchar("recipient_id").notNull().references(() => signatureRecipients.id, { onDelete: "cascade" }),
+  page: integer("page").notNull().default(1),
+  type: text("type").notNull(), // signature | initials | date | text | name
+  x: doublePrecision("x").notNull(),
+  y: doublePrecision("y").notNull(),
+  width: doublePrecision("width").notNull(),
+  height: doublePrecision("height").notNull(),
+  required: boolean("required").notNull().default(true),
+  value: text("value"), // filled value: signature image data-URL, or typed text/date/name
+  completedAt: timestamp("completed_at"),
+}, (table) => ({
+  docIdx: index("signature_fields_doc_idx").on(table.documentId),
+  recipientIdx: index("signature_fields_recipient_idx").on(table.recipientId),
+}));
+
+export const insertSignatureFieldSchema = createInsertSchema(signatureFields).omit({
+  id: true, completedAt: true,
+});
+export type InsertSignatureField = z.infer<typeof insertSignatureFieldSchema>;
+export type SignatureField = typeof signatureFields.$inferSelect;
