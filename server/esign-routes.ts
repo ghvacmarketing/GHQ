@@ -34,7 +34,9 @@ async function sendSigningEmail(opts: {
     console.warn("[esign] RESEND_API_KEY not set - skipping email, link must be shared manually");
     return false;
   }
-  const from = process.env.FROM_EMAIL || "quotes@ghvac.work";
+  // Must be on a Resend-verified domain. ghvacinc.com is the verified domain used
+  // by the working quote/invoice emails; quotes@ghvac.work is NOT verified and is rejected.
+  const from = process.env.SIGNATURE_FROM_EMAIL || "signatures@ghvacinc.com";
   const brand = process.env.BRAND_NAME || "Giesbrecht HVAC";
   const resend = new Resend(apiKey);
   const html = `
