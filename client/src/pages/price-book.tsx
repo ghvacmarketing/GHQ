@@ -44,6 +44,10 @@ import {
   CrawlspaceExamplePage,
   CrawlspaceElitePage,
   CrawlspaceEliteExamplePage,
+  GefaDividerPage,
+  GefaOverviewPage,
+  GefaComparisonPage,
+  GefaQualifyPage,
   buildSalesbookSections,
   getSalesbookTOC,
   type SalesbookSection,
@@ -388,6 +392,14 @@ export default function PriceBook() {
             packages={section.packages || []}
           />
         );
+      case "gefa-divider":
+        return <GefaDividerPage key={section.pageIndex} />;
+      case "gefa-overview":
+        return <GefaOverviewPage key={section.pageIndex} />;
+      case "gefa-comparison":
+        return <GefaComparisonPage key={section.pageIndex} />;
+      case "gefa-qualify":
+        return <GefaQualifyPage key={section.pageIndex} />;
       case "elite-divider":
         return <EliteDividerPage key={section.pageIndex} />;
       case "elite-bundles":

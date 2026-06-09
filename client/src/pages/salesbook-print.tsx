@@ -16,6 +16,10 @@ import {
   CrawlspaceExamplePage,
   CrawlspaceElitePage,
   CrawlspaceEliteExamplePage,
+  GefaDividerPage,
+  GefaOverviewPage,
+  GefaComparisonPage,
+  GefaQualifyPage,
   buildSalesbookSections,
   type SalesbookSection,
   type EliteBundle,
@@ -39,6 +43,14 @@ function renderSection(section: SalesbookSection) {
   switch (section.type) {
     case "static":
       return <StaticPageImage src={section.staticSrc!} pageNum={section.pageIndex + 1} />;
+    case "gefa-divider":
+      return <GefaDividerPage />;
+    case "gefa-overview":
+      return <GefaOverviewPage />;
+    case "gefa-comparison":
+      return <GefaComparisonPage />;
+    case "gefa-qualify":
+      return <GefaQualifyPage />;
     case "category-divider":
       return (
         <CategoryDividerPage

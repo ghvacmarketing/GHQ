@@ -1,2 +1,3 @@
 - [Salesbook PDF generation](salesbook-pdf.md) — PDF download is server-side (playwright screenshots /salesbook/print + pdf-lib), cached by data hash; not client html2canvas.
 - [PDF rasterization tools](pdf-rasterization-tools.md) — ImageMagick can't read PDFs here (no ghostscript); use poppler pdftoppm/pdftotext/pdfinfo.
+- [Adding a salesbook section](salesbook-sections.md) — new page types need the type union, builder, TOC, and ALL THREE render switches (print/public/crm) updated or they render blank in one surface.

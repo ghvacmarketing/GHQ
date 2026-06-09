@@ -3,6 +3,7 @@ import type { PricebookPackage, CrawlspaceTier } from "@shared/schema";
 
 const BRAND_COLOR = "#711419";
 const BRAND_COLOR_LIGHT = "#8a1a20";
+const GEFA_COLOR = "#0f5e8a";
 
 interface PageProps {
   children?: React.ReactNode;
@@ -1292,8 +1293,255 @@ export interface EliteAirflowOption {
   priceByTonnage: Record<string, number>;
 }
 
+export const GefaDividerPage = forwardRef<HTMLDivElement, object>((_, ref) => (
+  <PageWrapper ref={ref}>
+    <div style={{
+      flex: 1,
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+      alignItems: "center",
+      background: "linear-gradient(160deg, #0a2733 0%, #0e3d52 55%, #0f5e8a 100%)",
+      padding: "10%",
+      textAlign: "center",
+    }}>
+      <div style={{ width: 80, height: 3, background: "rgba(255,255,255,0.3)", marginBottom: 32 }} />
+      <div style={{ color: "rgba(255,215,0,0.9)", fontSize: 13, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 12 }}>
+        Georgia State Energy Rebates
+      </div>
+      <h1 style={{ color: "#fff", fontSize: "clamp(24px, 4vw, 42px)", fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 16 }}>
+        GEFA Home Energy Rebates
+      </h1>
+      <p style={{ color: "rgba(255,255,255,0.65)", fontSize: "clamp(11px, 1.6vw, 14px)", maxWidth: "85%", lineHeight: 1.6 }}>
+        State rebate programs that can help Georgia homeowners lower the cost of efficient, all-electric comfort — through the HER and HEAR programs.
+      </p>
+      <div style={{ width: 80, height: 3, background: "rgba(255,255,255,0.3)", marginTop: 32 }} />
+    </div>
+    <div style={{ height: 4, background: "#d4a500" }} />
+  </PageWrapper>
+));
+GefaDividerPage.displayName = "GefaDividerPage";
+
+export const GefaOverviewPage = forwardRef<HTMLDivElement, object>((_, ref) => {
+  const programs = [
+    {
+      tag: "HER",
+      name: "Home Efficiency Rebates",
+      amount: "Up to $16,000",
+      blurb: "For whole-home energy efficiency projects, based on the energy savings the upgrades are projected to achieve.",
+      covers: [
+        "Whole-home efficiency retrofits",
+        "HVAC + building envelope improvements",
+        "Insulation & air sealing",
+        "Projects modeled to hit energy-savings targets",
+      ],
+    },
+    {
+      tag: "HEAR",
+      name: "Home Electrification & Appliance Rebates",
+      amount: "Up to $14,000 total",
+      blurb: "For income-qualified households making electrification upgrades to all-electric equipment.",
+      covers: [
+        "Heat pump HVAC — up to $8,000",
+        "Heat pump water heater",
+        "Electrical panel & wiring upgrades",
+        "Insulation, air sealing & ventilation",
+        "Qualified electric appliances",
+      ],
+    },
+  ];
+  return (
+    <PageWrapper ref={ref}>
+      <div style={{
+        background: GEFA_COLOR,
+        padding: "12px 20px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}>
+        <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>What Is GEFA?</div>
+        <div style={{ color: "rgba(255,215,0,0.85)", fontSize: 11, fontWeight: 600 }}>Two Rebate Paths</div>
+      </div>
+
+      <div style={{ flex: 1, padding: "16px 20px", overflow: "hidden" }}>
+        <div style={{
+          background: "linear-gradient(135deg, #eef7fb 0%, #d9edf6 100%)",
+          border: "1px solid #bfe0ee",
+          borderRadius: 10,
+          padding: "12px 16px",
+          marginBottom: 14,
+        }}>
+          <div style={{ fontSize: 11.5, color: "#0e3d52", lineHeight: 1.6 }}>
+            The Georgia Environmental Finance Authority (GEFA) runs Georgia's Home Energy Rebates. These programs help homeowners lower the cost of energy-efficient and electrification upgrades. There are two main paths — choose the one that fits the project and the household.
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 12 }}>
+          {programs.map((p) => (
+            <div key={p.tag} style={{
+              flex: 1,
+              border: "1px solid #e4e9ec",
+              borderRadius: 8,
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+            }}>
+              <div style={{ padding: "10px 12px", background: GEFA_COLOR, color: "#fff" }}>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>{p.tag}</div>
+                <div style={{ fontSize: 9.5, opacity: 0.85, lineHeight: 1.3 }}>{p.name}</div>
+              </div>
+              <div style={{ padding: "10px 12px", flex: 1 }}>
+                <div style={{ fontSize: 17, fontWeight: 700, color: "#0f5e8a" }}>{p.amount}</div>
+                <div style={{ fontSize: 9.5, color: "#666", lineHeight: 1.45, marginTop: 4 }}>{p.blurb}</div>
+                <div style={{ height: 1, background: "#eee", margin: "8px 0" }} />
+                {p.covers.map((c, i) => (
+                  <div key={i} style={{ fontSize: 9.5, color: "#1a6b3c", display: "flex", gap: 4, marginBottom: 3, lineHeight: 1.3 }}>
+                    <span style={{ color: "#22c55e", fontWeight: 700 }}>✓</span>
+                    <span>{c}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ height: 3, background: GEFA_COLOR }} />
+    </PageWrapper>
+  );
+});
+GefaOverviewPage.displayName = "GefaOverviewPage";
+
+export const GefaComparisonPage = forwardRef<HTMLDivElement, object>((_, ref) => {
+  const rows = [
+    { label: "Main focus", her: "Whole-home energy efficiency", hear: "Switching to all-electric equipment" },
+    { label: "Based on", her: "Projected energy savings", hear: "Household income qualification" },
+    { label: "Maximum rebate", her: "Up to $16,000", hear: "Up to $14,000 total" },
+    { label: "Heat pump HVAC", her: "Part of the whole-home project", hear: "Up to $8,000 toward the system" },
+    { label: "Also covers", her: "Insulation, air sealing, envelope & HVAC", hear: "Water heater, panel, wiring, appliances" },
+    { label: "Best for", her: "Larger efficiency retrofits", hear: "Income-qualified homes going electric" },
+  ];
+  return (
+    <PageWrapper ref={ref}>
+      <div style={{
+        background: GEFA_COLOR,
+        padding: "12px 20px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}>
+        <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>HER vs. HEAR</div>
+        <div style={{ color: "rgba(255,215,0,0.85)", fontSize: 11, fontWeight: 600 }}>Which Path Fits?</div>
+      </div>
+
+      <div style={{ flex: 1, padding: "16px 20px", overflow: "hidden" }}>
+        <div style={{ border: "1px solid #e0e6ea", borderRadius: 8, overflow: "hidden" }}>
+          <div style={{ display: "flex", background: GEFA_COLOR, color: "#fff" }}>
+            <div style={{ flex: "0 0 30%", padding: "9px 12px", fontSize: 11, fontWeight: 700 }}></div>
+            <div style={{ flex: 1, padding: "9px 12px", fontSize: 12, fontWeight: 700, borderLeft: "1px solid rgba(255,255,255,0.2)" }}>HER</div>
+            <div style={{ flex: 1, padding: "9px 12px", fontSize: 12, fontWeight: 700, borderLeft: "1px solid rgba(255,255,255,0.2)" }}>HEAR</div>
+          </div>
+          {rows.map((r, i) => (
+            <div key={r.label} style={{ display: "flex", background: i % 2 === 0 ? "#fff" : "#f7fafc", borderTop: "1px solid #eef2f4" }}>
+              <div style={{ flex: "0 0 30%", padding: "9px 12px", fontSize: 10, fontWeight: 700, color: "#33424b" }}>{r.label}</div>
+              <div style={{ flex: 1, padding: "9px 12px", fontSize: 10, color: "#444", borderLeft: "1px solid #eef2f4", lineHeight: 1.35 }}>{r.her}</div>
+              <div style={{ flex: 1, padding: "9px 12px", fontSize: 10, color: "#444", borderLeft: "1px solid #eef2f4", lineHeight: 1.35 }}>{r.hear}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{
+          marginTop: 14,
+          background: "#f0fdf4",
+          border: "1px solid #bbf7d0",
+          borderRadius: 8,
+          padding: "10px 14px",
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#166534", marginBottom: 3 }}>The simple version</div>
+          <div style={{ fontSize: 10.5, color: "#15803d", lineHeight: 1.5 }}>
+            HER rewards how much energy a whole-home project saves. HEAR helps income-qualified homes pay for specific electrification upgrades like a heat pump. A project usually fits one path, not both.
+          </div>
+        </div>
+      </div>
+
+      <div style={{ height: 3, background: GEFA_COLOR }} />
+    </PageWrapper>
+  );
+});
+GefaComparisonPage.displayName = "GefaComparisonPage";
+
+export const GefaQualifyPage = forwardRef<HTMLDivElement, object>((_, ref) => {
+  const qualify = [
+    "Georgia homeowners upgrading a primary residence",
+    "HEAR eligibility is based on household income",
+    "HER is open to whole-home efficiency projects that meet energy-savings targets",
+    "Equipment must meet program efficiency requirements",
+  ];
+  const dependsOn = ["Household income", "Project type", "Equipment eligibility", "Documentation", "GEFA approval"];
+  return (
+    <PageWrapper ref={ref}>
+      <div style={{
+        background: GEFA_COLOR,
+        padding: "12px 20px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}>
+        <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>Who Qualifies & What to Know</div>
+        <div style={{ color: "rgba(255,215,0,0.85)", fontSize: 11, fontWeight: 600 }}>Eligibility</div>
+      </div>
+
+      <div style={{ flex: 1, padding: "16px 20px", overflow: "hidden" }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#111", marginBottom: 8 }}>Who May Qualify</div>
+        <div style={{ marginBottom: 16 }}>
+          {qualify.map((q, i) => (
+            <div key={i} style={{ display: "flex", gap: 6, marginBottom: 5, fontSize: 10.5, color: "#444", lineHeight: 1.4 }}>
+              <span style={{ color: GEFA_COLOR, fontWeight: 700 }}>•</span>
+              <span>{q}</span>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#111", marginBottom: 8 }}>Every Rebate Depends On</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+          {dependsOn.map((d, i) => (
+            <span key={i} style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: "#0e3d52",
+              background: "#e8f3f9",
+              border: "1px solid #cae3f0",
+              borderRadius: 999,
+              padding: "4px 12px",
+            }}>
+              {d}
+            </span>
+          ))}
+        </div>
+
+        <div style={{
+          background: "linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)",
+          border: "2px solid #fdba74",
+          borderRadius: 10,
+          padding: "12px 16px",
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#9a3412", marginBottom: 4 }}>
+            Important — Never Promise a Rebate
+          </div>
+          <div style={{ fontSize: 10.5, color: "#7c2d12", lineHeight: 1.55 }}>
+            The amounts above are program <strong>maximums</strong>, not guaranteed amounts. Final rebates depend on income, project scope, equipment eligibility, complete documentation, and official GEFA approval. Never tell a customer they will receive a rebate until their application has been reviewed and approved by GEFA.
+          </div>
+        </div>
+      </div>
+
+      <div style={{ height: 3, background: GEFA_COLOR }} />
+    </PageWrapper>
+  );
+});
+GefaQualifyPage.displayName = "GefaQualifyPage";
+
 export interface SalesbookSection {
-  type: "static" | "category-divider" | "tier-header" | "product-detail" | "ducting-detail" | "elite-divider" | "elite-bundles" | "elite-discount" | "elite-airflow" | "crawlspace-divider" | "crawlspace-tiers" | "crawlspace-example" | "crawlspace-elite" | "crawlspace-elite-example";
+  type: "static" | "gefa-divider" | "gefa-overview" | "gefa-comparison" | "gefa-qualify" | "category-divider" | "tier-header" | "product-detail" | "ducting-detail" | "elite-divider" | "elite-bundles" | "elite-discount" | "elite-airflow" | "crawlspace-divider" | "crawlspace-tiers" | "crawlspace-example" | "crawlspace-elite" | "crawlspace-elite-example";
   label?: string;
   unitType?: string;
   tier?: string;
@@ -1324,6 +1572,11 @@ export function buildSalesbookSections(
   for (const src of staticPages) {
     sections.push({ type: "static", staticSrc: src, pageIndex: pageIndex++, label: `Intro Page ${pageIndex}` });
   }
+
+  sections.push({ type: "gefa-divider", pageIndex: pageIndex++, label: "GEFA Home Energy Rebates" });
+  sections.push({ type: "gefa-overview", pageIndex: pageIndex++, label: "GEFA — What Is GEFA?" });
+  sections.push({ type: "gefa-comparison", pageIndex: pageIndex++, label: "GEFA — HER vs. HEAR" });
+  sections.push({ type: "gefa-qualify", pageIndex: pageIndex++, label: "GEFA — Who Qualifies" });
 
   const byType = new Map<string, PricebookPackage[]>();
   for (const pkg of packages) {
@@ -1438,7 +1691,7 @@ export function buildSalesbookSections(
 export function getSalesbookTOC(sections: SalesbookSection[]): { label: string; page: number }[] {
   const toc: { label: string; page: number }[] = [];
   for (const s of sections) {
-    if (s.type === "category-divider" || s.type === "elite-divider" || s.type === "crawlspace-divider") {
+    if (s.type === "gefa-divider" || s.type === "category-divider" || s.type === "elite-divider" || s.type === "crawlspace-divider") {
       toc.push({ label: s.label || "Section", page: s.pageIndex + 1 });
     }
   }
