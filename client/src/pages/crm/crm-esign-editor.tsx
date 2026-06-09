@@ -265,80 +265,111 @@ export default function CrmEsignEditor() {
   const fieldsByRecipient = new Map<string, number>();
   fields.forEach((f) => fieldsByRecipient.set(f.recipientId, (fieldsByRecipient.get(f.recipientId) || 0) + 1));
 
+  const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() || "").join("") || "?";
+
   return (
     <CrmLayout currentUser={currentUser} disableScroll>
       <div className="flex flex-col h-full">
         {/* Top bar */}
-        <div className="flex items-center gap-3 border-b px-4 py-3 bg-background">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/crm/esign")} data-testid="button-back">
+        <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3 bg-white">
+          <Button variant="ghost" size="icon" className="text-slate-600 hover:text-slate-900" onClick={() => navigate("/crm/esign")} data-testid="button-back">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h1 className="font-semibold truncate" data-testid="text-doc-title">{doc.title}</h1>
-              <Badge variant="secondary" className={doc.status === "draft" ? "bg-gray-100 text-gray-700" : doc.status === "sent" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"}>
-                {doc.status}
+              <h1 className="font-semibold text-slate-900 truncate" data-testid="text-doc-title">{doc.title}</h1>
+              <Badge
+                variant="outline"
+                className={doc.status === "draft" ? "bg-slate-100 text-slate-700 border-slate-200" : doc.status === "sent" ? "bg-blue-100 text-blue-700 border-blue-200" : "bg-green-100 text-green-700 border-green-200"}
+              >
+                {doc.status === "completed" && <CheckCircle2 className="mr-1 h-3 w-3" />}
+                {doc.status === "sent" && <Send className="mr-1 h-3 w-3" />}
+                {doc.status === "draft" ? "Draft" : doc.status === "sent" ? "Out for signature" : doc.status === "completed" ? "Completed" : doc.status}
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground">{doc.pageCount} page{doc.pageCount === 1 ? "" : "s"}</p>
+            <p className="text-xs text-slate-500">
+              {doc.pageCount} page{doc.pageCount === 1 ? "" : "s"} · {doc.recipients.length} recipient{doc.recipients.length === 1 ? "" : "s"} · {fields.length} field{fields.length === 1 ? "" : "s"}
+            </p>
           </div>
           {isDraft && (
             <>
+              {dirty && <span className="hidden sm:inline text-xs text-amber-600 font-medium">Unsaved changes</span>}
               <Button variant="outline" onClick={() => saveFields.mutate()} disabled={saveFields.isPending || !dirty} data-testid="button-save">
                 {saveFields.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Save
               </Button>
-              <Button className="bg-[#711419] hover:bg-[#5a0f14]" onClick={() => { setSendResults(null); setSendOpen(true); }} data-testid="button-open-send">
+              <Button className="bg-[#711419] hover:bg-[#5a1014]" onClick={() => { setSendResults(null); setSendOpen(true); }} data-testid="button-open-send">
                 <Send className="mr-2 h-4 w-4" /> Send
               </Button>
             </>
           )}
           {doc.status === "completed" && doc.signedObjectPath && (
             <Button variant="outline" onClick={() => window.open(doc.signedObjectPath!, "_blank")} data-testid="button-download-signed">
-              Download Signed PDF
+              <Save className="mr-2 h-4 w-4" /> Download Signed PDF
             </Button>
           )}
         </div>
 
         <div className="flex flex-1 min-h-0">
           {/* Sidebar */}
-          <div className="w-72 border-r overflow-y-auto p-4 space-y-6 bg-muted/20 shrink-0 hidden md:block">
+          <div className="w-72 border-r border-slate-200 overflow-y-auto p-4 space-y-6 bg-slate-50/70 shrink-0 hidden md:block">
             <div>
-              <h3 className="text-sm font-semibold mb-2">Recipients</h3>
+              <div className="flex items-center justify-between mb-2.5">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recipients</h3>
+                <span className="text-xs text-slate-400">{doc.recipients.length}</span>
+              </div>
               <div className="space-y-2">
-                {doc.recipients.map((r) => (
-                  <div
-                    key={r.id}
-                    className={`rounded-md border p-2 cursor-pointer transition-colors ${activeRecipientId === r.id ? "ring-2 ring-offset-1" : "hover:bg-muted"}`}
-                    style={{ borderLeft: `4px solid ${r.color}`, ...(activeRecipientId === r.id ? { ["--tw-ring-color" as any]: r.color } : {}) }}
-                    onClick={() => setActiveRecipientId(r.id)}
-                    data-testid={`recipient-${r.id}`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium truncate">{r.name}</div>
-                        <div className="text-xs text-muted-foreground truncate">{r.email}</div>
+                {doc.recipients.map((r) => {
+                  const active = activeRecipientId === r.id;
+                  return (
+                    <div
+                      key={r.id}
+                      className={`rounded-lg border bg-white p-2.5 cursor-pointer transition-all ${active ? "border-transparent ring-2 shadow-sm" : "border-slate-200 hover:border-slate-300 hover:shadow-sm"}`}
+                      style={active ? { ["--tw-ring-color" as any]: r.color } : {}}
+                      onClick={() => setActiveRecipientId(r.id)}
+                      data-testid={`recipient-${r.id}`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white"
+                          style={{ backgroundColor: r.color }}
+                        >
+                          {initials(r.name)}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium text-slate-900 truncate">{r.name}</div>
+                          <div className="text-xs text-slate-500 truncate">{r.email}</div>
+                        </div>
+                        {isDraft ? (
+                          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-slate-400 hover:text-red-600" onClick={(e) => { e.stopPropagation(); removeRecipient.mutate(r.id); }} data-testid={`button-remove-recipient-${r.id}`}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : (
+                          <Badge variant="secondary" className="text-[10px] capitalize">{r.status}</Badge>
+                        )}
                       </div>
-                      {isDraft ? (
-                        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => { e.stopPropagation(); removeRecipient.mutate(r.id); }} data-testid={`button-remove-recipient-${r.id}`}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      ) : (
-                        <Badge variant="secondary" className="text-[10px]">{r.status}</Badge>
-                      )}
+                      <div className="mt-1.5 flex items-center gap-1 pl-[42px] text-[11px] text-slate-500">
+                        <span
+                          className="inline-block h-1.5 w-1.5 rounded-full"
+                          style={{ backgroundColor: (fieldsByRecipient.get(r.id) || 0) > 0 ? r.color : "#cbd5e1" }}
+                        />
+                        {fieldsByRecipient.get(r.id) || 0} field{(fieldsByRecipient.get(r.id) || 0) === 1 ? "" : "s"}
+                      </div>
                     </div>
-                    <div className="text-[11px] text-muted-foreground mt-1">{fieldsByRecipient.get(r.id) || 0} field(s)</div>
-                  </div>
-                ))}
-                {doc.recipients.length === 0 && <p className="text-xs text-muted-foreground">No recipients yet.</p>}
+                  );
+                })}
+                {doc.recipients.length === 0 && (
+                  <p className="text-xs text-slate-400 rounded-lg border border-dashed border-slate-300 p-3 text-center">No recipients yet.</p>
+                )}
               </div>
 
               {isDraft && (
-                <div className="mt-3 space-y-2 border-t pt-3">
-                  <Input placeholder="Name" value={recipName} onChange={(e) => setRecipName(e.target.value)} data-testid="input-recipient-name" />
-                  <Input placeholder="Email" type="email" value={recipEmail} onChange={(e) => setRecipEmail(e.target.value)} data-testid="input-recipient-email" />
+                <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-white p-2.5">
+                  <p className="text-[11px] font-medium text-slate-600">Add a recipient</p>
+                  <Input placeholder="Name" value={recipName} onChange={(e) => setRecipName(e.target.value)} className="h-9" data-testid="input-recipient-name" />
+                  <Input placeholder="Email" type="email" value={recipEmail} onChange={(e) => setRecipEmail(e.target.value)} className="h-9" data-testid="input-recipient-email" />
                   <Button
-                    size="sm" variant="outline" className="w-full"
+                    size="sm" className="w-full bg-[#711419] hover:bg-[#5a1014]"
                     disabled={!recipName.trim() || !recipEmail.trim() || addRecipient.isPending}
                     onClick={() => addRecipient.mutate()}
                     data-testid="button-add-recipient"
@@ -352,17 +383,27 @@ export default function CrmEsignEditor() {
 
             {isDraft && (
               <div>
-                <h3 className="text-sm font-semibold mb-2">Fields</h3>
-                <p className="text-[11px] text-muted-foreground mb-2">
-                  Pick a recipient, choose a field, then click on the document to place it.
-                </p>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Fields</h3>
+                {!activeRecipientId ? (
+                  <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2 mb-2">
+                    Select a recipient above first, then choose a field and click on the document.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-slate-500 mb-2">
+                    Placing fields for{" "}
+                    <span className="font-medium" style={{ color: recipientById.get(activeRecipientId)?.color }}>
+                      {recipientById.get(activeRecipientId)?.name}
+                    </span>. Click the document to drop it.
+                  </p>
+                )}
                 <div className="grid grid-cols-2 gap-2">
                   {FIELD_TYPES.map((ft) => {
                     const Icon = ft.icon;
+                    const selected = activeTool === ft.type;
                     return (
                       <button
                         key={ft.type}
-                        className={`flex items-center gap-1.5 rounded-md border p-2 text-xs transition-colors ${activeTool === ft.type ? "border-[#711419] bg-[#711419]/10 text-[#711419]" : "hover:bg-muted"}`}
+                        className={`flex items-center gap-1.5 rounded-lg border p-2.5 text-xs font-medium transition-all disabled:opacity-50 ${selected ? "border-[#711419] bg-[#711419]/10 text-[#711419] shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"}`}
                         onClick={() => setActiveTool(ft.type)}
                         disabled={!activeRecipientId}
                         data-testid={`tool-${ft.type}`}
@@ -377,7 +418,7 @@ export default function CrmEsignEditor() {
           </div>
 
           {/* PDF canvas */}
-          <div ref={containerRef} className="flex-1 overflow-auto bg-muted/40 p-4">
+          <div ref={containerRef} className="flex-1 overflow-auto bg-slate-100 p-4">
             <Document
               file={pdfUrl}
               loading={<div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}
@@ -387,10 +428,11 @@ export default function CrmEsignEditor() {
                 const pageNum = idx + 1;
                 const pageFields = fields.filter((f) => f.page === pageNum);
                 return (
-                  <div key={pageNum} className="mx-auto mb-6 shadow-md w-fit bg-white">
+                  <div key={pageNum} className="mx-auto mb-6 w-fit">
+                    <div className="mb-1.5 text-center text-[11px] font-medium text-slate-400">Page {pageNum} of {doc.pageCount}</div>
                     <div
                       ref={(el) => { pageRefs.current[pageNum] = el; }}
-                      className="relative"
+                      className="relative rounded-md overflow-hidden shadow-md ring-1 ring-slate-200 bg-white"
                       style={{ cursor: isDraft && activeRecipientId ? "crosshair" : "default" }}
                       onClick={(e) => placeField(pageNum, e)}
                     >
@@ -479,7 +521,7 @@ export default function CrmEsignEditor() {
             ) : (
               <>
                 <Button variant="outline" onClick={() => setSendOpen(false)}>Cancel</Button>
-                <Button className="bg-[#711419] hover:bg-[#5a0f14]" onClick={() => sendDoc.mutate()} disabled={sendDoc.isPending} data-testid="button-confirm-send">
+                <Button className="bg-[#711419] hover:bg-[#5a1014]" onClick={() => sendDoc.mutate()} disabled={sendDoc.isPending} data-testid="button-confirm-send">
                   {sendDoc.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Send now
                 </Button>

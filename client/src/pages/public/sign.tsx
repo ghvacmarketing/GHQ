@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { SignaturePad } from "@/components/esign/signature-pad";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PenTool, Type, Calendar, UserSquare, Hash, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, PenTool, Type, Calendar, UserSquare, Hash, CheckCircle2, AlertCircle, FileSignature } from "lucide-react";
 import type { SignatureField } from "@shared/schema";
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
@@ -148,34 +148,56 @@ export default function PublicSign() {
   }
 
   const accent = data.recipient.color || "#711419";
+  const totalRequired = data.fields.filter((f) => f.required).length;
+  const completedRequired = totalRequired - requiredRemaining;
+  const progressPct = totalRequired > 0 ? Math.round((completedRequired / totalRequired) * 100) : 100;
 
   return (
-    <div className="min-h-screen flex flex-col bg-muted/30">
+    <div className="min-h-screen flex flex-col bg-slate-100">
       {/* Header */}
-      <div className="border-b bg-white px-4 py-3 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="font-semibold truncate">{data.document.title}</h1>
-            <p className="text-xs text-muted-foreground">Signing as {data.recipient.name}</p>
+      <div className="border-b border-slate-200 bg-white shadow-sm sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-3 px-4 py-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: `${accent}1a` }}>
+              <FileSignature className="h-5 w-5" style={{ color: accent }} />
+            </span>
+            <div className="min-w-0">
+              <h1 className="font-semibold text-slate-900 truncate">{data.document.title}</h1>
+              <p className="text-xs text-slate-500">Signing as {data.recipient.name}</p>
+            </div>
           </div>
           <Button
             onClick={() => submit.mutate()}
             disabled={requiredRemaining > 0 || submit.isPending}
-            style={{ backgroundColor: accent }}
-            className="text-white hover:opacity-90"
+            style={{ backgroundColor: requiredRemaining > 0 ? undefined : accent }}
+            className="text-white hover:opacity-90 shrink-0"
             data-testid="button-finish"
           >
             {submit.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {requiredRemaining > 0 ? `${requiredRemaining} field(s) left` : "Finish & Submit"}
+            {requiredRemaining > 0 ? `${requiredRemaining} field${requiredRemaining === 1 ? "" : "s"} left` : "Finish & Submit"}
           </Button>
+        </div>
+        {/* Progress bar */}
+        <div className="h-1 w-full bg-slate-100">
+          <div className="h-full transition-all duration-300" style={{ width: `${progressPct}%`, backgroundColor: accent }} />
         </div>
       </div>
 
       {data.document.message && (
-        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-sm text-amber-800 text-center">
-          {data.document.message}
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 text-sm text-amber-800">
+          <div className="max-w-4xl mx-auto flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>{data.document.message}</span>
+          </div>
         </div>
       )}
+
+      {/* Helper banner */}
+      <div className="bg-white/70 border-b border-slate-200 px-4 py-2 text-center text-xs text-slate-500">
+        {requiredRemaining > 0
+          ? "Click the highlighted fields below to fill them in."
+          : "All required fields are complete — click Finish & Submit above."}
+      </div>
 
       {/* PDF */}
       <div ref={containerRef} className="flex-1 overflow-auto p-4">
@@ -189,8 +211,9 @@ export default function PublicSign() {
               const pageNum = idx + 1;
               const pf = fieldsByPage.get(pageNum) || [];
               return (
-                <div key={pageNum} className="mx-auto mb-6 shadow-md w-fit bg-white">
-                  <div ref={(el) => { pageRefs.current[pageNum] = el; }} className="relative">
+                <div key={pageNum} className="mx-auto mb-6 w-fit">
+                  <div className="mb-1.5 text-center text-[11px] font-medium text-slate-400">Page {pageNum} of {data.document.pageCount}</div>
+                  <div ref={(el) => { pageRefs.current[pageNum] = el; }} className="relative rounded-md overflow-hidden shadow-md ring-1 ring-slate-200 bg-white">
                     <Page pageNumber={pageNum} width={pageWidth} renderAnnotationLayer={false} renderTextLayer={false} />
                     {pf.map((f) => {
                       const filled = !!values[f.id];
