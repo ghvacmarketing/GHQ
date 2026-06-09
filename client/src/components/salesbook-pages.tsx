@@ -1,5 +1,6 @@
 import { forwardRef } from "react";
 import type { PricebookPackage, CrawlspaceTier } from "@shared/schema";
+import gefaBookingQr from "@assets/gefa-booking-qr.svg";
 
 const BRAND_COLOR = "#711419";
 const BRAND_COLOR_LIGHT = "#8a1a20";
@@ -1530,6 +1531,39 @@ export const GefaQualifyPage = forwardRef<HTMLDivElement, object>((_, ref) => {
           </div>
           <div style={{ fontSize: 10.5, color: "#7c2d12", lineHeight: 1.55 }}>
             The amounts above are program <strong>maximums</strong>, not guaranteed amounts. Final rebates depend on income, project scope, equipment eligibility, complete documentation, and official GEFA approval. Never tell a customer they will receive a rebate until their application has been reviewed and approved by GEFA.
+          </div>
+        </div>
+
+        <div style={{
+          marginTop: 16,
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          background: "linear-gradient(135deg, #0e3d52 0%, #0f5e8a 100%)",
+          borderRadius: 12,
+          padding: "16px 18px",
+        }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: "rgba(255,215,0,0.9)", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>
+              Interested? Let's Talk
+            </div>
+            <div style={{ color: "#fff", fontSize: 16, fontWeight: 700, lineHeight: 1.25, marginBottom: 6 }}>
+              Book a Free Sales Consultation
+            </div>
+            <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 10.5, lineHeight: 1.5 }}>
+              Scan the code to schedule a visit and find out which rebate path may fit your home.
+            </div>
+            <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 9, marginTop: 6, wordBreak: "break-all" }}>
+              widget.zenbooker.com/book/giesbrechthvac
+            </div>
+          </div>
+          <div style={{
+            flex: "0 0 auto",
+            background: "#fff",
+            borderRadius: 10,
+            padding: 8,
+          }}>
+            <img src={gefaBookingQr} alt="Scan to book a consultation" style={{ display: "block", width: 96, height: 96 }} />
           </div>
         </div>
       </div>
