@@ -4,7 +4,7 @@ import gefaBookingQr from "@assets/gefa-booking-qr.svg";
 
 const BRAND_COLOR = "#711419";
 const BRAND_COLOR_LIGHT = "#8a1a20";
-const GEFA_COLOR = "#0f5e8a";
+const GEFA_COLOR = BRAND_COLOR;
 
 interface PageProps {
   children?: React.ReactNode;
@@ -1302,7 +1302,7 @@ export const GefaDividerPage = forwardRef<HTMLDivElement, object>((_, ref) => (
       flexDirection: "column",
       justifyContent: "center",
       alignItems: "center",
-      background: "linear-gradient(160deg, #0a2733 0%, #0e3d52 55%, #0f5e8a 100%)",
+      background: "linear-gradient(160deg, #2a0809 0%, #4d0e12 50%, #711419 100%)",
       padding: "10%",
       textAlign: "center",
     }}>
@@ -1366,13 +1366,13 @@ export const GefaOverviewPage = forwardRef<HTMLDivElement, object>((_, ref) => {
 
       <div style={{ flex: 1, padding: "16px 20px", overflow: "hidden" }}>
         <div style={{
-          background: "linear-gradient(135deg, #eef7fb 0%, #d9edf6 100%)",
-          border: "1px solid #bfe0ee",
+          background: "linear-gradient(135deg, #fbf1f1 0%, #f6e2e3 100%)",
+          border: "1px solid #e6c9cb",
           borderRadius: 10,
           padding: "12px 16px",
           marginBottom: 14,
         }}>
-          <div style={{ fontSize: 11.5, color: "#0e3d52", lineHeight: 1.6 }}>
+          <div style={{ fontSize: 11.5, color: "#5a1015", lineHeight: 1.6 }}>
             The Georgia Environmental Finance Authority (GEFA) runs Georgia's Home Energy Rebates. These programs help homeowners lower the cost of energy-efficient and electrification upgrades. There are two main paths — choose the one that fits the project and the household.
           </div>
         </div>
@@ -1392,7 +1392,7 @@ export const GefaOverviewPage = forwardRef<HTMLDivElement, object>((_, ref) => {
                 <div style={{ fontSize: 9.5, opacity: 0.85, lineHeight: 1.3 }}>{p.name}</div>
               </div>
               <div style={{ padding: "10px 12px", flex: 1 }}>
-                <div style={{ fontSize: 17, fontWeight: 700, color: "#0f5e8a" }}>{p.amount}</div>
+                <div style={{ fontSize: 17, fontWeight: 700, color: BRAND_COLOR }}>{p.amount}</div>
                 <div style={{ fontSize: 9.5, color: "#666", lineHeight: 1.45, marginTop: 4 }}>{p.blurb}</div>
                 <div style={{ height: 1, background: "#eee", margin: "8px 0" }} />
                 {p.covers.map((c, i) => (
@@ -1436,17 +1436,17 @@ export const GefaComparisonPage = forwardRef<HTMLDivElement, object>((_, ref) =>
       </div>
 
       <div style={{ flex: 1, padding: "16px 20px", overflow: "hidden" }}>
-        <div style={{ border: "1px solid #e0e6ea", borderRadius: 8, overflow: "hidden" }}>
+        <div style={{ border: "1px solid #ead9da", borderRadius: 8, overflow: "hidden" }}>
           <div style={{ display: "flex", background: GEFA_COLOR, color: "#fff" }}>
             <div style={{ flex: "0 0 30%", padding: "9px 12px", fontSize: 11, fontWeight: 700 }}></div>
             <div style={{ flex: 1, padding: "9px 12px", fontSize: 12, fontWeight: 700, borderLeft: "1px solid rgba(255,255,255,0.2)" }}>HER</div>
             <div style={{ flex: 1, padding: "9px 12px", fontSize: 12, fontWeight: 700, borderLeft: "1px solid rgba(255,255,255,0.2)" }}>HEAR</div>
           </div>
           {rows.map((r, i) => (
-            <div key={r.label} style={{ display: "flex", background: i % 2 === 0 ? "#fff" : "#f7fafc", borderTop: "1px solid #eef2f4" }}>
-              <div style={{ flex: "0 0 30%", padding: "9px 12px", fontSize: 10, fontWeight: 700, color: "#33424b" }}>{r.label}</div>
-              <div style={{ flex: 1, padding: "9px 12px", fontSize: 10, color: "#444", borderLeft: "1px solid #eef2f4", lineHeight: 1.35 }}>{r.her}</div>
-              <div style={{ flex: 1, padding: "9px 12px", fontSize: 10, color: "#444", borderLeft: "1px solid #eef2f4", lineHeight: 1.35 }}>{r.hear}</div>
+            <div key={r.label} style={{ display: "flex", background: i % 2 === 0 ? "#fff" : "#faf4f4", borderTop: "1px solid #f0e6e6" }}>
+              <div style={{ flex: "0 0 30%", padding: "9px 12px", fontSize: 10, fontWeight: 700, color: "#4a3334" }}>{r.label}</div>
+              <div style={{ flex: 1, padding: "9px 12px", fontSize: 10, color: "#444", borderLeft: "1px solid #f0e6e6", lineHeight: 1.35 }}>{r.her}</div>
+              <div style={{ flex: 1, padding: "9px 12px", fontSize: 10, color: "#444", borderLeft: "1px solid #f0e6e6", lineHeight: 1.35 }}>{r.hear}</div>
             </div>
           ))}
         </div>
@@ -1509,9 +1509,9 @@ export const GefaQualifyPage = forwardRef<HTMLDivElement, object>((_, ref) => {
             <span key={i} style={{
               fontSize: 10,
               fontWeight: 600,
-              color: "#0e3d52",
-              background: "#e8f3f9",
-              border: "1px solid #cae3f0",
+              color: "#5a1015",
+              background: "#fbeeef",
+              border: "1px solid #ecd2d4",
               borderRadius: 999,
               padding: "4px 12px",
             }}>
@@ -1539,7 +1539,7 @@ export const GefaQualifyPage = forwardRef<HTMLDivElement, object>((_, ref) => {
           display: "flex",
           alignItems: "center",
           gap: 16,
-          background: "linear-gradient(135deg, #0e3d52 0%, #0f5e8a 100%)",
+          background: "linear-gradient(135deg, #4d0e12 0%, #711419 100%)",
           borderRadius: 12,
           padding: "16px 18px",
         }}>
