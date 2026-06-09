@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRoute } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Document, Page, pdfjs } from "react-pdf";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { apiRequest } from "@/lib/queryClient";
@@ -15,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, PenTool, Type, Calendar, UserSquare, Hash, CheckCircle2, AlertCircle } from "lucide-react";
 import type { SignatureField } from "@shared/schema";
 
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 type SignSession = {
   document: { id: string; title: string; message: string | null; pageCount: number; status: string };

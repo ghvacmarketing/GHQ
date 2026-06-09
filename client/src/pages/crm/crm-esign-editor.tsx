@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Document, Page, pdfjs } from "react-pdf";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -20,7 +21,7 @@ import {
 } from "lucide-react";
 import type { CrmUser, SignatureDocument, SignatureRecipient, SignatureField } from "@shared/schema";
 
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 type DocDetail = SignatureDocument & { recipients: SignatureRecipient[]; fields: SignatureField[] };
 

@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import mammoth from "mammoth";
 import { Button } from "@/components/ui/button";
 import { X, Download, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 // Set up PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 type FullScreenFileViewerProps = {
   fileId: string;

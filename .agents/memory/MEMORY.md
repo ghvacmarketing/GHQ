@@ -1,1 +1,2 @@
 - [drizzle-kit push blocked by orphan tables](drizzle-push-orphan-tables.md) — push hangs on raw-TTY rename prompts; add new tables via raw executeSql CREATE TABLE instead.
+- [react-pdf / pdfjs worker setup](pdfjs-worker-setup.md) — CDN pdf.worker.min.js 404s on pdfjs v5; bundle worker locally via `pdfjs-dist/build/pdf.worker.min.mjs?url`.
