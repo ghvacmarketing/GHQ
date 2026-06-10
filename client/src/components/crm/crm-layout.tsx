@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -33,8 +33,11 @@ import {
   ListTodo,
   Award,
   PenLine,
+  Clock,
+  Loader2,
 } from "lucide-react";
-import type { CrmUser } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
+import type { CrmUser, CrmTimeEntry } from "@shared/schema";
 import ghqLogo from "@assets/redlogo.webp";
 import GhqSearch from "./ghq-search";
 import NotificationsDrawerContent from "./notifications-drawer";
@@ -142,6 +145,97 @@ function NavItemComponent({
         ) : null}
       </div>
     </Link>
+  );
+}
+
+function formatElapsed(fromIso: string | Date) {
+  const start = new Date(fromIso).getTime();
+  const diff = Math.max(0, Date.now() - start);
+  const totalSec = Math.floor(diff / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
+function ClockInButton() {
+  const { toast } = useToast();
+  const [, setTick] = useState(0);
+
+  const { data: current } = useQuery<{ entry: CrmTimeEntry | null }>({
+    queryKey: ["/api/mobile/time/current"],
+    refetchInterval: 60000,
+    staleTime: 30000,
+  });
+
+  const entry = current?.entry ?? null;
+  const isClockedIn = !!entry;
+
+  useEffect(() => {
+    if (!isClockedIn) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [isClockedIn]);
+
+  const clockInMutation = useMutation({
+    mutationFn: async () => apiRequest("POST", "/api/mobile/time/clock-in", {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/mobile/time/current"] });
+      toast({ title: "Clocked in", description: "Your shift timer has started." });
+    },
+    onError: (e: Error) =>
+      toast({ title: "Could not clock in", description: e.message, variant: "destructive" }),
+  });
+
+  const clockOutMutation = useMutation({
+    mutationFn: async () => apiRequest("POST", "/api/mobile/time/clock-out"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/mobile/time/current"] });
+      toast({ title: "Clocked out", description: "Your shift has been recorded." });
+    },
+    onError: (e: Error) =>
+      toast({ title: "Could not clock out", description: e.message, variant: "destructive" }),
+  });
+
+  const busy = clockInMutation.isPending || clockOutMutation.isPending;
+
+  if (isClockedIn && entry) {
+    return (
+      <Button
+        size="sm"
+        className="w-full justify-between bg-green-600 hover:bg-green-700 text-white mb-2"
+        onClick={() => clockOutMutation.mutate()}
+        disabled={busy}
+        data-testid="button-clock-toggle"
+      >
+        <span className="flex items-center gap-2">
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
+            </span>
+          )}
+          Clock Out
+        </span>
+        <span className="font-mono text-xs tabular-nums" data-testid="text-clock-elapsed">
+          {formatElapsed(entry.clockInAt)}
+        </span>
+      </Button>
+    );
+  }
+
+  return (
+    <Button
+      size="sm"
+      className="w-full justify-start bg-[#711419] hover:bg-[#5a1014] text-white mb-2"
+      onClick={() => clockInMutation.mutate()}
+      disabled={busy}
+      data-testid="button-clock-toggle"
+    >
+      {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Clock className="h-4 w-4 mr-2" />}
+      Clock In
+    </Button>
   );
 }
 
@@ -290,6 +384,7 @@ function SidebarContent({
               </Badge>
             </div>
           </div>
+          <ClockInButton />
           <Button
             variant="ghost"
             size="sm"
