@@ -5,7 +5,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, subDays, startOfWeek, endOfWeek } from "date-fns";
 import { 
   Clock, ArrowLeft, Loader2, Search, Download, Edit2, Save, X, User, Calendar,
-  Car, Wrench, Coffee, BarChart3
+  Car, Wrench, Coffee, BarChart3, Trash2, Activity, AlertTriangle
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,11 @@ interface TimeEntryWithTech extends CrmTimeEntry {
   technicianName?: string;
 }
 
+interface ActiveEntry extends CrmTimeEntry {
+  technicianName?: string;
+  role?: string;
+}
+
 export default function CrmSettingsTime() {
   usePageTitle("Time Logs");
   const [, navigate] = useLocation();
@@ -62,6 +67,9 @@ export default function CrmSettingsTime() {
   const [editNotes, setEditNotes] = useState("");
   const [editClockIn, setEditClockIn] = useState("");
   const [editClockOut, setEditClockOut] = useState("");
+  const [entryToDelete, setEntryToDelete] = useState<TimeEntryWithTech | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [nowTick, setNowTick] = useState(Date.now());
   
   // Default breakdown date range to this week
   const [breakdownStartDate, setBreakdownStartDate] = useState<string>(() => {
@@ -114,6 +122,13 @@ export default function CrmSettingsTime() {
     enabled: !!currentUser && !!breakdownStartDate && !!breakdownEndDate,
   });
 
+  const { data: activeEntries } = useQuery<ActiveEntry[]>({
+    queryKey: ["/api/crm/time-entries/active"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: !!currentUser,
+    refetchInterval: 30000,
+  });
+
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
       return apiRequest("PATCH", `/api/crm/time-entries/${id}`, data);
@@ -128,11 +143,52 @@ export default function CrmSettingsTime() {
     },
   });
 
+  const invalidateTimeData = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/time-entries"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/time-breakdown"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/time-entries/active"] });
+  };
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/crm/time-entries/${id}`);
+    },
+    onSuccess: () => {
+      setEntryToDelete(null);
+      invalidateTimeData();
+      toast({ title: "Deleted", description: "Time entry has been removed." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to delete", variant: "destructive" });
+    },
+  });
+
+  const clearAllMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      for (const id of ids) {
+        await apiRequest("DELETE", `/api/crm/time-entries/${id}`);
+      }
+    },
+    onSuccess: (_data, ids) => {
+      setShowClearConfirm(false);
+      invalidateTimeData();
+      toast({ title: "Cleared", description: `${ids.length} time ${ids.length === 1 ? "entry" : "entries"} removed.` });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to clear logs", variant: "destructive" });
+    },
+  });
+
   useEffect(() => {
     if (!authLoading && !currentUser) {
       navigate("/crm/login");
     }
   }, [authLoading, currentUser, navigate]);
+
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(Date.now()), 60000);
+    return () => clearInterval(t);
+  }, []);
 
   const formatDuration = (minutes: number | null) => {
     if (!minutes) return "--";
@@ -216,6 +272,11 @@ export default function CrmSettingsTime() {
     return Math.round((part / total) * 100);
   };
 
+  const formatElapsed = (fromIso: string) => {
+    const mins = Math.max(0, Math.floor((nowTick - new Date(fromIso).getTime()) / 60000));
+    return formatMinutesToHoursMinutes(mins);
+  };
+
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="p-6 max-w-6xl mx-auto" data-testid="crm-time-logs">
@@ -245,6 +306,52 @@ export default function CrmSettingsTime() {
           </TabsList>
 
           <TabsContent value="breakdown" className="space-y-4">
+            <Card data-testid="card-currently-clocked-in">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-green-600" />
+                  Currently Clocked In
+                  {activeEntries && activeEntries.length > 0 && (
+                    <span className="ml-1 inline-flex items-center justify-center rounded-full bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5">
+                      {activeEntries.length}
+                    </span>
+                  )}
+                </CardTitle>
+                <CardDescription>Who is on the clock right now</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {!activeEntries || activeEntries.length === 0 ? (
+                  <p className="text-sm text-slate-500 py-2">No one is clocked in right now.</p>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {activeEntries.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50/60 p-3"
+                        data-testid={`active-card-${entry.id}`}
+                      >
+                        <div className="relative">
+                          <div className="w-10 h-10 rounded-full bg-[#711419] text-white flex items-center justify-center text-sm font-semibold">
+                            {entry.technicianName?.charAt(0) || "?"}
+                          </div>
+                          <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 ring-2 ring-white animate-pulse" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-medium text-slate-900 truncate">{entry.technicianName}</div>
+                          <div className="text-xs text-slate-500 capitalize">{entry.role}</div>
+                          <div className="text-xs text-slate-600 mt-0.5">
+                            <span className="font-semibold text-green-700">{formatElapsed(entry.clockInAt as unknown as string)}</span>
+                            {" · since "}
+                            {format(new Date(entry.clockInAt), "h:mm a")}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-medium">Date Range</CardTitle>
@@ -460,10 +567,20 @@ export default function CrmSettingsTime() {
                   data-testid="input-end-date"
                 />
               </div>
-              <div className="flex-1 flex items-end justify-end">
+              <div className="flex-1 flex items-end justify-end gap-2">
                 <Button variant="outline" onClick={handleExportCSV} disabled={!timeEntries || timeEntries.length === 0} data-testid="button-export">
                   <Download className="h-4 w-4 mr-2" />
                   Export CSV
+                </Button>
+                <Button
+                  variant="outline"
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                  onClick={() => setShowClearConfirm(true)}
+                  disabled={!timeEntries || timeEntries.length === 0 || clearAllMutation.isPending}
+                  data-testid="button-clear-logs"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Clear Logs
                 </Button>
               </div>
             </div>
@@ -515,9 +632,20 @@ export default function CrmSettingsTime() {
                       <TableCell>{formatDuration(entry.durationMinutes)}</TableCell>
                       <TableCell className="max-w-[200px] truncate">{entry.notes || "--"}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(entry)} data-testid={`button-edit-${entry.id}`}>
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => handleEdit(entry)} data-testid={`button-edit-${entry.id}`}>
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => setEntryToDelete(entry)}
+                            data-testid={`button-delete-${entry.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -571,6 +699,68 @@ export default function CrmSettingsTime() {
             <Button onClick={handleSave} disabled={updateMutation.isPending} data-testid="button-save-edit">
               {updateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
               Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!entryToDelete} onOpenChange={(open) => !open && setEntryToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              Delete Time Entry
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-sm text-slate-600">
+            Are you sure you want to delete this time entry
+            {entryToDelete?.technicianName ? ` for ${entryToDelete.technicianName}` : ""}
+            {entryToDelete?.clockInAt ? ` on ${format(new Date(entryToDelete.clockInAt), "MMM d, yyyy")}` : ""}?
+            This can't be undone.
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEntryToDelete(null)} data-testid="button-cancel-delete">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => entryToDelete && deleteMutation.mutate(entryToDelete.id)}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showClearConfirm} onOpenChange={(open) => !open && setShowClearConfirm(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              Clear Time Logs
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-sm text-slate-600">
+            This will permanently delete{" "}
+            <span className="font-semibold text-slate-900">{timeEntries?.length || 0}</span>{" "}
+            time {(timeEntries?.length || 0) === 1 ? "entry" : "entries"} currently shown by your filters.
+            This can't be undone.
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowClearConfirm(false)} data-testid="button-cancel-clear">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => timeEntries && clearAllMutation.mutate(timeEntries.map((e) => e.id))}
+              disabled={clearAllMutation.isPending || !timeEntries || timeEntries.length === 0}
+              data-testid="button-confirm-clear"
+            >
+              {clearAllMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Clear {timeEntries?.length || 0} {(timeEntries?.length || 0) === 1 ? "Entry" : "Entries"}
             </Button>
           </DialogFooter>
         </DialogContent>

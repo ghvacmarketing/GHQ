@@ -24594,6 +24594,37 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // DELETE /api/crm/time-entries/:id - Delete (clear) a time entry
+  app.delete("/api/crm/time-entries/:id", requireCrmAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteTimeEntry(id);
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting time entry:", error);
+      return res.status(500).json({ message: "Failed to delete time entry" });
+    }
+  });
+
+  // GET /api/crm/time-entries/active - List everyone currently clocked in
+  app.get("/api/crm/time-entries/active", requireCrmTechOrAbove, async (_req, res) => {
+    try {
+      const entries = await storage.getActiveTimeEntries();
+      const users = await db.select().from(crmUsers);
+      const userMap = new Map(users.map((u) => [u.id, u.name]));
+      const roleMap = new Map(users.map((u) => [u.id, u.role]));
+      const enriched = entries.map((entry) => ({
+        ...entry,
+        technicianName: userMap.get(entry.technicianId) || "Unknown",
+        role: roleMap.get(entry.technicianId) || "",
+      }));
+      return res.json(enriched);
+    } catch (error) {
+      console.error("Error fetching active time entries:", error);
+      return res.status(500).json({ message: "Failed to fetch active time entries" });
+    }
+  });
+
   // GET /api/crm/time-breakdown - Get time breakdown (idle/drive/work) per employee
   // Available to all CRM users (tech and above) who can view dispatch board
   app.get("/api/crm/time-breakdown", requireCrmTechOrAbove, async (req, res) => {

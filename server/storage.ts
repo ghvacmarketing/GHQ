@@ -278,6 +278,8 @@ export interface IStorage {
   clockOut(entryId: string): Promise<CrmTimeEntry>;
   getTimeEntries(filters: { technicianId?: string; startDate?: Date; endDate?: Date }): Promise<CrmTimeEntry[]>;
   updateTimeEntry(id: string, data: Partial<InsertCrmTimeEntry>): Promise<CrmTimeEntry>;
+  deleteTimeEntry(id: string): Promise<void>;
+  getActiveTimeEntries(): Promise<CrmTimeEntry[]>;
 
   // SMS Notification Log operations
   createSmsNotificationLog(data: InsertSmsNotificationLog): Promise<SmsNotificationLog>;
@@ -2340,6 +2342,16 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Time entry not found");
     }
     return updated;
+  }
+
+  async deleteTimeEntry(id: string): Promise<void> {
+    await db.delete(crmTimeEntries).where(eq(crmTimeEntries.id, id));
+  }
+
+  async getActiveTimeEntries(): Promise<CrmTimeEntry[]> {
+    return await db.select().from(crmTimeEntries)
+      .where(isNull(crmTimeEntries.clockOutAt))
+      .orderBy(desc(crmTimeEntries.clockInAt));
   }
 
   // SMS Notification Log operations
