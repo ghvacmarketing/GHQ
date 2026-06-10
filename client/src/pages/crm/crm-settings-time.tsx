@@ -452,75 +452,83 @@ export default function CrmSettingsTime() {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="h-4 w-full rounded-full bg-slate-100 overflow-hidden flex">
-                        <div 
-                          className="h-full bg-amber-400" 
-                          style={{ width: `${getTimePercentage(breakdown.idleTimeMinutes, breakdown.totalClockedMinutes)}%` }}
-                          title={`Idle: ${formatMinutesToHoursMinutes(breakdown.idleTimeMinutes)}`}
-                        />
-                        <div 
-                          className="h-full bg-blue-500" 
-                          style={{ width: `${getTimePercentage(breakdown.driveTimeMinutes, breakdown.totalClockedMinutes)}%` }}
-                          title={`Drive: ${formatMinutesToHoursMinutes(breakdown.driveTimeMinutes)}`}
-                        />
-                        <div 
-                          className="h-full bg-green-500" 
-                          style={{ width: `${getTimePercentage(breakdown.workTimeMinutes, breakdown.totalClockedMinutes)}%` }}
-                          title={`Work: ${formatMinutesToHoursMinutes(breakdown.workTimeMinutes)}`}
-                        />
-                      </div>
+                      {["owner", "admin"].includes(breakdown.role) ? (
+                        <div className="text-sm text-slate-500">
+                          Office staff — total clocked time only (idle, drive, and work breakdown not tracked for office roles).
+                        </div>
+                      ) : (
+                        <>
+                          <div className="h-4 w-full rounded-full bg-slate-100 overflow-hidden flex">
+                            <div 
+                              className="h-full bg-amber-400" 
+                              style={{ width: `${getTimePercentage(breakdown.idleTimeMinutes, breakdown.totalClockedMinutes)}%` }}
+                              title={`Idle: ${formatMinutesToHoursMinutes(breakdown.idleTimeMinutes)}`}
+                            />
+                            <div 
+                              className="h-full bg-blue-500" 
+                              style={{ width: `${getTimePercentage(breakdown.driveTimeMinutes, breakdown.totalClockedMinutes)}%` }}
+                              title={`Drive: ${formatMinutesToHoursMinutes(breakdown.driveTimeMinutes)}`}
+                            />
+                            <div 
+                              className="h-full bg-green-500" 
+                              style={{ width: `${getTimePercentage(breakdown.workTimeMinutes, breakdown.totalClockedMinutes)}%` }}
+                              title={`Work: ${formatMinutesToHoursMinutes(breakdown.workTimeMinutes)}`}
+                            />
+                          </div>
 
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-amber-400" />
-                          <div>
-                            <div className="text-sm font-medium flex items-center gap-1">
-                              <Coffee className="h-3 w-3 text-amber-600" />
-                              Idle
+                          <div className="grid grid-cols-3 gap-4">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-amber-400" />
+                              <div>
+                                <div className="text-sm font-medium flex items-center gap-1">
+                                  <Coffee className="h-3 w-3 text-amber-600" />
+                                  Idle
+                                </div>
+                                <div className="text-lg font-semibold text-slate-900">
+                                  {formatMinutesToHoursMinutes(breakdown.idleTimeMinutes)}
+                                </div>
+                                <div className="text-xs text-slate-500">
+                                  {getTimePercentage(breakdown.idleTimeMinutes, breakdown.totalClockedMinutes)}% of total
+                                </div>
+                              </div>
                             </div>
-                            <div className="text-lg font-semibold text-slate-900">
-                              {formatMinutesToHoursMinutes(breakdown.idleTimeMinutes)}
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-blue-500" />
+                              <div>
+                                <div className="text-sm font-medium flex items-center gap-1">
+                                  <Car className="h-3 w-3 text-blue-600" />
+                                  Drive
+                                </div>
+                                <div className="text-lg font-semibold text-slate-900">
+                                  {formatMinutesToHoursMinutes(breakdown.driveTimeMinutes)}
+                                </div>
+                                <div className="text-xs text-slate-500">
+                                  {getTimePercentage(breakdown.driveTimeMinutes, breakdown.totalClockedMinutes)}% of total
+                                </div>
+                              </div>
                             </div>
-                            <div className="text-xs text-slate-500">
-                              {getTimePercentage(breakdown.idleTimeMinutes, breakdown.totalClockedMinutes)}% of total
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-green-500" />
+                              <div>
+                                <div className="text-sm font-medium flex items-center gap-1">
+                                  <Wrench className="h-3 w-3 text-green-600" />
+                                  Work
+                                </div>
+                                <div className="text-lg font-semibold text-slate-900">
+                                  {formatMinutesToHoursMinutes(breakdown.workTimeMinutes)}
+                                </div>
+                                <div className="text-xs text-slate-500">
+                                  {getTimePercentage(breakdown.workTimeMinutes, breakdown.totalClockedMinutes)}% of total
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-blue-500" />
-                          <div>
-                            <div className="text-sm font-medium flex items-center gap-1">
-                              <Car className="h-3 w-3 text-blue-600" />
-                              Drive
-                            </div>
-                            <div className="text-lg font-semibold text-slate-900">
-                              {formatMinutesToHoursMinutes(breakdown.driveTimeMinutes)}
-                            </div>
-                            <div className="text-xs text-slate-500">
-                              {getTimePercentage(breakdown.driveTimeMinutes, breakdown.totalClockedMinutes)}% of total
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-green-500" />
-                          <div>
-                            <div className="text-sm font-medium flex items-center gap-1">
-                              <Wrench className="h-3 w-3 text-green-600" />
-                              Work
-                            </div>
-                            <div className="text-lg font-semibold text-slate-900">
-                              {formatMinutesToHoursMinutes(breakdown.workTimeMinutes)}
-                            </div>
-                            <div className="text-xs text-slate-500">
-                              {getTimePercentage(breakdown.workTimeMinutes, breakdown.totalClockedMinutes)}% of total
-                            </div>
-                          </div>
-                        </div>
-                      </div>
 
-                      <div className="pt-2 border-t text-sm text-slate-500">
-                        <span className="font-medium text-slate-700">{breakdown.workOrdersCompleted}</span> work orders completed
-                      </div>
+                          <div className="pt-2 border-t text-sm text-slate-500">
+                            <span className="font-medium text-slate-700">{breakdown.workOrdersCompleted}</span> work orders completed
+                          </div>
+                        </>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
