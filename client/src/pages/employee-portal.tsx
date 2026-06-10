@@ -12,8 +12,22 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { LogOut, User, DollarSign, FileText, Download, Edit, Phone, MapPin, Calendar, Briefcase, Mail, Home, Shield } from "lucide-react";
-import type { PortalUser, EmployeeProfile, Compensation, Paystub, EmployeeDocument } from "@shared/schema";
+import { LogOut, User, DollarSign, FileText, Download, Edit, Phone, MapPin, Calendar, Briefcase, Mail, Home, Shield, Clock, Loader2 } from "lucide-react";
+import type { PortalUser, EmployeeProfile, Compensation, Paystub, EmployeeDocument, CrmTimeEntry } from "@shared/schema";
+
+function formatElapsed(fromIso: string | Date) {
+  const diff = Math.max(0, Date.now() - new Date(fromIso).getTime());
+  const totalSec = Math.floor(diff / 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(Math.floor(totalSec / 3600))}:${pad(Math.floor((totalSec % 3600) / 60))}:${pad(totalSec % 60)}`;
+}
+
+function formatDurationMins(mins: number | null | undefined) {
+  if (mins == null) return "—";
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
 
 type ProfileData = PortalUser & {
   profile: EmployeeProfile;
@@ -27,6 +41,7 @@ export default function EmployeePortal() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editPhone, setEditPhone] = useState("");
   const [editAddress, setEditAddress] = useState("");
+  const [, setTick] = useState(0);
 
   const { data: currentUser, isLoading: authLoading, error: authError } = useQuery<PortalUser | null>({
     queryKey: ["/api/employee-portal/me"],
@@ -75,6 +90,54 @@ export default function EmployeePortal() {
       toast({ title: "Failed to update profile", variant: "destructive" });
     },
   });
+
+  const { data: timeStatus, isLoading: timeLoading } = useQuery<{ entry: CrmTimeEntry | null; linked: boolean }>({
+    queryKey: ["/api/employee-portal/time/current"],
+    enabled: !!currentUser,
+  });
+
+  const { data: timeHistory } = useQuery<CrmTimeEntry[]>({
+    queryKey: ["/api/employee-portal/time/history"],
+    enabled: !!currentUser,
+  });
+
+  const clockInMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/employee-portal/time/clock-in");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/employee-portal/time/current"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/employee-portal/time/history"] });
+      toast({ title: "Clocked in" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Couldn't clock in", description: err?.message, variant: "destructive" });
+    },
+  });
+
+  const clockOutMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/employee-portal/time/clock-out");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/employee-portal/time/current"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/employee-portal/time/history"] });
+      toast({ title: "Clocked out" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Couldn't clock out", description: err?.message, variant: "destructive" });
+    },
+  });
+
+  const activeEntry = timeStatus?.entry ?? null;
+
+  useEffect(() => {
+    if (!activeEntry) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [activeEntry]);
 
   useEffect(() => {
     if (!authLoading && !currentUser) {
@@ -193,6 +256,84 @@ export default function EmployeePortal() {
             </div>
           </div>
         </div>
+
+        <Card className="border-0 shadow-md rounded-2xl overflow-hidden" data-testid="card-time-clock">
+          <CardContent className="p-6">
+            {timeLoading ? (
+              <Skeleton className="h-20 w-full rounded-xl" />
+            ) : timeStatus && !timeStatus.linked ? (
+              <div className="flex items-center gap-3 text-muted-foreground" data-testid="text-clock-unlinked">
+                <Clock className="h-5 w-5 flex-shrink-0" />
+                <p className="text-sm">
+                  Time clock isn't available yet — your portal account isn't linked to a staff record. Ask an admin to match your email in the CRM.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className={`h-14 w-14 rounded-full flex items-center justify-center flex-shrink-0 ${activeEntry ? "bg-emerald-100" : "bg-slate-100"}`}>
+                    <Clock className={`h-7 w-7 ${activeEntry ? "text-emerald-600" : "text-slate-400"}`} />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      {activeEntry ? "Clocked in since " + new Date(activeEntry.clockInAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "You're clocked out"}
+                    </p>
+                    {activeEntry ? (
+                      <p className="font-bold text-2xl tabular-nums text-emerald-600" data-testid="text-elapsed">
+                        {formatElapsed(activeEntry.clockInAt)}
+                      </p>
+                    ) : (
+                      <p className="font-semibold text-lg" data-testid="text-clock-status">Ready to start your shift</p>
+                    )}
+                  </div>
+                </div>
+                {activeEntry ? (
+                  <Button
+                    size="lg"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full px-8"
+                    onClick={() => clockOutMutation.mutate()}
+                    disabled={clockOutMutation.isPending}
+                    data-testid="button-clock-out"
+                  >
+                    {clockOutMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Clock className="h-4 w-4 mr-2" />}
+                    Clock Out
+                  </Button>
+                ) : (
+                  <Button
+                    size="lg"
+                    className="bg-[#711419] hover:bg-[#5a1014] text-white rounded-full px-8"
+                    onClick={() => clockInMutation.mutate()}
+                    disabled={clockInMutation.isPending}
+                    data-testid="button-clock-in"
+                  >
+                    {clockInMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Clock className="h-4 w-4 mr-2" />}
+                    Clock In
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {timeStatus?.linked && timeHistory && timeHistory.length > 0 && (
+              <div className="mt-6 pt-6 border-t">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-3">Recent shifts</p>
+                <div className="space-y-2">
+                  {timeHistory.slice(0, 5).map((entry) => (
+                    <div key={entry.id} className="flex items-center justify-between text-sm" data-testid={`row-shift-${entry.id}`}>
+                      <span className="text-muted-foreground">
+                        {new Date(entry.clockInAt).toLocaleDateString([], { month: "short", day: "numeric" })}
+                        {" · "}
+                        {new Date(entry.clockInAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                        {" – "}
+                        {entry.clockOutAt ? new Date(entry.clockOutAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "in progress"}
+                      </span>
+                      <span className="font-medium">{entry.clockOutAt ? formatDurationMins(entry.durationMinutes) : "—"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap" data-testid="tabs-navigation">

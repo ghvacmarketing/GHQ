@@ -4,6 +4,7 @@ import { Express, Request, Response, NextFunction } from "express";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
+import { getCrmUserByEmail } from "./crm-auth";
 import { PortalUser } from "@shared/schema";
 
 const scryptAsync = promisify(scrypt);
@@ -173,6 +174,94 @@ export function setupEmployeeAuth(app: Express) {
     } catch (error) {
       console.error("Error changing password:", error);
       return res.status(500).json({ message: "Failed to change password" });
+    }
+  });
+
+  // ============================================
+  // EMPLOYEE PORTAL TIME TRACKING
+  // Records are stored in the shared CRM time-entry system so they also
+  // show up for admins in the CRM. The portal account is linked to a CRM
+  // staff record by matching email address.
+  // ============================================
+
+  // Resolve the CRM staff record that owns this portal user's time entries.
+  async function resolveCrmUser(req: Request) {
+    const email = req.user?.email;
+    if (!email) return null;
+    const crmUser = await getCrmUserByEmail(email);
+    if (!crmUser || !crmUser.isActive) return null;
+    return crmUser;
+  }
+
+  // GET current active time entry (plus whether the account is linked)
+  app.get("/api/employee-portal/time/current", requirePortalAuth, async (req, res) => {
+    try {
+      const crmUser = await resolveCrmUser(req);
+      if (!crmUser) {
+        return res.json({ entry: null, linked: false });
+      }
+      const entry = await storage.getActiveTimeEntry(crmUser.id);
+      return res.json({ entry, linked: true });
+    } catch (error) {
+      console.error("Error fetching portal time entry:", error);
+      return res.status(500).json({ message: "Failed to fetch time entry" });
+    }
+  });
+
+  // POST clock in
+  app.post("/api/employee-portal/time/clock-in", requirePortalAuth, async (req, res) => {
+    try {
+      const crmUser = await resolveCrmUser(req);
+      if (!crmUser) {
+        return res.status(409).json({
+          message: "Your portal account isn't linked to a staff record yet. Ask an admin to match your email in the CRM.",
+        });
+      }
+      const existing = await storage.getActiveTimeEntry(crmUser.id);
+      if (existing) {
+        return res.status(400).json({ message: "Already clocked in" });
+      }
+      const entry = await storage.clockIn(crmUser.id, undefined, "portal");
+      return res.status(201).json(entry);
+    } catch (error) {
+      console.error("Error clocking in (portal):", error);
+      return res.status(500).json({ message: "Failed to clock in" });
+    }
+  });
+
+  // POST clock out
+  app.post("/api/employee-portal/time/clock-out", requirePortalAuth, async (req, res) => {
+    try {
+      const crmUser = await resolveCrmUser(req);
+      if (!crmUser) {
+        return res.status(409).json({ message: "Your portal account isn't linked to a staff record yet." });
+      }
+      const active = await storage.getActiveTimeEntry(crmUser.id);
+      if (!active) {
+        return res.status(400).json({ message: "Not currently clocked in" });
+      }
+      const entry = await storage.clockOut(active.id);
+      return res.json(entry);
+    } catch (error) {
+      console.error("Error clocking out (portal):", error);
+      return res.status(500).json({ message: "Failed to clock out" });
+    }
+  });
+
+  // GET recent shifts (last 30 days)
+  app.get("/api/employee-portal/time/history", requirePortalAuth, async (req, res) => {
+    try {
+      const crmUser = await resolveCrmUser(req);
+      if (!crmUser) {
+        return res.json([]);
+      }
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const entries = await storage.getTimeEntries({ technicianId: crmUser.id, startDate: thirtyDaysAgo });
+      return res.json(entries);
+    } catch (error) {
+      console.error("Error fetching portal time history:", error);
+      return res.status(500).json({ message: "Failed to fetch time history" });
     }
   });
 }
