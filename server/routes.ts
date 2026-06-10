@@ -24669,16 +24669,17 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           )
         );
 
-      // Get all users (technicians)
+      // Get all users. Anyone who can clock in (any role, including
+      // owner/admin) should appear in the breakdown if they have time data.
       const users = await db.select().from(crmUsers);
-      const techUsers = users.filter(u => ["tech", "supervisor", "sales"].includes(u.role || ""));
+      const techUsers = users;
 
       // Calculate breakdown for each technician
       const breakdowns = techUsers.map(tech => {
         // Get time entries for this tech
         const techTimeEntries = timeEntries.filter(e => e.technicianId === tech.id);
         
-        // Calculate total clocked time in minutes (skip entries without clock-out)
+        // Calculate total clocked time in minutes
         let totalClockedMinutes = 0;
         for (const entry of techTimeEntries) {
           if (entry.durationMinutes) {
@@ -24686,8 +24687,12 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           } else if (entry.clockOutAt) {
             const duration = Math.floor((entry.clockOutAt.getTime() - entry.clockInAt.getTime()) / 60000);
             if (duration > 0) totalClockedMinutes += duration;
+          } else {
+            // Still clocked in: count elapsed time so far so today's active
+            // sessions show up in the breakdown.
+            const duration = Math.floor((Date.now() - entry.clockInAt.getTime()) / 60000);
+            if (duration > 0) totalClockedMinutes += duration;
           }
-          // Skip entries without clock-out (still in progress)
         }
 
         // Get work orders for this tech

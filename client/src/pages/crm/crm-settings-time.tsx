@@ -257,7 +257,7 @@ export default function CrmSettingsTime() {
     );
   }
 
-  const technicians = users?.filter((u) => u.role === "tech" || u.role === "sales" || u.role === "supervisor") || [];
+  const technicians = users?.filter((u) => u.isActive !== false) || [];
 
   const formatMinutesToHoursMinutes = (minutes: number) => {
     if (!minutes || minutes === 0) return "0h 0m";
