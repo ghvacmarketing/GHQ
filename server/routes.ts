@@ -41,7 +41,7 @@ import { fieldEdgeCustomerService, type FieldEdgeCustomer } from "./services/fie
 import { sendAutomatedSms, hasNotificationBeenSent, getWorkOrderEnRouteTemplate, getWorkOrderOnSiteTemplate, getInvoiceSmsTemplate } from "./services/smsNotificationService";
 import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, hashPassword } from "./employee-auth";
 import { recordUserActivity } from "./activity-tracker";
-import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword, isSupervisor } from "./crm-auth";
+import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmOwner, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword, isSupervisor } from "./crm-auth";
 import { startGoogleOAuth, handleGoogleOAuthCallback, isGoogleOAuthConfigured } from "./crm-google-auth";
 import cookieParser from "cookie-parser";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
@@ -24536,7 +24536,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // ============================================
 
   // GET /api/crm/time-entries - Get all time entries with filters
-  app.get("/api/crm/time-entries", requireCrmAdmin, async (req, res) => {
+  app.get("/api/crm/time-entries", requireCrmOwner, async (req, res) => {
     try {
       const { technicianId, startDate, endDate } = req.query;
 
@@ -24571,7 +24571,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   });
 
   // PATCH /api/crm/time-entries/:id - Update a time entry (for admin adjustments)
-  app.patch("/api/crm/time-entries/:id", requireCrmAdmin, async (req, res) => {
+  app.patch("/api/crm/time-entries/:id", requireCrmOwner, async (req, res) => {
     try {
       const { id } = req.params;
       const { clockInAt, clockOutAt, durationMinutes, notes, workOrderId } = req.body;
@@ -24595,7 +24595,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   });
 
   // DELETE /api/crm/time-entries/:id - Delete (clear) a time entry
-  app.delete("/api/crm/time-entries/:id", requireCrmAdmin, async (req, res) => {
+  app.delete("/api/crm/time-entries/:id", requireCrmOwner, async (req, res) => {
     try {
       const { id } = req.params;
       await storage.deleteTimeEntry(id);
@@ -24607,7 +24607,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   });
 
   // GET /api/crm/time-entries/active - List everyone currently clocked in
-  app.get("/api/crm/time-entries/active", requireCrmTechOrAbove, async (_req, res) => {
+  app.get("/api/crm/time-entries/active", requireCrmOwner, async (_req, res) => {
     try {
       const entries = await storage.getActiveTimeEntries();
       const users = await db.select().from(crmUsers);
@@ -24626,8 +24626,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   });
 
   // GET /api/crm/time-breakdown - Get time breakdown (idle/drive/work) per employee
-  // Available to all CRM users (tech and above) who can view dispatch board
-  app.get("/api/crm/time-breakdown", requireCrmTechOrAbove, async (req, res) => {
+  // Owner-only.
+  app.get("/api/crm/time-breakdown", requireCrmOwner, async (req, res) => {
     try {
       const { startDate, endDate } = req.query;
 

@@ -246,12 +246,12 @@ export default function CrmSettingsTime() {
 
   if (!currentUser) return null;
 
-  const isAdmin = currentUser.role === "owner" || currentUser.role === "admin" || currentUser.role === "supervisor";
-  if (!isAdmin) {
+  const isOwner = currentUser.role === "owner";
+  if (!isOwner) {
     return (
       <CrmLayout currentUser={currentUser}>
         <div className="p-6 text-center">
-          <p className="text-slate-500">Only administrators can access time logs.</p>
+          <p className="text-slate-500">Only owners can access time logs.</p>
         </div>
       </CrmLayout>
     );

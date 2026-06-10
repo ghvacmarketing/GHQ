@@ -349,6 +349,23 @@ export function requireCrmAdmin(req: Request, res: Response, next: NextFunction)
     });
 }
 
+export function requireCrmOwner(req: Request, res: Response, next: NextFunction) {
+  getCurrentCrmUser(req)
+    .then((user) => {
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized - CRM authentication required" });
+      }
+      if (user.role !== "owner") {
+        return res.status(403).json({ message: "Forbidden - Owner role required" });
+      }
+      next();
+    })
+    .catch((error) => {
+      console.error("CRM auth error:", error);
+      return res.status(500).json({ message: "Authentication error" });
+    });
+}
+
 export function requireCrmSalesOrAbove(req: Request, res: Response, next: NextFunction) {
   getCurrentCrmUser(req)
     .then((user) => {

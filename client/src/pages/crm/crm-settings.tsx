@@ -27,6 +27,7 @@ interface SettingsItem {
   name: string;
   href: string;
   icon: typeof Users;
+  ownerOnly?: boolean;
 }
 
 interface SettingsSection {
@@ -39,7 +40,7 @@ const sections: SettingsSection[] = [
     title: "Team",
     items: [
       { name: "Users & Roles", href: "/crm/settings/users", icon: Users },
-      { name: "Time Logs", href: "/crm/settings/time-logs", icon: Clock },
+      { name: "Time Logs", href: "/crm/settings/time-logs", icon: Clock, ownerOnly: true },
     ],
   },
   {
@@ -148,7 +149,7 @@ export default function CrmSettings() {
                   {section.title}
                 </div>
                 <ul className="space-y-1">
-                  {section.items.map((item) => {
+                  {section.items.filter((item) => !item.ownerOnly || currentUser.role === "owner").map((item) => {
                     const Icon = item.icon;
                     return (
                       <li key={item.href}>
