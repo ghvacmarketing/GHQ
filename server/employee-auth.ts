@@ -5,7 +5,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { getCrmUserByEmail } from "./crm-auth";
-import { PortalUser } from "@shared/schema";
+import { PortalUser, InsertPortalUser, CrmUser } from "@shared/schema";
 
 const scryptAsync = promisify(scrypt);
 
@@ -27,6 +27,55 @@ export async function comparePasswords(supplied: string, stored: string): Promis
   const hashedPasswordBuf = Buffer.from(hashedPassword, "hex");
   const suppliedPasswordBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
   return timingSafeEqual(hashedPasswordBuf, suppliedPasswordBuf);
+}
+
+function crmRoleToPortalRole(role: string): string {
+  return role === "owner" || role === "admin" ? "admin" : "employee";
+}
+
+// The Employee Portal uses the CRM staff list as the source of truth for
+// who can log in. After verifying CRM credentials, we keep a matching
+// portal record (linked by email) that anchors portal-only data such as
+// the profile, compensation, paystubs, documents, and time clock.
+async function syncPortalUserFromCrm(crmUser: CrmUser): Promise<PortalUser> {
+  const email = crmUser.email.toLowerCase();
+  const portalRole = crmRoleToPortalRole(crmUser.role);
+
+  let portalUser =
+    (await storage.getPortalUserByEmail(email)) ||
+    (await storage.getPortalUserByUsername(email));
+
+  if (!portalUser) {
+    // Password column is required but unused (CRM is the source of truth),
+    // so store an unusable random hash.
+    const randomPassword = await hashPassword(randomBytes(32).toString("hex"));
+    portalUser = await storage.createPortalUser({
+      username: email,
+      email,
+      password: randomPassword,
+      role: portalRole,
+      isActive: true,
+    });
+    const [firstName, ...rest] = (crmUser.name || "").trim().split(/\s+/);
+    await storage.createEmployeeProfile({
+      userId: portalUser.id,
+      firstName: firstName || crmUser.name || email,
+      lastName: rest.join(" ") || "",
+      phone: crmUser.phone || null,
+    });
+    return portalUser;
+  }
+
+  // Keep role / active status / email aligned with the CRM on each login.
+  const updates: Partial<InsertPortalUser> = {};
+  if (portalUser.role !== portalRole) updates.role = portalRole;
+  if (!portalUser.isActive) updates.isActive = true;
+  if (portalUser.email !== email) updates.email = email;
+  if (Object.keys(updates).length > 0) {
+    const updated = await storage.updatePortalUser(portalUser.id, updates);
+    if (updated) portalUser = updated;
+  }
+  return portalUser;
 }
 
 export function requirePortalAuth(req: Request, res: Response, next: NextFunction) {
@@ -66,18 +115,22 @@ export function setupEmployeeAuth(app: Express) {
     "employee-local",
     new LocalStrategy(async (username, password, done) => {
       try {
-        const user = await storage.getPortalUserByUsername(username);
-        if (!user) {
-          return done(null, false, { message: "Invalid username or password" });
+        // The Employee Portal authenticates against CRM staff accounts.
+        // "username" carries the email submitted on the login form.
+        const email = (username || "").trim().toLowerCase();
+        const crmUser = await getCrmUserByEmail(email);
+        if (!crmUser) {
+          return done(null, false, { message: "Invalid email or password" });
         }
-        if (!user.isActive) {
+        if (!crmUser.isActive) {
           return done(null, false, { message: "Account is disabled" });
         }
-        const isValid = await comparePasswords(password, user.password);
+        const isValid = await comparePasswords(password, crmUser.passwordHash);
         if (!isValid) {
-          return done(null, false, { message: "Invalid username or password" });
+          return done(null, false, { message: "Invalid email or password" });
         }
-        return done(null, user);
+        const portalUser = await syncPortalUserFromCrm(crmUser);
+        return done(null, portalUser);
       } catch (error) {
         return done(error);
       }

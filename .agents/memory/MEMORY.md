@@ -1,2 +1,3 @@
 - [drizzle-kit push blocked by orphan tables](drizzle-push-orphan-tables.md) — push hangs on raw-TTY rename prompts; add new tables via raw executeSql CREATE TABLE instead.
 - [react-pdf / pdfjs worker setup](pdfjs-worker-setup.md) — CDN pdf.worker.min.js 404s on pdfjs v5; bundle worker locally via `pdfjs-dist/build/pdf.worker.min.mjs?url`.
+- [Session cookie testing](session-cookie-testing.md) — secure:true cookie means http/localhost curl never keeps the session; test login via response body, not follow-up /me.
