@@ -247,7 +247,7 @@ export default function CrmQuoteDetail() {
   // Items catalog state
   const [showItemsCatalogDialog, setShowItemsCatalogDialog] = useState(false);
   const [itemSearch, setItemSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<"all" | "install" | "service" | "maintenance" | "discount">("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "install" | "service" | "maintenance" | "discount" | "protection">("all");
 
   // Discount modal state
   const [showDiscountDialog, setShowDiscountDialog] = useState(false);
@@ -3278,6 +3278,7 @@ export default function CrmQuoteDetail() {
                     <SelectItem value="install">Install</SelectItem>
                     <SelectItem value="service">Service</SelectItem>
                     <SelectItem value="maintenance">Maintenance</SelectItem>
+                    <SelectItem value="protection">Protection Plans</SelectItem>
                     <SelectItem value="discount">Discount</SelectItem>
                   </SelectContent>
                 </Select>

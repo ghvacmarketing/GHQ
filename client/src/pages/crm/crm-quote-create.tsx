@@ -79,7 +79,7 @@ interface LineItem {
   taxable?: boolean;
   isDiscountLine?: boolean;
   discountKind?: "promotion" | "maintenance";
-  itemCategory?: "install" | "service" | "maintenance";
+  itemCategory?: "install" | "service" | "maintenance" | "protection";
   crmItemId?: string;
 }
 
@@ -148,7 +148,7 @@ export default function CrmQuoteCreate() {
   // CRM Items catalog state
   const [itemsCatalogOpen, setItemsCatalogOpen] = useState(false);
   const [itemSearch, setItemSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<"all" | "install" | "service" | "maintenance" | "discount">("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "install" | "service" | "maintenance" | "discount" | "protection">("all");
 
   // Fetch parent customer when selected customer has billToParent
   const { data: parentCustomerForBanner } = useQuery<CrmCustomer>({
@@ -212,7 +212,7 @@ export default function CrmQuoteCreate() {
       description: item.name,
       quantity: 1,
       unitPrice: parseFloat(item.rate || "0"),
-      itemCategory: (item.category as "install" | "service" | "maintenance") || "install",
+      itemCategory: (item.category as "install" | "service" | "maintenance" | "protection") || "install",
       taxable: item.taxable ?? true,
       crmItemId: item.id,
     };
@@ -916,7 +916,7 @@ export default function CrmQuoteCreate() {
                         <Label htmlFor={`item-cat-${item.id}`}>Category</Label>
                         <Select
                           value={item.itemCategory || "install"}
-                          onValueChange={(value) => updateLineItem(item.id, "itemCategory", value as "install" | "service" | "maintenance")}
+                          onValueChange={(value) => updateLineItem(item.id, "itemCategory", value as "install" | "service" | "maintenance" | "protection")}
                           disabled={!!item.crmItemId}
                         >
                           <SelectTrigger id={`item-cat-${item.id}`} data-testid={`select-line-item-category-${index}`} className={item.crmItemId ? "opacity-60" : ""}>
@@ -926,6 +926,7 @@ export default function CrmQuoteCreate() {
                             <SelectItem value="install">Install</SelectItem>
                             <SelectItem value="service">Service</SelectItem>
                             <SelectItem value="maintenance">Maintenance</SelectItem>
+                            <SelectItem value="protection">Protection Plans</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -1365,7 +1366,7 @@ export default function CrmQuoteCreate() {
                   data-testid="input-item-search"
                 />
               </div>
-              <Select value={categoryFilter} onValueChange={(value) => setCategoryFilter(value as "all" | "install" | "service" | "maintenance" | "discount")}>
+              <Select value={categoryFilter} onValueChange={(value) => setCategoryFilter(value as "all" | "install" | "service" | "maintenance" | "discount" | "protection")}>
                 <SelectTrigger className="w-[140px]" data-testid="select-category-filter">
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
@@ -1374,6 +1375,7 @@ export default function CrmQuoteCreate() {
                   <SelectItem value="install">Install</SelectItem>
                   <SelectItem value="service">Service</SelectItem>
                   <SelectItem value="maintenance">Maintenance</SelectItem>
+                  <SelectItem value="protection">Protection Plans</SelectItem>
                   <SelectItem value="discount">Discount</SelectItem>
                 </SelectContent>
               </Select>

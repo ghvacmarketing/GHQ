@@ -232,10 +232,110 @@ async function runProposalTemplateMigrations() {
   }
 }
 
+async function runProtectionAndCarePlanSeeds() {
+  try {
+    const { db } = await import("./db");
+    const { crmItems, customAgreementTypes } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+
+    // 1. Installation Protection Bundles (one-time, fixed-price add-ons)
+    const protectionBundles = [
+      {
+        name: "Elite Protection (10 Yr)",
+        rate: "1200.00",
+        description:
+          "Maximum protection + longevity. 10-year coverage. Includes 3 maintenance visits total, 20% parts discount, and priority scheduling.",
+      },
+      {
+        name: "Advanced Protection (5 Yr)",
+        rate: "800.00",
+        description:
+          "Balanced value + protection. 5-year coverage. Includes 2 maintenance visits total, 15% parts discount, and priority scheduling.",
+      },
+      {
+        name: "Standard Protection (2 Yr)",
+        rate: "400.00",
+        description:
+          "Minimum recommended coverage. 2-year coverage. Includes 1 maintenance visit, 10% parts discount, and standard scheduling.",
+      },
+      {
+        name: "Basic Protection (1 Yr)",
+        rate: "200.00",
+        description:
+          "Entry-level support. 1-year coverage. No scheduled visits, 5% parts discount, and standard scheduling.",
+      },
+    ];
+
+    for (const bundle of protectionBundles) {
+      const existing = await db
+        .select({ id: crmItems.id })
+        .from(crmItems)
+        .where(eq(crmItems.name, bundle.name));
+      if (existing.length === 0) {
+        await db.insert(crmItems).values({
+          name: bundle.name,
+          description: bundle.description,
+          category: "protection",
+          itemType: "service",
+          rate: bundle.rate,
+          isActive: true,
+        });
+        console.log(`[ProtectionPlans] Seeded bundle item: ${bundle.name}`);
+      }
+    }
+
+    // 2. Monthly Care plan templates (maintenance agreement sign-ups, billed monthly)
+    const carePlans = [
+      {
+        name: "Essential Care",
+        defaultPrice: "14.00",
+        visitsPerPeriod: 1,
+        description:
+          "Basic protection + compliance. Billed monthly. Includes 1 tune-up visit per year, 10% member parts discount, no priority service.",
+      },
+      {
+        name: "Priority Care",
+        defaultPrice: "21.00",
+        visitsPerPeriod: 2,
+        description:
+          "Core recommended plan. Billed monthly. Includes 2 tune-up visits per year, 15% member parts discount, and priority service.",
+      },
+      {
+        name: "Elite Care",
+        defaultPrice: "30.00",
+        visitsPerPeriod: 3,
+        description:
+          "Premium full-service membership. Billed monthly. Includes 2–3 tune-up visits per year, 20% member parts discount, and top priority service.",
+      },
+    ];
+
+    for (const plan of carePlans) {
+      const existing = await db
+        .select({ id: customAgreementTypes.id })
+        .from(customAgreementTypes)
+        .where(eq(customAgreementTypes.name, plan.name));
+      if (existing.length === 0) {
+        await db.insert(customAgreementTypes).values({
+          name: plan.name,
+          description: plan.description,
+          frequency: "monthly",
+          visitsPerPeriod: plan.visitsPerPeriod,
+          defaultPrice: plan.defaultPrice,
+          isActive: true,
+        });
+        console.log(`[CarePlans] Seeded care plan template: ${plan.name}`);
+      }
+    }
+  } catch (err) {
+    console.error("Protection & care plan seed error (non-fatal):", err);
+  }
+}
+
 (async () => {
   await runTaggedCommentMigrations();
   await runSalesbookMigrations();
   await runProposalTemplateMigrations();
+  await runProtectionAndCarePlanSeeds();
   try {
     const { ensureSalesbookConverted } = await import("./services/salesbook-converter");
     ensureSalesbookConverted();

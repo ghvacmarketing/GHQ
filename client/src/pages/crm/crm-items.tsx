@@ -67,8 +67,17 @@ const categoryTabs = [
   { key: "install", label: "Install" },
   { key: "service", label: "Service" },
   { key: "maintenance", label: "Maintenance" },
+  { key: "protection", label: "Protection Plans" },
   { key: "discount", label: "Discounts" },
 ];
+
+const categoryLabels: Record<string, string> = {
+  install: "Install",
+  service: "Service",
+  maintenance: "Maintenance",
+  protection: "Protection Plans",
+  discount: "Discount",
+};
 
 type SortField = "name" | "category" | "itemType" | "rate";
 type SortDirection = "asc" | "desc";
@@ -271,6 +280,8 @@ export default function CrmItems() {
         return "bg-indigo-100 text-indigo-700 border-indigo-200";
       case "maintenance":
         return "bg-cyan-100 text-cyan-700 border-cyan-200";
+      case "protection":
+        return "bg-emerald-100 text-emerald-700 border-emerald-200";
       case "service":
         return "bg-green-100 text-green-700 border-green-200";
       case "supplies":
@@ -299,7 +310,7 @@ export default function CrmItems() {
 
   const formatCategoryLabel = (category: string | null | undefined) => {
     if (!category) return "Uncategorized";
-    return category.charAt(0).toUpperCase() + category.slice(1);
+    return categoryLabels[category] || category.charAt(0).toUpperCase() + category.slice(1);
   };
 
   const formatTypeLabel = (itemType: string | null | undefined) => {
@@ -689,7 +700,7 @@ export default function CrmItems() {
                       <SelectContent>
                         {crmItemCategoryEnum.map((cat) => (
                           <SelectItem key={cat} value={cat}>
-                            {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                            {categoryLabels[cat] || cat.charAt(0).toUpperCase() + cat.slice(1)}
                           </SelectItem>
                         ))}
                       </SelectContent>
