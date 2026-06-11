@@ -1399,7 +1399,7 @@ export const crmQuotes = pgTable("crm_quotes", {
 export const crmQuoteLineItems = pgTable("crm_quote_line_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   quoteId: varchar("quote_id").notNull().references(() => crmQuotes.id, { onDelete: "cascade" }),
-  lineType: text("line_type").$type<"part" | "labor" | "service" | "other" | "discount" | "install" | "maintenance">().notNull().default("part"),
+  lineType: text("line_type").$type<"part" | "labor" | "service" | "other" | "discount" | "install" | "maintenance" | "protection">().notNull().default("part"),
   description: text("description").notNull(),
   partNumber: text("part_number"),
   quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
@@ -1509,7 +1509,7 @@ export const crmInvoices = pgTable("crm_invoices", {
 export const crmInvoiceLineItems = pgTable("crm_invoice_line_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   invoiceId: varchar("invoice_id").notNull().references(() => crmInvoices.id, { onDelete: "cascade" }),
-  lineType: text("line_type").$type<"part" | "labor" | "service" | "other" | "discount" | "install" | "maintenance">().notNull().default("part"),
+  lineType: text("line_type").$type<"part" | "labor" | "service" | "other" | "discount" | "install" | "maintenance" | "protection">().notNull().default("part"),
   description: text("description").notNull(),
   partNumber: text("part_number"),
   quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
@@ -1570,7 +1570,7 @@ export type CrmItemType = typeof crmItemTypeEnum[number];
 export const crmItemCategoryEnum = ["install", "service", "maintenance", "discount", "protection"] as const;
 export type CrmItemCategory = typeof crmItemCategoryEnum[number];
 
-export const discountKindEnum = ["promotion", "maintenance"] as const;
+export const discountKindEnum = ["promotion", "maintenance", "protection"] as const;
 export type DiscountKind = typeof discountKindEnum[number];
 
 export const crmItems = pgTable("crm_items", {

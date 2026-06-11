@@ -99,6 +99,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import RichTextEditor, { RichTextDisplay } from "@/components/rich-text-editor";
 import ghvacLogo from "@assets/ghvac-logo.png";
 import { generateContractTemplate, applyTemplateVariables } from "@/lib/contract-template";
+import {
+  getProtectionDiscountPct,
+  protectionDiscountLabel,
+  parseProtectionDiscountLabelPct,
+} from "@/lib/protection-discount";
 import type { ProposalTemplate } from "@shared/schema";
 import {
   BRAND_COLOR,
@@ -254,6 +259,9 @@ export default function CrmQuoteDetail() {
   const [discountKind, setDiscountKind] = useState<"promotion" | "maintenance">("promotion");
   const [discountMode, setDiscountMode] = useState<"amount" | "percentage">("amount");
   const [discountValue, setDiscountValue] = useState("");
+
+  // Protection bundle parts-discount prompt
+  const [protectionPrompt, setProtectionPrompt] = useState<{ pct: number; bundleName: string } | null>(null);
 
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
   const [followUpContext, setFollowUpContext] = useState<{
@@ -820,7 +828,7 @@ export default function CrmQuoteDetail() {
       });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
       setShowItemsCatalogDialog(false);
       setItemSearch("");
@@ -828,11 +836,111 @@ export default function CrmQuoteDetail() {
       setCatalogItemOptionTag("");
       setCatalogItemOptionTagCreating(false);
       toast({ title: "Item added from catalog" });
+      // Offer to auto-apply the bundle's parts discount to the rest of the quote.
+      const item = variables.item;
+      if (item.category === "protection") {
+        const pct = getProtectionDiscountPct(item.description, item.name);
+        if (pct && !hasProtectionDiscountLine()) {
+          setProtectionPrompt({ pct, bundleName: item.name });
+        }
+      }
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to add item", variant: "destructive" });
     },
   });
+
+  // --- Protection bundle parts-discount helpers ---
+  const hasProtectionBundleLine = () =>
+    quote?.lineItems?.some(
+      (item) => item.lineType === "protection" && parseFloat(String(item.unitPrice)) > 0,
+    ) || false;
+
+  const findProtectionDiscountLine = () =>
+    quote?.lineItems?.find(
+      (item) => item.discountKind === "protection" && parseFloat(String(item.unitPrice)) < 0,
+    );
+
+  const hasProtectionDiscountLine = () => !!findProtectionDiscountLine();
+
+  const calculateProtectionEligibleSubtotal = () =>
+    quote?.lineItems
+      ?.filter((item) => {
+        const price = parseFloat(String(item.unitPrice)) || 0;
+        if (item.isDiscountLine || item.lineType === "discount") return false;
+        if (item.lineType === "protection") return false;
+        return price > 0;
+      })
+      .reduce((sum, item) => sum + parseFloat(String(item.lineTotal || 0)), 0) || 0;
+
+  const addProtectionDiscountMutation = useMutation({
+    mutationFn: async ({ pct, amount }: { pct: number; amount: number }) => {
+      const value = -Math.abs(amount);
+      const res = await apiRequest("POST", `/api/crm/quotes/${quoteId}/line-items`, {
+        description: protectionDiscountLabel(pct),
+        quantity: "1",
+        unitPrice: value.toString(),
+        lineTotal: value.toString(),
+        lineType: "discount",
+        isDiscountLine: true,
+        discountKind: "protection",
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/quotes", quoteId] });
+      setProtectionPrompt(null);
+      toast({ title: "Parts discount applied" });
+    },
+    onError: (error: any) => {
+      setProtectionPrompt(null);
+      toast({ title: "Error", description: error.message || "Failed to apply discount", variant: "destructive" });
+    },
+  });
+
+  const handleApplyProtectionDiscount = (pct: number) => {
+    const eligible = calculateProtectionEligibleSubtotal();
+    if (eligible <= 0) {
+      toast({
+        title: "No eligible items",
+        description: "Add priced line items before applying the parts discount.",
+        variant: "destructive",
+      });
+      setProtectionPrompt(null);
+      return;
+    }
+    addProtectionDiscountMutation.mutate({ pct, amount: eligible * (pct / 100) });
+  };
+
+  // Keep the protection discount in sync: recalc when eligible items change and
+  // remove it automatically once the bundle is gone.
+  useEffect(() => {
+    if (!quote?.lineItems) return;
+    const discountLine = findProtectionDiscountLine();
+    if (!discountLine) return;
+    if (deleteLineItemMutation.isPending || updateLineItemMutation.isPending) return;
+
+    if (!hasProtectionBundleLine()) {
+      deleteLineItemMutation.mutate(discountLine.id);
+      return;
+    }
+
+    const pct = parseProtectionDiscountLabelPct(discountLine.description);
+    if (!pct) return;
+    const eligible = calculateProtectionEligibleSubtotal();
+    const target = -Math.abs(eligible * (pct / 100));
+    const current = parseFloat(String(discountLine.unitPrice)) || 0;
+    if (Math.abs(current - target) > 0.005) {
+      updateLineItemMutation.mutate({
+        lineItemId: discountLine.id,
+        description: discountLine.description || protectionDiscountLabel(pct),
+        quantity: 1,
+        unitPrice: target,
+        lineTotal: target,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quote?.lineItems]);
 
   const calculateQuoteSubtotal = () => {
     return quote?.lineItems
@@ -3522,6 +3630,47 @@ export default function CrmQuoteDetail() {
                 ) : (
                   "Apply Discount"
                 )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!protectionPrompt} onOpenChange={(open) => { if (!open) setProtectionPrompt(null); }}>
+          <DialogContent className="sm:max-w-md" data-testid="protection-discount-prompt">
+            <DialogHeader>
+              <DialogTitle>Apply Parts Discount?</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <p className="text-sm text-slate-600">
+                <span className="font-medium text-slate-800">{protectionPrompt?.bundleName}</span> includes a{" "}
+                <span className="font-semibold text-[#b8944d]">{protectionPrompt?.pct}% parts discount</span>.
+                Apply it to the eligible items on this quote now?
+              </p>
+              {protectionPrompt && (
+                <div className="p-3 bg-slate-50 rounded-lg border text-sm">
+                  ≈ ${(calculateProtectionEligibleSubtotal() * (protectionPrompt.pct / 100)).toFixed(2)} off{" "}
+                  ${calculateProtectionEligibleSubtotal().toFixed(2)} eligible subtotal
+                  <p className="text-xs text-slate-400 mt-1">
+                    Applies to all priced items except the protection bundle. Removing the bundle reverses it.
+                  </p>
+                </div>
+              )}
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                onClick={() => setProtectionPrompt(null)}
+                data-testid="button-protection-skip"
+              >
+                Skip
+              </Button>
+              <Button
+                onClick={() => protectionPrompt && handleApplyProtectionDiscount(protectionPrompt.pct)}
+                disabled={addProtectionDiscountMutation.isPending}
+                className="bg-[#d3b07d] hover:bg-[#b8944d] text-white"
+                data-testid="button-protection-apply"
+              >
+                {addProtectionDiscountMutation.isPending ? "Applying..." : `Apply ${protectionPrompt?.pct}% Discount`}
               </Button>
             </DialogFooter>
           </DialogContent>

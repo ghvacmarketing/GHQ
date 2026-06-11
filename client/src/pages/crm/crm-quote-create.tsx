@@ -45,6 +45,10 @@ import {
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import {
+  getProtectionDiscountPct,
+  protectionDiscountLabel,
+} from "@/lib/protection-discount";
 import type { CrmUser, CrmCustomer, CrmItem } from "@shared/schema";
 
 const QUOTE_TYPES = [
@@ -78,9 +82,10 @@ interface LineItem {
   lineType?: "item" | "discount";
   taxable?: boolean;
   isDiscountLine?: boolean;
-  discountKind?: "promotion" | "maintenance";
+  discountKind?: "promotion" | "maintenance" | "protection";
   itemCategory?: "install" | "service" | "maintenance" | "protection";
   crmItemId?: string;
+  protectionDiscountPct?: number;
 }
 
 interface FormData {
@@ -138,6 +143,9 @@ export default function CrmQuoteCreate() {
   const [discountKind, setDiscountKind] = useState<"promotion" | "maintenance">("promotion");
   const [discountMode, setDiscountMode] = useState<"amount" | "percentage">("amount");
   const [discountValue, setDiscountValue] = useState("");
+
+  // Protection bundle parts-discount prompt
+  const [protectionPrompt, setProtectionPrompt] = useState<{ pct: number; bundleName: string } | null>(null);
 
   // Customer search state
   const [customerSearch, setCustomerSearch] = useState("");
@@ -207,6 +215,10 @@ export default function CrmQuoteCreate() {
   });
 
   const handleAddItemFromCatalog = (item: CrmItem) => {
+    const isProtection = item.category === "protection";
+    const protectionPct = isProtection
+      ? getProtectionDiscountPct(item.description, item.name)
+      : null;
     const newLineItem: LineItem = {
       id: Date.now().toString(),
       description: item.name,
@@ -215,6 +227,7 @@ export default function CrmQuoteCreate() {
       itemCategory: (item.category as "install" | "service" | "maintenance" | "protection") || "install",
       taxable: item.taxable ?? true,
       crmItemId: item.id,
+      ...(protectionPct ? { protectionDiscountPct: protectionPct } : {}),
     };
     updateField("lineItems", [...formData.lineItems, newLineItem]);
     setItemsCatalogOpen(false);
@@ -224,7 +237,105 @@ export default function CrmQuoteCreate() {
       title: "Item Added",
       description: `"${item.name}" has been added to line items.`,
     });
+    // Offer to auto-apply the bundle's parts discount to the rest of the quote.
+    if (protectionPct) {
+      setProtectionPrompt({ pct: protectionPct, bundleName: item.name });
+    }
   };
+
+  // Subtotal of items eligible for a protection parts discount:
+  // all priced, non-discount line items except the protection bundle(s) themselves.
+  const calculateProtectionEligibleSubtotal = (items: LineItem[]) => {
+    return items
+      .filter(
+        (item) =>
+          !item.isDiscountLine &&
+          item.itemCategory !== "protection" &&
+          item.unitPrice > 0,
+      )
+      .reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+  };
+
+  const hasProtectionBundle = (items: LineItem[]) =>
+    items.some((item) => !item.isDiscountLine && item.itemCategory === "protection");
+
+  const activeProtectionPct = (items: LineItem[]) => {
+    const bundle = items.find(
+      (item) =>
+        !item.isDiscountLine &&
+        item.itemCategory === "protection" &&
+        item.protectionDiscountPct,
+    );
+    return bundle?.protectionDiscountPct ?? null;
+  };
+
+  const applyProtectionDiscount = (pct: number) => {
+    const eligible = calculateProtectionEligibleSubtotal(formData.lineItems);
+    if (eligible <= 0) {
+      toast({
+        title: "No Eligible Items",
+        description: "Add priced line items before applying the parts discount.",
+        variant: "destructive",
+      });
+      setProtectionPrompt(null);
+      return;
+    }
+    const amount = eligible * (pct / 100);
+    const discountItem: LineItem = {
+      id: `discount-protection-${Date.now()}`,
+      description: protectionDiscountLabel(pct),
+      quantity: 1,
+      unitPrice: -Math.abs(amount),
+      lineType: "discount",
+      taxable: false,
+      isDiscountLine: true,
+      discountKind: "protection",
+    };
+    // Replace any existing protection discount line, then add the fresh one.
+    const withoutProtection = formData.lineItems.filter(
+      (item) => !(item.isDiscountLine && item.discountKind === "protection"),
+    );
+    updateField("lineItems", [...withoutProtection, discountItem]);
+    setProtectionPrompt(null);
+    toast({
+      title: "Parts Discount Applied",
+      description: `${pct}% parts discount ($${Math.abs(amount).toFixed(2)}) applied to eligible items.`,
+    });
+  };
+
+  // Keep the protection discount line in sync: recalc when eligible items change,
+  // and remove it automatically when the bundle is removed.
+  useEffect(() => {
+    const items = formData.lineItems;
+    const discountIndex = items.findIndex(
+      (item) => item.isDiscountLine && item.discountKind === "protection",
+    );
+    if (discountIndex === -1) return;
+
+    const pct = activeProtectionPct(items);
+    if (!hasProtectionBundle(items) || pct === null) {
+      // Bundle removed -> reverse the discount.
+      updateField(
+        "lineItems",
+        items.filter(
+          (item) => !(item.isDiscountLine && item.discountKind === "protection"),
+        ),
+      );
+      return;
+    }
+
+    const eligible = calculateProtectionEligibleSubtotal(items);
+    const target = -Math.abs(eligible * (pct / 100));
+    if (Math.abs(items[discountIndex].unitPrice - target) > 0.005) {
+      const updated = items.map((item, idx) =>
+        idx === discountIndex
+          ? { ...item, unitPrice: target, description: protectionDiscountLabel(pct) }
+          : item,
+      );
+      updateField("lineItems", updated);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.lineItems]);
 
   const filteredItems = itemSearchResults?.filter(item => {
     if (categoryFilter === "all") return true;
@@ -535,7 +646,11 @@ export default function CrmQuoteCreate() {
           taxable: item.taxable !== false,
           isDiscountLine: item.isDiscountLine || false,
           discountKind: item.discountKind,
-          lineType: item.isDiscountLine ? "discount" : "part",
+          lineType: item.isDiscountLine
+            ? "discount"
+            : item.itemCategory === "protection"
+              ? "protection"
+              : "part",
         })),
       });
 
@@ -1334,6 +1449,46 @@ export default function CrmQuoteCreate() {
               data-testid="button-discount-apply"
             >
               Apply Discount
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!protectionPrompt} onOpenChange={(open) => { if (!open) setProtectionPrompt(null); }}>
+        <DialogContent className="sm:max-w-md" data-testid="protection-discount-prompt">
+          <DialogHeader>
+            <DialogTitle>Apply Parts Discount?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-slate-600">
+              <span className="font-medium text-slate-800">{protectionPrompt?.bundleName}</span> includes a{" "}
+              <span className="font-semibold text-[#b8944d]">{protectionPrompt?.pct}% parts discount</span>.
+              Apply it to the eligible items on this quote now?
+            </p>
+            {protectionPrompt && (
+              <div className="p-3 bg-slate-50 rounded-lg border text-sm">
+                ≈ ${(calculateProtectionEligibleSubtotal(formData.lineItems) * (protectionPrompt.pct / 100)).toFixed(2)} off{" "}
+                ${calculateProtectionEligibleSubtotal(formData.lineItems).toFixed(2)} eligible subtotal
+                <p className="text-xs text-slate-400 mt-1">
+                  Applies to all priced items except the protection bundle. Removing the bundle reverses it.
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setProtectionPrompt(null)}
+              data-testid="button-protection-skip"
+            >
+              Skip
+            </Button>
+            <Button
+              onClick={() => protectionPrompt && applyProtectionDiscount(protectionPrompt.pct)}
+              className="bg-[#d3b07d] hover:bg-[#b8944d] text-white"
+              data-testid="button-protection-apply"
+            >
+              Apply {protectionPrompt?.pct}% Discount
             </Button>
           </DialogFooter>
         </DialogContent>
