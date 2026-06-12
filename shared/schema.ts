@@ -1770,6 +1770,10 @@ export const customAgreementTypes = pgTable("custom_agreement_types", {
   name: text("name").notNull().unique(),
   description: text("description"),
   frequency: text("frequency").$type<AgreementFrequency>().notNull().default("annual"),
+  // Billing cadence ("frequency") is decoupled from how scheduled visits are spread.
+  // When null, visit spacing falls back to "frequency". Care plans bill monthly but
+  // spread their tune-up visits across the year (visitFrequency = "annual").
+  visitFrequency: text("visit_frequency").$type<AgreementFrequency>(),
   visitsPerPeriod: integer("visits_per_period").notNull().default(2),
   defaultPrice: decimal("default_price", { precision: 10, scale: 2 }).default("0.00"),
   isActive: boolean("is_active").notNull().default(true),
@@ -1807,6 +1811,10 @@ export const crmAgreements = pgTable("crm_agreements", {
   numberOfSystems: integer("number_of_systems").notNull().default(1),
   price: decimal("price", { precision: 10, scale: 2 }).default("229.00"),
   frequency: text("frequency").$type<AgreementFrequency>().notNull().default("annual"),
+  // Cadence used to space scheduled maintenance visits. Decoupled from "frequency"
+  // (billing cadence) so e.g. a monthly-billed Care plan can spread its yearly
+  // tune-ups across 12 months. When null, visit spacing falls back to "frequency".
+  visitFrequency: text("visit_frequency").$type<AgreementFrequency>(),
   visitsPerPeriod: integer("visits_per_period").notNull().default(2),
   autoRenew: boolean("auto_renew").notNull().default(true),
   regionId: varchar("region_id").references(() => maintenanceRegions.id),

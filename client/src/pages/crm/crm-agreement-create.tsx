@@ -113,6 +113,9 @@ export default function CrmAgreementCreate() {
   const [notes, setNotes] = useState("");
   const [price, setPrice] = useState("229.00");
   const [frequency, setFrequency] = useState<"weekly" | "monthly" | "annual">("annual");
+  // Visit cadence is separate from billing frequency so a monthly-billed Care plan
+  // can spread its yearly tune-ups across the year. Falls back to billing frequency.
+  const [visitFrequency, setVisitFrequency] = useState<"weekly" | "monthly" | "annual" | null>(null);
   const [visitsPerPeriod, setVisitsPerPeriod] = useState(2);
   const [customTypeApplied, setCustomTypeApplied] = useState(false);
 
@@ -143,6 +146,7 @@ export default function CrmAgreementCreate() {
       if (selectedType) {
         setAgreementPlan(selectedType.name);
         setFrequency(selectedType.frequency || "annual");
+        setVisitFrequency(selectedType.visitFrequency || null);
         setVisitsPerPeriod(selectedType.visitsPerPeriod);
         setPrice(selectedType.defaultPrice || "0.00");
         setCustomTypeApplied(true);
@@ -303,6 +307,7 @@ export default function CrmAgreementCreate() {
         notes,
         status: "pending" as const,
         frequency,
+        visitFrequency,
         visitsPerPeriod,
         billingPreference,
         isInitialCycle: true,
@@ -332,15 +337,18 @@ export default function CrmAgreementCreate() {
     try {
       const firstVisit = parseISO(appointmentDate);
       const visits: { visitNumber: number; date: string }[] = [];
+      // Visit spacing follows the visit cadence (falls back to billing frequency),
+      // so a monthly-billed Care plan spreads its yearly tune-ups across the year.
+      const visitFreq = visitFrequency || frequency;
       
       for (let i = 0; i < visitsPerPeriod; i++) {
         let visitDate: Date;
         
-        if (frequency === "weekly") {
+        if (visitFreq === "weekly") {
           // Weekly: 7 days ÷ visits = spacing between visits
           const daysApart = Math.floor(7 / visitsPerPeriod);
           visitDate = addDays(firstVisit, i * daysApart);
-        } else if (frequency === "monthly") {
+        } else if (visitFreq === "monthly") {
           // Monthly: 30 days ÷ visits = spacing between visits
           const daysApart = Math.floor(30 / visitsPerPeriod);
           visitDate = addDays(firstVisit, i * daysApart);

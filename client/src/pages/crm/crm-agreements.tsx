@@ -154,6 +154,8 @@ export default function CrmAgreements() {
     name: "",
     description: "",
     frequency: "annual" as "weekly" | "monthly" | "annual",
+    // How scheduled visits are spread, separate from the billing cycle. null = same as billing.
+    visitFrequency: null as "weekly" | "monthly" | "annual" | null,
     visitsPerPeriod: 2,
     defaultPrice: "0.00",
     isActive: true,
@@ -253,7 +255,7 @@ export default function CrmAgreements() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/custom-agreement-types"] });
       setShowCreateTypeDialog(false);
-      setTypeForm({ name: "", description: "", frequency: "annual", visitsPerPeriod: 2, defaultPrice: "0.00", isActive: true });
+      setTypeForm({ name: "", description: "", frequency: "annual", visitFrequency: null, visitsPerPeriod: 2, defaultPrice: "0.00", isActive: true });
       toast({ title: "Custom agreement type created successfully" });
     },
     onError: () => {
@@ -269,7 +271,7 @@ export default function CrmAgreements() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/custom-agreement-types"] });
       setEditingType(null);
-      setTypeForm({ name: "", description: "", frequency: "annual", visitsPerPeriod: 2, defaultPrice: "0.00", isActive: true });
+      setTypeForm({ name: "", description: "", frequency: "annual", visitFrequency: null, visitsPerPeriod: 2, defaultPrice: "0.00", isActive: true });
       toast({ title: "Custom agreement type updated successfully" });
     },
     onError: () => {
@@ -1287,7 +1289,7 @@ export default function CrmAgreements() {
                 size="sm"
                 className="bg-[#711419] hover:bg-[#5a1014]"
                 onClick={() => {
-                  setTypeForm({ name: "", description: "", frequency: "annual", visitsPerPeriod: 2, defaultPrice: "0.00", isActive: true });
+                  setTypeForm({ name: "", description: "", frequency: "annual", visitFrequency: null, visitsPerPeriod: 2, defaultPrice: "0.00", isActive: true });
                   setShowCreateTypeDialog(true);
                 }}
                 data-testid="button-create-type"
@@ -1351,6 +1353,7 @@ export default function CrmAgreements() {
                                 name: type.name,
                                 description: type.description || "",
                                 frequency: type.frequency || "annual",
+                                visitFrequency: type.visitFrequency || null,
                                 visitsPerPeriod: type.visitsPerPeriod,
                                 defaultPrice: type.defaultPrice || "0.00",
                                 isActive: type.isActive,
@@ -1392,7 +1395,7 @@ export default function CrmAgreements() {
           if (!open) {
             setShowCreateTypeDialog(false);
             setEditingType(null);
-            setTypeForm({ name: "", description: "", frequency: "annual", visitsPerPeriod: 2, defaultPrice: "0.00", isActive: true });
+            setTypeForm({ name: "", description: "", frequency: "annual", visitFrequency: null, visitsPerPeriod: 2, defaultPrice: "0.00", isActive: true });
           }
         }}
       >
@@ -1446,7 +1449,8 @@ export default function CrmAgreements() {
                   <Select
                     value={typeForm.frequency}
                     onValueChange={(value: "weekly" | "monthly" | "annual") => {
-                      const max = value === "weekly" ? 7 : value === "monthly" ? 30 : 365;
+                      const effectiveVisitFreq = typeForm.visitFrequency || value;
+                      const max = effectiveVisitFreq === "weekly" ? 7 : effectiveVisitFreq === "monthly" ? 30 : 365;
                       setTypeForm({ 
                         ...typeForm, 
                         frequency: value,
@@ -1465,32 +1469,70 @@ export default function CrmAgreements() {
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="type-visits">Visits *</Label>
-                    <span className="text-xs text-muted-foreground">
-                      (max {typeForm.frequency === "weekly" ? "7" : typeForm.frequency === "monthly" ? "30" : "365"})
-                    </span>
-                  </div>
-                  <Input
-                    id="type-visits"
-                    type="number"
-                    min="1"
-                    max={typeForm.frequency === "weekly" ? 7 : typeForm.frequency === "monthly" ? 30 : 365}
-                    value={typeForm.visitsPerPeriod}
-                    onChange={(e) => {
-                      const rawValue = e.target.value;
-                      if (rawValue === "") {
-                        setTypeForm({ ...typeForm, visitsPerPeriod: 1 });
-                        return;
-                      }
-                      const val = parseInt(rawValue);
-                      if (isNaN(val)) return;
-                      const max = typeForm.frequency === "weekly" ? 7 : typeForm.frequency === "monthly" ? 30 : 365;
-                      setTypeForm({ ...typeForm, visitsPerPeriod: Math.max(1, Math.min(val, max)) });
+                  <Label htmlFor="type-visit-frequency">Visit Schedule</Label>
+                  <Select
+                    value={typeForm.visitFrequency ?? "same"}
+                    onValueChange={(value: "same" | "weekly" | "monthly" | "annual") => {
+                      const visitFrequency = value === "same" ? null : value;
+                      const effectiveVisitFreq = visitFrequency || typeForm.frequency;
+                      const max = effectiveVisitFreq === "weekly" ? 7 : effectiveVisitFreq === "monthly" ? 30 : 365;
+                      setTypeForm({
+                        ...typeForm,
+                        visitFrequency,
+                        visitsPerPeriod: Math.min(typeForm.visitsPerPeriod, max),
+                      });
                     }}
-                    data-testid="input-type-visits"
-                  />
+                  >
+                    <SelectTrigger id="type-visit-frequency" data-testid="select-type-visit-frequency">
+                      <SelectValue placeholder="Same as billing" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="same">Same as billing</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="annual">Annual (spread across year)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
+              </div>
+              <p className="text-xs text-muted-foreground -mt-2">
+                Set "Visit Schedule" to spread tune-up visits differently than billing — e.g. a monthly-billed plan with visits spread across the year.
+              </p>
+              <div className="grid gap-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="type-visits">Visits *</Label>
+                  <span className="text-xs text-muted-foreground">
+                    {(() => {
+                      const vf = typeForm.visitFrequency || typeForm.frequency;
+                      const label = vf === "weekly" ? "7" : vf === "monthly" ? "30" : "365";
+                      const per = vf === "annual" ? "per year" : vf === "monthly" ? "per month" : "per week";
+                      return `(max ${label}, ${per})`;
+                    })()}
+                  </span>
+                </div>
+                <Input
+                  id="type-visits"
+                  type="number"
+                  min="1"
+                  max={(() => {
+                    const vf = typeForm.visitFrequency || typeForm.frequency;
+                    return vf === "weekly" ? 7 : vf === "monthly" ? 30 : 365;
+                  })()}
+                  value={typeForm.visitsPerPeriod}
+                  onChange={(e) => {
+                    const rawValue = e.target.value;
+                    if (rawValue === "") {
+                      setTypeForm({ ...typeForm, visitsPerPeriod: 1 });
+                      return;
+                    }
+                    const val = parseInt(rawValue);
+                    if (isNaN(val)) return;
+                    const vf = typeForm.visitFrequency || typeForm.frequency;
+                    const max = vf === "weekly" ? 7 : vf === "monthly" ? 30 : 365;
+                    setTypeForm({ ...typeForm, visitsPerPeriod: Math.max(1, Math.min(val, max)) });
+                  }}
+                  data-testid="input-type-visits"
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="type-price">Default Price ($) *</Label>
@@ -1522,7 +1564,7 @@ export default function CrmAgreements() {
                 onClick={() => {
                   setShowCreateTypeDialog(false);
                   setEditingType(null);
-                  setTypeForm({ name: "", description: "", frequency: "annual", visitsPerPeriod: 2, defaultPrice: "0.00", isActive: true });
+                  setTypeForm({ name: "", description: "", frequency: "annual", visitFrequency: null, visitsPerPeriod: 2, defaultPrice: "0.00", isActive: true });
                 }}
                 data-testid="button-cancel-type"
               >

@@ -9,6 +9,44 @@ import { z } from "zod";
 import { fromZonedTime } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
+
+// Compute the target date for a single scheduled maintenance visit.
+// Visit spacing is driven by `visitFrequency` (how visits are spread), which is
+// intentionally separate from an agreement's billing `frequency`. This lets a
+// monthly-billed Care plan spread its yearly tune-ups across 12 months.
+// - weekly: 7 days ÷ visits = days apart
+// - monthly: 30 days ÷ visits = days apart
+// - annual: 12 months ÷ visits = months apart
+function computeVisitDate(
+  baseDate: Date,
+  index: number,
+  visitsPerPeriod: number,
+  visitFrequency: string,
+): Date {
+  const visitDate = new Date(baseDate);
+  const safeVisits = Math.max(1, visitsPerPeriod);
+  if (visitFrequency === "weekly") {
+    const daysApart = Math.max(1, Math.round(7 / safeVisits));
+    visitDate.setDate(visitDate.getDate() + index * daysApart);
+  } else if (visitFrequency === "monthly") {
+    const daysApart = Math.max(1, Math.round(30 / safeVisits));
+    visitDate.setDate(visitDate.getDate() + index * daysApart);
+  } else {
+    const monthsApart = Math.max(1, Math.round(12 / safeVisits));
+    visitDate.setMonth(visitDate.getMonth() + index * monthsApart);
+  }
+  return visitDate;
+}
+
+// Cadence used to space scheduled visits. Falls back to billing frequency for
+// older agreements/types created before visitFrequency existed.
+function effectiveVisitFrequency(record: {
+  visitFrequency?: string | null;
+  frequency?: string | null;
+}): string {
+  return record.visitFrequency || record.frequency || "annual";
+}
+
 import { storage } from "./storage";
 import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, crmNotifications, crmComments, crmCommentMentions, insertCrmNotificationSchema, insertCrmCommentSchema, insertCrmCommentMentionSchema, type CrmNotification, type InsertCrmNotification, type CrmComment, type InsertCrmComment, type CrmCommentMention, type InsertCrmCommentMention, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry, crmLeads, crmLeadTypes, insertCrmLeadSchema, insertCrmLeadTypeSchema, type CrmLead, type CrmLeadType, type InsertCrmLead, type InsertCrmLeadType, crmLeadTempOptions, crmLeadDriverOptions, insertCrmLeadTempOptionSchema, insertCrmLeadDriverOptionSchema, type CrmLeadTempOption, type CrmLeadDriverOption, type InsertCrmLeadTempOption, type InsertCrmLeadDriverOption, tasks, taskTypes, taskActivity, insertTaskSchema, insertTaskTypeSchema, insertTaskActivitySchema, type Task, type TaskType, type TaskActivity, type InsertTask, type InsertTaskType, type InsertTaskActivity, crmTaggedComments, crmTaggedCommentRecipients, salesbookBookmarks, insertSalesbookBookmarkSchema, customerFiles, insertCustomerFileSchema, type CustomerFile, rebateCases, insertRebateCaseSchema, type RebateCase, type InsertRebateCase, insertRebateCaseDocumentSchema, insertRebateCaseScopeChecklistSchema, rebateProgramTypeEnum, rebateApplicationStatusEnum, rebateWorkflowStepStatusEnum, rebateDocumentCategoryEnum } from "@shared/schema";
 import * as xlsx from "xlsx";
@@ -12998,14 +13036,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validated = insertCustomAgreementTypeSchema.parse(req.body);
       
-      // Validate visits per period cannot exceed days in the period
-      const frequency = validated.frequency || "annual";
+      // Validate visits cannot exceed the days available in the VISIT cadence.
+      // Visit cadence is separate from billing frequency (e.g. monthly-billed Care
+      // plans spread their visits across the year, so cap against the annual window).
+      const visitFrequency = validated.visitFrequency || validated.frequency || "annual";
       const visitsPerPeriod = validated.visitsPerPeriod || 2;
-      const maxVisits = frequency === "weekly" ? 7 : frequency === "monthly" ? 30 : 365;
+      const maxVisits = visitFrequency === "weekly" ? 7 : visitFrequency === "monthly" ? 30 : 365;
       
       if (visitsPerPeriod > maxVisits) {
         return res.status(400).json({ 
-          message: `Visits per period cannot exceed ${maxVisits} for ${frequency} frequency` 
+          message: `Visits per period cannot exceed ${maxVisits} for ${visitFrequency} visit frequency` 
         });
       }
       
@@ -13356,21 +13396,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return `${year}-${month}-${day}`;
         };
         
+        // Spacing uses visit cadence, not billing cadence (e.g. monthly-billed
+        // Care plans spread their yearly tune-ups across the year).
+        const visitFreq = effectiveVisitFrequency(agreement);
         for (let i = 0; i < visitsPerPeriod; i++) {
-          const visitDate = new Date(appointmentDate);
-          if (frequency === "weekly") {
-            // Weekly: 7 days ÷ number of visits = days apart (minimum 1 day)
-            const daysApart = Math.max(1, Math.round(7 / visitsPerPeriod));
-            visitDate.setDate(visitDate.getDate() + (i * daysApart));
-          } else if (frequency === "monthly") {
-            // Monthly: 30 days ÷ number of visits = days apart (minimum 1 day)
-            const daysApart = Math.max(1, Math.round(30 / visitsPerPeriod));
-            visitDate.setDate(visitDate.getDate() + (i * daysApart));
-          } else {
-            // Annual: evenly spaced throughout the year (minimum 1 month)
-            const monthsApart = Math.max(1, Math.round(12 / visitsPerPeriod));
-            visitDate.setMonth(visitDate.getMonth() + (i * monthsApart));
-          }
+          const visitDate = computeVisitDate(appointmentDate, i, visitsPerPeriod, visitFreq);
           
           const isLastVisit = i === visitsPerPeriod - 1;
           // For pay-on-visit agreements, the last visit is the renewal trigger
@@ -16509,6 +16539,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Standard Preventative Maintenance is ALWAYS annual with 2 visits
             // Only use custom type settings if explicitly matching a custom agreement type
             const agreementFrequency = customType ? (customType.frequency as "weekly" | "monthly" | "annual") : "annual";
+            // Visit spacing cadence is separate from billing cadence (e.g. monthly-billed
+            // Care plans spread their yearly tune-ups across the year).
+            const agreementVisitFrequency = customType ? effectiveVisitFrequency(customType) : "annual";
             // Use custom type's visitsPerPeriod directly - visits are NOT multiplied by quantity
             // Only the price is multiplied by quantity (handled by line total from invoice)
             const agreementVisitsPerPeriod = customType?.visitsPerPeriod || 2;
@@ -16618,6 +16651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 autoRenew: true,
                 visitsPerPeriod: agreementVisitsPerPeriod,
                 frequency: agreementFrequency,
+                visitFrequency: agreementVisitFrequency,
                 customAgreementTypeId: customType?.id || null,
                 notes: `Auto-created from Invoice ${invoice.invoiceNumber}`,
               }).returning();
@@ -16629,21 +16663,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Annual: spread evenly across the year (months apart)
               if (newAgreement) {
                 for (let i = 0; i < agreementVisitsPerPeriod; i++) {
-                  const visitDate = new Date(appointmentDate);
-                  
-                  if (agreementFrequency === "weekly") {
-                    // Weekly: 7 days ÷ number of visits = days apart (minimum 1 day)
-                    const daysApart = Math.max(1, Math.round(7 / agreementVisitsPerPeriod));
-                    visitDate.setDate(visitDate.getDate() + (i * daysApart));
-                  } else if (agreementFrequency === "monthly") {
-                    // Monthly: 30 days ÷ number of visits = days apart (minimum 1 day)
-                    const daysApart = Math.max(1, Math.round(30 / agreementVisitsPerPeriod));
-                    visitDate.setDate(visitDate.getDate() + (i * daysApart));
-                  } else {
-                    // Annual: spread evenly across the year (minimum 1 month)
-                    const monthsApart = Math.max(1, Math.round(12 / agreementVisitsPerPeriod));
-                    visitDate.setMonth(visitDate.getMonth() + (i * monthsApart));
-                  }
+                  const visitDate = computeVisitDate(appointmentDate, i, agreementVisitsPerPeriod, agreementVisitFrequency);
                   
                   await db.insert(maintenanceVisits).values({
                     agreementId: newAgreement.id,
@@ -16704,21 +16724,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Create new visits for the new cycle
               const visitsPerPeriod = agreement.visitsPerPeriod || 2;
               const frequency = agreement.frequency || "annual";
+              // Visit spacing follows visit cadence, billing keeps using frequency.
+              const visitFreq = effectiveVisitFrequency(agreement);
               const appointmentDate = new Date(agreement.appointmentDate || todayStr);
               const isPayOnVisit = agreement.billingPreference === "pay_on_visit";
               
               for (let i = 0; i < visitsPerPeriod; i++) {
-                const visitDate = new Date(appointmentDate);
-                if (frequency === "weekly") {
-                  const daysApart = Math.max(1, Math.round(7 / visitsPerPeriod));
-                  visitDate.setDate(visitDate.getDate() + (i * daysApart));
-                } else if (frequency === "monthly") {
-                  const daysApart = Math.max(1, Math.round(30 / visitsPerPeriod));
-                  visitDate.setDate(visitDate.getDate() + (i * daysApart));
-                } else {
-                  const monthsApart = Math.max(1, Math.round(12 / visitsPerPeriod));
-                  visitDate.setMonth(visitDate.getMonth() + (i * monthsApart));
-                }
+                const visitDate = computeVisitDate(appointmentDate, i, visitsPerPeriod, visitFreq);
                 
                 const isLastVisit = i === visitsPerPeriod - 1;
                 const isRenewalTrigger = isPayOnVisit && isLastVisit;
@@ -16792,6 +16804,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const currentYear = new Date().getFullYear();
               const visitsPerPeriod = agreement.visitsPerPeriod || 2;
               const frequency = agreement.frequency || "annual";
+              // Visit spacing follows visit cadence, billing keeps using frequency.
+              const visitFreq = effectiveVisitFrequency(agreement);
               
               // Mark the renewal visit as collected
               await db.update(maintenanceVisits)
@@ -16828,17 +16842,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               // Create new visits for the next cycle
               for (let i = 0; i < visitsPerPeriod; i++) {
-                const visitDate = new Date(appointmentDate);
-                if (frequency === "weekly") {
-                  const daysApart = Math.max(1, Math.round(7 / visitsPerPeriod));
-                  visitDate.setDate(visitDate.getDate() + (i * daysApart));
-                } else if (frequency === "monthly") {
-                  const daysApart = Math.max(1, Math.round(30 / visitsPerPeriod));
-                  visitDate.setDate(visitDate.getDate() + (i * daysApart));
-                } else {
-                  const monthsApart = Math.max(1, Math.round(12 / visitsPerPeriod));
-                  visitDate.setMonth(visitDate.getMonth() + (i * monthsApart));
-                }
+                const visitDate = computeVisitDate(appointmentDate, i, visitsPerPeriod, visitFreq);
                 
                 const isLastVisit = i === visitsPerPeriod - 1;
                 

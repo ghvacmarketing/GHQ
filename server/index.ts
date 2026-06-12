@@ -232,11 +232,29 @@ async function runProposalTemplateMigrations() {
   }
 }
 
+async function runAgreementVisitFrequencyMigration() {
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    // Decouple visit cadence from billing cadence: add a nullable visit_frequency
+    // column to both the agreement templates and the agreements themselves.
+    // Idempotent so it runs safely on every environment (dev + production).
+    await db.execute(
+      sql`ALTER TABLE custom_agreement_types ADD COLUMN IF NOT EXISTS visit_frequency text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE crm_agreements ADD COLUMN IF NOT EXISTS visit_frequency text`,
+    );
+  } catch (err) {
+    console.error("Agreement visit-frequency migration error (non-fatal):", err);
+  }
+}
+
 async function runProtectionAndCarePlanSeeds() {
   try {
     const { db } = await import("./db");
     const { crmItems, customAgreementTypes } = await import("@shared/schema");
-    const { eq } = await import("drizzle-orm");
+    const { eq, and, isNull, sql } = await import("drizzle-orm");
 
     // 1. Installation Protection Bundles (one-time, fixed-price add-ons)
     const protectionBundles = [
@@ -318,14 +336,42 @@ async function runProtectionAndCarePlanSeeds() {
         await db.insert(customAgreementTypes).values({
           name: plan.name,
           description: plan.description,
+          // Billed monthly, but tune-up visits are spread across the year.
           frequency: "monthly",
+          visitFrequency: "annual",
           visitsPerPeriod: plan.visitsPerPeriod,
           defaultPrice: plan.defaultPrice,
           isActive: true,
         });
         console.log(`[CarePlans] Seeded care plan template: ${plan.name}`);
+      } else {
+        // Backfill visitFrequency for previously-seeded Care plans (idempotent).
+        await db
+          .update(customAgreementTypes)
+          .set({ visitFrequency: "annual" })
+          .where(
+            and(
+              eq(customAgreementTypes.name, plan.name),
+              isNull(customAgreementTypes.visitFrequency),
+            ),
+          );
       }
     }
+
+    // 3. Backfill existing agreements that predate the visit/billing-cadence split.
+    // Propagate each agreement's linked template visit cadence to the agreement
+    // itself where it hasn't been set yet. This fixes already-created monthly-billed
+    // Care plan agreements whose yearly tune-ups would otherwise be spaced within a
+    // single month (effectiveVisitFrequency() falls back to the monthly "frequency").
+    // Idempotent: only touches rows where visit_frequency IS NULL.
+    await db.execute(sql`
+      UPDATE crm_agreements a
+      SET visit_frequency = t.visit_frequency
+      FROM custom_agreement_types t
+      WHERE a.custom_agreement_type_id = t.id
+        AND a.visit_frequency IS NULL
+        AND t.visit_frequency IS NOT NULL
+    `);
   } catch (err) {
     console.error("Protection & care plan seed error (non-fatal):", err);
   }
@@ -335,6 +381,7 @@ async function runProtectionAndCarePlanSeeds() {
   await runTaggedCommentMigrations();
   await runSalesbookMigrations();
   await runProposalTemplateMigrations();
+  await runAgreementVisitFrequencyMigration();
   await runProtectionAndCarePlanSeeds();
   try {
     const { ensureSalesbookConverted } = await import("./services/salesbook-converter");
