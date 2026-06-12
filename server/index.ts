@@ -397,12 +397,63 @@ async function runProtectionAndCarePlanSeeds() {
   }
 }
 
+async function runWaterHeaterSeeds() {
+  try {
+    const { db } = await import("./db");
+    const { pricebookPackages } = await import("@shared/schema");
+    const { eq, and } = await import("drizzle-orm");
+
+    // Water heater products for the salesbook (single-tier, non-tonnage).
+    // tonnage is used purely as a stable display-order key. packageLevel is the
+    // stable variant code that the WATER_HEATER_SPECS warranty/feature config is
+    // keyed off of (keep these in sync with client/src/components/salesbook-pages.tsx).
+    const waterHeaters = [
+      { tonnage: "1", packageLevel: "Tankless",    outdoorName: "On Demand Tankless",       outdoorBrand: "Navien", outdoorModel: "NAVNPE240S2",     monthlyPayment: 10100, totalInvestment: 676300 },
+      { tonnage: "2", packageLevel: "Natural Gas", outdoorName: "50 Gallon Natural Gas",    outdoorBrand: "Rheem",  outdoorModel: "RHPROG5036PRH60", monthlyPayment: 4700,  totalInvestment: 309100 },
+      { tonnage: "3", packageLevel: "Propane",     outdoorName: "50 Gallon Liquid Propane", outdoorBrand: "Rheem",  outdoorModel: "RHPROG5038NRH60", monthlyPayment: 4000,  totalInvestment: 264500 },
+      { tonnage: "4", packageLevel: "Electric",    outdoorName: "50 Gallon Electric",       outdoorBrand: "Rheem",  outdoorModel: "RHPROE50T2RH95",  monthlyPayment: 3900,  totalInvestment: 255400 },
+    ];
+
+    for (const wh of waterHeaters) {
+      const existing = await db
+        .select({ id: pricebookPackages.id })
+        .from(pricebookPackages)
+        .where(
+          and(
+            eq(pricebookPackages.unitType, "Water Heater"),
+            eq(pricebookPackages.tier, "Standard"),
+            eq(pricebookPackages.tonnage, wh.tonnage),
+            eq(pricebookPackages.packageLevel, wh.packageLevel),
+          ),
+        );
+      if (existing.length === 0) {
+        await db.insert(pricebookPackages).values({
+          unitType: "Water Heater",
+          tier: "Standard",
+          tonnage: wh.tonnage,
+          packageLevel: wh.packageLevel,
+          monthlyPayment: wh.monthlyPayment,
+          totalInvestment: wh.totalInvestment,
+          outdoorBrand: wh.outdoorBrand,
+          outdoorModel: wh.outdoorModel,
+          outdoorName: wh.outdoorName,
+          isActive: true,
+        });
+        console.log(`[WaterHeaters] Seeded package: ${wh.outdoorName}`);
+      }
+    }
+  } catch (err) {
+    console.error("Water heater seed error (non-fatal):", err);
+  }
+}
+
 (async () => {
   await runTaggedCommentMigrations();
   await runSalesbookMigrations();
   await runProposalTemplateMigrations();
   await runAgreementVisitFrequencyMigration();
   await runProtectionAndCarePlanSeeds();
+  await runWaterHeaterSeeds();
   try {
     const { ensureSalesbookConverted } = await import("./services/salesbook-converter");
     ensureSalesbookConverted();

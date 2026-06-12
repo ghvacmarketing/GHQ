@@ -57,6 +57,45 @@ const UNIT_TYPE_DISPLAY: Record<string, { name: string; tagline: string }> = {
   PHP: { name: "Package Heat Pump", tagline: "All-in-one packaged heat pump unit" },
   "Mini-Split": { name: "Mini-Split", tagline: "Ductless single-zone heating & cooling" },
   Ducting: { name: "Duct System", tagline: "Complete duct system replacement" },
+  "Water Heater": { name: "Water Heaters", tagline: "Reliable hot water — tankless, gas & electric options" },
+};
+
+interface WaterHeaterSpec {
+  warranty: string[];
+  features: string[];
+}
+
+// Static product specs, keyed by the stable packageLevel variant code (not the
+// editable display name). Keep keys in sync with the runWaterHeaterSeeds() seed
+// in server/index.ts.
+const WATER_HEATER_SPECS: Record<string, WaterHeaterSpec> = {
+  Tankless: {
+    warranty: ["1 Year Labor", "5 Year Parts", "15 Year Heat Exchanger"],
+    features: [
+      "½\" gas pipe capable up to 24'",
+      "Field convertible gas system",
+      "Ultra condensing efficiency",
+      "Dual stainless steel heat exchangers",
+      "Low NOx emissions (20ppm)",
+      "SCH 40, 2\" venting up to 75'",
+      "Cascading capable",
+      "EZNav multi-line control panel",
+      "Built-in HotButton control panel",
+      "Common vent up to 12 units",
+    ],
+  },
+  "Natural Gas": {
+    warranty: ["1 Year Labor", "6 Year Tank and Limited Parts"],
+    features: [],
+  },
+  Propane: {
+    warranty: ["1 Year Labor", "6 Year Tank and Limited Parts"],
+    features: [],
+  },
+  Electric: {
+    warranty: ["1 Year Labor", "6 Year Tank and Limited Parts"],
+    features: [],
+  },
 };
 
 const TIER_DISPLAY: Record<string, string> = {
@@ -518,6 +557,121 @@ export const SingleTierDetailPage = forwardRef<HTMLDivElement, {
   );
 });
 SingleTierDetailPage.displayName = "SingleTierDetailPage";
+
+
+export const WaterHeaterDetailPage = forwardRef<HTMLDivElement, {
+  packages: PricebookPackage[];
+}>(({ packages }, ref) => {
+  const sorted = [...packages].sort((a, b) => parseFloat(a.tonnage) - parseFloat(b.tonnage));
+
+  return (
+    <PageWrapper ref={ref}>
+      <div style={{
+        background: BRAND_COLOR,
+        padding: "12px 20px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}>
+        <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>Water Heaters</div>
+        <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: 600 }}>Total Investment*</div>
+      </div>
+
+      <div style={{
+        flex: 1,
+        padding: "12px",
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gridAutoRows: "1fr",
+        gap: 10,
+        overflow: "hidden",
+      }}>
+        {sorted.map((pkg) => {
+          const name = pkg.outdoorName || pkg.packageLevel;
+          const spec = WATER_HEATER_SPECS[pkg.packageLevel] || { warranty: [], features: [] };
+          return (
+            <div key={pkg.id} style={{
+              border: "1px solid #e8e8e8",
+              borderRadius: 8,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}>
+              <div style={{
+                padding: "8px 12px",
+                background: "#fafafa",
+                borderBottom: "1px solid #eee",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: 8,
+              }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: "#111", lineHeight: 1.2 }}>{name}</div>
+                  <div style={{ fontSize: 8.5, color: "#999", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {[pkg.outdoorBrand, pkg.outdoorModel].filter(Boolean).join(" ")}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: 17, fontWeight: 700, color: "#111", lineHeight: 1 }}>
+                    {formatCents(pkg.monthlyPayment)}
+                    <span style={{ fontSize: 9, fontWeight: 600, color: "#888" }}>/mo*</span>
+                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: BRAND_COLOR, marginTop: 2 }}>
+                    {formatCents(pkg.totalInvestment)}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ padding: "8px 12px", flex: 1, overflow: "hidden" }}>
+                <div style={{ fontSize: 8, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                  Warranty
+                </div>
+                {spec.warranty.map((w, i) => (
+                  <div key={i} style={{ fontSize: 9.5, color: "#444", lineHeight: 1.45 }}>• {w}</div>
+                ))}
+
+                {spec.features.length > 0 && (
+                  <>
+                    <div style={{ fontSize: 8, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.06em", margin: "6px 0 4px" }}>
+                      Features
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+                      {spec.features.map((f, i) => (
+                        <span key={i} style={{
+                          fontSize: 8,
+                          color: "#1a5a8a",
+                          background: "#eef5fb",
+                          padding: "1px 5px",
+                          borderRadius: 3,
+                          lineHeight: 1.35,
+                        }}>
+                          {f}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div style={{
+                padding: "5px 12px",
+                borderTop: "1px solid #f0f0f0",
+                fontSize: 8,
+                color: "#aaa",
+              }}>
+                12.99% APR, 120 mos — with approved credit
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ height: 3, background: BRAND_COLOR }} />
+    </PageWrapper>
+  );
+});
+WaterHeaterDetailPage.displayName = "WaterHeaterDetailPage";
 
 
 export const EliteDividerPage = forwardRef<HTMLDivElement, object>((_, ref) => (
@@ -1575,7 +1729,7 @@ export const GefaQualifyPage = forwardRef<HTMLDivElement, object>((_, ref) => {
 GefaQualifyPage.displayName = "GefaQualifyPage";
 
 export interface SalesbookSection {
-  type: "static" | "gefa-divider" | "gefa-overview" | "gefa-comparison" | "gefa-qualify" | "category-divider" | "tier-header" | "product-detail" | "ducting-detail" | "elite-divider" | "elite-bundles" | "elite-discount" | "elite-airflow" | "crawlspace-divider" | "crawlspace-tiers" | "crawlspace-example" | "crawlspace-elite" | "crawlspace-elite-example";
+  type: "static" | "gefa-divider" | "gefa-overview" | "gefa-comparison" | "gefa-qualify" | "category-divider" | "tier-header" | "product-detail" | "ducting-detail" | "water-heater-detail" | "elite-divider" | "elite-bundles" | "elite-discount" | "elite-airflow" | "crawlspace-divider" | "crawlspace-tiers" | "crawlspace-example" | "crawlspace-elite" | "crawlspace-elite-example";
   label?: string;
   unitType?: string;
   tier?: string;
@@ -1590,7 +1744,7 @@ export interface SalesbookSection {
   pageIndex: number;
 }
 
-const UNIT_TYPE_ORDER = ["SGA", "SHP", "STA", "GP", "PHP", "Mini-Split", "Ducting"];
+const UNIT_TYPE_ORDER = ["SGA", "SHP", "STA", "GP", "PHP", "Mini-Split", "Ducting", "Water Heater"];
 const TIER_ORDER = ["Essential", "Premium", "Ultimate", "Packaged", "Standard"];
 
 export function buildSalesbookSections(
@@ -1629,6 +1783,26 @@ export function buildSalesbookSections(
 
     const unitDisplay = UNIT_TYPE_DISPLAY[unitType]?.name || unitType;
     const heroImg = typePackages.find(p => p.outdoorImageUrl)?.outdoorImageUrl || undefined;
+
+    if (unitType === "Water Heater") {
+      sections.push({
+        type: "category-divider",
+        unitType,
+        tierCount: 1,
+        packages: typePackages,
+        heroImageUrl: heroImg,
+        pageIndex: pageIndex++,
+        label: unitDisplay,
+      });
+      sections.push({
+        type: "water-heater-detail",
+        unitType,
+        packages: typePackages,
+        pageIndex: pageIndex++,
+        label: `${unitDisplay} Options`,
+      });
+      continue;
+    }
 
     const isSingleTier = unitType === "Ducting" || unitType === "Mini-Split";
     if (isSingleTier) {

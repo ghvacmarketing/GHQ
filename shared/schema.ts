@@ -3102,7 +3102,7 @@ export type AppSetting = typeof appSettings.$inferSelect;
 // Stores package data that was previously in pricebook-packages.json
 export const pricebookPackages = pgTable("pricebook_packages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  unitType: varchar("unit_type", { length: 50 }).notNull(), // PHP, GP, SGA, SHP, Mini-Split, Ducting
+  unitType: varchar("unit_type", { length: 50 }).notNull(), // PHP, GP, SGA, SHP, Mini-Split, Ducting, Water Heater
   tier: varchar("tier", { length: 50 }).notNull(), // Packaged, Essential, Premium, Ultimate, Standard
   tonnage: varchar("tonnage", { length: 20 }).notNull(), // 2, 2.5, 3, 3.5, 4, 5
   packageLevel: varchar("package_level", { length: 50 }).notNull(), // Best, Better, Good, Budget

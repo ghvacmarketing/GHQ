@@ -2,3 +2,4 @@
 - [react-pdf / pdfjs worker setup](pdfjs-worker-setup.md) — CDN pdf.worker.min.js 404s on pdfjs v5; bundle worker locally via `pdfjs-dist/build/pdf.worker.min.mjs?url`.
 - [Session cookie testing](session-cookie-testing.md) — secure:true cookie means http/localhost curl never keeps the session; test login via response body, not follow-up /me.
 - [Agreement visit vs billing cadence](agreement-visit-cadence.md) — visit spacing uses `visitFrequency` (falls back to `frequency`); billing keeps using `frequency`. Care plans bill monthly, visit annually.
+- [Salesbook product provisioning](salesbook-product-provisioning.md) — pricebook rows need idempotent startup seeds (not ad-hoc SQL); Sheets sync is upsert-only so they're safe.

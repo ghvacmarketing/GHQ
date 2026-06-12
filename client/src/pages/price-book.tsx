@@ -35,6 +35,7 @@ import {
   TierHeaderPage,
   ProductDetailPage,
   SingleTierDetailPage,
+  WaterHeaterDetailPage,
   EliteDividerPage,
   EliteBundlesPage,
   EliteDiscountPage,
@@ -389,6 +390,13 @@ export default function PriceBook() {
           <SingleTierDetailPage
             key={section.pageIndex}
             unitType={section.unitType!}
+            packages={section.packages || []}
+          />
+        );
+      case "water-heater-detail":
+        return (
+          <WaterHeaterDetailPage
+            key={section.pageIndex}
             packages={section.packages || []}
           />
         );
