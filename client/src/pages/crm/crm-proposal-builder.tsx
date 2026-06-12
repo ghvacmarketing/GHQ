@@ -29,7 +29,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import ProposalEditor from "@/components/proposal-editor";
 import redlogo from "@assets/redlogo.webp";
 import componentsData from "@assets/pricebook-components.json";
-import type { Customer, CrmUser, CrmCustomer, QuotePart } from "@shared/schema";
+import type { Customer, CrmUser, CrmCustomer, QuotePart, CrmItem } from "@shared/schema";
+import {
+  getProtectionDiscountPct,
+  protectionDiscountLabel,
+} from "@/lib/protection-discount";
 
 // API response types for pricebook data
 type ApiPricebookPackage = {
@@ -75,6 +79,7 @@ type CrmCustomerForProposal = {
 
 const CART_STORAGE_KEY = 'ghvac-proposal-cart';
 const CUSTOMER_STORAGE_KEY = 'ghvac-proposal-customer';
+const PROTECTION_STORAGE_KEY = 'ghvac-proposal-protection';
 
 // Company branding constants for proposals and documents
 const COMPANY_INFO = {
@@ -794,6 +799,28 @@ function loadCustomerFromStorage(): { name: string; address: string; notes: stri
   return { name: '', address: '', notes: '' };
 }
 
+type ProposalProtectionBundle = {
+  crmItemId: string;
+  name: string;
+  description: string | null;
+  price: number;
+  pct: number;
+};
+
+function loadProtectionFromStorage(): { bundle: ProposalProtectionBundle | null; applied: boolean } {
+  if (typeof window === 'undefined') return { bundle: null, applied: false };
+  try {
+    const stored = localStorage.getItem(PROTECTION_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return { bundle: parsed.bundle ?? null, applied: !!parsed.applied };
+    }
+  } catch (e) {
+    console.error('Failed to load protection bundle from storage:', e);
+  }
+  return { bundle: null, applied: false };
+}
+
 export default function CrmProposalBuilder() {
   usePageTitle("Proposal Builder");
   const { toast } = useToast();
@@ -984,6 +1011,27 @@ export default function CrmProposalBuilder() {
     
     fetchProperties();
   }, [selectedCustomer, preloadedPropertyId]);
+
+  // Protection bundle state (parts-discount add-on for the whole proposal)
+  const [protectionBundle, setProtectionBundle] = useState<ProposalProtectionBundle | null>(
+    () => loadProtectionFromStorage().bundle,
+  );
+  const [protectionDiscountApplied, setProtectionDiscountApplied] = useState<boolean>(
+    () => loadProtectionFromStorage().applied,
+  );
+  const [protectionPrompt, setProtectionPrompt] = useState<{ pct: number; bundleName: string } | null>(null);
+
+  // Fetch protection plan items from the CRM catalog
+  const { data: protectionItems = [] } = useQuery<CrmItem[]>({
+    queryKey: ["/api/crm/items", "protection"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/items`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load protection plans");
+      const data = await res.json();
+      const items: CrmItem[] = data.items || data || [];
+      return items.filter((item) => item.category === "protection" && item.isActive !== false);
+    },
+  });
 
   // Elite Package state - per-package (key = package index)
   const [eliteEnabledByIndex, setEliteEnabledByIndex] = useState<Record<number, boolean>>({});
@@ -1246,6 +1294,9 @@ export default function CrmProposalBuilder() {
         taxable?: boolean;
         optionTag?: string;
         imageUrl?: string;
+        lineType?: string;
+        isDiscountLine?: boolean;
+        discountKind?: string;
       }>;
       status?: string;
       quoteMode?: string;
@@ -1324,6 +1375,9 @@ export default function CrmProposalBuilder() {
       taxable: boolean;
       optionTag?: string;
       imageUrl?: string;
+      lineType?: string;
+      isDiscountLine?: boolean;
+      discountKind?: string;
     }> = [];
     
     cart.forEach(item => {
@@ -1378,6 +1432,30 @@ export default function CrmProposalBuilder() {
         });
       }
     });
+
+    // Protection bundle (+ optional parts discount) line items
+    if (protectionBundle) {
+      lineItems.push({
+        description: protectionBundle.pct > 0
+          ? `${protectionBundle.name} (${protectionBundle.pct}% parts discount)`
+          : protectionBundle.name,
+        quantity: 1,
+        unitPrice: protectionBundle.price,
+        taxable: true,
+        lineType: "protection",
+      });
+      if (protectionDiscountApplied && cartProtectionDiscountAmount > 0) {
+        lineItems.push({
+          description: protectionDiscountLabel(protectionBundle.pct),
+          quantity: 1,
+          unitPrice: -Math.abs(cartProtectionDiscountAmount),
+          taxable: false,
+          lineType: "discount",
+          isDiscountLine: true,
+          discountKind: "protection",
+        });
+      }
+    }
 
     // Check if property selection is required and valid
     const propertyIdToUse = selectedPropertyId || preloadedPropertyId;
@@ -1557,6 +1635,13 @@ export default function CrmProposalBuilder() {
   useEffect(() => {
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
   }, [cart]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      PROTECTION_STORAGE_KEY,
+      JSON.stringify({ bundle: protectionBundle, applied: protectionDiscountApplied }),
+    );
+  }, [protectionBundle, protectionDiscountApplied]);
 
   useEffect(() => {
     localStorage.setItem(CUSTOMER_STORAGE_KEY, JSON.stringify({
@@ -1839,13 +1924,29 @@ export default function CrmProposalBuilder() {
     }, 0);
   }, [cart]);
 
-  // Canonical pricing: Total after discount = Subtotal - Elite Discount
+  // Protection bundle add-on price (fixed, not a range)
+  const protectionBundlePrice = protectionBundle?.price ?? 0;
+
+  // Eligible base for the protection parts discount: all priced items after the
+  // Elite discount, excluding the protection bundle itself.
+  const cartProtectionEligibleSubtotal = useMemo(
+    () => Math.max(0, cartSubtotalPreDiscount.high - cartEliteDiscountAmount),
+    [cartSubtotalPreDiscount, cartEliteDiscountAmount],
+  );
+
+  // Protection parts-discount amount (auto-recalculates as eligible items change)
+  const cartProtectionDiscountAmount = useMemo(() => {
+    if (!protectionBundle || !protectionDiscountApplied || protectionBundle.pct <= 0) return 0;
+    return Math.round(cartProtectionEligibleSubtotal * (protectionBundle.pct / 100));
+  }, [protectionBundle, protectionDiscountApplied, cartProtectionEligibleSubtotal]);
+
+  // Canonical pricing: Total = Subtotal - Elite Discount + Protection bundle - Protection discount
   const cartTotalAfterDiscount = useMemo(() => {
     return {
-      low: cartSubtotalPreDiscount.low - cartEliteDiscountAmount,
-      high: cartSubtotalPreDiscount.high - cartEliteDiscountAmount
+      low: cartSubtotalPreDiscount.low - cartEliteDiscountAmount + protectionBundlePrice - cartProtectionDiscountAmount,
+      high: cartSubtotalPreDiscount.high - cartEliteDiscountAmount + protectionBundlePrice - cartProtectionDiscountAmount
     };
-  }, [cartSubtotalPreDiscount, cartEliteDiscountAmount]);
+  }, [cartSubtotalPreDiscount, cartEliteDiscountAmount, protectionBundlePrice, cartProtectionDiscountAmount]);
 
   // Legacy aliases for backward compatibility
   const cartTotalRange = cartTotalAfterDiscount;
@@ -1853,7 +1954,7 @@ export default function CrmProposalBuilder() {
   const cartEliteSavings = cartEliteDiscountAmount;
 
   const cartMonthlyTotalRange = useMemo(() => {
-    return cart.reduce((acc, item) => {
+    const base = cart.reduce((acc, item) => {
       if (isCrawlspaceItem(item)) {
         // Crawlspace: derive monthly from price / 67
         const basePrice = item.eliteData ? item.eliteData.finalTotal : item.pricingBreakdown.totalPrice;
@@ -1882,13 +1983,58 @@ export default function CrmProposalBuilder() {
         }
       }
     }, { low: 0, high: 0 });
-  }, [cart]);
+    const protectionMonthlyAdj = Math.round((protectionBundlePrice - cartProtectionDiscountAmount) / 67);
+    return { low: base.low + protectionMonthlyAdj, high: base.high + protectionMonthlyAdj };
+  }, [cart, protectionBundlePrice, cartProtectionDiscountAmount]);
 
   const cartMonthlyTotal = cartMonthlyTotalRange.high; // Use high for backward compatibility
 
   const hasEstimatedItems = useMemo(() => {
     return cart.some(item => isCustomBuild(item));
   }, [cart]);
+
+  // --- Protection bundle handlers ---
+  const handleSelectProtectionBundle = (item: CrmItem) => {
+    const pct = getProtectionDiscountPct(item.description, item.name) ?? 0;
+    const price = parseFloat(item.rate || "0") || 0;
+    setProtectionBundle({
+      crmItemId: item.id,
+      name: item.name,
+      description: item.description ?? null,
+      price,
+      pct,
+    });
+    setProtectionDiscountApplied(false);
+    toast({ title: "Protection Plan Added", description: `${item.name} added to the proposal.` });
+    if (pct > 0) {
+      setProtectionPrompt({ pct, bundleName: item.name });
+    }
+  };
+
+  const handleRemoveProtectionBundle = () => {
+    setProtectionBundle(null);
+    setProtectionDiscountApplied(false);
+    setProtectionPrompt(null);
+  };
+
+  const handleApplyProtectionDiscount = (pct: number) => {
+    if (cartProtectionEligibleSubtotal <= 0) {
+      toast({
+        title: "No eligible items",
+        description: "Add priced equipment before applying the parts discount.",
+        variant: "destructive",
+      });
+      setProtectionPrompt(null);
+      return;
+    }
+    setProtectionDiscountApplied(true);
+    setProtectionPrompt(null);
+    toast({ title: "Parts discount applied" });
+  };
+
+  const handleRemoveProtectionDiscount = () => {
+    setProtectionDiscountApplied(false);
+  };
 
   const currentStep = useMemo(() => {
     if (!selectedUnitType) return 1;
@@ -2214,6 +2360,9 @@ export default function CrmProposalBuilder() {
 
   const clearCart = () => {
     setCart([]);
+    setProtectionBundle(null);
+    setProtectionDiscountApplied(false);
+    setProtectionPrompt(null);
     setCustomerName('');
     setCustomerAddress('');
     setCustomerNotes('');
@@ -2248,6 +2397,8 @@ export default function CrmProposalBuilder() {
         cartTotalAfterDiscount,
         cartMonthlyTotalRange,
         hasEstimatedItems,
+        protectionBundle,
+        cartProtectionDiscountAmount,
       },
     };
     sessionStorage.setItem("ghvac-proposal-preview-state", JSON.stringify(previewState));
@@ -2271,7 +2422,7 @@ export default function CrmProposalBuilder() {
   };
 
   const buildCartLineItems = () => {
-    return cart.map(item => {
+    const items = cart.map(item => {
       if (isCrawlspaceItem(item)) {
         const unitPrice = item.eliteData ? item.eliteData.finalTotal : item.pricingBreakdown.totalPrice;
         return {
@@ -2310,6 +2461,15 @@ export default function CrmProposalBuilder() {
         };
       }
     });
+    if (protectionBundle) {
+      items.push({
+        name: protectionBundle.name,
+        description: protectionBundle.pct > 0 ? `${protectionBundle.pct}% parts discount` : '',
+        qty: 1,
+        price: protectionBundle.price,
+      });
+    }
+    return items;
   };
 
   const downloadQuoteAsDoc = async () => {
@@ -2390,6 +2550,18 @@ export default function CrmProposalBuilder() {
       if (cartEliteDiscountAmount > 0) {
         paragraphs.push(new Paragraph({
           children: [new TextRun({ text: 'Elite Bundle Discount: ' }), new TextRun({ text: `-$${cartEliteDiscountAmount.toLocaleString()}`, bold: true, color: '16a34a' })],
+          spacing: { after: 40 },
+        }));
+      }
+      if (protectionBundle) {
+        paragraphs.push(new Paragraph({
+          children: [new TextRun({ text: `${protectionBundle.name}: ` }), new TextRun({ text: `$${protectionBundle.price.toLocaleString()}`, bold: true })],
+          spacing: { after: 40 },
+        }));
+      }
+      if (cartProtectionDiscountAmount > 0) {
+        paragraphs.push(new Paragraph({
+          children: [new TextRun({ text: `Protection Parts Discount (${protectionBundle?.pct}%): ` }), new TextRun({ text: `-$${cartProtectionDiscountAmount.toLocaleString()}`, bold: true, color: '16a34a' })],
           spacing: { after: 40 },
         }));
       }
@@ -2555,6 +2727,22 @@ export default function CrmProposalBuilder() {
         doc.text('Elite Bundle Discount:', margin, y);
         doc.setFont('helvetica', 'bold');
         doc.text(`-$${cartEliteDiscountAmount.toLocaleString()}`, pageW - margin, y, { align: 'right' });
+        doc.setTextColor(0, 0, 0);
+        y += 6;
+      }
+      if (protectionBundle) {
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${protectionBundle.name}:`, margin, y);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`$${protectionBundle.price.toLocaleString()}`, pageW - margin, y, { align: 'right' });
+        y += 6;
+      }
+      if (cartProtectionDiscountAmount > 0) {
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(22, 163, 74);
+        doc.text(`Protection Parts Discount (${protectionBundle?.pct}%):`, margin, y);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`-$${cartProtectionDiscountAmount.toLocaleString()}`, pageW - margin, y, { align: 'right' });
         doc.setTextColor(0, 0, 0);
         y += 6;
       }
@@ -5100,6 +5288,80 @@ export default function CrmProposalBuilder() {
 
             <Separator className="my-6" />
 
+            {/* Protection Plan selector */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Shield className="h-4 w-4 text-[#b8944d]" />
+                <span className="text-sm font-semibold text-foreground">Protection Plan</span>
+              </div>
+              {protectionBundle ? (
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{protectionBundle.name}</p>
+                      <p className="text-xs text-muted-foreground">{formatPrice(protectionBundle.price)}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600"
+                      onClick={handleRemoveProtectionBundle}
+                      data-testid="button-remove-protection-bundle"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {protectionBundle.pct > 0 && (
+                    cartProtectionDiscountAmount > 0 ? (
+                      <div className="flex items-center justify-between rounded-md bg-green-50 dark:bg-green-950 px-3 py-2">
+                        <span className="text-xs font-medium text-green-700 dark:text-green-400">
+                          {protectionBundle.pct}% parts discount applied (–{formatPrice(cartProtectionDiscountAmount)})
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-muted-foreground hover:text-red-600"
+                          onClick={handleRemoveProtectionDiscount}
+                          data-testid="button-remove-protection-discount"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full text-xs border-[#b8944d] text-[#b8944d] hover:bg-[#b8944d]/10"
+                        onClick={() => handleApplyProtectionDiscount(protectionBundle.pct)}
+                        data-testid="button-apply-protection-discount"
+                      >
+                        Apply {protectionBundle.pct}% parts discount
+                      </Button>
+                    )
+                  )}
+                </div>
+              ) : (
+                <Select
+                  value=""
+                  onValueChange={(value) => {
+                    const item = protectionItems.find((p) => p.id === value);
+                    if (item) handleSelectProtectionBundle(item);
+                  }}
+                >
+                  <SelectTrigger className="w-full min-h-[44px]" data-testid="select-protection-bundle">
+                    <SelectValue placeholder={protectionItems.length ? "Add a protection plan…" : "No protection plans available"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {protectionItems.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name} — {formatPrice(parseFloat(item.rate || "0") || 0)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
             <div className="bg-muted rounded-lg p-4">
               {quoteMode === "options" ? (
                 <>
@@ -5167,6 +5429,26 @@ export default function CrmProposalBuilder() {
                       <span className="font-medium text-green-600 dark:text-green-400">–{formatPrice(cartEliteDiscountAmount)}</span>
                     </div>
                   )}
+
+                  {protectionBundle && (
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <Shield className="h-4 w-4 text-[#b8944d]" />
+                        {protectionBundle.name}
+                      </span>
+                      <span className="font-medium">{formatPrice(protectionBundle.price)}</span>
+                    </div>
+                  )}
+
+                  {cartProtectionDiscountAmount > 0 && (
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                        <Shield className="h-4 w-4" />
+                        Protection Parts Discount ({protectionBundle?.pct}%)
+                      </span>
+                      <span className="font-medium text-green-600 dark:text-green-400">–{formatPrice(cartProtectionDiscountAmount)}</span>
+                    </div>
+                  )}
                   
                   <Separator className="my-3" />
                   
@@ -5230,6 +5512,43 @@ export default function CrmProposalBuilder() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Protection parts-discount prompt */}
+      <Dialog open={!!protectionPrompt} onOpenChange={(open) => { if (!open) setProtectionPrompt(null); }}>
+        <DialogContent className="sm:max-w-md" data-testid="protection-discount-prompt">
+          <DialogHeader>
+            <DialogTitle>Apply parts discount?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-600">
+            <span className="font-medium text-slate-800">{protectionPrompt?.bundleName}</span> includes a{" "}
+            <span className="font-semibold text-[#b8944d]">{protectionPrompt?.pct}% parts discount</span>.
+          </p>
+          {protectionPrompt && (
+            <p className="text-sm text-slate-600">
+              ≈ {formatPrice(Math.round(cartProtectionEligibleSubtotal * (protectionPrompt.pct / 100)))} off{" "}
+              <span className="text-xs text-slate-500 block mt-1">
+                Applies to all priced items except the protection plan. Removing the plan reverses it.
+              </span>
+            </p>
+          )}
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setProtectionPrompt(null)}
+              data-testid="button-protection-skip"
+            >
+              Skip
+            </Button>
+            <Button
+              onClick={() => protectionPrompt && handleApplyProtectionDiscount(protectionPrompt.pct)}
+              className="bg-[#711419] hover:bg-[#5a1014] text-white"
+              data-testid="button-protection-apply"
+            >
+              Apply {protectionPrompt?.pct}% Discount
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       

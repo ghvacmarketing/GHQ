@@ -18263,6 +18263,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sortOrder: sortOrder++,
           optionTag: item.optionTag || null,
           imageUrl: item.imageUrl || null,
+          isDiscountLine: item.isDiscountLine ?? false,
+          discountKind: item.discountKind ?? null,
         }).returning();
         createdLineItems.push(createdItem);
       }

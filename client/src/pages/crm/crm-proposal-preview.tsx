@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  ArrowLeft, Package, Crown, Award, Wrench, Check, Loader2, FileText, CheckCircle2, MapPin, ClipboardList, Star
+  ArrowLeft, Package, Crown, Award, Wrench, Check, Loader2, FileText, CheckCircle2, MapPin, ClipboardList, Star, Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ import { CrmLayout } from "@/components/crm/crm-layout";
 import ProposalEditor from "@/components/proposal-editor";
 import redlogo from "@assets/redlogo.webp";
 import { generateContractTemplate, applyTemplateVariables } from "@/lib/contract-template";
+import { protectionDiscountLabel } from "@/lib/protection-discount";
 import type { ProposalTemplate, ProposalTemplateImage } from "@shared/schema";
 
 // ─── Types (mirrored from crm-proposal-builder) ──────────────────────────────
@@ -107,6 +108,8 @@ type PreviewState = {
     cartTotalAfterDiscount: { low: number; high: number };
     cartMonthlyTotalRange: { low: number; high: number };
     hasEstimatedItems: boolean;
+    protectionBundle?: { name: string; price: number; pct: number } | null;
+    cartProtectionDiscountAmount?: number;
   };
 };
 
@@ -249,7 +252,7 @@ export default function CrmProposalPreview() {
     mutationFn: async (payload: {
       customerId: string; propertyId?: string; projectId?: string; workOrderId?: string;
       title: string; description?: string; notes?: string;
-      lineItems: Array<{ description: string; quantity: number; unitPrice: number; taxable?: boolean; optionTag?: string; imageUrl?: string }>;
+      lineItems: Array<{ description: string; quantity: number; unitPrice: number; taxable?: boolean; optionTag?: string; imageUrl?: string; lineType?: string; isDiscountLine?: boolean; discountKind?: string }>;
       status?: string; quoteMode?: string; quoteType?: string; assignedToId?: string;
     }) => {
       const res = await apiRequest("POST", "/api/crm/quotes/from-proposal", payload);
@@ -290,7 +293,7 @@ export default function CrmProposalPreview() {
     }
     const finalPropertyId = isValidProperty ? propertyIdToUse : (customerProperties.length === 1 ? customerProperties[0].id : undefined);
 
-    const lineItems: Array<{ description: string; quantity: number; unitPrice: number; taxable: boolean; optionTag?: string; imageUrl?: string }> = [];
+    const lineItems: Array<{ description: string; quantity: number; unitPrice: number; taxable: boolean; optionTag?: string; imageUrl?: string; lineType?: string; isDiscountLine?: boolean; discountKind?: string }> = [];
 
     cart.forEach(item => {
       if (isHvacPackage(item)) {
@@ -330,6 +333,31 @@ export default function CrmProposalPreview() {
       }
     });
 
+    const protectionBundle = previewData.computedTotals?.protectionBundle;
+    const protectionDiscountAmount = previewData.computedTotals?.cartProtectionDiscountAmount ?? 0;
+    if (protectionBundle) {
+      lineItems.push({
+        description: protectionBundle.pct > 0
+          ? `${protectionBundle.name} (${protectionBundle.pct}% parts discount)`
+          : protectionBundle.name,
+        quantity: 1,
+        unitPrice: protectionBundle.price,
+        taxable: true,
+        lineType: "protection",
+      });
+      if (protectionDiscountAmount > 0) {
+        lineItems.push({
+          description: protectionDiscountLabel(protectionBundle.pct),
+          quantity: 1,
+          unitPrice: -Math.abs(protectionDiscountAmount),
+          taxable: false,
+          lineType: "discount",
+          isDiscountLine: true,
+          discountKind: "protection",
+        });
+      }
+    }
+
     const crmTitle = cart.length > 0
       ? (isHvacPackage(cart[0]) ? `${(cart[0] as HvacPackageCartItem).packageLevel} Package Proposal` : "Equipment Proposal")
       : "Equipment Proposal";
@@ -361,7 +389,7 @@ export default function CrmProposalPreview() {
   }
 
   const { cart, selectedCustomer, quoteMode, customerNotes, assignableUsers, customerProperties, computedTotals } = previewData;
-  const { cartSubtotalPreDiscount, cartEliteDiscountAmount, cartTotalAfterDiscount, cartMonthlyTotalRange, hasEstimatedItems } = computedTotals;
+  const { cartSubtotalPreDiscount, cartEliteDiscountAmount, cartTotalAfterDiscount, cartMonthlyTotalRange, hasEstimatedItems, protectionBundle, cartProtectionDiscountAmount } = computedTotals;
 
   return (
     <CrmLayout>
@@ -806,6 +834,22 @@ export default function CrmProposalPreview() {
                     <Crown className="h-4 w-4" /> Elite Bundle Discount (20%)
                   </span>
                   <span className="font-medium text-green-600 dark:text-green-400">–{formatPrice(cartEliteDiscountAmount)}</span>
+                </div>
+              )}
+              {protectionBundle && (
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <Shield className="h-4 w-4" /> {protectionBundle.name}
+                  </span>
+                  <span className="font-medium">{formatPrice(protectionBundle.price)}</span>
+                </div>
+              )}
+              {protectionBundle && (cartProtectionDiscountAmount ?? 0) > 0 && (
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                    <Shield className="h-4 w-4" /> Protection Parts Discount ({protectionBundle.pct}%)
+                  </span>
+                  <span className="font-medium text-green-600 dark:text-green-400">–{formatPrice(cartProtectionDiscountAmount ?? 0)}</span>
                 </div>
               )}
               <Separator className="my-3" />
