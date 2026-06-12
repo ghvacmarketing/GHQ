@@ -262,6 +262,33 @@ function validateDiscountLineItems(
   return { valid: true };
 }
 
+// Recompute and persist a quote's stored subtotal/total from its line items.
+// Mirrors the quote detail page: subtotal = sum of non-discount line totals (gross),
+// total = sum of ALL line totals (discount lines have negative totals, so they net out).
+// Keeps crmQuotes.subtotal/total in sync so lists, pipeline value, and invoice
+// conversion reflect the same totals as the detail page.
+async function recomputeQuoteStoredTotals(quoteId: string): Promise<void> {
+  const items = await db.select().from(crmQuoteLineItems)
+    .where(eq(crmQuoteLineItems.quoteId, quoteId));
+
+  let subtotal = 0;
+  let total = 0;
+  for (const item of items) {
+    const lineTotal = parseFloat(String(item.lineTotal ?? "0")) || 0;
+    total += lineTotal;
+    const isDiscount = item.isDiscountLine === true
+      || item.lineType === "discount"
+      || (item.description ?? "").startsWith("Discount:");
+    if (!isDiscount) {
+      subtotal += lineTotal;
+    }
+  }
+
+  await db.update(crmQuotes)
+    .set({ subtotal: subtotal.toFixed(2), total: total.toFixed(2), updatedAt: new Date() })
+    .where(eq(crmQuotes.id, quoteId));
+}
+
 // Helper function to check for scheduling conflicts
 async function checkSchedulingConflict(
   techId: string | null | undefined,
@@ -18517,7 +18544,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const [lineItem] = await db.insert(crmQuoteLineItems).values(parseResult.data).returning();
-      
+
+      // Keep the quote's stored subtotal/total in sync with its line items
+      await recomputeQuoteStoredTotals(req.params.id);
+
       await logCrmAudit(
         user.id,
         "quote_line_item.created",
@@ -18604,7 +18634,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .set(updates)
         .where(eq(crmQuoteLineItems.id, req.params.lineItemId))
         .returning();
-      
+
+      // Keep the quote's stored subtotal/total in sync with its line items
+      await recomputeQuoteStoredTotals(req.params.id);
+
       await logCrmAudit(
         user.id,
         "quote_line_item.updated",
@@ -18651,7 +18684,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       await db.delete(crmQuoteLineItems).where(eq(crmQuoteLineItems.id, req.params.lineItemId));
-      
+
+      // Keep the quote's stored subtotal/total in sync with its line items
+      await recomputeQuoteStoredTotals(req.params.id);
+
       await logCrmAudit(
         user.id,
         "quote_line_item.deleted",
