@@ -932,6 +932,9 @@ export const crmCustomers = pgTable("crm_customers", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   lastReviewRequestAt: timestamp("last_review_request_at"),
+  // Protection Plan membership (set when a quote with a protection bundle is accepted)
+  protectionPlanLevel: text("protection_plan_level"), // "basic" | "standard" | "advanced" | "elite" | null
+  protectionPlanSince: timestamp("protection_plan_since"),
 }, (table) => ({
   customerTypeIdx: index("crm_customers_customer_type_idx").on(table.customerType),
   customerStatusIdx: index("crm_customers_customer_status_idx").on(table.customerStatus),

@@ -18748,6 +18748,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Detects a protection-plan tier ("basic"|"standard"|"advanced"|"elite") from a line item description.
+  const detectProtectionTier = (text: string | null | undefined): string | null => {
+    if (!text) return null;
+    const lower = text.toLowerCase();
+    if (!lower.includes("protection")) return null;
+    if (lower.includes("elite")) return "elite";
+    if (lower.includes("advanced")) return "advanced";
+    if (lower.includes("standard")) return "standard";
+    if (lower.includes("basic")) return "basic";
+    return null;
+  };
+  const PROTECTION_TIER_RANK: Record<string, number> = { basic: 1, standard: 2, advanced: 3, elite: 4 };
+
+  // When a quote containing a Protection bundle is accepted, mark the customer as a
+  // protection-plan member at the highest tier purchased (never downgrades).
+  const applyProtectionMembershipFromQuote = async (
+    quote: { id: string; customerId: string | null; quoteMode?: string | null },
+    selectedOption: string | null,
+  ): Promise<void> => {
+    try {
+      if (!quote?.customerId) return;
+      const items = await db.select().from(crmQuoteLineItems)
+        .where(eq(crmQuoteLineItems.quoteId, quote.id));
+      const relevant = items.filter((it) => {
+        if (it.lineType !== "protection") return false;
+        if (quote.quoteMode === "options" && selectedOption) {
+          return !it.optionTag || it.optionTag === selectedOption;
+        }
+        return true;
+      });
+      let bestTier: string | null = null;
+      let bestRank = 0;
+      for (const it of relevant) {
+        const tier = detectProtectionTier(it.description);
+        if (tier && (PROTECTION_TIER_RANK[tier] || 0) > bestRank) {
+          bestRank = PROTECTION_TIER_RANK[tier];
+          bestTier = tier;
+        }
+      }
+      if (!bestTier) return;
+      const [cust] = await db.select().from(crmCustomers)
+        .where(eq(crmCustomers.id, quote.customerId)).limit(1);
+      if (!cust) return;
+      const existingTier = cust.protectionPlanLevel
+        ? cust.protectionPlanLevel.toLowerCase().trim()
+        : null;
+      const existingRank = existingTier
+        ? (PROTECTION_TIER_RANK[existingTier] || 0)
+        : 0;
+      if (bestRank <= existingRank) return; // keep the higher existing tier
+      await db.update(crmCustomers)
+        .set({
+          protectionPlanLevel: bestTier,
+          protectionPlanSince: cust.protectionPlanSince || new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(crmCustomers.id, quote.customerId));
+    } catch (err) {
+      console.error("Failed to apply protection membership from quote:", err);
+    }
+  };
+
   // POST /api/crm/quotes/:id/accept - Mark quote as accepted
   app.post("/api/crm/quotes/:id/accept", requireCrmSalesOrAbove, async (req, res) => {
     try {
@@ -18815,6 +18877,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { quoteNumber: existing.quoteNumber, acceptedBy, selectedOption },
         req.ip
       );
+
+      // Mark the customer as a protection-plan member if this quote includes a protection bundle
+      await applyProtectionMembershipFromQuote(existing, selectedOption || existing.selectedOption || null);
 
       // Add system email log entry for quote acceptance
       const now = new Date();
@@ -18959,6 +19024,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         req.ip
       );
+
+      // Mark the customer as a protection-plan member if this quote includes a protection bundle
+      await applyProtectionMembershipFromQuote(existing, (selectedOption as string) || existing.selectedOption || null);
 
       // Add system email log entry for in-person acceptance
       await db.insert(quoteEmailLogs).values({

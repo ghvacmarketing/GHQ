@@ -68,6 +68,7 @@ import {
   Info,
   Upload,
   ImageIcon,
+  ShieldCheck,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -182,6 +183,11 @@ function formatDate(date: Date | string | null): string {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function protectionPlanLabel(level: string | null | undefined): string {
+  if (!level) return "";
+  return level.charAt(0).toUpperCase() + level.slice(1).toLowerCase();
 }
 
 interface CustomerOverviewProps {
@@ -2010,7 +2016,18 @@ function CustomerTabbedView({
                 <h2 className="text-lg font-semibold text-slate-900">{getCustomerTypeLabel()} Customer</h2>
                 <p className="text-sm text-slate-500 mt-0.5">{customer.name}</p>
               </div>
-              <Badge className={getCustomerBadgeColor()}>{customer.customerType}</Badge>
+              <div className="flex flex-col items-end gap-1.5">
+                <Badge className={getCustomerBadgeColor()}>{customer.customerType}</Badge>
+                {customer.protectionPlanLevel && (
+                  <Badge
+                    className="bg-emerald-100 text-emerald-700 border-emerald-200 flex items-center gap-1"
+                    data-testid="badge-protection-plan"
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    {protectionPlanLabel(customer.protectionPlanLevel)} Protection Member
+                  </Badge>
+                )}
+              </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -2032,6 +2049,24 @@ function CustomerTabbedView({
                 <div>
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Status</p>
                   <Badge variant="outline" className="text-xs">{customer.customerStatus || "Active"}</Badge>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Protection Plan</p>
+                  {customer.protectionPlanLevel ? (
+                    <div className="flex items-center gap-1.5" data-testid="text-protection-plan">
+                      <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                      <span className="text-sm font-medium text-slate-900">
+                        {protectionPlanLabel(customer.protectionPlanLevel)} Plan Member
+                      </span>
+                      {customer.protectionPlanSince && (
+                        <span className="text-xs text-slate-400">
+                          since {formatDate(customer.protectionPlanSince)}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-400">Not a member</p>
+                  )}
                 </div>
                 {customer.parentCustomerId && parentCustomer && (
                   <div>
