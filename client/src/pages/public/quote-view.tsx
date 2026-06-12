@@ -753,11 +753,7 @@ export default function PublicQuoteView() {
                                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                       />
                                     </div>
-                                  ) : (
-                                    <div className="flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center">
-                                      <span className="text-xs text-slate-400 text-center leading-tight px-1">No Image</span>
-                                    </div>
-                                  )}
+                                  ) : null}
                                   <div className="flex-1 min-w-0">
                                     {/* Only show line item description if no AI category title */}
                                     {!whatsIncluded.categoryTitle && (
