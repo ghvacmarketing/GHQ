@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, subDays, startOfWeek, endOfWeek } from "date-fns";
 import { 
   Clock, ArrowLeft, Loader2, Search, Download, Edit2, Save, X, User, Calendar,
-  Car, Wrench, Coffee, BarChart3, Trash2, Activity, AlertTriangle
+  Car, Wrench, Coffee, BarChart3, Trash2, Activity, AlertTriangle,
+  TrendingUp, Users, Timer, Award, Gauge, FileText
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ interface TimeBreakdown {
     clockInAt: string;
     clockOutAt: string | null;
     durationMinutes: number;
+    notes: string | null;
   }[];
 }
 
@@ -59,7 +61,7 @@ export default function CrmSettingsTime() {
   usePageTitle("Time Logs");
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<string>("breakdown");
+  const [activeTab, setActiveTab] = useState<string>("overview");
   const [selectedTechId, setSelectedTechId] = useState<string>("all");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
@@ -128,6 +130,31 @@ export default function CrmSettingsTime() {
     enabled: !!currentUser,
     refetchInterval: 30000,
   });
+
+  const overview = useMemo(() => {
+    const rows = breakdownData?.breakdowns ?? [];
+    if (rows.length === 0) return null;
+    const totalClocked = rows.reduce((s, b) => s + b.totalClockedMinutes, 0);
+    const totalWork = rows.reduce((s, b) => s + b.workTimeMinutes, 0);
+    const totalDrive = rows.reduce((s, b) => s + b.driveTimeMinutes, 0);
+    const totalIdle = rows.reduce((s, b) => s + b.idleTimeMinutes, 0);
+    const totalWorkOrders = rows.reduce((s, b) => s + b.workOrdersCompleted, 0);
+    const headcount = rows.length;
+    const avgClocked = Math.round(totalClocked / headcount);
+    const teamEfficiency = totalClocked > 0 ? Math.round((totalWork / totalClocked) * 100) : 0;
+    const maxClocked = Math.max(...rows.map((b) => b.totalClockedMinutes), 1);
+    const byHours = [...rows].sort((a, b) => b.totalClockedMinutes - a.totalClockedMinutes);
+    const byEfficiency = rows
+      .map((b) => ({
+        ...b,
+        efficiency: b.totalClockedMinutes > 0 ? Math.round((b.workTimeMinutes / b.totalClockedMinutes) * 100) : 0,
+      }))
+      .sort((a, b) => b.efficiency - a.efficiency);
+    return {
+      totalClocked, totalWork, totalDrive, totalIdle, totalWorkOrders,
+      headcount, avgClocked, teamEfficiency, maxClocked, byHours, byEfficiency,
+    };
+  }, [breakdownData]);
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
@@ -294,7 +321,11 @@ export default function CrmSettingsTime() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-xl grid-cols-3">
+            <TabsTrigger value="overview" className="flex items-center gap-2" data-testid="tab-overview">
+              <TrendingUp className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
             <TabsTrigger value="breakdown" className="flex items-center gap-2" data-testid="tab-breakdown">
               <BarChart3 className="h-4 w-4" />
               Time Breakdown
@@ -304,6 +335,176 @@ export default function CrmSettingsTime() {
               Time Logs
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="overview" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-medium">Date Range</CardTitle>
+                <CardDescription>Analytics for the selected period (shared with Time Breakdown)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-4 items-end">
+                  <div className="w-40">
+                    <Label className="text-xs text-slate-500 mb-1 block">Start Date</Label>
+                    <Input type="date" value={breakdownStartDate} onChange={(e) => setBreakdownStartDate(e.target.value)} data-testid="input-overview-start" />
+                  </div>
+                  <div className="w-40">
+                    <Label className="text-xs text-slate-500 mb-1 block">End Date</Label>
+                    <Input type="date" value={breakdownEndDate} onChange={(e) => setBreakdownEndDate(e.target.value)} data-testid="input-overview-end" />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => { setBreakdownStartDate(format(new Date(), "yyyy-MM-dd")); setBreakdownEndDate(format(new Date(), "yyyy-MM-dd")); }}>Today</Button>
+                    <Button variant="outline" size="sm" onClick={() => { setBreakdownStartDate(format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd")); setBreakdownEndDate(format(endOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd")); }}>This Week</Button>
+                    <Button variant="outline" size="sm" onClick={() => { setBreakdownStartDate(format(subDays(new Date(), 30), "yyyy-MM-dd")); setBreakdownEndDate(format(new Date(), "yyyy-MM-dd")); }}>Last 30 Days</Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {loadingBreakdown ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+              </div>
+            ) : !overview ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <TrendingUp className="h-12 w-12 mx-auto mb-3 text-slate-300" />
+                  <p className="text-slate-500">No analytics available for this period</p>
+                  <p className="text-sm text-slate-400 mt-1">Try selecting a different date range</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <Card data-testid="kpi-total-hours">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-2 text-slate-500 text-sm mb-1">
+                        <Clock className="h-4 w-4 text-[#711419]" /> Total Hours
+                      </div>
+                      <div className="text-2xl font-bold text-slate-900">{formatMinutesToHoursMinutes(overview.totalClocked)}</div>
+                    </CardContent>
+                  </Card>
+                  <Card data-testid="kpi-employees">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-2 text-slate-500 text-sm mb-1">
+                        <Users className="h-4 w-4 text-[#711419]" /> Active Employees
+                      </div>
+                      <div className="text-2xl font-bold text-slate-900">{overview.headcount}</div>
+                    </CardContent>
+                  </Card>
+                  <Card data-testid="kpi-avg-hours">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-2 text-slate-500 text-sm mb-1">
+                        <Gauge className="h-4 w-4 text-[#711419]" /> Avg / Employee
+                      </div>
+                      <div className="text-2xl font-bold text-slate-900">{formatMinutesToHoursMinutes(overview.avgClocked)}</div>
+                    </CardContent>
+                  </Card>
+                  <Card data-testid="kpi-efficiency">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-2 text-slate-500 text-sm mb-1">
+                        <TrendingUp className="h-4 w-4 text-[#711419]" /> Team Work Efficiency
+                      </div>
+                      <div className="text-2xl font-bold text-slate-900">{overview.teamEfficiency}%</div>
+                      <div className="text-xs text-slate-500 mt-0.5">{overview.totalWorkOrders} work orders completed</div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card data-testid="card-hours-by-member">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base font-medium flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 text-[#711419]" /> Hours by Team Member
+                    </CardTitle>
+                    <CardDescription>Total clocked time compared across employees</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {overview.byHours.map((b) => (
+                      <div key={b.technicianId} data-testid={`hours-bar-${b.technicianId}`}>
+                        <div className="flex items-center justify-between text-sm mb-1">
+                          <span className="font-medium text-slate-700">{b.technicianName}</span>
+                          <span className="text-slate-500">{formatMinutesToHoursMinutes(b.totalClockedMinutes)}</span>
+                        </div>
+                        <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden">
+                          <div className="h-full bg-[#711419] rounded-full" style={{ width: `${getTimePercentage(b.totalClockedMinutes, overview.maxClocked)}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                <Card data-testid="card-efficiency-by-member">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base font-medium flex items-center gap-2">
+                      <Award className="h-4 w-4 text-[#711419]" /> Work Efficiency Ranking
+                    </CardTitle>
+                    <CardDescription>Share of clocked time spent on actual work (field roles only)</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {overview.byEfficiency.filter((b) => !["owner", "admin"].includes(b.role)).length === 0 ? (
+                      <p className="text-sm text-slate-500">No field technician data for this period.</p>
+                    ) : (
+                      overview.byEfficiency
+                        .filter((b) => !["owner", "admin"].includes(b.role))
+                        .map((b) => (
+                          <div key={b.technicianId} data-testid={`efficiency-bar-${b.technicianId}`}>
+                            <div className="flex items-center justify-between text-sm mb-1">
+                              <span className="font-medium text-slate-700">{b.technicianName}</span>
+                              <span className="text-slate-500">{b.efficiency}% work</span>
+                            </div>
+                            <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden">
+                              <div className="h-full bg-green-500 rounded-full" style={{ width: `${b.efficiency}%` }} />
+                            </div>
+                          </div>
+                        ))
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card data-testid="card-team-composition">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base font-medium flex items-center gap-2">
+                      <Timer className="h-4 w-4 text-[#711419]" /> Team Time Composition
+                    </CardTitle>
+                    <CardDescription>How the team's total clocked time is spent</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="h-4 w-full rounded-full bg-slate-100 overflow-hidden flex">
+                      <div className="h-full bg-amber-400" style={{ width: `${getTimePercentage(overview.totalIdle, overview.totalClocked)}%` }} title={`Idle: ${formatMinutesToHoursMinutes(overview.totalIdle)}`} />
+                      <div className="h-full bg-blue-500" style={{ width: `${getTimePercentage(overview.totalDrive, overview.totalClocked)}%` }} title={`Drive: ${formatMinutesToHoursMinutes(overview.totalDrive)}`} />
+                      <div className="h-full bg-green-500" style={{ width: `${getTimePercentage(overview.totalWork, overview.totalClocked)}%` }} title={`Work: ${formatMinutesToHoursMinutes(overview.totalWork)}`} />
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-amber-400" />
+                        <div>
+                          <div className="text-sm font-medium flex items-center gap-1"><Coffee className="h-3 w-3 text-amber-600" /> Idle</div>
+                          <div className="text-lg font-semibold text-slate-900">{formatMinutesToHoursMinutes(overview.totalIdle)}</div>
+                          <div className="text-xs text-slate-500">{getTimePercentage(overview.totalIdle, overview.totalClocked)}% of total</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-blue-500" />
+                        <div>
+                          <div className="text-sm font-medium flex items-center gap-1"><Car className="h-3 w-3 text-blue-600" /> Drive</div>
+                          <div className="text-lg font-semibold text-slate-900">{formatMinutesToHoursMinutes(overview.totalDrive)}</div>
+                          <div className="text-xs text-slate-500">{getTimePercentage(overview.totalDrive, overview.totalClocked)}% of total</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-green-500" />
+                        <div>
+                          <div className="text-sm font-medium flex items-center gap-1"><Wrench className="h-3 w-3 text-green-600" /> Work</div>
+                          <div className="text-lg font-semibold text-slate-900">{formatMinutesToHoursMinutes(overview.totalWork)}</div>
+                          <div className="text-xs text-slate-500">{getTimePercentage(overview.totalWork, overview.totalClocked)}% of total</div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </TabsContent>
 
           <TabsContent value="breakdown" className="space-y-4">
             <Card data-testid="card-currently-clocked-in">
@@ -452,11 +653,7 @@ export default function CrmSettingsTime() {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {["owner", "admin"].includes(breakdown.role) ? (
-                        <div className="text-sm text-slate-500">
-                          Office staff — total clocked time only (idle, drive, and work breakdown not tracked for office roles).
-                        </div>
-                      ) : (
+                      {!["owner", "admin"].includes(breakdown.role) && (
                         <>
                           <div className="h-4 w-full rounded-full bg-slate-100 overflow-hidden flex">
                             <div 
@@ -528,6 +725,34 @@ export default function CrmSettingsTime() {
                             <span className="font-medium text-slate-700">{breakdown.workOrdersCompleted}</span> work orders completed
                           </div>
                         </>
+                      )}
+
+                      {breakdown.entries.length > 0 && (
+                        <div className="pt-3 border-t space-y-2">
+                          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                            <FileText className="h-3 w-3" /> Daily Work Notes
+                          </p>
+                          {[...breakdown.entries]
+                            .sort((a, b) => new Date(b.clockInAt).getTime() - new Date(a.clockInAt).getTime())
+                            .map((entry) => (
+                              <div key={entry.id} className="rounded-md bg-slate-50 px-3 py-2 text-sm" data-testid={`breakdown-note-${entry.id}`}>
+                                <div className="flex items-center justify-between text-xs text-slate-500 mb-0.5">
+                                  <span>
+                                    {format(new Date(entry.clockInAt), "EEE, MMM d")}
+                                    {" · "}
+                                    {format(new Date(entry.clockInAt), "h:mm a")}
+                                    {entry.clockOutAt ? ` – ${format(new Date(entry.clockOutAt), "h:mm a")}` : " · in progress"}
+                                  </span>
+                                  <span className="font-medium text-slate-700">{formatMinutesToHoursMinutes(entry.durationMinutes)}</span>
+                                </div>
+                                {entry.notes ? (
+                                  <p className="text-slate-700 whitespace-pre-wrap">{entry.notes}</p>
+                                ) : (
+                                  <p className="text-slate-400 italic">No description provided</p>
+                                )}
+                              </div>
+                            ))}
+                        </div>
                       )}
                     </CardContent>
                   </Card>

@@ -24775,6 +24775,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
             clockInAt: e.clockInAt,
             clockOutAt: e.clockOutAt,
             durationMinutes: e.durationMinutes || (e.clockOutAt ? Math.max(0, Math.floor((e.clockOutAt.getTime() - e.clockInAt.getTime()) / 60000)) : 0),
+            notes: e.notes ?? null,
           })),
         };
       });
