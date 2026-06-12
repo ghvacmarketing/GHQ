@@ -24500,12 +24500,17 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(401).json({ message: "Not authenticated" });
       }
 
+      const notes = typeof req.body?.notes === "string" ? req.body.notes.trim() : "";
+      if (!notes) {
+        return res.status(400).json({ message: "Please describe what you worked on before clocking out." });
+      }
+
       const activeEntry = await storage.getActiveTimeEntry(user.id);
       if (!activeEntry) {
         return res.status(400).json({ message: "Not currently clocked in" });
       }
 
-      const entry = await storage.clockOut(activeEntry.id);
+      const entry = await storage.clockOut(activeEntry.id, notes);
       return res.json(entry);
     } catch (error) {
       console.error("Error clocking out:", error);

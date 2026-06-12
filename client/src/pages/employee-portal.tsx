@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -42,6 +43,8 @@ export default function EmployeePortal() {
   const [editPhone, setEditPhone] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [, setTick] = useState(0);
+  const [showClockOutDialog, setShowClockOutDialog] = useState(false);
+  const [workNotes, setWorkNotes] = useState("");
 
   const { data: currentUser, isLoading: authLoading, error: authError } = useQuery<PortalUser | null>({
     queryKey: ["/api/employee-portal/me"],
@@ -117,14 +120,16 @@ export default function EmployeePortal() {
   });
 
   const clockOutMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/employee-portal/time/clock-out");
+    mutationFn: async (notes: string) => {
+      const res = await apiRequest("POST", "/api/employee-portal/time/clock-out", { notes });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/employee-portal/time/current"] });
       queryClient.invalidateQueries({ queryKey: ["/api/employee-portal/time/history"] });
       toast({ title: "Clocked out" });
+      setShowClockOutDialog(false);
+      setWorkNotes("");
     },
     onError: (err: any) => {
       toast({ title: "Couldn't clock out", description: err?.message, variant: "destructive" });
@@ -291,7 +296,7 @@ export default function EmployeePortal() {
                   <Button
                     size="lg"
                     className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full px-8"
-                    onClick={() => clockOutMutation.mutate()}
+                    onClick={() => setShowClockOutDialog(true)}
                     disabled={clockOutMutation.isPending}
                     data-testid="button-clock-out"
                   >
@@ -318,15 +323,20 @@ export default function EmployeePortal() {
                 <p className="text-xs text-muted-foreground uppercase tracking-wide mb-3">Recent shifts</p>
                 <div className="space-y-2">
                   {timeHistory.slice(0, 5).map((entry) => (
-                    <div key={entry.id} className="flex items-center justify-between text-sm" data-testid={`row-shift-${entry.id}`}>
-                      <span className="text-muted-foreground">
-                        {new Date(entry.clockInAt).toLocaleDateString([], { month: "short", day: "numeric" })}
-                        {" · "}
-                        {new Date(entry.clockInAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-                        {" – "}
-                        {entry.clockOutAt ? new Date(entry.clockOutAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "in progress"}
-                      </span>
-                      <span className="font-medium">{entry.clockOutAt ? formatDurationMins(entry.durationMinutes) : "—"}</span>
+                    <div key={entry.id} className="text-sm" data-testid={`row-shift-${entry.id}`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">
+                          {new Date(entry.clockInAt).toLocaleDateString([], { month: "short", day: "numeric" })}
+                          {" · "}
+                          {new Date(entry.clockInAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                          {" – "}
+                          {entry.clockOutAt ? new Date(entry.clockOutAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "in progress"}
+                        </span>
+                        <span className="font-medium">{entry.clockOutAt ? formatDurationMins(entry.durationMinutes) : "—"}</span>
+                      </div>
+                      {entry.notes && (
+                        <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{entry.notes}</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -672,6 +682,51 @@ export default function EmployeePortal() {
           </TabsContent>
         </Tabs>
       </main>
+
+      <Dialog open={showClockOutDialog} onOpenChange={(open) => {
+        if (!clockOutMutation.isPending) setShowClockOutDialog(open);
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>What did you work on today?</DialogTitle>
+            <DialogDescription>
+              A summary of your work is required before you can clock out.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="portal-work-notes">Work summary</Label>
+            <Textarea
+              id="portal-work-notes"
+              placeholder="Describe what you worked on during your shift..."
+              value={workNotes}
+              onChange={(e) => setWorkNotes(e.target.value)}
+              rows={5}
+              autoFocus
+              data-testid="textarea-work-notes"
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              className="rounded-full"
+              onClick={() => setShowClockOutDialog(false)}
+              disabled={clockOutMutation.isPending}
+              data-testid="button-cancel-clock-out"
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full"
+              onClick={() => clockOutMutation.mutate(workNotes.trim())}
+              disabled={clockOutMutation.isPending || !workNotes.trim()}
+              data-testid="button-confirm-clock-out"
+            >
+              {clockOutMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Clock className="h-4 w-4 mr-2" />}
+              Clock Out
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

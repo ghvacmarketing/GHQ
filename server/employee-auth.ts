@@ -289,11 +289,15 @@ export function setupEmployeeAuth(app: Express) {
       if (!crmUser) {
         return res.status(409).json({ message: "Your portal account isn't linked to a staff record yet." });
       }
+      const notes = typeof req.body?.notes === "string" ? req.body.notes.trim() : "";
+      if (!notes) {
+        return res.status(400).json({ message: "Please describe what you worked on before clocking out." });
+      }
       const active = await storage.getActiveTimeEntry(crmUser.id);
       if (!active) {
         return res.status(400).json({ message: "Not currently clocked in" });
       }
-      const entry = await storage.clockOut(active.id);
+      const entry = await storage.clockOut(active.id, notes);
       return res.json(entry);
     } catch (error) {
       console.error("Error clocking out (portal):", error);

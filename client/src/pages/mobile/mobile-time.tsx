@@ -1,15 +1,28 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Clock, Play, Square, Loader2, AlertCircle, CheckCircle, Briefcase } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import MobileShell from "./mobile-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { CrmTimeEntry, CrmWorkOrder } from "@shared/schema";
 
 export default function MobileTime() {
   const { toast } = useToast();
+  const [showClockOutDialog, setShowClockOutDialog] = useState(false);
+  const [workNotes, setWorkNotes] = useState("");
 
   const { data: currentEntry, isLoading: loadingCurrent } = useQuery<{ entry: CrmTimeEntry | null }>({
     queryKey: ["/api/mobile/time/current"],
@@ -46,13 +59,15 @@ export default function MobileTime() {
   });
 
   const clockOutMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("POST", "/api/mobile/time/clock-out");
+    mutationFn: async (notes: string) => {
+      return apiRequest("POST", "/api/mobile/time/clock-out", { notes });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/mobile/time/current"] });
       queryClient.invalidateQueries({ queryKey: ["/api/mobile/time/history"] });
       toast({ title: "Clocked Out", description: "Time entry has been saved." });
+      setShowClockOutDialog(false);
+      setWorkNotes("");
     },
     onError: (error: any) => {
       toast({ 
@@ -132,7 +147,7 @@ export default function MobileTime() {
                       ? "bg-red-600 hover:bg-red-700" 
                       : "bg-green-600 hover:bg-green-700"
                   }`}
-                  onClick={() => isClockedIn ? clockOutMutation.mutate() : clockInMutation.mutate(undefined)}
+                  onClick={() => isClockedIn ? setShowClockOutDialog(true) : clockInMutation.mutate(undefined)}
                   disabled={isLoading}
                   data-testid={isClockedIn ? "button-clock-out" : "button-clock-in"}
                 >
@@ -193,6 +208,11 @@ export default function MobileTime() {
                           <span>Work Order</span>
                         </div>
                       )}
+                      {entry.notes && (
+                        <p className="text-xs text-slate-600 mt-1 whitespace-pre-wrap">
+                          {entry.notes}
+                        </p>
+                      )}
                     </div>
                     <div className="text-right">
                       <span className={`font-semibold ${entry.clockOutAt ? "text-slate-800" : "text-green-600"}`}>
@@ -206,6 +226,54 @@ export default function MobileTime() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={showClockOutDialog} onOpenChange={(open) => {
+        if (!clockOutMutation.isPending) setShowClockOutDialog(open);
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>What did you work on today?</DialogTitle>
+            <DialogDescription>
+              A summary of your work is required before you can clock out.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="work-notes">Work summary</Label>
+            <Textarea
+              id="work-notes"
+              placeholder="e.g. AC tune-up at Smith residence, replaced capacitor; furnace inspection on Main St..."
+              value={workNotes}
+              onChange={(e) => setWorkNotes(e.target.value)}
+              rows={5}
+              autoFocus
+              data-testid="textarea-work-notes"
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowClockOutDialog(false)}
+              disabled={clockOutMutation.isPending}
+              data-testid="button-cancel-clock-out"
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => clockOutMutation.mutate(workNotes.trim())}
+              disabled={clockOutMutation.isPending || !workNotes.trim()}
+              data-testid="button-confirm-clock-out"
+            >
+              {clockOutMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Square className="h-4 w-4 mr-2" />
+              )}
+              Clock Out
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MobileShell>
   );
 }

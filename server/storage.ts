@@ -275,7 +275,7 @@ export interface IStorage {
   // Time Entry operations
   getActiveTimeEntry(technicianId: string): Promise<CrmTimeEntry | null>;
   clockIn(technicianId: string, workOrderId?: string, source?: string): Promise<CrmTimeEntry>;
-  clockOut(entryId: string): Promise<CrmTimeEntry>;
+  clockOut(entryId: string, notes?: string): Promise<CrmTimeEntry>;
   getTimeEntries(filters: { technicianId?: string; startDate?: Date; endDate?: Date }): Promise<CrmTimeEntry[]>;
   updateTimeEntry(id: string, data: Partial<InsertCrmTimeEntry>): Promise<CrmTimeEntry>;
   deleteTimeEntry(id: string): Promise<void>;
@@ -2286,7 +2286,7 @@ export class DatabaseStorage implements IStorage {
     return entry;
   }
 
-  async clockOut(entryId: string): Promise<CrmTimeEntry> {
+  async clockOut(entryId: string, notes?: string): Promise<CrmTimeEntry> {
     const [existing] = await db.select().from(crmTimeEntries)
       .where(eq(crmTimeEntries.id, entryId))
       .limit(1);
@@ -2303,6 +2303,7 @@ export class DatabaseStorage implements IStorage {
       .set({
         clockOutAt: now,
         durationMinutes,
+        ...(notes !== undefined ? { notes } : {}),
         updatedAt: now,
       })
       .where(eq(crmTimeEntries.id, entryId))
