@@ -358,6 +358,26 @@ async function runProtectionAndCarePlanSeeds() {
       }
     }
 
+    // 2b. Monthly Care plans as catalog Items (so they can be added to quotes/invoices).
+    // Mirrors the agreement templates above; billed monthly, category "maintenance".
+    for (const plan of carePlans) {
+      const existing = await db
+        .select({ id: crmItems.id })
+        .from(crmItems)
+        .where(eq(crmItems.name, plan.name));
+      if (existing.length === 0) {
+        await db.insert(crmItems).values({
+          name: plan.name,
+          description: plan.description,
+          category: "maintenance",
+          itemType: "service",
+          rate: plan.defaultPrice,
+          isActive: true,
+        });
+        console.log(`[CarePlans] Seeded care plan item: ${plan.name}`);
+      }
+    }
+
     // 3. Backfill existing agreements that predate the visit/billing-cadence split.
     // Propagate each agreement's linked template visit cadence to the agreement
     // itself where it hasn't been set yet. This fixes already-created monthly-billed
