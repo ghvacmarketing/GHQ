@@ -1,10 +1,14 @@
 import { forwardRef } from "react";
 import type { PricebookPackage, CrawlspaceTier } from "@shared/schema";
 import gefaBookingQr from "@assets/gefa-booking-qr.svg";
-import whTanklessImg from "@assets/image_1781528279007.png";
-import whNaturalGasImg from "@assets/image_1781528303384.png";
-import whPropaneImg from "@assets/image_1781528313578.png";
-import whElectricImg from "@assets/image_1781528322992.png";
+
+// Served as static files from attached_assets via the backend `/assets` route
+// (not Vite @assets imports) so they capture reliably in the html2canvas PDF
+// export, matching every other salesbook equipment image.
+const whTanklessImg = "/assets/image_1781528279007.png";
+const whNaturalGasImg = "/assets/image_1781528303384.png";
+const whPropaneImg = "/assets/image_1781528313578.png";
+const whElectricImg = "/assets/image_1781528322992.png";
 
 const BRAND_COLOR = "#711419";
 const BRAND_COLOR_LIGHT = "#8a1a20";
