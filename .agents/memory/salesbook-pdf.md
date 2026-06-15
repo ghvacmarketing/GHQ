@@ -22,3 +22,13 @@ lock so concurrent requests share one generation. Prewarmed on startup in produc
   5-min `/api/salesbook/data` in-process cache TTL (acceptable — data changes rarely).
 - The `/salesbook/print` route forces images `eager` and re-sets `src` because they use `loading="lazy"`;
   without that, equipment image boxes render blank in the PDF.
+- **Two separate `renderSection` switches exist and must stay in sync** when adding a new
+  salesbook section type: the on-screen/html2canvas one in `client/src/pages/price-book.tsx`
+  AND the server-PDF one in `client/src/pages/salesbook-print.tsx`. Both consume the same
+  `buildSalesbookSections` output. A type present in one but missing in the other renders as a
+  **blank page** only in that path (e.g. water-heater pages showed in the flipbook but were blank
+  in the CRM `/api/salesbook/pdf` download because the print switch lacked the case + import).
+- Public `/salesbook` download = client html2canvas (price-book.tsx). CRM `/crm/salesbook`
+  download = server `/api/salesbook/pdf` (playwright → salesbook-print.tsx). Different render paths.
+- html2canvas (the client path) does NOT resolve CSS Grid `fr`/`gridAutoRows` track heights —
+  cards collapse to a blank page. Use flexbox (nested rows with `flex:1`) for export-captured pages.

@@ -7,6 +7,7 @@ import {
   TierHeaderPage,
   ProductDetailPage,
   SingleTierDetailPage,
+  WaterHeaterDetailPage,
   EliteDividerPage,
   EliteBundlesPage,
   EliteDiscountPage,
@@ -79,6 +80,8 @@ function renderSection(section: SalesbookSection) {
       );
     case "ducting-detail":
       return <SingleTierDetailPage unitType={section.unitType!} packages={section.packages || []} />;
+    case "water-heater-detail":
+      return <WaterHeaterDetailPage packages={section.packages || []} />;
     case "elite-divider":
       return <EliteDividerPage />;
     case "elite-bundles":

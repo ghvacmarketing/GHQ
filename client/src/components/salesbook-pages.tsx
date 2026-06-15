@@ -597,17 +597,20 @@ export const WaterHeaterDetailPage = forwardRef<HTMLDivElement, {
       <div style={{
         flex: 1,
         padding: "12px",
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gridAutoRows: "1fr",
+        display: "flex",
+        flexDirection: "column",
         gap: 10,
         overflow: "hidden",
       }}>
-        {sorted.map((pkg) => {
+        {[0, 2].map((rowStart) => (
+          <div key={`wh-row-${rowStart}`} style={{ display: "flex", flex: 1, gap: 10, minHeight: 0 }}>
+            {sorted.slice(rowStart, rowStart + 2).map((pkg) => {
           const name = pkg.outdoorName || pkg.packageLevel;
           const spec = WATER_HEATER_SPECS[pkg.packageLevel] || { image: "", description: "", warranty: [], features: [] };
           return (
             <div key={pkg.id} style={{
+              flex: 1,
+              minWidth: 0,
               border: "1px solid #e8e8e8",
               borderRadius: 10,
               display: "flex",
@@ -706,7 +709,9 @@ export const WaterHeaterDetailPage = forwardRef<HTMLDivElement, {
               </div>
             </div>
           );
-        })}
+            })}
+          </div>
+        ))}
       </div>
 
       <div style={{ height: 3, background: BRAND_COLOR }} />
