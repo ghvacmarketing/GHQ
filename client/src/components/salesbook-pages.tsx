@@ -1,6 +1,10 @@
 import { forwardRef } from "react";
 import type { PricebookPackage, CrawlspaceTier } from "@shared/schema";
 import gefaBookingQr from "@assets/gefa-booking-qr.svg";
+import whTanklessImg from "@assets/image_1781528279007.png";
+import whNaturalGasImg from "@assets/image_1781528303384.png";
+import whPropaneImg from "@assets/image_1781528313578.png";
+import whElectricImg from "@assets/image_1781528322992.png";
 
 const BRAND_COLOR = "#711419";
 const BRAND_COLOR_LIGHT = "#8a1a20";
@@ -61,6 +65,8 @@ const UNIT_TYPE_DISPLAY: Record<string, { name: string; tagline: string }> = {
 };
 
 interface WaterHeaterSpec {
+  image: string;
+  description: string;
   warranty: string[];
   features: string[];
 }
@@ -70,29 +76,37 @@ interface WaterHeaterSpec {
 // in server/index.ts.
 const WATER_HEATER_SPECS: Record<string, WaterHeaterSpec> = {
   Tankless: {
+    image: whTanklessImg,
+    description:
+      "Premium high-efficiency option with continuous hot water, longer equipment life, and a space-saving design.",
     warranty: ["1 Year Labor", "5 Year Parts", "15 Year Heat Exchanger"],
     features: [
-      "½\" gas pipe capable up to 24'",
-      "Field convertible gas system",
+      "Continuous hot water",
       "Ultra condensing efficiency",
-      "Dual stainless steel heat exchangers",
-      "Low NOx emissions (20ppm)",
-      "SCH 40, 2\" venting up to 75'",
+      "Field convertible gas system",
+      "Space-saving wall mount",
+      "Low NOx emissions",
       "Cascading capable",
-      "EZNav multi-line control panel",
-      "Built-in HotButton control panel",
-      "Common vent up to 12 units",
     ],
   },
   "Natural Gas": {
+    image: whNaturalGasImg,
+    description:
+      "Reliable standard replacement for homes with natural gas service. Lower upfront investment than tankless.",
     warranty: ["1 Year Labor", "6 Year Tank and Limited Parts"],
     features: [],
   },
   Propane: {
+    image: whPropaneImg,
+    description:
+      "Dependable propane water heater option for homes without natural gas service.",
     warranty: ["1 Year Labor", "6 Year Tank and Limited Parts"],
     features: [],
   },
   Electric: {
+    image: whElectricImg,
+    description:
+      "Simple, cost-effective electric replacement option for homes without gas service.",
     warranty: ["1 Year Labor", "6 Year Tank and Limited Parts"],
     features: [],
   },
@@ -568,13 +582,12 @@ export const WaterHeaterDetailPage = forwardRef<HTMLDivElement, {
     <PageWrapper ref={ref}>
       <div style={{
         background: BRAND_COLOR,
-        padding: "12px 20px",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
+        padding: "14px 20px",
       }}>
-        <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>Water Heaters</div>
-        <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: 600 }}>Total Investment*</div>
+        <div style={{ color: "#fff", fontSize: 17, fontWeight: 700, lineHeight: 1.1 }}>Water Heaters</div>
+        <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 10.5, fontWeight: 500, marginTop: 2 }}>
+          Reliable hot water — tankless, gas &amp; electric options
+        </div>
       </div>
 
       <div style={{
@@ -588,47 +601,72 @@ export const WaterHeaterDetailPage = forwardRef<HTMLDivElement, {
       }}>
         {sorted.map((pkg) => {
           const name = pkg.outdoorName || pkg.packageLevel;
-          const spec = WATER_HEATER_SPECS[pkg.packageLevel] || { warranty: [], features: [] };
+          const spec = WATER_HEATER_SPECS[pkg.packageLevel] || { image: "", description: "", warranty: [], features: [] };
           return (
             <div key={pkg.id} style={{
               border: "1px solid #e8e8e8",
-              borderRadius: 8,
+              borderRadius: 10,
               display: "flex",
               flexDirection: "column",
               overflow: "hidden",
+              background: "#fff",
             }}>
               <div style={{
-                padding: "8px 12px",
-                background: "#fafafa",
-                borderBottom: "1px solid #eee",
+                padding: "10px 12px",
                 display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                gap: 8,
+                gap: 10,
+                alignItems: "center",
+                borderBottom: "1px solid #f0f0f0",
               }}>
-                <div style={{ minWidth: 0 }}>
+                <div style={{
+                  width: 54,
+                  height: 64,
+                  flexShrink: 0,
+                  borderRadius: 6,
+                  background: "#f7f7f7",
+                  border: "1px solid #eee",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                }}>
+                  {spec.image && (
+                    <img
+                      src={spec.image}
+                      alt={name}
+                      style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+                      loading="lazy"
+                    />
+                  )}
+                </div>
+                <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 700, color: "#111", lineHeight: 1.2 }}>{name}</div>
                   <div style={{ fontSize: 8.5, color: "#999", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {[pkg.outdoorBrand, pkg.outdoorModel].filter(Boolean).join(" ")}
                   </div>
-                </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 17, fontWeight: 700, color: "#111", lineHeight: 1 }}>
-                    {formatCents(pkg.monthlyPayment)}
-                    <span style={{ fontSize: 9, fontWeight: 600, color: "#888" }}>/mo*</span>
-                  </div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: BRAND_COLOR, marginTop: 2 }}>
-                    {formatCents(pkg.totalInvestment)}
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 5 }}>
+                    <span style={{ fontSize: 18, fontWeight: 800, color: BRAND_COLOR, lineHeight: 1 }}>
+                      {formatCents(pkg.totalInvestment)}
+                    </span>
+                    <span style={{ fontSize: 9, fontWeight: 600, color: "#888" }}>
+                      or {formatCents(pkg.monthlyPayment)}/mo*
+                    </span>
                   </div>
                 </div>
               </div>
 
               <div style={{ padding: "8px 12px", flex: 1, overflow: "hidden" }}>
-                <div style={{ fontSize: 8, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                {spec.description && (
+                  <div style={{ fontSize: 9.5, color: "#555", lineHeight: 1.4, marginBottom: 6, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                    {spec.description}
+                  </div>
+                )}
+
+                <div style={{ fontSize: 8, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>
                   Warranty
                 </div>
                 {spec.warranty.map((w, i) => (
-                  <div key={i} style={{ fontSize: 9.5, color: "#444", lineHeight: 1.45 }}>• {w}</div>
+                  <div key={i} style={{ fontSize: 9.5, color: "#444", lineHeight: 1.4 }}>• {w}</div>
                 ))}
 
                 {spec.features.length > 0 && (
@@ -660,7 +698,7 @@ export const WaterHeaterDetailPage = forwardRef<HTMLDivElement, {
                 fontSize: 8,
                 color: "#aaa",
               }}>
-                12.99% APR, 120 mos — with approved credit
+                *12.99% APR, 120 mos — with approved credit
               </div>
             </div>
           );
