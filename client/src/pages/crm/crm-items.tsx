@@ -68,6 +68,7 @@ const categoryTabs = [
   { key: "service", label: "Service" },
   { key: "maintenance", label: "Maintenance" },
   { key: "protection", label: "Protection Plans" },
+  { key: "field_edge", label: "Field Edge" },
   { key: "discount", label: "Discounts" },
 ];
 
@@ -76,6 +77,7 @@ const categoryLabels: Record<string, string> = {
   service: "Service",
   maintenance: "Maintenance",
   protection: "Protection Plans",
+  field_edge: "Field Edge",
   discount: "Discount",
 };
 
@@ -282,6 +284,8 @@ export default function CrmItems() {
         return "bg-cyan-100 text-cyan-700 border-cyan-200";
       case "protection":
         return "bg-emerald-100 text-emerald-700 border-emerald-200";
+      case "field_edge":
+        return "bg-violet-100 text-violet-700 border-violet-200";
       case "service":
         return "bg-green-100 text-green-700 border-green-200";
       case "supplies":

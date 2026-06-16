@@ -1570,7 +1570,7 @@ export const crmItemTypeEnum = ["parts", "equipment", "material", "service", "di
 export type CrmItemType = typeof crmItemTypeEnum[number];
 
 // category = where it belongs (navigation/filtering)
-export const crmItemCategoryEnum = ["install", "service", "maintenance", "discount", "protection"] as const;
+export const crmItemCategoryEnum = ["install", "service", "maintenance", "discount", "protection", "field_edge"] as const;
 export type CrmItemCategory = typeof crmItemCategoryEnum[number];
 
 export const discountKindEnum = ["promotion", "maintenance", "protection"] as const;
