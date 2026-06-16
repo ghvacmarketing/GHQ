@@ -3,3 +3,4 @@
 - [Session cookie testing](session-cookie-testing.md) — secure:true cookie means http/localhost curl never keeps the session; test login via response body, not follow-up /me.
 - [Agreement visit vs billing cadence](agreement-visit-cadence.md) — visit spacing uses `visitFrequency` (falls back to `frequency`); billing keeps using `frequency`. Care plans bill monthly, visit annually.
 - [Salesbook product provisioning](salesbook-product-provisioning.md) — pricebook rows need idempotent startup seeds (not ad-hoc SQL); Sheets sync is upsert-only so they're safe.
+- [CRM role real-time propagation](role-realtime-propagation.md) — role changes reach other devices via 30s polling of shared ["/api/crm/auth/me"] query; no websockets.

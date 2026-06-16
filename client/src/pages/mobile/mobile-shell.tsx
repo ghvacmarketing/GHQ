@@ -32,7 +32,9 @@ export default function MobileShell({ children }: MobileShellProps) {
       if (!res.ok) return null;
       return res.json();
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchInterval: 30 * 1000, // Poll so role/permission changes propagate in near real-time
+    refetchIntervalInBackground: true,
   });
 
   // Check if user can access mobile app
