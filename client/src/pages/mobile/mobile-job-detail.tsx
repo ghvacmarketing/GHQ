@@ -777,7 +777,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   const [showCatalog, setShowCatalog] = useState(false);
   const [showDiscount, setShowDiscount] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
-  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<"all" | "service" | "maintenance">("service");
+  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<"all" | "service" | "maintenance" | "field_edge">("service");
   const [discountSearch, setDiscountSearch] = useState("");
   const [showManualDiscount, setShowManualDiscount] = useState(false);
   const [discountDescription, setDiscountDescription] = useState("");
@@ -831,8 +831,8 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
   // Filter CRM items for catalog (only service and maintenance for mobile techs)
   const filteredCatalogItems = crmItems
     .filter(item => {
-      // Only show service and maintenance categories for mobile techs
-      if (item.category !== "service" && item.category !== "maintenance") {
+      // Only show service, maintenance, and field edge categories for mobile techs
+      if (item.category !== "service" && item.category !== "maintenance" && item.category !== "field_edge") {
         return false;
       }
       // Apply category filter
@@ -1480,6 +1480,7 @@ function QuoteTab({ workOrder }: { workOrder: WorkOrderDetail }) {
               { key: "all", label: "All" },
               { key: "service", label: "Service" },
               { key: "maintenance", label: "Maintenance" },
+              { key: "field_edge", label: "Field Edge" },
             ].map((cat) => (
               <Button
                 key={cat.key}
@@ -1779,7 +1780,7 @@ function InvoiceTab({
   const [showCatalog, setShowCatalog] = useState(false);
   const [showDiscount, setShowDiscount] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
-  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<"all" | "service" | "maintenance">("service");
+  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<"all" | "service" | "maintenance" | "field_edge">("service");
   const [discountSearch, setDiscountSearch] = useState("");
   const [showManualDiscount, setShowManualDiscount] = useState(false);
   const [discountDescription, setDiscountDescription] = useState("");
@@ -1891,8 +1892,8 @@ function InvoiceTab({
   // Filter CRM items for catalog (only service and maintenance for mobile techs)
   const filteredCatalogItems = crmItems
     .filter(item => {
-      // Only show service and maintenance categories for mobile techs
-      if (item.category !== "service" && item.category !== "maintenance") {
+      // Only show service, maintenance, and field edge categories for mobile techs
+      if (item.category !== "service" && item.category !== "maintenance" && item.category !== "field_edge") {
         return false;
       }
       // Apply category filter
@@ -2891,6 +2892,7 @@ function InvoiceTab({
               { key: "install", label: "Install" },
               { key: "service", label: "Service" },
               { key: "maintenance", label: "Maintenance" },
+              { key: "field_edge", label: "Field Edge" },
             ].map((cat) => (
               <Button
                 key={cat.key}
