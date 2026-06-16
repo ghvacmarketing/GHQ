@@ -252,7 +252,7 @@ export default function CrmQuoteDetail() {
   // Items catalog state
   const [showItemsCatalogDialog, setShowItemsCatalogDialog] = useState(false);
   const [itemSearch, setItemSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<"all" | "install" | "service" | "maintenance" | "discount" | "protection">("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "install" | "service" | "maintenance" | "discount" | "protection" | "field_edge">("all");
 
   // Discount modal state
   const [showDiscountDialog, setShowDiscountDialog] = useState(false);
@@ -822,7 +822,9 @@ export default function CrmQuoteDetail() {
         quantity: "1",
         unitPrice: price.toString(),
         lineTotal: price.toString(),
-        lineType: item.category || "install",
+        lineType: ["install", "service", "maintenance", "protection", "discount"].includes(item.category || "")
+          ? item.category
+          : "install",
         itemId: item.id,
         ...(optionTag ? { optionTag } : {}),
       });
@@ -3387,6 +3389,7 @@ export default function CrmQuoteDetail() {
                     <SelectItem value="service">Service</SelectItem>
                     <SelectItem value="maintenance">Maintenance</SelectItem>
                     <SelectItem value="protection">Protection Plans</SelectItem>
+                    <SelectItem value="field_edge">Field Edge</SelectItem>
                     <SelectItem value="discount">Discount</SelectItem>
                   </SelectContent>
                 </Select>

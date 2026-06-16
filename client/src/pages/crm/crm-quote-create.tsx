@@ -156,7 +156,7 @@ export default function CrmQuoteCreate() {
   // CRM Items catalog state
   const [itemsCatalogOpen, setItemsCatalogOpen] = useState(false);
   const [itemSearch, setItemSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<"all" | "install" | "service" | "maintenance" | "discount" | "protection">("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "install" | "service" | "maintenance" | "discount" | "protection" | "field_edge">("all");
 
   // Fetch parent customer when selected customer has billToParent
   const { data: parentCustomerForBanner } = useQuery<CrmCustomer>({
@@ -224,7 +224,9 @@ export default function CrmQuoteCreate() {
       description: item.name,
       quantity: 1,
       unitPrice: parseFloat(item.rate || "0"),
-      itemCategory: (item.category as "install" | "service" | "maintenance" | "protection") || "install",
+      itemCategory: (["install", "service", "maintenance", "protection"].includes(item.category || "")
+        ? (item.category as "install" | "service" | "maintenance" | "protection")
+        : "install"),
       taxable: item.taxable ?? true,
       crmItemId: item.id,
       ...(protectionPct ? { protectionDiscountPct: protectionPct } : {}),
@@ -1521,7 +1523,7 @@ export default function CrmQuoteCreate() {
                   data-testid="input-item-search"
                 />
               </div>
-              <Select value={categoryFilter} onValueChange={(value) => setCategoryFilter(value as "all" | "install" | "service" | "maintenance" | "discount" | "protection")}>
+              <Select value={categoryFilter} onValueChange={(value) => setCategoryFilter(value as "all" | "install" | "service" | "maintenance" | "discount" | "protection" | "field_edge")}>
                 <SelectTrigger className="w-[140px]" data-testid="select-category-filter">
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
@@ -1531,6 +1533,7 @@ export default function CrmQuoteCreate() {
                   <SelectItem value="service">Service</SelectItem>
                   <SelectItem value="maintenance">Maintenance</SelectItem>
                   <SelectItem value="protection">Protection Plans</SelectItem>
+                  <SelectItem value="field_edge">Field Edge</SelectItem>
                   <SelectItem value="discount">Discount</SelectItem>
                 </SelectContent>
               </Select>
@@ -1566,9 +1569,10 @@ export default function CrmQuoteCreate() {
                               item.category === "install" && "bg-blue-100 text-blue-700",
                               item.category === "service" && "bg-green-100 text-green-700",
                               item.category === "maintenance" && "bg-amber-100 text-amber-700",
+                              item.category === "field_edge" && "bg-violet-100 text-violet-700",
                               item.category === "discount" && "bg-purple-100 text-purple-700"
                             )}>
-                              {item.category || "install"}
+                              {item.category === "field_edge" ? "Field Edge" : (item.category || "install")}
                             </span>
                             {item.taxable && (
                               <span className="text-xs text-slate-400">Taxable</span>
