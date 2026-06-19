@@ -143,6 +143,7 @@ export interface CrmInvoiceEmailOptions {
   senderEmail?: string;
   senderName?: string;
   replyToEmail?: string;
+  isManual?: boolean;
 }
 
 export async function sendCrmInvoiceEmail(
@@ -154,10 +155,12 @@ export async function sendCrmInvoiceEmail(
   sentBy?: string,
   options?: CrmInvoiceEmailOptions
 ): Promise<CrmInvoiceEmailResult> {
-  const emailSetting = await storage.getSetting("automated_email_enabled");
-  if (emailSetting && emailSetting.value === "false") {
-    console.log("[CRM Invoice Email] Automated emails are disabled");
-    return { success: false, error: "Automated emails are disabled" };
+  if (!options?.isManual) {
+    const emailSetting = await storage.getSetting("automated_email_enabled");
+    if (emailSetting && emailSetting.value === "false") {
+      console.log("[CRM Invoice Email] Automated emails are disabled (skipped for manual sends)");
+      return { success: false, error: "Automated emails are disabled" };
+    }
   }
 
   const apiKey = process.env.RESEND_API_KEY;
