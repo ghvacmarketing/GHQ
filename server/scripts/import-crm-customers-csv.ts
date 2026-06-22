@@ -150,7 +150,7 @@ async function main() {
       email: stripQuotes(record["Email"] || "") || null,
       phone: hasPhone ? formatPhone(record["Phone"] || "") : null,
       customerType: mapType(record["Customer Type"] || ""),
-      customerStatus: "client",
+      customerStatus: "Customer" as CrmCustomerStatus,
       fullAddress,
       leadSource,
       sourceSystem: "csv_import_2026_06_22",
