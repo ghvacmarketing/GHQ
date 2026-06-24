@@ -2648,7 +2648,7 @@ export default function ProposalBuilder() {
                   Back
                 </Button>
               ) : (
-                <Link href="/">
+                <Link href="/tools">
                   <Button variant="ghost" size="sm" className="min-h-[44px]" data-testid="button-home">
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Home
@@ -3166,7 +3166,7 @@ export default function ProposalBuilder() {
                   Back
                 </Button>
               ) : (
-                <Link href="/">
+                <Link href="/tools">
                   <Button variant="ghost" size="sm" className="min-h-[44px]" data-testid="button-home-custom">
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Home
@@ -3748,7 +3748,7 @@ export default function ProposalBuilder() {
 
           <TabsContent value="crawlspace">
             <div className="flex items-center gap-2 mb-4">
-              <Link href="/">
+              <Link href="/tools">
                 <Button variant="ghost" size="sm" className="min-h-[44px]" data-testid="button-home-crawlspace">
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Home

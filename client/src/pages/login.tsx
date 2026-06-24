@@ -30,7 +30,7 @@ export default function Login() {
             description: result.message || "Logging you in...",
           });
           // Redirect to home immediately
-          setTimeout(() => navigate("/"), 500);
+          setTimeout(() => navigate("/tools"), 500);
         } else {
           // Normal SMS flow
           toast({

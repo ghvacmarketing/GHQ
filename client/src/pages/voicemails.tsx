@@ -2482,7 +2482,7 @@ export default function Voicemails() {
         <div className="flex items-center justify-between p-3 sm:p-4">
           <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
             <MobileNav />
-            <Link href="/">
+            <Link href="/tools">
               <Button variant="ghost" size="icon" className="flex-shrink-0 min-h-[44px] min-w-[44px]" data-testid="button-back-home">
                 <ArrowLeft className="h-4 w-4" />
               </Button>

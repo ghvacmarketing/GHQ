@@ -33,6 +33,7 @@ import {
   ListTodo,
   Award,
   PenLine,
+  Wrench,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 import ghqLogo from "@assets/redlogo.webp";
@@ -256,13 +257,13 @@ function SidebarContent({
             </div>
           </Link>
         )}
-        <Link href="/" onClick={onItemClick}>
+        <Link href="/tools" onClick={onItemClick}>
           <div
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all text-slate-300 hover:bg-slate-800 hover:text-white mb-2"
             data-testid="nav-item-home"
           >
-            <Home className="h-5 w-5" />
-            <span className="text-sm font-medium">Back to Main App</span>
+            <Wrench className="h-5 w-5" />
+            <span className="text-sm font-medium">GHVAC Tools</span>
           </div>
         </Link>
 

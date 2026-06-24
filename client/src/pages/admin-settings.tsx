@@ -99,7 +99,7 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
       <div className="w-full max-w-md">
         <Button
           variant="ghost"
-          onClick={() => setLocation("/")}
+          onClick={() => setLocation("/tools")}
           className="mb-4"
           data-testid="button-back"
         >

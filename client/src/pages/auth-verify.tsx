@@ -29,7 +29,7 @@ export default function AuthVerify() {
           setMessage(`Welcome, ${result.user.name}!`);
           // Redirect to home after 2 seconds
           setTimeout(() => {
-            navigate("/");
+            navigate("/tools");
           }, 2000);
         } else {
           setStatus("error");

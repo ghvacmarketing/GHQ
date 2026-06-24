@@ -7,6 +7,7 @@ import { lazy, Suspense, useState, useEffect, Component, type ReactNode } from "
 import type { Announcement } from "@shared/schema";
 import { Loader2 } from "lucide-react";
 import Home from "@/pages/home";
+import LandingSelect from "@/pages/landing-select";
 import QuoteGenerator from "@/pages/quote-generator";
 import QuoteEdit from "@/pages/quote-edit";
 import QuotesHistory from "@/pages/quotes-history";
@@ -243,7 +244,8 @@ function AdminSettingsWrapper() {
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      <Route path="/" component={LandingSelect} />
+      <Route path="/tools" component={Home} />
       <Route path="/book" component={BookOnline} />
       <Route path="/quote" component={QuoteGenerator} />
       <Route path="/quote/edit/:id" component={QuoteEdit} />

@@ -407,7 +407,7 @@ export default function ProposalHistory() {
             <span className="text-sm sm:text-base font-semibold truncate">Proposal History</span>
           </div>
           <div className="flex items-center space-x-2 flex-shrink-0">
-            <Link href="/">
+            <Link href="/tools">
               <Button variant="ghost" size="icon" data-testid="button-back">
                 <ArrowLeft className="h-5 w-5" />
               </Button>

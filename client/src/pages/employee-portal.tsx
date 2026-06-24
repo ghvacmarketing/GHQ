@@ -205,7 +205,7 @@ export default function EmployeePortal() {
       <header className="bg-white border-b shadow-sm sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/">
+            <Link href="/tools">
               <Button variant="ghost" size="icon" className="h-9 w-9" data-testid="button-home">
                 <Home className="h-4 w-4" />
               </Button>

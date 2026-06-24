@@ -1048,7 +1048,7 @@ export default function Installation() {
 
       <main className="p-3 sm:p-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
-          <Link href="/">
+          <Link href="/tools">
             <Button variant="ghost" size="sm" className="min-h-[44px] min-w-[44px]" data-testid="button-back">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back

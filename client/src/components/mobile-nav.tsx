@@ -59,9 +59,9 @@ export default function MobileNav() {
         </SheetHeader>
         <ScrollArea className="h-[calc(100vh-60px)]">
           <div className="p-2">
-            <Link href="/" onClick={() => setOpen(false)}>
+            <Link href="/tools" onClick={() => setOpen(false)}>
               <Button
-                variant={location === "/" ? "secondary" : "ghost"}
+                variant={location === "/tools" ? "secondary" : "ghost"}
                 className="w-full justify-start gap-3 mb-2"
                 data-testid="nav-home"
               >
