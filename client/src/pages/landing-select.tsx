@@ -77,8 +77,8 @@ export default function LandingSelect() {
             />
           </h1>
           <p
-            className={`text-slate-300 transition-all duration-500 ${
-              stage >= 1 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
+            className={`text-slate-300 transition-opacity duration-700 ${
+              stage >= 1 ? "opacity-100" : "opacity-0"
             }`}
             data-testid="text-subheading"
           >
@@ -87,8 +87,8 @@ export default function LandingSelect() {
         </div>
 
         <div
-          className={`grid grid-cols-1 sm:grid-cols-2 gap-5 transition-all duration-700 ${
-            stage >= 2 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
+          className={`grid grid-cols-1 sm:grid-cols-2 gap-5 transition-opacity duration-700 ${
+            stage >= 2 ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
         >
           <Link href="/crm">
