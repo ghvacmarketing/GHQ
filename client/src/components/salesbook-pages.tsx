@@ -479,6 +479,8 @@ export const SingleTierDetailPage = forwardRef<HTMLDivElement, {
     return aNum - bNum;
   });
 
+  const isMiniSplit = unitType === "Mini-Split";
+
   return (
     <PageWrapper ref={ref}>
       <div style={{ padding: "20px 24px 8px" }}>
@@ -537,7 +539,7 @@ export const SingleTierDetailPage = forwardRef<HTMLDivElement, {
                 </div>
               )}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                   <span style={{
                     background: BRAND_COLOR,
                     color: "#fff",
@@ -549,6 +551,25 @@ export const SingleTierDetailPage = forwardRef<HTMLDivElement, {
                   }}>
                     {pkg.packageLevel}
                   </span>
+                  {isMiniSplit && !pkg.packageLevel.toUpperCase().includes("36") && (
+                    <span style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 3,
+                      background: "#e6f4ea",
+                      color: "#1e7d3a",
+                      border: "1px solid #b7e0c4",
+                      fontSize: 8,
+                      fontWeight: 700,
+                      padding: "1px 6px",
+                      borderRadius: 4,
+                      flexShrink: 0,
+                      letterSpacing: 0.2,
+                    }}>
+                      <span style={{ fontSize: 9, lineHeight: 1 }}>★</span>
+                      AHRI · ENERGY STAR® Certified
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: "#222", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {pkg.outdoorName || `${pkg.packageLevel} System`}
