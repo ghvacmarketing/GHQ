@@ -95,11 +95,11 @@ export default function CrmLogin() {
         setCrmToken(data.token);
         // Small delay to ensure localStorage is flushed before navigation
         setTimeout(() => {
-          // Technicians go directly to mobile app, others go to CRM
+          // Technicians go directly to mobile app, others go to the selection screen
           if (data.user?.role === "tech") {
             window.location.href = "/mobile";
           } else {
-            window.location.href = "/crm";
+            window.location.href = "/";
           }
         }, 100);
       } else {
@@ -107,7 +107,7 @@ export default function CrmLogin() {
         if (data.user?.role === "tech") {
           window.location.href = "/mobile";
         } else {
-          window.location.href = "/crm";
+          window.location.href = "/";
         }
       }
     },

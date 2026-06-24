@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Monitor, Smartphone, Wrench, ChevronRight } from "lucide-react";
+import { Monitor, Smartphone, Wrench, ChevronRight, Loader2 } from "lucide-react";
 import { crmFetch } from "@/lib/crmAuth";
 import { getQueryFn } from "@/lib/queryClient";
 import type { CrmUser, PortalUser } from "@shared/schema";
@@ -30,7 +30,18 @@ export default function LandingSelect() {
     staleTime: 60 * 1000,
   });
 
+  const [, navigate] = useLocation();
+
   const ready = !isLoadingCrm && !isLoadingPortal;
+  const isAuthenticated = !!crmUser?.id;
+
+  // Require sign-in before reaching the app selection screen.
+  useEffect(() => {
+    if (ready && !isAuthenticated) {
+      navigate("/crm/login");
+    }
+  }, [ready, isAuthenticated, navigate]);
+
   const firstName = firstNameOf(crmUser?.name) || firstNameOf(portalUser?.username);
   const fullText = `Welcome${firstName ? `, ${firstName}` : ""}`;
 
@@ -60,6 +71,17 @@ export default function LandingSelect() {
   }, [ready, fullText]);
 
   const typingDone = typed.length >= fullText.length && fullText.length > 0;
+
+  // While verifying the session (or redirecting an unauthenticated visitor to
+  // login), show a loader instead of the app selection screen.
+  if (!ready || !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#4a0d10] to-slate-900 flex flex-col items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-[#e08a8f] mb-4" />
+        <p className="text-slate-300">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#4a0d10] to-slate-900 flex flex-col items-center justify-center p-4">
