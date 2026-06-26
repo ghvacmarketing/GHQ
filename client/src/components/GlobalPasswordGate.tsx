@@ -15,6 +15,7 @@ const PUBLIC_ROUTES = [
   /^\/quote\/[^/]+$/,       // /quote/:token - public quote viewing (legacy long URL)
   /^\/q\/[^/]+$/,           // /q/:token - short public quote viewing
   /^\/i\/[^/]+$/,           // /i/:token - short public invoice viewing
+  /^\/sign\/[^/]+$/,        // /sign/:token - public e-signature signing (token-based)
   /^\/portal(\/|$)/,        // /portal/* - customer portal (has its own auth)
   /^\/book-online/,         // /book-online - public booking page
   /^\/auth-verify/,         // /auth-verify - SMS magic link verification
