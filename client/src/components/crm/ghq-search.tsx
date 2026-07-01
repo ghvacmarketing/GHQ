@@ -177,7 +177,13 @@ type ConversationMessage = {
   relatedTopics?: string[];
 };
 
-export function GhqSearch() {
+// Top-nav triggers dispatch these so the global search/AI/comment dialogs can be
+// opened from anywhere without prop-drilling. GhqSearch listens for them.
+export const openGlobalSearch = () => window.dispatchEvent(new Event("ghq-open-search"));
+export const openGlobalAI = () => window.dispatchEvent(new Event("ghq-open-ai"));
+export const openGlobalComment = () => window.dispatchEvent(new Event("ghq-open-comment"));
+
+export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -502,9 +508,25 @@ export function GhqSearch() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
 
+  // Allow the top nav (or anything) to open these dialogs via window events.
+  useEffect(() => {
+    const onSearch = () => { setOpen(true); setMode("search"); };
+    const onAi = () => { setOpen(true); setMode("help"); };
+    const onComment = () => setCommentOpen(true);
+    window.addEventListener("ghq-open-search", onSearch);
+    window.addEventListener("ghq-open-ai", onAi);
+    window.addEventListener("ghq-open-comment", onComment);
+    return () => {
+      window.removeEventListener("ghq-open-search", onSearch);
+      window.removeEventListener("ghq-open-ai", onAi);
+      window.removeEventListener("ghq-open-comment", onComment);
+    };
+  }, []);
+
   return (
     <>
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col-reverse items-center gap-3">
+      {showFab && (
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col-reverse items-center gap-3 lg:hidden">
         <button
           onClick={() => setMenuOpen(!menuOpen)}
           className={`w-14 h-14 rounded-full bg-[#711419] text-white shadow-lg flex items-center justify-center transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[#711419] focus:ring-offset-2 ${menuOpen ? "rotate-90" : ""}`}
@@ -532,6 +554,7 @@ export function GhqSearch() {
           </div>
         )}
       </div>
+      )}
 
       {commentOpen && <TaggedCommentComposer onClose={() => setCommentOpen(false)} />}
 
@@ -541,30 +564,21 @@ export function GhqSearch() {
           data-testid="dialog-ghq-search"
           onKeyDown={handleKeyDown}
         >
-          <div className="border-b border-slate-700">
-            <div className="flex">
-              <button
-                onClick={() => { setMode("search"); setSearchQuery(""); }}
-                className={`flex-1 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
-                  mode === "search"
-                    ? "text-white border-b-2 border-[#711419] bg-slate-800/50"
-                    : "text-slate-400 hover:text-slate-300"
-                }`}
-              >
-                <Search className="h-4 w-4" />
-                Search
-              </button>
-              <button
-                onClick={() => { setMode("help"); setSearchQuery(""); setTimeout(() => inputRef.current?.focus(), 50); }}
-                className={`flex-1 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
-                  mode === "help"
-                    ? "text-white border-b-2 border-purple-500 bg-purple-900/20"
-                    : "text-slate-400 hover:text-slate-300"
-                }`}
-              >
-                <HelpCircle className="h-4 w-4" />
-                Ask AI
-              </button>
+          {/* Search and AI are separate experiences, each opened from its own top-nav
+              button. The header just reflects the active one (no tab switching). */}
+          <div className="border-b border-slate-700 px-4 py-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-white">
+              {mode === "search" ? (
+                <>
+                  <Search className="h-4 w-4 text-[#e8704f]" />
+                  Search the CRM
+                </>
+              ) : (
+                <>
+                  <HelpCircle className="h-4 w-4 text-purple-400" />
+                  Ask AI
+                </>
+              )}
             </div>
           </div>
 

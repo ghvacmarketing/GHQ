@@ -8,6 +8,7 @@ import { WebhookHandlers } from "./webhookHandlers";
 import { startBackgroundSyncScheduler } from "./services/quickbooksService";
 import { fieldEdgeCustomerService } from "./services/fieldedge-customers";
 import { scheduleBookingReminders } from "./services/bookingEmail";
+import { startGoveeBackgroundSync } from "./services/goveeService";
 
 const app = express();
 
@@ -484,11 +485,16 @@ async function runWaterHeaterSeeds() {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
+  const listenOptions: { port: number; host: string; reusePort?: boolean } = {
     port,
     host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
+  };
+  // SO_REUSEPORT is not supported on Windows (throws ENOTSUP); only enable it
+  // on platforms that support it (e.g. Linux/Replit).
+  if (process.platform !== "win32") {
+    listenOptions.reusePort = true;
+  }
+  server.listen(listenOptions, () => {
     log(`serving on port ${port}`);
 
     if (app.get("env") !== "development") {
@@ -512,5 +518,8 @@ async function runWaterHeaterSeeds() {
     
     // Start FieldEdge customer cache with 5-minute refresh
     fieldEdgeCustomerService.startAutoRefresh(5);
+
+    // Start Govee H5103 sensor polling (humidity/temperature) every 5 minutes
+    startGoveeBackgroundSync(5);
   });
 })();

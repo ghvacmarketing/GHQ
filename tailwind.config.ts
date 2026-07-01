@@ -65,7 +65,18 @@ export default {
       fontFamily: {
         sans: ["var(--font-sans)"],
         serif: ["var(--font-serif)"],
+        display: ["var(--font-serif)"], // Poppins — page titles / brand
         mono: ["var(--font-mono)"],
+      },
+      // Soft, layered, neutral elevation (premium SaaS). Replaces the old
+      // 0-opacity shadow tokens so cards read as elevation, not heavy borders.
+      boxShadow: {
+        xs: "0 1px 2px 0 rgb(16 24 40 / 0.04)",
+        sm: "0 1px 2px 0 rgb(16 24 40 / 0.06), 0 1px 3px 0 rgb(16 24 40 / 0.04)",
+        DEFAULT: "0 1px 3px 0 rgb(16 24 40 / 0.08), 0 1px 2px -1px rgb(16 24 40 / 0.06)",
+        md: "0 4px 8px -2px rgb(16 24 40 / 0.08), 0 2px 4px -2px rgb(16 24 40 / 0.04)",
+        lg: "0 12px 16px -4px rgb(16 24 40 / 0.08), 0 4px 6px -2px rgb(16 24 40 / 0.04)",
+        xl: "0 20px 24px -4px rgb(16 24 40 / 0.10), 0 8px 8px -4px rgb(16 24 40 / 0.03)",
       },
       keyframes: {
         "accordion-down": {

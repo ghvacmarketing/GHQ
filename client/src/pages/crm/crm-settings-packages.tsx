@@ -250,8 +250,8 @@ export default function CrmSettingsPackages() {
   if (!canManage) {
     return (
       <CrmLayout currentUser={currentUser}>
-        <div className="p-6 max-w-4xl mx-auto">
-          <h1 className="text-2xl font-bold text-slate-900 mb-6">Package Pricing Management</h1>
+        <div className="mx-auto w-full max-w-4xl space-y-6">
+          <h1 className="font-display text-xl font-semibold tracking-tight text-foreground mb-6">Package Pricing Management</h1>
           <Card>
             <CardContent className="py-12 text-center text-slate-500">
               <Package className="h-12 w-12 mx-auto mb-4 text-slate-300" />
@@ -265,7 +265,7 @@ export default function CrmSettingsPackages() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="p-6 max-w-4xl mx-auto">
+      <div className="mx-auto w-full max-w-4xl space-y-6">
         <div className="flex items-center gap-4 mb-6">
           <Button
             variant="ghost"
@@ -276,7 +276,7 @@ export default function CrmSettingsPackages() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Package Pricing Management</h1>
+            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Package Pricing Management</h1>
             <p className="text-sm text-slate-500">Adjust HVAC and Crawlspace package prices by percentage</p>
           </div>
         </div>

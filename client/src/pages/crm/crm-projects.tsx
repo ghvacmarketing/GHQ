@@ -86,6 +86,7 @@ import {
   GripVertical,
   ListTodo,
 } from "lucide-react";
+import { PageHeader } from "@/components/crm/ui-kit";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isSameMonth, startOfWeek, endOfWeek, addDays, subDays, addWeeks, subWeeks, isBefore, isAfter, startOfDay, setHours, getHours, isToday } from "date-fns";
@@ -1273,18 +1274,16 @@ export default function CrmProjects() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <FolderKanban className="h-8 w-8 text-primary" />
-            <div>
-              <h1 className="text-2xl font-bold">Projects</h1>
-              <p className="text-sm text-slate-500">Manage your project pipeline</p>
-            </div>
-          </div>
-          <Button onClick={() => setCreateDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" /> New Project
-          </Button>
-        </div>
+        <PageHeader
+          title="Projects"
+          description="Manage your project pipeline"
+          icon={FolderKanban}
+          actions={
+            <Button onClick={() => setCreateDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> New Project
+            </Button>
+          }
+        />
 
         <div className="flex overflow-x-auto overflow-y-hidden border-b border-slate-200">
           <button

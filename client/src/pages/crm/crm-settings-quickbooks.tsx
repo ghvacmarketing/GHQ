@@ -468,7 +468,7 @@ export default function CrmSettingsQuickBooks() {
   if (!isAdmin) {
     return (
       <CrmLayout currentUser={currentUser}>
-        <div className="p-6 max-w-4xl mx-auto">
+        <div className="mx-auto w-full max-w-4xl space-y-6">
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
@@ -482,13 +482,13 @@ export default function CrmSettingsQuickBooks() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="p-6 max-w-4xl mx-auto">
+      <div className="mx-auto w-full max-w-4xl space-y-6">
         <div className="flex items-center gap-4 mb-6">
           <Link href="/crm/settings" className="text-slate-500 hover:text-slate-700">
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">QuickBooks Integration</h1>
+            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">QuickBooks Integration</h1>
             <p className="text-slate-500">Connect and sync with QuickBooks Online</p>
           </div>
         </div>
@@ -694,11 +694,11 @@ export default function CrmSettingsQuickBooks() {
                         <>
                           <div className="grid grid-cols-3 gap-4 p-4 bg-slate-50 rounded-lg">
                             <div className="text-center">
-                              <div className="text-2xl font-bold text-slate-900">{parentAccounts.length}</div>
+                              <div className="font-display text-xl font-semibold tracking-tight text-foreground">{parentAccounts.length}</div>
                               <div className="text-xs text-slate-500">Parent Accounts</div>
                             </div>
                             <div className="text-center">
-                              <div className="text-2xl font-bold text-slate-900">{subAccounts.length}</div>
+                              <div className="font-display text-xl font-semibold tracking-tight text-foreground">{subAccounts.length}</div>
                               <div className="text-xs text-slate-500">Sub-Accounts</div>
                             </div>
                             <div className="text-center">

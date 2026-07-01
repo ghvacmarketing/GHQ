@@ -4962,23 +4962,6 @@ export default function CrmCustomerDetail() {
           </div>
         </div>
 
-        {/* FieldEdge Source Banner */}
-        {(customer as any).source === 'fieldedge' && (
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 flex items-center gap-3">
-            <div className="flex-shrink-0">
-              <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
-                <span className="text-orange-600 text-sm font-bold">FE</span>
-              </div>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-orange-800">FieldEdge Customer</p>
-              <p className="text-xs text-orange-600">
-                This customer is synced from your FieldEdge Google Sheet. Some features may be limited until you add them to the CRM.
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* New Job Dialog */}
         <Dialog open={createDialogOpen} onOpenChange={(open) => !open && handleCloseDialog()}>
           <DialogContent className="sm:max-w-[500px]">

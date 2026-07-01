@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { useLocation } from "wouter";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
@@ -14,7 +15,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -33,6 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import {
   MessageSquare,
@@ -48,11 +49,12 @@ import {
   Loader2,
   ArrowLeft,
   RefreshCw,
-  Maximize2,
-  Minimize2,
   Plus,
   User,
   Trash2,
+  PanelRight,
+  Phone,
+  CircleUserRound,
 } from "lucide-react";
 import type {
   CrmMessagingConversation,
@@ -61,11 +63,15 @@ import type {
   CrmCustomer,
   CrmUser,
 } from "@shared/schema";
-import { format } from "date-fns";
+import { format, isSameDay } from "date-fns";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { MessagingCustomerPanel } from "@/components/crm/messaging-customer-panel";
+import { cn } from "@/lib/utils";
 
 type ConversationWithCustomer = CrmMessagingConversation & {
   customer?: CrmCustomer | null;
+  lastMessagePreview?: string | null;
+  lastMessageDirection?: string | null;
 };
 
 type MessageWithAuthor = CrmMessagingMessage & {
@@ -79,20 +85,22 @@ type ConversationDetail = {
   customer?: CrmCustomer | null;
 };
 
-const statusColors: Record<string, string> = {
-  open: "bg-green-100 text-green-700",
-  snoozed: "bg-yellow-100 text-yellow-700",
-  resolved: "bg-blue-100 text-blue-700",
-  archived: "bg-slate-100 text-slate-500",
+const messageStatusIcons: Record<string, JSX.Element> = {
+  queued: <Clock className="h-3 w-3 opacity-70" />,
+  sent: <Check className="h-3 w-3 opacity-70" />,
+  delivered: <CheckCheck className="h-3 w-3 opacity-70" />,
+  read: <CheckCheck className="h-3 w-3" />,
+  failed: <X className="h-3 w-3 text-red-300" />,
 };
 
-const messageStatusIcons: Record<string, JSX.Element> = {
-  queued: <Clock className="h-3 w-3 text-slate-400" />,
-  sent: <Check className="h-3 w-3 text-slate-400" />,
-  delivered: <CheckCheck className="h-3 w-3 text-slate-400" />,
-  read: <CheckCheck className="h-3 w-3 text-blue-500" />,
-  failed: <X className="h-3 w-3 text-red-500" />,
-};
+type FilterTab = "open" | "unread" | "all" | "resolved";
+
+const FILTER_TABS: { value: FilterTab; label: string }[] = [
+  { value: "open", label: "Open" },
+  { value: "unread", label: "Unread" },
+  { value: "all", label: "All" },
+  { value: "resolved", label: "Resolved" },
+];
 
 function getInitials(name: string): string {
   return name
@@ -108,7 +116,7 @@ function formatMessageTime(date: Date | string | null): string {
   const d = new Date(date);
   const now = new Date();
   const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
-  
+
   if (diffDays === 0) {
     return format(d, "h:mm a");
   } else if (diffDays < 7) {
@@ -128,13 +136,21 @@ type CustomerSearchResult = {
 export default function CrmMessaging() {
   usePageTitle("Messaging");
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterTab, setFilterTab] = useState<FilterTab>("open");
   const [messageText, setMessageText] = useState("");
   const [showMobileThread, setShowMobileThread] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [contextSheetOpen, setContextSheetOpen] = useState(false);
+  const [contextCollapsed, setContextCollapsed] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("crm_msg_context_collapsed") === "1"
+  );
+  useEffect(() => {
+    localStorage.setItem("crm_msg_context_collapsed", contextCollapsed ? "1" : "0");
+  }, [contextCollapsed]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+
   const [newMessageOpen, setNewMessageOpen] = useState(false);
   const [newMessagePhone, setNewMessagePhone] = useState("");
   const [newMessageBody, setNewMessageBody] = useState("");
@@ -146,11 +162,14 @@ export default function CrmMessaging() {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
+  // Server-side status filter (unread is derived client-side over the open set)
+  const serverStatus = filterTab === "resolved" ? "resolved" : filterTab === "all" ? "" : "open";
+
   const { data: conversations, isLoading: loadingConversations } = useQuery<ConversationWithCustomer[]>({
-    queryKey: ["/api/crm/messaging/conversations", { status: "open", search: searchQuery }],
+    queryKey: ["/api/crm/messaging/conversations", { status: serverStatus, search: searchQuery }],
     queryFn: async () => {
       const params = new URLSearchParams();
-      params.set("status", "open");
+      if (serverStatus) params.set("status", serverStatus);
       if (searchQuery) params.set("search", searchQuery);
       const res = await fetch(`/api/crm/messaging/conversations?${params.toString()}`, {
         credentials: "include",
@@ -158,9 +177,22 @@ export default function CrmMessaging() {
       if (!res.ok) throw new Error("Failed to fetch conversations");
       return res.json();
     },
-    staleTime: 30000, // Cache for 30 seconds
-    refetchInterval: 30000, // Refresh every 30 seconds instead of 5
+    staleTime: 30000,
+    refetchInterval: 30000,
   });
+
+  const visibleConversations = useMemo(() => {
+    if (!conversations) return [];
+    if (filterTab === "unread") {
+      return conversations.filter((c) => (c.unreadInboundCount || 0) > 0);
+    }
+    return conversations;
+  }, [conversations, filterTab]);
+
+  const totalUnread = useMemo(
+    () => (conversations || []).reduce((sum, c) => sum + (c.unreadInboundCount || 0), 0),
+    [conversations]
+  );
 
   const { data: conversationDetail, isLoading: loadingDetail } = useQuery<ConversationDetail>({
     queryKey: ["/api/crm/messaging/conversations", selectedConversationId],
@@ -172,8 +204,8 @@ export default function CrmMessaging() {
       return res.json();
     },
     enabled: !!selectedConversationId,
-    staleTime: 30000, // Cache for 30 seconds
-    refetchInterval: 30000, // Refresh every 30 seconds instead of 5
+    staleTime: 30000,
+    refetchInterval: 30000,
   });
 
   const sendMessageMutation = useMutation({
@@ -206,7 +238,7 @@ export default function CrmMessaging() {
   });
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  
+
   const deleteConversationMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("DELETE", `/api/crm/messaging/conversations/${selectedConversationId}`);
@@ -279,10 +311,10 @@ export default function CrmMessaging() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/messaging/conversations"] });
     },
     onError: (error: any) => {
-      toast({ 
-        title: "Failed to send message", 
+      toast({
+        title: "Failed to send message",
         description: error?.message || "Please try again",
-        variant: "destructive" 
+        variant: "destructive",
       });
     },
   });
@@ -314,7 +346,6 @@ export default function CrmMessaging() {
 
   // Auto-sync with Textline on page load
   useEffect(() => {
-    // Always sync on page load to get latest messages
     syncTextlineMutation.mutate();
   }, []);
 
@@ -342,56 +373,117 @@ export default function CrmMessaging() {
 
   const selectedConversation = conversations?.find((c) => c.id === selectedConversationId);
 
+  const headerName =
+    conversationDetail?.customer?.name ||
+    conversationDetail?.conversation?.customerName ||
+    selectedConversation?.customerName ||
+    "Unknown Contact";
+  const headerPhone =
+    conversationDetail?.customer?.phone ||
+    conversationDetail?.conversation?.phoneNumber ||
+    selectedConversation?.phoneNumber ||
+    "";
+
+  const handleAddCustomer = () => {
+    const phone = conversationDetail?.conversation?.phoneNumber || selectedConversation?.phoneNumber || "";
+    const name = conversationDetail?.conversation?.customerName || selectedConversation?.customerName || "";
+    const params = new URLSearchParams();
+    if (phone) params.set("phone", phone);
+    if (name) params.set("name", name);
+    navigate(`/crm/accounts/new?${params.toString()}`);
+  };
+
   if (!currentUser) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-[#d3b07d]" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
+  const contextPanel = selectedConversationId ? (
+    <MessagingCustomerPanel
+      conversationId={selectedConversationId}
+      phoneNumber={headerPhone}
+      fallbackName={headerName}
+      onAddCustomer={handleAddCustomer}
+    />
+  ) : null;
+
   const messagingContent = (
-    <div className={`h-full flex overflow-hidden ${isFullscreen ? "fixed inset-0 z-50 bg-white" : ""}`}>
-      <div className={`w-full md:w-56 lg:w-64 border-r bg-white flex-shrink-0 flex flex-col ${showMobileThread ? "hidden md:flex" : "flex"}`}>
-        <div className="p-3 border-b space-y-2">
+    <div className="h-full flex overflow-hidden bg-muted/30">
+      {/* ───────────── Conversation list ───────────── */}
+      <div
+        className={cn(
+          "w-full md:w-72 lg:w-80 xl:w-96 border-r border-border bg-card flex-shrink-0 flex flex-col",
+          showMobileThread ? "hidden md:flex" : "flex"
+        )}
+      >
+        <div className="p-3 border-b border-border space-y-3">
           <div className="flex items-center justify-between">
-            <h1 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-[#d3b07d]" />
-              Messages
-              {syncTextlineMutation.isPending && (
-                <RefreshCw className="h-3 w-3 animate-spin text-slate-400" />
+            <h1 className="text-lg font-display font-semibold text-foreground flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <MessageSquare className="h-4 w-4" />
+              </span>
+              Inbox
+              {totalUnread > 0 && (
+                <Badge variant="default" className="ml-0.5">
+                  {totalUnread}
+                </Badge>
               )}
             </h1>
             <div className="flex items-center gap-1">
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => setNewMessageOpen(true)}
+                onClick={() => syncTextlineMutation.mutate()}
                 className="h-8 w-8 p-0"
-                data-testid="button-new-message"
+                title="Sync messages"
               >
-                <Plus className="h-4 w-4" />
+                <RefreshCw className={cn("h-4 w-4", syncTextlineMutation.isPending && "animate-spin")} />
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => setIsFullscreen(!isFullscreen)}
+                onClick={() => setNewMessageOpen(true)}
                 className="h-8 w-8 p-0"
-                data-testid="button-toggle-fullscreen"
+                data-testid="button-new-message"
+                title="New message"
               >
-                {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                <Plus className="h-4 w-4" />
               </Button>
             </div>
           </div>
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search..."
-              className="pl-8 h-8 text-sm"
+              placeholder="Search conversations…"
+              className="pl-8 h-9 text-sm"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               data-testid="input-search-conversations"
             />
+          </div>
+          {/* Filter tabs */}
+          <div className="flex items-center gap-0.5 rounded-md bg-muted p-0.5">
+            {FILTER_TABS.map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => setFilterTab(tab.value)}
+                className={cn(
+                  "flex-1 rounded-sm px-2 py-1 text-xs font-medium transition-colors",
+                  filterTab === tab.value
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                data-testid={`filter-tab-${tab.value}`}
+              >
+                {tab.label}
+                {tab.value === "unread" && totalUnread > 0 && (
+                  <span className="ml-1 text-primary">{totalUnread}</span>
+                )}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -399,65 +491,87 @@ export default function CrmMessaging() {
           {loadingConversations ? (
             <div className="p-3 space-y-2">
               {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex gap-2 p-2">
-                  <Skeleton className="h-9 w-9 rounded-full" />
-                  <div className="flex-1 space-y-1">
+                <div key={i} className="flex gap-3 p-2">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="flex-1 space-y-2">
                     <Skeleton className="h-4 w-3/4" />
                     <Skeleton className="h-3 w-1/2" />
                   </div>
                 </div>
               ))}
             </div>
-          ) : conversations?.length === 0 ? (
-            <div className="p-6 text-center text-slate-500">
-              <MessageSquare className="h-10 w-10 mx-auto mb-2 text-slate-300" />
-              <p className="text-sm">No conversations</p>
+          ) : visibleConversations.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">
+              <MessageSquare className="h-10 w-10 mx-auto mb-2 text-muted-foreground/40" />
+              <p className="text-sm font-medium">{searchQuery ? "No matches" : "No conversations"}</p>
+              <p className="text-xs">
+                {searchQuery
+                  ? `Nothing found for "${searchQuery}".`
+                  : filterTab === "unread"
+                    ? "You're all caught up."
+                    : "Start a new message to begin."}
+              </p>
             </div>
           ) : (
             <div>
-              {conversations?.map((conv) => {
+              {searchQuery && (
+                <p className="px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  {visibleConversations.length} result{visibleConversations.length === 1 ? "" : "s"} for “{searchQuery}”
+                </p>
+              )}
+              {visibleConversations.map((conv) => {
                 const hasUnread = (conv.unreadInboundCount || 0) > 0;
+                const isActive = selectedConversationId === conv.id;
+                const name = conv.customer?.name || conv.customerName || "Unknown";
+                const preview = conv.lastMessagePreview
+                  ? `${conv.lastMessageDirection === "outbound" ? "You: " : ""}${conv.lastMessagePreview}`
+                  : conv.phoneNumber || conv.customer?.phone || "";
                 return (
                   <button
                     key={conv.id}
-                    className={`w-full text-left p-3 border-b hover:bg-slate-50 transition-colors ${
-                      selectedConversationId === conv.id ? "bg-[#faf6ef] border-l-2 border-l-[#d3b07d]" : ""
-                    } ${hasUnread && selectedConversationId !== conv.id ? "bg-blue-50" : ""}`}
+                    className={cn(
+                      "w-full text-left px-3 py-2.5 border-b border-border/60 border-l-2 transition-colors",
+                      isActive ? "border-l-primary bg-muted/70" : "border-l-transparent hover:bg-muted/40"
+                    )}
                     onClick={() => {
                       setSelectedConversationId(conv.id);
                       setShowMobileThread(true);
                     }}
                     data-testid={`conversation-item-${conv.id}`}
                   >
-                    <div className="flex gap-2">
-                      <div className="relative">
-                        <Avatar className="h-9 w-9">
-                          <AvatarFallback className="bg-[#d3b07d] text-white text-xs">
-                            {getInitials(conv.customer?.name || conv.customerName || "?")}
-                          </AvatarFallback>
-                        </Avatar>
-                        {hasUnread && (
-                          <span 
-                            className="absolute -top-1 -right-1 bg-blue-600 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center"
-                            data-testid={`badge-unread-count-${conv.id}`}
-                          >
-                            {conv.unreadInboundCount! > 9 ? "9+" : conv.unreadInboundCount}
-                          </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className={cn(
+                            "flex min-w-0 items-center gap-1.5 truncate text-sm text-foreground",
+                            hasUnread ? "font-semibold" : "font-medium"
+                          )}
+                        >
+                          {hasUnread && (
+                            <span
+                              className="h-2 w-2 shrink-0 rounded-full bg-primary"
+                              data-testid={`badge-unread-count-${conv.id}`}
+                            />
+                          )}
+                          <span className="truncate">{name}</span>
+                        </span>
+                        <span
+                          className={cn(
+                            "text-xs shrink-0",
+                            hasUnread ? "text-primary font-medium" : "text-muted-foreground"
+                          )}
+                        >
+                          {formatMessageTime(conv.lastMessageAt)}
+                        </span>
+                      </div>
+                      <p
+                        className={cn(
+                          "text-xs truncate mt-0.5",
+                          hasUnread ? "text-foreground/80 font-medium" : "text-muted-foreground"
                         )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span className={`truncate text-sm ${hasUnread ? "font-bold text-slate-900" : "font-medium text-slate-900"}`}>
-                            {conv.customer?.name || conv.customerName || "Unknown"}
-                          </span>
-                          <span className={`text-xs ${hasUnread ? "text-blue-600 font-medium" : "text-slate-400"}`}>
-                            {formatMessageTime(conv.lastMessageAt)}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-500 truncate">
-                          {conv.phoneNumber || conv.customer?.phone || ""}
-                        </p>
-                      </div>
+                      >
+                        {preview}
+                      </p>
                     </div>
                   </button>
                 );
@@ -467,125 +581,171 @@ export default function CrmMessaging() {
         </ScrollArea>
       </div>
 
-      <div className={`flex-1 flex flex-col bg-white ${!showMobileThread ? "hidden md:flex" : "flex"}`}>
+      {/* ───────────── Thread ───────────── */}
+      <div className={cn("flex-1 flex flex-col bg-background min-w-0", !showMobileThread ? "hidden md:flex" : "flex")}>
         {!selectedConversationId ? (
-          <div className="flex-1 flex items-center justify-center text-slate-400">
+          <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <div className="text-center">
-              <MessageSquare className="h-12 w-12 mx-auto mb-3 text-slate-200" />
-              <p>Select a conversation</p>
+              <span className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
+                <MessageSquare className="h-7 w-7 text-muted-foreground/50" />
+              </span>
+              <p className="font-medium text-foreground">Select a conversation</p>
+              <p className="text-sm">Choose a conversation from the list to view messages.</p>
             </div>
           </div>
         ) : loadingDetail ? (
           <div className="flex-1 flex items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-[#d3b07d]" />
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
         ) : (
           <>
-            <div className="p-3 border-b flex items-center justify-between bg-white">
-              <div className="flex items-center gap-2">
+            <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-card">
+              <div className="flex items-center gap-3 min-w-0">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="md:hidden h-8 w-8 p-0"
+                  className="md:hidden h-8 w-8 p-0 shrink-0"
                   onClick={() => setShowMobileThread(false)}
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
-                <Avatar className="h-9 w-9">
-                  <AvatarFallback className="bg-[#d3b07d] text-white text-sm">
-                    {getInitials(conversationDetail?.customer?.name || conversationDetail?.conversation?.customerName || selectedConversation?.customerName || "?")}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h2 className="font-medium text-slate-900 text-sm">
-                    {conversationDetail?.customer?.name || conversationDetail?.conversation?.customerName || selectedConversation?.customerName || "Unknown Contact"}
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    {conversationDetail?.customer?.phone || conversationDetail?.conversation?.phoneNumber || selectedConversation?.phoneNumber || ""}
+                <div className="min-w-0">
+                  <h2 className="font-semibold text-foreground text-sm truncate">{headerName}</h2>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 truncate">
+                    <Phone className="h-3 w-3" /> {headerPhone || "No phone"}
                   </p>
                 </div>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "resolved" })}>
-                    <Check className="h-4 w-4 mr-2" /> Resolve
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "snoozed" })}>
-                    <BellOff className="h-4 w-4 mr-2" /> Snooze
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "archived" })}>
-                    <Archive className="h-4 w-4 mr-2" /> Archive
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    className="text-red-600 focus:text-red-600"
-                    onClick={() => setDeleteDialogOpen(true)}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" /> Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex items-center gap-1 shrink-0">
+                {/* Context toggle — collapses the rail on lg+, opens a drawer below lg */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 lg:hidden"
+                  onClick={() => setContextSheetOpen(true)}
+                  title="Customer details"
+                >
+                  <PanelRight className="h-4 w-4" />
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "open" })}>
+                      <MessageSquare className="h-4 w-4 mr-2" /> Reopen
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "resolved" })}>
+                      <Check className="h-4 w-4 mr-2" /> Resolve
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "snoozed" })}>
+                      <BellOff className="h-4 w-4 mr-2" /> Snooze
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "archived" })}>
+                      <Archive className="h-4 w-4 mr-2" /> Archive
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-red-600 focus:text-red-600"
+                      onClick={() => setDeleteDialogOpen(true)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hidden lg:inline-flex"
+                  onClick={() => setContextCollapsed((v) => !v)}
+                  title={contextCollapsed ? "Show customer details" : "Hide customer details"}
+                  data-testid="button-toggle-context"
+                >
+                  <PanelRight className={cn("h-4 w-4 transition-colors", !contextCollapsed && "text-primary")} />
+                </Button>
+              </div>
             </div>
 
-            <ScrollArea className="flex-1 p-3">
-              <div className="space-y-3">
-                {conversationDetail?.messages?.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      className={`max-w-[75%] rounded-xl px-3 py-2 ${
-                        msg.direction === "outbound"
-                          ? "bg-[#d3b07d] text-white"
-                          : msg.direction === "system"
-                          ? "bg-slate-100 text-slate-500 text-xs italic text-center w-full max-w-none"
-                          : "bg-slate-100 text-slate-900"
-                      }`}
-                      data-testid={`message-${msg.id}`}
-                    >
-                      <p className="whitespace-pre-wrap text-sm">{msg.body}</p>
-                      <div className={`flex items-center gap-1 mt-1 text-xs ${
-                        msg.direction === "outbound" ? "text-white/70 justify-end" : "text-slate-400"
-                      }`}>
-                        {msg.direction === "outbound" && msg.authorName && (
-                          <span className="mr-1">Sent by {msg.authorName} &middot;</span>
-                        )}
-                        <span>{formatMessageTime(msg.createdAt)}</span>
-                        {msg.direction === "outbound" && messageStatusIcons[msg.status || "sent"]}
+            <ScrollArea className="flex-1 px-4 py-4 lg:px-6">
+              <div className="space-y-1">
+                {conversationDetail?.messages?.map((msg, idx) => {
+                  const prev = conversationDetail.messages[idx - 1];
+                  const showDateDivider =
+                    !prev || !isSameDay(new Date(prev.createdAt || 0), new Date(msg.createdAt || 0));
+                  if (msg.direction === "system") {
+                    return (
+                      <div key={msg.id} className="flex justify-center py-2">
+                        <span className="rounded-full bg-muted px-3 py-1 text-xs italic text-muted-foreground">
+                          {msg.body}
+                        </span>
+                      </div>
+                    );
+                  }
+                  const outbound = msg.direction === "outbound";
+                  return (
+                    <div key={msg.id}>
+                      {showDateDivider && (
+                        <div className="flex justify-center py-3">
+                          <span className="rounded-full bg-muted px-3 py-1 text-[11px] font-medium text-muted-foreground">
+                            {msg.createdAt && format(new Date(msg.createdAt), "EEEE, MMMM d")}
+                          </span>
+                        </div>
+                      )}
+                      <div className={cn("flex flex-col", outbound ? "items-end" : "items-start")}>
+                        {/* Only the text is boxed */}
+                        <div
+                          className={cn(
+                            "max-w-[75%] rounded-2xl px-3.5 py-2",
+                            outbound
+                              ? "bg-[#c0607a] text-white rounded-br-sm shadow-sm"
+                              : "bg-muted text-foreground rounded-bl-sm"
+                          )}
+                          data-testid={`message-${msg.id}`}
+                        >
+                          <p className="whitespace-pre-wrap text-[0.9375rem] leading-relaxed">{msg.body}</p>
+                        </div>
+                        {/* Sender · time · status sit below the bubble, outside the box */}
+                        <div
+                          className={cn(
+                            "flex items-center gap-1 mt-1 px-1 text-[11px] text-muted-foreground",
+                            outbound ? "justify-end" : "justify-start"
+                          )}
+                        >
+                          {outbound && msg.authorName && <span className="mr-0.5">{msg.authorName} ·</span>}
+                          <span>{formatMessageTime(msg.createdAt)}</span>
+                          {outbound && messageStatusIcons[msg.status || "sent"]}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 <div ref={messagesEndRef} />
               </div>
             </ScrollArea>
 
-            <div className="p-3 border-t bg-white">
-              <div className="flex gap-2">
+            <div className="p-3 border-t border-border bg-card">
+              <div className="flex gap-2 items-end">
                 <Textarea
-                  placeholder="Type a message..."
+                  placeholder="Type a message…"
                   value={messageText}
                   onChange={(e) => setMessageText(e.target.value)}
                   onKeyDown={handleKeyDown}
                   rows={1}
-                  className="resize-none text-sm min-h-[40px]"
+                  className="resize-none text-sm min-h-[42px] max-h-32 rounded-lg focus-visible:ring-0 focus-visible:ring-offset-0"
                   data-testid="input-message-text"
                 />
                 <Button
+                  variant="ghost"
                   onClick={handleSendMessage}
                   disabled={!messageText.trim() || sendMessageMutation.isPending}
-                  className="bg-[#d3b07d] hover:bg-[#c4a06e] h-10 w-10 p-0"
+                  className="h-[42px] w-[42px] p-0 shrink-0 rounded-lg text-primary hover:bg-primary/10 hover:text-primary disabled:opacity-40"
                   data-testid="button-send-message"
                 >
                   {sendMessageMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-5 w-5 animate-spin" />
                   ) : (
-                    <Send className="h-4 w-4" />
+                    <Send className="h-5 w-5" />
                   )}
                 </Button>
               </div>
@@ -593,6 +753,19 @@ export default function CrmMessaging() {
           </>
         )}
       </div>
+
+      {/* ── Customer context rail (lg+, collapsible with the same smooth slide as the sidebar) ── */}
+      {selectedConversationId && (
+        <div
+          className={cn(
+            "hidden lg:block flex-shrink-0 overflow-hidden bg-card transition-[width] duration-[600ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+            contextCollapsed ? "lg:w-0 border-l-0" : "lg:w-80 xl:w-96 border-l border-border"
+          )}
+        >
+          {/* Fixed-width inner so the content clips/slides cleanly instead of reflowing */}
+          <div className="h-full w-80 xl:w-96">{contextPanel}</div>
+        </div>
+      )}
     </div>
   );
 
@@ -601,22 +774,22 @@ export default function CrmMessaging() {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Plus className="h-5 w-5 text-[#d3b07d]" />
+            <Plus className="h-5 w-5 text-primary" />
             New Message
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-4">
           {selectedCustomer ? (
-            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
               <div className="flex items-center gap-3">
-                <Avatar className="h-10 w-10">
-                  <AvatarFallback className="bg-[#d3b07d] text-white">
+                <Avatar className="h-10 w-10 rounded-md">
+                  <AvatarFallback className="bg-primary text-primary-foreground">
                     {getInitials(selectedCustomer.name)}
                   </AvatarFallback>
                 </Avatar>
                 <div>
                   <p className="font-medium text-sm">{selectedCustomer.name}</p>
-                  <p className="text-xs text-slate-500">{selectedCustomer.phone}</p>
+                  <p className="text-xs text-muted-foreground">{selectedCustomer.phone}</p>
                 </div>
               </div>
               <Button
@@ -633,9 +806,9 @@ export default function CrmMessaging() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Search Customer or Enter Phone</label>
               <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by name or enter phone number..."
+                  placeholder="Search by name or enter phone number…"
                   className="pl-8"
                   value={customerSearch || newMessagePhone}
                   onChange={(e) => {
@@ -652,27 +825,25 @@ export default function CrmMessaging() {
                 />
               </div>
               {customerSearchResults && customerSearchResults.length > 0 && (
-                <div className="border rounded-lg max-h-40 overflow-y-auto">
+                <div className="border border-border rounded-lg max-h-40 overflow-y-auto">
                   {customerSearchResults.map((customer) => (
                     <button
                       key={customer.id}
-                      className="w-full text-left p-2 hover:bg-slate-50 flex items-center gap-2 border-b last:border-b-0"
+                      className="w-full text-left p-2 hover:bg-muted flex items-center gap-2 border-b border-border last:border-b-0"
                       onClick={() => handleSelectCustomer(customer)}
                       data-testid={`customer-option-${customer.id}`}
                     >
-                      <User className="h-4 w-4 text-slate-400" />
+                      <User className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="text-sm font-medium">{customer.name}</p>
-                        <p className="text-xs text-slate-500">{customer.phone}</p>
+                        <p className="text-xs text-muted-foreground">{customer.phone}</p>
                       </div>
                     </button>
                   ))}
                 </div>
               )}
               {newMessagePhone && !selectedCustomer && (
-                <p className="text-xs text-slate-500">
-                  Sending to: {newMessagePhone}
-                </p>
+                <p className="text-xs text-muted-foreground">Sending to: {newMessagePhone}</p>
               )}
             </div>
           )}
@@ -680,7 +851,7 @@ export default function CrmMessaging() {
           <div className="space-y-2">
             <label className="text-sm font-medium">Message</label>
             <Textarea
-              placeholder="Type your message..."
+              placeholder="Type your message…"
               value={newMessageBody}
               onChange={(e) => setNewMessageBody(e.target.value)}
               rows={3}
@@ -706,11 +877,10 @@ export default function CrmMessaging() {
           <Button
             onClick={handleStartNewConversation}
             disabled={
-              startConversationMutation.isPending || 
-              (!selectedCustomer?.phone && !newMessagePhone.trim()) || 
+              startConversationMutation.isPending ||
+              (!selectedCustomer?.phone && !newMessagePhone.trim()) ||
               !newMessageBody.trim()
             }
-            className="bg-[#d3b07d] hover:bg-[#c4a06e]"
             data-testid="button-send-new-message"
           >
             {startConversationMutation.isPending ? (
@@ -740,9 +910,7 @@ export default function CrmMessaging() {
             onClick={() => deleteConversationMutation.mutate()}
             className="bg-red-600 hover:bg-red-700"
           >
-            {deleteConversationMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : null}
+            {deleteConversationMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Delete
           </AlertDialogAction>
         </AlertDialogFooter>
@@ -750,21 +918,25 @@ export default function CrmMessaging() {
     </AlertDialog>
   );
 
-  if (isFullscreen) {
-    return (
-      <>
-        {messagingContent}
-        {newMessageDialog}
-        {deleteConfirmDialog}
-      </>
-    );
-  }
+  // Context drawer for screens below lg (where the rail is hidden)
+  const contextDrawer = (
+    <Sheet open={contextSheetOpen} onOpenChange={setContextSheetOpen}>
+      <SheetContent side="right" className="w-full max-w-sm p-0">
+        <div className="flex items-center gap-2 border-b border-border p-3">
+          <CircleUserRound className="h-5 w-5 text-primary" />
+          <span className="font-semibold text-foreground">Customer details</span>
+        </div>
+        <div className="h-[calc(100%-3.5rem)]">{contextPanel}</div>
+      </SheetContent>
+    </Sheet>
+  );
 
   return (
-    <CrmLayout currentUser={currentUser} disableScroll hideGlobalSearch>
+    <CrmLayout currentUser={currentUser} disableScroll hideGlobalSearch flush>
       {messagingContent}
       {newMessageDialog}
       {deleteConfirmDialog}
+      {contextDrawer}
     </CrmLayout>
   );
 }

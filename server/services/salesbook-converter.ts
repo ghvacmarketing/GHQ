@@ -2,7 +2,7 @@ import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 
-const PDF_PATH = path.join(process.cwd(), "attached_assets", "Chandler_Sales_Book_1766587153181.pdf");
+const PDF_PATH = path.join(process.cwd(), "attached_assets", "GHVAC-Sales-Pricebook-2026.pdf");
 const OUTPUT_DIR = path.join(process.cwd(), "public", "salesbook-pages");
 const PAGE_PREFIX = "page";
 const DPI = 150;

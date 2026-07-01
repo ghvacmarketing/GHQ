@@ -1,157 +1,75 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import HTMLFlipBook from "react-pageflip";
+import { Document, Page, pdfjs } from "react-pdf";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
 import { CrmLayout } from "@/components/crm/crm-layout";
-
-interface FlipBookRef {
-  pageFlip(): {
-    flip(page: number): void;
-    flipNext(): void;
-    flipPrev(): void;
-    turnToPage(page: number): void;
-    getCurrentPageIndex(): number;
-    getPageCount(): number;
-  } | null;
-}
-
-import {
-  ChevronLeft,
-  ChevronRight,
-  ZoomIn,
-  ZoomOut,
-  Maximize,
-  Minimize,
-  BookOpen,
-  X,
-  List,
-  Loader2,
-  Download,
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { PricebookPackage, CrawlspaceTier, SalesbookBookmark } from "@shared/schema";
+import { cn } from "@/lib/utils";
 import {
-  StaticPageImage,
-  CategoryDividerPage,
-  TierHeaderPage,
-  ProductDetailPage,
-  SingleTierDetailPage,
-  WaterHeaterDetailPage,
-  EliteDividerPage,
-  EliteBundlesPage,
-  EliteDiscountPage,
-  EliteAirflowPage,
-  CrawlspaceDividerPage,
-  CrawlspaceTiersPage,
-  CrawlspaceExamplePage,
-  CrawlspaceElitePage,
-  CrawlspaceEliteExamplePage,
-  GefaDividerPage,
-  GefaOverviewPage,
-  GefaComparisonPage,
-  GefaQualifyPage,
-  buildSalesbookSections,
-  getSalesbookTOC,
-  type SalesbookSection,
-  type EliteBundle,
-  type EliteAirflowOption,
-} from "@/components/salesbook-pages";
+  ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize, Minimize,
+  Loader2, Download, List, X,
+} from "lucide-react";
 
-interface SalesbookData {
-  staticPages: string[];
-  pageWidth: number;
-  pageHeight: number;
-  packages: PricebookPackage[];
-  crawlspaceTiers: CrawlspaceTier[];
-  eliteCoreBundles: EliteBundle[];
-  eliteAirflowOptions: EliteAirflowOption[];
-}
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+
+const PDF_URL = "/assets/GHVAC-Sales-Pricebook-2026.pdf";
+const PDF_FILENAME = "GHVAC-Sales-Pricebook-2026.pdf";
+
+// Section map for the 2026 pricebook (the PDF has no embedded outline and its
+// pages are flattened images, so section starts are pinned to the divider pages).
+type Section = { key: string; label: string; short: string; page: number };
+const SECTIONS: Section[] = [
+  { key: "intro",  label: "Introduction",       short: "Intro",     page: 1 },
+  { key: "gefa",   label: "GEFA Rebates",        short: "GEFA",      page: 13 },
+  { key: "sga",    label: "Split Gas Air",       short: "SGA",       page: 17 },
+  { key: "shp",    label: "Split Heat Pump",     short: "SHP",       page: 42 },
+  { key: "gp",     label: "Gas Package",         short: "GP",        page: 67 },
+  { key: "php",    label: "Packaged Heat Pump",  short: "PHP",       page: 75 },
+  { key: "mini",   label: "Mini-Split",          short: "Mini",      page: 83 },
+  { key: "duct",   label: "Duct System",         short: "Duct",      page: 85 },
+  { key: "water",  label: "Water Heaters",       short: "Water",     page: 87 },
+  { key: "elite",  label: "Elite Package",       short: "Elite",     page: 89 },
+  { key: "crawl",  label: "Crawlspace",          short: "Crawl",     page: 93 },
+];
 
 export default function CrmSalesbook() {
-  const { data: currentUser } = useQuery<any>({
-    queryKey: ["/api/crm/auth/me"],
-  });
-  const [currentPage, setCurrentPage] = useState(0);
-  const currentPageRef = useRef(0);
-  const [scale, setScale] = useState(1);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showBookmarks, setShowBookmarks] = useState(false);
+  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/crm/auth/me"] });
+
+  const [numPages, setNumPages] = useState(0);
+  const [page, setPage] = useState(1); // 1-based
   const [pageInput, setPageInput] = useState("1");
-  const [containerSize, setContainerSize] = useState({ w: 800, h: 600 });
-  const [resizing, setResizing] = useState(false);
-  const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [tocOpen, setTocOpen] = useState(true);
+  const [size, setSize] = useState({ w: 900, h: 640 });
+
   const viewerRef = useRef<HTMLDivElement>(null);
-  const flipBookRef = useRef<FlipBookRef>(null);
-  const [isExporting, setIsExporting] = useState(false);
-
-  const { data: salesbookData, isLoading } = useQuery<SalesbookData>({
-    queryKey: ["/api/salesbook/data"],
-  });
-
-  const { data: bookmarks = [] } = useQuery<SalesbookBookmark[]>({
-    queryKey: ["/api/salesbook/bookmarks"],
-  });
-
-  const sections = useMemo(() => {
-    if (!salesbookData) return [];
-    return buildSalesbookSections(
-      salesbookData.staticPages,
-      salesbookData.packages,
-      salesbookData.crawlspaceTiers,
-      salesbookData.eliteCoreBundles,
-      salesbookData.eliteAirflowOptions,
-    );
-  }, [salesbookData]);
-
-  const toc = useMemo(() => {
-    if (bookmarks.length > 0) {
-      return bookmarks
-        .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map((b) => ({ label: b.label, page: b.pageNumber }));
-    }
-    return getSalesbookTOC(sections);
-  }, [bookmarks, sections]);
-  const totalPages = sections.length;
-
-  const [layoutReady, setLayoutReady] = useState(false);
+  const stageRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const updateSize = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        if (rect.width > 100 && rect.height > 100) {
-          setContainerSize({ w: rect.width, h: rect.height });
-          setLayoutReady(true);
-        }
-      }
+    const el = stageRef.current;
+    if (!el) return;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      setSize((prev) => {
+        const w = Math.round(r.width), h = Math.round(r.height);
+        return prev.w === w && prev.h === h ? prev : { w, h };
+      });
     };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
-    const debouncedUpdate = () => {
-      setResizing(true);
-      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
-      resizeTimerRef.current = setTimeout(() => {
-        updateSize();
-        setResizing(false);
-      }, 200);
-    };
-
-    const retryInterval = setInterval(updateSize, 100);
-    const observer = new ResizeObserver((entries) => {
-      if (!layoutReady) {
-        updateSize();
-      } else {
-        debouncedUpdate();
-      }
-    });
-    if (containerRef.current) observer.observe(containerRef.current);
-
-    return () => {
-      clearInterval(retryInterval);
-      observer.disconnect();
-      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
-    };
-  }, [layoutReady]);
+  // Collapse the TOC by default on small screens.
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 900) setTocOpen(false);
+  }, []);
 
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement);
@@ -159,478 +77,209 @@ export default function CrmSalesbook() {
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
 
-  const onFlip = useCallback((e: { data: number }) => {
-    const page = e.data;
-    currentPageRef.current = page;
-    setCurrentPage(page);
-    setPageInput(String(page + 1));
-  }, []);
+  const goTo = useCallback((p: number) => {
+    setPage((prev) => {
+      const next = Math.max(1, Math.min(p, numPages || 1));
+      setPageInput(String(next));
+      if (next !== prev) stageRef.current?.scrollTo({ top: 0 });
+      return next;
+    });
+  }, [numPages]);
 
-  const goToPage = useCallback(
-    (pageNum: number) => {
-      if (totalPages === 0) return;
-      const p = Math.max(0, Math.min(pageNum, totalPages - 1));
-      if (flipBookRef.current) {
-        flipBookRef.current.pageFlip()?.turnToPage(p);
-      }
-      currentPageRef.current = p;
-      setCurrentPage(p);
-      setPageInput(String(p + 1));
-    },
-    [totalPages]
-  );
-
-  const handlePageInputSubmit = () => {
-    const p = parseInt(pageInput, 10);
-    if (!isNaN(p)) goToPage(p - 1);
-  };
-
-  const toggleFullscreen = async () => {
-    if (!viewerRef.current) return;
-    if (!document.fullscreenElement) {
-      await viewerRef.current.requestFullscreen();
-    } else {
-      await document.exitFullscreen();
-    }
-  };
-
-  const zoomIn = () => setScale((s) => Math.min(s + 0.2, 2.5));
-  const zoomOut = () => setScale((s) => Math.max(s - 0.2, 0.5));
+  const next = useCallback(() => goTo(page + 1), [goTo, page]);
+  const prev = useCallback(() => goTo(page - 1), [goTo, page]);
+  const zoomIn = useCallback(() => setZoom((z) => Math.min(z + 0.2, 3)), []);
+  const zoomOut = useCallback(() => setZoom((z) => Math.max(z - 0.2, 0.5)), []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return;
-      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-        e.preventDefault();
-        flipBookRef.current?.pageFlip()?.flipNext();
-      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-        e.preventDefault();
-        flipBookRef.current?.pageFlip()?.flipPrev();
-      } else if (e.key === "+" || e.key === "=") {
-        zoomIn();
-      } else if (e.key === "-") {
-        zoomOut();
-      }
+      if (e.key === "ArrowRight" || e.key === "PageDown") { e.preventDefault(); next(); }
+      else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); prev(); }
+      else if (e.key === "+" || e.key === "=") zoomIn();
+      else if (e.key === "-") zoomOut();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  }, [next, prev, zoomIn, zoomOut]);
 
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        if (e.deltaY < 0) zoomIn();
-        else zoomOut();
-      }
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, []);
+  const toggleFullscreen = async () => {
+    if (!viewerRef.current) return;
+    if (!document.fullscreenElement) await viewerRef.current.requestFullscreen();
+    else await document.exitFullscreen();
+  };
 
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    let initialDistance = 0;
-    let initialScale = 1;
-    const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        initialDistance = Math.hypot(dx, dy);
-        initialScale = scale;
-      }
-    };
-    const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length === 2 && initialDistance > 0) {
-        e.preventDefault();
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        const currentDistance = Math.hypot(dx, dy);
-        const newScale = Math.max(0.5, Math.min(2.5, initialScale * (currentDistance / initialDistance)));
-        setScale(newScale);
-      }
-    };
-    const onTouchEnd = () => {
-      initialDistance = 0;
-    };
-    el.addEventListener("touchstart", onTouchStart, { passive: true });
-    el.addEventListener("touchmove", onTouchMove, { passive: false });
-    el.addEventListener("touchend", onTouchEnd, { passive: true });
-    return () => {
-      el.removeEventListener("touchstart", onTouchStart);
-      el.removeEventListener("touchmove", onTouchMove);
-      el.removeEventListener("touchend", onTouchEnd);
-    };
-  }, [scale]);
+  const isNarrow = size.w < 720;
+  const pageDims = useMemo(() => {
+    const pad = 32;
+    if (isNarrow) return { width: Math.max(240, (size.w - pad) * zoom) };
+    return { height: Math.max(320, (size.h - pad) * zoom) };
+  }, [isNarrow, size.w, size.h, zoom]);
 
-  const isMobile = containerSize.w < 640;
-  const bookPanelWidth = showBookmarks && !isMobile ? 256 : 0;
-  const availWidth = Math.max(containerSize.w - bookPanelWidth - 32, 200);
-  const availHeight = containerSize.h - 16;
+  // The active section is the last one whose start page we've reached.
+  const activeKey = useMemo(() => {
+    let key = SECTIONS[0].key;
+    for (const s of SECTIONS) if (page >= s.page) key = s.key;
+    return key;
+  }, [page]);
 
-  const aspectRatio = salesbookData ? salesbookData.pageHeight / salesbookData.pageWidth : 1.294;
-  let pageW: number;
-  let pageH: number;
+  const handleInputSubmit = () => {
+    const p = parseInt(pageInput, 10);
+    if (!isNaN(p)) goTo(p);
+  };
 
-  if (isMobile) {
-    pageW = Math.min(availWidth - 8, 500);
-    pageH = pageW * aspectRatio;
-    if (pageH > availHeight - 8) {
-      pageH = availHeight - 8;
-      pageW = pageH / aspectRatio;
-    }
-  } else {
-    pageH = Math.min(availHeight - 8, 800);
-    pageW = pageH / aspectRatio;
-    if (pageW * 2 > availWidth) {
-      pageW = (availWidth) / 2;
-      pageH = pageW * aspectRatio;
-    }
-  }
-
-  pageW = Math.max(Math.floor(pageW), 200);
-  pageH = Math.max(Math.floor(pageH), 260);
-
-  const handleDownloadPdf = useCallback(async () => {
-    if (isExporting) return;
-    setIsExporting(true);
-    try {
-      const res = await fetch("/api/salesbook/pdf");
-      if (!res.ok) throw new Error("Failed to generate PDF");
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "GHVAC-Sales-Pricebook-2026.pdf";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("PDF download failed:", err);
-      alert("Sorry, the PDF could not be generated. Please try again.");
-    } finally {
-      setIsExporting(false);
-    }
-  }, [isExporting]);
-
-  const renderSection = (section: SalesbookSection) => {
-    switch (section.type) {
-      case "static":
-        return <StaticPageImage key={section.pageIndex} src={section.staticSrc!} pageNum={section.pageIndex + 1} />;
-      case "category-divider":
-        return (
-          <CategoryDividerPage
-            key={section.pageIndex}
-            unitType={section.unitType!}
-            tierCount={section.tierCount || 0}
-            packageCount={section.packages?.length || 0}
-            heroImageUrl={section.heroImageUrl}
-          />
-        );
-      case "tier-header":
-        return (
-          <TierHeaderPage
-            key={section.pageIndex}
-            unitType={section.unitType!}
-            tier={section.tier!}
-            packages={section.packages || []}
-          />
-        );
-      case "product-detail":
-        return (
-          <ProductDetailPage
-            key={section.pageIndex}
-            unitType={section.unitType!}
-            tier={section.tier!}
-            tonnage={section.tonnage!}
-            packages={section.packages || []}
-          />
-        );
-      case "ducting-detail":
-        return (
-          <SingleTierDetailPage
-            key={section.pageIndex}
-            unitType={section.unitType!}
-            packages={section.packages || []}
-          />
-        );
-      case "water-heater-detail":
-        return (
-          <WaterHeaterDetailPage
-            key={section.pageIndex}
-            packages={section.packages || []}
-          />
-        );
-      case "gefa-divider":
-        return <GefaDividerPage key={section.pageIndex} />;
-      case "gefa-overview":
-        return <GefaOverviewPage key={section.pageIndex} />;
-      case "gefa-comparison":
-        return <GefaComparisonPage key={section.pageIndex} />;
-      case "gefa-qualify":
-        return <GefaQualifyPage key={section.pageIndex} />;
-      case "elite-divider":
-        return <EliteDividerPage key={section.pageIndex} />;
-      case "elite-bundles":
-        return <EliteBundlesPage key={section.pageIndex} bundles={section.eliteCoreBundles || []} />;
-      case "elite-discount":
-        return <EliteDiscountPage key={section.pageIndex} />;
-      case "elite-airflow":
-        return <EliteAirflowPage key={section.pageIndex} options={section.eliteAirflowOptions || []} />;
-      case "crawlspace-divider":
-        return <CrawlspaceDividerPage key={section.pageIndex} />;
-      case "crawlspace-tiers":
-        return <CrawlspaceTiersPage key={section.pageIndex} tiers={section.crawlspaceTiers || []} />;
-      case "crawlspace-example":
-        return <CrawlspaceExamplePage key={section.pageIndex} />;
-      case "crawlspace-elite":
-        return <CrawlspaceElitePage key={section.pageIndex} />;
-      case "crawlspace-elite-example":
-        return <CrawlspaceEliteExamplePage key={section.pageIndex} />;
-      default:
-        return null;
-    }
+  const jumpToSection = (s: Section) => {
+    goTo(s.page);
+    if (typeof window !== "undefined" && window.innerWidth < 900) setTocOpen(false);
   };
 
   return (
     <CrmLayout currentUser={currentUser}>
       <div
         ref={viewerRef}
-        className="flex flex-col bg-neutral-900 text-white overflow-hidden rounded-lg"
-        style={{ height: isFullscreen ? "100vh" : "calc(100vh - 80px)" }}
+        className="flex flex-col overflow-hidden rounded-xl border border-border bg-card"
+        style={{ height: isFullscreen ? "100vh" : "calc(100vh - 96px)" }}
       >
-        <div className="flex-shrink-0 bg-neutral-800 border-b border-neutral-700 px-3 py-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4 text-amber-400" />
-            <span className="text-sm font-semibold">Sales Pricebook</span>
-          </div>
-          <div className="flex items-center space-x-1">
+        {/* Toolbar */}
+        <div className="flex flex-shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
+          <div className="flex min-w-0 items-center gap-2">
             <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleDownloadPdf}
-              disabled={isExporting || sections.length === 0}
-              className="text-white hover:bg-neutral-700 h-8 w-8 disabled:opacity-50"
-              title="Download PDF"
-            >
-              {isExporting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowBookmarks(!showBookmarks)}
-              className="text-white hover:bg-neutral-700 h-8 w-8"
-              title="Table of Contents"
+              variant="ghost" size="icon"
+              onClick={() => setTocOpen((v) => !v)}
+              className={cn("h-8 w-8", tocOpen && "bg-muted text-primary")}
+              title="Table of contents"
+              data-testid="button-toc-toggle"
             >
               <List className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={zoomOut}
-              className="text-white hover:bg-neutral-700 h-8 w-8"
-              title="Zoom Out"
-            >
+            <div className="min-w-0 leading-tight">
+              <p className="truncate text-sm font-semibold text-foreground">Sales Pricebook</p>
+              <p className="text-[11px] text-muted-foreground">2026 edition</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={zoomOut} disabled={zoom <= 0.5} className="h-8 w-8" title="Zoom out">
               <ZoomOut className="h-4 w-4" />
             </Button>
-            <span className="text-xs text-neutral-400 w-10 text-center hidden sm:block">
-              {Math.round(scale * 100)}%
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={zoomIn}
-              className="text-white hover:bg-neutral-700 h-8 w-8"
-              title="Zoom In"
-            >
+            <span className="w-11 text-center text-xs tabular-nums text-muted-foreground">{Math.round(zoom * 100)}%</span>
+            <Button variant="ghost" size="icon" onClick={zoomIn} disabled={zoom >= 3} className="h-8 w-8" title="Zoom in">
               <ZoomIn className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleFullscreen}
-              className="text-white hover:bg-neutral-700 h-8 w-8"
-              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-            >
+            <div className="mx-1 h-5 w-px bg-border" />
+            <a href={PDF_URL} download={PDF_FILENAME} title="Download PDF">
+              <Button variant="ghost" size="icon" className="h-8 w-8"><Download className="h-4 w-4" /></Button>
+            </a>
+            <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="h-8 w-8" title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>
               {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
             </Button>
           </div>
         </div>
 
-        <div className="flex-1 flex overflow-hidden relative">
-          {isExporting && (
-            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-neutral-900/85">
-              <Loader2 className="h-9 w-9 animate-spin text-amber-400" />
-              <p className="text-sm text-neutral-100">
-                Preparing your PDF…
-              </p>
-              <p className="text-xs text-neutral-400">This only takes a few seconds.</p>
-            </div>
-          )}
-          {showBookmarks && (
-            <div className="w-64 bg-neutral-800 border-r border-neutral-700 flex flex-col flex-shrink-0 absolute sm:relative z-20 h-full">
-              <div className="flex items-center justify-between p-3 border-b border-neutral-700">
-                <div className="flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 text-amber-400" />
-                  <span className="text-sm font-semibold">Contents</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowBookmarks(false)}
-                  className="text-neutral-400 hover:text-white hover:bg-neutral-700 h-6 w-6"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
+        {/* Section tabs */}
+        <div className="flex flex-shrink-0 items-center gap-1 overflow-x-auto border-b border-border px-2 py-1.5 scrollbar-hide">
+          {SECTIONS.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => jumpToSection(s)}
+              className={cn(
+                "shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                activeKey === s.key
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+              data-testid={`tab-${s.key}`}
+            >
+              {s.short}
+            </button>
+          ))}
+        </div>
+
+        {/* Body: TOC + stage */}
+        <div className="flex min-h-0 flex-1">
+          {tocOpen && (
+            <aside className="flex w-56 flex-shrink-0 flex-col border-r border-border bg-muted/30">
+              <div className="flex items-center justify-between px-3 py-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Contents</span>
+                <button onClick={() => setTocOpen(false)} className="rounded p-0.5 text-muted-foreground hover:text-foreground lg:hidden">
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-2">
-                {toc.length === 0 ? (
-                  <p className="text-xs text-neutral-500 p-2">Loading contents...</p>
-                ) : (
-                  <ul className="space-y-0.5">
-                    <li>
-                      <button
-                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                          currentPage < (toc.length > 0 ? toc[0].page - 1 : 12)
-                            ? "bg-amber-600/20 text-amber-400"
-                            : "text-neutral-300 hover:bg-neutral-700 hover:text-white"
-                        }`}
-                        onClick={() => {
-                          goToPage(0);
-                          if (isMobile) setShowBookmarks(false);
-                        }}
-                      >
-                        <span className="block truncate">Introduction</span>
-                        <span className="text-xs text-neutral-500">Page 1</span>
-                      </button>
-                    </li>
-                    {toc.map((entry, idx) => (
-                      <li key={idx}>
-                        <button
-                          className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
-                            currentPage + 1 >= entry.page &&
-                            (idx === toc.length - 1 || currentPage + 1 < toc[idx + 1].page)
-                              ? "bg-amber-600/20 text-amber-400"
-                              : "text-neutral-300 hover:bg-neutral-700 hover:text-white"
-                          }`}
-                          onClick={() => {
-                            goToPage(entry.page - 1);
-                            if (isMobile) setShowBookmarks(false);
-                          }}
-                        >
-                          <span className="block truncate">{entry.label}</span>
-                          <span className="text-xs text-neutral-500">Page {entry.page}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
+              <nav className="flex-1 overflow-y-auto px-2 pb-3">
+                {SECTIONS.map((s) => (
+                  <button
+                    key={s.key}
+                    onClick={() => jumpToSection(s)}
+                    className={cn(
+                      "group flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors",
+                      activeKey === s.key
+                        ? "bg-primary/10 font-medium text-primary"
+                        : "text-foreground hover:bg-muted"
+                    )}
+                    data-testid={`toc-${s.key}`}
+                  >
+                    <span className="truncate">{s.label}</span>
+                    <span className={cn("text-[11px] tabular-nums", activeKey === s.key ? "text-primary" : "text-muted-foreground")}>
+                      {s.page}
+                    </span>
+                  </button>
+                ))}
+              </nav>
+            </aside>
           )}
 
-          <div
-            ref={containerRef}
-            className="flex-1 overflow-auto flex justify-center items-center bg-neutral-600"
-          >
-            {isLoading || !layoutReady ? (
-              <div className="flex flex-col items-center justify-center gap-3">
-                <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
-                <p className="text-sm text-neutral-400">Loading salesbook...</p>
-              </div>
-            ) : sections.length > 0 ? (
-              <div style={{
-                transform: `scale(${scale})${!isMobile && (currentPage === 0 || currentPage >= totalPages - 1) ? ` translateX(${currentPage === 0 ? `-${Math.floor(pageW / 2)}px` : `${Math.floor(pageW / 2)}px`})` : ''}`,
-                transformOrigin: 'center center',
-                transition: 'transform 0.3s ease-out, opacity 0.2s ease-out',
-                opacity: resizing ? 0 : 1,
-              }}>
-                <HTMLFlipBook
-                  key={`${pageW}-${pageH}`}
-                  ref={flipBookRef}
-                  style={{}}
-                  width={pageW}
-                  height={pageH}
-                  size="fixed"
-                  minWidth={200}
-                  maxWidth={1200}
-                  minHeight={260}
-                  maxHeight={1600}
-                  showCover={true}
-                  mobileScrollSupport={false}
-                  onFlip={onFlip}
-                  className="flipbook-container"
-                  startPage={currentPageRef.current}
-                  drawShadow={true}
-                  flippingTime={400}
-                  usePortrait={isMobile}
-                  startZIndex={0}
-                  autoSize={false}
-                  maxShadowOpacity={0.15}
-                  showPageCorners={true}
-                  disableFlipByClick={true}
-                  swipeDistance={50}
-                  clickEventForward={false}
-                  useMouseEvents={true}
-                  renderOnlyPageLengthChange={false}
-                >
-                  {sections.map(renderSection)}
-                </HTMLFlipBook>
+          {/* Stage */}
+          <div ref={stageRef} className="relative flex flex-1 items-center justify-center overflow-auto bg-neutral-200 dark:bg-neutral-900">
+            {loadError ? (
+              <div className="flex flex-col items-center gap-2 text-center">
+                <p className="text-sm text-muted-foreground">Could not load the salesbook PDF.</p>
+                <a href={PDF_URL} download={PDF_FILENAME}>
+                  <Button variant="outline" size="sm" className="mt-1"><Download className="mr-1.5 h-3.5 w-3.5" /> Download instead</Button>
+                </a>
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-3">
-                <BookOpen className="h-8 w-8 text-neutral-500" />
-                <p className="text-sm text-neutral-400">No salesbook pages available</p>
-              </div>
+              <Document
+                file={PDF_URL}
+                onLoadSuccess={({ numPages }) => { setNumPages(numPages); setLoadError(false); }}
+                onLoadError={() => setLoadError(true)}
+                loading={<div className="flex flex-col items-center gap-3"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="text-sm text-muted-foreground">Loading salesbook…</p></div>}
+                error={<p className="text-sm text-muted-foreground">Could not load the salesbook PDF.</p>}
+              >
+                <Page
+                  pageNumber={page}
+                  width={pageDims.width}
+                  height={pageDims.height}
+                  devicePixelRatio={Math.max(2, typeof window !== "undefined" ? window.devicePixelRatio : 1)}
+                  renderTextLayer={false}
+                  renderAnnotationLayer={false}
+                  className="my-4 shadow-xl [&>canvas]:rounded-sm"
+                  loading={null}
+                />
+              </Document>
             )}
           </div>
         </div>
 
-        <div className="flex-shrink-0 bg-neutral-800 border-t border-neutral-700 px-3 py-2">
-          <div className="flex items-center justify-center gap-2 sm:gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => flipBookRef.current?.pageFlip()?.flipPrev()}
-              disabled={currentPage <= 0}
-              className="text-white hover:bg-neutral-700 h-8 w-8 disabled:opacity-30"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-
-            <div className="flex items-center gap-1.5 text-sm">
-              <span className="text-neutral-400">Page</span>
-              <Input
-                type="text"
-                value={pageInput}
-                onChange={(e) => setPageInput(e.target.value)}
-                onBlur={handlePageInputSubmit}
-                onKeyDown={(e) => e.key === "Enter" && handlePageInputSubmit()}
-                className="w-12 h-7 text-center bg-neutral-700 border-neutral-600 text-white text-sm p-0"
-              />
-              <span className="text-neutral-400">of {totalPages || "..."}</span>
-            </div>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => flipBookRef.current?.pageFlip()?.flipNext()}
-              disabled={totalPages > 0 ? currentPage >= totalPages - 1 : true}
-              className="text-white hover:bg-neutral-700 h-8 w-8 disabled:opacity-30"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </Button>
+        {/* Footer nav */}
+        <div className="flex flex-shrink-0 items-center justify-center gap-3 border-t border-border px-3 py-2">
+          <Button variant="ghost" size="icon" onClick={prev} disabled={page <= 1} className="h-8 w-8 disabled:opacity-30" title="Previous page">
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex items-center gap-1.5 text-sm">
+            <span className="text-muted-foreground">Page</span>
+            <Input
+              type="text"
+              value={pageInput}
+              onChange={(e) => setPageInput(e.target.value)}
+              onBlur={handleInputSubmit}
+              onKeyDown={(e) => e.key === "Enter" && handleInputSubmit()}
+              className="h-7 w-12 p-0 text-center text-sm"
+            />
+            <span className="text-muted-foreground">of {numPages || "…"}</span>
           </div>
+          <Button variant="ghost" size="icon" onClick={next} disabled={numPages > 0 && page >= numPages} className="h-8 w-8 disabled:opacity-30" title="Next page">
+            <ChevronRight className="h-5 w-5" />
+          </Button>
         </div>
-
       </div>
     </CrmLayout>
   );

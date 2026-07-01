@@ -1,8 +1,13 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { ThemeProvider } from "./components/theme-provider";
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  <ThemeProvider defaultTheme="light" storageKey="ghvac-ui-theme">
+    <App />
+  </ThemeProvider>
+);
 
 // Register service worker for PWA functionality with update handling
 if ('serviceWorker' in navigator) {

@@ -117,7 +117,7 @@ export default function CrmSettingsImport() {
   if (!isAdmin) {
     return (
       <CrmLayout currentUser={currentUser}>
-        <div className="p-6 max-w-4xl mx-auto">
+        <div className="mx-auto w-full max-w-4xl space-y-6">
           <div className="flex items-center gap-4 mb-6">
             <Link href="/crm/settings">
               <Button variant="ghost" size="sm">
@@ -139,7 +139,7 @@ export default function CrmSettingsImport() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="p-6 max-w-4xl mx-auto">
+      <div className="mx-auto w-full max-w-4xl space-y-6">
         <div className="flex items-center gap-4 mb-6">
           <Link href="/crm/settings">
             <Button variant="ghost" size="sm">
@@ -148,7 +148,7 @@ export default function CrmSettingsImport() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Import Data</h1>
+            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Import Data</h1>
             <p className="text-slate-500 text-sm">Import customers and agreements from CSV or Excel files</p>
           </div>
         </div>

@@ -34,6 +34,7 @@ import {
   CornerDownRight,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { EmptyState } from "@/components/crm/ui-kit";
 import { format } from "date-fns";
 import type { CrmUser, CrmCustomer, CrmProject } from "@shared/schema";
 
@@ -351,19 +352,20 @@ export default function CrmCustomers() {
   const getCustomerTypeBadgeClass = (type: string | null) => {
     const normalizedType = type?.toLowerCase() || "";
     if (normalizedType === "commercial") {
-      return "bg-amber-100 text-amber-700 border-amber-200";
+      return "bg-amber-50 text-amber-700";
     }
     if (normalizedType === "property manager" || normalizedType === "property_manager") {
-      return "bg-purple-100 text-purple-700 border-purple-200";
+      return "bg-purple-50 text-purple-700";
     }
-    return "bg-blue-100 text-blue-700 border-blue-200";
+    return "bg-blue-50 text-blue-700";
   };
 
   const formatCustomerStatus = (status: string | null) => {
     if (!status) return "Unknown";
     const normalizedStatus = status.toLowerCase();
     if (normalizedStatus === "prospect") return "Lead";
-    if (normalizedStatus === "customer") return "Customer";
+    // "client" is the legacy value for a converted customer — always show "Customer".
+    if (normalizedStatus === "customer" || normalizedStatus === "client") return "Customer";
     return status;
   };
 
@@ -371,11 +373,11 @@ export default function CrmCustomers() {
     const normalizedStatus = status?.toLowerCase() || "";
     switch (normalizedStatus) {
       case "prospect":
-        return "bg-amber-100 text-amber-700 border-amber-200";
+        return "bg-amber-50 text-amber-700";
       case "customer":
-        return "bg-green-100 text-green-700 border-green-200";
+        return "bg-green-50 text-green-700";
       default:
-        return "bg-slate-100 text-slate-600 border-slate-200";
+        return "bg-slate-100 text-slate-600";
     }
   };
 
@@ -415,33 +417,34 @@ export default function CrmCustomers() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
-        {/* Search bar at top - DoorLoop style */}
-        <div className="flex justify-center mb-2">
-          <div className="relative w-full max-w-xl">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+        {/* Title + subheading · centered search · action — all on one row */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
+          <div className="min-w-0 shrink-0">
+            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground truncate" data-testid="text-customers-title">
+              Customers
+            </h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">Manage customer accounts, contacts, and history</p>
+          </div>
+
+          <div className="relative w-full lg:flex-1 lg:max-w-sm lg:mx-auto">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search by name, phone, email, or address..."
+              placeholder="Search customers…"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
+              className="pl-9 h-9"
               data-testid="input-search"
             />
           </div>
-        </div>
 
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900" data-testid="text-customers-title">
-              Customers
-            </h1>
-            <p className="text-sm text-slate-500">Total: {total}</p>
+          <div className="shrink-0">
+            <Link href="/crm/accounts/new">
+              <Button size="sm" data-testid="button-create-customer">
+                <Plus className="h-4 w-4 mr-1" />
+                New Customer
+              </Button>
+            </Link>
           </div>
-          <Link href="/crm/accounts/new">
-            <Button size="sm" className="bg-[#711419] hover:bg-[#5a1014] text-white" data-testid="button-create-customer">
-              <Plus className="h-4 w-4 mr-1" />
-              New Customer
-            </Button>
-          </Link>
         </div>
 
         {/* Tabs styled like projects page - underline style */}
@@ -455,7 +458,7 @@ export default function CrmCustomers() {
             }`}
             data-testid="tab-status-all"
           >
-            All ({statsData?.total?.toLocaleString() || 0})
+            All ({total.toLocaleString()})
           </button>
           <button
             onClick={() => { setStatusTab("prospects"); setCustomerType("all"); setHasAgreement(false); setSourceFilter("all"); setAccountRole("all"); }}
@@ -550,11 +553,11 @@ export default function CrmCustomers() {
           </button>
         </div>
 
-        <Card className="bg-white border shadow-sm overflow-hidden">
+        <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50">
+                <TableRow>
                   <TableHead className="font-semibold">Name</TableHead>
                   <TableHead className="font-semibold">Type</TableHead>
                   <TableHead className="font-semibold">Status</TableHead>
@@ -576,13 +579,13 @@ export default function CrmCustomers() {
                     </TableRow>
                   ))
                 ) : organizedCustomers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12">
-                      <Users className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                      <p className="text-slate-500 font-medium">No customers found</p>
-                      <p className="text-slate-400 text-sm mt-1">
-                        Try adjusting your search or filters
-                      </p>
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={6} className="p-0">
+                      <EmptyState
+                        icon={Users}
+                        title="No customers found"
+                        message="Try adjusting your search or filters."
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -611,28 +614,17 @@ export default function CrmCustomers() {
                                   Sub
                                 </Badge>
                               )}
-                              {customer.source === 'fieldedge' && (
-                                <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 text-xs">
-                                  FE
-                                </Badge>
-                              )}
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={getCustomerTypeBadgeClass(customer.customerType)}
-                            >
+                            <span className={`inline-flex items-center rounded-sm px-2 py-0.5 text-xs font-medium ${getCustomerTypeBadgeClass(customer.customerType)}`}>
                               {formatCustomerType(customer.customerType)}
-                            </Badge>
+                            </span>
                           </TableCell>
                           <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={getStatusBadgeClass(customer.customerStatus)}
-                            >
+                            <span className={`inline-flex items-center rounded-sm px-2 py-0.5 text-xs font-medium ${getStatusBadgeClass(customer.customerStatus)}`}>
                               {formatCustomerStatus(customer.customerStatus)}
-                            </Badge>
+                            </span>
                           </TableCell>
                           <TableCell className="hidden md:table-cell text-slate-600 max-w-xs truncate">
                             {formatAddress(customer)}

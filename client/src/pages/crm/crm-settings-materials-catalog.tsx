@@ -275,7 +275,7 @@ export default function CrmSettingsMaterialsCatalog() {
   if (!isAdmin) {
     return (
       <CrmLayout currentUser={currentUser}>
-        <div className="p-6 max-w-6xl mx-auto">
+        <div className="mx-auto w-full max-w-6xl space-y-6">
           <div className="flex items-center gap-4 mb-6">
             <Link href="/crm/settings">
               <Button variant="ghost" size="sm">
@@ -297,7 +297,7 @@ export default function CrmSettingsMaterialsCatalog() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="p-6 max-w-6xl mx-auto">
+      <div className="mx-auto w-full max-w-6xl space-y-6">
         <div className="flex items-center gap-4 mb-6">
           <Link href="/crm/settings">
             <Button variant="ghost" size="sm">
@@ -306,7 +306,7 @@ export default function CrmSettingsMaterialsCatalog() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Materials Catalog</h1>
+            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Materials Catalog</h1>
             <p className="text-slate-500 text-sm">Manage materials and job costing settings</p>
           </div>
         </div>

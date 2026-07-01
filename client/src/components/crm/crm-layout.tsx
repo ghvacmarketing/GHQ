@@ -1,4 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { cn } from "@/lib/utils";
+
+// Persisted across route changes (the module stays loaded even though CrmLayout
+// re-mounts per page) so the nav doesn't jump back to the top when you click.
+let navScrollPos = 0;
 import { Link, useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -34,10 +39,17 @@ import {
   Award,
   PenLine,
   Wrench,
+  Activity,
+  Sparkles,
+  MessageSquarePlus,
+  PanelLeftClose,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 import ghqLogo from "@assets/redlogo.webp";
-import GhqSearch from "./ghq-search";
+import GhqSearch, { openGlobalAI, openGlobalComment } from "./ghq-search";
+import { TopNavSearch } from "./topnav-search";
 import NotificationsDrawerContent from "./notifications-drawer";
 import TaggedCommentsDisplay from "./tagged-comments-display";
 
@@ -46,6 +58,8 @@ interface CrmLayoutProps {
   currentUser: CrmUser;
   disableScroll?: boolean;
   hideGlobalSearch?: boolean;
+  /** Render content edge-to-edge below the top bar (no gutter padding) — for app-shell pages like Messaging. */
+  flush?: boolean;
 }
 
 type NavItem = {
@@ -84,6 +98,7 @@ const navSections: NavSection[] = [
     title: "Operations",
     items: [
       { label: "Work Orders", href: "/crm/work-orders", icon: ClipboardList },
+      { label: "Analytics", href: "/crm/analytics", icon: Activity },
       { label: "Projects", href: "/crm/projects", icon: FolderKanban },
       { label: "Tasks", href: "/crm/tasks/board", icon: ListTodo },
       { label: "Rebate Programs", href: "/crm/rebate-programs", icon: Award },
@@ -112,34 +127,44 @@ function NavItemComponent({
   item,
   isActive,
   onClick,
+  collapsed = false,
 }: {
   item: NavItem;
   isActive: boolean;
   onClick?: () => void;
+  collapsed?: boolean;
 }) {
   const Icon = item.icon;
+  const hasBadge = !!item.badgeCount && item.badgeCount > 0;
 
   return (
     <Link href={item.href} onClick={onClick}>
       <div
-        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 group ${
+        title={collapsed ? item.label : undefined}
+        className={cn(
+          "relative flex items-center rounded-md cursor-pointer transition-colors",
+          collapsed ? "justify-center px-0 py-2" : "gap-2.5 px-2.5 py-1.5",
           isActive
-            ? "bg-[#711419] text-white font-semibold"
-            : "text-slate-300 hover:bg-slate-800 hover:text-white"
-        }`}
+            ? "bg-white/[0.07] text-white"
+            : "text-slate-400 hover:bg-white/[0.04] hover:text-white"
+        )}
         data-testid={`nav-item-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
       >
-        <Icon className="h-5 w-5 flex-shrink-0" />
-        <span className="text-sm font-medium">{item.label}</span>
-        {item.badgeCount && item.badgeCount > 0 ? (
-          <Badge 
-            className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 min-w-[20px] text-center"
+        {isActive && (
+          <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r-full bg-[#e8704f]" />
+        )}
+        <Icon className={cn("h-4 w-4 flex-shrink-0", isActive && "text-[#e8704f]")} />
+        {!collapsed && <span className="text-[13px] font-medium">{item.label}</span>}
+        {!collapsed && hasBadge ? (
+          <Badge
+            className="ml-auto bg-[#e8704f] text-white text-xs px-1.5 py-0.5 min-w-[20px] text-center border-0"
             data-testid={`badge-unread-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
           >
-            {item.badgeCount > 99 ? "99+" : item.badgeCount}
+            {item.badgeCount! > 99 ? "99+" : item.badgeCount}
           </Badge>
-        ) : isActive ? (
-          <ChevronRight className="h-4 w-4 ml-auto opacity-70" />
+        ) : null}
+        {collapsed && hasBadge ? (
+          <span className="absolute top-1 right-2 h-2 w-2 rounded-full bg-[#e8704f]" />
         ) : null}
       </div>
     </Link>
@@ -149,11 +174,20 @@ function NavItemComponent({
 function SidebarContent({
   currentUser,
   onItemClick,
+  collapsed = false,
+  onToggleCollapse,
 }: {
   currentUser: CrmUser;
   onItemClick?: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }) {
   const [location] = useLocation();
+  const navScrollRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = navScrollRef.current;
+    if (el) el.scrollTop = navScrollPos;
+  }, []);
 
   const { data: unreadData } = useQuery<{ unreadCount: number }>({
     queryKey: ["/api/crm/messaging/unread-count"],
@@ -202,26 +236,55 @@ function SidebarContent({
   };
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-slate-900 via-slate-900 to-[#1a1015]">
-      <div className="p-4 border-b border-slate-700/50">
-        <div className="flex items-center gap-3">
-          <img src={ghqLogo} alt="GHQ Logo" className="h-10 w-10 rounded-lg object-contain brightness-0 invert" />
-          <div>
-            <h1 className="text-lg font-bold text-white" data-testid="text-sidebar-title">
-              GHQ
-            </h1>
-            <p className="text-xs text-slate-400">Management System</p>
-          </div>
-        </div>
+    <div className="flex flex-col h-full w-full bg-gradient-to-b from-[#0f172a] to-[#020617]">
+      <div className={cn("flex items-center gap-2.5 overflow-hidden border-b border-slate-700/50", collapsed ? "p-2 justify-center" : "p-4")}>
+        {/* Logo is the constant element in both states (click to expand when collapsed) */}
+        <button
+          onClick={collapsed ? onToggleCollapse : undefined}
+          title={collapsed ? "Expand sidebar" : undefined}
+          className={cn("shrink-0 rounded-lg", collapsed && "transition-colors hover:opacity-80")}
+          data-testid={collapsed ? "button-expand-sidebar" : undefined}
+          {...(collapsed ? {} : { tabIndex: -1, "aria-hidden": true })}
+        >
+          <img src={ghqLogo} alt="GHQ Logo" className="h-9 w-9 rounded-lg object-contain brightness-0 invert" />
+        </button>
+        {/* Text + collapse toggle: clipped (overflow-hidden) + nowrap so they don't
+            stack/wrap mid-animation while the sidebar width is transitioning. */}
+        {!collapsed && (
+          <>
+            <div className="min-w-0 flex-1 overflow-hidden leading-tight">
+              <h1 className="truncate whitespace-nowrap text-lg font-bold text-white" data-testid="text-sidebar-title">GHQ</h1>
+              <p className="truncate whitespace-nowrap text-[10px] font-medium uppercase tracking-wider text-slate-400">Command Center</p>
+            </div>
+            {onToggleCollapse && (
+              <button
+                onClick={onToggleCollapse}
+                title="Collapse sidebar"
+                className="shrink-0 rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
+                data-testid="button-collapse-sidebar"
+              >
+                <PanelLeftClose className="h-4 w-4" />
+              </button>
+            )}
+          </>
+        )}
       </div>
 
-      <div className="flex-1 px-3 py-4 overflow-y-auto scrollbar-hide">
-        <div className="space-y-6">
-          {navSections.map((section) => (
+      <div
+        ref={navScrollRef}
+        onScroll={(e) => { navScrollPos = e.currentTarget.scrollTop; }}
+        className={cn("flex-1 overflow-y-auto scrollbar-hide py-4", collapsed ? "px-2" : "px-3")}
+      >
+        <div className={collapsed ? "space-y-2" : "space-y-6"}>
+          {navSections.map((section, idx) => (
             <div key={section.title}>
-              <p className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                {section.title}
-              </p>
+              {collapsed ? (
+                idx > 0 ? <div className="mx-2 mb-2 border-t border-slate-700/40" /> : null
+              ) : (
+                <p className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  {section.title}
+                </p>
+              )}
               <div className="space-y-1">
                 {section.items.map((item) => {
                   let itemWithBadge = item;
@@ -236,6 +299,7 @@ function SidebarContent({
                       item={itemWithBadge}
                       isActive={isActive(item.href)}
                       onClick={onItemClick}
+                      collapsed={collapsed}
                     />
                   );
                 })}
@@ -245,73 +309,105 @@ function SidebarContent({
         </div>
       </div>
 
-      <div className="p-3 border-t border-slate-700/50">
+      <div className={cn("border-t border-slate-700/50", collapsed ? "p-2" : "p-3")}>
         {currentUser?.role !== "tech" && (
           <Link href="/mobile" onClick={onItemClick}>
             <div
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all text-slate-300 hover:bg-slate-800 hover:text-white mb-2"
+              title={collapsed ? "Mobile View" : undefined}
+              className={cn(
+                "flex items-center rounded-md cursor-pointer transition-all text-slate-300 hover:bg-slate-800 hover:text-white mb-1.5",
+                collapsed ? "justify-center py-2" : "gap-2.5 px-2.5 py-2"
+              )}
               data-testid="nav-item-mobile-view"
             >
-              <Smartphone className="h-5 w-5" />
-              <span className="text-sm font-medium">Mobile View</span>
+              <Smartphone className="h-4 w-4 shrink-0" />
+              {!collapsed && <span className="text-[13px] font-medium">Mobile View</span>}
             </div>
           </Link>
         )}
         <Link href="/tools" onClick={onItemClick}>
           <div
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all text-slate-300 hover:bg-slate-800 hover:text-white mb-2"
+            title={collapsed ? "GHVAC Tools" : undefined}
+            className={cn(
+              "flex items-center rounded-md cursor-pointer transition-all text-slate-300 hover:bg-slate-800 hover:text-white mb-2",
+              collapsed ? "justify-center py-2" : "gap-2.5 px-2.5 py-2"
+            )}
             data-testid="nav-item-home"
           >
-            <Wrench className="h-5 w-5" />
-            <span className="text-sm font-medium">GHVAC Tools</span>
+            <Wrench className="h-4 w-4 shrink-0" />
+            {!collapsed && <span className="text-[13px] font-medium">GHVAC Tools</span>}
           </div>
         </Link>
 
-        <div className="p-3 bg-slate-800/50 rounded-lg">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-full bg-[#711419] flex items-center justify-center text-white font-semibold text-sm">
+        {collapsed ? (
+          <div className="flex flex-col items-center gap-1.5">
+            <div
+              className="h-9 w-9 rounded-md bg-[#711419] flex items-center justify-center text-white text-xs font-semibold"
+              title={currentUser?.name || "User"}
+              data-testid="text-sidebar-user-name"
+            >
               {currentUser?.name
                 ? currentUser.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
                 : "U"}
             </div>
-            <div className="flex-1 min-w-0">
-              <p
-                className="text-sm font-medium text-white truncate"
-                data-testid="text-sidebar-user-name"
-              >
+            <button
+              onClick={() => logoutMutation.mutate()}
+              disabled={logoutMutation.isPending}
+              title="Log out"
+              className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-700/60 hover:text-white disabled:opacity-50"
+              data-testid="button-sidebar-logout"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 rounded-lg border border-slate-700/60 bg-slate-800/40 p-1.5">
+            <div className="h-7 w-7 shrink-0 rounded-md bg-[#711419] flex items-center justify-center text-white text-[11px] font-semibold">
+              {currentUser?.name
+                ? currentUser.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+                : "U"}
+            </div>
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="truncate text-[13px] font-medium text-white" data-testid="text-sidebar-user-name">
                 {currentUser?.name || "User"}
               </p>
-              <Badge
-                className={`text-xs capitalize mt-0.5 border ${getRoleBadgeClass(
-                  currentUser?.role || "user"
-                )}`}
-                data-testid="badge-sidebar-user-role"
-              >
+              <p className="truncate text-[11px] capitalize text-slate-400" data-testid="text-sidebar-user-role">
                 {currentUser?.role || "User"}
-              </Badge>
+              </p>
             </div>
+            <button
+              onClick={() => logoutMutation.mutate()}
+              disabled={logoutMutation.isPending}
+              title="Log out"
+              className="shrink-0 rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-700/60 hover:text-white disabled:opacity-50"
+              data-testid="button-sidebar-logout"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start text-slate-400 hover:text-white hover:bg-slate-700"
-            onClick={() => logoutMutation.mutate()}
-            disabled={logoutMutation.isPending}
-            data-testid="button-sidebar-logout"
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            {logoutMutation.isPending ? "Logging out..." : "Logout"}
-          </Button>
-        </div>
+        )}
       </div>
     </div>
   );
 }
 
-export function CrmLayout({ children, currentUser, disableScroll = false, hideGlobalSearch = false }: CrmLayoutProps) {
+export function CrmLayout({ children, currentUser, disableScroll = false, hideGlobalSearch = false, flush = false }: CrmLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("crm_sidebar_collapsed") === "1"
+  );
+  const [topNavCollapsed, setTopNavCollapsed] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("crm_topnav_collapsed") === "1"
+  );
+
+  useEffect(() => {
+    localStorage.setItem("crm_sidebar_collapsed", sidebarCollapsed ? "1" : "0");
+  }, [sidebarCollapsed]);
+  useEffect(() => {
+    localStorage.setItem("crm_topnav_collapsed", topNavCollapsed ? "1" : "0");
+  }, [topNavCollapsed]);
+
   useCrmPrefetch(!!currentUser);
 
   // Shared queryKey with SidebarContent — TanStack deduplicates the network call,
@@ -323,34 +419,84 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
   });
 
   return (
-    <div className="h-screen overflow-hidden bg-white flex">
-      <aside className="hidden lg:flex w-60 flex-shrink-0 fixed inset-y-0 left-0 z-40">
-        <SidebarContent currentUser={currentUser} />
+    <div className="h-screen overflow-hidden bg-background flex">
+      <aside
+        className={cn(
+          "hidden lg:flex flex-shrink-0 fixed inset-y-0 left-0 z-40 transition-[width] duration-[600ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+          sidebarCollapsed ? "w-[64px]" : "w-56"
+        )}
+      >
+        <SidebarContent
+          currentUser={currentUser}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+        />
       </aside>
 
-      <div className="hidden lg:flex fixed top-0 left-60 right-0 z-40 bg-white border-b h-14 items-center justify-end px-6 gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative"
-          onClick={() => setNotificationsOpen(true)}
-        >
-          <Bell className="h-5 w-5 text-slate-600" />
-          {(notificationCount?.count ?? 0) > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full text-white text-[10px] font-bold flex items-center justify-center px-1" style={{ backgroundColor: "#711419" }}>
-              {notificationCount!.count > 99 ? "99+" : notificationCount!.count}
-            </span>
-          )}
-        </Button>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-slate-600">{currentUser?.name || "User"}</span>
-          <div className="w-8 h-8 rounded-full bg-[#711419] flex items-center justify-center text-white font-semibold text-xs">
-            {currentUser?.name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "U"}
+      <div
+        className={cn(
+          "hidden lg:flex fixed top-0 right-0 z-40 bg-background border-b h-14 items-center gap-4 px-5 transition-[left,transform] duration-[600ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+          sidebarCollapsed ? "left-[64px]" : "left-56",
+          topNavCollapsed && "-translate-y-full"
+        )}
+      >
+        <div className="flex-1" />
+        {/* Global customer-related search — inline dropdown of linked records, centered */}
+        <TopNavSearch />
+
+        <div className="flex flex-1 items-center justify-end gap-1.5">
+          <Button variant="ghost" size="icon" onClick={openGlobalAI} title="Ask AI" data-testid="button-topnav-ai">
+            <Sparkles className="h-5 w-5 text-slate-600" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={openGlobalComment} title="Leave a comment" data-testid="button-topnav-comment">
+            <MessageSquarePlus className="h-5 w-5 text-slate-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative"
+            onClick={() => setNotificationsOpen(true)}
+            data-testid="button-topnav-notifications"
+          >
+            <Bell className="h-5 w-5 text-slate-600" />
+            {(notificationCount?.count ?? 0) > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full text-white text-[10px] font-bold flex items-center justify-center px-1" style={{ backgroundColor: "#711419" }}>
+                {notificationCount!.count > 99 ? "99+" : notificationCount!.count}
+              </span>
+            )}
+          </Button>
+          <div className="ml-1 flex items-center gap-2 border-l border-border pl-3">
+            <span className="text-sm font-medium text-slate-600">{currentUser?.name || "User"}</span>
+            <div className="w-8 h-8 rounded-md bg-[#711419] flex items-center justify-center text-white font-semibold text-xs">
+              {currentUser?.name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "U"}
+            </div>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="ml-1 h-8 w-8"
+            onClick={() => setTopNavCollapsed(true)}
+            title="Hide top bar"
+            data-testid="button-collapse-topnav"
+          >
+            <ChevronUp className="h-4 w-4 text-slate-600" />
+          </Button>
         </div>
       </div>
+      {/* Centered reveal handle — slides/fades in when the top bar is hidden */}
+      <button
+        onClick={() => setTopNavCollapsed(false)}
+        title="Show top bar"
+        className={cn(
+          "hidden lg:flex fixed top-0 left-1/2 z-40 h-6 items-center gap-1 rounded-b-md border border-t-0 border-border bg-background px-3 text-xs font-medium text-muted-foreground shadow-sm transition-all duration-[600ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-foreground",
+          topNavCollapsed ? "-translate-x-1/2 translate-y-0 opacity-100" : "-translate-x-1/2 -translate-y-full opacity-0 pointer-events-none"
+        )}
+        data-testid="button-expand-topnav"
+      >
+        <ChevronDown className="h-3.5 w-3.5" />
+      </button>
 
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b shadow-sm">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-background border-b shadow-sm">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -403,18 +549,23 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
         </div>
       </div>
 
-      <main className="flex-1 lg:ml-60 overflow-x-hidden">
+      <main
+        className={cn(
+          "flex-1 overflow-x-hidden transition-[margin] duration-[600ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+          sidebarCollapsed ? "lg:ml-[64px]" : "lg:ml-56"
+        )}
+      >
         {disableScroll ? (
-          <div className="h-screen pt-16 lg:pt-14 overflow-hidden flex flex-col">
-            <div className="flex-1 min-h-0 p-4 lg:p-6 flex flex-col">{children}</div>
+          <div className={cn("h-screen overflow-hidden flex flex-col bg-background pt-16", topNavCollapsed ? "lg:pt-0" : "lg:pt-14")}>
+            <div className={cn("flex-1 min-h-0 flex flex-col", !flush && "px-4 py-4 lg:px-5 lg:py-5")}>{children}</div>
           </div>
         ) : (
-          <div className="h-screen pt-16 lg:pt-14 overflow-y-auto overflow-x-hidden bg-white">
-            <div className="p-4 lg:p-6 overflow-x-hidden">{children}</div>
+          <div className={cn("h-screen overflow-y-auto overflow-x-hidden bg-background pt-16", topNavCollapsed ? "lg:pt-0" : "lg:pt-14")}>
+            <div className={cn("overflow-x-hidden", !flush && "px-4 py-4 lg:px-5 lg:py-5")}>{children}</div>
           </div>
         )}
       </main>
-      {!hideGlobalSearch && <GhqSearch />}
+      <GhqSearch showFab={!hideGlobalSearch} />
       <TaggedCommentsDisplay />
       <Sheet open={notificationsOpen} onOpenChange={setNotificationsOpen}>
         <SheetContent side="right" className="w-full sm:w-96 p-0">

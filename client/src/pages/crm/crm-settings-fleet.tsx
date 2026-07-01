@@ -409,7 +409,7 @@ export default function CrmSettingsFleet() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="p-6 max-w-6xl mx-auto">
+      <div className="mx-auto w-full max-w-6xl space-y-6">
         <div className="mb-6">
           <Button
             variant="ghost"
@@ -420,7 +420,7 @@ export default function CrmSettingsFleet() {
             <ArrowLeft className="h-4 w-4 mr-1" />
             Back to Settings
           </Button>
-          <h1 className="text-2xl font-bold text-slate-900">Fleet Settings</h1>
+          <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Fleet Settings</h1>
           <p className="text-muted-foreground">Manage your fleet vehicles and Bouncie integration</p>
         </div>
 

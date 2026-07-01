@@ -884,7 +884,9 @@ export const bouncieVehicles = pgTable("bouncie_vehicles", {
 export const crmCustomerTypeEnum = ["residential", "commercial", "property_manager"] as const;
 export type CrmCustomerType = typeof crmCustomerTypeEnum[number];
 
-export const crmCustomerStatusEnum = ["prospect", "client"] as const;
+// A converted prospect is a "customer" (was previously "client" — renamed so the
+// stored value matches the UI, which only ever labels it "Customer").
+export const crmCustomerStatusEnum = ["prospect", "customer"] as const;
 export type CrmCustomerStatus = typeof crmCustomerStatusEnum[number];
 
 // Sales Stage Enum for prospect funnel
@@ -911,7 +913,7 @@ export const crmCustomers = pgTable("crm_customers", {
   email: text("email"),
   phone: text("phone"),
   customerType: text("customer_type").$type<CrmCustomerType>().default("residential"),
-  customerStatus: text("customer_status").$type<CrmCustomerStatus>().default("client"),
+  customerStatus: text("customer_status").$type<CrmCustomerStatus>().default("customer"),
   fullAddress: text("full_address"),
   leadSource: text("lead_source"),
   tags: json("tags").$type<string[]>().default([]),
@@ -974,6 +976,86 @@ export const crmProperties = pgTable("crm_properties", {
   propertyType: text("property_type").$type<PropertyType>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// ── Govee H5103 humidity/temperature sensors ────────────────────────────────
+export const goveeSensorLocationEnum = [
+  "crawlspace", "attic", "living_room", "basement", "garage", "kitchen", "bedroom", "mechanical_room", "other",
+] as const;
+export type GoveeSensorLocation = (typeof goveeSensorLocationEnum)[number];
+
+// One durable row per Govee device, mapped (manually) to a CRM property/customer.
+export const goveeSensors = pgTable("govee_sensors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  device: text("device").notNull().unique(), // Govee MAC-style device id
+  sku: text("sku").notNull(), // e.g. "H5103"
+  deviceName: text("device_name"), // name from Govee cloud
+  label: text("label"), // user-facing label, e.g. "Crawlspace Sensor"
+  locationType: text("location_type").$type<GoveeSensorLocation>(),
+  propertyId: varchar("property_id").references(() => crmProperties.id, { onDelete: "set null" }),
+  customerId: varchar("customer_id").references(() => crmCustomers.id, { onDelete: "set null" }),
+  isActive: boolean("is_active").notNull().default(true),
+  // Cached latest state (so cards render without scanning readings)
+  lastTemperatureF: decimal("last_temperature_f", { precision: 6, scale: 2 }),
+  lastHumidity: decimal("last_humidity", { precision: 5, scale: 2 }),
+  lastOnline: boolean("last_online"),
+  lastReadingAt: timestamp("last_reading_at"),
+  // Per-sensor alert thresholds (spec defaults)
+  humidityWatch: decimal("humidity_watch", { precision: 5, scale: 2 }).default("60"),
+  humidityHigh: decimal("humidity_high", { precision: 5, scale: 2 }).default("65"),
+  humidityCritical: decimal("humidity_critical", { precision: 5, scale: 2 }).default("75"),
+  tempLowF: decimal("temp_low_f", { precision: 6, scale: 2 }).default("40"),
+  tempHighF: decimal("temp_high_f", { precision: 6, scale: 2 }), // configurable; null = disabled
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  propertyIdx: index("govee_sensors_property_idx").on(table.propertyId),
+  customerIdx: index("govee_sensors_customer_idx").on(table.customerId),
+}));
+
+// Time-series readings for graphs (polled every few minutes).
+export const goveeSensorReadings = pgTable("govee_sensor_readings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sensorId: varchar("sensor_id").notNull().references(() => goveeSensors.id, { onDelete: "cascade" }),
+  temperatureF: decimal("temperature_f", { precision: 6, scale: 2 }),
+  humidity: decimal("humidity", { precision: 5, scale: 2 }),
+  online: boolean("online").notNull().default(true),
+  recordedAt: timestamp("recorded_at").notNull().defaultNow(),
+}, (table) => ({
+  sensorTimeIdx: index("govee_readings_sensor_time_idx").on(table.sensorId, table.recordedAt),
+}));
+
+// Alert events (open/acknowledged/resolved) for dedup + history.
+export const goveeSensorAlerts = pgTable("govee_sensor_alerts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sensorId: varchar("sensor_id").notNull().references(() => goveeSensors.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // humidity_critical | humidity_high_sustained | offline | temp_low | temp_high
+  severity: text("severity").notNull(), // watch | high | critical
+  message: text("message").notNull(),
+  value: decimal("value", { precision: 6, scale: 2 }),
+  status: text("status").notNull().default("open"), // open | acknowledged | resolved
+  recommendedAction: text("recommended_action"),
+  notificationId: varchar("notification_id"),
+  openedAt: timestamp("opened_at").defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+}, (table) => ({
+  sensorStatusIdx: index("govee_alerts_sensor_status_idx").on(table.sensorId, table.status),
+}));
+
+export const insertGoveeSensorSchema = createInsertSchema(goveeSensors).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const insertGoveeSensorReadingSchema = createInsertSchema(goveeSensorReadings).omit({ id: true });
+export const insertGoveeSensorAlertSchema = createInsertSchema(goveeSensorAlerts).omit({
+  id: true,
+  openedAt: true,
+  resolvedAt: true,
+});
+export type GoveeSensor = typeof goveeSensors.$inferSelect;
+export type InsertGoveeSensor = z.infer<typeof insertGoveeSensorSchema>;
+export type GoveeSensorReading = typeof goveeSensorReadings.$inferSelect;
+export type GoveeSensorAlert = typeof goveeSensorAlerts.$inferSelect;
 
 // CRM Lead Types (configurable lead/opportunity types)
 export const crmLeadTypes = pgTable("crm_lead_types", {

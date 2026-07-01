@@ -19,8 +19,12 @@ import {
   Boxes,
   Target,
   FileText,
+  ChevronRight,
+  CalendarClock,
+  Palette,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { PageHeader, SectionCard } from "@/components/crm/ui-kit";
 import type { CrmUser } from "@shared/schema";
 
 interface SettingsItem {
@@ -46,6 +50,7 @@ const sections: SettingsSection[] = [
   {
     title: "Sales & Operations",
     items: [
+      { name: "Dispatch Board", href: "/crm/settings/dispatch", icon: CalendarClock },
       { name: "Lead Types", href: "/crm/settings/lead-types", icon: Target },
       { name: "Lead Classification", href: "/crm/settings/lead-classification", icon: Tags },
       { name: "Work Order Subtypes", href: "/crm/settings/subtypes", icon: Tags },
@@ -65,6 +70,7 @@ const sections: SettingsSection[] = [
   {
     title: "Data & System",
     items: [
+      { name: "Appearance", href: "/crm/settings/appearance", icon: Palette },
       { name: "Import Data", href: "/crm/settings/import", icon: Upload },
       { name: "Fleet Tracking", href: "/crm/settings/fleet", icon: Truck },
       { name: "Salesbook Directory", href: "/crm/settings/salesbook", icon: BookOpen },
@@ -90,20 +96,12 @@ export default function CrmSettings() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-white p-8">
-        <div className="max-w-6xl mx-auto">
-          <Skeleton className="h-7 w-32 mb-1" />
-          <Skeleton className="h-1 w-10 mb-8" />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="space-y-3">
-                <Skeleton className="h-5 w-28" />
-                {[...Array(3)].map((_, j) => (
-                  <Skeleton key={j} className="h-7 w-full" />
-                ))}
-              </div>
-            ))}
-          </div>
+      <div className="mx-auto w-full max-w-6xl space-y-6 p-6">
+        <Skeleton className="h-7 w-40" />
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-40 w-full rounded-xl" />
+          ))}
         </div>
       </div>
     );
@@ -120,10 +118,12 @@ export default function CrmSettings() {
   if (!canViewSettings) {
     return (
       <CrmLayout currentUser={currentUser}>
-        <div className="min-h-screen bg-white p-8 flex items-center justify-center">
+        <div className="flex min-h-[60vh] items-center justify-center">
           <div className="text-center">
-            <Shield className="h-12 w-12 mx-auto mb-4 text-slate-300" />
-            <p className="text-slate-500">Settings are only available to managers.</p>
+            <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+              <Shield className="h-6 w-6" />
+            </span>
+            <p className="text-sm text-muted-foreground">Settings are only available to managers.</p>
           </div>
         </div>
       </CrmLayout>
@@ -132,24 +132,19 @@ export default function CrmSettings() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="min-h-screen bg-white px-8 py-10">
-        <div className="max-w-6xl mx-auto">
+      <div className="w-full space-y-6">
+        <PageHeader
+          title="Settings"
+          description="Manage your team, operations, billing, and system configuration."
+        />
 
-          {/* Title */}
-          <div className="mb-8">
-            <h1 className="text-xl font-bold tracking-widest text-slate-900 uppercase">Settings</h1>
-            <div className="mt-1 h-[3px] w-10 bg-[#c0172c] rounded-full" />
-          </div>
-
-          {/* Column grid */}
-          <div className="grid grid-cols-2 gap-x-8 gap-y-10 md:grid-cols-4">
-            {sections.map((section) => (
-              <div key={section.title}>
-                <div className="mb-4 text-sm font-semibold text-slate-900 border-b border-slate-100 pb-2">
-                  {section.title}
-                </div>
-                <ul className="space-y-1">
-                  {section.items.filter((item) => !item.ownerOnly || currentUser.role === "owner").map((item) => {
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          {sections.map((section) => (
+            <SectionCard key={section.title} title={section.title} noBodyPadding>
+              <ul className="divide-y divide-border">
+                {section.items
+                  .filter((item) => !item.ownerOnly || currentUser.role === "owner")
+                  .map((item) => {
                     const Icon = item.icon;
                     return (
                       <li key={item.href}>
@@ -157,19 +152,20 @@ export default function CrmSettings() {
                           href={item.href}
                           data-testid={`settings-link-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
                         >
-                          <span className="group flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-slate-600 transition-colors hover:bg-slate-50 hover:text-[#c0172c] cursor-pointer">
-                            <Icon className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-[#c0172c] transition-colors" />
-                            {item.name}
+                          <span className="group flex cursor-pointer items-center gap-3 px-4 py-2.5 text-sm text-foreground transition-colors hover:bg-muted">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary">
+                              <Icon className="h-4 w-4" />
+                            </span>
+                            <span className="min-w-0 flex-1 truncate font-medium">{item.name}</span>
+                            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 transition-colors group-hover:text-primary" />
                           </span>
                         </Link>
                       </li>
                     );
                   })}
-                </ul>
-              </div>
-            ))}
-          </div>
-
+              </ul>
+            </SectionCard>
+          ))}
         </div>
       </div>
     </CrmLayout>

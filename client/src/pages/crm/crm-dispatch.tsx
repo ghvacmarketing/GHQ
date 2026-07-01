@@ -231,7 +231,12 @@ function getInitials(name: string): string {
 
 const START_HOUR = 6;
 const END_HOUR = 22;
-const STEP_MINUTES = 30;
+// Dispatch board snap increment — configurable in Settings → Dispatch Board.
+// Read once at load (changing it takes effect on next page load).
+const STEP_MINUTES: 15 | 30 = (() => {
+  if (typeof window === "undefined") return 30;
+  return Number(localStorage.getItem("crm_dispatch_step_minutes")) === 15 ? 15 : 30;
+})();
 const TOTAL_SLOTS = ((END_HOUR - START_HOUR) * 60) / STEP_MINUTES;
 
 function formatHour(hour: number): string {
@@ -270,8 +275,14 @@ const timeSlots = Array.from({ length: TOTAL_SLOTS }, (_, i) => {
   };
 });
 
-const SLOT_WIDTH = 60;
+// Slot width derives from the increment so the full 6am–10pm timeline keeps the
+// same total width (~1408px, fits a typical desktop) whether it's 30- or 15-min.
+const SLOT_WIDTH = STEP_MINUTES === 15 ? 22 : 44;
 const TIMELINE_WIDTH = TOTAL_SLOTS * SLOT_WIDTH;
+// Snap increment expressed in hours (0.25 for 15-min, 0.5 for 30-min). All
+// drag/resize snapping and minimum-duration clamps derive from this so the
+// board honors the configured increment.
+const STEP_HOURS = STEP_MINUTES / 60;
 
 const createRestrictToContainerModifier = (containerRef: React.RefObject<HTMLDivElement | null>): Modifier => {
   return ({ transform, draggingNodeRect }) => {
@@ -350,6 +361,20 @@ const statusHeaderColors: Record<string, string> = {
   cancelled: "bg-rose-700 text-white",
 };
 
+// Small status pill shown on work-order cards. Single source of truth — replaces
+// the status-color ternary that was duplicated (and inconsistent) across the
+// timeline card, drag overlay, and mobile card.
+const statusBadgeColors: Record<string, string> = {
+  scheduled: "bg-amber-500 text-white",
+  dispatched: "bg-blue-500 text-white",
+  en_route: "bg-blue-400 text-white",
+  on_site: "bg-green-500 text-white",
+  completed: "bg-gray-500 text-white",
+  cancelled: "bg-rose-500 text-white",
+};
+const statusBadgeClass = (status: string): string =>
+  statusBadgeColors[status] || "bg-gray-500 text-white";
+
 const visitTypeHeaderColors: Record<string, string> = {
   SERVICE: "bg-sky-600 text-white",
   INSTALL: "bg-blue-700 text-white",
@@ -405,7 +430,7 @@ function getWorkOrderDisplayTimes(workOrder: DispatchWorkOrder): { startHour: nu
   const endSlot = timeToSlotIndex(endHour);
   return { 
     startHour, 
-    endHour: endHour > startHour ? endHour : startHour + 0.5, 
+    endHour: endHour > startHour ? endHour : startHour + STEP_HOURS,
     startSlot, 
     endSlot: endSlot > startSlot ? endSlot : startSlot + 1 
   };
@@ -573,7 +598,7 @@ function QueueStageBox({
 const SCHEDULE_START_HOUR = 6;
 const SCHEDULE_END_HOUR = 22;
 const SCHEDULE_TOTAL_MINUTES = (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR) * 60;
-const SCHEDULE_INTERVAL = 30;
+const SCHEDULE_INTERVAL = STEP_MINUTES;
 const SCHEDULE_TIMELINE_WIDTH = TIMELINE_WIDTH;
 
 function getScheduleLeftPercent(date: Date): number {
@@ -602,14 +627,17 @@ function computeDropHourOffset(
   const pointerFraction = (pointerClientX - timelineRect.left) / timelineRect.width;
   const pointerHours = pointerFraction * totalHours;
   const rawStartHour = pointerHours - dragClickHourOffset;
-  const snappedHour = Math.round(rawStartHour * 2) / 2;
+  // Snap to the START of the block the cursor is currently over (floor, not round):
+  // the instant the pointer crosses a border into the next block, the card jumps to
+  // the beginning of that block — no need to drag past the block's midpoint.
+  const snappedHour = Math.floor(rawStartHour / STEP_HOURS) * STEP_HOURS;
   const maxStartHour = Math.max(0, totalHours - durationHours);
   return Math.max(0, Math.min(snappedHour, maxStartHour));
 }
 
 function getWorkOrderDurationHours(workOrder: DispatchWorkOrder): number {
   const { startHour, endHour } = getWorkOrderDisplayTimes(workOrder);
-  return Math.max(0.5, endHour - startHour);
+  return Math.max(STEP_HOURS, endHour - startHour);
 }
 
 const scheduleVisitTypeColors: Record<string, string> = {
@@ -712,27 +740,34 @@ function TrucksMapView({ technicians }: TrucksMapViewProps) {
 
   return (
     <Card className="h-full flex flex-col">
-      <CardHeader className="pb-3 border-b">
+      <CardHeader className="pb-3 border-b bg-gradient-to-r from-[#711419]/[0.05] to-transparent">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <CardTitle className="text-lg flex items-center gap-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#711419]/10 ring-1 ring-[#711419]/10">
               <Truck className="h-5 w-5 text-[#711419]" />
-              Fleet Tracking
-            </CardTitle>
-            {bouncieStatus?.connected ? (
-              <Badge className="bg-green-100 text-green-700 border-green-200">
-                Bouncie Connected
-              </Badge>
-            ) : (
-              <Badge className="bg-amber-100 text-amber-700 border-amber-200">
-                Bouncie Not Connected
-              </Badge>
-            )}
+            </div>
+            <div>
+              <CardTitle className="text-base font-semibold leading-tight">Fleet Tracking</CardTitle>
+              <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+                {bouncieStatus?.connected ? (
+                  <>
+                    <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                    Bouncie connected
+                    {bouncieStatus.lastSync ? ` · synced ${formatLastUpdate(bouncieStatus.lastSync)}` : ""}
+                  </>
+                ) : (
+                  <>
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                    Bouncie not connected
+                  </>
+                )}
+              </p>
+            </div>
           </div>
           <Link href="/crm/settings/fleet">
-            <Button variant="outline" size="sm" className="text-slate-600">
+            <Button variant="outline" size="sm" className="text-slate-600 rounded-lg">
               <Wrench className="h-4 w-4 mr-1.5" />
-              Configure Fleet
+              Configure
             </Button>
           </Link>
         </div>
@@ -748,44 +783,50 @@ function TrucksMapView({ technicians }: TrucksMapViewProps) {
             onVehicleClick={handleVehicleClick}
           />
 
-          <div className="w-80 border-l bg-white flex flex-col">
-            <div className="p-3 border-b bg-slate-50">
-              <h4 className="text-sm font-semibold text-slate-700">
-                Vehicles ({vehicles.length})
-              </h4>
+          <div className="w-80 border-l bg-slate-50/60 flex flex-col">
+            <div className="px-4 py-3 border-b bg-white">
+              <h4 className="text-sm font-semibold text-slate-800">Vehicles</h4>
+              <p className="text-xs text-slate-400 mt-0.5">{vehicles.length} in fleet</p>
             </div>
             <ScrollArea className="flex-1">
-              <div className="p-2 space-y-2">
+              <div className="p-2.5 space-y-2">
                 {vehicles.length === 0 ? (
-                  <div className="text-center py-8 text-sm text-slate-500">
-                    <Truck className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                  <div className="text-center py-10 text-sm text-slate-500">
+                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100">
+                      <Truck className="h-6 w-6 text-slate-300" />
+                    </div>
                     No vehicles configured
-                    <Link href="/crm/settings/fleet" className="block mt-2 text-[#711419] hover:underline">
+                    <Link href="/crm/settings/fleet" className="block mt-2 font-medium text-[#711419] hover:underline">
                       Add vehicles
                     </Link>
                   </div>
                 ) : (
                   vehicles.map(vehicle => {
                     const isSelected = selectedVehicleId === vehicle.id;
+                    const isActive = vehicle.isActive !== false;
+                    const isMoving = !!vehicle.lastSpeed && parseFloat(vehicle.lastSpeed) > 0;
+                    const statusColor = !isActive ? "#94a3b8" : isMoving ? "#16a34a" : "#711419";
+                    const statusLabel = !isActive ? "Offline" : isMoving ? "Moving" : "Parked";
                     return (
                       <div
                         key={vehicle.id}
                         onClick={() => handleVehicleClick(vehicle.id)}
                         className={cn(
-                          "p-3 rounded-lg border bg-white hover:bg-slate-50 transition-colors cursor-pointer",
-                          isSelected && "ring-2 ring-[#711419] bg-slate-50"
+                          "group p-3 rounded-xl border bg-white cursor-pointer transition-all hover:shadow-md hover:border-[#711419]/20",
+                          isSelected && "ring-2 ring-[#711419] border-transparent shadow-md"
                         )}
                       >
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2.5 h-2.5 rounded-full ${vehicle.isActive ? 'bg-green-500' : 'bg-slate-300'}`} />
-                            <span className="font-medium text-slate-800">{vehicle.vehicleName}</span>
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: statusColor }} />
+                            <span className="font-medium text-slate-800 text-sm truncate">{vehicle.vehicleName}</span>
                           </div>
-                          {vehicle.lastSpeed && parseFloat(vehicle.lastSpeed) > 0 && (
-                            <Badge variant="outline" className="text-xs">
-                              {Math.round(parseFloat(vehicle.lastSpeed))} mph
-                            </Badge>
-                          )}
+                          <span
+                            className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                            style={{ backgroundColor: `${statusColor}1a`, color: statusColor }}
+                          >
+                            {isMoving ? `${Math.round(parseFloat(vehicle.lastSpeed!))} mph` : statusLabel}
+                          </span>
                         </div>
                         <div className="text-xs text-slate-500 space-y-1">
                           <div className="flex items-center gap-1.5">
@@ -1339,16 +1380,16 @@ function DraggableScheduleCard({
 
       const pointerFraction = (moveEvent.clientX - timelineRect.left) / timelineRect.width;
       const pointerHour = SCHEDULE_START_HOUR + pointerFraction * totalHours;
-      const snappedHour = Math.round(pointerHour * 2) / 2;
+      const snappedHour = Math.round(pointerHour / STEP_HOURS) * STEP_HOURS;
 
       if (edge === 'start') {
-        const clampedHour = Math.max(SCHEDULE_START_HOUR, Math.min(SCHEDULE_END_HOUR - 0.5, origEndHour - 0.5, snappedHour));
+        const clampedHour = Math.max(SCHEDULE_START_HOUR, Math.min(SCHEDULE_END_HOUR - STEP_HOURS, origEndHour - STEP_HOURS, snappedHour));
         const newLeftPercent = ((clampedHour - SCHEDULE_START_HOUR) / totalHours) * 100;
         const deltaPercent = newLeftPercent - leftPercent;
         setResizeOffset({ left: deltaPercent, width: -deltaPercent });
         accumulatedStartDeltaRef.current = Math.round((clampedHour - origStartHour) * 60);
       } else {
-        const clampedHour = Math.max(origStartHour + 0.5, Math.min(SCHEDULE_END_HOUR, snappedHour));
+        const clampedHour = Math.max(origStartHour + STEP_HOURS, Math.min(SCHEDULE_END_HOUR, snappedHour));
         const newEndPercent = ((clampedHour - SCHEDULE_START_HOUR) / totalHours) * 100;
         const deltaPercent = newEndPercent - (leftPercent + widthPercent);
         setResizeOffset({ left: 0, width: deltaPercent });
@@ -1531,11 +1572,21 @@ function ScheduleRowTimeline({
     >
       {Array.from({ length: totalHours }, (_, i) => {
         const hourPercent = (i / totalHours) * 100;
-        const halfHourPercent = ((i + 0.5) / totalHours) * 100;
+        // Minor gridlines at each increment within the hour (1 line for 30-min, 3 for 15-min).
+        const subdivisions = 60 / STEP_MINUTES;
         return (
           <Fragment key={`grid-${i}`}>
             <div className="absolute top-0 bottom-0 border-l border-slate-200" style={{ left: `${hourPercent}%` }} />
-            <div className="absolute top-0 bottom-0 border-l border-dashed border-slate-100" style={{ left: `${halfHourPercent}%` }} />
+            {Array.from({ length: subdivisions - 1 }, (_, s) => {
+              const subPercent = ((i + (s + 1) / subdivisions) / totalHours) * 100;
+              return (
+                <div
+                  key={`sub-${i}-${s}`}
+                  className="absolute top-0 bottom-0 border-l border-dashed border-slate-100"
+                  style={{ left: `${subPercent}%` }}
+                />
+              );
+            })}
           </Fragment>
         );
       })}
@@ -1543,23 +1594,9 @@ function ScheduleRowTimeline({
 
       {isDragActive && previewLeft !== null && (
         <div
-          className="absolute top-1 bottom-1 bg-[#711419]/25 border-2 border-dashed border-[#711419]/70 rounded-md pointer-events-none z-[5] shadow-md"
+          className="absolute top-1 bottom-1 border-2 border-[#711419] rounded-lg pointer-events-none z-[5]"
           style={{ left: `${previewLeft}%`, width: `${previewWidthPercent}%` }}
-        >
-          <div className="flex flex-col items-center justify-center h-full gap-0 overflow-hidden px-1">
-            {activeDragLabel && (
-              <div className="text-[10px] text-[#711419] font-bold text-center truncate w-full leading-tight">
-                {activeDragLabel}
-              </div>
-            )}
-            <div className="text-[11px] text-[#711419] font-bold text-center leading-tight">
-              {formatPreviewTime(previewStartHour)}
-            </div>
-            <div className="text-[9px] text-[#711419]/80 font-medium text-center leading-tight">
-              to {formatPreviewTime(previewStartHour + previewDurationHours)}
-            </div>
-          </div>
-        </div>
+        />
       )}
 
       {children}
@@ -1615,22 +1652,26 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
   }
 
   return (
-    <Card className="bg-white border overflow-hidden h-full">
-      <div className="overflow-x-auto overflow-y-auto h-full dispatch-timeline-scroll">
+    <Card className="bg-white border overflow-hidden">
+      <div className="overflow-x-auto dispatch-timeline-scroll">
         <div style={{ minWidth: SCHEDULE_TIMELINE_WIDTH + 200 }}>
           <div className="flex border-b border-slate-200 sticky top-0 bg-white z-20">
             <div className="w-48 flex-shrink-0 px-4 py-3 border-r border-slate-200 text-sm font-semibold text-slate-700 bg-white sticky left-0 z-30">
               Technicians
             </div>
             <div className="flex-1 relative" style={{ minWidth: SCHEDULE_TIMELINE_WIDTH }}>
-              <div className="relative py-3" style={{ height: 40 }}>
+              <div className="relative" style={{ height: 32 }}>
                 {hourLabels.map((label, i) => {
                   const leftPercent = (i / (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR)) * 100;
                   const isFirst = i === 0;
                   const isLast = i === hourLabels.length - 1;
-                  const transform = isFirst ? 'translateX(0)' : isLast ? 'translateX(-100%)' : 'translateX(-50%)';
+                  const tx = isFirst ? '0' : isLast ? '-100%' : '-50%';
                   return (
-                    <div key={i} className="absolute text-xs font-medium text-slate-500 whitespace-nowrap" style={{ left: `${leftPercent}%`, transform }}>
+                    <div
+                      key={i}
+                      className="absolute top-1/2 text-xs font-medium text-slate-500 whitespace-nowrap tabular-nums"
+                      style={{ left: `${leftPercent}%`, transform: `translate(${tx}, -50%)` }}
+                    >
                       {label}
                     </div>
                   );
@@ -1710,6 +1751,36 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
               </DroppableScheduleRow>
             );
           })}
+
+          {/* Empty-day hint — subtle, only when nothing is scheduled */}
+          {workOrders.length === 0 && (
+            <div className="flex border-t border-slate-100">
+              <div className="w-48 flex-shrink-0 sticky left-0 z-10 bg-white" />
+              <div
+                className="flex-1 px-4 py-5 text-center text-xs text-slate-400"
+                style={{ minWidth: SCHEDULE_TIMELINE_WIDTH }}
+              >
+                No work orders scheduled for this day. Create one or drag an unassigned job onto a technician.
+              </div>
+            </div>
+          )}
+
+          {/* Add-technician action — gives the grid an intentional end instead of blank space */}
+          <div className="flex border-t border-slate-200">
+            <div className="w-48 flex-shrink-0 sticky left-0 z-10 bg-white px-2 py-1.5">
+              <Link href="/crm/settings/users">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-slate-500 hover:text-[#711419]"
+                  data-testid="button-add-technician"
+                >
+                  <Plus className="h-4 w-4 mr-1.5" /> Add technician
+                </Button>
+              </Link>
+            </div>
+            <div className="flex-1" style={{ minWidth: SCHEDULE_TIMELINE_WIDTH }} />
+          </div>
         </div>
       </div>
     </Card>
@@ -1885,12 +1956,12 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
       const deltaHours = deltaX * hoursPerPixel;
       
       if (isResizingLeft) {
-        let newStart = Math.round((originalStart.current + deltaHours) * 2) / 2;
-        newStart = Math.max(START_HOUR, Math.min(newStart, originalEnd.current - 0.5));
+        let newStart = Math.round((originalStart.current + deltaHours) / STEP_HOURS) * STEP_HOURS;
+        newStart = Math.max(START_HOUR, Math.min(newStart, originalEnd.current - STEP_HOURS));
         setVisualStart(newStart);
       } else if (isResizingRight) {
-        let newEnd = Math.round((originalEnd.current + deltaHours) * 2) / 2;
-        newEnd = Math.max(originalStart.current + 0.5, Math.min(newEnd, END_HOUR));
+        let newEnd = Math.round((originalEnd.current + deltaHours) / STEP_HOURS) * STEP_HOURS;
+        newEnd = Math.max(originalStart.current + STEP_HOURS, Math.min(newEnd, END_HOUR));
         setVisualEnd(newEnd);
       }
     };
@@ -1935,7 +2006,7 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
         setNodeRef(node);
         (cardRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
       }}
-      className={`absolute top-1 bottom-1 rounded border-l-4 ${jobColors.bg} ${jobColors.border} ${jobColors.text} ${statusStripe} overflow-hidden ${isDragging ? 'z-50' : ''} ${isCompletedStatus ? 'opacity-60' : ''}`}
+      className={`absolute top-1 bottom-1 rounded-md border-l-4 shadow-sm hover:shadow-md transition-shadow ${jobColors.bg} ${jobColors.border} ${jobColors.text} ${statusStripe} overflow-hidden ${isDragging ? 'z-50 shadow-lg' : ''} ${isCompletedStatus ? 'opacity-60' : ''}`}
       style={style}
       data-testid={`workorder-card-${workOrder.id}`}
     >
@@ -1988,13 +2059,10 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
           <p className={`text-xs font-medium truncate flex-1 ${workOrder.isPending ? 'ml-5' : ''}`}>{workOrder.customerName}</p>
           {workOrder.status !== "scheduled" && (
             <span
-              className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm ${
-                workOrder.status === 'dispatched' ? 'bg-blue-500 text-white' :
-                workOrder.status === 'en_route' ? 'bg-blue-400 text-white' :
-                workOrder.status === 'on_site' ? 'bg-green-500 text-white' :
-                workOrder.status === 'completed' ? 'bg-gray-500 text-white' :
-                'bg-gray-500 text-white'
-              }`}
+              className={cn(
+                "text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm",
+                statusBadgeClass(workOrder.status)
+              )}
               data-testid={`status-badge-${workOrder.id}`}
             >
               {statusLabels[workOrder.status] || workOrder.status}
@@ -2039,13 +2107,10 @@ function WorkOrderCardOverlay({ workOrder }: { workOrder: DispatchWorkOrder }) {
       <div className="flex items-center gap-1">
         <p className={`text-xs font-medium truncate flex-1 ${workOrder.isPending ? 'ml-5' : ''}`}>{workOrder.customerName}</p>
         {workOrder.status !== "scheduled" && (
-          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm ${
-            workOrder.status === 'dispatched' ? 'bg-purple-600 text-white' :
-            workOrder.status === 'en_route' ? 'bg-amber-500 text-white' :
-            workOrder.status === 'on_site' ? 'bg-orange-500 text-white' :
-            workOrder.status === 'completed' ? 'bg-green-600 text-white' :
-            'bg-gray-600 text-white'
-          }`}>
+          <span className={cn(
+            "text-[8px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap shadow-sm",
+            statusBadgeClass(workOrder.status)
+          )}>
             {statusLabels[workOrder.status] || workOrder.status}
           </span>
         )}
@@ -2138,15 +2203,12 @@ function MobileWorkOrderCard({ workOrder, technician, onClick }: { workOrder: Di
             <p className={`font-semibold text-sm ${jobColors.text}`}>{workOrder.customerName}</p>
             <p className={`text-xs ${jobColors.text} opacity-80`}>{workOrder.propertyAddress || "No address"}</p>
           </div>
-          <Badge 
-            className={`text-xs font-bold ${workOrder.priority && workOrder.priority !== "normal" ? 'mr-12' : ''} ${
-              workOrder.status === 'scheduled' ? 'bg-blue-600 text-white' :
-              workOrder.status === 'dispatched' ? 'bg-purple-600 text-white' :
-              workOrder.status === 'en_route' ? 'bg-amber-500 text-white' :
-              workOrder.status === 'on_site' ? 'bg-orange-500 text-white' :
-              workOrder.status === 'completed' ? 'bg-green-600 text-white' :
-              'bg-gray-600 text-white'
-            }`}
+          <Badge
+            className={cn(
+              "text-xs font-bold",
+              workOrder.priority && workOrder.priority !== "normal" && "mr-12",
+              statusBadgeClass(workOrder.status)
+            )}
             data-testid={`mobile-status-badge-${workOrder.id}`}
           >
             {statusLabels[workOrder.status] || workOrder.status}
@@ -2230,6 +2292,13 @@ export default function CrmDispatch() {
   const [viewMode, setViewMode] = useState<ViewMode>("day");
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [searchInput, setSearchInput] = useState("");
+
+  // The schedule grid derives from STEP_MINUTES (read once at module load). If the
+  // configured increment (Settings → Dispatch Board) changed, reload once to apply it.
+  useEffect(() => {
+    const desired = Number(localStorage.getItem("crm_dispatch_step_minutes")) === 15 ? 15 : 30;
+    if (desired !== STEP_MINUTES) window.location.reload();
+  }, []);
   const debouncedSearch = useDebounce(searchInput, 300);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeFromQueue, setActiveFromQueue] = useState(false);
@@ -2243,6 +2312,7 @@ export default function CrmDispatch() {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [localWorkOrders, setLocalWorkOrders] = useState<DispatchWorkOrder[]>([]);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
   const [newNote, setNewNote] = useState("");
   const [dispatchNote, setDispatchNote] = useState("");
   const [workOrderDescription, setWorkOrderDescription] = useState("");
@@ -2348,6 +2418,7 @@ export default function CrmDispatch() {
   const handleWorkOrderClick = useCallback((workOrderId: string) => {
     const wo = localWorkOrders.find(w => w.id === workOrderId);
     setSelectedWorkOrderId(workOrderId);
+    setPanelCollapsed(false); // always open expanded on a fresh selection
     setNewNote("");
     setWorkOrderDescription(wo?.description || "");
   }, [localWorkOrders]);
@@ -2441,7 +2512,7 @@ export default function CrmDispatch() {
           phone: newCustPhone.trim() || null,
           email: newCustEmail.trim() || null,
           customerType: newCustType,
-          customerStatus: "client",
+          customerStatus: "customer",
           fullAddress,
         },
         property: {
@@ -3383,10 +3454,10 @@ export default function CrmDispatch() {
 
       const wo = localWorkOrders.find(w => w.id === workOrderId);
       const activeRect = event.active.rect.current.initial;
-      if (wo && activatorEvt && activeRect) {
-        const duration = getWorkOrderDurationHours(wo);
-        const clickFraction = Math.max(0, Math.min(1, (activatorEvt.clientX - activeRect.left) / activeRect.width));
-        dragClickHourOffsetRef.current = clickFraction * duration;
+      if (wo && activeRect) {
+        // Cursor-relative snapping: the work order moves to whichever increment the
+        // cursor is over, regardless of where on the card it was grabbed.
+        dragClickHourOffsetRef.current = 0;
         activeCardWidthRef.current = activeRect.width;
       } else {
         dragClickHourOffsetRef.current = 0;
@@ -3838,6 +3909,19 @@ export default function CrmDispatch() {
     }
   };
 
+  // Step the selected date forward/back by one unit of the active view.
+  const stepDate = (direction: 1 | -1) => {
+    const newDate = new Date(selectedDate);
+    if (viewMode === "week") {
+      newDate.setDate(newDate.getDate() + 7 * direction);
+    } else if (viewMode === "month") {
+      newDate.setMonth(newDate.getMonth() + direction);
+    } else {
+      newDate.setDate(newDate.getDate() + direction);
+    }
+    setSelectedDate(newDate);
+  };
+
   const dateDisplay = selectedDate.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
@@ -3882,150 +3966,117 @@ export default function CrmDispatch() {
         {/* Main Content - flex-1 so it genuinely shrinks when sidebar opens */}
         <div className="flex-1 min-w-0 flex flex-col overflow-hidden h-full">
         {/* Fixed Header Section */}
-        <div className="flex-shrink-0 space-y-3 pb-3">
-          <div className="flex justify-center">
-            <div className="relative w-full max-w-xl">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Search work orders..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
-                data-testid="input-search-dispatch"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-center">
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => {
-                  const newDate = new Date(selectedDate);
-                  if (viewMode === "week") {
-                    newDate.setDate(newDate.getDate() - 7);
-                  } else if (viewMode === "month") {
-                    newDate.setMonth(newDate.getMonth() - 1);
-                  } else {
-                    newDate.setDate(newDate.getDate() - 1);
-                  }
-                  setSelectedDate(newDate);
-                }}
-                className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors"
-                data-testid="button-prev-date"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-              
-              {viewMode === "day" ? (
-                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                  <PopoverTrigger asChild>
-                    <button 
-                      className="text-sm text-slate-700 font-medium min-w-[160px] text-center hover:text-[#711419] transition-colors"
-                      data-testid="button-date-picker"
-                    >
-                      {dateDisplay}
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="center">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={handleDateSelect}
-                      initialFocus
-                      data-testid="calendar-picker"
-                    />
-                  </PopoverContent>
-                </Popover>
-              ) : viewMode === "week" ? (
-                <span className="text-sm font-medium text-slate-700 px-2 min-w-[160px] text-center">
-                  {formatWeekRange(weekDates)}
-                </span>
-              ) : (
-                <span className="text-sm font-medium text-slate-700 px-2 min-w-[160px] text-center">
-                  {format(selectedDate, "MMMM yyyy")}
-                </span>
-              )}
-              
-              <button
-                onClick={() => {
-                  const newDate = new Date(selectedDate);
-                  if (viewMode === "week") {
-                    newDate.setDate(newDate.getDate() + 7);
-                  } else if (viewMode === "month") {
-                    newDate.setMonth(newDate.getMonth() + 1);
-                  } else {
-                    newDate.setDate(newDate.getDate() + 1);
-                  }
-                  setSelectedDate(newDate);
-                }}
-                className="p-2 text-[#711419] hover:text-[#5a1014] transition-colors"
-                data-testid="button-next-date"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-4">
-            <div>
-              <h1 className="text-xl font-bold text-slate-900" data-testid="text-dispatch-title">
+        <div className="flex-shrink-0 mb-3 space-y-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center gap-2 mr-1">
+              <h1 className="font-display text-xl font-semibold tracking-tight text-foreground" data-testid="text-dispatch-title">
                 Dispatch Board
               </h1>
-              <p className="text-sm text-slate-500">
-                {viewMode === "day" ? "Daily Schedule" : viewMode === "week" ? "Weekly Schedule" : viewMode === "month" ? "Monthly Schedule" : "Fleet Tracking"} {viewMode !== "trucks" && `- ${localWorkOrders.length} work orders`}
-              </p>
             </div>
-            
-            <div className="flex items-center border-b border-slate-200">
-              <button
-                onClick={() => setViewMode("day")}
-                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-                  viewMode === "day" 
-                    ? "text-[#711419] border-[#711419]" 
-                    : "text-slate-500 border-transparent hover:text-slate-700"
-                }`}
-                data-testid="button-view-day"
-              >
-                Day
-              </button>
-              <button
-                onClick={() => setViewMode("week")}
-                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-                  viewMode === "week" 
-                    ? "text-[#711419] border-[#711419]" 
-                    : "text-slate-500 border-transparent hover:text-slate-700"
-                }`}
-                data-testid="button-view-week"
-              >
-                Week
-              </button>
-              <button
-                onClick={() => setViewMode("month")}
-                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-                  viewMode === "month"
-                    ? "text-[#711419] border-[#711419]"
-                    : "text-slate-500 border-transparent hover:text-slate-700"
-                }`}
-                data-testid="button-view-month"
-              >
-                Month
-              </button>
+
+            <div className="inline-flex items-center gap-1 rounded-lg bg-slate-100 p-1">
+              {(["day", "week", "month"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={cn(
+                    "px-3 py-1 text-sm font-medium rounded-md capitalize transition-all",
+                    viewMode === mode
+                      ? "bg-white text-[#711419] shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
+                  )}
+                  data-testid={`button-view-${mode}`}
+                >
+                  {mode}
+                </button>
+              ))}
               <button
                 onClick={() => setViewMode("trucks")}
-                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-1.5 ${
-                  viewMode === "trucks" 
-                    ? "text-[#711419] border-[#711419]" 
-                    : "text-slate-500 border-transparent hover:text-slate-700"
-                }`}
+                className={cn(
+                  "px-3 py-1 text-sm font-medium rounded-md transition-all flex items-center gap-1.5",
+                  viewMode === "trucks"
+                    ? "bg-white text-[#711419] shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                )}
                 data-testid="button-view-trucks"
               >
                 <Truck className="h-4 w-4" />
                 Trucks
               </button>
             </div>
-          </div>
-          
+
+            {viewMode !== "trucks" && (
+              <div className="flex items-center gap-2">
+                <div className="inline-flex items-center rounded-lg border border-slate-200 bg-white overflow-hidden">
+                  <button
+                    onClick={() => stepDate(-1)}
+                    className="px-2 py-1.5 text-[#711419] hover:bg-slate-50 transition-colors"
+                    data-testid="button-prev-date"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  {viewMode === "day" ? (
+                    <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                      <PopoverTrigger asChild>
+                        <button
+                          className="text-sm text-slate-700 font-semibold min-w-[150px] px-3 py-1.5 text-center border-x border-slate-100 hover:text-[#711419] hover:bg-slate-50 transition-colors"
+                          data-testid="button-date-picker"
+                        >
+                          {dateDisplay}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={handleDateSelect}
+                          initialFocus
+                          data-testid="calendar-picker"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  ) : viewMode === "week" ? (
+                    <span className="text-sm font-semibold text-slate-700 px-3 py-1.5 min-w-[150px] text-center border-x border-slate-100">
+                      {formatWeekRange(weekDates)}
+                    </span>
+                  ) : (
+                    <span className="text-sm font-semibold text-slate-700 px-3 py-1.5 min-w-[150px] text-center border-x border-slate-100">
+                      {format(selectedDate, "MMMM yyyy")}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => stepDate(1)}
+                    className="px-2 py-1.5 text-[#711419] hover:bg-slate-50 transition-colors"
+                    data-testid="button-next-date"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedDate(new Date())}
+                  className="rounded-lg border-slate-200 bg-white text-slate-600 hover:text-[#711419] h-8"
+                  data-testid="button-today"
+                >
+                  Today
+                </Button>
+              </div>
+            )}
+
+            <div className="flex-1 min-w-[80px]" />
+
+            <div className="relative w-full sm:w-52 lg:w-60">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search work orders..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="pl-9 h-9 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
+                data-testid="input-search-dispatch"
+              />
+            </div>
+
           <div className="flex items-center gap-2 flex-shrink-0">
             
             <Popover>
@@ -4191,9 +4242,10 @@ export default function CrmDispatch() {
           onDragCancel={handleDragCleanup}
           modifiers={combinedModifiers}
         >
-          <div ref={dispatchBoardRef} className="flex flex-col flex-1 min-h-0 gap-4 overflow-hidden">
-            {/* Scrollable Technician Schedule - vertical scroll here, horizontal inside component */}
-            <div className="flex-1 min-h-[200px] overflow-y-auto overflow-x-hidden">
+          <div ref={dispatchBoardRef} className={cn("flex flex-col flex-1 min-h-0 gap-2", viewMode === "day" ? "overflow-y-auto overflow-x-hidden" : "overflow-hidden")}>
+            {/* Technician schedule. Day view sizes to content so the grid ends at the
+                last tech row (no blank stretch); other views fill + scroll internally. */}
+            <div className={cn("overflow-x-hidden", viewMode === "day" ? "flex-shrink-0" : "flex-1 min-h-[280px] overflow-y-auto")}>
               {viewMode === "trucks" ? (
                 <TrucksMapView technicians={technicians} />
               ) : viewMode === "day" ? (
@@ -4243,9 +4295,9 @@ export default function CrmDispatch() {
               )}
             </div>
             
-            {/* Fixed Unassigned Queue - hidden in trucks view */}
+            {/* Unassigned Queue — sits directly below the grid (day view), hidden in trucks */}
             {viewMode !== "trucks" && (
-            <div className="flex-shrink-0 max-h-[220px] overflow-y-auto overflow-x-hidden">
+            <div className={cn("flex-shrink-0 overflow-x-hidden", viewMode === "day" ? "" : "max-h-[220px] overflow-y-auto")}>
               <UnassignedQueueSection
                 workOrders={unassignedWorkOrders}
                 onWorkOrderClick={handleWorkOrderClick}
@@ -4261,32 +4313,43 @@ export default function CrmDispatch() {
             )}
           </div>
           
-          <DragOverlay dropAnimation={null}>
-            {activeId ? (() => {
-              const wo = localWorkOrders.find(w => w.id === activeId);
-              const label = wo?.customerName || wo?.title || 'Work Order';
-              const addr = wo?.propertyAddress || '';
-              return (
-                <div
-                  className="rounded-lg bg-white border-2 border-[#711419]/40 shadow-xl cursor-grabbing px-3 py-2 flex items-center gap-2"
-                  style={{ width: activeFromQueue ? 180 : Math.min(activeCardWidthRef.current || 180, 220), pointerEvents: 'none' }}
-                >
-                  <div className="w-2 h-8 rounded-full bg-[#711419]/60 flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-bold text-slate-800 truncate">{label}</div>
-                    {addr && <div className="text-[10px] text-slate-500 truncate">{addr}</div>}
-                  </div>
-                </div>
-              );
-            })() : null}
-          </DragOverlay>
+          {/* No floating preview card — only the snap outline on the timeline is shown. */}
+          <DragOverlay dropAnimation={null}>{null}</DragOverlay>
         </DndContext>
 
         </div>
 
-        {/* Side Panel - Push Layout */}
+        {/* Side Panel - Push Layout (collapsible, smooth width animation) */}
         {selectedWorkOrder && (
-          <div className="w-[400px] flex-shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-hidden shadow-lg" data-testid="workorder-detail-panel">
+          <div
+            className="flex-shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-hidden shadow-lg transition-[width] duration-[600ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+            style={{ width: panelCollapsed ? 52 : 400 }}
+            data-testid="workorder-detail-panel"
+          >
+          {panelCollapsed ? (
+            /* Collapsed rail — expand / close + vertical WO label */
+            <div className="flex h-full w-[52px] flex-col items-center gap-2 py-3">
+              <button
+                onClick={() => setPanelCollapsed(false)}
+                className="rounded-full p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                aria-label="Expand panel"
+                data-testid="button-expand-panel"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setSelectedWorkOrderId(null)}
+                className="rounded-full p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                aria-label="Close panel"
+              >
+                <XCircle className="h-4 w-4" />
+              </button>
+              <div className="mt-1 whitespace-nowrap text-[11px] font-medium tracking-wide text-slate-500 [writing-mode:vertical-rl]">
+                WO {selectedWorkOrder.workOrderNumber}
+              </div>
+            </div>
+          ) : (
+          <div className="flex h-full w-[400px] flex-col">
             {/* Panel Header — color reflects visit type */}
             <div className={`flex items-center justify-between px-4 py-3 flex-shrink-0 ${
               (selectedWorkOrder.visitType || "SERVICE") === "SERVICE"
@@ -4297,15 +4360,25 @@ export default function CrmDispatch() {
                 <h2 className="text-sm font-semibold" data-testid="panel-workorder-title">Work Order: {selectedWorkOrder.workOrderNumber}</h2>
                 <p className="text-xs opacity-80">{visitTypeLabels[selectedWorkOrder.visitType || "SERVICE"] || selectedWorkOrder.visitType}</p>
               </div>
-              <button
-                onClick={() => setSelectedWorkOrderId(null)}
-                className="p-1.5 hover:bg-white/20 rounded-full transition-colors opacity-80 hover:opacity-100"
-                aria-label="Close panel"
-              >
-                <XCircle className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-0.5">
+                <button
+                  onClick={() => setPanelCollapsed(true)}
+                  className="p-1.5 hover:bg-white/20 rounded-full transition-colors opacity-80 hover:opacity-100"
+                  aria-label="Collapse panel"
+                  data-testid="button-collapse-panel"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setSelectedWorkOrderId(null)}
+                  className="p-1.5 hover:bg-white/20 rounded-full transition-colors opacity-80 hover:opacity-100"
+                  aria-label="Close panel"
+                >
+                  <XCircle className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-            
+
             {/* Panel Content - Scrollable */}
             <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide">
                 <div className="space-y-4">
@@ -4614,6 +4687,8 @@ export default function CrmDispatch() {
                   </div>
               </div>
             </div>
+          </div>
+          )}
           </div>
         )}
       </div>

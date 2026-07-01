@@ -410,7 +410,7 @@ export default function CrmSettingsSystemTools() {
   if (!isAdmin) {
     return (
       <CrmLayout currentUser={currentUser}>
-        <div className="p-6 max-w-2xl mx-auto">
+        <div className="mx-auto w-full max-w-2xl space-y-6">
           <h1 className="text-xl font-semibold text-slate-900 mb-6">System Tools</h1>
           <div className="py-12 text-center text-slate-400">
             <AlertCircle className="h-8 w-8 mx-auto mb-3" />
@@ -423,7 +423,7 @@ export default function CrmSettingsSystemTools() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="p-6 max-w-2xl mx-auto">
+      <div className="mx-auto w-full max-w-2xl space-y-6">
         <div className="mb-6">
           <Link href="/crm/settings">
             <button className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-4">

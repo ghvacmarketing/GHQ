@@ -555,49 +555,35 @@ export default function CrmQuotes() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
-        {/* Search bar at top - DoorLoop style */}
-        <div className="flex justify-center mb-2">
-          <div className="relative w-full max-w-xl">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+        {/* Title + subheading · centered search · actions — all on one row */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
+          <div className="min-w-0 shrink-0">
+            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground truncate" data-testid="text-quotes-title">
+              Quotes
+            </h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">Create, send, and track customer quotes</p>
+          </div>
+
+          <div className="relative w-full lg:flex-1 lg:max-w-sm lg:mx-auto">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search by customer, quote #..."
+              placeholder="Search quotes…"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
+              className="pl-9 h-9"
               data-testid="input-search"
             />
           </div>
-        </div>
 
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900" data-testid="text-quotes-title">
-              CRM Quotes
-            </h1>
-            <p className="text-sm text-slate-500">
-              {filteredAndSortedQuotes.length} quote{filteredAndSortedQuotes.length !== 1 ? "s" : ""}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             {hasActiveFilters && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={resetFilters}
-                className="h-8 text-xs text-slate-600"
-                data-testid="button-reset-filters"
-              >
+              <Button variant="ghost" size="sm" onClick={resetFilters} className="text-xs text-muted-foreground" data-testid="button-reset-filters">
                 <RotateCcw className="h-3 w-3 mr-1" />
                 Reset
               </Button>
             )}
             <Link href="/crm/quotes/new">
-              <Button 
-                size="sm" 
-                className="bg-[#711419] hover:bg-[#5a1014]" 
-                data-testid="button-create-quote"
-              >
+              <Button size="sm" data-testid="button-create-quote">
                 <Plus className="h-4 w-4 mr-1" />
                 New Quote
               </Button>

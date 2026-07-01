@@ -4379,7 +4379,7 @@ export default function CrmQuoteDetail() {
                 Printed Name
               </label>
               <Input
-                placeholder="Client's full name"
+                placeholder="Customer's full name"
                 value={manualSignerName}
                 onChange={(e) => setManualSignerName(e.target.value)}
               />

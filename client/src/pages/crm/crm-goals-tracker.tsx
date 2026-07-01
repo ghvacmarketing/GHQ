@@ -20,6 +20,7 @@ import {
   Users,
   User,
 } from "lucide-react";
+import { PageHeader } from "@/components/crm/ui-kit";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import type { CrmUser } from "@shared/schema";
 
@@ -247,27 +248,21 @@ export default function CrmGoalsTracker() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900" data-testid="text-goals-title">
-              Goals Tracker
-            </h1>
-            <p className="text-slate-500 text-sm flex items-center gap-2 mt-1">
+        <PageHeader
+          title={<span data-testid="text-goals-title">Goals Tracker</span>}
+          description={
+            <span className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               {trackerData?.month} {trackerData?.year} — Day {trackerData?.dayOfMonth} of {trackerData?.daysInMonth}
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-            className="gap-2"
-            data-testid="button-refresh-goals"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Refresh
-          </Button>
-        </div>
+            </span>
+          }
+          actions={
+            <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2" data-testid="button-refresh-goals">
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </Button>
+          }
+        />
 
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -51,6 +51,7 @@ import {
   Lock,
   Percent,
 } from "lucide-react";
+import { PageHeader } from "@/components/crm/ui-kit";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -374,41 +375,26 @@ export default function CrmItems() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900" data-testid="text-items-title">
-              Items
-            </h1>
-            <p className="text-sm text-slate-500">
-              {itemsLoading ? "Loading..." : `${filteredAndSortedItems.length} item${filteredAndSortedItems.length !== 1 ? "s" : ""}`}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {hasActiveFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={resetFilters}
-                className="h-8 text-xs text-slate-600"
-                data-testid="button-reset-filters"
-              >
-                <RotateCcw className="h-3 w-3 mr-1" />
-                Reset
-              </Button>
-            )}
-            {activeCategory !== "discount" && (
-              <Button
-                size="sm"
-                className="bg-[#711419] hover:bg-[#5a1014]"
-                onClick={() => setShowCreateDialog(true)}
-                data-testid="button-add-item"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Item
-              </Button>
-            )}
-          </div>
-        </div>
+        <PageHeader
+          title={<span data-testid="text-items-title">Items</span>}
+          description={itemsLoading ? "Loading…" : `${filteredAndSortedItems.length} item${filteredAndSortedItems.length !== 1 ? "s" : ""}`}
+          actions={
+            <>
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={resetFilters} className="text-xs text-muted-foreground" data-testid="button-reset-filters">
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  Reset
+                </Button>
+              )}
+              {activeCategory !== "discount" && (
+                <Button size="sm" onClick={() => setShowCreateDialog(true)} data-testid="button-add-item">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Item
+                </Button>
+              )}
+            </>
+          }
+        />
 
         <Tabs value={activeCategory} onValueChange={setActiveCategory} className="w-full">
           <TabsList className="w-full h-auto flex flex-wrap justify-start gap-1 bg-transparent p-0">

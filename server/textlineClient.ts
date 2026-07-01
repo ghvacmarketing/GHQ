@@ -71,6 +71,36 @@ export interface SendMessageResult {
   errorMessage?: string;
 }
 
+// Textline timestamps are unix SECONDS; convert to an ISO string so downstream
+// `new Date(...)` produces the right date (raw seconds would parse as 1970).
+function toIso(ts: any): string | undefined {
+  if (ts == null) return undefined;
+  if (typeof ts === "number") return new Date(ts * 1000).toISOString();
+  return ts;
+}
+
+// Map a Textline "post" (message) to our TextlineMessage. Posts have no
+// `direction` field — inbound is derived from creator.type === "customer".
+function mapPost(post: any): TextlineMessage {
+  return {
+    uuid: post.uuid,
+    body: post.body || "",
+    direction: post.direction || (post.creator?.type === "customer" ? "inbound" : "outbound"),
+    created_at: toIso(post.created_at) as any,
+    delivered_at: toIso(post.delivered_at),
+    read_at: toIso(post.read_at),
+    author: post.author
+      ? { uuid: post.author.uuid, name: post.author.name || post.author.email, email: post.author.email }
+      : undefined,
+    attachments: post.attachments?.map((att: any) => ({
+      uuid: att.uuid,
+      url: att.url,
+      filename: att.filename,
+      content_type: att.content_type,
+    })),
+  };
+}
+
 class TextlineClient {
   private apiKey: string | undefined;
 
@@ -441,12 +471,13 @@ class TextlineClient {
     }
 
     try {
-      // Clean phone number for URL
-      const cleanPhone = phoneNumber.replace(/[^\d+]/g, "");
-      // Textline API: GET /api/conversations/phone_number/{phone}.json returns single conversation with posts
-      const url = `${TEXTLINE_BASE_URL}/api/conversations/phone_number/${encodeURIComponent(cleanPhone)}.json`;
+      // Textline returns a conversation's message history (posts) from the
+      // conversations LIST endpoint filtered by phone number. The old
+      // /api/conversations/phone_number/{phone}.json path now 404s.
+      // Response shape: { conversation, group, posts, posts_page_size }.
+      const url = `${TEXTLINE_BASE_URL}/api/conversations.json?phone_number=${encodeURIComponent(phoneNumber)}`;
       console.log("[Textline] Fetching conversation by phone:", url);
-      
+
       const response = await fetch(url, {
         method: "GET",
         headers: this.getHeaders(),
@@ -473,29 +504,11 @@ class TextlineClient {
         };
       }
 
-      // Response has conversation object with posts array
-      const posts = data.conversation?.posts || data.posts || [];
-      console.log("[Textline] Fetched", posts.length, "messages for phone", cleanPhone);
-      
-      const mappedMessages: TextlineMessage[] = posts.map((post: any) => ({
-        uuid: post.uuid,
-        body: post.body || "",
-        direction: post.direction || (post.creator?.type === "customer" ? "inbound" : "outbound"),
-        created_at: post.created_at,
-        delivered_at: post.delivered_at,
-        read_at: post.read_at,
-        author: post.author ? {
-          uuid: post.author.uuid,
-          name: post.author.name || post.author.email,
-          email: post.author.email,
-        } : undefined,
-        attachments: post.attachments?.map((att: any) => ({
-          uuid: att.uuid,
-          url: att.url,
-          filename: att.filename,
-          content_type: att.content_type,
-        })),
-      }));
+      // Messages live in `posts` (fall back to nested conversation.posts for safety).
+      const posts = data.posts || data.conversation?.posts || [];
+      console.log("[Textline] Fetched", posts.length, "messages for phone", phoneNumber);
+
+      const mappedMessages: TextlineMessage[] = posts.map((post: any) => mapPost(post));
 
       return { messages: mappedMessages };
     } catch (error: any) {
@@ -550,26 +563,8 @@ class TextlineClient {
       // Textline returns conversation object with posts array
       const posts = data.conversation?.posts || data.posts || [];
       console.log("[Textline] Fetched", posts.length, "messages for conversation", conversationUuid);
-      
-      const mappedMessages: TextlineMessage[] = posts.map((post: any) => ({
-        uuid: post.uuid,
-        body: post.body || "",
-        direction: post.direction || (post.author ? "outbound" : "inbound"),
-        created_at: post.created_at,
-        delivered_at: post.delivered_at,
-        read_at: post.read_at,
-        author: post.author ? {
-          uuid: post.author.uuid,
-          name: post.author.name || post.author.email,
-          email: post.author.email,
-        } : undefined,
-        attachments: post.attachments?.map((att: any) => ({
-          uuid: att.uuid,
-          url: att.url,
-          filename: att.filename,
-          content_type: att.content_type,
-        })),
-      }));
+
+      const mappedMessages: TextlineMessage[] = posts.map((post: any) => mapPost(post));
 
       return { messages: mappedMessages };
     } catch (error: any) {

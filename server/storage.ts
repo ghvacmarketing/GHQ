@@ -1993,14 +1993,40 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (filters?.search) {
+      const term = `%${filters.search}%`;
+      // Phone search is format-agnostic: strip non-digits from both the query and
+      // the stored values so "5551234567" matches "(555) 123-4567", "555.123.4567", etc.
+      const digits = filters.search.replace(/\D/g, "");
+      const phoneDigits = digits.length >= 3 ? `%${digits}%` : null;
+      // Search everything a conversation is "about": the thread's own name/phone
+      // (most Textline-synced threads have no linked CRM customer), a linked
+      // customer's name/phone/email, AND the full text of every message in the
+      // thread (so a search hits anything that was actually said, not just the
+      // contact). Message content is matched with an EXISTS subquery so one row
+      // per conversation is returned regardless of how many messages match.
+      const searchMatch = or(
+        ilike(crmMessagingConversations.customerName, term),
+        ilike(crmMessagingConversations.phoneNumber, term),
+        ilike(crmCustomers.name, term),
+        ilike(crmCustomers.phone, term),
+        ilike(crmCustomers.email, term),
+        sql`EXISTS (SELECT 1 FROM ${crmMessagingMessages} m WHERE m.conversation_id = ${crmMessagingConversations.id} AND m.body ILIKE ${term})`,
+        ...(phoneDigits
+          ? [
+              sql`regexp_replace(${crmMessagingConversations.phoneNumber}, '[^0-9]', '', 'g') LIKE ${phoneDigits}`,
+              sql`regexp_replace(${crmCustomers.phone}, '[^0-9]', '', 'g') LIKE ${phoneDigits}`,
+              sql`EXISTS (SELECT 1 FROM ${crmMessagingMessages} m WHERE m.conversation_id = ${crmMessagingConversations.id} AND regexp_replace(COALESCE(m.body, ''), '[^0-9]', '', 'g') LIKE ${phoneDigits})`,
+            ]
+          : []),
+      );
       const searchResults = await db
         .select({ conversation: crmMessagingConversations })
         .from(crmMessagingConversations)
         .leftJoin(crmCustomers, eq(crmMessagingConversations.customerId, crmCustomers.id))
         .where(
           conditions.length > 0
-            ? and(...conditions, ilike(crmCustomers.name, `%${filters.search}%`))
-            : ilike(crmCustomers.name, `%${filters.search}%`)
+            ? and(...conditions, searchMatch)
+            : searchMatch
         )
         .orderBy(sql`${crmMessagingConversations.lastMessageAt} DESC NULLS LAST`);
       return searchResults.map(r => r.conversation);
@@ -2238,14 +2264,8 @@ export class DatabaseStorage implements IStorage {
 
   async getCrmCustomerByPhone(phone: string): Promise<{ id: string; name: string; phone: string | null; email: string | null } | undefined> {
     const normalizedPhone = phone.replace(/\D/g, '');
-    const phoneVariants = [
-      phone,
-      normalizedPhone,
-      `+${normalizedPhone}`,
-      `+1${normalizedPhone}`,
-      normalizedPhone.slice(-10),
-    ];
-    
+    const last10 = normalizedPhone.slice(-10);
+
     const [customer] = await db.select({
       id: crmCustomers.id,
       name: crmCustomers.name,
@@ -2253,11 +2273,15 @@ export class DatabaseStorage implements IStorage {
       email: crmCustomers.email,
     })
     .from(crmCustomers)
-    .where(or(
-      ...phoneVariants.map(p => ilike(crmCustomers.phone, `%${p}%`))
-    ))
+    .where(
+      // Compare digits-only on both sides so a digits query (e.g. "7068728329")
+      // matches any stored format like "(706) 872-8329" or "+1 706-872-8329".
+      last10.length >= 7
+        ? sql`regexp_replace(COALESCE(${crmCustomers.phone}, ''), '[^0-9]', '', 'g') LIKE ${'%' + last10 + '%'}`
+        : ilike(crmCustomers.phone, `%${phone}%`)
+    )
     .limit(1);
-    
+
     return customer || undefined;
   }
 

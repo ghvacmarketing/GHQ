@@ -239,7 +239,7 @@ export default function CrmSettingsSubtypes() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="p-6 max-w-4xl mx-auto">
+      <div className="mx-auto w-full max-w-4xl space-y-6">
         <div className="mb-6">
           <Button
             variant="ghost"
@@ -253,7 +253,7 @@ export default function CrmSettingsSubtypes() {
           </Button>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">
+              <h1 className="font-display text-xl font-semibold tracking-tight text-foreground" data-testid="text-page-title">
                 Work Order Subtypes
               </h1>
               <p className="text-muted-foreground" data-testid="text-page-subtitle">

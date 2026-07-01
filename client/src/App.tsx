@@ -37,6 +37,7 @@ import CrmRouteGuard from "@/components/crm/crm-route-guard";
 // Lazy-load CRM pages to reduce initial bundle size
 const CrmLogin = lazy(() => import("@/pages/crm/crm-login"));
 const CrmDispatch = lazy(() => import("@/pages/crm/crm-dispatch"));
+const CrmAnalytics = lazy(() => import("@/pages/crm/crm-analytics"));
 const CrmCustomers = lazy(() => import("@/pages/crm/crm-customers"));
 const CrmCustomerDetail = lazy(() => import("@/pages/crm/crm-customer-detail"));
 const CrmAccountCreate = lazy(() => import("@/pages/crm/crm-account-create"));
@@ -72,6 +73,8 @@ const CrmSettingsLeadTypes = lazy(() => import("@/pages/crm/crm-settings-lead-ty
 const CrmSettingsLeadClassification = lazy(() => import("@/pages/crm/crm-settings-lead-classification"));
 const CrmSettingsTime = lazy(() => import("@/pages/crm/crm-settings-time"));
 const CrmSettingsPayments = lazy(() => import("@/pages/crm/crm-settings-payments"));
+const CrmSettingsDispatch = lazy(() => import("@/pages/crm/crm-settings-dispatch"));
+const CrmSettingsAppearance = lazy(() => import("@/pages/crm/crm-settings-appearance"));
 const CrmSettingsSystemTools = lazy(() => import("@/pages/crm/crm-settings-system-tools"));
 const CrmSettingsQuickBooks = lazy(() => import("@/pages/crm/crm-settings-quickbooks"));
 const CrmSettingsImport = lazy(() => import("@/pages/crm/crm-settings-import"));
@@ -110,6 +113,7 @@ const PortalInvoiceDetail = lazy(() => import("@/pages/portal/portal-invoice-det
 const PortalQuotes = lazy(() => import("@/pages/portal/portal-quotes"));
 const PortalAgreements = lazy(() => import("@/pages/portal/portal-agreements"));
 const PortalServiceHistory = lazy(() => import("@/pages/portal/portal-service-history"));
+const PortalSensors = lazy(() => import("@/pages/portal/portal-sensors"));
 
 // Lazy-load Public pages (no auth required)
 const PublicQuoteView = lazy(() => import("@/pages/public/quote-view"));
@@ -176,12 +180,16 @@ function GlobalLoader() {
   );
 }
 
-// CRM-specific loading placeholder
+// CRM inter-page loading placeholder. Kept intentionally quiet: a subtle,
+// fading spinner on the app background (no full-screen "Loading…" banner) so
+// navigating between pages feels like a smooth transition, not a page reload.
 function CrmLoader() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background" data-testid="crm-loader">
-      <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-      <p className="text-muted-foreground">Loading GHQ CRM...</p>
+    <div
+      className="flex min-h-[60vh] items-center justify-center bg-background animate-in fade-in-0 duration-300"
+      data-testid="crm-loader"
+    >
+      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/60" />
     </div>
   );
 }
@@ -269,6 +277,7 @@ function Router() {
       <Route path="/employee-portal" component={EmployeePortal} />
       <Route path="/crm/login">{() => <CrmWrapper><CrmLogin /></CrmWrapper>}</Route>
       <Route path="/crm/dispatch">{() => <ProtectedCrmWrapper><CrmDispatch /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/analytics">{() => <ProtectedCrmWrapper><CrmAnalytics /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/rebate-programs/:id">{() => <ProtectedCrmWrapper><CrmRebateCase /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/rebate-programs">{() => <ProtectedCrmWrapper><CrmRebatePrograms /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/work-orders/:id">{() => <ProtectedCrmWrapper><CrmWorkOrderDetail /></ProtectedCrmWrapper>}</Route>
@@ -306,6 +315,8 @@ function Router() {
       <Route path="/crm/settings/lead-classification">{() => <ProtectedCrmWrapper><CrmSettingsLeadClassification /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/time-logs">{() => <ProtectedCrmWrapper><CrmSettingsTime /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/payments">{() => <ProtectedCrmWrapper><CrmSettingsPayments /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/settings/dispatch">{() => <ProtectedCrmWrapper><CrmSettingsDispatch /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/settings/appearance">{() => <ProtectedCrmWrapper><CrmSettingsAppearance /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/system-tools">{() => <ProtectedCrmWrapper><CrmSettingsSystemTools /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/quickbooks">{() => <ProtectedCrmWrapper><CrmSettingsQuickBooks /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/import">{() => <ProtectedCrmWrapper><CrmSettingsImport /></ProtectedCrmWrapper>}</Route>
@@ -340,6 +351,7 @@ function Router() {
       <Route path="/portal/quotes">{() => <PortalWrapper><PortalQuotes /></PortalWrapper>}</Route>
       <Route path="/portal/agreements">{() => <PortalWrapper><PortalAgreements /></PortalWrapper>}</Route>
       <Route path="/portal/service-history">{() => <PortalWrapper><PortalServiceHistory /></PortalWrapper>}</Route>
+      <Route path="/portal/sensors">{() => <PortalWrapper><PortalSensors /></PortalWrapper>}</Route>
       <Route path="/quote/:token">{() => <Suspense fallback={<GlobalLoader />}><PublicQuoteView /></Suspense>}</Route>
       <Route path="/q/:token">{() => <Suspense fallback={<GlobalLoader />}><PublicQuoteView /></Suspense>}</Route>
       <Route path="/i/:token">{() => <Suspense fallback={<GlobalLoader />}><PublicInvoiceView /></Suspense>}</Route>

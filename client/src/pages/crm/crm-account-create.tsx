@@ -216,13 +216,24 @@ export default function CrmAccountCreate() {
   }>>([]);
   const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
 
-  // Pre-populate parentAccountId from URL param (e.g. when coming from "Add Sub-Account" button)
+  // Pre-populate from URL params (parentId from "Add Sub-Account"; phone/name when
+  // coming from Messaging's "Add as customer" for an unknown number).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const parentId = params.get("parentId");
-    if (parentId) {
-      setFormData(prev => ({ ...prev, parentAccountId: parentId }));
-    }
+    const phone = params.get("phone");
+    const name = params.get("name");
+    setFormData(prev => {
+      const next = { ...prev };
+      if (parentId) next.parentAccountId = parentId;
+      if (phone) next.phone = phone;
+      if (name) {
+        const parts = name.trim().split(/\s+/);
+        next.firstName = parts[0] || "";
+        next.lastName = parts.slice(1).join(" ");
+      }
+      return next;
+    });
   }, []);
 
   // Auto-focus first input when step changes

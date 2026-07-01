@@ -134,8 +134,8 @@ export default function CrmSettingsPayments() {
   if (!isAdmin) {
     return (
       <CrmLayout currentUser={currentUser}>
-        <div className="p-6 max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold text-slate-900 mb-6">Payment Settings</h1>
+        <div className="mx-auto w-full max-w-2xl space-y-6">
+          <h1 className="font-display text-xl font-semibold tracking-tight text-foreground mb-6">Payment Settings</h1>
           <Card>
             <CardContent className="py-12 text-center text-slate-500">
               <CreditCard className="h-12 w-12 mx-auto mb-4 text-slate-300" />
@@ -187,7 +187,7 @@ export default function CrmSettingsPayments() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="p-6 max-w-2xl mx-auto">
+      <div className="mx-auto w-full max-w-2xl space-y-6">
         <div className="flex items-center gap-4 mb-6">
           <Button
             variant="ghost"
@@ -197,7 +197,7 @@ export default function CrmSettingsPayments() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-2xl font-bold text-slate-900">Payment Settings</h1>
+          <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Payment Settings</h1>
         </div>
 
         <Card>

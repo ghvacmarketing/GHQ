@@ -3,38 +3,36 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
-import {
-  Target,
-  TrendingUp,
-  DollarSign,
-  Users,
-  Wrench,
-  HardHat,
-  Settings2,
-  CheckCircle,
-  AlertTriangle,
-  FolderOpen,
-  ClipboardList,
-  FileText,
-  Calendar,
-  Clock,
-} from "lucide-react";
 import {
   AreaChart,
   Area,
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RTooltip,
   ResponsiveContainer,
 } from "recharts";
+import {
+  Target,
+  TrendingUp,
+  DollarSign,
+  Percent,
+  Wrench,
+  HardHat,
+  ShieldCheck,
+  Users,
+  FolderKanban,
+  ClipboardList,
+  Receipt,
+  Trophy,
+  CheckCircle2,
+} from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { PageHeader, StatCard, SectionCard, EmptyState } from "@/components/crm/ui-kit";
 import { PerformanceGauge } from "@/components/ui/performance-gauge";
+import { cn } from "@/lib/utils";
 import type { CrmUser } from "@shared/schema";
 
 type TimeRange = "day" | "week" | "month" | "rolling12";
@@ -55,40 +53,9 @@ interface DashboardAnalytics {
     MAINTENANCE: { today: number; mtd: number; ytd: number; goal: number; goalProgress: number };
   };
   monthlyRevenue: Array<{ month: string; revenue: number }>;
-  projectsOverview: {
-    open: number;
-    completed: number;
-    recent: Array<{
-      id: string;
-      name: string;
-      status: string;
-      projectType: string;
-      createdAt: string;
-    }>;
-  };
-  workOrdersOverview: {
-    scheduled: number;
-    completed: number;
-    recent: Array<{
-      id: string;
-      visitType: string;
-      status: string;
-      scheduledStart: string | null;
-      createdAt: string;
-    }>;
-  };
-  invoicesOverview: {
-    created: number;
-    sent: number;
-    pending: number;
-    recent: Array<{
-      id: string;
-      invoiceNumber: string;
-      total: string;
-      status: string;
-      createdAt: string;
-    }>;
-  };
+  projectsOverview: { open: number; completed: number; recent: any[] };
+  workOrdersOverview: { scheduled: number; completed: number; recent: any[] };
+  invoicesOverview: { created: number; sent: number; pending: number; recent: any[] };
   techPerformance: Array<{
     id: string;
     name: string;
@@ -110,30 +77,33 @@ interface DashboardAnalytics {
     quotesGenerated: number;
     averageSale: number;
     closingRate: number;
-    pipeline: {
-      won: number;
-      negotiating: number;
-      lost: number;
-    };
+    pipeline: { won: number; negotiating: number; lost: number };
   }>;
 }
 
-function formatCurrency(value: number): string {
-  if (value >= 1000000) {
-    return `$${(value / 1000000).toFixed(1)}M`;
-  }
-  if (value >= 1000) {
-    return `$${(value / 1000).toFixed(0)}K`;
-  }
-  return `$${value.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+const num = (v: unknown) => Number(v) || 0;
+const fmtCurrency = (v: number) =>
+  num(v).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const fmtPct = (v: number) => `${Math.round(num(v))}%`;
+const clampPct = (v: number) => Math.max(0, Math.min(100, num(v)));
+
+function GoalBar({ value }: { value: number }) {
+  return (
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+      <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${clampPct(value)}%` }} />
+    </div>
+  );
 }
 
-function formatCurrencyFull(value: number): string {
-  return `$${value.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-}
+const TIME_RANGES: { label: string; value: TimeRange }[] = [
+  { label: "Day", value: "day" },
+  { label: "Week", value: "week" },
+  { label: "Month", value: "month" },
+  { label: "12 mo", value: "rolling12" },
+];
 
 export default function CrmBusinessDashboard() {
-  usePageTitle("Business Dashboard");
+  usePageTitle("Dashboard");
   const [, navigate] = useLocation();
   const [timeRange, setTimeRange] = useState<TimeRange>("month");
 
@@ -142,513 +112,242 @@ export default function CrmBusinessDashboard() {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
-  const { data: analytics, isLoading: analyticsLoading, error } = useQuery<DashboardAnalytics>({
+  const { data: analytics, isLoading } = useQuery<DashboardAnalytics>({
     queryKey: ["/api/crm/dashboard/analytics", timeRange],
     queryFn: async () => {
-      const response = await fetch(`/api/crm/dashboard/analytics?range=${timeRange}`, {
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("Failed to fetch analytics");
-      return response.json();
+      const res = await fetch(`/api/crm/dashboard/analytics?range=${timeRange}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch analytics");
+      return res.json();
     },
     enabled: !!currentUser,
   });
 
   useEffect(() => {
-    if (!authLoading && !currentUser) {
-      navigate("/crm/login");
-    }
+    if (!authLoading && !currentUser) navigate("/crm/login");
   }, [authLoading, currentUser, navigate]);
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          <Skeleton className="h-12 w-64" />
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-32 rounded-xl" />
-            ))}
-          </div>
+      <div className="min-h-screen space-y-6 p-6">
+        <Skeleton className="h-10 w-72" />
+        <Skeleton className="h-44 w-full rounded-lg" />
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-lg" />)}
         </div>
       </div>
     );
   }
+  if (!currentUser) return null;
 
-  if (!currentUser) {
-    return null;
-  }
-
-  const timeRanges: { label: string; value: TimeRange }[] = [
-    { label: "Day", value: "day" },
-    { label: "Week", value: "week" },
-    { label: "Month", value: "month" },
-    { label: "Rolling 12", value: "rolling12" },
+  const co = analytics?.companyOverview;
+  const remaining = Math.max(0, num(co?.companyGoal) - num(co?.totalSold));
+  const depts: { key: keyof DashboardAnalytics["revenueByDepartment"]; label: string; icon: any }[] = [
+    { key: "SERVICE", label: "Service", icon: Wrench },
+    { key: "INSTALL", label: "Install", icon: HardHat },
+    { key: "MAINTENANCE", label: "Maintenance", icon: ShieldCheck },
   ];
+  const techs = (analytics?.techPerformance || []).slice().sort((a, b) => num(b.serviceRevenue) - num(a.serviceRevenue));
+  const reps = analytics?.salesPerformance || [];
+  const monthly = analytics?.monthlyRevenue || [];
+  const hasRevenue = monthly.some((m) => num(m.revenue) > 0);
 
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-6">
-        <div className="bg-gradient-to-r from-[#711419] to-[#8b1a20] text-white p-6 rounded-xl shadow-lg">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2" data-testid="text-business-dashboard-title">
-                <Target className="h-7 w-7" />
-                Business Dashboard
-              </h1>
-              <p className="text-white/80 mt-1">Real-time performance metrics and insights</p>
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              {timeRanges.map((range) => (
-                <Button
-                  key={range.value}
-                  variant={timeRange === range.value ? "secondary" : "ghost"}
-                  size="sm"
-                  onClick={() => setTimeRange(range.value)}
-                  className={
-                    timeRange === range.value
-                      ? "bg-white text-[#711419] hover:bg-white/90"
-                      : "text-white border border-white/30 hover:bg-white/20"
-                  }
-                  data-testid={`btn-range-${range.value}`}
+        <PageHeader
+          title={<span data-testid="text-business-dashboard-title">Dashboard</span>}
+          description="Real-time performance metrics and insights"
+          actions={
+            <div className="inline-flex items-center gap-1 rounded-lg bg-muted p-1" role="tablist">
+              {TIME_RANGES.map((r) => (
+                <button
+                  key={r.value}
+                  onClick={() => setTimeRange(r.value)}
+                  className={cn(
+                    "rounded-md px-3 py-1 text-sm font-medium transition-all",
+                    timeRange === r.value ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  )}
+                  data-testid={`range-${r.value}`}
                 >
-                  {range.label}
-                </Button>
+                  {r.label}
+                </button>
               ))}
+            </div>
+          }
+        />
+
+        {/* Signature hero: company goal progress + revenue trend */}
+        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+          <div className="grid grid-cols-1 lg:grid-cols-5">
+            <div className="relative border-b border-border p-6 lg:col-span-2 lg:border-b-0 lg:border-r">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.07] to-transparent" />
+              <div className="relative">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Target className="h-4 w-4 text-primary" /> Company goal
+                </div>
+                {isLoading ? (
+                  <Skeleton className="mt-3 h-10 w-48" />
+                ) : (
+                  <>
+                    <p className="mt-2 font-display text-4xl font-semibold tracking-tight tabular-nums" data-testid="value-total-sold">
+                      {fmtCurrency(num(co?.totalSold))}
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      of {fmtCurrency(num(co?.companyGoal))} sold
+                    </p>
+                    <div className="mt-4">
+                      <div className="mb-1 flex items-center justify-between text-xs font-medium">
+                        <span className="text-primary">{fmtPct(co?.goalProgress)} to goal</span>
+                        <span className="text-muted-foreground">{fmtCurrency(remaining)} to go</span>
+                      </div>
+                      <GoalBar value={num(co?.goalProgress)} />
+                    </div>
+                    <div className="mt-4 flex gap-6">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Close rate</p>
+                        <p className="text-lg font-semibold tabular-nums">{fmtPct(co?.closeRate)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Rolling 12-mo</p>
+                        <p className="text-lg font-semibold tabular-nums" data-testid="value-rolling-12">{fmtCurrency(num(co?.rolling12Month))}</p>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="p-5 lg:col-span-3">
+              <p className="mb-2 text-sm font-medium text-muted-foreground">Revenue — last 12 months</p>
+              {isLoading ? (
+                <Skeleton className="h-44 w-full" />
+              ) : !hasRevenue ? (
+                <div className="flex h-[184px] flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/40 text-center">
+                  <TrendingUp className="h-7 w-7 text-muted-foreground/40" />
+                  <p className="mt-2 text-sm font-medium text-foreground">No revenue this period</p>
+                  <p className="text-xs text-muted-foreground">Sold quotes will chart here as revenue comes in.</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={184}>
+                  <AreaChart data={monthly} margin={{ top: 5, right: 8, left: -16, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="bizRev" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#711419" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#711419" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
+                    <XAxis dataKey="month" fontSize={11} stroke="#a8a29e" tickLine={false} axisLine={false} />
+                    <YAxis fontSize={11} stroke="#a8a29e" tickLine={false} axisLine={false} tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : `${v}`)} />
+                    <RTooltip formatter={(v: any) => [fmtCurrency(Number(v)), "Revenue"]} />
+                    <Area type="monotone" dataKey="revenue" stroke="#711419" strokeWidth={2} fill="url(#bizRev)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
         </div>
 
-        {error ? (
-          <Card className="border-destructive">
-            <CardContent className="p-6 text-center text-destructive">
-              Failed to load analytics. Please try again.
-            </CardContent>
-          </Card>
-        ) : analyticsLoading ? (
-          <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {[1, 2, 3, 4].map((i) => (
-                <Skeleton key={i} className="h-36 rounded-xl" />
+        {/* KPI row */}
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard label="Total Quoted" value={fmtCurrency(num(co?.totalQuoted))} hint={`${timeRange} range`} icon={DollarSign} tone="primary" />
+          <StatCard label="Total Sold" value={fmtCurrency(num(co?.totalSold))} hint={`${timeRange} range`} icon={TrendingUp} tone="success" />
+          <StatCard label="Close Rate" value={fmtPct(co?.closeRate)} hint="Quoted → sold" icon={Percent} tone="warning" />
+          <StatCard label="Rolling 12-Month" value={fmtCurrency(num(co?.rolling12Month))} hint="Trailing year" icon={Target} tone="neutral" />
+        </div>
+
+        {/* Revenue by department */}
+        <SectionCard title="Revenue by department" description="Month-to-date vs goal">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            {depts.map(({ key, label, icon: Icon }) => {
+              const d = analytics?.revenueByDepartment?.[key];
+              return (
+                <div key={key}>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <span className="flex items-center gap-2 text-sm font-medium"><Icon className="h-4 w-4 text-primary" />{label}</span>
+                    <span className="text-xs text-muted-foreground">{fmtPct(d?.goalProgress)}</span>
+                  </div>
+                  <p className="mb-2 text-xl font-semibold tabular-nums">{fmtCurrency(num(d?.mtd))}</p>
+                  <GoalBar value={num(d?.goalProgress)} />
+                  <p className="mt-1 text-xs text-muted-foreground">Goal {fmtCurrency(num(d?.goal))}</p>
+                </div>
+              );
+            })}
+          </div>
+        </SectionCard>
+
+        {/* Technician performance — speedometers (sold vs quoted vs goal) */}
+        <SectionCard title="Technician performance" description="Sold vs pipeline against goal" action={<Trophy className="h-4 w-4 text-amber-500" />}>
+          {techs.length === 0 ? (
+            <EmptyState icon={Users} title="No technician data" message="Each tech's speedometer appears here as service jobs are logged this period." />
+          ) : (
+            <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2 xl:grid-cols-3">
+              {techs.map((t) => (
+                <div key={t.id} className="flex flex-col items-center rounded-lg border border-border bg-muted/20 p-4">
+                  <PerformanceGauge
+                    label={t.name}
+                    sold={num(t.serviceRevenue)}
+                    quoted={num(t.quotedAmount)}
+                    goal={num(t.goalTarget ?? t.goal)}
+                    size={210}
+                  />
+                  <div className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <span>{num(t.serviceJobs)} jobs</span>
+                    <span>·</span>
+                    <span>{fmtCurrency(num(t.perTicketAvg))}/ticket</span>
+                    {t.goalMet && (
+                      <span className="flex items-center gap-1 text-green-600">
+                        <CheckCircle2 className="h-3 w-3" /> Goal met
+                      </span>
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
-            <Skeleton className="h-48 rounded-xl" />
-            <Skeleton className="h-64 rounded-xl" />
-          </>
-        ) : analytics ? (
-          <>
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xl font-bold text-slate-800 border-b-2 border-[#711419] pb-2">
-                  Company Overview
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-gradient-to-br from-[#711419] to-[#8b1a20] rounded-xl p-5 text-white relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-                    <p className="text-sm opacity-90 mb-2">Total Quoted</p>
-                    <p className="text-3xl font-bold" data-testid="value-total-quoted">
-                      {formatCurrency(analytics.companyOverview.totalQuoted)}
-                    </p>
-                    <p className="text-xs opacity-75 mt-1">
-                      {timeRange === "month" ? "Month to Date" : timeRange === "day" ? "Today" : timeRange === "week" ? "This Week" : "Rolling 12 Months"}
-                    </p>
-                    <Progress value={Math.min((analytics.companyOverview.totalQuoted / analytics.companyOverview.companyGoal) * 100, 100)} className="mt-3 h-2 bg-white/20" />
-                  </div>
+          )}
+        </SectionCard>
 
-                  <div className="bg-gradient-to-br from-[#711419] to-[#8b1a20] rounded-xl p-5 text-white relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-                    <p className="text-sm opacity-90 mb-2">Total Sold</p>
-                    <p className="text-3xl font-bold" data-testid="value-total-sold">
-                      {formatCurrency(analytics.companyOverview.totalSold)}
-                    </p>
-                    <p className="text-xs opacity-75 mt-1">
-                      {analytics.companyOverview.closeRate.toFixed(0)}% Close Rate
-                    </p>
-                    <Progress value={analytics.companyOverview.closeRate} className="mt-3 h-2 bg-white/20" />
+        {/* Sales performance — activity + pipeline */}
+        <SectionCard title="Sales performance" noBodyPadding>
+          {reps.length === 0 ? (
+            <EmptyState icon={Users} title="No sales data" message="Rep activity, pipeline, and closing rates appear here as quotes are created." />
+          ) : (
+            <ul className="divide-y divide-border">
+              {reps.map((r) => (
+                <li key={r.id} className="flex flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                      {r.name.slice(0, 2).toUpperCase()}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{r.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {num(r.leadsReceived)} leads · {num(r.salesVisits)} visits · {num(r.quotesGenerated)} quotes
+                      </p>
+                    </div>
                   </div>
+                  <div className="flex items-center justify-between gap-4 sm:justify-end">
+                    <div className="flex items-center gap-1.5 text-[11px] font-medium">
+                      <span className="rounded bg-green-100 px-1.5 py-0.5 text-green-700">{num(r.pipeline?.won)} won</span>
+                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-700">{num(r.pipeline?.negotiating)} neg</span>
+                      <span className="rounded bg-stone-100 px-1.5 py-0.5 text-stone-600">{num(r.pipeline?.lost)} lost</span>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold tabular-nums">{fmtPct(r.closingRate)}</p>
+                      <p className="text-[11px] text-muted-foreground">{fmtCurrency(num(r.averageSale))} avg</p>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
 
-                  <div className="bg-gradient-to-br from-[#711419] to-[#8b1a20] rounded-xl p-5 text-white relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-                    <p className="text-sm opacity-90 mb-2">Company Goal</p>
-                    <p className="text-3xl font-bold" data-testid="value-company-goal">
-                      {formatCurrency(analytics.companyOverview.companyGoal)}
-                    </p>
-                    <p className="text-xs opacity-75 mt-1">
-                      {analytics.companyOverview.goalProgress.toFixed(0)}% Complete
-                    </p>
-                    <Progress value={Math.min(analytics.companyOverview.goalProgress, 100)} className="mt-3 h-2 bg-white/20" />
-                  </div>
-
-                  <div className="bg-gradient-to-br from-[#711419] to-[#8b1a20] rounded-xl p-5 text-white relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-                    <p className="text-sm opacity-90 mb-2">Rolling 12-Month</p>
-                    <p className="text-3xl font-bold" data-testid="value-rolling-12">
-                      {formatCurrency(analytics.companyOverview.rolling12Month)}
-                    </p>
-                    <p className="text-xs opacity-75 mt-1">Total Revenue</p>
-                    <Progress value={Math.min((analytics.companyOverview.rolling12Month / (analytics.companyOverview.companyGoal * 12)) * 100, 100)} className="mt-3 h-2 bg-white/20" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xl font-bold text-slate-800 border-b-2 border-[#711419] pb-2">
-                  Revenue by Department
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-cyan-50 border-2 border-cyan-200 rounded-xl p-5">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Wrench className="h-5 w-5 text-cyan-600" />
-                      <span className="text-lg font-bold text-cyan-800">Service</span>
-                    </div>
-                    <p className="text-3xl font-bold mb-3 text-cyan-900" data-testid="value-service-mtd">
-                      {formatCurrency(analytics.revenueByDepartment.SERVICE.mtd)}
-                    </p>
-                    <div className="text-sm text-cyan-700 space-y-1">
-                      <p>Today: {formatCurrency(analytics.revenueByDepartment.SERVICE.today)}</p>
-                      <p>MTD: {formatCurrency(analytics.revenueByDepartment.SERVICE.mtd)}</p>
-                      <p>YTD: {formatCurrency(analytics.revenueByDepartment.SERVICE.ytd)}</p>
-                      <p>Goal: {formatCurrency(analytics.revenueByDepartment.SERVICE.goal)}/mo ({analytics.revenueByDepartment.SERVICE.goalProgress.toFixed(0)}%)</p>
-                    </div>
-                  </div>
-
-                  <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-5">
-                    <div className="flex items-center gap-2 mb-3">
-                      <HardHat className="h-5 w-5 text-yellow-600" />
-                      <span className="text-lg font-bold text-yellow-800">Install</span>
-                    </div>
-                    <p className="text-3xl font-bold mb-3 text-yellow-900" data-testid="value-install-mtd">
-                      {formatCurrency(analytics.revenueByDepartment.INSTALL.mtd)}
-                    </p>
-                    <div className="text-sm text-yellow-700 space-y-1">
-                      <p>Today: {formatCurrency(analytics.revenueByDepartment.INSTALL.today)}</p>
-                      <p>MTD: {formatCurrency(analytics.revenueByDepartment.INSTALL.mtd)}</p>
-                      <p>YTD: {formatCurrency(analytics.revenueByDepartment.INSTALL.ytd)}</p>
-                      <p>Goal: {formatCurrency(analytics.revenueByDepartment.INSTALL.goal)}/mo ({analytics.revenueByDepartment.INSTALL.goalProgress.toFixed(0)}%)</p>
-                    </div>
-                  </div>
-
-                  <div className="bg-green-50 border-2 border-green-200 rounded-xl p-5">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Settings2 className="h-5 w-5 text-green-600" />
-                      <span className="text-lg font-bold text-green-800">Maintenance</span>
-                    </div>
-                    <p className="text-3xl font-bold mb-3 text-green-900" data-testid="value-maintenance-mtd">
-                      {formatCurrency(analytics.revenueByDepartment.MAINTENANCE.mtd)}
-                    </p>
-                    <div className="text-sm text-green-700 space-y-1">
-                      <p>Today: {formatCurrency(analytics.revenueByDepartment.MAINTENANCE.today)}</p>
-                      <p>MTD: {formatCurrency(analytics.revenueByDepartment.MAINTENANCE.mtd)}</p>
-                      <p>YTD: {formatCurrency(analytics.revenueByDepartment.MAINTENANCE.ytd)}</p>
-                      <p>Goal: {formatCurrency(analytics.revenueByDepartment.MAINTENANCE.goal)}/mo ({analytics.revenueByDepartment.MAINTENANCE.goalProgress.toFixed(0)}%)</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xl font-bold text-slate-800 border-b-2 border-[#711419] pb-2">
-                  Monthly Revenue Trend
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={analytics.monthlyRevenue}>
-                      <defs>
-                        <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#711419" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#711419" stopOpacity={0.05}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 12 }} />
-                      <YAxis 
-                        tickFormatter={(value) => formatCurrency(value)}
-                        tick={{ fill: '#64748b', fontSize: 12 }}
-                      />
-                      <Tooltip 
-                        formatter={(value: number) => [formatCurrencyFull(value), "Revenue"]}
-                        contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="revenue" 
-                        stroke="#711419" 
-                        strokeWidth={2}
-                        fill="url(#revenueGradient)"
-                        dot={{ fill: '#711419', strokeWidth: 2, r: 4 }}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="border-0 shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                    <FolderOpen className="h-5 w-5 text-[#711419]" />
-                    Projects
-                  </CardTitle>
-                  <p className="text-xs text-slate-500">Last 30 days</p>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-                      <p className="text-2xl font-bold text-blue-800">{analytics.projectsOverview.open}</p>
-                      <p className="text-xs text-blue-600">Open</p>
-                    </div>
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-                      <p className="text-2xl font-bold text-green-800">{analytics.projectsOverview.completed}</p>
-                      <p className="text-xs text-green-600">Completed</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold text-slate-500 uppercase">Recent Projects</p>
-                    {analytics.projectsOverview.recent.length > 0 ? (
-                      analytics.projectsOverview.recent.map((project) => (
-                        <div key={project.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-                          <div className="truncate flex-1">
-                            <p className="text-sm font-medium text-slate-800 truncate">{project.name}</p>
-                            <p className="text-xs text-slate-500">{project.projectType}</p>
-                          </div>
-                          <Badge className="text-xs ml-2" variant="outline">{project.status}</Badge>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-slate-500 text-center py-2">No recent projects</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                    <ClipboardList className="h-5 w-5 text-[#711419]" />
-                    Work Orders
-                  </CardTitle>
-                  <p className="text-xs text-slate-500">Last 30 days</p>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
-                      <p className="text-2xl font-bold text-amber-800">{analytics.workOrdersOverview.scheduled}</p>
-                      <p className="text-xs text-amber-600">Scheduled</p>
-                    </div>
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-                      <p className="text-2xl font-bold text-green-800">{analytics.workOrdersOverview.completed}</p>
-                      <p className="text-xs text-green-600">Completed</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold text-slate-500 uppercase">Recent Work Orders</p>
-                    {analytics.workOrdersOverview.recent.length > 0 ? (
-                      analytics.workOrdersOverview.recent.map((wo) => (
-                        <div key={wo.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-                          <div className="truncate flex-1">
-                            <p className="text-sm font-medium text-slate-800">{wo.visitType}</p>
-                            <p className="text-xs text-slate-500 flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {wo.scheduledStart ? new Date(wo.scheduledStart).toLocaleDateString() : "Not scheduled"}
-                            </p>
-                          </div>
-                          <Badge className="text-xs ml-2" variant="outline">{wo.status}</Badge>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-slate-500 text-center py-2">No recent work orders</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-[#711419]" />
-                    Invoices
-                  </CardTitle>
-                  <p className="text-xs text-slate-500">Last 30 days</p>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-3 mb-4">
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-center">
-                      <p className="text-2xl font-bold text-slate-800">{analytics.invoicesOverview.created}</p>
-                      <p className="text-xs text-slate-600">Created</p>
-                    </div>
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-                      <p className="text-2xl font-bold text-blue-800">{analytics.invoicesOverview.sent}</p>
-                      <p className="text-xs text-blue-600">Sent</p>
-                    </div>
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
-                      <p className="text-2xl font-bold text-amber-800">{analytics.invoicesOverview.pending}</p>
-                      <p className="text-xs text-amber-600">Pending</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold text-slate-500 uppercase">Recent Invoices</p>
-                    {analytics.invoicesOverview.recent && analytics.invoicesOverview.recent.length > 0 ? (
-                      analytics.invoicesOverview.recent.map((invoice) => (
-                        <div key={invoice.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-                          <div className="truncate flex-1">
-                            <p className="text-sm font-medium text-slate-800">{invoice.invoiceNumber || `INV-${invoice.id.slice(0, 8)}`}</p>
-                            <p className="text-xs text-slate-500">{formatCurrency(parseFloat(invoice.total || "0"))}</p>
-                          </div>
-                          <Badge className="text-xs ml-2" variant="outline">{invoice.status}</Badge>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-slate-500 text-center py-2">No recent invoices</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {analytics.techPerformance.length > 0 && (
-              <Card className="border-0 shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xl font-bold text-slate-800 border-b-2 border-[#711419] pb-2">
-                    Technician Performance
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {analytics.techPerformance.map((tech) => (
-                    <div key={tech.id} className="border-2 border-slate-200 rounded-lg p-5" data-testid={`tech-card-${tech.id}`}>
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 pb-4 border-b border-slate-200">
-                        <h3 className="text-lg font-bold text-slate-800">{tech.name}</h3>
-                        <div className="flex gap-2">
-                          {tech.goalMet ? (
-                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Goal Met
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
-                              <AlertTriangle className="h-3 w-3 mr-1" />
-                              {tech.goalProgress.toFixed(0)}% to Goal
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex flex-col lg:flex-row gap-6">
-                        <div className="flex-shrink-0 flex justify-center">
-                          <PerformanceGauge
-                            sold={tech.serviceRevenue}
-                            quoted={tech.quotedAmount}
-                            goal={tech.goal}
-                            goalTarget={tech.goalTarget}
-                            size={200}
-                          />
-                        </div>
-                        <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4">
-                          <div className="bg-slate-50 border-l-4 border-blue-500 p-3 rounded">
-                            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Service Revenue</p>
-                            <p className="text-xl font-bold text-slate-800">{formatCurrencyFull(tech.serviceRevenue)}</p>
-                            <p className={`text-xs ${tech.goalMet ? "text-green-600" : "text-slate-500"}`}>
-                              Goal: {formatCurrency(tech.goal)} ({tech.goalProgress.toFixed(0)}%)
-                            </p>
-                          </div>
-                          <div className="bg-slate-50 border-l-4 border-green-500 p-3 rounded">
-                            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Per Ticket Avg</p>
-                            <p className="text-xl font-bold text-slate-800">{formatCurrencyFull(tech.perTicketAvg)}</p>
-                          </div>
-                          <div className="bg-slate-50 border-l-4 border-purple-500 p-3 rounded">
-                            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Service Jobs</p>
-                            <p className="text-xl font-bold text-slate-800">{tech.serviceJobs}</p>
-                            <p className="text-xs text-slate-500">
-                              {timeRange === "day" ? "Today" : timeRange === "week" ? "7 Days" : "MTD"}
-                            </p>
-                          </div>
-                          <div className="bg-slate-50 border-l-4 border-amber-500 p-3 rounded">
-                            <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Maint. Agreements</p>
-                            <p className="text-xl font-bold text-slate-800">{tech.maintenanceAgreements}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {analytics.techPerformance.length === 0 && (
-                    <p className="text-slate-500 text-center py-8">No technicians found</p>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {analytics.salesPerformance.length > 0 && (
-              <Card className="border-0 shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xl font-bold text-slate-800 border-b-2 border-[#711419] pb-2">
-                    Sales Team Performance
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {analytics.salesPerformance.map((salesperson) => (
-                    <div key={salesperson.id} className="border-2 border-slate-200 rounded-lg p-5" data-testid={`sales-card-${salesperson.id}`}>
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 pb-4 border-b border-slate-200">
-                        <h3 className="text-lg font-bold text-slate-800">{salesperson.name}</h3>
-                        <Badge className="bg-green-100 text-green-800 hover:bg-green-100 w-fit">
-                          <TrendingUp className="h-3 w-3 mr-1" />
-                          {salesperson.closingRate.toFixed(0)}% Close Rate
-                        </Badge>
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
-                        <div className="bg-slate-50 border-l-4 border-blue-500 p-3 rounded">
-                          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Leads Received</p>
-                          <p className="text-xl font-bold text-slate-800">{salesperson.leadsReceived}</p>
-                        </div>
-                        <div className="bg-slate-50 border-l-4 border-green-500 p-3 rounded">
-                          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Sales Visits</p>
-                          <p className="text-xl font-bold text-slate-800">{salesperson.salesVisits}</p>
-                        </div>
-                        <div className="bg-slate-50 border-l-4 border-purple-500 p-3 rounded">
-                          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Quotes Generated</p>
-                          <p className="text-xl font-bold text-slate-800">{salesperson.quotesGenerated}</p>
-                        </div>
-                        <div className="bg-slate-50 border-l-4 border-amber-500 p-3 rounded">
-                          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Average Sale</p>
-                          <p className="text-xl font-bold text-slate-800">{formatCurrencyFull(salesperson.averageSale)}</p>
-                        </div>
-                        <div className="bg-slate-50 border-l-4 border-rose-500 p-3 rounded">
-                          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Closing Rate</p>
-                          <p className="text-xl font-bold text-slate-800">{salesperson.closingRate.toFixed(0)}%</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-3">
-                        <div className="flex-1 bg-green-50 border-l-4 border-green-500 p-3 rounded text-center">
-                          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Won</p>
-                          <p className="text-2xl font-bold text-green-700">{salesperson.pipeline.won}</p>
-                        </div>
-                        <div className="flex-1 bg-amber-50 border-l-4 border-amber-500 p-3 rounded text-center">
-                          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Negotiating</p>
-                          <p className="text-2xl font-bold text-amber-700">{salesperson.pipeline.negotiating}</p>
-                        </div>
-                        <div className="flex-1 bg-red-50 border-l-4 border-red-500 p-3 rounded text-center">
-                          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Lost</p>
-                          <p className="text-2xl font-bold text-red-700">{salesperson.pipeline.lost}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {analytics.salesPerformance.length === 0 && (
-                    <p className="text-slate-500 text-center py-8">No sales team members found</p>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-          </>
-        ) : null}
+        {/* Operations */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <StatCard label="Open Projects" value={num(analytics?.projectsOverview?.open)} hint={`${num(analytics?.projectsOverview?.completed)} completed`} icon={FolderKanban} tone="primary" />
+          <StatCard label="Scheduled Work Orders" value={num(analytics?.workOrdersOverview?.scheduled)} hint={`${num(analytics?.workOrdersOverview?.completed)} completed`} icon={ClipboardList} tone="warning" />
+          <StatCard label="Pending Invoices" value={num(analytics?.invoicesOverview?.pending)} hint={`${num(analytics?.invoicesOverview?.sent)} sent`} icon={Receipt} tone="neutral" />
+        </div>
       </div>
     </CrmLayout>
   );

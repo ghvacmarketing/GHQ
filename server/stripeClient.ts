@@ -45,6 +45,12 @@ export async function getStripeSync() {
         max: 2,
       },
       stripeSecretKey: secretKey,
+      // Local dev: the Stripe CLI (`stripe listen`) prints a signing secret
+      // (whsec_...). Set STRIPE_WEBHOOK_SECRET so webhook signatures verify
+      // without a managed webhook (which requires a public REPLIT_DOMAINS URL).
+      ...(process.env.STRIPE_WEBHOOK_SECRET
+        ? { stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET }
+        : {}),
     });
   }
   return stripeSync;

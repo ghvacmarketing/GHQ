@@ -26,6 +26,7 @@ import {
   AlertCircle,
   ExternalLink,
 } from "lucide-react";
+import { PageHeader } from "@/components/crm/ui-kit";
 import type { CrmUser, MarketingCampaign } from "@shared/schema";
 
 interface ReviewAutomationSettings {
@@ -141,14 +142,10 @@ export default function CrmMarketing() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900" data-testid="text-page-title">
-            Marketing Automation
-          </h1>
-          <p className="text-sm text-slate-500">
-            Automated campaigns and customer engagement
-          </p>
-        </div>
+        <PageHeader
+          title={<span data-testid="text-page-title">Marketing Automation</span>}
+          description="Automated campaigns and customer engagement"
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-amber-50 border-amber-200">

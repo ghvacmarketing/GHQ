@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, ClipboardCheck, Wrench, ArrowRight, DollarSign, Receipt } from "lucide-react";
+import { FileText, ClipboardCheck, Wrench, ArrowRight, DollarSign, Receipt, Droplets } from "lucide-react";
 import { PortalLayout } from "./portal-layout";
 
 interface PortalCustomer {
@@ -258,6 +258,19 @@ export default function PortalDashboard() {
                 <span className="flex items-center gap-2">
                   <Wrench className="h-4 w-4" />
                   Service History
+                </span>
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+            <Link href="/portal/sensors">
+              <Button
+                variant="outline"
+                className="w-full justify-between h-auto py-4 border-slate-200 hover:border-[#711419] hover:text-[#711419]"
+                data-testid="button-view-sensors"
+              >
+                <span className="flex items-center gap-2">
+                  <Droplets className="h-4 w-4" />
+                  Environment Monitoring
                 </span>
                 <ArrowRight className="h-4 w-4" />
               </Button>

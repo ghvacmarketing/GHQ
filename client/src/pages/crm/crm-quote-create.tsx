@@ -169,12 +169,17 @@ export default function CrmQuoteCreate() {
     enabled: !!selectedCustomer?.parentCustomerId && !!selectedCustomer?.billToParent,
   });
 
-  // Customer search query
+  // Customer search query — use the merged endpoint so both CRM-native customers
+  // AND the FieldEdge customer master (Google Sheet) are searchable. Selecting a
+  // FieldEdge customer is fine: the server promotes it into crm_customers on submit.
   const { data: customerSearchResults, isLoading: isSearchingCustomers } = useQuery<CrmCustomer[]>({
-    queryKey: ["/api/crm/customers", "search", customerSearch],
+    queryKey: ["/api/crm/customers/merged", "search", customerSearch],
     queryFn: async () => {
       if (!customerSearch.trim()) return [];
-      const response = await fetch(`/api/crm/customers?search=${encodeURIComponent(customerSearch)}`);
+      const response = await fetch(
+        `/api/crm/customers/merged?search=${encodeURIComponent(customerSearch)}&limit=25`,
+        { credentials: "include" },
+      );
       if (!response.ok) throw new Error("Failed to search customers");
       const data = await response.json();
       return data.customers || [];

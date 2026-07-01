@@ -50,6 +50,9 @@ function effectiveVisitFrequency(record: {
 import { storage } from "./storage";
 import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, crmNotifications, crmComments, crmCommentMentions, insertCrmNotificationSchema, insertCrmCommentSchema, insertCrmCommentMentionSchema, type CrmNotification, type InsertCrmNotification, type CrmComment, type InsertCrmComment, type CrmCommentMention, type InsertCrmCommentMention, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry, crmLeads, crmLeadTypes, insertCrmLeadSchema, insertCrmLeadTypeSchema, type CrmLead, type CrmLeadType, type InsertCrmLead, type InsertCrmLeadType, crmLeadTempOptions, crmLeadDriverOptions, insertCrmLeadTempOptionSchema, insertCrmLeadDriverOptionSchema, type CrmLeadTempOption, type CrmLeadDriverOption, type InsertCrmLeadTempOption, type InsertCrmLeadDriverOption, tasks, taskTypes, taskActivity, insertTaskSchema, insertTaskTypeSchema, insertTaskActivitySchema, type Task, type TaskType, type TaskActivity, type InsertTask, type InsertTaskType, type InsertTaskActivity, crmTaggedComments, crmTaggedCommentRecipients, salesbookBookmarks, insertSalesbookBookmarkSchema, customerFiles, insertCustomerFileSchema, type CustomerFile, rebateCases, insertRebateCaseSchema, type RebateCase, type InsertRebateCase, insertRebateCaseDocumentSchema, insertRebateCaseScopeChecklistSchema, rebateProgramTypeEnum, rebateApplicationStatusEnum, rebateWorkflowStepStatusEnum, rebateDocumentCategoryEnum } from "@shared/schema";
 import * as xlsx from "xlsx";
+import { goveeSensors, goveeSensorReadings, goveeSensorAlerts, type GoveeSensor } from "@shared/schema";
+import { goveeService } from "./services/goveeService";
+import { riskStatus, recommendedActions } from "@shared/govee";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
@@ -423,6 +426,137 @@ async function hasServiceItems(quoteId: string): Promise<boolean> {
   // If no service items found, check if ALL items are maintenance (return false)
   // Otherwise if there are install/parts items but no service, also return false
   return false;
+}
+
+// Promote a FieldEdge (read-only Google Sheet) customer into the crm_customers
+// table so it can be referenced by quotes/invoices/agreements. FieldEdge ids look
+// like "fieldedge-<hash>"; any other id is returned unchanged. Deduplicates against
+// existing CRM customers by sourceId, then phone/email/exact name, before inserting.
+async function ensureCrmCustomerId(
+  customerId: string | null | undefined,
+): Promise<string | null | undefined> {
+  if (!customerId || !customerId.startsWith("fieldedge-")) return customerId;
+
+  const fe = fieldEdgeCustomerService.getCustomerById(customerId);
+  if (!fe) return customerId; // unknown id — let the caller's existence check handle it
+
+  // 1) Already promoted? (sourceId match)
+  const [bySource] = await db
+    .select({ id: crmCustomers.id })
+    .from(crmCustomers)
+    .where(and(eq(crmCustomers.sourceSystem, "fieldedge"), eq(crmCustomers.sourceId, fe.id)))
+    .limit(1);
+  if (bySource) return bySource.id;
+
+  // 2) Dedup against existing CRM customers by phone / email / exact name
+  const normPhone = (fe.phone || "").replace(/\D/g, "");
+  const matchConds: any[] = [];
+  if (normPhone.length >= 10) {
+    matchConds.push(
+      sql`regexp_replace(coalesce(${crmCustomers.phone}, ''), '[^0-9]', '', 'g') = ${normPhone}`,
+    );
+  }
+  if (fe.email) {
+    matchConds.push(sql`lower(${crmCustomers.email}) = ${fe.email.toLowerCase().trim()}`);
+  }
+  matchConds.push(sql`lower(${crmCustomers.name}) = ${(fe.displayName || "").toLowerCase().trim()}`);
+  const [existing] = await db
+    .select({ id: crmCustomers.id })
+    .from(crmCustomers)
+    .where(or(...matchConds))
+    .limit(1);
+  if (existing) return existing.id;
+
+  // 3) Create a new crm_customers record from the FieldEdge data
+  const t = (fe.customerType || "").toLowerCase();
+  const customerType = t.includes("commercial")
+    ? "commercial"
+    : t.includes("property")
+      ? "property_manager"
+      : "residential";
+  const customerStatus = (fe.customerStatus || "").toLowerCase().includes("prospect")
+    ? "prospect"
+    : "customer";
+
+  const [created] = await db
+    .insert(crmCustomers)
+    .values({
+      name: fe.displayName || "Unknown",
+      phone: fe.phone || null,
+      email: fe.email || null,
+      fullAddress: fe.fullAddress || null,
+      leadSource: fe.leadSource || null,
+      customerType,
+      customerStatus,
+      sourceSystem: "fieldedge",
+      sourceId: fe.id,
+    })
+    .returning({ id: crmCustomers.id });
+  return created.id;
+}
+
+// Parse a free-form "Full Address" string into property fields. Handles the common
+// "123 Main St, City, ST 12345" / "123 Main St, City ST 12345" shapes; falls back
+// to putting the whole string in address1 so a location can always be created.
+function parseFullAddress(full: string): { address1: string; city: string; state: string; zip: string } {
+  // FieldEdge uses " - " between street and city; CRM-native uses commas. Handle both.
+  const parts = full.split(/\s*,\s*|\s+[-–]\s+/).map((p) => p.trim()).filter(Boolean);
+  let address1 = parts[0] || full.trim();
+  let city = "";
+  let state = "";
+  let zip = "";
+  const stateZip = (s: string) => {
+    const m = s.match(/([A-Za-z]{2})\s*(\d{5}(?:-\d{4})?)?$/);
+    if (m) { state = (m[1] || "").toUpperCase(); zip = m[2] || ""; return (s.slice(0, m.index).trim()); }
+    return s.trim();
+  };
+  if (parts.length >= 3) {
+    city = parts[1] || "";
+    stateZip(parts.slice(2).join(" "));
+  } else if (parts.length === 2) {
+    city = stateZip(parts[1]);
+  }
+  return { address1, city, state, zip };
+}
+
+// Shape a Govee sensor row into the API view (numeric values + computed risk +
+// optional property/customer display fields).
+function shapeGoveeSensor(
+  s: GoveeSensor,
+  prop?: { address1: string; city: string; state: string; zip: string } | null,
+  customerName?: string | null,
+) {
+  const humidity = s.lastHumidity != null ? Number(s.lastHumidity) : null;
+  const thresholds = {
+    watch: s.humidityWatch != null ? Number(s.humidityWatch) : null,
+    high: s.humidityHigh != null ? Number(s.humidityHigh) : null,
+    critical: s.humidityCritical != null ? Number(s.humidityCritical) : null,
+  };
+  return {
+    id: s.id,
+    device: s.device,
+    sku: s.sku,
+    deviceName: s.deviceName,
+    label: s.label,
+    locationType: s.locationType,
+    propertyId: s.propertyId,
+    customerId: s.customerId,
+    isActive: s.isActive,
+    temperatureF: s.lastTemperatureF != null ? Number(s.lastTemperatureF) : null,
+    humidity,
+    online: s.lastOnline,
+    lastReadingAt: s.lastReadingAt,
+    risk: riskStatus(humidity, thresholds),
+    thresholds: {
+      humidityWatch: thresholds.watch,
+      humidityHigh: thresholds.high,
+      humidityCritical: thresholds.critical,
+      tempLowF: s.tempLowF != null ? Number(s.tempLowF) : null,
+      tempHighF: s.tempHighF != null ? Number(s.tempHighF) : null,
+    },
+    propertyAddress: prop ? `${prop.address1}, ${prop.city}, ${prop.state} ${prop.zip}` : null,
+    customerName: customerName ?? null,
+  };
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -5985,13 +6119,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         billToParent: c.billToParent,
       }));
 
+      // When searching, also include FieldEdge cache customers — the vast majority
+      // of customers live there (crm_customers is sparse), so create-flow pickers
+      // and quick searches were only ever seeing a handful.
+      let mergedCustomers = transformedCustomers;
+      let mergedTotal = total;
+      if (searchTerm) {
+        const qDigits = searchTerm.replace(/\D/g, "");
+        const existingIds = new Set(transformedCustomers.map((c) => c.id));
+        const feMatches = fieldEdgeCustomerService
+          .getCustomers()
+          .filter((c) => {
+            const matchesSearch =
+              (c.displayName && c.displayName.toLowerCase().includes(searchTerm)) ||
+              (c.email && c.email.toLowerCase().includes(searchTerm)) ||
+              (c.phone && (c.phone.includes(searchTerm) || (qDigits.length >= 3 && c.phone.replace(/\D/g, "").includes(qDigits)))) ||
+              (c.fullAddress && c.fullAddress.toLowerCase().includes(searchTerm));
+            if (!matchesSearch) return false;
+            if (customerType && customerType !== "all" && (c.customerType || "").toLowerCase() !== customerType.toLowerCase()) return false;
+            if (customerStatus && customerStatus !== "all" && (c.customerStatus || "").toLowerCase() !== customerStatus.toLowerCase()) return false;
+            return true;
+          })
+          .filter((c) => !existingIds.has(c.id))
+          .map((c) => ({
+            id: c.id,
+            name: c.displayName,
+            customerType: c.customerType,
+            customerStatus: c.customerStatus,
+            fullAddress: c.fullAddress,
+            phone: c.phone,
+            email: c.email,
+            leadSource: c.leadSource,
+            createdAt: c.createdAt,
+            salesStage: null,
+            parentCustomerId: null,
+            billToParent: false,
+          }));
+        mergedTotal = total + feMatches.length;
+        mergedCustomers = [...transformedCustomers, ...feMatches].slice(0, limitNum);
+      }
+
       return res.json({
-        customers: transformedCustomers,
+        customers: mergedCustomers,
         pagination: {
           page: pageNum,
           limit: limitNum,
-          total,
-          totalPages: Math.ceil(total / limitNum),
+          total: mergedTotal,
+          totalPages: Math.ceil(mergedTotal / limitNum),
         },
       });
     } catch (error) {
@@ -6117,8 +6291,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           crmConditions.push(sql`(${sql.join(wordConditions, sql` AND `)})`);
         } else {
           const searchPattern = `%${searchTerm}%`;
+          const sd = searchTerm.replace(/\D/g, "");
+          const phoneDigitsPattern = sd.length >= 3 ? `%${sd}%` : null;
           crmConditions.push(
-            sql`(LOWER(${crmCustomers.name}) LIKE ${searchPattern} OR LOWER(${crmCustomers.email}) LIKE ${searchPattern} OR ${crmCustomers.phone} LIKE ${searchPattern} OR LOWER(${crmCustomers.fullAddress}) LIKE ${searchPattern})`
+            phoneDigitsPattern
+              ? sql`(LOWER(${crmCustomers.name}) LIKE ${searchPattern} OR LOWER(${crmCustomers.email}) LIKE ${searchPattern} OR ${crmCustomers.phone} LIKE ${searchPattern} OR regexp_replace(COALESCE(${crmCustomers.phone}, ''), '[^0-9]', '', 'g') LIKE ${phoneDigitsPattern} OR LOWER(${crmCustomers.fullAddress}) LIKE ${searchPattern})`
+              : sql`(LOWER(${crmCustomers.name}) LIKE ${searchPattern} OR LOWER(${crmCustomers.email}) LIKE ${searchPattern} OR ${crmCustomers.phone} LIKE ${searchPattern} OR LOWER(${crmCustomers.fullAddress}) LIKE ${searchPattern})`
           );
         }
       }
@@ -6194,6 +6372,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Apply filters to FieldEdge customers
       if (searchTerm) {
+        // Digits-only form of the query so any phone format matches (no parens/dashes/spaces).
+        const searchDigits = searchTerm.replace(/\D/g, "");
         fieldEdgeResults = fieldEdgeResults.filter(c => {
           const searchWords = searchTerm.split(/\s+/).filter(w => w.length > 0);
           if (searchWords.length > 1) {
@@ -6202,9 +6382,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               c.fullAddress?.toLowerCase().includes(word)
             );
           }
+          const phoneMatch =
+            (c.phone?.includes(searchTerm)) ||
+            (searchDigits.length >= 3 && !!c.phone && c.phone.replace(/\D/g, "").includes(searchDigits));
           return c.displayName.toLowerCase().includes(searchTerm) ||
             c.email?.toLowerCase().includes(searchTerm) ||
-            c.phone?.includes(searchTerm) ||
+            phoneMatch ||
             c.fullAddress?.toLowerCase().includes(searchTerm);
         });
       }
@@ -9592,9 +9775,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(accountCondition)
         .limit(LIMIT);
       const accountCount = await countMatches(crmAccounts, accountCondition);
-      const totalCustomerCount = customerCount + accountCount;
+      // Also search the FieldEdge customer cache — the vast majority of customers
+      // live there, not in crm_customers, so name/phone searches came up empty.
+      const qLower = query.toLowerCase();
+      const qDigits = query.replace(/\D/g, "");
+      const feMatches = fieldEdgeCustomerService.getCustomers().filter((c) =>
+        (c.displayName && c.displayName.toLowerCase().includes(qLower)) ||
+        (c.email && c.email.toLowerCase().includes(qLower)) ||
+        (c.phone && (c.phone.includes(query) || (qDigits.length >= 3 && c.phone.replace(/\D/g, "").includes(qDigits)))) ||
+        (c.fullAddress && c.fullAddress.toLowerCase().includes(qLower))
+      );
+      const totalCustomerCount = customerCount + accountCount + feMatches.length;
 
-      // Combine customers from both tables, dedupe by id, limit to 5
+      // Combine customers from both tables + FieldEdge, limit to 5
       const allCustomers = [
         ...customerResults.map(c => ({
           id: c.id,
@@ -9611,6 +9804,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           phone: null,
           matchField: findMatchField({ name: a.name, companyName: a.companyName }, ['name', 'companyName']),
           snippet: createSnippet(a.name || a.companyName)
+        })),
+        ...feMatches.map(c => ({
+          id: c.id,
+          name: c.displayName,
+          email: c.email,
+          phone: c.phone,
+          matchField: "name",
+          snippet: createSnippet(c.displayName || c.email || c.phone || c.fullAddress)
         }))
       ].slice(0, LIMIT);
 
@@ -10033,7 +10234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const mappedCustomerType = customerTypeMap[newAccount.accountType] || "residential";
-      const mappedStatus: "prospect" | "client" = newAccount.accountStatus === "ACTIVE" ? "client" : "prospect";
+      const mappedStatus: "prospect" | "customer" = newAccount.accountStatus === "ACTIVE" ? "customer" : "prospect";
       
       const [newCustomer] = await db.insert(crmCustomers).values({
         name: newAccount.displayName,
@@ -10777,7 +10978,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Map customerStatus to AccountStatus
           let accountStatus: AccountStatus = "PROSPECT";
-          if (customer.customerStatus === "client") {
+          if (customer.customerStatus === "customer") {
             accountStatus = "ACTIVE";
           }
 
@@ -11187,14 +11388,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/crm/properties", requireCrmAuth, async (req, res) => {
     try {
       const { customerId } = req.query;
-      
-      let properties;
-      if (customerId) {
-        properties = await db.select().from(crmProperties).where(eq(crmProperties.customerId, customerId as string));
-      } else {
-        properties = await db.select().from(crmProperties);
+
+      if (!customerId) {
+        const all = await db.select().from(crmProperties);
+        return res.json(all);
       }
-      
+
+      // Resolve a FieldEdge customer (fieldedge-...) into a real crm_customers id
+      // so any auto-created location/work order references a persisted customer.
+      const rawId = customerId as string;
+      const realCustomerId = (await ensureCrmCustomerId(rawId)) || rawId;
+
+      let properties = await db.select().from(crmProperties).where(eq(crmProperties.customerId, realCustomerId));
+
+      // Every customer/prospect with an address should have a location: if there are
+      // none yet but the customer has a full address, create one from it on demand.
+      if (properties.length === 0) {
+        let fullAddress: string | null = null;
+        if (rawId.startsWith("fieldedge-")) {
+          fullAddress = fieldEdgeCustomerService.getCustomerById(rawId)?.fullAddress || null;
+        }
+        if (!fullAddress) {
+          const [cust] = await db
+            .select({ fullAddress: crmCustomers.fullAddress })
+            .from(crmCustomers)
+            .where(eq(crmCustomers.id, realCustomerId));
+          fullAddress = cust?.fullAddress || null;
+        }
+        if (fullAddress && fullAddress.trim()) {
+          const parsed = parseFullAddress(fullAddress.trim());
+          const [created] = await db
+            .insert(crmProperties)
+            .values({
+              customerId: realCustomerId,
+              address1: parsed.address1 || fullAddress.trim(),
+              city: parsed.city,
+              state: parsed.state,
+              zip: parsed.zip,
+            })
+            .returning();
+          if (created) properties = [created];
+        }
+      }
+
       return res.json(properties);
     } catch (error) {
       console.error("Error fetching properties:", error);
@@ -12117,11 +12353,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate required fields for standalone work orders
-      const { customerId, propertyId, jobId, projectId, title, description, agreementId } = req.body;
-      
+      const { propertyId, jobId, projectId, title, description, agreementId } = req.body;
+      let customerId: string | null | undefined = req.body.customerId;
+
       if (!customerId) {
         return res.status(400).json({ message: "customerId is required" });
       }
+      // Promote a FieldEdge customer (fieldedge-...) into crm_customers so the work
+      // order references a persisted customer (matches the auto-created property).
+      customerId = (await ensureCrmCustomerId(customerId)) || customerId;
       if (!propertyId) {
         return res.status(400).json({ message: "propertyId is required" });
       }
@@ -16430,25 +16670,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.ip
       );
       
-      // Auto-update customer status from "prospect" to "client" when their first invoice is paid
+      // Auto-update customer status from "prospect" to "customer" when their first invoice is paid
       if (newStatus === "paid" && invoice.customerId) {
         try {
           const [customer] = await db.select({ customerStatus: crmCustomers.customerStatus })
             .from(crmCustomers)
             .where(eq(crmCustomers.id, invoice.customerId))
             .limit(1);
-          
+
           if (customer && customer.customerStatus === "prospect") {
             await db.update(crmCustomers)
-              .set({ customerStatus: "client", updatedAt: new Date() })
+              .set({ customerStatus: "customer", updatedAt: new Date() })
               .where(eq(crmCustomers.id, invoice.customerId));
-            
+
             await logCrmAudit(
               user.id,
               "customer.status_changed",
               "customer",
               invoice.customerId,
-              { previousStatus: "prospect", newStatus: "client", reason: "Invoice paid" },
+              { previousStatus: "prospect", newStatus: "customer", reason: "Invoice paid" },
               req.ip
             );
           }
@@ -17842,7 +18082,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         quoteData.workOrderId = null;
         quoteData.projectId = null;
-        
+
+        // Promote FieldEdge customers (fieldedge-* ids) into crm_customers so the
+        // quote can reference them; no-op for ids already in crm_customers.
+        quoteData.customerId = await ensureCrmCustomerId(quoteData.customerId);
+
         // Verify customer exists
         const [customer] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, quoteData.customerId));
         if (!customer) {
@@ -19986,7 +20230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Set convertedAt when moving to 'won'
       if (salesStage === 'won' && customer.salesStage !== 'won') {
         updateData.convertedAt = new Date();
-        updateData.customerStatus = 'client';
+        updateData.customerStatus = 'customer';
       }
 
       const [updatedCustomer] = await db.update(crmCustomers)
@@ -21573,8 +21817,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       if (search && typeof search === "string") filters.search = search;
 
       const conversations = await storage.getMessagingConversations(filters);
-      
-      // Attach customer info to each conversation
+
+      // Attach customer info + a short preview of the most recent message to each
+      // conversation so the inbox list can render readable cards.
       const conversationsWithCustomers = await Promise.all(
         conversations.map(async (conv) => {
           let customer = null;
@@ -21582,7 +21827,22 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
             const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, conv.customerId));
             customer = cust || null;
           }
-          return { ...conv, customer };
+          const [lastMessage] = await db
+            .select({
+              body: crmMessagingMessages.body,
+              direction: crmMessagingMessages.direction,
+              createdAt: crmMessagingMessages.createdAt,
+            })
+            .from(crmMessagingMessages)
+            .where(eq(crmMessagingMessages.conversationId, conv.id))
+            .orderBy(desc(crmMessagingMessages.createdAt))
+            .limit(1);
+          return {
+            ...conv,
+            customer,
+            lastMessagePreview: lastMessage?.body || null,
+            lastMessageDirection: lastMessage?.direction || null,
+          };
         })
       );
 
@@ -21690,6 +21950,182 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error) {
       console.error("Error fetching conversation details:", error);
       return res.status(500).json({ message: "Failed to fetch conversation" });
+    }
+  });
+
+  // GET /api/crm/messaging/conversations/:id/context - Rich CRM context for a conversation
+  // Resolves the linked customer (by id, or by phone fallback w/ backfill) and
+  // aggregates their open work orders, next appointment, invoices/balance,
+  // agreements, and lifetime value so the messaging UI can show live CRM data.
+  app.get("/api/crm/messaging/conversations/:id/context", requireCrmAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const conversation = await storage.getMessagingConversationById(id);
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      // Resolve the CRM customer: prefer the linked id, else match on phone and
+      // backfill the link so future loads are instant.
+      let customer: typeof crmCustomers.$inferSelect | null = null;
+      if (conversation.customerId) {
+        const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, conversation.customerId));
+        customer = cust || null;
+      }
+      if (!customer && conversation.phoneNumber) {
+        // 1) CRM-native customers (digits-only match handles any stored format).
+        const matched = await storage.getCrmCustomerByPhone(conversation.phoneNumber);
+        if (matched) {
+          const [full] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, matched.id));
+          customer = full || null;
+        }
+        // 2) FieldEdge cache (where most customers live) — match on last 10 digits,
+        //    then promote into crm_customers so the link is durable.
+        if (!customer) {
+          const digits = conversation.phoneNumber.replace(/\D/g, "").slice(-10);
+          if (digits.length >= 7) {
+            const phoneMatches = fieldEdgeCustomerService
+              .getCustomers()
+              .filter((fc) => (fc.phone || "").replace(/\D/g, "").slice(-10) === digits);
+            // Several FieldEdge records can share one phone; prefer the one whose name
+            // matches the conversation's stored contact name, else take the first.
+            const wantName = (conversation.customerName || "").toLowerCase().trim();
+            const feMatch =
+              (wantName && phoneMatches.find((fc) => (fc.displayName || "").toLowerCase().trim() === wantName)) ||
+              phoneMatches[0];
+            if (feMatch) {
+              const promotedId = await ensureCrmCustomerId(feMatch.id);
+              if (promotedId) {
+                const [full] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, promotedId));
+                customer = full || null;
+              }
+            }
+          }
+        }
+        if (customer) {
+          await storage.updateMessagingConversation(id, {
+            customerId: customer.id,
+            customerName: conversation.customerName || customer.name,
+          });
+        }
+      }
+
+
+      if (!customer) {
+        return res.json({
+          inCrm: false,
+          customer: null,
+          phoneNumber: conversation.phoneNumber,
+          openWorkOrders: [],
+          nextAppointment: null,
+          invoices: [],
+          balanceDue: 0,
+          lifetimeValue: 0,
+          agreements: [],
+          openQuotesCount: 0,
+        });
+      }
+
+      const customerId = customer.id;
+
+      // Property (primary address) for context
+      const [property] = await db
+        .select()
+        .from(crmProperties)
+        .where(eq(crmProperties.customerId, customerId))
+        .orderBy(asc(crmProperties.createdAt))
+        .limit(1);
+
+      // Work orders — split open vs. all, attach tech name
+      const workOrders = await db
+        .select({
+          id: crmWorkOrders.id,
+          workOrderNumber: crmWorkOrders.workOrderNumber,
+          title: crmWorkOrders.title,
+          status: crmWorkOrders.status,
+          visitType: crmWorkOrders.visitType,
+          workSubtype: crmWorkOrders.workSubtype,
+          priority: crmWorkOrders.priority,
+          scheduledStart: crmWorkOrders.scheduledStart,
+          scheduledEnd: crmWorkOrders.scheduledEnd,
+          completedAt: crmWorkOrders.completedAt,
+          assignedTechId: crmWorkOrders.assignedTechId,
+          techName: crmUsers.name,
+        })
+        .from(crmWorkOrders)
+        .leftJoin(crmUsers, eq(crmWorkOrders.assignedTechId, crmUsers.id))
+        .where(eq(crmWorkOrders.customerId, customerId))
+        .orderBy(desc(crmWorkOrders.scheduledStart))
+        .limit(50);
+
+      const openStatuses = new Set(["scheduled", "dispatched", "en_route", "on_site"]);
+      const openWorkOrders = workOrders.filter((wo) => openStatuses.has(wo.status as string));
+
+      // Next upcoming appointment (soonest future scheduled start among open WOs)
+      const now = Date.now();
+      const nextAppointment = openWorkOrders
+        .filter((wo) => wo.scheduledStart && new Date(wo.scheduledStart).getTime() >= now - 1000 * 60 * 60 * 12)
+        .sort((a, b) => new Date(a.scheduledStart!).getTime() - new Date(b.scheduledStart!).getTime())[0] || null;
+
+      // Invoices — recent + balance/lifetime
+      const invoices = await db
+        .select({
+          id: crmInvoices.id,
+          invoiceNumber: crmInvoices.invoiceNumber,
+          status: crmInvoices.status,
+          total: crmInvoices.total,
+          amountPaid: crmInvoices.amountPaid,
+          balanceDue: crmInvoices.balanceDue,
+          dueDate: crmInvoices.dueDate,
+          createdAt: crmInvoices.createdAt,
+        })
+        .from(crmInvoices)
+        .where(eq(crmInvoices.customerId, customerId))
+        .orderBy(desc(crmInvoices.createdAt))
+        .limit(20);
+
+      const balanceDue = invoices.reduce((sum, inv) => sum + (Number(inv.balanceDue) || 0), 0);
+      const lifetimeValue = invoices.reduce((sum, inv) => sum + (Number(inv.amountPaid) || 0), 0);
+
+      // Agreements
+      const agreements = await db
+        .select({
+          id: crmAgreements.id,
+          agreementNumber: crmAgreements.agreementNumber,
+          agreementPlan: crmAgreements.agreementPlan,
+          status: crmAgreements.status,
+          isActive: crmAgreements.isActive,
+          nextServiceDate: crmAgreements.nextServiceDate,
+        })
+        .from(crmAgreements)
+        .where(eq(crmAgreements.customerId, customerId))
+        .orderBy(desc(crmAgreements.createdAt))
+        .limit(10);
+
+      // Open quote count
+      const openQuotes = await db
+        .select({ id: crmQuotes.id })
+        .from(crmQuotes)
+        .where(and(eq(crmQuotes.customerId, customerId), inArray(crmQuotes.status, ["draft", "sent"])));
+
+      return res.json({
+        inCrm: true,
+        customer,
+        property: property || null,
+        phoneNumber: conversation.phoneNumber,
+        openWorkOrders,
+        recentWorkOrders: workOrders.slice(0, 8),
+        nextAppointment,
+        invoices: invoices.slice(0, 8),
+        balanceDue,
+        lifetimeValue,
+        agreements,
+        openQuotesCount: openQuotes.length,
+      });
+    } catch (error) {
+      console.error("Error fetching conversation context:", error);
+      return res.status(500).json({ message: "Failed to fetch conversation context" });
     }
   });
 
@@ -26913,8 +27349,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           name: customerName,
           email: email,
           phone: formattedPhone,
-          customerStatus: "Customer",
-          customerType: "Residential",
+          customerStatus: "customer",
+          customerType: "residential",
           leadSource: "Online Booking",
         }).returning();
         customerId = newCustomer.id;
@@ -28265,7 +28701,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         }
       ];
       const responseData = {
-        staticPages: pageInfo.pages.slice(0, 12),
+        // Return all converted PDF pages (was capped at 12, hiding most of the book).
+        staticPages: pageInfo.pages,
         pageWidth: pageInfo.pageWidth,
         pageHeight: pageInfo.pageHeight,
         packages,
@@ -28744,7 +29181,262 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
     // Start weather impact jobs (refreshes call_daily and weather_daily every 6 hours)
     scheduleWeatherImpactJobs();
+  }, 5000); // 5 second delay to allow health checks to pass first
 
+  // ════════════════ Govee H5103 sensor monitoring (Analytics) ════════════════
+    // Load sensors enriched with property address + customer name (+ computed risk).
+    const loadEnrichedSensors = async (where?: any) => {
+      const sensors = where
+        ? await db.select().from(goveeSensors).where(where)
+        : await db.select().from(goveeSensors);
+      const propIds = Array.from(new Set(sensors.map((s) => s.propertyId).filter(Boolean))) as string[];
+      const custIds = Array.from(new Set(sensors.map((s) => s.customerId).filter(Boolean))) as string[];
+      const props = propIds.length
+        ? await db.select().from(crmProperties).where(inArray(crmProperties.id, propIds))
+        : [];
+      const custs = custIds.length
+        ? await db.select({ id: crmCustomers.id, name: crmCustomers.name }).from(crmCustomers).where(inArray(crmCustomers.id, custIds))
+        : [];
+      const propMap = new Map(props.map((p) => [p.id, p]));
+      const custMap = new Map(custs.map((c) => [c.id, c.name]));
+      return sensors.map((s) =>
+        shapeGoveeSensor(
+          s,
+          s.propertyId ? propMap.get(s.propertyId) : null,
+          s.customerId ? custMap.get(s.customerId) : null,
+        ),
+      );
+    };
+
+    // Time-series readings for a sensor, downsampled to ~240 points for the chart.
+    const loadReadings = async (sensorId: string, range: string) => {
+      const ms = range === "30d" ? 30 * 864e5 : range === "7d" ? 7 * 864e5 : 24 * 36e5;
+      const since = new Date(Date.now() - ms);
+      const rows = await db
+        .select({
+          t: goveeSensorReadings.recordedAt,
+          temp: goveeSensorReadings.temperatureF,
+          hum: goveeSensorReadings.humidity,
+          online: goveeSensorReadings.online,
+        })
+        .from(goveeSensorReadings)
+        .where(and(eq(goveeSensorReadings.sensorId, sensorId), gte(goveeSensorReadings.recordedAt, since)))
+        .orderBy(goveeSensorReadings.recordedAt);
+      const step = Math.max(1, Math.ceil(rows.length / 240));
+      return {
+        range,
+        points: rows
+          .filter((_, i) => i % step === 0)
+          .map((r) => ({
+            t: r.t,
+            temperatureF: r.temp != null ? Number(r.temp) : null,
+            humidity: r.hum != null ? Number(r.hum) : null,
+            online: r.online,
+          })),
+      };
+    };
+
+    app.get("/api/crm/govee/devices", requireCrmAuth, async (_req, res) => {
+      try {
+        const [devices, mapped] = await Promise.all([
+          goveeService.listDevices().catch((e) => {
+            console.error("[Govee] listDevices:", (e as Error).message);
+            return [] as any[];
+          }),
+          db.select().from(goveeSensors),
+        ]);
+        const byDevice = new Map(mapped.map((s) => [s.device, s]));
+        res.json({
+          configured: goveeService.isConfigured(),
+          devices: devices.map((d: any) => ({
+            device: d.device,
+            sku: d.sku,
+            deviceName: d.deviceName,
+            type: d.type,
+            mapped: byDevice.has(d.device),
+            sensorId: byDevice.get(d.device)?.id ?? null,
+          })),
+        });
+      } catch (e) {
+        console.error("govee/devices", e);
+        res.status(500).json({ message: "Failed to list devices" });
+      }
+    });
+
+    app.post("/api/crm/govee/sync", requireCrmAuth, async (_req, res) => {
+      try {
+        await goveeService.pollAll();
+        res.json({ ok: true });
+      } catch (e) {
+        res.status(500).json({ message: (e as Error).message });
+      }
+    });
+
+    app.get("/api/crm/sensors", requireCrmAuth, async (_req, res) => {
+      try {
+        res.json({ sensors: await loadEnrichedSensors() });
+      } catch (e) {
+        console.error("crm/sensors", e);
+        res.status(500).json({ message: "Failed to load sensors" });
+      }
+    });
+
+    app.get("/api/crm/analytics/summary", requireCrmAuth, async (_req, res) => {
+      try {
+        const sensors = await loadEnrichedSensors();
+        const counts = { total: sensors.length, normal: 0, watch: 0, high: 0, critical: 0, offline: 0 };
+        const propsNeedingInspection = new Set<string>();
+        for (const s of sensors) {
+          counts[s.risk] += 1;
+          if (s.online === false) counts.offline += 1;
+          if ((s.risk === "high" || s.risk === "critical") && s.propertyId) propsNeedingInspection.add(s.propertyId);
+        }
+        const [openAlerts] = await db
+          .select({ c: sql<number>`count(*)::int` })
+          .from(goveeSensorAlerts)
+          .where(eq(goveeSensorAlerts.status, "open"));
+        res.json({ ...counts, propertiesNeedingInspection: propsNeedingInspection.size, openAlerts: Number(openAlerts?.c) || 0 });
+      } catch (e) {
+        console.error("analytics/summary", e);
+        res.status(500).json({ message: "Failed to load summary" });
+      }
+    });
+
+    // NOTE: register /alerts before /:id so "alerts" isn't captured as an id.
+    app.get("/api/crm/sensors/alerts", requireCrmAuth, async (_req, res) => {
+      try {
+        const alerts = await db
+          .select()
+          .from(goveeSensorAlerts)
+          .where(eq(goveeSensorAlerts.status, "open"))
+          .orderBy(desc(goveeSensorAlerts.openedAt));
+        const sensorIds = Array.from(new Set(alerts.map((a) => a.sensorId)));
+        const sensors = sensorIds.length
+          ? await db.select().from(goveeSensors).where(inArray(goveeSensors.id, sensorIds))
+          : [];
+        const sMap = new Map(sensors.map((s) => [s.id, s]));
+        res.json({
+          alerts: alerts.map((a) => ({
+            ...a,
+            sensorLabel: sMap.get(a.sensorId)?.label || sMap.get(a.sensorId)?.deviceName || null,
+          })),
+        });
+      } catch (e) {
+        console.error("sensors/alerts", e);
+        res.status(500).json({ message: "Failed to load alerts" });
+      }
+    });
+
+    app.post("/api/crm/sensors/alerts/:id/ack", requireCrmAuth, async (req, res) => {
+      try {
+        await db.update(goveeSensorAlerts).set({ status: "acknowledged" }).where(eq(goveeSensorAlerts.id, req.params.id));
+        res.json({ ok: true });
+      } catch (e) {
+        res.status(500).json({ message: "Failed to acknowledge" });
+      }
+    });
+
+    app.get("/api/crm/sensors/:id/readings", requireCrmAuth, async (req, res) => {
+      try {
+        res.json(await loadReadings(req.params.id, String(req.query.range || "24h")));
+      } catch (e) {
+        res.status(500).json({ message: "Failed to load readings" });
+      }
+    });
+
+    app.post("/api/crm/sensors/:id/create-work-order", requireCrmAuth, async (req, res) => {
+      try {
+        const [s] = await db.select().from(goveeSensors).where(eq(goveeSensors.id, req.params.id));
+        if (!s) return res.status(404).json({ message: "Sensor not found" });
+        if (!s.customerId) return res.status(400).json({ message: "Map this sensor to a customer/property before creating a work order." });
+        const humidity = s.lastHumidity != null ? Number(s.lastHumidity) : null;
+        const risk = riskStatus(humidity, {
+          watch: s.humidityWatch != null ? Number(s.humidityWatch) : null,
+          high: s.humidityHigh != null ? Number(s.humidityHigh) : null,
+          critical: s.humidityCritical != null ? Number(s.humidityCritical) : null,
+        });
+        const recs = recommendedActions(risk, s.locationType);
+        const title = recs[0] || `Humidity check — ${s.label || s.deviceName}`;
+        const [wo] = await db
+          .insert(crmWorkOrders)
+          .values({
+            customerId: s.customerId,
+            propertyId: s.propertyId,
+            visitType: "SERVICE",
+            workSubtype: "IAQ",
+            status: "scheduled",
+            priority: risk === "critical" ? "high" : "normal",
+            title,
+            description: `Auto-suggested from Govee sensor "${s.label || s.deviceName}" — humidity ${humidity ?? "?"}% (${risk}). ${recs.join("; ")}`,
+          })
+          .returning();
+        res.json({ workOrder: wo });
+      } catch (e) {
+        console.error("create-work-order", e);
+        res.status(500).json({ message: "Failed to create work order" });
+      }
+    });
+
+    app.get("/api/crm/sensors/:id", requireCrmAuth, async (req, res) => {
+      try {
+        const [s] = await db.select().from(goveeSensors).where(eq(goveeSensors.id, req.params.id));
+        if (!s) return res.status(404).json({ message: "Sensor not found" });
+        const prop = s.propertyId ? (await db.select().from(crmProperties).where(eq(crmProperties.id, s.propertyId)))[0] : null;
+        const cust = s.customerId ? (await db.select({ id: crmCustomers.id, name: crmCustomers.name }).from(crmCustomers).where(eq(crmCustomers.id, s.customerId)))[0] : null;
+        res.json({ sensor: shapeGoveeSensor(s, prop, cust?.name) });
+      } catch (e) {
+        res.status(500).json({ message: "Failed to load sensor" });
+      }
+    });
+
+    app.patch("/api/crm/sensors/:id", requireCrmAuth, async (req, res) => {
+      try {
+        const body = req.body ?? {};
+        const updates: any = { updatedAt: new Date() };
+        if (body.label !== undefined) updates.label = body.label;
+        if (body.locationType !== undefined) updates.locationType = body.locationType;
+        if (body.propertyId !== undefined) updates.propertyId = body.propertyId || null;
+        if (body.customerId !== undefined) updates.customerId = body.customerId || null;
+        if (body.isActive !== undefined) updates.isActive = !!body.isActive;
+        for (const key of ["humidityWatch", "humidityHigh", "humidityCritical", "tempLowF", "tempHighF"]) {
+          if (body[key] !== undefined) updates[key] = body[key] === null || body[key] === "" ? null : String(body[key]);
+        }
+        // If mapping to a property without an explicit customer, inherit the property's customer.
+        if (updates.propertyId && body.customerId === undefined) {
+          const [p] = await db.select({ customerId: crmProperties.customerId }).from(crmProperties).where(eq(crmProperties.id, updates.propertyId));
+          if (p?.customerId) updates.customerId = p.customerId;
+        }
+        await db.update(goveeSensors).set(updates).where(eq(goveeSensors.id, req.params.id));
+        const [s] = await db.select().from(goveeSensors).where(eq(goveeSensors.id, req.params.id));
+        res.json({ sensor: shapeGoveeSensor(s) });
+      } catch (e) {
+        console.error("patch sensor", e);
+        res.status(500).json({ message: "Failed to update sensor" });
+      }
+    });
+
+    // Customer portal — sensors scoped to the authenticated customer's account.
+    app.get("/api/portal/sensors", requireCustomerPortalAuth, async (req: any, res) => {
+      try {
+        res.json({ sensors: await loadEnrichedSensors(eq(goveeSensors.customerId, req.portalCustomer.id)) });
+      } catch (e) {
+        console.error("portal/sensors", e);
+        res.status(500).json({ message: "Failed to load sensors" });
+      }
+    });
+
+    app.get("/api/portal/sensors/:id/readings", requireCustomerPortalAuth, async (req: any, res) => {
+      try {
+        const [s] = await db.select({ customerId: goveeSensors.customerId }).from(goveeSensors).where(eq(goveeSensors.id, req.params.id));
+        if (!s || s.customerId !== req.portalCustomer.id) return res.status(404).json({ message: "Not found" });
+        res.json(await loadReadings(req.params.id, String(req.query.range || "24h")));
+      } catch (e) {
+        res.status(500).json({ message: "Failed to load readings" });
+      }
+    });
+
+  // Defer the remaining startup schedulers (run after the server is ready)
+  setTimeout(() => {
     // Start agreement renewal job (runs daily, creates invoices for due agreements)
     scheduleAgreementRenewals();
 

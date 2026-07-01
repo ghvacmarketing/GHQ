@@ -199,7 +199,7 @@ export default function MobileCustomerDetail() {
 
   const customerStatusConfig = {
     prospect: { label: "Lead", className: "bg-yellow-100 text-yellow-700 border-yellow-300" },
-    client: { label: "Client", className: "bg-green-100 text-green-700 border-green-300" },
+    customer: { label: "Customer", className: "bg-green-100 text-green-700 border-green-300" },
   };
 
   return (
@@ -251,10 +251,10 @@ export default function MobileCustomerDetail() {
                   </Badge>
                   <Badge
                     variant="outline"
-                    className={`text-xs ${customerStatusConfig[customer.customerStatus as keyof typeof customerStatusConfig]?.className || customerStatusConfig.client.className}`}
+                    className={`text-xs ${customerStatusConfig[customer.customerStatus as keyof typeof customerStatusConfig]?.className || customerStatusConfig.customer.className}`}
                     data-testid="customer-status-badge"
                   >
-                    {customerStatusConfig[customer.customerStatus as keyof typeof customerStatusConfig]?.label || "Client"}
+                    {customerStatusConfig[customer.customerStatus as keyof typeof customerStatusConfig]?.label || "Customer"}
                   </Badge>
                 </div>
               </div>

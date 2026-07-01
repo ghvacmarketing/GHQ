@@ -306,13 +306,13 @@ export default function CrmSettingsTime() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="p-6 max-w-6xl mx-auto" data-testid="crm-time-logs">
+      <div className="mx-auto w-full max-w-6xl space-y-6" data-testid="crm-time-logs">
         <div className="flex items-center gap-4 mb-6">
           <Button variant="ghost" size="icon" onClick={() => navigate("/crm/settings")} data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground flex items-center gap-2">
               <Clock className="h-6 w-6 text-[#711419]" />
               Time Tracking
             </h1>
@@ -381,7 +381,7 @@ export default function CrmSettingsTime() {
                       <div className="flex items-center gap-2 text-slate-500 text-sm mb-1">
                         <Clock className="h-4 w-4 text-[#711419]" /> Total Hours
                       </div>
-                      <div className="text-2xl font-bold text-slate-900">{formatMinutesToHoursMinutes(overview.totalClocked)}</div>
+                      <div className="font-display text-xl font-semibold tracking-tight text-foreground">{formatMinutesToHoursMinutes(overview.totalClocked)}</div>
                     </CardContent>
                   </Card>
                   <Card data-testid="kpi-employees">
@@ -389,7 +389,7 @@ export default function CrmSettingsTime() {
                       <div className="flex items-center gap-2 text-slate-500 text-sm mb-1">
                         <Users className="h-4 w-4 text-[#711419]" /> Active Employees
                       </div>
-                      <div className="text-2xl font-bold text-slate-900">{overview.headcount}</div>
+                      <div className="font-display text-xl font-semibold tracking-tight text-foreground">{overview.headcount}</div>
                     </CardContent>
                   </Card>
                   <Card data-testid="kpi-avg-hours">
@@ -397,7 +397,7 @@ export default function CrmSettingsTime() {
                       <div className="flex items-center gap-2 text-slate-500 text-sm mb-1">
                         <Gauge className="h-4 w-4 text-[#711419]" /> Avg / Employee
                       </div>
-                      <div className="text-2xl font-bold text-slate-900">{formatMinutesToHoursMinutes(overview.avgClocked)}</div>
+                      <div className="font-display text-xl font-semibold tracking-tight text-foreground">{formatMinutesToHoursMinutes(overview.avgClocked)}</div>
                     </CardContent>
                   </Card>
                   <Card data-testid="kpi-efficiency">
@@ -405,7 +405,7 @@ export default function CrmSettingsTime() {
                       <div className="flex items-center gap-2 text-slate-500 text-sm mb-1">
                         <TrendingUp className="h-4 w-4 text-[#711419]" /> Team Work Efficiency
                       </div>
-                      <div className="text-2xl font-bold text-slate-900">{overview.teamEfficiency}%</div>
+                      <div className="font-display text-xl font-semibold tracking-tight text-foreground">{overview.teamEfficiency}%</div>
                       <div className="text-xs text-slate-500 mt-0.5">{overview.totalWorkOrders} work orders completed</div>
                     </CardContent>
                   </Card>

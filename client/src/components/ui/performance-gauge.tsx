@@ -4,6 +4,7 @@ interface PerformanceGaugeProps {
   goal: number;
   goalTarget?: number;
   size?: number;
+  label?: string;
 }
 
 function formatCurrency(value: number): string {
@@ -16,43 +17,42 @@ function formatCurrency(value: number): string {
   return `$${value.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 }
 
-export function PerformanceGauge({ sold, quoted, goal, goalTarget, size = 180 }: PerformanceGaugeProps) {
+// Brand palette
+const COLOR_SOLD = "#711419"; // maroon — booked
+const COLOR_QUOTED = "#e8704f"; // coral — in pipeline
+const COLOR_MISSED = "#ece9e8"; // muted stone — remaining
+const COLOR_INK = "#1c1917"; // needle / marker
+
+export function PerformanceGauge({ sold, quoted, goal, goalTarget, size = 180, label }: PerformanceGaugeProps) {
   const actualGoal = goalTarget ?? goal;
-  
+
   const potential = quoted > 0 ? quoted : sold;
   const isPipelineEmpty = quoted === 0 && sold === 0;
   const scale = Math.max(actualGoal, sold + quoted, 1);
-  
+
   const soldPercent = scale > 0 ? Math.min((sold / scale) * 100, 100) : 0;
   const quotedPercent = scale > 0 ? Math.min((quoted / scale) * 100, 100 - soldPercent) : 0;
-  
+
   const radius = 70;
-  const strokeWidth = 20;
+  const strokeWidth = 18;
   const centerX = 90;
   const centerY = 85;
-  
-  // Calculate arc path for a semicircle (left to right, 180 degrees)
-  const arcLength = Math.PI * radius; // Half circumference
-  
-  // Calculate dash lengths for each segment
+
+  const arcLength = Math.PI * radius;
   const soldLength = (soldPercent / 100) * arcLength;
   const quotedLength = (quotedPercent / 100) * arcLength;
-  const missedLength = arcLength - soldLength - quotedLength;
-  
-  // Create semicircle arc path (from left to right)
+
   const arcPath = `M ${centerX - radius} ${centerY} A ${radius} ${radius} 0 0 1 ${centerX + radius} ${centerY}`;
-  
-  // Goal marker position
+
   const showGoalMarker = actualGoal > 0;
   const goalMarkerPercent = isPipelineEmpty ? 50 : Math.min((actualGoal / scale) * 100, 100);
   const goalMarkerAngle = (goalMarkerPercent / 100) * 180;
   const goalMarkerRadians = ((180 - goalMarkerAngle) * Math.PI) / 180;
-  const goalMarkerInnerX = centerX + (radius - strokeWidth/2 - 2) * Math.cos(goalMarkerRadians);
-  const goalMarkerInnerY = centerY - (radius - strokeWidth/2 - 2) * Math.sin(goalMarkerRadians);
-  const goalMarkerOuterX = centerX + (radius + strokeWidth/2 + 2) * Math.cos(goalMarkerRadians);
-  const goalMarkerOuterY = centerY - (radius + strokeWidth/2 + 2) * Math.sin(goalMarkerRadians);
-  
-  // Needle position
+  const goalMarkerInnerX = centerX + (radius - strokeWidth / 2 - 2) * Math.cos(goalMarkerRadians);
+  const goalMarkerInnerY = centerY - (radius - strokeWidth / 2 - 2) * Math.sin(goalMarkerRadians);
+  const goalMarkerOuterX = centerX + (radius + strokeWidth / 2 + 2) * Math.cos(goalMarkerRadians);
+  const goalMarkerOuterY = centerY - (radius + strokeWidth / 2 + 2) * Math.sin(goalMarkerRadians);
+
   const needleAngle = Math.min(soldPercent, 100);
   const needleRadians = ((180 - (needleAngle / 100) * 180) * Math.PI) / 180;
   const needleLength = radius - 15;
@@ -61,93 +61,80 @@ export function PerformanceGauge({ sold, quoted, goal, goalTarget, size = 180 }:
 
   return (
     <div className="flex flex-col items-center" style={{ width: size }}>
-      <div className="flex items-center justify-center gap-4 text-xs mb-2">
-        <div className="flex items-center gap-1">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-700" />
-          <span className="text-slate-600">Sold</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-2.5 h-2.5 rounded-full bg-green-300" />
-          <span className="text-slate-600">Quoted</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-2.5 h-2.5 rounded-full bg-slate-200" />
-          <span className="text-slate-600">Missed</span>
-        </div>
+      {label && <p className="mb-1 text-sm font-medium text-foreground">{label}</p>}
+      <div className="mb-2 flex items-center justify-center gap-3 text-[11px]">
+        <span className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: COLOR_SOLD }} />
+          <span className="text-muted-foreground">Sold</span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: COLOR_QUOTED }} />
+          <span className="text-muted-foreground">Quoted</span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: COLOR_MISSED }} />
+          <span className="text-muted-foreground">Remaining</span>
+        </span>
       </div>
-      
+
       <svg width={size} height={size * 0.6} viewBox="0 0 180 110">
-        {/* Background arc (missed/remaining) - full semicircle */}
-        <path
-          d={arcPath}
-          fill="none"
-          stroke="#e2e8f0"
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-        />
-        
-        {/* Quoted arc (light green) - layered on top, starts after sold */}
-        {(soldLength + quotedLength) > 0 && (
+        {/* Remaining arc */}
+        <path d={arcPath} fill="none" stroke={COLOR_MISSED} strokeWidth={strokeWidth} strokeLinecap="round" />
+
+        {/* Quoted (pipeline) arc */}
+        {soldLength + quotedLength > 0 && (
           <path
             d={arcPath}
             fill="none"
-            stroke="#86efac"
+            stroke={COLOR_QUOTED}
             strokeWidth={strokeWidth}
             strokeLinecap="round"
             strokeDasharray={`${soldLength + quotedLength} ${arcLength}`}
           />
         )}
-        
-        {/* Sold arc (dark green) - on top, covers sold portion */}
+
+        {/* Sold arc */}
         {soldLength > 0 && (
           <path
             d={arcPath}
             fill="none"
-            stroke="#166534"
+            stroke={COLOR_SOLD}
             strokeWidth={strokeWidth}
             strokeLinecap="round"
             strokeDasharray={`${soldLength} ${arcLength}`}
           />
         )}
-        
-        {/* Goal marker (red line) */}
+
+        {/* Goal marker */}
         {showGoalMarker && (
           <line
             x1={goalMarkerInnerX}
             y1={goalMarkerInnerY}
             x2={goalMarkerOuterX}
             y2={goalMarkerOuterY}
-            stroke="#dc2626"
-            strokeWidth={3}
+            stroke={COLOR_INK}
+            strokeWidth={2.5}
             strokeLinecap="round"
           />
         )}
-        
+
         {/* Needle */}
-        <line
-          x1={centerX}
-          y1={centerY}
-          x2={needleX}
-          y2={needleY}
-          stroke="#1e293b"
-          strokeWidth={3}
-          strokeLinecap="round"
-        />
-        <circle cx={centerX} cy={centerY} r={6} fill="#1e293b" />
+        <line x1={centerX} y1={centerY} x2={needleX} y2={needleY} stroke={COLOR_INK} strokeWidth={2.5} strokeLinecap="round" />
+        <circle cx={centerX} cy={centerY} r={5} fill={COLOR_INK} />
       </svg>
-      
-      <div className="flex justify-between w-full px-2 -mt-2">
+
+      <div className="-mt-2 flex w-full justify-between px-2">
         <div className="text-center">
-          <p className="text-lg font-bold text-slate-900">{formatCurrency(sold)}</p>
-          <p className="text-xs text-slate-500">Sold</p>
+          <p className="text-base font-semibold tabular-nums text-foreground">{formatCurrency(sold)}</p>
+          <p className="text-[11px] text-muted-foreground">Sold</p>
         </div>
         <div className="text-center">
-          <p className="text-lg font-bold text-red-600">{formatCurrency(actualGoal)}</p>
-          <p className="text-xs text-slate-500">Goal</p>
+          <p className="text-base font-semibold tabular-nums text-primary">{formatCurrency(actualGoal)}</p>
+          <p className="text-[11px] text-muted-foreground">Goal</p>
         </div>
         <div className="text-center">
-          <p className="text-lg font-bold text-slate-900">{formatCurrency(potential)}</p>
-          <p className="text-xs text-slate-500">Potential</p>
+          <p className="text-base font-semibold tabular-nums text-foreground">{formatCurrency(potential)}</p>
+          <p className="text-[11px] text-muted-foreground">Pipeline</p>
         </div>
       </div>
     </div>

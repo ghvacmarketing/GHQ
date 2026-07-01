@@ -3,55 +3,131 @@
 @tailwind utilities;
 
 :root {
-  --card: #fcfcfc;
-  --ring: hsl(0, 0%, 41.96%);
-  --input: #b5b5b5;
-  --muted: #e3e3e3;
-  --accent: hsl(0, 0%, 100%);
-  --border: #e8e8e8;
-  --radius: 0.8rem;
+  /* ── Surfaces (clean neutral slate — no green/yellow cast) ── */
+  --background: #f8fafc;            /* slate-50 — clean canvas */
+  --foreground: #0f172a;            /* slate-900 — primary text */
+  --card: #ffffff;                  /* white — cards sit above the canvas */
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+
+  /* ── Brand ────────────────────────────────────────────── */
+  --primary: #711419;              /* GHVAC maroon */
+  --primary-foreground: #ffffff;
+
+  /* ── Neutrals (slate) ─────────────────────────────────── */
+  --secondary: #f1f5f9;            /* slate-100 */
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;                /* slate-100 */
+  --muted-foreground: #64748b;     /* slate-500 — readable secondary */
+  --accent: #f1f5f9;               /* slate-100 — hover surface */
+  --accent-foreground: #0f172a;
+  --destructive: #b91c1c;
+  --destructive-foreground: #ffffff;
+  --border: #e2e8f0;               /* slate-200 hairline */
+  --input: #e2e8f0;
+  --ring: #711419;                 /* focus ring = brand */
+  --radius: 0.5rem;                /* 8px — sharper, premium-crisp corners */
+
+  /* ── Charts (kept) ────────────────────────────────────── */
   --chart-1: hsl(203.8863, 88.2845%, 53.1373%);
   --chart-2: hsl(159.7826, 100%, 36.0784%);
   --chart-3: hsl(42.0290, 92.8251%, 56.2745%);
   --chart-4: hsl(147.1429, 78.5047%, 41.9608%);
   --chart-5: hsl(341.4894, 75.2000%, 50.9804%);
-  --popover: hsl(45, 25%, 97%);
-  --primary: #711419;
-  --sidebar: hsl(45, 25%, 97%);
-  --spacing: 0.25rem;
-  --font-mono: Menlo, monospace;
-  --font-sans: 'Poppins', sans-serif;
-  --secondary: #c4c4c4;
-  --background: #f0f0f0;
-  --font-serif: 'Poppins', sans-serif;
-  --foreground: #1a1a1a;
-  --destructive: hsl(0, 0%, 0%);
-  --sidebar-ring: hsl(9, 75%, 61%);
-  --sidebar-accent: hsl(25, 45%, 80%);
-  --sidebar-border: hsl(45, 15%, 80%);
-  --card-foreground: hsl(0, 0%, 0%);
-  --sidebar-primary: hsl(9, 75%, 61%);
+
+  /* ── Sidebar ──────────────────────────────────────────── */
+  --sidebar: #ffffff;
+  --sidebar-background: #ffffff;
+  --sidebar-foreground: #44403c;   /* stone-700 */
+  --sidebar-primary: #711419;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #faf5f5;       /* faint maroon tint for active */
+  --sidebar-accent-foreground: #711419;
+  --sidebar-border: #ededec;
+  --sidebar-ring: #711419;
+
+  /* ── Type ─────────────────────────────────────────────── */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Poppins', sans-serif;  /* display / brand */
+  --font-mono: 'Geist Mono', Menlo, monospace;
   --tracking-normal: 0em;
-  --muted-foreground: #212121;
-  --accent-foreground: hsl(0, 0%, 10.2%);
-  --popover-foreground: hsl(0, 0%, 100%);
-  --primary-foreground: #ffffff;
-  --sidebar-foreground: hsl(20, 14%, 17%);
-  --secondary-foreground: #1a1a1a;
-  --destructive-foreground: #ffffff;
-  --sidebar-accent-foreground: hsl(20, 14%, 17%);
-  --sidebar-primary-foreground: hsl(0, 0%, 100%);
-  --shadow: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00), 0px 1px 2px -1px hsl(9, 75%, 61% / 0.00);
-  --shadow-lg: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00), 0px 4px 6px -1px hsl(9, 75%, 61% / 0.00);
-  --shadow-md: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00), 0px 2px 4px -1px hsl(9, 75%, 61% / 0.00);
-  --shadow-sm: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00), 0px 1px 2px -1px hsl(9, 75%, 61% / 0.00);
-  --shadow-xl: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00), 0px 8px 10px -1px hsl(9, 75%, 61% / 0.00);
-  --shadow-xs: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
-  --shadow-2xl: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
-  --shadow-2xs: 0px 2px 0px 0px hsl(9, 75%, 61% / 0.00);
 }
 
-/* Dark mode removed - light theme only for GHVAC */
+/* Dark theme — overrides the token values when <html> has the .dark class
+   (toggled in Settings → Appearance). Brand maroon is lifted for contrast. */
+.dark {
+  --background: #0b1220;
+  --foreground: #e5e9f0;
+  --card: #131d31;
+  --card-foreground: #e5e9f0;
+  --popover: #131d31;
+  --popover-foreground: #e5e9f0;
+  --primary: #b3303c;
+  --primary-foreground: #ffffff;
+  --secondary: #1e2a3f;
+  --secondary-foreground: #e5e9f0;
+  --muted: #1e2a3f;
+  --muted-foreground: #9aa6b8;
+  --accent: #1e2a3f;
+  --accent-foreground: #e5e9f0;
+  --destructive: #e5484d;
+  --destructive-foreground: #ffffff;
+  --border: #243246;
+  --input: #243246;
+  --ring: #b3303c;
+  --sidebar: #0b1220;
+  --sidebar-background: #0b1220;
+  --sidebar-foreground: #cbd5e1;
+  --sidebar-primary: #b3303c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1e2a3f;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #243246;
+  --sidebar-ring: #b3303c;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Dark-mode utility remap.
+
+   Most of the app predates the token system and paints surfaces with hardcoded
+   neutral utilities (bg-white, bg-slate-50, text-slate-700, border-slate-200…).
+   Those ignore the theme tokens, so without this block dark mode only darkens
+   the canvas and shadcn components while everything else stays white.
+
+   `.dark .bg-white` (two classes, specificity 0,2,0) outranks Tailwind's
+   `.bg-white` (0,1,0), so these win with no !important. We remap ONLY neutral
+   surfaces, text, and borders — semantic status colors (yellow/red/green/blue
+   badges) and the maroon brand are intentionally left untouched.
+   ────────────────────────────────────────────────────────────────────────── */
+/* Surfaces ────────────────────────────────────────────────────────────── */
+.dark .bg-white { background-color: var(--card); }
+.dark .bg-slate-50, .dark .bg-gray-50, .dark .bg-zinc-50, .dark .bg-neutral-50,
+.dark .bg-slate-50\/50, .dark .bg-gray-50\/50 { background-color: #161f33; }
+.dark .bg-slate-100, .dark .bg-gray-100, .dark .bg-zinc-100, .dark .bg-neutral-100 { background-color: var(--muted); }
+.dark .bg-slate-200, .dark .bg-gray-200 { background-color: #2b3a52; }
+
+/* Hover surfaces (Tailwind emits these as :hover utilities) ────────────── */
+.dark .hover\:bg-white:hover { background-color: var(--card); }
+.dark .hover\:bg-slate-50:hover, .dark .hover\:bg-gray-50:hover,
+.dark .hover\:bg-slate-50\/50:hover { background-color: #1b2740; }
+.dark .hover\:bg-slate-100:hover, .dark .hover\:bg-gray-100:hover { background-color: #233046; }
+
+/* Text ─────────────────────────────────────────────────────────────────── */
+.dark .text-black, .dark .text-slate-900, .dark .text-gray-900, .dark .text-zinc-900,
+.dark .text-slate-800, .dark .text-gray-800 { color: var(--foreground); }
+.dark .text-slate-700, .dark .text-gray-700, .dark .text-slate-600, .dark .text-gray-600,
+.dark .text-zinc-700, .dark .text-zinc-600 { color: #cbd5e1; }
+.dark .text-slate-500, .dark .text-gray-500, .dark .text-slate-400, .dark .text-gray-400,
+.dark .text-zinc-500, .dark .text-zinc-400 { color: var(--muted-foreground); }
+
+/* Borders & dividers ───────────────────────────────────────────────────── */
+.dark .border-slate-100, .dark .border-gray-100, .dark .border-slate-200, .dark .border-gray-200,
+.dark .border-slate-300, .dark .border-gray-300, .dark .border-zinc-200 { border-color: var(--border); }
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--border); }
 
 @layer utilities {
   .scrollbar-hide {
@@ -69,68 +145,20 @@
   }
 
   body {
-    @apply font-sans antialiased;
-    background: #f0f0f0 !important;
-    color: #1a1a1a !important;
+    @apply font-sans antialiased bg-background text-foreground;
   }
 
-  html {
-    background: #f0f0f0 !important;
-  }
-
-  /* Force light theme - no dark mode */
+  /* Canvas follows the active theme tokens (light or dark). */
   html, body, #root {
-    background-color: #f0f0f0 !important;
-    color: #1a1a1a !important;
+    background-color: var(--background);
+    color: var(--foreground);
     overflow-x: hidden;
     max-width: 100vw;
   }
 
-  /* Fix dropdown text visibility - comprehensive fix */
-  [data-radix-select-content],
-  .bg-popover {
-    background-color: #ffffff !important;
-    color: #1a1a1a !important;
-    border: 1px solid #e5e5e5 !important;
-  }
-
-  [data-radix-select-item],
-  .text-popover-foreground {
-    background-color: #ffffff !important;
-    color: #1a1a1a !important;
-  }
-
-  [data-radix-select-item]:hover,
-  [data-radix-select-item][data-highlighted] {
-    background-color: #f5f5f5 !important;
-    color: #1a1a1a !important;
-  }
-
-  [data-radix-select-trigger] {
-    color: #1a1a1a !important;
-    background-color: #ffffff !important;
-    border: 1px solid #e5e5e5 !important;
-  }
-
-  [data-radix-select-value],
-  [data-radix-select-trigger] span {
-    color: #1a1a1a !important;
-  }
-
-  /* Additional comprehensive fixes */
-  select,
-  option,
-  .select-trigger,
-  .select-content,
-  .select-item {
-    color: #1a1a1a !important;
-    background-color: #ffffff !important;
-  }
-
-  /* Ensure all text elements are readable */
-  * {
-    -webkit-text-fill-color: unset !important;
-  }
+  /* Dropdown/select readability now comes from correct popover tokens
+     (--popover / --popover-foreground), so the old !important overrides
+     were removed. */
 }
 
 .slide-in {
@@ -155,6 +183,27 @@
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* Premium shimmer skeleton */
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: #f5f5f4;
+}
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+  animation: skeletonShimmer 1.6s ease-in-out infinite;
+}
+@keyframes skeletonShimmer {
+  100% { transform: translateX(100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer::after { animation: none; }
 }
 
 .pulse-success {
@@ -363,21 +412,11 @@ gmp-place-autocomplete::part(input)::placeholder {
   background-color: #ffffff;
 }
 
+/* Hidden horizontal scrollbar — the timeline still scrolls via wheel/trackpad/drag
+   when it overflows, but no visible bar at the bottom of the board. */
 .dispatch-timeline-scroll::-webkit-scrollbar {
-  height: 14px;
-}
-.dispatch-timeline-scroll::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 7px;
-}
-.dispatch-timeline-scroll::-webkit-scrollbar-thumb {
-  background: #94a3b8;
-  border-radius: 7px;
-  border: 2px solid #f1f5f9;
-}
-.dispatch-timeline-scroll::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  display: none;
 }
 .dispatch-timeline-scroll {
-  scrollbar-width: auto;
+  scrollbar-width: none;
 }

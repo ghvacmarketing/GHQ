@@ -98,20 +98,20 @@ export class WebhookHandlers {
 
             console.log(`[Webhook] Invoice ${invoice.invoiceNumber} marked as paid - amount: $${amountPaid}`);
 
-            // Auto-update customer status from "prospect" to "client" when invoice is paid
+            // Auto-update customer status from "prospect" to "customer" when invoice is paid
             if (invoice.customerId) {
               try {
                 const [customer] = await db.select({ customerStatus: crmCustomers.customerStatus })
                   .from(crmCustomers)
                   .where(eq(crmCustomers.id, invoice.customerId))
                   .limit(1);
-                
+
                 if (customer && customer.customerStatus === "prospect") {
                   await db.update(crmCustomers)
-                    .set({ customerStatus: "client", updatedAt: now })
+                    .set({ customerStatus: "customer", updatedAt: now })
                     .where(eq(crmCustomers.id, invoice.customerId));
-                  
-                  console.log(`[Webhook] Customer ${invoice.customerId} status updated from prospect to client`);
+
+                  console.log(`[Webhook] Customer ${invoice.customerId} status updated from prospect to customer`);
                 }
               } catch (statusErr) {
                 console.error(`[Webhook] Failed to update customer status:`, statusErr);

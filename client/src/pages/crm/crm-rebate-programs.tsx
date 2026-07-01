@@ -346,7 +346,7 @@ export default function CrmRebatePrograms() {
                 <TableHeader>
                   <TableRow className="bg-slate-50 hover:bg-slate-50">
                     <TableHead className="text-xs font-semibold text-slate-600 w-28">Case #</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-600">Client</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Customer</TableHead>
                     <TableHead className="text-xs font-semibold text-slate-600 w-20">Program</TableHead>
                     <TableHead className="text-xs font-semibold text-slate-600 w-40">Status</TableHead>
                     <TableHead className="text-xs font-semibold text-slate-600 w-24">Priority</TableHead>

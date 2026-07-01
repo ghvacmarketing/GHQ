@@ -499,12 +499,14 @@ export default function CrmWorkOrders() {
   });
 
   const { data: customersData, isLoading: customersLoading } = useQuery<CustomersResponse>({
-    queryKey: ["/api/crm/customers", debouncedCustomerSearch],
+    queryKey: ["/api/crm/customers/merged", debouncedCustomerSearch],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (debouncedCustomerSearch) params.set("search", debouncedCustomerSearch);
       params.set("limit", "10");
-      const res = await fetch(`/api/crm/customers?${params.toString()}`, {
+      // /merged includes FieldEdge customers (the vast majority); /api/crm/customers
+      // alone only returns the sparse crm_customers table, so most searches came up empty.
+      const res = await fetch(`/api/crm/customers/merged?${params.toString()}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch customers");
@@ -588,11 +590,11 @@ export default function CrmWorkOrders() {
 
   // Query for customer search in reassignment (detail sheet)
   const { data: reassignCustomersData, isLoading: reassignCustomersLoading } = useQuery<CustomersResponse>({
-    queryKey: ["/api/crm/customers", debouncedReassignCustomerSearch, "reassign"],
+    queryKey: ["/api/crm/customers/merged", debouncedReassignCustomerSearch, "reassign"],
     queryFn: async () => {
       const params = new URLSearchParams({ page: "1", limit: "10" });
       if (debouncedReassignCustomerSearch) params.set("search", debouncedReassignCustomerSearch);
-      const res = await fetch(`/api/crm/customers?${params.toString()}`, {
+      const res = await fetch(`/api/crm/customers/merged?${params.toString()}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch customers");
@@ -1223,48 +1225,42 @@ export default function CrmWorkOrders() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
-        {/* Search bar at top - DoorLoop style */}
-        <div className="flex justify-center mb-2">
-          <div className="relative w-full max-w-xl">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+        {/* Title + subheading · centered search · actions — all on one row */}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
+          <div className="min-w-0 shrink-0">
+            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground truncate" data-testid="text-work-orders-title">
+              Work Orders
+            </h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">Schedule, dispatch, and track work orders</p>
+          </div>
+
+          <div className="relative w-full lg:flex-1 lg:max-w-sm lg:mx-auto">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search work orders..."
+              placeholder="Search work orders…"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
+              className="pl-9 h-9"
               data-testid="input-search-work-orders"
             />
           </div>
-        </div>
 
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900" data-testid="text-work-orders-title">
-              Work Orders
-            </h1>
-            <p className="text-sm text-slate-500">Total: {total}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Select 
-              value={visitTypeFilter} 
+          <div className="flex shrink-0 items-center gap-2">
+            <Select
+              value={visitTypeFilter}
               onValueChange={(v) => setVisitTypeFilter(v as WorkOrderVisitType | "all")}
             >
-              <SelectTrigger className="w-[140px] h-8 text-xs border-0 bg-transparent focus:ring-0 focus:ring-offset-0" data-testid="select-visit-type-filter">
+              <SelectTrigger className="h-9 w-[150px] text-sm" data-testid="select-visit-type-filter">
                 <SelectValue placeholder="All Types" />
               </SelectTrigger>
-              <SelectContent className="bg-white">
-                <SelectItem value="all" className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">All Types</SelectItem>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
                 {workOrderVisitTypeEnum.map((type) => (
-                  <SelectItem key={type} value={type} className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">{visitTypeLabels[type]}</SelectItem>
+                  <SelectItem key={type} value={type}>{visitTypeLabels[type]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Button
-              onClick={() => setCreateDialogOpen(true)}
-              className="bg-[#711419] hover:bg-[#5a1014] text-white"
-              size="sm"
-              data-testid="button-create-work-order"
-            >
+            <Button onClick={() => setCreateDialogOpen(true)} size="sm" data-testid="button-create-work-order">
               <Plus className="h-4 w-4 mr-1" />
               New Work Order
             </Button>

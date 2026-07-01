@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { CrmLayout } from "@/components/crm/crm-layout";
-import { Card } from "@/components/ui/card";
+import { PageHeader, StatCard, SectionCard, EmptyState, FilterBar } from "@/components/crm/ui-kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUpload } from "@/hooks/use-upload";
 import {
   PenLine, Plus, FileText, Loader2, Trash2, Upload, CheckCircle2, Send,
-  FileSignature, Search, Download, Clock, Users,
+  Download, Clock, Users,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { CrmUser, SignatureDocument } from "@shared/schema";
@@ -29,10 +29,10 @@ import type { CrmUser, SignatureDocument } from "@shared/schema";
 type DocWithCounts = SignatureDocument & { recipientCount: number; signedCount: number };
 
 const STATUS_STYLES: Record<string, string> = {
-  draft: "bg-slate-100 text-slate-700 border-slate-200",
-  sent: "bg-blue-100 text-blue-700 border-blue-200",
-  completed: "bg-green-100 text-green-700 border-green-200",
-  voided: "bg-red-100 text-red-700 border-red-200",
+  draft: "bg-muted text-muted-foreground border-border",
+  sent: "bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-300",
+  completed: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-300",
+  voided: "bg-red-500/10 text-red-600 border-red-500/20 dark:text-red-300",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -136,146 +136,130 @@ export default function CrmEsign() {
   const busy = isUploading || createMutation.isPending;
 
   const statCards = [
-    { label: "Total", value: stats.total, icon: FileText, color: "text-slate-700", bg: "bg-slate-100" },
-    { label: "Draft", value: stats.draft, icon: PenLine, color: "text-slate-600", bg: "bg-slate-100" },
-    { label: "Out for signature", value: stats.sent, icon: Send, color: "text-blue-600", bg: "bg-blue-50" },
-    { label: "Completed", value: stats.completed, icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50" },
+    { label: "Total", value: stats.total, icon: FileText },
+    { label: "Draft", value: stats.draft, icon: PenLine },
+    { label: "Out for signature", value: stats.sent, icon: Send },
+    { label: "Completed", value: stats.completed, icon: CheckCircle2 },
   ];
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="space-y-5">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#711419]/10">
-                <FileSignature className="h-5 w-5 text-[#711419]" />
-              </span>
-              Signatures
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">Upload a PDF, place fields, and send it for e-signature.</p>
-          </div>
-          <Button onClick={() => setDialogOpen(true)} className="bg-[#711419] hover:bg-[#5a1014] shrink-0" data-testid="button-new-document">
-            <Plus className="mr-2 h-4 w-4" /> New Document
-          </Button>
-        </div>
+      <div className="w-full space-y-6">
+        <PageHeader
+          title="Signatures"
+          description="Upload a PDF, place fields, and send it for e-signature."
+          actions={
+            <Button onClick={() => setDialogOpen(true)} data-testid="button-new-document">
+              <Plus className="mr-2 h-4 w-4" /> New Document
+            </Button>
+          }
+        />
 
         {/* Stat cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {statCards.map((s) => {
-            const Icon = s.icon;
-            return (
-              <Card key={s.label} className="p-4 flex items-center gap-3 border-slate-200">
-                <span className={`flex h-10 w-10 items-center justify-center rounded-lg ${s.bg}`}>
-                  <Icon className={`h-5 w-5 ${s.color}`} />
-                </span>
-                <div>
-                  <div className="text-2xl font-bold text-slate-900 leading-none">{s.value}</div>
-                  <div className="text-xs text-slate-500 mt-1">{s.label}</div>
-                </div>
-              </Card>
-            );
-          })}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {statCards.map((s) => (
+            <StatCard key={s.label} label={s.label} value={s.value} icon={s.icon} />
+          ))}
         </div>
 
         {/* Search */}
         {docs.length > 0 && (
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search documents..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-10 bg-white border-slate-300 focus-visible:ring-[#711419]"
-              data-testid="input-search-documents"
-            />
-          </div>
+          <FilterBar
+            search={search}
+            onSearchChange={setSearch}
+            placeholder="Search documents…"
+            className="max-w-md"
+          />
         )}
 
         {/* List */}
         {isLoading ? (
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-[72px] w-full rounded-lg" />)}
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-[72px] w-full rounded-xl" />)}
           </div>
         ) : docs.length === 0 ? (
-          <Card className="p-12 text-center border-dashed border-slate-300">
-            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#711419]/10">
-              <PenLine className="h-7 w-7 text-[#711419]" />
-            </span>
-            <h3 className="mt-4 font-semibold text-slate-900">No documents yet</h3>
-            <p className="text-sm text-slate-500 mt-1">Create your first signature document to get started.</p>
-            <Button onClick={() => setDialogOpen(true)} className="mt-4 bg-[#711419] hover:bg-[#5a1014]" data-testid="button-new-document-empty">
-              <Plus className="mr-2 h-4 w-4" /> New Document
-            </Button>
-          </Card>
+          <SectionCard noBodyPadding>
+            <EmptyState
+              icon={PenLine}
+              title="No documents yet"
+              message="Create your first signature document to get started."
+              action={
+                <Button onClick={() => setDialogOpen(true)} data-testid="button-new-document-empty">
+                  <Plus className="mr-2 h-4 w-4" /> New Document
+                </Button>
+              }
+            />
+          </SectionCard>
         ) : filtered.length === 0 ? (
-          <Card className="p-10 text-center border-slate-200">
-            <p className="text-sm text-slate-500">No documents match "{search}".</p>
-          </Card>
+          <SectionCard noBodyPadding>
+            <EmptyState icon={FileText} title="No matches" message={`No documents match "${search}".`} />
+          </SectionCard>
         ) : (
-          <div className="space-y-3">
-            {filtered.map((doc) => {
-              const pct = doc.recipientCount > 0 ? Math.round((doc.signedCount / doc.recipientCount) * 100) : 0;
-              return (
-                <Card
-                  key={doc.id}
-                  className="p-4 flex items-center gap-4 hover:shadow-md hover:border-[#711419]/30 transition-all cursor-pointer border-slate-200"
-                  onClick={() => navigate(`/crm/esign/${doc.id}`)}
-                  data-testid={`card-document-${doc.id}`}
-                >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#711419]/10 shrink-0">
-                    <FileText className="h-5 w-5 text-[#711419]" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-slate-900 truncate" data-testid={`text-title-${doc.id}`}>{doc.title}</span>
-                      <Badge variant="outline" className={STATUS_STYLES[doc.status] || STATUS_STYLES.draft}>
-                        {doc.status === "completed" && <CheckCircle2 className="mr-1 h-3 w-3" />}
-                        {doc.status === "sent" && <Send className="mr-1 h-3 w-3" />}
-                        {STATUS_LABELS[doc.status] || doc.status}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-slate-500 mt-1.5 flex-wrap">
-                      <span className="flex items-center gap-1">
-                        <FileText className="h-3 w-3" /> {doc.pageCount} page{doc.pageCount === 1 ? "" : "s"}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Users className="h-3 w-3" />
-                        {doc.recipientCount > 0 ? `${doc.signedCount}/${doc.recipientCount} signed` : "No recipients"}
-                      </span>
-                      {doc.createdAt && (
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" /> {format(new Date(doc.createdAt), "MMM d, yyyy")}
-                        </span>
-                      )}
-                    </div>
-                    {doc.status === "sent" && doc.recipientCount > 0 && (
-                      <div className="mt-2 h-1.5 w-full max-w-[220px] rounded-full bg-slate-100 overflow-hidden">
-                        <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${pct}%` }} />
-                      </div>
-                    )}
-                  </div>
-                  {doc.status === "completed" && doc.signedObjectPath && (
-                    <Button
-                      variant="outline" size="sm" className="shrink-0"
-                      onClick={(e) => { e.stopPropagation(); window.open(doc.signedObjectPath!, "_blank"); }}
-                      data-testid={`button-download-${doc.id}`}
+          <SectionCard title="Documents" description={`${filtered.length} of ${docs.length}`} noBodyPadding>
+            <ul className="divide-y divide-border">
+              {filtered.map((doc) => {
+                const pct = doc.recipientCount > 0 ? Math.round((doc.signedCount / doc.recipientCount) * 100) : 0;
+                return (
+                  <li key={doc.id}>
+                    <div
+                      className="group flex cursor-pointer items-center gap-4 px-5 py-3.5 transition-colors hover:bg-muted"
+                      onClick={() => navigate(`/crm/esign/${doc.id}`)}
+                      data-testid={`card-document-${doc.id}`}
                     >
-                      <Download className="mr-1.5 h-3.5 w-3.5" /> Download
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost" size="icon" className="shrink-0 text-slate-400 hover:text-red-600"
-                    onClick={(e) => { e.stopPropagation(); setDeleteId(doc.id); }}
-                    data-testid={`button-delete-${doc.id}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </Card>
-              );
-            })}
-          </div>
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <FileText className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="truncate font-medium text-foreground" data-testid={`text-title-${doc.id}`}>{doc.title}</span>
+                          <Badge variant="outline" className={STATUS_STYLES[doc.status] || STATUS_STYLES.draft}>
+                            {doc.status === "completed" && <CheckCircle2 className="mr-1 h-3 w-3" />}
+                            {doc.status === "sent" && <Send className="mr-1 h-3 w-3" />}
+                            {STATUS_LABELS[doc.status] || doc.status}
+                          </Badge>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <FileText className="h-3 w-3" /> {doc.pageCount} page{doc.pageCount === 1 ? "" : "s"}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            {doc.recipientCount > 0 ? `${doc.signedCount}/${doc.recipientCount} signed` : "No recipients"}
+                          </span>
+                          {doc.createdAt && (
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" /> {format(new Date(doc.createdAt), "MMM d, yyyy")}
+                            </span>
+                          )}
+                        </div>
+                        {doc.status === "sent" && doc.recipientCount > 0 && (
+                          <div className="mt-2 h-1.5 w-full max-w-[220px] overflow-hidden rounded-full bg-muted">
+                            <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+                        )}
+                      </div>
+                      {doc.status === "completed" && doc.signedObjectPath && (
+                        <Button
+                          variant="outline" size="sm" className="shrink-0"
+                          onClick={(e) => { e.stopPropagation(); window.open(doc.signedObjectPath!, "_blank"); }}
+                          data-testid={`button-download-${doc.id}`}
+                        >
+                          <Download className="mr-1.5 h-3.5 w-3.5" /> Download
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-red-600"
+                        onClick={(e) => { e.stopPropagation(); setDeleteId(doc.id); }}
+                        data-testid={`button-delete-${doc.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </SectionCard>
         )}
       </div>
 
@@ -293,13 +277,13 @@ export default function CrmEsign() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="mt-1.5 flex w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 py-6 text-center transition-colors hover:border-[#711419]/50 hover:bg-[#711419]/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#711419] focus-visible:ring-offset-2"
+                className="mt-1.5 flex w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border py-6 text-center transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
-                <Upload className="h-6 w-6 text-slate-400" />
-                <span className="text-sm font-medium text-slate-700">
+                <Upload className="h-6 w-6 text-muted-foreground" />
+                <span className="text-sm font-medium text-foreground">
                   {pendingFile ? pendingFile.name : "Click to choose a PDF"}
                 </span>
-                <span className="text-xs text-slate-400">Max 25MB</span>
+                <span className="text-xs text-muted-foreground">Max 25MB</span>
               </button>
             </div>
             <div>
@@ -313,7 +297,7 @@ export default function CrmEsign() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={busy}>Cancel</Button>
-            <Button onClick={() => createMutation.mutate()} disabled={busy || !pendingFile} className="bg-[#711419] hover:bg-[#5a1014]" data-testid="button-create-document">
+            <Button onClick={() => createMutation.mutate()} disabled={busy || !pendingFile} data-testid="button-create-document">
               {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isUploading ? "Uploading…" : "Create & Prepare"}
             </Button>
