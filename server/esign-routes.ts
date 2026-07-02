@@ -325,8 +325,7 @@ export function registerEsignRoutes(app: Express): void {
       const doc = await storage.getSignatureDocument(recipient.documentId);
       if (!doc) return res.status(404).json({ message: "Not found" });
       const path = doc.signedObjectPath || doc.originalObjectPath;
-      const file = await objectStorageService.getObjectEntityFile(path);
-      await objectStorageService.downloadObject(file, res);
+      await objectStorageService.serveObject(path, res);
     } catch (err) {
       if (err instanceof ObjectNotFoundError) return res.status(404).json({ message: "File not found" });
       console.error("[esign] sign file error:", err);

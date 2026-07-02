@@ -10,25 +10,14 @@ const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
  * Read the raw bytes of an object stored at an `/objects/...` path.
  */
 export async function downloadObjectBytes(objectPath: string): Promise<Buffer> {
-  const file = await objectStorageService.getObjectEntityFile(objectPath);
-  const [buf] = await file.download();
-  return buf;
+  return objectStorageService.readObjectBytes(objectPath);
 }
 
 /**
- * Upload raw bytes to object storage and return the normalized `/objects/...` path.
+ * Upload raw bytes to object storage (local disk or GCS) and return the `/objects/...` path.
  */
 async function uploadBytes(bytes: Uint8Array, contentType: string): Promise<string> {
-  const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-  const res = await fetch(uploadURL, {
-    method: "PUT",
-    body: Buffer.from(bytes),
-    headers: { "Content-Type": contentType },
-  });
-  if (!res.ok) {
-    throw new Error(`Failed to upload signed PDF to storage (status ${res.status})`);
-  }
-  return objectStorageService.normalizeObjectEntityPath(uploadURL);
+  return objectStorageService.writeObject(Buffer.from(bytes), contentType);
 }
 
 /**

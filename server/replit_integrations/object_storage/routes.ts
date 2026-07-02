@@ -1,4 +1,4 @@
-import type { Express, Request, Response, NextFunction } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { requireCrmAuth } from "../../crm-auth";
 
@@ -85,17 +85,44 @@ export function registerObjectStorageRoutes(app: Express): void {
   });
 
   /**
-   * Serve uploaded objects.
+   * Local-filesystem upload target (off Replit only). The presigned-URL flow's
+   * "uploadURL" points here in local mode; the browser PUTs the raw file and we
+   * write it to disk. Write-once by random id, size/type validated.
+   */
+  app.put(
+    "/api/uploads/local/:id",
+    express.raw({ type: () => true, limit: MAX_FILE_SIZE }),
+    async (req: Request, res: Response) => {
+      try {
+        if (!objectStorageService.isLocal()) {
+          return res.status(404).json({ error: "Not found" });
+        }
+        const id = req.params.id;
+        if (!/^[a-zA-Z0-9-]{8,64}$/.test(id)) {
+          return res.status(400).json({ error: "Invalid upload id" });
+        }
+        const body = req.body as Buffer;
+        if (!Buffer.isBuffer(body) || body.length === 0) {
+          return res.status(400).json({ error: "Empty upload" });
+        }
+        const contentType = (req.headers["content-type"] as string) || "application/octet-stream";
+        await objectStorageService.saveUpload(id, body, contentType);
+        res.status(200).json({ ok: true });
+      } catch (error) {
+        console.error("Error saving upload:", error);
+        res.status(500).json({ error: "Failed to save upload" });
+      }
+    },
+  );
+
+  /**
+   * Serve uploaded objects (local disk or object storage).
    *
    * GET /objects/:objectPath(*)
-   *
-   * This serves files from object storage. For public files, no auth needed.
-   * For protected files, add authentication middleware and ACL checks.
    */
   app.get("/objects/:objectPath(*)", async (req, res) => {
     try {
-      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
-      await objectStorageService.downloadObject(objectFile, res);
+      await objectStorageService.serveObject(req.path, res);
     } catch (error) {
       console.error("Error serving object:", error);
       if (error instanceof ObjectNotFoundError) {

@@ -13,7 +13,26 @@ import {
   doublePrecision,
   index,
   uniqueIndex,
+  customType,
 } from "drizzle-orm/pg-core";
+
+// Postgres bytea (raw binary) column type for storing uploaded file bytes.
+const bytea = customType<{ data: Buffer; default: false }>({
+  dataType() {
+    return "bytea";
+  },
+});
+
+// Uploaded objects (e-signature PDFs, etc.) stored directly in the app DB so
+// file uploads work on any deployment without a separate object-storage service.
+// See server/replit_integrations/object_storage/objectStorage.ts (DB backend).
+export const objectStore = pgTable("object_store", {
+  key: varchar("key").primaryKey(),
+  contentType: text("content_type").notNull().default("application/octet-stream"),
+  data: bytea("data").notNull(),
+  size: integer("size").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
 
 
 import { createInsertSchema } from "drizzle-zod";

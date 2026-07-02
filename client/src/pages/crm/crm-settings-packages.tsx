@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -46,6 +46,10 @@ import {
   RefreshCw,
   FileSpreadsheet,
   DollarSign,
+  Upload,
+  Download,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
@@ -169,6 +173,61 @@ export default function CrmSettingsPackages() {
     },
   });
 
+  // ---- CSV import of packages ----
+  const csvInputRef = useRef<HTMLInputElement>(null);
+  const [importResult, setImportResult] = useState<{ total: number; created: number; updated: number; errors: string[] } | null>(null);
+
+  const importCsvMutation = useMutation({
+    mutationFn: async (csv: string) => {
+      const res = await apiRequest("POST", "/api/pricebook/packages/import-csv", { csv });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Import failed");
+      return data as { total: number; created: number; updated: number; errors: string[] };
+    },
+    onSuccess: (data) => {
+      setImportResult(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/pricebook/packages"] });
+      toast({
+        title: "Packages imported",
+        description: `${data.created} added, ${data.updated} updated${data.errors.length ? `, ${data.errors.length} skipped` : ""}.`,
+      });
+    },
+    onError: (e: Error) => toast({ title: "Import failed", description: e.message, variant: "destructive" }),
+  });
+
+  const handleCsvFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!/\.csv$/i.test(file.name)) {
+      toast({ title: "CSV files only", description: "Please choose a .csv file.", variant: "destructive" });
+      return;
+    }
+    setImportResult(null);
+    const reader = new FileReader();
+    reader.onload = () => importCsvMutation.mutate(String(reader.result || ""));
+    reader.onerror = () => toast({ title: "Could not read file", variant: "destructive" });
+    reader.readAsText(file);
+    e.target.value = ""; // allow re-selecting the same file
+  };
+
+  const downloadTemplate = async () => {
+    try {
+      const res = await fetch("/api/pricebook/packages/csv-template", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to download template");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "package-pricing-template.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast({ title: "Download failed", description: err.message, variant: "destructive" });
+    }
+  };
+
   const handleApplyClick = () => {
     if (percentageChange === 0) {
       toast({
@@ -282,6 +341,87 @@ export default function CrmSettingsPackages() {
         </div>
 
         <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Upload className="h-5 w-5" />
+                Import Packages from CSV
+              </CardTitle>
+              <CardDescription>
+                Upload a spreadsheet of all your packages and pricing. Rows are matched by
+                Unit Type + Tier + Tonnage + Level — existing packages are updated and new
+                ones added, then the proposal builder reflects the changes. Download the
+                template first so your columns line up exactly.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={handleCsvFile}
+                data-testid="input-csv-file"
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" onClick={downloadTemplate} data-testid="button-download-template">
+                  <Download className="mr-2 h-4 w-4" /> Download template
+                </Button>
+                <Button
+                  onClick={() => csvInputRef.current?.click()}
+                  disabled={importCsvMutation.isPending}
+                  data-testid="button-upload-csv"
+                >
+                  {importCsvMutation.isPending ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Importing…</>
+                  ) : (
+                    <><Upload className="mr-2 h-4 w-4" /> Upload CSV</>
+                  )}
+                </Button>
+              </div>
+
+              <div className="rounded-lg border border-border bg-muted/40 p-3">
+                <p className="text-xs font-medium text-foreground">Required columns</p>
+                <p className="mt-1 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                  unitType, tier, tonnage, packageLevel, monthlyPayment, totalInvestment,
+                  outdoorBrand, outdoorModel, outdoorName, coilModel, coilName,
+                  indoorHeatModel, indoorHeatName, thermostatModel, thermostatName, accessoryModels
+                </p>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Prices are in dollars (e.g. <span className="font-mono">11576</span> and <span className="font-mono">173</span>).
+                  Equipment/image details are preserved when a cell is left blank.
+                </p>
+              </div>
+
+              {importResult && (
+                <div className="space-y-2 rounded-lg border border-border p-3 text-sm">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 className="h-4 w-4" /> {importResult.created} added
+                    </span>
+                    <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                      <RefreshCw className="h-4 w-4" /> {importResult.updated} updated
+                    </span>
+                    {importResult.errors.length > 0 && (
+                      <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                        <AlertCircle className="h-4 w-4" /> {importResult.errors.length} skipped
+                      </span>
+                    )}
+                    <span className="text-muted-foreground">of {importResult.total} rows</span>
+                  </div>
+                  {importResult.errors.length > 0 && (
+                    <ul className="max-h-32 space-y-0.5 overflow-y-auto text-xs text-muted-foreground">
+                      {importResult.errors.slice(0, 20).map((err, i) => (
+                        <li key={i}>• {err}</li>
+                      ))}
+                      {importResult.errors.length > 20 && <li>…and {importResult.errors.length - 20} more</li>}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

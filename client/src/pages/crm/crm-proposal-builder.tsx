@@ -197,6 +197,15 @@ type CartItem = CartPackage | CustomBuildCart | CrawlspaceCartItem | CrawlspaceS
 
 const components: PricebookComponent[] = componentsData as PricebookComponent[];
 
+// Package images are stored as relative object paths (e.g. "gp_images_v2/x.png").
+// They are served from attached_assets at /assets/. Prefix relative paths so
+// <img src> resolves correctly. Idempotent: absolute/rooted URLs pass through.
+function assetUrl(u?: string | null): string | undefined {
+  if (!u) return undefined;
+  if (/^https?:\/\//i.test(u) || u.startsWith("/")) return u;
+  return `/assets/${u.replace(/^\/+/, "")}`;
+}
+
 // Transform API packages to frontend format (cents to dollars as strings)
 function transformApiPackages(apiPackages: ApiPricebookPackage[]): PricebookPackage[] {
   return apiPackages.map(pkg => ({
@@ -216,10 +225,10 @@ function transformApiPackages(apiPackages: ApiPricebookPackage[]): PricebookPack
     thermostatModel: pkg.thermostatModel || "",
     thermostatName: pkg.thermostatName || "",
     accessoryModels: pkg.accessoryModels || "",
-    outdoorImageUrl: pkg.outdoorImageUrl || undefined,
-    coilImageUrl: pkg.coilImageUrl || undefined,
-    furnaceImageUrl: pkg.furnaceImageUrl || undefined,
-    thermostatImageUrl: pkg.thermostatImageUrl || undefined,
+    outdoorImageUrl: assetUrl(pkg.outdoorImageUrl),
+    coilImageUrl: assetUrl(pkg.coilImageUrl),
+    furnaceImageUrl: assetUrl(pkg.furnaceImageUrl),
+    thermostatImageUrl: assetUrl(pkg.thermostatImageUrl),
   }));
 }
 
@@ -4479,10 +4488,128 @@ export default function CrmProposalBuilder() {
                 ) : (
                   /* Standard component selection for SGA, SHP, PHP, GP */
                   <>
+                {/* Salesbook packages (primary path) — pick a Best/Better/Good/Budget
+                    tier for the chosen type + size, mirroring the sales pricebook. */}
+                {(() => {
+                  const LEVEL_ORDER: Record<string, number> = { Best: 0, Better: 1, Good: 2, Budget: 3 };
+                  const ton = (customTonnage || "").replace(/\s*Ton\s*/i, "").trim();
+                  const matches = packages
+                    .filter((p) => p.unitType === customEquipmentType && String(p.tonnage) === ton)
+                    .sort(
+                      (a, b) =>
+                        (LEVEL_ORDER[a.packageLevel] ?? 9) - (LEVEL_ORDER[b.packageLevel] ?? 9) ||
+                        (parseFloat(b.totalInvestment) || 0) - (parseFloat(a.totalInvestment) || 0)
+                    );
+                  if (matches.length === 0) return null;
+                  const equipLine = (label: string, model?: string | null, name?: string | null) =>
+                    model ? (
+                      <div className="flex items-baseline justify-between gap-3 text-sm">
+                        <span className="shrink-0 text-xs font-medium text-muted-foreground">{label}</span>
+                        <span className="min-w-0 truncate text-right">
+                          <span className="font-medium">{model}</span>
+                          {name ? <span className="text-muted-foreground"> · {name}</span> : null}
+                        </span>
+                      </div>
+                    ) : null;
+                  return (
+                    <div className="mb-8">
+                      <div className="mb-4">
+                        <h2 className="text-xl font-semibold">
+                          Recommended Packages — {customEquipmentType} {customTonnage}
+                        </h2>
+                        <p className="text-muted-foreground">
+                          Straight from the sales pricebook. Pick a tier to walk your client through, or build a custom system below.
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                        {matches.map((pkg, idx) => {
+                          const inCart = cart.some(
+                            (item) =>
+                              isHvacPackage(item) &&
+                              item.unitType === pkg.unitType &&
+                              item.tier === pkg.tier &&
+                              item.packageLevel === pkg.packageLevel
+                          );
+                          const heatLabel =
+                            pkg.unitType === "PHP" ? "Heat Kit" : pkg.unitType === "SHP" ? "Air Handler" : "Furnace / Indoor";
+                          return (
+                            <Card
+                              key={`${pkg.tier}-${pkg.packageLevel}-${idx}`}
+                              className={`relative flex flex-col bg-slate-50 ${inCart ? "border-primary ring-1 ring-primary" : ""}`}
+                              data-testid={`custom-package-${pkg.packageLevel.toLowerCase()}`}
+                            >
+                              <CardHeader className="pb-2">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex flex-col gap-1">
+                                    <Badge className={`${getPackageLevelColor(pkg.packageLevel)} w-fit text-white`}>
+                                      {pkg.packageLevel}
+                                    </Badge>
+                                    <span className="text-xs text-muted-foreground">{pkg.tier} · {pkg.outdoorBrand}</span>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-xl font-bold text-primary">
+                                      {formatPrice(parseFloat(pkg.totalInvestment) || 0)}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {formatPrice(parseFloat(pkg.monthlyPayment) || 0)}/mo
+                                    </p>
+                                  </div>
+                                </div>
+                              </CardHeader>
+                              <CardContent className="flex flex-1 flex-col gap-2">
+                                {(pkg.outdoorImageUrl || pkg.furnaceImageUrl || pkg.thermostatImageUrl) && (
+                                  <div className="flex items-center justify-center gap-2 rounded-md bg-white p-2">
+                                    {[pkg.outdoorImageUrl, pkg.coilImageUrl, pkg.furnaceImageUrl, pkg.thermostatImageUrl]
+                                      .filter(Boolean)
+                                      .slice(0, 4)
+                                      .map((src, i) => (
+                                        <img
+                                          key={i}
+                                          src={src as string}
+                                          alt=""
+                                          className="h-16 w-16 shrink-0 rounded object-contain"
+                                          loading="lazy"
+                                        />
+                                      ))}
+                                  </div>
+                                )}
+                                <div className="space-y-1.5 rounded-md border border-border bg-background/60 p-2.5">
+                                  {equipLine("Outdoor", `${pkg.outdoorBrand || ""} ${pkg.outdoorModel || ""}`.trim(), pkg.outdoorName)}
+                                  {equipLine(pkg.unitType === "SHP" ? "Coil/AH" : "Coil", pkg.coilModel, pkg.coilName)}
+                                  {equipLine(heatLabel, pkg.indoorHeatModel, pkg.indoorHeatName)}
+                                  {equipLine("Thermostat", pkg.thermostatModel, pkg.thermostatName)}
+                                </div>
+                                <Button
+                                  className="mt-auto min-h-[44px] w-full"
+                                  variant={inCart ? "outline" : "default"}
+                                  onClick={() => addToCart(pkg)}
+                                  data-testid={`button-add-custom-package-${pkg.packageLevel.toLowerCase()}`}
+                                >
+                                  {inCart ? (
+                                    <><Check className="mr-2 h-4 w-4" /> In cart — add another</>
+                                  ) : (
+                                    <><ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart</>
+                                  )}
+                                </Button>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                      <div className="my-8 flex items-center gap-3">
+                        <div className="h-px flex-1 bg-border" />
+                        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Or build a custom system
+                        </span>
+                        <div className="h-px flex-1 bg-border" />
+                      </div>
+                    </div>
+                  );
+                })()}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
                   <div>
                     <h2 className="text-xl font-semibold">Build Your {customEquipmentType} {customTonnage} System</h2>
-                    <p className="text-muted-foreground">Select one component from each category</p>
+                    <p className="text-muted-foreground">Prefer to customize? Select one component from each category.</p>
                   </div>
                   <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
                     <div className="text-right">

@@ -6,5 +6,6 @@ dist
 !.env.example
 server/public
 public/salesbook-pages
+uploads/objects
 vite.config.ts.*
 *.tar.gz

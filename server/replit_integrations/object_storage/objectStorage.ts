@@ -1,6 +1,10 @@
 import { Storage, File } from "@google-cloud/storage";
 import { Response } from "express";
 import { randomUUID } from "crypto";
+import fs from "fs";
+import path from "path";
+import { db } from "../../db";
+import { sql } from "drizzle-orm";
 import {
   ObjectAclPolicy,
   ObjectPermission,
@@ -10,6 +14,46 @@ import {
 } from "./objectAcl";
 
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
+
+// ── Storage backends ───────────────────────────────────────────────────────
+// On Replit, files live in GCS via the sidecar (REPL_ID is set). Everywhere else
+// — local dev and any cloud/VPS deployment — files are stored in the app's Neon
+// database (object_store table), so uploads work wherever the app is launched
+// with no extra service/credentials. Object paths encode the backend:
+//   /objects/db/<key>     -> Neon (object_store row)
+//   /objects/local/<id>   -> local disk (legacy fallback, still readable)
+//   /objects/<other>      -> Replit GCS
+const DB_PREFIX = "/objects/db/";
+const LOCAL_PREFIX = "/objects/local/";
+const LOCAL_OBJECT_DIR = path.join(process.cwd(), "uploads", "objects");
+
+// True when NOT running on Replit → use the Neon-backed object store.
+function useDbStorage(): boolean {
+  return !process.env.REPL_ID;
+}
+function idFromPath(objectPath: string, prefix: string): string {
+  return objectPath.slice(prefix.length).split(/[?#]/)[0];
+}
+function localFiles(id: string) {
+  return { data: path.join(LOCAL_OBJECT_DIR, id), meta: path.join(LOCAL_OBJECT_DIR, `${id}.type`) };
+}
+
+// ── Neon object_store helpers ──────────────────────────────────────────────
+async function dbSave(key: string, buffer: Buffer, contentType: string): Promise<void> {
+  await db.execute(sql`
+    INSERT INTO object_store (key, content_type, data, size)
+    VALUES (${key}, ${contentType}, ${buffer}, ${buffer.length})
+    ON CONFLICT (key) DO UPDATE
+      SET content_type = EXCLUDED.content_type, data = EXCLUDED.data, size = EXCLUDED.size
+  `);
+}
+async function dbRead(key: string): Promise<{ data: Buffer; contentType: string } | null> {
+  const r = await db.execute(sql`SELECT content_type, data FROM object_store WHERE key = ${key} LIMIT 1`);
+  const row = (r as any).rows?.[0];
+  if (!row) return null;
+  const data = Buffer.isBuffer(row.data) ? row.data : Buffer.from(row.data);
+  return { data, contentType: row.content_type || "application/octet-stream" };
+}
 
 // The object storage client is used to interact with the object storage service.
 export const objectStorageClient = new Storage({
@@ -130,8 +174,92 @@ export class ObjectStorageService {
     }
   }
 
+  // True when uploads are handled by the app (Neon DB / local disk) rather than
+  // Replit GCS — i.e. the browser PUTs to our own /api/uploads/local/<id> route.
+  isLocal(): boolean {
+    return useDbStorage();
+  }
+
+  // Persist raw bytes for an upload id (called by the PUT upload route).
+  // Off Replit this writes to Neon; the returned scheme is chosen by the caller.
+  async saveUpload(id: string, buffer: Buffer, contentType: string): Promise<void> {
+    if (useDbStorage()) {
+      await dbSave(id, buffer, contentType || "application/octet-stream");
+      return;
+    }
+    // (Only reached if explicitly using disk.) Write to local disk.
+    fs.mkdirSync(LOCAL_OBJECT_DIR, { recursive: true });
+    const { data, meta } = localFiles(id);
+    fs.writeFileSync(data, buffer);
+    fs.writeFileSync(meta, contentType || "application/octet-stream");
+  }
+
+  // Read the raw bytes of an object (Neon DB, local disk, or GCS) by /objects/... path.
+  async readObjectBytes(objectPath: string): Promise<Buffer> {
+    if (objectPath.startsWith(DB_PREFIX)) {
+      const obj = await dbRead(idFromPath(objectPath, DB_PREFIX));
+      if (!obj) throw new ObjectNotFoundError();
+      return obj.data;
+    }
+    if (objectPath.startsWith(LOCAL_PREFIX)) {
+      const { data } = localFiles(idFromPath(objectPath, LOCAL_PREFIX));
+      if (!fs.existsSync(data)) throw new ObjectNotFoundError();
+      return fs.readFileSync(data);
+    }
+    const file = await this.getObjectEntityFile(objectPath);
+    const [buf] = await file.download();
+    return buf;
+  }
+
+  // Write raw bytes to storage (server-side) and return the /objects/... path.
+  async writeObject(buffer: Buffer, contentType: string): Promise<string> {
+    if (useDbStorage()) {
+      const id = randomUUID();
+      await dbSave(id, buffer, contentType || "application/octet-stream");
+      return `${DB_PREFIX}${id}`;
+    }
+    const uploadURL = await this.getObjectEntityUploadURL();
+    const res = await fetch(uploadURL, { method: "PUT", body: buffer, headers: { "Content-Type": contentType } });
+    if (!res.ok) throw new Error(`Failed to write object (status ${res.status})`);
+    return this.normalizeObjectEntityPath(uploadURL);
+  }
+
+  // Serve an object (Neon DB, local disk, or GCS) to an Express response.
+  async serveObject(objectPath: string, res: Response, cacheTtlSec: number = 3600): Promise<void> {
+    if (objectPath.startsWith(DB_PREFIX)) {
+      const obj = await dbRead(idFromPath(objectPath, DB_PREFIX));
+      if (!obj) throw new ObjectNotFoundError();
+      res.set({
+        "Content-Type": obj.contentType,
+        "Content-Length": String(obj.data.length),
+        "Cache-Control": `private, max-age=${cacheTtlSec}`,
+      });
+      res.end(obj.data);
+      return;
+    }
+    if (objectPath.startsWith(LOCAL_PREFIX)) {
+      const { data, meta } = localFiles(idFromPath(objectPath, LOCAL_PREFIX));
+      if (!fs.existsSync(data)) throw new ObjectNotFoundError();
+      const contentType = fs.existsSync(meta) ? fs.readFileSync(meta, "utf-8").trim() : "application/octet-stream";
+      const stat = fs.statSync(data);
+      res.set({
+        "Content-Type": contentType,
+        "Content-Length": String(stat.size),
+        "Cache-Control": `private, max-age=${cacheTtlSec}`,
+      });
+      fs.createReadStream(data).pipe(res);
+      return;
+    }
+    const file = await this.getObjectEntityFile(objectPath);
+    await this.downloadObject(file, res, cacheTtlSec);
+  }
+
   // Gets the upload URL for an object entity.
   async getObjectEntityUploadURL(): Promise<string> {
+    if (this.isLocal()) {
+      // Relative, same-origin URL the browser PUTs the file to (server-mediated).
+      return `/api/uploads/local/${randomUUID()}`;
+    }
     const privateObjectDir = this.getPrivateObjectDir();
     if (!privateObjectDir) {
       throw new Error(
@@ -184,6 +312,12 @@ export class ObjectStorageService {
   normalizeObjectEntityPath(
     rawPath: string,
   ): string {
+    // Server-mediated upload URL ("/api/uploads/local/<id>") -> object path.
+    // Off Replit the bytes are stored in Neon, so it maps to /objects/db/<id>.
+    const localMatch = rawPath.match(/\/api\/uploads\/local\/([^/?#]+)/);
+    if (localMatch) {
+      return `${useDbStorage() ? DB_PREFIX : LOCAL_PREFIX}${localMatch[1]}`;
+    }
     if (!rawPath.startsWith("https://storage.googleapis.com/")) {
       return rawPath;
     }

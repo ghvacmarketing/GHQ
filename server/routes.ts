@@ -18411,16 +18411,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST /api/crm/quotes/from-proposal - Create standalone quote from proposal builder
   app.post("/api/crm/quotes/from-proposal", requireCrmSalesOrAbove, async (req, res) => {
     try {
-      const user = getCurrentCrmUser(req);
+      const user = await getCurrentCrmUser(req);
       if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const { customerId, propertyId, projectId, workOrderId, title, description, notes, lineItems, status, aiNotes, aiGeneratedQuote, quoteMode, quoteType, assignedToId } = req.body;
+      const { customerId: rawCustomerId, propertyId, projectId, workOrderId, title, description, notes, lineItems, status, aiNotes, aiGeneratedQuote, quoteMode, quoteType, assignedToId } = req.body;
 
-      if (!customerId) {
+      if (!rawCustomerId) {
         return res.status(400).json({ message: "Customer is required" });
       }
+
+      // Proposals can be built for FieldEdge-cached customers (id "fieldedge-…")
+      // that aren't in crm_customers yet. Promote to a real CRM customer first,
+      // otherwise the existence check below fails with "Customer not found".
+      const customerId = (await ensureCrmCustomerId(rawCustomerId)) || rawCustomerId;
 
       if (!lineItems || !Array.isArray(lineItems) || lineItems.length === 0) {
         return res.status(400).json({ message: "At least one line item is required" });
@@ -27725,6 +27730,165 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error: any) {
       console.error("Error exporting packages:", error);
       res.status(500).json({ message: "Failed to export packages", error: error.message });
+    }
+  });
+
+  // Canonical CSV column order for the sales-facing package template. Prices are
+  // in DOLLARS here (the DB stores cents); image columns are omitted so the sheet
+  // stays clean — existing images are preserved on import.
+  const PACKAGE_CSV_COLUMNS = [
+    "unitType", "tier", "tonnage", "packageLevel", "monthlyPayment", "totalInvestment",
+    "outdoorBrand", "outdoorModel", "outdoorName", "coilModel", "coilName",
+    "indoorHeatModel", "indoorHeatName", "thermostatModel", "thermostatName", "accessoryModels",
+  ];
+  const csvCell = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+  // GET /api/pricebook/packages/csv-template - Download a ready-to-edit CSV of the
+  // current packages (or a small example if empty). This IS the upload template.
+  app.get("/api/pricebook/packages/csv-template", requireCrmSalesOrAbove, async (_req, res) => {
+    try {
+      const existing = await db
+        .select()
+        .from(pricebookPackages)
+        .where(eq(pricebookPackages.isActive, true))
+        .orderBy(asc(pricebookPackages.unitType), asc(pricebookPackages.tier), asc(pricebookPackages.tonnage), asc(pricebookPackages.packageLevel));
+
+      const header = PACKAGE_CSV_COLUMNS.join(",");
+      let rows: string[];
+      if (existing.length > 0) {
+        rows = existing.map((p) => [
+          p.unitType, p.tier, p.tonnage, p.packageLevel,
+          Math.round(p.monthlyPayment / 100), Math.round(p.totalInvestment / 100),
+          p.outdoorBrand, p.outdoorModel, p.outdoorName, p.coilModel, p.coilName,
+          p.indoorHeatModel, p.indoorHeatName, p.thermostatModel, p.thermostatName, p.accessoryModels,
+        ].map(csvCell).join(","));
+      } else {
+        // Two example rows so a first-time user sees the exact expected format.
+        rows = [
+          ["SHP", "Essential", "2", "Best", "173", "11576", "Trane", "5TWR5024A1000", "XR15 Single-Stage Heat Pump", "", "", "5TEM4B02AC21S", "TEM4 Air Handler", "TCONT724AS42DA", "Connected Control", ""],
+          ["SGA", "Essential", "3", "Better", "162", "11282", "Trane", "4TTR4036L1000", "XR14 AC", "4TXCB003DS3HC", "Evaporator Coil", "S9V2B080U3PSA", "80% Gas Furnace", "TCONT724AS42DA", "Connected Control", "Media filter"],
+        ].map((r) => r.map(csvCell).join(","));
+      }
+      const csv = [header, ...rows].join("\r\n");
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", "attachment; filename=package-pricing-template.csv");
+      res.send(csv);
+    } catch (error: any) {
+      console.error("Error building CSV template:", error);
+      res.status(500).json({ message: "Failed to build template", error: error.message });
+    }
+  });
+
+  // POST /api/pricebook/packages/import-csv - Upsert packages from an uploaded CSV.
+  // Body: { csv: string }. Matches existing rows by (unitType, tier, tonnage,
+  // packageLevel); updates pricing/equipment (preserving images) or inserts new.
+  app.post("/api/pricebook/packages/import-csv", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const csvText: string = (req.body?.csv || "").toString();
+      if (!csvText.trim()) return res.status(400).json({ message: "No CSV content provided" });
+
+      const { parse } = await import("csv-parse/sync");
+      let records: Record<string, string>[];
+      try {
+        records = parse(csvText, { columns: true, skip_empty_lines: true, trim: true, bom: true });
+      } catch (e: any) {
+        return res.status(400).json({ message: `Could not parse CSV: ${e.message}` });
+      }
+      if (records.length === 0) return res.status(400).json({ message: "CSV has no data rows" });
+
+      // Accept dollars like "11,576", "$11576", "11576.00" -> cents.
+      const toCents = (v: any): number | null => {
+        if (v == null) return null;
+        const n = parseFloat(String(v).replace(/[$,\s]/g, ""));
+        return Number.isFinite(n) ? Math.round(n * 100) : null;
+      };
+      const clean = (v: any) => {
+        const s = String(v ?? "").trim();
+        // Tolerate Google-Sheets =IMAGE("url") wrappers pasted into a cell.
+        const m = s.match(/^=IMAGE\("(.*)"\)$/i);
+        return (m ? m[1] : s) || null;
+      };
+
+      // Preload existing active packages keyed by the natural key.
+      const existing = await db.select().from(pricebookPackages);
+      const keyOf = (u: string, t: string, ton: string, lvl: string) =>
+        `${u}|${t}|${ton}|${lvl}`.toLowerCase();
+      const byKey = new Map(existing.map((p) => [keyOf(p.unitType, p.tier, p.tonnage, p.packageLevel), p]));
+
+      let created = 0, updated = 0;
+      const errors: string[] = [];
+
+      for (let i = 0; i < records.length; i++) {
+        const r = records[i];
+        const rowNum = i + 2; // header is row 1
+        const unitType = (r.unitType || "").trim();
+        const tier = (r.tier || "").trim();
+        const tonnage = (r.tonnage || "").toString().trim();
+        const packageLevel = (r.packageLevel || "").trim();
+        const monthly = toCents(r.monthlyPayment);
+        const total = toCents(r.totalInvestment);
+
+        if (!unitType || !tier || !tonnage || !packageLevel) {
+          errors.push(`Row ${rowNum}: missing required unitType/tier/tonnage/packageLevel`);
+          continue;
+        }
+        if (total == null) {
+          errors.push(`Row ${rowNum}: invalid totalInvestment "${r.totalInvestment}"`);
+          continue;
+        }
+
+        const equip = {
+          outdoorBrand: clean(r.outdoorBrand),
+          outdoorModel: clean(r.outdoorModel),
+          outdoorName: clean(r.outdoorName),
+          coilModel: clean(r.coilModel),
+          coilName: clean(r.coilName),
+          indoorHeatModel: clean(r.indoorHeatModel),
+          indoorHeatName: clean(r.indoorHeatName),
+          thermostatModel: clean(r.thermostatModel),
+          thermostatName: clean(r.thermostatName),
+          accessoryModels: clean(r.accessoryModels),
+        };
+
+        const match = byKey.get(keyOf(unitType, tier, tonnage, packageLevel));
+        try {
+          if (match) {
+            await db.update(pricebookPackages)
+              .set({
+                monthlyPayment: monthly ?? match.monthlyPayment,
+                totalInvestment: total,
+                // Uploading fresh prices clears any prior % adjustment baseline.
+                baseMonthlyPayment: monthly ?? match.monthlyPayment,
+                baseTotalInvestment: total,
+                adjustmentBasisPoints: 0,
+                ...equip,
+                isActive: true,
+                updatedAt: new Date(),
+              })
+              .where(eq(pricebookPackages.id, match.id));
+            updated++;
+          } else {
+            await db.insert(pricebookPackages).values({
+              unitType, tier, tonnage, packageLevel,
+              monthlyPayment: monthly ?? 0,
+              totalInvestment: total,
+              baseMonthlyPayment: monthly ?? 0,
+              baseTotalInvestment: total,
+              adjustmentBasisPoints: 0,
+              ...equip,
+              isActive: true,
+            } as any);
+            created++;
+          }
+        } catch (e: any) {
+          errors.push(`Row ${rowNum}: ${e.message}`);
+        }
+      }
+
+      res.json({ total: records.length, created, updated, errors });
+    } catch (error: any) {
+      console.error("Error importing packages CSV:", error);
+      res.status(500).json({ message: "Failed to import CSV", error: error.message });
     }
   });
 

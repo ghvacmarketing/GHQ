@@ -2687,7 +2687,7 @@ export default function CrmQuoteDetail() {
   if (authLoading || quoteLoading) {
     return (
       <div className="min-h-screen bg-slate-50 p-6">
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="w-full space-y-6">
           <Skeleton className="h-10 w-48" />
           <Skeleton className="h-64 w-full rounded-xl" />
           <Skeleton className="h-96 w-full rounded-xl" />
@@ -2719,7 +2719,7 @@ export default function CrmQuoteDetail() {
 
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="space-y-6 max-w-4xl mx-auto pb-8">
+      <div className="w-full space-y-6 pb-8">
         {/* Header - Two rows for cleaner layout */}
         <div className="space-y-4">
           {/* First row: Back button, Quote number, Status, Preview icon */}
