@@ -27,6 +27,16 @@ RUN PW_VERSION="$(node -p "require('playwright-core/package.json').version")" \
 
 # App source + production build (client -> dist/public, server -> dist/index.js).
 COPY . .
+
+# Client-side (VITE_) vars are inlined into the bundle at build time. Render
+# exposes a service's env vars as Docker build args, so declare them here and
+# promote to ENV so `vite build` can read them. (Empty on the very first build
+# before env vars are set; the env-triggered rebuild picks them up.)
+ARG VITE_GEOAPIFY_API_KEY
+ARG VITE_GOOGLE_PLACES_API_KEY
+ENV VITE_GEOAPIFY_API_KEY=$VITE_GEOAPIFY_API_KEY
+ENV VITE_GOOGLE_PLACES_API_KEY=$VITE_GOOGLE_PLACES_API_KEY
+
 RUN npm run build
 
 # Render injects PORT; the server reads process.env.PORT (defaults to 5000).
