@@ -19,9 +19,10 @@ whenever the app is NOT running on Replit, so no separate object store is needed
 
 1. Push this repo to GitHub.
 2. Render → **New → Blueprint** → pick this repo. It reads `render.yaml`:
-   - build: `npm ci && npm run build`
-   - start: `npm start`
+   - runtime: **Docker** (builds from `./Dockerfile` — includes Chromium + poppler
+     so salesbook PDFs and page rendering work)
    - health check: `/health`
+   - plan: **standard** (Chromium PDF rendering needs more than the 512MB starter)
 3. In the service's **Environment** tab, fill in every `sync:false` variable
    (values come from your local `.env`). At minimum you cannot boot without:
    - `DATABASE_URL`
@@ -46,10 +47,9 @@ whenever the app is NOT running on Replit, so no separate object store is needed
 
 ## Known follow-ups
 
-- **Salesbook PDF export** needs Chromium, which Render's native Node runtime
-  doesn't include. Switch this service to a Docker deploy (Node + Chromium) or
-  add `playwright` + `npx playwright install chromium` in a Docker build to
-  enable it. All other features work without it.
+- **Salesbook PDF export** works via the Docker image (Chromium + poppler). If
+  PDFs fail with an out-of-memory error, bump the Render plan (Chromium is
+  memory-hungry). First deploy is slow — the image installs Chromium.
 - **Cloudflare R2 (optional)**: files currently live in Neon. If the DB grows
   large from uploads, move the storage layer to R2 (S3-compatible). Not needed
   to launch.

@@ -5,11 +5,10 @@
 services:
   - type: web
     name: ghvac-tools
-    runtime: node
-    plan: starter # bump to standard/pro as traffic grows
+    runtime: docker # Docker build bundles Chromium + poppler for salesbook PDFs
+    dockerfilePath: ./Dockerfile
+    plan: standard # Chromium PDF rendering needs headroom; starter (512MB) may OOM
     region: oregon # pick the region closest to your Neon project
-    buildCommand: npm ci && npm run build
-    startCommand: npm start
     healthCheckPath: /health
     autoDeploy: true
     envVars:
@@ -91,6 +90,6 @@ services:
       # Do NOT set REPL_ID here — its absence is what makes the app use the
       # Neon-backed file store instead of the Replit object-storage sidecar.
       #
-      # Salesbook PDF export needs Chromium, which the native runtime lacks.
-      # That feature stays disabled until we switch this service to a Docker
-      # deploy (or add a Chromium buildpack). Everything else works.
+      # Salesbook PDF export works: the Dockerfile installs Chromium (Playwright)
+      # and poppler-utils (pdftoppm). No extra env needed — playwright-core
+      # resolves the browser from PLAYWRIGHT_BROWSERS_PATH set in the image.
