@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 import { CheckCircle2, FileText, AlertCircle, Loader2, CreditCard, ExternalLink } from "lucide-react";
 import type { CrmQuote, CrmQuoteLineItem } from "@shared/schema";
 import ghvacLogo from "@assets/ghvac-logo.png";
@@ -683,7 +684,7 @@ export default function PublicQuoteView() {
             {quoteData.description && (
               <div
                 className="contract-description border-t pt-4"
-                dangerouslySetInnerHTML={{ __html: quoteData.description }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(quoteData.description) }}
               />
             )}
 

@@ -249,31 +249,14 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
   });
 
   const handleRefresh = async () => {
-    try {
-      // Call the server endpoint to invalidate cache and fetch fresh data
-      const response = await adminApiRequest("POST", "/api/admin/refresh-sheets", {});
-      const result = await response.json();
-      
-      // Invalidate all related queries to force refetch with fresh data
-      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/initial-data"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/cache-metadata"] });
-      
-      // Refetch current page data
-      await refetch();
-      await refetchMetadata();
-      
-      toast({
-        title: "Data Refreshed",
-        description: "Fresh pricing data loaded from Google Sheets.",
-      });
-    } catch (error) {
-      toast({
-        title: "Refresh Failed",
-        description: "Failed to refresh data from Google Sheets.",
-        variant: "destructive",
-      });
-    }
+    // Google Sheets sync removed. Just refetch current data from the database.
+    queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/initial-data"] });
+    await refetch();
+    toast({
+      title: "Data Refreshed",
+      description: "Reloaded pricing settings from the database.",
+    });
   };
 
   // Bulk delete quotes mutation
@@ -559,6 +542,8 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
   }>({
     queryKey: ['/api/customers/sync/status'],
     queryFn: getAdminQueryFn({ on401: 'throw' }),
+    // Google Sheets customer sync removed; endpoint retired. Do not poll it.
+    enabled: false,
   });
 
   // Customer import mutation
@@ -608,49 +593,32 @@ function AdminDashboard({ toast, queryClient, setLocation }: { toast: any; query
     },
   });
 
-  // Customer sync mutation
+  // Customer sync mutations — Google Sheets sync has been removed. These now
+  // surface a clear message instead of calling the retired endpoints. Use the
+  // Customer CSV import/export above to move data in and out.
   const triggerSyncMutation = useMutation({
     mutationFn: async () => {
-      const response = await adminApiRequest("POST", "/api/customers/sync/trigger");
-      return response.json();
-    },
-    onSuccess: (data) => {
-      if (data.noChange) {
-        toast({
-          title: "No Changes",
-          description: "Customer data is already up to date.",
-        });
-      } else {
-        toast({
-          title: "Sync Complete",
-          description: `Created: ${data.result?.created || 0}, Updated: ${data.result?.updated || 0}`,
-        });
-      }
-      refetchSyncStatus();
-      refetchCustomerStats();
+      throw new Error("Google Sheets sync has been removed. Use CSV import/export instead.");
     },
     onError: (error) => {
       toast({
-        title: "Sync Failed",
-        description: error instanceof Error ? error.message : "Failed to sync customers",
+        title: "Sync Removed",
+        description: error instanceof Error ? error.message : "Google Sheets sync has been removed.",
         variant: "destructive",
       });
-      refetchSyncStatus();
     },
   });
 
-  // Reset sync hash mutation
   const resetSyncHashMutation = useMutation({
     mutationFn: async () => {
-      const response = await adminApiRequest("POST", "/api/customers/sync/reset");
-      return response.json();
+      throw new Error("Google Sheets sync has been removed. Use CSV import/export instead.");
     },
-    onSuccess: () => {
+    onError: (error) => {
       toast({
-        title: "Hash Reset",
-        description: "Next sync will process all data.",
+        title: "Sync Removed",
+        description: error instanceof Error ? error.message : "Google Sheets sync has been removed.",
+        variant: "destructive",
       });
-      refetchSyncStatus();
     },
   });
 

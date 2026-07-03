@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import compression from "compression";
@@ -56,7 +56,6 @@ import { riskStatus, recommendedActions } from "@shared/govee";
 import { nanoid } from "nanoid";
 import { googleSheetsService } from "./google-sheets";
 import { equipmentSheetsService } from "./equipment-sheets";
-import { packageSheetsService, startPricebookAutoSync, syncPricebookPackages } from "./services/package-sheets-sync";
 import { emailService } from "./services/email";
 import { trelloService } from "./services/trello";
 import { voiceService } from "./services/voice";
@@ -66,10 +65,9 @@ import { sendQuoteSms, sendInvoiceSms } from "./services/documentSmsService";
 import { twilioService } from "./sms";
 import { pool, db } from "./db";
 import { eq, inArray, desc, sql, and, or, ilike, asc, count, isNull, lt, gt, gte, lte, ne, isNotNull } from "drizzle-orm";
-import { randomUUID, createHmac } from "crypto";
+import { randomUUID, createHmac, randomBytes, timingSafeEqual } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
-import { syncCustomersFromSheet, getCustomerSyncStatus, resetSyncHash, startAutoSync } from "./services/customer-sync";
 import { uploadBufferToVectorStore, listVectorStoreFiles, deleteFileFromVectorStore, getOrCreateVectorStore, seedVectorStoreWithSalesBook, uploadCRMKnowledgeBase } from "./services/vector-store";
 import { refreshWeather, scheduleWeatherRefresh, getWeatherData } from "./weather-service";
 import { startBouncieBackgroundSync } from "./services/bouncieService";
@@ -91,6 +89,32 @@ import stripePaymentsRouter from "./stripe-payments";
 import { getMessagingAdapter } from "./services/messaging/adapters";
 import { textlineClient } from "./textlineClient";
 import { autoSyncCustomer, autoSyncInvoice, autoVoidInvoice, autoDeleteInvoice, autoSyncPayment } from "./services/quickbooksService";
+
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+
+// Resolve the session signing secret. In production we refuse to boot with a
+// known/default secret (predictable secrets let anyone forge session cookies).
+// In development we fall back to an ephemeral per-boot random secret so local
+// runs still work without leaking a hardcoded value into the codebase.
+function getSessionSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+  if (secret && secret.length >= 16) return secret;
+  if (IS_PRODUCTION) {
+    throw new Error(
+      "SESSION_SECRET must be set to a strong random value in production. Refusing to start with a default secret.",
+    );
+  }
+  console.warn("[security] SESSION_SECRET not set - using an ephemeral dev-only secret (sessions reset on restart).");
+  return randomBytes(32).toString("hex");
+}
+
+// Constant-time comparison for shared-secret passwords to avoid timing leaks.
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
 
 // Simple in-memory token store for admin authentication (works in Replit iframe where cookies fail)
 const adminTokens = new Map<string, { createdAt: number }>();
@@ -148,6 +172,93 @@ function requireAdminAuth(req: any, res: any, next: any) {
     return res.status(401).json({ message: "Unauthorized - Admin access required" });
   }
   next();
+}
+
+// ── Legacy API gate ──────────────────────────────────────────────────────────
+// The legacy sales-tool routes (/api/quotes, /api/leads, /api/customers, ...)
+// historically had NO server-side auth — the "global password gate" was purely
+// client-side (a localStorage flag), so anyone who could reach the server could
+// read/modify all data. This middleware enforces a real credential server-side.
+// ANY of the following grants access (per configuration):
+//   - the global gate password (server session set by /api/global/verify)
+//   - a phone magic-link session (session.authenticated)
+//   - an employee-portal session (passport)
+//   - a CRM session (cookie or Bearer token), validated against the DB
+//   - a valid admin token / ADMIN_API_KEY
+// Enforcement is opt-in: it activates only when GLOBAL_PASSWORD is set (or
+// ENFORCE_LEGACY_AUTH=true). Until then the gate is a pass-through, so an
+// unconfigured deployment is never locked out (it just logs a warning).
+const LEGACY_AUTH_ENFORCED =
+  !!process.env.GLOBAL_PASSWORD || process.env.ENFORCE_LEGACY_AUTH === "true";
+
+// API paths that must stay reachable without a legacy credential.
+const LEGACY_AUTH_PUBLIC_PATHS: RegExp[] = [
+  /^\/api\/health\b/,
+  /^\/api\/global\//,               // the gate itself + auth-required probe
+  /^\/api\/auth\//,                 // legacy phone login / magic link / status / logout
+  /^\/api\/admin\/login\b/,         // admin login (issues the admin token)
+  /^\/api\/crm\/auth\//,            // CRM login + Google OAuth
+  /^\/api\/employee-portal\/login\b/,
+  /^\/api\/employee-portal\/me\b/,
+  /^\/api\/portal\//,               // customer portal (its own token auth)
+  /^\/api\/public\//,               // token-based public access (quotes/invoices)
+  /^\/api\/webhooks\//,             // external webhooks (own signature verification)
+  /^\/api\/stripe\/webhook\b/,
+  /^\/api\/quickbooks\/callback\b/,
+  /^\/api\/bouncie\/callback\b/,
+];
+
+let loggedLegacyAuthDisabled = false;
+
+// Returns true if the request carries ANY accepted legacy credential.
+async function hasLegacyCredential(req: Request): Promise<boolean> {
+  const session = req.session as any;
+  // Global gate password (server-tracked) or phone magic-link session.
+  if (session?.legacyAuthed || session?.authenticated) return true;
+
+  // Employee-portal session (passport).
+  if (typeof (req as any).isAuthenticated === "function" && (req as any).isAuthenticated()) {
+    return true;
+  }
+
+  // Admin token / ADMIN_API_KEY (Bearer).
+  const authHeader = req.headers.authorization;
+  const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (bearer) {
+    if (validateAdminToken(bearer)) return true;
+    if (process.env.ADMIN_API_KEY && bearer === process.env.ADMIN_API_KEY) return true;
+  }
+
+  // CRM session (cookie or Bearer), validated against the DB.
+  try {
+    const crmUser = await getCurrentCrmUser(req);
+    if (crmUser) return true;
+  } catch (err) {
+    console.error("[security] CRM session check failed:", err);
+  }
+
+  return false;
+}
+
+async function requireLegacyApiAuth(req: Request, res: Response, next: NextFunction) {
+  // Only gate API traffic; static/asset/SPA routes pass through untouched.
+  if (!req.path.startsWith("/api/")) return next();
+
+  if (!LEGACY_AUTH_ENFORCED) {
+    if (!loggedLegacyAuthDisabled) {
+      console.warn(
+        "[security] Legacy API auth is NOT enforced. Set GLOBAL_PASSWORD (or ENFORCE_LEGACY_AUTH=true) to require a login on the legacy /api routes.",
+      );
+      loggedLegacyAuthDisabled = true;
+    }
+    return next();
+  }
+
+  if (LEGACY_AUTH_PUBLIC_PATHS.some((re) => re.test(req.path))) return next();
+
+  if (await hasLegacyCredential(req)) return next();
+
+  return res.status(401).json({ message: "Authentication required" });
 }
 
 // Discount line item validation helper
@@ -591,7 +702,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       tableName: 'session',
       createTableIfMissing: true,
     }),
-    secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production',
+    secret: getSessionSecret(),
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -621,6 +732,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register Stripe payment routes
   app.use(stripePaymentsRouter);
+
+  // Enforce a server-side credential on the legacy /api routes defined below.
+  // (Object-storage, e-sign, Stripe routers above keep their own auth.)
+  // No-op unless GLOBAL_PASSWORD / ENFORCE_LEGACY_AUTH is configured.
+  app.use(requireLegacyApiAuth);
 
   // Ensure CRM users exist with correct roles
   ensureTechniciansExist().catch(console.error);
@@ -715,19 +831,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).send("Server configuration error");
       }
 
-      // Verify HMAC-SHA1 signature
+      // Verify HMAC-SHA1 signature. The signature header is REQUIRED - a missing
+      // header previously skipped verification entirely (trivial bypass).
       const signature = req.headers['x-trello-webhook'] as string;
-      if (signature) {
-        const callbackURL = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
-        const rawBody = req.body.toString('utf8');
-        const expectedSignature = createHmac('sha1', trelloSecret)
-          .update(rawBody + callbackURL)
-          .digest('base64');
+      if (!signature) {
+        console.warn("Trello webhook missing signature header");
+        return res.status(401).send("Missing signature");
+      }
+      const callbackURL = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+      const rawBody = req.body.toString('utf8');
+      const expectedSignature = createHmac('sha1', trelloSecret)
+        .update(rawBody + callbackURL)
+        .digest('base64');
 
-        if (signature !== expectedSignature) {
-          console.warn("Trello webhook signature mismatch");
-          return res.status(401).send("Invalid signature");
-        }
+      if (!safeEqual(signature, expectedSignature)) {
+        console.warn("Trello webhook signature mismatch");
+        return res.status(401).send("Invalid signature");
       }
 
       // Parse the webhook payload
@@ -1885,21 +2004,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Manually refresh Google Sheets cache (force fresh fetch)
-  app.post("/api/admin/refresh-sheets", async (req, res) => {
-    try {
-      console.log('Manual refresh requested for Google Sheets cache');
-      // refreshData forces a fresh fetch and handles cache restoration on failure
-      const freshData = await googleSheetsService.refreshData();
-      const metadata = googleSheetsService.getCacheMetadata();
-      res.json({ 
-        message: "Google Sheets data refreshed successfully",
-        timestamp: metadata.timestamp,
-        data: freshData
-      });
-    } catch (error) {
-      console.error('Error refreshing Google Sheets:', error);
-      res.status(500).json({ message: "Error refreshing Google Sheets data" });
-    }
+  app.post("/api/admin/refresh-sheets", async (_req, res) => {
+    // Google Sheets sync has been removed; data flows via import/export only.
+    res.status(410).json({ message: "Google Sheets sync has been removed. Use CSV import/export instead." });
   });
 
   // Get cache metadata (for UI display)
@@ -2613,9 +2720,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ success: true, skipAuth: true });
       }
       
-      // Require password match
-      if (password === globalPassword) {
-        res.json({ success: true });
+      // Require password match (constant-time)
+      if (typeof password === "string" && safeEqual(password, globalPassword)) {
+        // Establish a server-side session flag so the legacy API gate recognizes
+        // this browser (the client localStorage flag alone is not trusted server-side).
+        (req.session as any).legacyAuthed = true;
+        req.session.save((err) => {
+          if (err) {
+            console.error("Failed to save global gate session:", err);
+            return res.status(500).json({ success: false, message: "Verification failed" });
+          }
+          res.json({ success: true });
+        });
       } else {
         res.status(401).json({ success: false, message: "Invalid password" });
       }
@@ -2631,13 +2747,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ required: !!globalPassword && !skipAuth });
   });
 
+  // Server-truth check for the client gate: is this browser currently allowed
+  // on the legacy API? Lets the client trust the server session instead of a
+  // stale localStorage flag (session is 8h; localStorage hint is 90d).
+  app.get("/api/global/session", async (req, res) => {
+    if (!LEGACY_AUTH_ENFORCED) return res.json({ authed: true, enforced: false });
+    const authed = await hasLegacyCredential(req);
+    res.json({ authed, enforced: true });
+  });
+
   // Admin authentication endpoint
   app.post("/api/admin/login", async (req, res) => {
     try {
       const { password } = req.body;
-      const adminPassword = process.env.ADMIN_PASSWORD || "ghvacadmin";
-      
-      if (password === adminPassword) {
+      const adminPassword = process.env.ADMIN_PASSWORD;
+
+      // No hardcoded fallback: if ADMIN_PASSWORD isn't configured, admin login
+      // is disabled rather than accepting a publicly-known default.
+      if (!adminPassword) {
+        console.error("[security] ADMIN_PASSWORD is not set - admin login is disabled.");
+        return res.status(503).json({ message: "Admin login is not configured" });
+      }
+
+      if (typeof password === "string" && safeEqual(password, adminPassword)) {
         // Generate admin token for this session
         const adminToken = generateAdminToken();
         
@@ -3471,88 +3603,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // LEAD MANAGEMENT API ROUTES
   // ========================================
 
-  // GET /api/leads/sheet-customers/search - Search customers directly from Google Sheet for Sales Prospects
+  // GET /api/leads/sheet-customers/search - Search customers for Sales Prospects.
+  // Repointed from Google Sheets to the database (Sheets ties removed). Customer
+  // data now flows in via import; this searches the imported DB records.
   app.get("/api/leads/sheet-customers/search", async (req, res) => {
     try {
       const term = req.query.term as string;
       const searchAll = req.query.searchAll === 'true';
-      
+
       if (!term || term.length < 2) {
         return res.json([]);
       }
 
-      const apiKey = process.env.GOOGLE_SHEETS_API_KEY;
-      const sheetId = process.env.FIELDEDGE_CUSTOMER_SHEET_ID || '1POeQRuDUTia0BUYsVmEsBOqW6BDBvfL5qyKv-GQICU0';
-      
-      if (!apiKey) {
-        return res.status(500).json({ message: "Google Sheets API key not configured" });
-      }
-
-      // Fetch directly from Google Sheet
-      const range = encodeURIComponent('Sheet1');
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?key=${apiKey}`;
-      
-      const response = await fetch(url);
-      if (!response.ok) {
-        console.error('Google Sheets API error:', response.status, response.statusText);
-        return res.status(500).json({ message: "Failed to fetch from Google Sheets" });
-      }
-
-      const data = await response.json();
-      
-      if (!data.values || data.values.length === 0) {
-        return res.json([]);
-      }
-
-      const headers = data.values[0] as string[];
-      const rows = data.values.slice(1) as string[][];
-      
-      // Map column indices
-      const colIndex = {
-        displayName: headers.indexOf('Display Name'),
-        customerType: headers.indexOf('Customer Type'),
-        customerStatus: headers.indexOf('Customer Status'),
-        fullAddress: headers.indexOf('Full Address'),
-        phone: headers.indexOf('Phone'),
-        email: headers.indexOf('Email'),
-        leadSource: headers.indexOf('Lead Source'),
-      };
-
-      const searchLower = term.toLowerCase();
-      
-      // Filter and transform matching rows
-      const results = rows
-        .map((row, idx) => ({
-          id: `sheet-${idx}`,
-          displayName: row[colIndex.displayName] || '',
-          customerType: row[colIndex.customerType] || 'Residential',
-          customerStatus: row[colIndex.customerStatus] || 'Customer',
-          fullAddress: row[colIndex.fullAddress] || '',
-          phone: row[colIndex.phone] || '',
-          email: row[colIndex.email] || '',
-          leadSource: row[colIndex.leadSource] || '',
-        }))
-        .filter(customer => {
-          if (!customer.displayName) return false;
-          
-          if (searchAll) {
-            // Search across all fields
-            return (
-              customer.displayName.toLowerCase().includes(searchLower) ||
-              customer.phone.toLowerCase().includes(searchLower) ||
-              customer.email.toLowerCase().includes(searchLower) ||
-              customer.fullAddress.toLowerCase().includes(searchLower)
-            );
-          } else {
-            // Search only by name
-            return customer.displayName.toLowerCase().includes(searchLower);
-          }
-        })
-        .slice(0, 20); // Limit to 20 results
+      const matches = await storage.searchCustomers(term, searchAll);
+      const results = matches.slice(0, 20).map((c) => ({
+        id: c.id,
+        displayName: c.displayName || '',
+        customerType: c.customerType || 'Residential',
+        customerStatus: c.customerStatus || 'Customer',
+        fullAddress: c.fullAddress || '',
+        phone: c.phone || '',
+        email: c.email || '',
+        leadSource: c.leadSource || '',
+      }));
 
       res.json(results);
     } catch (error) {
-      console.error('Error searching sheet customers:', error);
+      console.error('Error searching customers:', error);
       res.status(500).json({ message: "Error searching customers" });
     }
   });
@@ -4742,43 +4819,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get customer sync status (must be before /:id to avoid route conflict)
-  app.get("/api/customers/sync/status", requireAdminAuth, async (req, res) => {
-    try {
-      const status = getCustomerSyncStatus();
-      res.json({ status });
-    } catch (error) {
-      console.error('Error getting sync status:', error);
-      res.status(500).json({ message: "Error getting sync status" });
-    }
-  });
-
-  // Manually trigger customer sync (must be before /:id to avoid route conflict)
-  app.post("/api/customers/sync/trigger", requireAdminAuth, async (req, res) => {
-    try {
-      const result = await syncCustomersFromSheet();
-      
-      if (result === 'no_change') {
-        return res.json({ message: "No changes detected", noChange: true });
-      }
-      
-      res.json({ message: "Sync completed", result });
-    } catch (error) {
-      console.error('Error triggering sync:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      res.status(500).json({ message: "Sync failed", error: errorMessage });
-    }
-  });
-
-  // Reset sync hash to force full re-sync (must be before /:id to avoid route conflict)
-  app.post("/api/customers/sync/reset", requireAdminAuth, async (req, res) => {
-    try {
-      resetSyncHash();
-      res.json({ message: "Sync hash reset. Next sync will process all data." });
-    } catch (error) {
-      console.error('Error resetting sync hash:', error);
-      res.status(500).json({ message: "Error resetting sync hash" });
-    }
-  });
+  // Google Sheets customer sync has been removed. Use CSV import/export instead.
+  const sheetSyncRemoved = (_req: Request, res: Response) =>
+    res.status(410).json({ message: "Google Sheets sync has been removed. Use CSV import/export instead." });
+  app.get("/api/customers/sync/status", requireAdminAuth, sheetSyncRemoved);
+  app.post("/api/customers/sync/trigger", requireAdminAuth, sheetSyncRemoved);
+  app.post("/api/customers/sync/reset", requireAdminAuth, sheetSyncRemoved);
 
   // Get customer import history (must be before /:id to avoid route conflict)
   app.get("/api/customers/import/history", requireAdminAuth, async (req, res) => {
@@ -7623,17 +7669,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tech: ["owner", "admin", "sales", "tech"],
       };
       
+      const VALID_ROLES = ["owner", "admin", "sales", "tech"];
       let allowedRoles: string[];
-      
-      // exactRole takes precedence - filter by exact role only
+
+      // exactRole takes precedence - filter by exact role only.
+      // Validate against the known role set so untrusted query input never
+      // reaches the SQL layer (previously interpolated via sql.raw).
       if (exactRole) {
+        if (!VALID_ROLES.includes(exactRole)) {
+          return res.status(400).json({ message: "Invalid role filter" });
+        }
         allowedRoles = [exactRole];
       } else if (minRole && roleHierarchy[minRole]) {
         allowedRoles = roleHierarchy[minRole];
       } else {
-        allowedRoles = ["owner", "admin", "sales", "tech"];
+        allowedRoles = VALID_ROLES;
       }
-      
+
       const users = await db.select({
         id: crmUsers.id,
         displayName: crmUsers.name,
@@ -7641,7 +7693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: crmUsers.role,
       }).from(crmUsers)
         .where(and(
-          sql`${crmUsers.role} IN (${sql.raw(allowedRoles.map(r => `'${r}'`).join(', '))})`,
+          inArray(crmUsers.role, allowedRoles as any),
           eq(crmUsers.isActive, true)
         ))
         .orderBy(crmUsers.name);
@@ -22340,9 +22392,25 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
-  // POST /api/webhooks/textline - Textline webhook for inbound messages (no auth)
+  // POST /api/webhooks/textline - Textline webhook for inbound messages.
+  // Textline has no HMAC signing scheme, so authenticity is enforced with a
+  // shared secret embedded in the webhook URL/header. Set TEXTLINE_WEBHOOK_SECRET
+  // and configure Textline to send it as ?secret=... or an x-webhook-secret header.
   app.post("/api/webhooks/textline", async (req, res) => {
     try {
+      const webhookSecret = process.env.TEXTLINE_WEBHOOK_SECRET;
+      if (webhookSecret) {
+        const provided =
+          (req.query.secret as string) ||
+          (req.headers["x-webhook-secret"] as string) ||
+          "";
+        if (!provided || !safeEqual(provided, webhookSecret)) {
+          console.warn("[Textline Webhook] Rejected request with invalid/missing secret");
+          return res.status(401).json({ message: "Unauthorized" });
+        }
+      } else {
+        console.warn("[Textline Webhook] TEXTLINE_WEBHOOK_SECRET not set - webhook is unauthenticated.");
+      }
       const payload = req.body;
       const webhookType = payload.webhook;
       const eventType = payload.event_type;
@@ -28152,60 +28220,12 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
-  // GET /api/pricebook/sheets/status - Check if Google Sheets sync is configured
-  app.get("/api/pricebook/sheets/status", requireCrmAuth, async (req, res) => {
-    try {
-      const configured = packageSheetsService.isConfigured();
-      res.json({
-        configured,
-        spreadsheetId: configured ? packageSheetsService.getSpreadsheetId() : undefined,
-      });
-    } catch (error: any) {
-      console.error("Error checking sheets status:", error);
-      res.status(500).json({ message: "Failed to check sheets status", error: error.message });
-    }
+  // Google Sheets pricebook sync has been removed. Use CSV import/export instead.
+  app.get("/api/pricebook/sheets/status", requireCrmAuth, async (_req, res) => {
+    res.json({ configured: false, removed: true });
   });
-
-  // POST /api/pricebook/sheets/sync - Sync packages from Google Sheets
-  app.post("/api/pricebook/sheets/sync", requireCrmSalesOrAbove, async (req, res) => {
-    try {
-      if (!packageSheetsService.isConfigured()) {
-        return res.status(400).json({
-          message: "Google Sheets sync not configured. Set PRICEBOOK_SHEETS_ID environment variable.",
-        });
-      }
-
-      const crmUser = getCurrentCrmUser(req);
-      console.log(`Pricebook sheets sync initiated by ${crmUser?.email || 'unknown'}`);
-
-      // Use the shared sync function (delta-only, preserves CRM data not in sheet)
-      const result = await syncPricebookPackages();
-
-      // Log the sync action
-      if (crmUser) {
-        await logCrmAudit(
-          crmUser.id,
-          "pricebook_sheets_sync",
-          "pricebook",
-          undefined,
-          { hvacPackagesCount: result.total }
-        );
-      }
-
-      res.json({
-        message: result.errors.length > 0 
-          ? `Pricebook sync completed with ${result.errors.length} warnings` 
-          : "Pricebook sync completed - images preserved",
-        hvacPackages: result.total,
-        updated: result.updated,
-        inserted: result.inserted,
-        errors: result.errors,
-        imagesPreserved: true,
-      });
-    } catch (error: any) {
-      console.error("Error during pricebook sheets sync:", error);
-      res.status(500).json({ message: "Failed to sync from sheets", error: error.message });
-    }
+  app.post("/api/pricebook/sheets/sync", requireCrmSalesOrAbove, async (_req, res) => {
+    res.status(410).json({ message: "Google Sheets pricebook sync has been removed. Use CSV import/export instead." });
   });
 
 
@@ -29336,9 +29356,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   const httpServer = createServer(app);
   // Defer expensive startup operations to run after server is ready (allows health checks to pass)
   setTimeout(() => {
-    // Customer auto-sync from Google Sheets (every 1 minute with delta-only updates)
-    startAutoSync(1);
-    console.log('Customer auto-sync started (every 1 minute)');
+    // Google Sheets customer auto-sync removed: data now flows via import/export only.
 
     // Start daily weather refresh
     scheduleWeatherRefresh();

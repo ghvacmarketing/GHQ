@@ -1,3 +1,5 @@
+import DOMPurify from "dompurify";
+
 /**
  * HTML-escape special characters to prevent corruption
  */
@@ -175,6 +177,11 @@ export function renderPreviewHtml(content: string): string {
   
   // Ensure links open in new tab and have proper styling
   html = html.replace(/<a\s+/gi, '<a target="_blank" rel="noopener noreferrer" class="text-primary hover:underline" ');
-  
-  return html.trim();
+
+  // Final defense: regex tag-stripping above is not a real sanitizer (it leaves
+  // event-handler attributes on allowed tags), so run the result through DOMPurify.
+  return DOMPurify.sanitize(html.trim(), {
+    ALLOWED_TAGS: ["p", "span", "strong", "em", "b", "i", "u", "a", "br"],
+    ALLOWED_ATTR: ["href", "target", "rel", "class"],
+  });
 }

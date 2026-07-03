@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 import { Document, Page, pdfjs } from "react-pdf";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import mammoth from "mammoth";
@@ -195,7 +196,7 @@ export default function FullScreenFileViewer({
         >
           <div 
             className="prose prose-sm dark:prose-invert max-w-none"
-            dangerouslySetInnerHTML={{ __html: docxHtml }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(docxHtml) }}
             data-testid="docx-content"
           />
         </div>

@@ -70,6 +70,27 @@ export default function GlobalPasswordGate({ children }: { children: React.React
       setAuthRequired(true);
     }
 
+    // Source of truth: ask the server whether this browser currently holds a
+    // valid credential (global gate session, employee-portal, CRM, or admin).
+    // This avoids trusting a stale localStorage flag once server enforcement is
+    // on (server session is 8h; the localStorage hint is 90d).
+    try {
+      const sessionResponse = await fetch('/api/global/session', { credentials: 'include' });
+      if (sessionResponse.ok) {
+        const data = await sessionResponse.json();
+        if (data.authed) {
+          setIsAuthenticated(true);
+          return;
+        }
+        // Server says not authed — clear any stale local hint and show the gate.
+        localStorage.removeItem(STORAGE_KEY);
+        setIsAuthenticated(false);
+        return;
+      }
+    } catch {
+      // Endpoint unreachable — fall back to the checks below.
+    }
+
     // Check if user is logged into Employee Portal (shares session)
     try {
       const portalResponse = await fetch('/api/employee-portal/me');
@@ -98,7 +119,7 @@ export default function GlobalPasswordGate({ children }: { children: React.React
         localStorage.removeItem(STORAGE_KEY);
       }
     }
-    
+
     setIsAuthenticated(false);
   };
 

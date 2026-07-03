@@ -3,6 +3,7 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -541,7 +542,7 @@ export default function CrmItems() {
                         {activeCategory === "discount" ? (
                           <>
                             <TableCell className="text-slate-600 max-w-xs">
-                              <div className="prose prose-sm max-w-none line-clamp-2" dangerouslySetInnerHTML={{ __html: item.description || "—" }} />
+                              <div className="prose prose-sm max-w-none line-clamp-2" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description || "—") }} />
                             </TableCell>
                             <TableCell>
                               <Badge

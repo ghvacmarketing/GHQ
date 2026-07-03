@@ -3,6 +3,7 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, useRoute } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -3145,7 +3146,7 @@ export default function CrmQuoteDetail() {
                         </>
                       ) : (
                         <>
-                          <TableCell><div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: item.description || "—" }} /></TableCell>
+                          <TableCell><div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description || "—") }} /></TableCell>
                           {quote.quoteMode === "options" && (
                             <TableCell>
                               {item.optionTag ? (
@@ -4144,7 +4145,7 @@ export default function CrmQuoteDetail() {
                           {isOutgoing && log.htmlContent ? (
                             <div 
                               className="prose prose-sm max-w-none text-slate-700"
-                              dangerouslySetInnerHTML={{ __html: log.htmlContent }}
+                              dangerouslySetInnerHTML={{ __html: sanitizeHtml(log.htmlContent) }}
                             />
                           ) : log.textContent ? (
                             <pre className="text-sm text-slate-700 whitespace-pre-wrap font-sans">
@@ -4850,7 +4851,7 @@ export default function CrmQuoteDetail() {
                           {quote.description && (
                             <div
                               className="contract-description"
-                              dangerouslySetInnerHTML={{ __html: quote.description }}
+                              dangerouslySetInnerHTML={{ __html: sanitizeHtml(quote.description) }}
                             />
                           )}
                         </>
@@ -4993,7 +4994,7 @@ export default function CrmQuoteDetail() {
                             {quote.lineItems && quote.lineItems.length > 0 ? (
                               quote.lineItems.map((item) => (
                                 <TableRow key={item.id}>
-                                  <TableCell><div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: item.description || "—" }} /></TableCell>
+                                  <TableCell><div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description || "—") }} /></TableCell>
                                   <TableCell className="text-right">{item.quantity}</TableCell>
                                   <TableCell className="text-right">{formatPresentationCurrency(item.unitPrice)}</TableCell>
                                   <TableCell className="text-right">{formatPresentationCurrency(item.lineTotal)}</TableCell>

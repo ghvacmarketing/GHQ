@@ -28,16 +28,21 @@ async function fetchDataHash(): Promise<string | null> {
 
 async function render(): Promise<Buffer> {
   const { chromium } = await import("playwright-core");
-  const executablePath = process.env.REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE;
-  if (!executablePath || !fs.existsSync(executablePath)) {
-    throw new Error(
-      "Chromium is not available for salesbook PDF generation (REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE is missing or invalid).",
-    );
-  }
+  // Resolve Chromium across hosts:
+  //  - Replit sets REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE
+  //  - Other hosts can set PLAYWRIGHT_CHROMIUM_EXECUTABLE (or CHROMIUM_PATH)
+  //  - Otherwise fall back to the browser installed by `playwright install
+  //    chromium` (let playwright-core auto-resolve its default location).
+  const explicitPath =
+    process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ||
+    process.env.CHROMIUM_PATH ||
+    process.env.REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE;
+  const executablePath =
+    explicitPath && fs.existsSync(explicitPath) ? explicitPath : undefined;
   let browser: Browser | null = null;
   try {
     browser = await chromium.launch({
-      executablePath: executablePath || undefined,
+      executablePath,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",

@@ -6,7 +6,6 @@ import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
 import { startBackgroundSyncScheduler } from "./services/quickbooksService";
-import { fieldEdgeCustomerService } from "./services/fieldedge-customers";
 import { scheduleBookingReminders } from "./services/bookingEmail";
 import { startGoveeBackgroundSync } from "./services/goveeService";
 
@@ -515,9 +514,6 @@ async function runWaterHeaterSeeds() {
 
     // Start booking email reminder scheduler (checks every 30 min for 2-hour reminders)
     scheduleBookingReminders();
-    
-    // Start FieldEdge customer cache with 5-minute refresh
-    fieldEdgeCustomerService.startAutoRefresh(5);
 
     // Start Govee H5103 sensor polling (humidity/temperature) every 5 minutes
     startGoveeBackgroundSync(5);

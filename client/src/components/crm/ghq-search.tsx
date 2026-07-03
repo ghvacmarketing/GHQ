@@ -322,7 +322,7 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
   const renderResults = () => {
     if (searchQuery.length < 2) {
       return (
-        <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
           <Search className="h-12 w-12 mb-3 opacity-50" />
           <p className="text-sm">Type at least 2 characters to search</p>
           <p className="text-xs mt-1 opacity-70">Press Cmd+K to open search anytime</p>
@@ -332,7 +332,7 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
 
     if (isLoading) {
       return (
-        <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
           <Loader2 className="h-8 w-8 animate-spin mb-3" />
           <p className="text-sm">Searching...</p>
         </div>
@@ -341,7 +341,7 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
 
     if (!data || data.totalCount === 0) {
       return (
-        <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
           <SearchX className="h-12 w-12 mb-3 opacity-50" />
           <p className="text-sm">No results found for "{searchQuery}"</p>
           <p className="text-xs mt-1 opacity-70">Try different keywords</p>
@@ -360,9 +360,9 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
     return (
       <div ref={resultsRef} className="space-y-4">
         {data.aiEnhanced && data.aiIntent && (
-          <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-900/30 to-transparent rounded-lg border border-purple-700/30">
-            <Sparkles className="h-4 w-4 text-purple-400" />
-            <span className="text-xs text-purple-300">
+          <div className="flex items-center gap-2 px-3 py-2 bg-primary/5 rounded-lg border border-primary/20">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <span className="text-xs text-primary">
               AI-enhanced: {data.aiIntent.intent}
             </span>
           </div>
@@ -378,7 +378,7 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
           return (
             <div key={categoryKey}>
               <div className="flex items-center justify-between px-3 py-2">
-                <div className="flex items-center gap-2 text-slate-400">
+                <div className="flex items-center gap-2 text-muted-foreground">
                   <Icon className="h-4 w-4" />
                   <span className="text-xs font-semibold uppercase tracking-wider">
                     {config.label}
@@ -388,7 +388,7 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
                 {categoryData.hasMore && (
                   <button
                     onClick={() => handleViewAll(config.listUrl)}
-                    className="text-xs text-[#711419] hover:text-[#8a1a20] font-medium"
+                    className="text-xs text-primary hover:text-primary/80 font-medium"
                     data-testid={`view-all-${categoryKey}`}
                   >
                     View all {categoryData.total}
@@ -406,8 +406,8 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
                       key={`${categoryKey}-${item.id}`}
                       className={`flex items-center gap-3 px-3 py-2 mx-1 rounded-lg cursor-pointer transition-colors ${
                         isSelected
-                          ? "bg-[#711419] text-white"
-                          : "text-slate-300 hover:bg-slate-800"
+                          ? "bg-primary text-primary-foreground"
+                          : "text-foreground hover:bg-accent"
                       }`}
                       onClick={() => handleResultClick(categoryKey, item)}
                       data-testid={`search-result-${categoryKey}-${item.id}`}
@@ -417,7 +417,7 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
                         <p className="text-sm font-medium truncate">
                           {config.getPrimaryText(item)}
                         </p>
-                        <p className={`text-xs truncate ${isSelected ? "text-white/70" : "text-slate-500"}`}>
+                        <p className={`text-xs truncate ${isSelected ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
                           {config.getSecondaryText(item)}
                         </p>
                       </div>
@@ -435,8 +435,10 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
   const renderHelpResults = () => {
     if (conversationMessages.length === 0 && !helpMutation.isPending) {
       return (
-        <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-          <HelpCircle className="h-12 w-12 mb-3 opacity-50" />
+        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+          <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <Sparkles className="h-6 w-6" />
+          </span>
           <p className="text-sm">Ask a question about the CRM</p>
           <p className="text-xs mt-1 opacity-70">e.g., "What does auto pay mean for invoices?"</p>
         </div>
@@ -449,7 +451,7 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
           if (msg.role === "user") {
             return (
               <div key={i} className="flex justify-end">
-                <div className="bg-slate-700 text-slate-200 rounded-2xl rounded-tr-sm px-4 py-2 max-w-[85%] text-sm">
+                <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-4 py-2 max-w-[85%] text-sm">
                   {msg.content}
                 </div>
               </div>
@@ -457,16 +459,16 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
           }
           return (
             <div key={i} className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-primary to-[#e8704f] flex items-center justify-center">
                 <Sparkles className="h-4 w-4 text-white" />
               </div>
               <div className="flex-1 space-y-2">
-                <div className="bg-slate-800 rounded-2xl rounded-tl-sm p-4 text-slate-200 text-sm leading-relaxed whitespace-pre-wrap">
+                <div className="bg-muted rounded-2xl rounded-tl-sm p-4 text-foreground text-sm leading-relaxed whitespace-pre-wrap">
                   {msg.content}
                 </div>
                 {msg.relatedTopics && msg.relatedTopics.length > 0 && (
                   <div className="flex flex-wrap gap-2 pl-1">
-                    <span className="text-xs text-slate-500 self-center">Ask about:</span>
+                    <span className="text-xs text-muted-foreground self-center">Ask about:</span>
                     {msg.relatedTopics.map((topic, j) => (
                       <button
                         key={j}
@@ -474,7 +476,7 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
                           setSearchQuery(topic);
                           setTimeout(() => inputRef.current?.focus(), 0);
                         }}
-                        className="text-xs px-2 py-1 rounded bg-slate-800 text-purple-300 hover:bg-slate-700 transition-colors border border-slate-700"
+                        className="text-xs px-2 py-1 rounded-md bg-muted text-primary hover:bg-accent transition-colors border border-border"
                       >
                         {topic}
                       </button>
@@ -489,13 +491,13 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
         {/* Typing indicator while waiting for response */}
         {helpMutation.isPending && (
           <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-primary to-[#e8704f] flex items-center justify-center">
               <Sparkles className="h-4 w-4 text-white" />
             </div>
-            <div className="bg-slate-800 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:0ms]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:150ms]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce [animation-delay:300ms]" />
+            <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
             </div>
           </div>
         )}
@@ -539,14 +541,14 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
           <div className="flex flex-col gap-2 mb-1 animate-in fade-in slide-in-from-bottom-2 duration-200">
             <button
               onClick={() => { setMenuOpen(false); setCommentOpen(true); }}
-              className="w-12 h-12 rounded-full bg-slate-800 text-white shadow-lg flex items-center justify-center hover:bg-slate-700 transition-colors"
+              className="w-12 h-12 rounded-full bg-card text-foreground border border-border shadow-lg flex items-center justify-center hover:bg-accent transition-colors"
               title="Leave a Comment"
             >
               <MessageSquarePlus className="h-5 w-5" />
             </button>
             <button
               onClick={() => { setMenuOpen(false); setOpen(true); setMode("search"); }}
-              className="w-12 h-12 rounded-full bg-slate-800 text-white shadow-lg flex items-center justify-center hover:bg-slate-700 transition-colors"
+              className="w-12 h-12 rounded-full bg-card text-foreground border border-border shadow-lg flex items-center justify-center hover:bg-accent transition-colors"
               title="Search & AI"
             >
               <Search className="h-5 w-5" />
@@ -560,34 +562,34 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
-          className="max-w-2xl p-0 bg-slate-900 border-slate-700 overflow-hidden"
+          className="max-w-2xl p-0 bg-popover text-popover-foreground border-border overflow-hidden"
           data-testid="dialog-ghq-search"
           onKeyDown={handleKeyDown}
         >
           {/* Search and AI are separate experiences, each opened from its own top-nav
               button. The header just reflects the active one (no tab switching). */}
-          <div className="border-b border-slate-700 px-4 py-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-white">
+          <div className="border-b border-border px-4 py-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
               {mode === "search" ? (
                 <>
-                  <Search className="h-4 w-4 text-[#e8704f]" />
+                  <Search className="h-4 w-4 text-primary" />
                   Search the CRM
                 </>
               ) : (
                 <>
-                  <HelpCircle className="h-4 w-4 text-purple-400" />
+                  <Sparkles className="h-4 w-4 text-primary" />
                   Ask AI
                 </>
               )}
             </div>
           </div>
 
-          <div className="p-4 border-b border-slate-700">
+          <div className="p-4 border-b border-border">
             <div className="relative">
               {mode === "search" ? (
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               ) : (
-                <MessageCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-purple-400" />
+                <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-primary" />
               )}
               <Input
                 ref={inputRef}
@@ -601,24 +603,22 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
                 }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`pl-10 pr-20 h-12 bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 ${
-                  mode === "help" ? "focus-visible:ring-purple-500" : "focus-visible:ring-[#711419]"
-                }`}
+                className="pl-10 pr-20 h-12"
                 data-testid="input-ghq-search"
               />
               {mode === "help" && searchQuery.trim().length >= 3 && (
                 <button
                   onClick={handleAskHelp}
                   disabled={helpMutation.isPending}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs rounded flex items-center gap-1 transition-colors disabled:opacity-50"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground text-xs rounded-md flex items-center gap-1 transition-colors disabled:opacity-50"
                 >
                   <Send className="h-3 w-3" />
                   Ask
                 </button>
               )}
               {mode === "search" && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500">
-                  <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">Esc</kbd>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                  <kbd className="px-1.5 py-0.5 bg-muted rounded">Esc</kbd>
                 </div>
               )}
             </div>
@@ -630,15 +630,15 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
             </div>
           </ScrollArea>
 
-          <div className="px-4 py-2 border-t border-slate-700 flex items-center gap-4 text-xs text-slate-500">
+          <div className="px-4 py-2 border-t border-border flex items-center gap-4 text-xs text-muted-foreground">
             {mode === "search" && (
               <>
                 <button
                   onClick={() => setAiEnabled(!aiEnabled)}
-                  className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors ${
                     aiEnabled
-                      ? "bg-purple-900/50 text-purple-300 border border-purple-700/50"
-                      : "bg-slate-800 text-slate-400 border border-slate-700"
+                      ? "bg-primary/10 text-primary border-primary/20"
+                      : "bg-muted text-muted-foreground border-border"
                   }`}
                   data-testid="toggle-ai-search"
                 >
@@ -646,26 +646,26 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
                   <span>AI {aiEnabled ? "On" : "Off"}</span>
                 </button>
                 <div className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">↑</kbd>
-                  <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">↓</kbd>
+                  <kbd className="px-1.5 py-0.5 bg-muted rounded">↑</kbd>
+                  <kbd className="px-1.5 py-0.5 bg-muted rounded">↓</kbd>
                   <span className="ml-1">navigate</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">Enter</kbd>
+                  <kbd className="px-1.5 py-0.5 bg-muted rounded">Enter</kbd>
                   <span className="ml-1">select</span>
                 </div>
               </>
             )}
             {mode === "help" && (
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-purple-300">
+                <div className="flex items-center gap-2 text-primary">
                   <Sparkles className="h-3 w-3" />
                   <span>AI-powered CRM help</span>
                 </div>
                 {conversationMessages.length > 0 && (
                   <button
                     onClick={handleNewConversation}
-                    className="flex items-center gap-1.5 text-slate-400 hover:text-slate-200 transition-colors ml-2"
+                    className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors ml-2"
                   >
                     <RotateCcw className="h-3 w-3" />
                     <span>New conversation</span>
@@ -674,8 +674,8 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
               </div>
             )}
             <div className="flex items-center gap-1 ml-auto">
-              <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">⌘</kbd>
-              <kbd className="px-1.5 py-0.5 bg-slate-700 rounded">K</kbd>
+              <kbd className="px-1.5 py-0.5 bg-muted rounded">⌘</kbd>
+              <kbd className="px-1.5 py-0.5 bg-muted rounded">K</kbd>
             </div>
           </div>
         </DialogContent>

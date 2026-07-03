@@ -1,0 +1,96 @@
+# Render Blueprint for ghvac-tools.
+# Deploy: push to GitHub, then in Render → New → Blueprint, pick this repo.
+# Secrets are marked sync:false — set their values in the Render dashboard
+# (Environment tab), NOT here, so they never land in git.
+services:
+  - type: web
+    name: ghvac-tools
+    runtime: node
+    plan: starter # bump to standard/pro as traffic grows
+    region: oregon # pick the region closest to your Neon project
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # Render injects PORT automatically; the app reads process.env.PORT.
+      - key: NODE_ENV
+        value: production
+
+      # ── Core (required) ──────────────────────────────────────────────
+      - key: DATABASE_URL # Neon pooled connection string
+        sync: false
+      - key: SESSION_SECRET # long random string; app refuses to boot without it in prod
+        sync: false
+
+      # ── Legacy API gate + admin ──────────────────────────────────────
+      - key: GLOBAL_PASSWORD # turns on server-side auth for the legacy /api routes
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_API_KEY
+        sync: false
+
+      # ── AI ───────────────────────────────────────────────────────────
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: AI_INTEGRATIONS_OPENAI_API_KEY
+        sync: false
+
+      # ── Stripe ───────────────────────────────────────────────────────
+      - key: STRIPE_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+
+      # ── Email (Resend) ───────────────────────────────────────────────
+      - key: RESEND_API_KEY
+        sync: false
+      - key: FROM_EMAIL
+        sync: false
+
+      # ── SMS ──────────────────────────────────────────────────────────
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
+      - key: TEXTLINE_API_KEY
+        sync: false
+      - key: TEXTLINE_WEBHOOK_SECRET
+        sync: false
+
+      # ── Google OAuth (CRM staff sign-in) ─────────────────────────────
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_OAUTH_REDIRECT_URI # https://<your-render-domain>/api/crm/auth/google/callback
+        sync: false
+
+      # ── QuickBooks ───────────────────────────────────────────────────
+      - key: QUICKBOOKS_CLIENT_ID
+        sync: false
+      - key: QUICKBOOKS_CLIENT_SECRET
+        sync: false
+
+      # ── Trello ───────────────────────────────────────────────────────
+      - key: TRELLO_API_KEY
+        sync: false
+      - key: TRELLO_TOKEN
+        sync: false
+      - key: TRELLO_SECRET
+        sync: false
+
+      # NOTE: add any remaining vars from .env you actually use (Bouncie,
+      # Govee, weather, etc.) via the Render dashboard the same way.
+      #
+      # Do NOT set REPL_ID here — its absence is what makes the app use the
+      # Neon-backed file store instead of the Replit object-storage sidecar.
+      #
+      # Salesbook PDF export needs Chromium, which the native runtime lacks.
+      # That feature stays disabled until we switch this service to a Docker
+      # deploy (or add a Chromium buildpack). Everything else works.

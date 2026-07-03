@@ -1,155 +1,20 @@
 import type { Equipment, EquipmentCategory } from "@shared/schema";
 
-interface CachedEquipment {
-  categories: EquipmentCategory[];
-  timestamp: number;
-}
+// Google Sheets ties have been removed. Equipment is served from the local
+// default catalog below; there is no live Sheets fetch. Data now flows into the
+// app exclusively via import/export.
 
 class EquipmentSheetsService {
-  private apiKey: string;
-  private sheetId: string;
-  private baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
-  private cache: CachedEquipment | null = null;
-  private readonly CACHE_TTL = 24 * 60 * 60 * 1000;
-
-  constructor() {
-    this.apiKey = process.env.GOOGLE_SHEETS_API_KEY || '';
-    this.sheetId = process.env.GOOGLE_SHEET_ID || '';
-  }
-
-  private isCacheValid(): boolean {
-    if (!this.cache) return false;
-    const age = Date.now() - this.cache.timestamp;
-    return age < this.CACHE_TTL;
-  }
-
   getCacheMetadata(): { cached: boolean; timestamp: number | null; age: number | null } {
-    if (!this.cache) {
-      return { cached: false, timestamp: null, age: null };
-    }
-    const age = Date.now() - this.cache.timestamp;
-    return {
-      cached: this.isCacheValid(),
-      timestamp: this.cache.timestamp,
-      age: age
-    };
+    return { cached: false, timestamp: null, age: null };
   }
 
   invalidateCache(): void {
-    this.cache = null;
-    console.log('Equipment cache invalidated');
+    // No-op: nothing to invalidate now that Sheets is disconnected.
   }
 
-  async fetchEquipment(forceRefresh: boolean = false): Promise<EquipmentCategory[]> {
-    if (!forceRefresh && this.isCacheValid() && this.cache) {
-      console.log('Returning cached equipment data');
-      return this.cache.categories;
-    }
-
-    if (!this.apiKey || !this.sheetId) {
-      console.error('Google Sheets credentials not configured for equipment');
-      if (this.cache) {
-        return this.cache.categories;
-      }
-      return this.getDefaultEquipment();
-    }
-
-    console.log('Fetching equipment from Google Sheets...');
-    const previousCache = this.cache;
-
-    try {
-      const url = `${this.baseUrl}/${this.sheetId}/values/Equipment!A:L?key=${this.apiKey}`;
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        console.error('Google Sheets API error for equipment:', response.status);
-        if (previousCache) {
-          this.cache = previousCache;
-          return previousCache.categories;
-        }
-        return this.getDefaultEquipment();
-      }
-
-      const data = await response.json();
-      const rows = data.values || [];
-
-      if (rows.length < 2) {
-        console.log('No equipment data in sheet, using defaults');
-        return this.getDefaultEquipment();
-      }
-
-      const headers = rows[0];
-      const equipmentList: Equipment[] = [];
-
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        if (!row[0]) continue;
-
-        const equipment: Equipment = {
-          id: `eq-${i}`,
-          category: row[0] || '',
-          subcategory: row[1] || undefined,
-          brand: row[2] || '',
-          model: row[3] || '',
-          description: row[4] || '',
-          tonnage: row[5] || undefined,
-          seer: row[6] || undefined,
-          afue: row[7] || undefined,
-          voltage: row[8] || undefined,
-          price: parseFloat(String(row[9] || '0').replace(/[$,]/g, '')) || 0,
-          laborHours: parseFloat(row[10] || '0') || undefined,
-          warranty: row[11] || undefined,
-        };
-        equipmentList.push(equipment);
-      }
-
-      const categories = this.groupByCategory(equipmentList);
-      
-      this.cache = {
-        categories,
-        timestamp: Date.now()
-      };
-      console.log(`Cached ${equipmentList.length} equipment items in ${categories.length} categories`);
-
-      return categories;
-
-    } catch (error) {
-      console.error('Error fetching equipment:', error);
-      if (previousCache) {
-        this.cache = previousCache;
-        return previousCache.categories;
-      }
-      return this.getDefaultEquipment();
-    }
-  }
-
-  private groupByCategory(equipment: Equipment[]): EquipmentCategory[] {
-    const categoryMap: Record<string, Equipment[]> = {};
-
-    for (const item of equipment) {
-      if (!categoryMap[item.category]) {
-        categoryMap[item.category] = [];
-      }
-      categoryMap[item.category].push(item);
-    }
-
-    const categories: EquipmentCategory[] = [];
-    const categoryNames = Object.keys(categoryMap);
-    for (const name of categoryNames) {
-      const items = categoryMap[name];
-      const subcatSet: Record<string, boolean> = {};
-      items.forEach((i: Equipment) => {
-        if (i.subcategory) subcatSet[i.subcategory] = true;
-      });
-      const subcategories = Object.keys(subcatSet);
-      categories.push({
-        name,
-        subcategories,
-        equipment: items
-      });
-    }
-
-    return categories;
+  async fetchEquipment(_forceRefresh: boolean = false): Promise<EquipmentCategory[]> {
+    return this.getDefaultEquipment();
   }
 
   private getDefaultEquipment(): EquipmentCategory[] {
