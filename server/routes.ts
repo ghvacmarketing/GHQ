@@ -21889,6 +21889,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
               body: crmMessagingMessages.body,
               direction: crmMessagingMessages.direction,
               createdAt: crmMessagingMessages.createdAt,
+              authorUserId: crmMessagingMessages.authorUserId,
             })
             .from(crmMessagingMessages)
             .where(eq(crmMessagingMessages.conversationId, conv.id))
@@ -21899,11 +21900,30 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
             customer,
             lastMessagePreview: lastMessage?.body || null,
             lastMessageDirection: lastMessage?.direction || null,
+            lastMessageAuthorId: lastMessage?.authorUserId || null,
           };
         })
       );
 
-      return res.json(conversationsWithCustomers);
+      // Resolve the last outbound message's sender name (shared inbox: show who
+      // on the team sent it, e.g. "Kylee:" instead of a generic "You:").
+      const lastAuthorIds = Array.from(
+        new Set(conversationsWithCustomers.map((c) => c.lastMessageAuthorId).filter((v): v is string => !!v)),
+      );
+      const lastAuthorNameById = new Map<string, string>();
+      if (lastAuthorIds.length > 0) {
+        const authors = await db
+          .select({ id: crmUsers.id, name: crmUsers.name })
+          .from(crmUsers)
+          .where(inArray(crmUsers.id, lastAuthorIds));
+        for (const a of authors) lastAuthorNameById.set(a.id, a.name);
+      }
+      const result = conversationsWithCustomers.map(({ lastMessageAuthorId, ...c }) => ({
+        ...c,
+        lastMessageAuthorName: lastMessageAuthorId ? lastAuthorNameById.get(lastMessageAuthorId) ?? null : null,
+      }));
+
+      return res.json(result);
     } catch (error) {
       console.error("Error fetching messaging conversations:", error);
       return res.status(500).json({ message: "Failed to fetch conversations" });
@@ -21994,8 +22014,26 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         }
       }
 
-      const messages = await storage.getMessagesForConversation(id);
+      const rawMessages = await storage.getMessagesForConversation(id);
       const tags = await storage.getConversationTags(id);
+
+      // Attach the sending staff member's name to outbound messages so the UI
+      // can show "sent from Kylee". Looked up once per distinct author.
+      const authorIds = Array.from(
+        new Set(rawMessages.map((m) => m.authorUserId).filter((v): v is string => !!v)),
+      );
+      const authorNameById = new Map<string, string>();
+      if (authorIds.length > 0) {
+        const authors = await db
+          .select({ id: crmUsers.id, name: crmUsers.name })
+          .from(crmUsers)
+          .where(inArray(crmUsers.id, authorIds));
+        for (const a of authors) authorNameById.set(a.id, a.name);
+      }
+      const messages = rawMessages.map((m) => ({
+        ...m,
+        authorName: m.authorUserId ? authorNameById.get(m.authorUserId) ?? null : null,
+      }));
 
       let customer = null;
       if (conversation.customerId) {

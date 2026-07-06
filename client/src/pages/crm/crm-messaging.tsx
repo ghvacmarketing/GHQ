@@ -72,6 +72,7 @@ type ConversationWithCustomer = CrmMessagingConversation & {
   customer?: CrmCustomer | null;
   lastMessagePreview?: string | null;
   lastMessageDirection?: string | null;
+  lastMessageAuthorName?: string | null;
 };
 
 type MessageWithAuthor = CrmMessagingMessage & {
@@ -177,8 +178,8 @@ export default function CrmMessaging() {
       if (!res.ok) throw new Error("Failed to fetch conversations");
       return res.json();
     },
-    staleTime: 30000,
-    refetchInterval: 30000,
+    staleTime: 3000,
+    refetchInterval: 5000,
   });
 
   const visibleConversations = useMemo(() => {
@@ -204,8 +205,8 @@ export default function CrmMessaging() {
       return res.json();
     },
     enabled: !!selectedConversationId,
-    staleTime: 30000,
-    refetchInterval: 30000,
+    staleTime: 3000,
+    refetchInterval: 6000,
   });
 
   const sendMessageMutation = useMutation({
@@ -523,8 +524,12 @@ export default function CrmMessaging() {
                 const hasUnread = (conv.unreadInboundCount || 0) > 0;
                 const isActive = selectedConversationId === conv.id;
                 const name = conv.customer?.name || conv.customerName || "Unknown";
+                const outPrefix =
+                  conv.lastMessageDirection === "outbound"
+                    ? `${conv.lastMessageAuthorName || "You"}: `
+                    : "";
                 const preview = conv.lastMessagePreview
-                  ? `${conv.lastMessageDirection === "outbound" ? "You: " : ""}${conv.lastMessagePreview}`
+                  ? `${outPrefix}${conv.lastMessagePreview}`
                   : conv.phoneNumber || conv.customer?.phone || "";
                 return (
                   <button
@@ -703,7 +708,7 @@ export default function CrmMessaging() {
                           )}
                           data-testid={`message-${msg.id}`}
                         >
-                          <p className="whitespace-pre-wrap text-[0.9375rem] leading-relaxed">{msg.body}</p>
+                          <p className="whitespace-pre-wrap break-words text-[0.9375rem] leading-relaxed">{msg.body}</p>
                         </div>
                         {/* Sender · time · status sit below the bubble, outside the box */}
                         <div
