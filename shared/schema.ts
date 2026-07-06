@@ -1,4 +1,11 @@
 import { sql } from "drizzle-orm";
+import type {
+  AutomationTrigger,
+  AutomationCondition,
+  AutomationAction,
+  AutomationTiming,
+  AutomationSafeguards,
+} from "./automation";
 
 import {
   pgTable,
@@ -2946,6 +2953,37 @@ export const insertMarketingCampaignSchema = createInsertSchema(marketingCampaig
 
 export type InsertMarketingCampaign = z.infer<typeof insertMarketingCampaignSchema>;
 export type MarketingCampaign = typeof marketingCampaigns.$inferSelect;
+
+// Marketing automation campaigns (trigger → conditions → actions → timing →
+// safeguards). Config pieces are stored as JSON; shapes live in ./automation.
+export const automationCampaigns = pgTable("automation_campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(false),
+  trigger: json("trigger").$type<AutomationTrigger>().notNull(),
+  conditions: json("conditions").$type<AutomationCondition[]>().default([]),
+  actions: json("actions").$type<AutomationAction[]>().notNull(),
+  timing: json("timing").$type<AutomationTiming>(),
+  safeguards: json("safeguards").$type<AutomationSafeguards>(),
+  totalTriggered: integer("total_triggered").notNull().default(0),
+  totalCompleted: integer("total_completed").notNull().default(0),
+  lastRunAt: timestamp("last_run_at"),
+  createdById: varchar("created_by_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAutomationCampaignSchema = createInsertSchema(automationCampaigns).omit({
+  id: true,
+  totalTriggered: true,
+  totalCompleted: true,
+  lastRunAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertAutomationCampaign = z.infer<typeof insertAutomationCampaignSchema>;
+export type AutomationCampaign = typeof automationCampaigns.$inferSelect;
 
 // =============================================
 // QUICKBOOKS INTEGRATION
