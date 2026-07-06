@@ -257,12 +257,25 @@ export default function CrmMessaging() {
   });
 
   const markReadMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("POST", `/api/crm/messaging/conversations/${selectedConversationId}/read`);
+    mutationFn: async (conversationId: string) => {
+      await apiRequest("POST", `/api/crm/messaging/conversations/${conversationId}/read`);
+    },
+    // Clear the unread badge instantly (optimistic), before the server responds.
+    onMutate: async (conversationId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/crm/messaging/conversations"] });
+      queryClient.setQueriesData<ConversationWithCustomer[]>(
+        { queryKey: ["/api/crm/messaging/conversations"] },
+        (old) =>
+          old?.map((c) =>
+            c.id === conversationId ? { ...c, unreadInboundCount: 0, unreadCount: 0 } : c,
+          ),
+      );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/messaging/conversations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/messaging/unread-count"] });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/messaging/conversations"] });
     },
   });
 
@@ -350,9 +363,12 @@ export default function CrmMessaging() {
     syncTextlineMutation.mutate();
   }, []);
 
+  // Fallback: also mark read when a conversation is opened programmatically
+  // (e.g. deep-link or after creating one), not just via a list click.
   useEffect(() => {
-    if (conversationDetail?.conversation?.unreadInboundCount && conversationDetail.conversation.unreadInboundCount > 0) {
-      markReadMutation.mutate();
+    const conv = conversationDetail?.conversation;
+    if (conv?.id && (conv.unreadInboundCount || 0) > 0) {
+      markReadMutation.mutate(conv.id);
     }
   }, [conversationDetail?.conversation?.id]);
 
@@ -532,6 +548,11 @@ export default function CrmMessaging() {
                     onClick={() => {
                       setSelectedConversationId(conv.id);
                       setShowMobileThread(true);
+                      // Mark read the instant it's clicked, don't wait for the
+                      // thread (which does a slow Textline pull) to load.
+                      if ((conv.unreadInboundCount || 0) > 0) {
+                        markReadMutation.mutate(conv.id);
+                      }
                     }}
                     data-testid={`conversation-item-${conv.id}`}
                   >
