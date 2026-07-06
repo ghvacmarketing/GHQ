@@ -1,6 +1,6 @@
 import { db } from "../db";
 import { and, eq, lte, gte, sql } from "drizzle-orm";
-import { automationCampaigns, automationRuns, crmNotifications, crmUsers } from "@shared/schema";
+import { automationCampaigns, automationRuns, crmNotifications, crmUsers, crmCustomers } from "@shared/schema";
 import { storage } from "../storage";
 import { sendAutomatedSms } from "./smsNotificationService";
 import type {
@@ -121,6 +121,38 @@ export async function runAutomationTrigger(triggerType: string, ctx: AutomationC
   } catch (err) {
     console.error("[Automation] runAutomationTrigger error:", err);
   }
+}
+
+/**
+ * Convenience wrapper used at CRM event points: resolves the customer and fires
+ * the trigger (fire-and-forget). Extra fields let callers add entity data
+ * (e.g. { "invoice.total": 1250 }) for condition matching.
+ */
+export function fireAutomationForCustomer(
+  triggerType: string,
+  customerId: string | null | undefined,
+  entity: { type?: string; id?: string },
+  extraFields: Record<string, string | number | null | undefined> = {},
+): void {
+  if (!customerId) return;
+  db.select().from(crmCustomers).where(eq(crmCustomers.id, customerId))
+    .then(([cust]) => {
+      if (!cust) return;
+      runAutomationTrigger(triggerType, {
+        customerId: cust.id,
+        customerName: cust.name,
+        phoneNumber: cust.phone,
+        email: cust.email,
+        entityType: entity.type,
+        entityId: entity.id,
+        fields: {
+          "customer.type": cust.customerType,
+          "customer.status": cust.customerStatus,
+          ...extraFields,
+        },
+      });
+    })
+    .catch((e) => console.error(`[Automation] ${triggerType} trigger:`, e));
 }
 
 async function dispatchAction(action: AutomationAction, ctx: AutomationContext): Promise<string> {

@@ -52,7 +52,7 @@ import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProc
 import * as xlsx from "xlsx";
 import { goveeSensors, goveeSensorReadings, goveeSensorAlerts, type GoveeSensor } from "@shared/schema";
 import { automationCampaigns, insertAutomationCampaignSchema } from "@shared/schema";
-import { runAutomationTrigger } from "./services/automationEngine";
+import { runAutomationTrigger, fireAutomationForCustomer } from "./services/automationEngine";
 import { goveeService } from "./services/goveeService";
 import { riskStatus, recommendedActions } from "@shared/govee";
 import { nanoid } from "nanoid";
@@ -6634,7 +6634,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [customer] = await db.insert(crmCustomers).values(parsed.data).returning();
       autoSyncCustomer(customer.id);
-      
+      fireAutomationForCustomer("customer.created", customer.id, { type: "customer", id: customer.id });
+
       await logCrmAudit(
         user?.id || null,
         "customer.created",
@@ -16654,7 +16655,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(crmInvoices.id, req.params.id))
         .returning();
       autoSyncInvoice(updatedInvoice.id);
-      
+      fireAutomationForCustomer("invoice.sent", updatedInvoice.customerId, { type: "invoice", id: updatedInvoice.id }, { "invoice.total": Number(updatedInvoice.total) || 0 });
+
       await logCrmAudit(
         user.id,
         "invoice.sent",
@@ -16663,7 +16665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { invoiceNumber: invoice.invoiceNumber },
         req.ip
       );
-      
+
       return res.json(updatedInvoice);
     } catch (error) {
       console.error("Error sending invoice:", error);
@@ -16724,7 +16726,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Sync invoice and payment to QuickBooks
       autoSyncInvoice(updatedInvoice.id);
       autoSyncPayment(updatedInvoice.id, paidAmount.toFixed(2));
-      
+      if (newStatus === "paid") {
+        fireAutomationForCustomer("invoice.paid", updatedInvoice.customerId, { type: "invoice", id: updatedInvoice.id }, { "invoice.total": Number(updatedInvoice.total) || 0 });
+      }
+
       // Deactivate Stripe payment link if invoice is fully paid and has one
       if (newStatus === "paid" && invoice.stripePaymentLinkId) {
         try {
@@ -19089,13 +19094,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const [updated] = await db.update(crmQuotes)
-        .set({ 
-          status: 'sent', 
+        .set({
+          status: 'sent',
           sentAt: new Date(),
-          updatedAt: new Date() 
+          updatedAt: new Date()
         })
         .where(eq(crmQuotes.id, req.params.id))
         .returning();
+
+      fireAutomationForCustomer("quote.sent", updated.customerId, { type: "quote", id: updated.id });
 
       await logCrmAudit(
         user.id,
@@ -19224,15 +19231,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const [updated] = await db.update(crmQuotes)
-        .set({ 
-          status: 'accepted', 
+        .set({
+          status: 'accepted',
           acceptedAt: new Date(),
           acceptedBy: acceptedBy || null,
           selectedOption: selectedOption || existing.selectedOption || null,
-          updatedAt: new Date() 
+          updatedAt: new Date()
         })
         .where(eq(crmQuotes.id, req.params.id))
         .returning();
+
+      fireAutomationForCustomer("quote.accepted", updated.customerId, { type: "quote", id: updated.id });
 
       await logCrmAudit(
         user.id,

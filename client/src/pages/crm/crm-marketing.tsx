@@ -17,8 +17,8 @@ import {
   AlertTriangle, FileText, ThumbsUp, UserPlus, Trophy, XCircle, CalendarX,
   MessageSquare, Mail, Star, ListTodo, Tag, Bell,
 } from "lucide-react";
+import { useLocation } from "wouter";
 import { PageHeader } from "@/components/crm/ui-kit";
-import { AutomationBuilder } from "@/components/crm/automation-builder";
 import {
   AUTOMATION_TRIGGERS, AUTOMATION_ACTIONS, triggerLabel, actionLabel,
 } from "@shared/automation";
@@ -38,8 +38,7 @@ function LIcon({ name, className }: { name?: string; className?: string }) {
 export default function CrmMarketing() {
   usePageTitle("Marketing Automation");
   const { toast } = useToast();
-  const [builderOpen, setBuilderOpen] = useState(false);
-  const [editing, setEditing] = useState<AutomationCampaign | null>(null);
+  const [, navigate] = useLocation();
 
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -71,8 +70,8 @@ export default function CrmMarketing() {
     },
   });
 
-  const openNew = () => { setEditing(null); setBuilderOpen(true); };
-  const openEdit = (a: AutomationCampaign) => { setEditing(a); setBuilderOpen(true); };
+  const openNew = () => navigate("/crm/marketing/new");
+  const openEdit = (a: AutomationCampaign) => navigate(`/crm/marketing/edit/${a.id}`);
 
   const activeCount = automations.filter((a) => a.isActive).length;
 
@@ -202,9 +201,6 @@ export default function CrmMarketing() {
         )}
       </div>
 
-      {builderOpen && (
-        <AutomationBuilder open={builderOpen} onClose={() => setBuilderOpen(false)} existing={editing} />
-      )}
     </CrmLayout>
   );
 }
