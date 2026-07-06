@@ -239,21 +239,24 @@ const STEP_MINUTES: 15 | 30 = (() => {
 })();
 const TOTAL_SLOTS = ((END_HOUR - START_HOUR) * 60) / STEP_MINUTES;
 
+// Zero-padded 12-hour clock, e.g. 7 -> "07:00 AM", 13.5h -> "01:30 PM".
+function formatClock(hour24: number, minute: number = 0): string {
+  const period = hour24 >= 12 ? "PM" : "AM";
+  let h = hour24 % 12;
+  if (h === 0) h = 12;
+  return `${String(h).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
 function formatHour(hour: number): string {
-  if (hour === 12) return "12pm";
-  if (hour > 12) return `${hour - 12}pm`;
-  return `${hour}am`;
+  return formatClock(hour, 0);
 }
 
 function formatDecimalHour(decimalHour: number): string {
   const hours = Math.floor(decimalHour);
   const minutes = Math.round((decimalHour % 1) * 60);
-  const displayHour = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-  const ampm = hours >= 12 ? "pm" : "am";
-  if (minutes === 0) {
-    return `${displayHour}${ampm}`;
-  }
-  return `${displayHour}:${minutes.toString().padStart(2, "0")}${ampm}`;
+  // Guard the rounding edge (e.g. x.999 -> 60 minutes rolls to the next hour).
+  if (minutes === 60) return formatClock(hours + 1, 0);
+  return formatClock(hours, minutes);
 }
 
 // Create hour labels for 6am through 10pm
@@ -1089,7 +1092,7 @@ function WeekDispatchBoard({ technicians, workOrders, weekDates, onWorkOrderClic
                           <div className="space-y-1">
                             {dayWOs.slice(0, 3).map((wo) => {
                               const colors = weekCardColors[wo.status] || weekCardColors.scheduled;
-                              const startTime = wo.scheduledStart ? formatLocal(wo.scheduledStart, "h:mma").toLowerCase() : "";
+                              const startTime = wo.scheduledStart ? formatLocal(wo.scheduledStart, "hh:mm a") : "";
                               return (
                                 <div
                                   key={wo.id}
@@ -1537,9 +1540,8 @@ function ScheduleRowTimeline({
   const formatPreviewTime = (absHour: number) => {
     const h = Math.floor(absHour);
     const m = Math.round((absHour % 1) * 60);
-    const displayH = h === 0 ? 12 : h > 12 ? h - 12 : h;
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    return m === 0 ? `${displayH} ${ampm}` : `${displayH}:${String(m).padStart(2, '0')} ${ampm}`;
+    if (m === 60) return formatClock(h + 1, 0);
+    return formatClock(h, m);
   };
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
@@ -1621,11 +1623,11 @@ interface TechnicianScheduleBoardProps {
 }
 
 function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, dragClickHourOffset = 0, onPreviewTimeChange, onOpenQuickStatus, activeDragDurationHours = 1, onRegisterTimelineNode, activeDragLabel, previewHourByTech = {} }: TechnicianScheduleBoardProps) {
+  // One label per hour *block* (positioned between the gridlines), padded format.
   const hourLabels = useMemo(() => {
     const labels: string[] = [];
-    for (let h = SCHEDULE_START_HOUR; h <= SCHEDULE_END_HOUR; h++) {
-      const label = h === 12 ? "12 PM" : h > 12 ? `${h - 12} PM` : `${h} AM`;
-      labels.push(label);
+    for (let h = SCHEDULE_START_HOUR; h < SCHEDULE_END_HOUR; h++) {
+      labels.push(formatClock(h));
     }
     return labels;
   }, []);
@@ -1662,15 +1664,13 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
             <div className="flex-1 relative" style={{ minWidth: SCHEDULE_TIMELINE_WIDTH }}>
               <div className="relative" style={{ height: 32 }}>
                 {hourLabels.map((label, i) => {
-                  const leftPercent = (i / (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR)) * 100;
-                  const isFirst = i === 0;
-                  const isLast = i === hourLabels.length - 1;
-                  const tx = isFirst ? '0' : isLast ? '-100%' : '-50%';
+                  // Center each label in its hour block (between the gridlines).
+                  const leftPercent = ((i + 0.5) / (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR)) * 100;
                   return (
                     <div
                       key={i}
                       className="absolute top-1/2 text-xs font-medium text-slate-500 whitespace-nowrap tabular-nums"
-                      style={{ left: `${leftPercent}%`, transform: `translate(${tx}, -50%)` }}
+                      style={{ left: `${leftPercent}%`, transform: `translate(-50%, -50%)` }}
                     >
                       {label}
                     </div>
@@ -2726,7 +2726,7 @@ export default function CrmDispatch() {
       if (error?.error === 'SCHEDULING_CONFLICT' || error?.message === 'Scheduling conflict') {
         const conflictInfo = error?.conflictingOrder;
         const startTime = conflictInfo?.scheduledStart 
-          ? formatLocal(conflictInfo.scheduledStart, "h:mm a")
+          ? formatLocal(conflictInfo.scheduledStart, "hh:mm a")
           : 'unknown time';
         toast({
           title: "Scheduling Conflict",
@@ -2958,7 +2958,7 @@ export default function CrmDispatch() {
           const conflict = checkSchedulingConflict(localWorkOrders, effectiveTechId, scheduledStartUTC, scheduledEndUTC);
           if (conflict) {
             const techName = technicians.find(t => t.id === effectiveTechId)?.name || "This technician";
-            const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "h:mm a") : "unknown time";
+            const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "hh:mm a") : "unknown time";
             throw new Error(`${techName} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`);
           }
         }
@@ -3024,7 +3024,7 @@ export default function CrmDispatch() {
       if (error?.error === 'SCHEDULING_CONFLICT' || error?.message === 'Scheduling conflict') {
         const conflictInfo = error?.conflictingOrder;
         const startTime = conflictInfo?.scheduledStart 
-          ? formatLocal(conflictInfo.scheduledStart, "h:mm a")
+          ? formatLocal(conflictInfo.scheduledStart, "hh:mm a")
           : "unknown time";
         toast({ 
           title: "Scheduling Conflict",
@@ -3192,7 +3192,7 @@ export default function CrmDispatch() {
     // Check for scheduling conflict before assigning
     const conflict = checkSchedulingConflict(localWorkOrders, techId, startDateUTC, endDateUTC, workOrderId);
     if (conflict) {
-      const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "h:mm a") : "unknown time";
+      const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "hh:mm a") : "unknown time";
       toast({
         title: "Scheduling Conflict",
         description: `${newTech?.name || 'This technician'} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
@@ -3235,7 +3235,7 @@ export default function CrmDispatch() {
       const conflict = checkSchedulingConflict(localWorkOrders, wo.assignedTechId, startDateUTC, endDateUTC, workOrderId);
       if (conflict) {
         const techName = wo.techName || technicians.find(t => t.id === wo.assignedTechId)?.name || "This technician";
-        const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "h:mm a") : "unknown time";
+        const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "hh:mm a") : "unknown time";
         toast({
           title: "Scheduling Conflict",
           description: `${techName} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
@@ -3325,7 +3325,7 @@ export default function CrmDispatch() {
       const conflict = checkSchedulingConflict(localWorkOrders, wo.assignedTechId, startDate, endDate, workOrderId);
       if (conflict) {
         const techName = wo.techName || technicians.find(t => t.id === wo.assignedTechId)?.name || "This technician";
-        const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "h:mm a") : "unknown time";
+        const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "hh:mm a") : "unknown time";
         toast({
           title: "Scheduling Conflict",
           description: `${techName} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
@@ -3378,7 +3378,7 @@ export default function CrmDispatch() {
       const conflict = checkSchedulingConflict(localWorkOrders, wo.assignedTechId, newStart, newEnd, workOrderId);
       if (conflict) {
         const techName = wo.techName || technicians.find(t => t.id === wo.assignedTechId)?.name || "This technician";
-        const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "h:mm a") : "unknown time";
+        const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "hh:mm a") : "unknown time";
         toast({
           title: "Scheduling Conflict",
           description: `${techName} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
@@ -3591,7 +3591,7 @@ export default function CrmDispatch() {
         
         const conflict = checkSchedulingConflict(localWorkOrders, newTechId, startDate, endDate, workOrderId);
         if (conflict) {
-          const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "h:mm a") : "unknown time";
+          const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "hh:mm a") : "unknown time";
           toast({
             title: "Scheduling Conflict",
             description: `${newTech?.name || 'This technician'} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
@@ -3658,7 +3658,7 @@ export default function CrmDispatch() {
         
         const conflict = checkSchedulingConflict(localWorkOrders, newTechId, startDate, endDate, workOrderId);
         if (conflict) {
-          const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "h:mm a") : "unknown time";
+          const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "hh:mm a") : "unknown time";
           toast({
             title: "Scheduling Conflict",
             description: `${newTech?.name || 'This technician'} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}. You cannot schedule overlapping appointments.`,
@@ -3781,7 +3781,7 @@ export default function CrmDispatch() {
     if (techId) {
       const conflict = checkSchedulingConflict(localWorkOrders, techId, startDate, endDate, workOrderId);
       if (conflict) {
-        const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "h:mm a") : "unknown time";
+        const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "hh:mm a") : "unknown time";
         toast({
           title: "Scheduling Conflict",
           description: `${techName || 'This technician'} already has "${conflict.title || 'a work order'}" scheduled at ${conflictStart}.`,
