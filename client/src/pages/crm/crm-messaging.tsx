@@ -437,15 +437,6 @@ export default function CrmMessaging() {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => syncTextlineMutation.mutate()}
-                className="h-8 w-8 p-0"
-                title="Sync messages"
-              >
-                <RefreshCw className={cn("h-4 w-4", syncTextlineMutation.isPending && "animate-spin")} />
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
                 onClick={() => setNewMessageOpen(true)}
                 className="h-8 w-8 p-0"
                 data-testid="button-new-message"
@@ -677,7 +668,7 @@ export default function CrmMessaging() {
                 {conversationDetail?.messages?.map((msg, idx) => {
                   const prev = conversationDetail.messages[idx - 1];
                   const showDateDivider =
-                    !prev || !isSameDay(new Date(prev.createdAt || 0), new Date(msg.createdAt || 0));
+                    !prev || !isSameDay(new Date(prev.sentAt || prev.createdAt || 0), new Date(msg.sentAt || msg.createdAt || 0));
                   if (msg.direction === "system") {
                     return (
                       <div key={msg.id} className="flex justify-center py-2">
@@ -693,7 +684,7 @@ export default function CrmMessaging() {
                       {showDateDivider && (
                         <div className="flex justify-center py-3">
                           <span className="rounded-full bg-muted px-3 py-1 text-[11px] font-medium text-muted-foreground">
-                            {msg.createdAt && format(new Date(msg.createdAt), "EEEE, MMMM d")}
+                            {(msg.sentAt || msg.createdAt) && format(new Date(msg.sentAt || msg.createdAt!), "EEEE, MMMM d")}
                           </span>
                         </div>
                       )}
@@ -718,7 +709,7 @@ export default function CrmMessaging() {
                           )}
                         >
                           {outbound && msg.authorName && <span className="mr-0.5">{msg.authorName} ·</span>}
-                          <span>{formatMessageTime(msg.createdAt)}</span>
+                          <span>{formatMessageTime(msg.sentAt || msg.createdAt)}</span>
                           {outbound && messageStatusIcons[msg.status || "sent"]}
                         </div>
                       </div>

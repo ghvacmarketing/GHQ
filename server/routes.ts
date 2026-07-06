@@ -22001,6 +22001,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
                   channel: "sms" as any,
                   status: "delivered" as any,
                   externalMessageId: tm.uuid,
+                  // Preserve the real message time so ordering + display are
+                  // correct (otherwise createdAt defaults to the sync time).
+                  createdAt: tm.created_at ? new Date(tm.created_at) : undefined,
                   sentAt: tm.created_at ? new Date(tm.created_at) : undefined,
                   deliveredAt: tm.delivered_at ? new Date(tm.delivered_at) : undefined,
                   readAt: tm.read_at ? new Date(tm.read_at) : undefined,
@@ -25530,6 +25533,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
                   channel: "sms" as any,
                   status: "delivered" as any,
                   externalMessageId: tm.uuid,
+                  // Preserve the real message time so ordering + display are
+                  // correct (otherwise createdAt defaults to the sync time).
+                  createdAt: tm.created_at ? new Date(tm.created_at) : undefined,
                   sentAt: tm.created_at ? new Date(tm.created_at) : undefined,
                   deliveredAt: tm.delivered_at ? new Date(tm.delivered_at) : undefined,
                   readAt: tm.read_at ? new Date(tm.read_at) : undefined,

@@ -137,6 +137,19 @@ class ErrorBoundary extends Component<
 
   componentDidCatch(error: Error, errorInfo: { componentStack: string }) {
     console.error("App Error:", error, errorInfo);
+    // Auto-recover from stale-deploy chunk failures. A new deploy changes the
+    // hashed asset filenames, so an already-open tab (or one served a stale
+    // shell by the service worker) can fail to lazy-load a route chunk. Reload
+    // once to pull the fresh index.html/assets instead of showing an error.
+    const text = `${error?.name || ""} ${error?.message || ""}`;
+    const isChunkError =
+      /ChunkLoadError|Loading chunk|dynamically imported module|module script failed|error loading dynamically/i.test(
+        text,
+      );
+    if (isChunkError && !sessionStorage.getItem("chunk-reload-attempted")) {
+      sessionStorage.setItem("chunk-reload-attempted", "1");
+      window.location.reload();
+    }
   }
 
   render() {
@@ -364,6 +377,12 @@ function Router() {
 
 function AppContent() {
   const [showAnnouncement, setShowAnnouncement] = useState(false);
+
+  // App mounted successfully — clear the chunk-error reload guard so a future
+  // stale-deploy failure can trigger a fresh one-time recovery reload.
+  useEffect(() => {
+    sessionStorage.removeItem("chunk-reload-attempted");
+  }, []);
 
   // Fetch active announcement (no auth check)
   const { data: announcement } = useQuery<Announcement | null>({

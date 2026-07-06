@@ -2067,8 +2067,10 @@ export class DatabaseStorage implements IStorage {
       .from(crmMessagingMessages)
       .leftJoin(crmUsers, eq(crmMessagingMessages.authorUserId, crmUsers.id))
       .where(eq(crmMessagingMessages.conversationId, conversationId))
-      .orderBy(asc(crmMessagingMessages.createdAt));
-    
+      // Order by the real message time (sentAt), not the DB insert time —
+      // Textline-synced messages are inserted long after they were sent.
+      .orderBy(sql`COALESCE(${crmMessagingMessages.sentAt}, ${crmMessagingMessages.createdAt}) ASC`);
+
     return results.map(r => ({
       ...r.message,
       authorName: r.authorName,
