@@ -30,6 +30,7 @@ import NotFound from "@/pages/not-found";
 import BookOnline from "@/pages/public/book-online";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import GlobalPasswordGate from "@/components/GlobalPasswordGate";
+import IdleLogout from "@/components/IdleLogout";
 
 // CRM Route Guard (blocks tech users from desktop CRM)
 import CrmRouteGuard from "@/components/crm/crm-route-guard";
@@ -388,8 +389,9 @@ function AppContent() {
   return (
     <>
       <Toaster />
+      <IdleLogout />
       <Router />
-      <AnnouncementModal 
+      <AnnouncementModal
         announcement={announcement || null}
         open={showAnnouncement}
         onDismiss={handleDismiss}
