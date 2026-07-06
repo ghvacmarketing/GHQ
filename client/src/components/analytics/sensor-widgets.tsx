@@ -116,6 +116,18 @@ export function RiskBadge({ risk, className }: { risk: RiskLevel; className?: st
 export function SensorCard({ sensor, onClick }: { sensor: SensorView; onClick?: () => void }) {
   const meta = RISK_META[sensor.risk];
   const offline = sensor.online === false;
+  const hum = sensor.humidity;
+  const humPct = hum != null ? Math.max(0, Math.min(100, hum)) : null;
+  const t = sensor.thresholds;
+  // Threshold ticks drawn over the humidity bar so the reading's distance from
+  // each danger zone is visible at a glance.
+  const markers = [t.humidityWatch, t.humidityHigh, t.humidityCritical].filter(
+    (v): v is number => v != null,
+  );
+  const subtitle = [prettyLocation(sensor.locationType), sensor.propertyAddress || sensor.customerName]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <Card
       onClick={onClick}
@@ -129,16 +141,17 @@ export function SensorCard({ sensor, onClick }: { sensor: SensorView; onClick?: 
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className="min-w-0">
-            <p className="font-semibold text-slate-900 truncate">
-              {sensor.label || sensor.deviceName || "Unnamed sensor"}
-            </p>
-            {(sensor.locationType || sensor.propertyAddress) && (
-              <p className="text-xs text-slate-500 truncate">
-                {prettyLocation(sensor.locationType)}
-                {sensor.locationType && sensor.propertyAddress ? " · " : ""}
-                {sensor.propertyAddress}
+            <div className="flex items-center gap-2">
+              <p className="font-semibold text-slate-900 truncate">
+                {sensor.label || sensor.deviceName || "Unnamed sensor"}
               </p>
-            )}
+              {sensor.sku && (
+                <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+                  {sensor.sku}
+                </span>
+              )}
+            </div>
+            {subtitle && <p className="text-xs text-slate-500 truncate">{subtitle}</p>}
           </div>
           <span
             className={cn(
@@ -150,25 +163,46 @@ export function SensorCard({ sensor, onClick }: { sensor: SensorView; onClick?: 
             {offline ? "Offline" : "Online"}
           </span>
         </div>
+
         <div className="flex items-end justify-between">
-          <div>
-            <div className="flex items-center gap-1.5">
-              <Droplets className="h-5 w-5" style={{ color: meta.color }} />
-              <span className="text-3xl font-bold tabular-nums" style={{ color: meta.color }}>
-                {sensor.humidity != null ? `${Math.round(sensor.humidity)}%` : "—"}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 mt-1 text-slate-600">
-              <Thermometer className="h-4 w-4 text-slate-400" />
-              <span className="text-sm font-medium tabular-nums">
-                {sensor.temperatureF != null ? `${Math.round(sensor.temperatureF)}°F` : "—"}
-              </span>
-            </div>
+          <div className="flex items-baseline gap-2">
+            <Droplets className="h-5 w-5 self-center" style={{ color: meta.color }} />
+            <span className="text-3xl font-bold tabular-nums leading-none" style={{ color: meta.color }}>
+              {hum != null ? `${Math.round(hum)}%` : "—"}
+            </span>
+            <span className="text-xs font-semibold" style={{ color: meta.color }}>
+              {meta.label}
+            </span>
           </div>
-          <div className="text-right">
-            <RiskBadge risk={sensor.risk} />
-            <p className="text-[11px] text-slate-400 mt-2">Updated {timeAgo(sensor.lastReadingAt)}</p>
+          <div className="flex items-center gap-1.5 text-slate-600">
+            <Thermometer className="h-4 w-4 text-slate-400" />
+            <span className="text-sm font-medium tabular-nums">
+              {sensor.temperatureF != null ? `${Math.round(sensor.temperatureF)}°F` : "—"}
+            </span>
           </div>
+        </div>
+
+        {/* Humidity level relative to watch / high / critical thresholds */}
+        <div className="relative mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
+          {humPct != null && (
+            <div
+              className="absolute inset-y-0 left-0 rounded-full"
+              style={{ width: `${humPct}%`, backgroundColor: meta.color }}
+            />
+          )}
+          {markers.map((v, i) => (
+            <span
+              key={i}
+              className="absolute inset-y-0 w-px bg-white/80"
+              style={{ left: `${Math.max(0, Math.min(100, v))}%` }}
+              title={`Threshold ${v}%`}
+            />
+          ))}
+        </div>
+
+        <div className="mt-2.5 flex items-center justify-between">
+          <RiskBadge risk={sensor.risk} />
+          <p className="text-[11px] text-slate-400">Updated {timeAgo(sensor.lastReadingAt)}</p>
         </div>
       </CardContent>
     </Card>

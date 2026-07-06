@@ -2312,7 +2312,6 @@ export default function CrmDispatch() {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [localWorkOrders, setLocalWorkOrders] = useState<DispatchWorkOrder[]>([]);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
-  const [panelCollapsed, setPanelCollapsed] = useState(false);
   const [newNote, setNewNote] = useState("");
   const [dispatchNote, setDispatchNote] = useState("");
   const [workOrderDescription, setWorkOrderDescription] = useState("");
@@ -2418,7 +2417,6 @@ export default function CrmDispatch() {
   const handleWorkOrderClick = useCallback((workOrderId: string) => {
     const wo = localWorkOrders.find(w => w.id === workOrderId);
     setSelectedWorkOrderId(workOrderId);
-    setPanelCollapsed(false); // always open expanded on a fresh selection
     setNewNote("");
     setWorkOrderDescription(wo?.description || "");
   }, [localWorkOrders]);
@@ -4319,37 +4317,16 @@ export default function CrmDispatch() {
 
         </div>
 
-        {/* Side Panel - Push Layout (collapsible, smooth width animation) */}
+        {/* Work-order detail panel — overlay drawer. Opens only when a work
+            order is clicked; closes with the X. No collapse rail/arrow: it
+            overlaps the board so open/close never shifts the layout. */}
         {selectedWorkOrder && (
           <div
-            className="flex-shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-hidden shadow-lg transition-[width] duration-[600ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
-            style={{ width: panelCollapsed ? 52 : 400 }}
+            className="fixed right-0 top-0 z-50 h-full w-[400px] max-w-[92vw] flex-shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-right duration-300"
             data-testid="workorder-detail-panel"
           >
-          {panelCollapsed ? (
-            /* Collapsed rail — expand / close + vertical WO label */
-            <div className="flex h-full w-[52px] flex-col items-center gap-2 py-3">
-              <button
-                onClick={() => setPanelCollapsed(false)}
-                className="rounded-full p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
-                aria-label="Expand panel"
-                data-testid="button-expand-panel"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setSelectedWorkOrderId(null)}
-                className="rounded-full p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
-                aria-label="Close panel"
-              >
-                <XCircle className="h-4 w-4" />
-              </button>
-              <div className="mt-1 whitespace-nowrap text-[11px] font-medium tracking-wide text-slate-500 [writing-mode:vertical-rl]">
-                WO {selectedWorkOrder.workOrderNumber}
-              </div>
-            </div>
-          ) : (
-          <div className="flex h-full w-[400px] flex-col">
+          {false ? null : (
+          <div className="flex h-full w-full flex-col">
             {/* Panel Header — color reflects visit type */}
             <div className={`flex items-center justify-between px-4 py-3 flex-shrink-0 ${
               (selectedWorkOrder.visitType || "SERVICE") === "SERVICE"
@@ -4361,14 +4338,6 @@ export default function CrmDispatch() {
                 <p className="text-xs opacity-80">{visitTypeLabels[selectedWorkOrder.visitType || "SERVICE"] || selectedWorkOrder.visitType}</p>
               </div>
               <div className="flex items-center gap-0.5">
-                <button
-                  onClick={() => setPanelCollapsed(true)}
-                  className="p-1.5 hover:bg-white/20 rounded-full transition-colors opacity-80 hover:opacity-100"
-                  aria-label="Collapse panel"
-                  data-testid="button-collapse-panel"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
                 <button
                   onClick={() => setSelectedWorkOrderId(null)}
                   className="p-1.5 hover:bg-white/20 rounded-full transition-colors opacity-80 hover:opacity-100"
