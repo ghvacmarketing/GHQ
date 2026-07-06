@@ -2985,6 +2985,27 @@ export const insertAutomationCampaignSchema = createInsertSchema(automationCampa
 export type InsertAutomationCampaign = z.infer<typeof insertAutomationCampaignSchema>;
 export type AutomationCampaign = typeof automationCampaigns.$inferSelect;
 
+// Queue + history for automation runs. Each triggered run is enqueued with a
+// dueAt (trigger time + timing delay); a scheduler processes due rows. Also
+// serves as the send-log used by cooldown / max-per-month safeguards.
+export const automationRuns = pgTable("automation_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").notNull(),
+  triggerType: text("trigger_type").notNull(),
+  customerId: varchar("customer_id"),
+  entityType: text("entity_type"),
+  entityId: varchar("entity_id"),
+  dueAt: timestamp("due_at").notNull(),
+  status: text("status").notNull().default("pending"), // pending | sent | skipped | failed
+  detail: text("detail"),
+  createdAt: timestamp("created_at").defaultNow(),
+  processedAt: timestamp("processed_at"),
+}, (table) => ({
+  dueStatusIdx: index("automation_runs_due_status_idx").on(table.status, table.dueAt),
+  campaignCustomerIdx: index("automation_runs_campaign_customer_idx").on(table.campaignId, table.customerId),
+}));
+export type AutomationRun = typeof automationRuns.$inferSelect;
+
 // =============================================
 // QUICKBOOKS INTEGRATION
 // =============================================

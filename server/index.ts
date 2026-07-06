@@ -517,5 +517,11 @@ async function runWaterHeaterSeeds() {
 
     // Start Govee H5103 sensor polling (humidity/temperature) every 5 minutes
     startGoveeBackgroundSync(5);
+
+    // Start marketing automation scheduler (processes due automation runs).
+    // All sends are gated behind the automated_sms/email_enabled settings.
+    import("./services/automationEngine")
+      .then(({ startAutomationScheduler }) => startAutomationScheduler(60_000))
+      .catch((err) => console.error("Automation scheduler failed to start:", err));
   });
 })();

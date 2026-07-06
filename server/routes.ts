@@ -52,6 +52,7 @@ import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProc
 import * as xlsx from "xlsx";
 import { goveeSensors, goveeSensorReadings, goveeSensorAlerts, type GoveeSensor } from "@shared/schema";
 import { automationCampaigns, insertAutomationCampaignSchema } from "@shared/schema";
+import { runAutomationTrigger } from "./services/automationEngine";
 import { goveeService } from "./services/goveeService";
 import { riskStatus, recommendedActions } from "@shared/govee";
 import { nanoid } from "nanoid";
@@ -12804,6 +12805,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const workOrder = await storage.updateWorkOrder(req.params.id, updateData);
+
+      // Fire marketing automations for the "work order completed" trigger
+      // (fire-and-forget; the engine gates all sends behind the settings toggles).
+      if (status === "completed" && existingWorkOrder.status !== "completed") {
+        const custId = workOrder?.customerId || existingWorkOrder.customerId;
+        if (custId) {
+          db.select().from(crmCustomers).where(eq(crmCustomers.id, custId)).then(([cust]) => {
+            if (!cust) return;
+            runAutomationTrigger("work_order.completed", {
+              customerId: cust.id,
+              customerName: cust.name,
+              phoneNumber: cust.phone,
+              email: cust.email,
+              entityType: "work_order",
+              entityId: workOrder?.id,
+              fields: {
+                "customer.type": cust.customerType,
+                "customer.status": cust.customerStatus,
+                "work_order.visitType": workOrder?.visitType,
+                "work_order.priority": workOrder?.priority,
+              },
+            });
+          }).catch((e) => console.error("[Automation] wo.completed trigger:", e));
+        }
+      }
 
       // If work order status changed to "completed" and it's a MAINTENANCE visit,
       // update any linked maintenance visit to completed
