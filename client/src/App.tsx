@@ -219,7 +219,11 @@ function CrmLoader() {
       className="flex min-h-[60vh] items-center justify-center bg-background animate-in fade-in-0 duration-300"
       data-testid="crm-loader"
     >
-      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/60" />
+      {/* Unique, minimalist brand pulse — a maroon dot with an expanding ring. */}
+      <span className="relative flex h-3.5 w-3.5">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#711419] opacity-60" />
+        <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-[#711419]" />
+      </span>
     </div>
   );
 }
