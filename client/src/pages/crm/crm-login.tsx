@@ -12,9 +12,18 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { setCrmToken, crmFetch } from "@/lib/crmAuth";
-import { ArrowLeft, AlertCircle, Building2, Lock, Mail, Loader2, Home } from "lucide-react";
+import { ArrowLeft, AlertCircle, Lock, Mail, Loader2, Home, Zap, MessageSquare, Gauge, CalendarClock, Sparkles } from "lucide-react";
 import { Link } from "wouter";
+import redlogo from "@assets/redlogo.webp";
 import type { CrmUser } from "@shared/schema";
+
+// "What's new" shown on the login screen. Edit to post product updates.
+const WHATS_NEW: { icon: any; title: string; body: string }[] = [
+  { icon: Zap, title: "Marketing automations", body: "Build hands-free campaigns — trigger, conditions, actions, timing, and safeguards." },
+  { icon: MessageSquare, title: "Faster messaging inbox", body: "Instant read receipts, sender names, and near-real-time inbound texts." },
+  { icon: Gauge, title: "Humidity & temp sensors", body: "Live Govee monitoring with clear cards and threshold alerts in Analytics." },
+  { icon: CalendarClock, title: "Cleaner dispatch board", body: "A tidier timeline and a smoother work-order detail panel." },
+];
 
 const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
   google_not_authorized: "This Google account isn't authorized for the CRM. Ask an admin to add your email under Settings → Users & Roles.",
@@ -141,139 +150,99 @@ export default function CrmLogin() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#4a0d10] to-slate-900 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMyMDIwMjAiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRoLTJ2LTRoMnY0em0wLTZoLTJ2LTRoMnY0em0wLTZoLTJ2LTRoMnY0em0wLTZoLTJWOGgydjh6bTAgMjRoLTJ2LTRoMnY0em0wIDZoLTJ2LTRoMnY0em0tOC0xMmgtMnYtNGgydjR6bTAgNmgtMnYtNGgydjR6bTAtMTJoLTJ2LTRoMnY0em0wLTZoLTJWOGgydjh6bTAgMjRoLTJ2LTRoMnY0em0wIDZoLTJ2LTRoMnY0em0tOC02aC0ydi00aDJ2NHptMC02aC0ydi00aDJ2NHptMC02aC0ydi00aDJ2NHptMC02aC0yVjhoMnY4em0wIDI0aC0ydi00aDJ2NHptMCA2aC0ydi00aDJ2NHoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-20"></div>
+    <div className="flex min-h-screen bg-background">
+      {/* Left — sign in */}
+      <div className="relative flex w-full flex-col justify-center px-6 py-10 sm:px-10 lg:w-[46%] lg:px-16">
+        <Link href="/">
+          <Button variant="ghost" size="sm" className="absolute left-4 top-4 text-muted-foreground" data-testid="button-home">
+            <ArrowLeft className="mr-1.5 h-4 w-4" /> Home
+          </Button>
+        </Link>
 
-      <Link href="/">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute top-4 left-4 z-20 bg-white/10 hover:bg-white/20 text-white shadow-lg transition-all"
-          data-testid="button-home"
-        >
-          <Home className="h-5 w-5" />
-        </Button>
-      </Link>
+        <div className="mx-auto w-full max-w-sm">
+          <img src={redlogo} alt="Giesbrecht HVAC" className="mb-8 h-12" />
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Sign in to GHQ</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">Giesbrecht HVAC Headquarters</p>
 
-      <div className="w-full max-w-md relative z-10">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="mb-6 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-          onClick={handleBackToHome}
-          data-testid="button-back-gate"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-
-        <Card className="border-0 shadow-2xl bg-white/95 backdrop-blur-sm">
-          <CardHeader className="text-center pb-2 pt-8">
-            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-gradient-to-br from-[#711419] to-[#8b1a20] flex items-center justify-center shadow-lg">
-              <Building2 className="h-8 w-8 text-white" />
+          {googleError && (
+            <div className="mt-6 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" data-testid="banner-google-error">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{googleError}</span>
             </div>
-            <CardTitle className="text-2xl font-bold">GHQ Login</CardTitle>
-            <CardDescription className="text-base">
-              Sign in to access GHVAC Headquarters
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-8 pb-8 pt-4">
-            {googleError && (
-              <div
-                className="mb-4 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-                data-testid="banner-google-error"
-              >
-                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                <span>{googleError}</span>
-              </div>
-            )}
+          )}
 
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleGoogleSignIn}
-              className="w-full h-12 mb-4 border-slate-300 hover:bg-slate-50 font-medium"
-              data-testid="button-google-signin"
-            >
-              <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24" aria-hidden="true">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.75h3.57c2.08-1.92 3.28-4.74 3.28-8.07z" />
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.75c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                <path fill="#FBBC05" d="M5.84 14.12A6.74 6.74 0 015.5 12c0-.74.13-1.45.34-2.12V7.04H2.18A10.99 10.99 0 001 12c0 1.78.43 3.46 1.18 4.96l3.66-2.84z" />
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.65l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.04l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38z" />
-              </svg>
-              Continue with Google
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleGoogleSignIn}
+            className="mt-7 h-11 w-full font-medium"
+            data-testid="button-google-signin"
+          >
+            <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.75h3.57c2.08-1.92 3.28-4.74 3.28-8.07z" />
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.75c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+              <path fill="#FBBC05" d="M5.84 14.12A6.74 6.74 0 015.5 12c0-.74.13-1.45.34-2.12V7.04H2.18A10.99 10.99 0 001 12c0 1.78.43 3.46 1.18 4.96l3.66-2.84z" />
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.65l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.04l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38z" />
+            </svg>
+            Continue with Google
+          </Button>
+
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+            <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">or with email</span></div>
+          </div>
+
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-sm">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input id="email" type="email" placeholder="you@company.com" className="h-11 pl-10" {...form.register("email")} data-testid="input-email" />
+              </div>
+              {form.formState.errors.email && <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="password" className="text-sm">Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input id="password" type="password" placeholder="Enter your password" className="h-11 pl-10" {...form.register("password")} data-testid="input-password" />
+              </div>
+              {form.formState.errors.password && <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>}
+            </div>
+            <Button type="submit" className="h-11 w-full bg-[#711419] text-base hover:bg-[#5a1014]" disabled={loginMutation.isPending} data-testid="button-login">
+              {loginMutation.isPending ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Signing in…</> : "Sign in"}
             </Button>
+          </form>
+        </div>
+      </div>
 
-            <div className="relative mb-4">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-slate-200" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-slate-400">or sign in with email</span>
-              </div>
-            </div>
+      {/* Right — brand + what's new */}
+      <div className="relative hidden overflow-hidden bg-gradient-to-br from-[#711419] to-[#2c0709] text-white lg:flex lg:w-[54%]">
+        <div className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-10 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
+        <div className="relative z-10 flex w-full flex-col justify-center px-12 py-14 xl:px-20">
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/60">
+            <Sparkles className="h-3.5 w-3.5" /> What's new in GHQ
+          </div>
+          <h2 className="max-w-md text-3xl font-semibold leading-tight xl:text-4xl">Your whole operation, in one place.</h2>
+          <p className="mt-3 max-w-md text-sm text-white/70">The latest improvements to the Giesbrecht HVAC command center.</p>
 
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium">Email Address</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="you@company.com"
-                    className="pl-10 h-12 bg-slate-50 border-slate-200 focus:bg-white transition-colors"
-                    {...form.register("email")}
-                    data-testid="input-email"
-                  />
+          <div className="mt-9 max-w-md space-y-3">
+            {WHATS_NEW.map((u) => (
+              <div key={u.title} className="flex gap-3 rounded-xl border border-white/10 bg-white/5 p-3.5 backdrop-blur-sm">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10">
+                  <u.icon className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold">{u.title}</p>
+                  <p className="text-xs leading-relaxed text-white/65">{u.body}</p>
                 </div>
-                {form.formState.errors.email && (
-                  <p className="text-sm text-destructive">
-                    {form.formState.errors.email.message}
-                  </p>
-                )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Enter your password"
-                    className="pl-10 h-12 bg-slate-50 border-slate-200 focus:bg-white transition-colors"
-                    {...form.register("password")}
-                    data-testid="input-password"
-                  />
-                </div>
-                {form.formState.errors.password && (
-                  <p className="text-sm text-destructive">
-                    {form.formState.errors.password.message}
-                  </p>
-                )}
-              </div>
-              <Button
-                type="submit"
-                className="w-full h-12 text-base font-semibold bg-gradient-to-r from-[#711419] to-[#8b1a20] hover:from-[#8b1a20] hover:to-[#711419] shadow-lg hover:shadow-xl transition-all"
-                disabled={loginMutation.isPending}
-                data-testid="button-login"
-              >
-                {loginMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                    Signing in...
-                  </>
-                ) : (
-                  "Sign In"
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+            ))}
+          </div>
 
-        <p className="text-center text-slate-400 text-sm mt-6">
-          Giesbrecht HVAC Headquarters
-        </p>
+          <p className="mt-10 text-xs text-white/50">giesbrechthvac.com · Powered by GHQ</p>
+        </div>
       </div>
     </div>
   );

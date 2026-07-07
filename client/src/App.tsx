@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { lazy, Suspense, useState, useEffect, Component, type ReactNode } from "react";
 import type { Announcement } from "@shared/schema";
 import { Loader2 } from "lucide-react";
+import redLogoUrl from "@assets/redlogo.webp";
 import Home from "@/pages/home";
 import LandingSelect from "@/pages/landing-select";
 import QuoteGenerator from "@/pages/quote-generator";
@@ -185,12 +186,25 @@ class ErrorBoundary extends Component<
   }
 }
 
-// Global loading spinner for initial app load
+// Branded full-screen loader for the initial app load.
 function GlobalLoader() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background" data-testid="global-loader">
-      <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-      <p className="text-muted-foreground">Loading GHVAC Tools...</p>
+      <div className="relative mb-6 flex items-center justify-center">
+        <span className="absolute h-24 w-24 rounded-full bg-[#711419]/10 blur-2xl animate-pulse" />
+        <img
+          src={redLogoUrl}
+          alt="Giesbrecht HVAC"
+          className="relative h-14 w-14 rounded-2xl object-contain animate-[pulse_2.2s_ease-in-out_infinite]"
+        />
+      </div>
+      <div className="flex items-center gap-1.5" aria-hidden="true">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#711419] animate-bounce [animation-delay:-0.3s]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-[#711419] animate-bounce [animation-delay:-0.15s]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-[#711419] animate-bounce" />
+      </div>
+      <p className="mt-5 text-sm font-medium tracking-wide text-foreground">Giesbrecht HVAC</p>
+      <p className="mt-0.5 text-xs uppercase tracking-[0.25em] text-muted-foreground">GHQ</p>
     </div>
   );
 }
