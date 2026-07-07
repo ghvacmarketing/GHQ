@@ -52,7 +52,7 @@ import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProc
 import * as xlsx from "xlsx";
 import { goveeSensors, goveeSensorReadings, goveeSensorAlerts, type GoveeSensor } from "@shared/schema";
 import { automationCampaigns, insertAutomationCampaignSchema } from "@shared/schema";
-import { runAutomationTrigger, fireAutomationForCustomer } from "./services/automationEngine";
+import { runAutomationTrigger, fireAutomationForCustomer, fireAutomationForLead } from "./services/automationEngine";
 import { goveeService } from "./services/goveeService";
 import { riskStatus, recommendedActions } from "@shared/govee";
 import { nanoid } from "nanoid";
@@ -4338,7 +4338,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updatedLead = await storage.updateLead(req.params.id, updateData);
-      
+
+      fireAutomationForLead("lead.won", { id: lead.id, name: lead.name, phone: lead.phone, email: lead.email, customerType: (lead as any).customerType });
+
       // Create history entry for marking won
       const actor = (req.session as any)?.user?.phone || "system";
       await storage.createLeadHistory({
@@ -4347,7 +4349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         actionType: "status_changed",
         payload: { from: lead.status, to: "Won", won: true }
       });
-      
+
       res.json(updatedLead);
     } catch (error) {
       console.error('Error marking lead as won:', error);
@@ -4369,7 +4371,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         closedAt: new Date(),
         status: "Lost"
       });
-      
+
+      fireAutomationForLead("lead.lost", { id: lead.id, name: lead.name, phone: lead.phone, email: lead.email, customerType: (lead as any).customerType });
+
       // Create history entry for marking lost
       const actor = (req.session as any)?.user?.phone || "system";
       await storage.createLeadHistory({

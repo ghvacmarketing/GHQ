@@ -1,6 +1,6 @@
 import { db } from "../db";
-import { and, eq, lte, gte, sql } from "drizzle-orm";
-import { automationCampaigns, automationRuns, crmNotifications, crmUsers, crmCustomers } from "@shared/schema";
+import { and, eq, lte, gte, lt, sql } from "drizzle-orm";
+import { automationCampaigns, automationRuns, crmNotifications, crmUsers, crmCustomers, crmInvoices, crmAgreements } from "@shared/schema";
 import { storage } from "../storage";
 import { sendAutomatedSms } from "./smsNotificationService";
 import type {
@@ -100,6 +100,13 @@ export async function runAutomationTrigger(triggerType: string, ctx: AutomationC
     const matching = active.filter((c) => (c.trigger as any)?.type === triggerType);
     for (const c of matching) {
       if (!evaluateConditions(c.conditions as AutomationCondition[], ctx)) continue;
+      // Don't run the same campaign twice for the same entity (also stops the
+      // daily overdue/expiring checks from re-firing every day).
+      if (ctx.entityId) {
+        const [dup] = await db.select({ id: automationRuns.id }).from(automationRuns)
+          .where(and(eq(automationRuns.campaignId, c.id), eq(automationRuns.entityId, ctx.entityId))).limit(1);
+        if (dup) continue;
+      }
       const guard = await passesSafeguards(c.id, ctx, c.safeguards as AutomationSafeguards);
       const timing = (c.timing as AutomationTiming) || { delay: 0, delayUnit: "hours", businessHoursOnly: true };
       const dueAt = new Date(Date.now() + (timing.delay || 0) * (DELAY_MS[timing.delayUnit] || DELAY_MS.hours));
@@ -153,6 +160,65 @@ export function fireAutomationForCustomer(
       });
     })
     .catch((e) => console.error(`[Automation] ${triggerType} trigger:`, e));
+}
+
+/** Fire a trigger for a legacy lead (leads aren't customer records, so we pass
+ *  the lead's own contact info; the lead id doubles as the cooldown key). */
+export function fireAutomationForLead(
+  triggerType: string,
+  lead: { id: string; name?: string | null; phone?: string | null; email?: string | null; customerType?: string | null },
+): void {
+  runAutomationTrigger(triggerType, {
+    customerId: lead.id,
+    customerName: lead.name,
+    phoneNumber: lead.phone,
+    email: lead.email,
+    entityType: "lead",
+    entityId: lead.id,
+    fields: { "customer.type": lead.customerType },
+  });
+}
+
+/** Daily sweep for triggers that aren't tied to a user action: invoices that
+ *  went overdue and agreements nearing expiry. Deduped per entity so each only
+ *  fires once. Only queries when a matching active campaign exists. */
+export async function runDailyAutomationChecks(): Promise<void> {
+  try {
+    const active = await db.select().from(automationCampaigns).where(eq(automationCampaigns.isActive, true));
+    const has = (t: string) => active.some((c) => (c.trigger as any)?.type === t);
+    const now = new Date();
+
+    if (has("invoice.overdue")) {
+      // Recently-overdue only (last 14 days), unpaid, with a balance.
+      const windowStart = new Date(now.getTime() - 14 * 86_400_000);
+      const overdue = await db.select().from(crmInvoices)
+        .where(and(
+          lt(crmInvoices.dueDate, now),
+          gte(crmInvoices.dueDate, windowStart),
+          sql`${crmInvoices.status} NOT IN ('paid','void')`,
+        ))
+        .limit(500);
+      for (const inv of overdue) {
+        fireAutomationForCustomer("invoice.overdue", inv.customerId, { type: "invoice", id: inv.id }, { "invoice.total": Number(inv.total) || 0 });
+      }
+    }
+
+    if (has("agreement.expiring")) {
+      const soon = new Date(now.getTime() + 30 * 86_400_000);
+      const expiring = await db.select().from(crmAgreements)
+        .where(and(
+          eq(crmAgreements.status, "active"),
+          gte(crmAgreements.endDate, now.toISOString().slice(0, 10)),
+          lte(crmAgreements.endDate, soon.toISOString().slice(0, 10)),
+        ))
+        .limit(500);
+      for (const ag of expiring) {
+        fireAutomationForCustomer("agreement.expiring", ag.customerId, { type: "agreement", id: ag.id });
+      }
+    }
+  } catch (err) {
+    console.error("[Automation] runDailyAutomationChecks error:", err);
+  }
 }
 
 async function dispatchAction(action: AutomationAction, ctx: AutomationContext): Promise<string> {
@@ -259,4 +325,8 @@ export function startAutomationScheduler(intervalMs = 60_000): void {
   schedulerStarted = true;
   console.log("[Automation] scheduler started");
   setInterval(() => { processDueAutomationRuns(); }, intervalMs);
+  // Daily sweep for overdue invoices / expiring agreements (runs shortly after
+  // boot, then every 24h).
+  setTimeout(() => { runDailyAutomationChecks(); }, 30_000);
+  setInterval(() => { runDailyAutomationChecks(); }, 24 * 60 * 60 * 1000);
 }
