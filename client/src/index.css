@@ -420,3 +420,9 @@ gmp-place-autocomplete::part(input)::placeholder {
 .dispatch-timeline-scroll {
   scrollbar-width: none;
 }
+
+/* GHQ CRM entry loader — a unique, minimalist indeterminate sweep. */
+@keyframes ghq-loader-sweep {
+  0%   { transform: translateX(-120%); }
+  100% { transform: translateX(460%); }
+}

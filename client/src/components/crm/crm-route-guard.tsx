@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
-import { Loader2, ShieldX } from "lucide-react";
+import { ShieldX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { crmFetch } from "@/lib/crmAuth";
+import redLogo from "@assets/redlogo.webp";
 import type { CrmUser } from "@shared/schema";
 
 interface CrmRouteGuardProps {
@@ -34,9 +35,26 @@ export default function CrmRouteGuard({ children }: CrmRouteGuardProps) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background" data-testid="crm-auth-loading">
-        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Verifying access...</p>
+      <div
+        className="min-h-screen flex flex-col items-center justify-center gap-6 bg-background"
+        data-testid="crm-auth-loading"
+      >
+        {/* Unique, minimalist GHQ entry loader: breathing logo + a sweeping bar. */}
+        <div className="relative">
+          <span className="absolute inset-0 rounded-2xl bg-[#711419]/10 blur-xl animate-pulse" />
+          <img
+            src={redLogo}
+            alt="GHQ"
+            className="relative h-12 w-12 rounded-xl object-contain animate-[pulse_2.2s_ease-in-out_infinite]"
+          />
+        </div>
+        <div className="h-1 w-36 overflow-hidden rounded-full bg-[#711419]/10">
+          <div
+            className="h-full w-1/4 rounded-full bg-[#711419]"
+            style={{ animation: "ghq-loader-sweep 1.1s ease-in-out infinite" }}
+          />
+        </div>
+        <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Entering GHQ</p>
       </div>
     );
   }
