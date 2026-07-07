@@ -198,7 +198,7 @@ export default function CrmAnalytics() {
                       <h2 className="text-sm font-semibold text-slate-700">{g.title}</h2>
                       <span className="text-xs text-slate-400">({g.sensors.length})</span>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {g.sensors.map((s) => (
                         <SensorCard key={s.id} sensor={s} onClick={() => setDetail(s)} />
                       ))}

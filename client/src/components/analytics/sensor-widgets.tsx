@@ -137,12 +137,13 @@ export function SensorCard({ sensor, onClick }: { sensor: SensorView; onClick?: 
       )}
       data-testid={`sensor-card-${sensor.id}`}
     >
-      <div className="h-1" style={{ backgroundColor: meta.color }} />
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-2 mb-3">
+      <div className="h-1.5" style={{ backgroundColor: meta.color }} />
+      <CardContent className="p-5">
+        {/* Header */}
+        <div className="mb-4 flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <p className="font-semibold text-slate-900 truncate">
+              <p className="truncate text-base font-semibold text-slate-900">
                 {sensor.label || sensor.deviceName || "Unnamed sensor"}
               </p>
               {sensor.sku && (
@@ -151,12 +152,12 @@ export function SensorCard({ sensor, onClick }: { sensor: SensorView; onClick?: 
                 </span>
               )}
             </div>
-            {subtitle && <p className="text-xs text-slate-500 truncate">{subtitle}</p>}
+            {subtitle && <p className="truncate text-xs text-slate-500">{subtitle}</p>}
           </div>
           <span
             className={cn(
-              "inline-flex items-center gap-1 text-[11px] font-medium shrink-0",
-              offline ? "text-slate-400" : "text-green-600",
+              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium shrink-0",
+              offline ? "bg-slate-100 text-slate-400" : "bg-green-50 text-green-600",
             )}
           >
             {offline ? <WifiOff className="h-3.5 w-3.5" /> : <Wifi className="h-3.5 w-3.5" />}
@@ -164,43 +165,56 @@ export function SensorCard({ sensor, onClick }: { sensor: SensorView; onClick?: 
           </span>
         </div>
 
-        <div className="flex items-end justify-between">
-          <div className="flex items-baseline gap-2">
-            <Droplets className="h-5 w-5 self-center" style={{ color: meta.color }} />
-            <span className="text-3xl font-bold tabular-nums leading-none" style={{ color: meta.color }}>
-              {hum != null ? `${Math.round(hum)}%` : "—"}
-            </span>
-            <span className="text-xs font-semibold" style={{ color: meta.color }}>
-              {meta.label}
-            </span>
+        {/* Big readings */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Humidity — the hero reading */}
+          <div className="rounded-2xl p-4" style={{ backgroundColor: `${meta.color}12` }}>
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide" style={{ color: meta.color }}>
+              <Droplets className="h-4 w-4" /> Humidity
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-0.5">
+              <span className="text-5xl font-bold leading-none tabular-nums" style={{ color: meta.color }}>
+                {hum != null ? Math.round(hum) : "—"}
+              </span>
+              <span className="text-2xl font-semibold" style={{ color: meta.color }}>%</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-slate-600">
-            <Thermometer className="h-4 w-4 text-slate-400" />
-            <span className="text-sm font-medium tabular-nums">
-              {sensor.temperatureF != null ? `${Math.round(sensor.temperatureF)}°F` : "—"}
-            </span>
+          {/* Temperature */}
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <Thermometer className="h-4 w-4" /> Temp
+            </div>
+            <div className="mt-1.5 flex items-baseline gap-0.5">
+              <span className="text-5xl font-bold leading-none tabular-nums text-slate-800">
+                {sensor.temperatureF != null ? Math.round(sensor.temperatureF) : "—"}
+              </span>
+              <span className="text-2xl font-semibold text-slate-400">°F</span>
+            </div>
           </div>
         </div>
 
-        {/* Humidity level relative to watch / high / critical thresholds */}
-        <div className="relative mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
-          {humPct != null && (
-            <div
-              className="absolute inset-y-0 left-0 rounded-full"
-              style={{ width: `${humPct}%`, backgroundColor: meta.color }}
-            />
-          )}
-          {markers.map((v, i) => (
-            <span
-              key={i}
-              className="absolute inset-y-0 w-px bg-white/80"
-              style={{ left: `${Math.max(0, Math.min(100, v))}%` }}
-              title={`Threshold ${v}%`}
-            />
-          ))}
+        {/* Humidity gauge with safe→danger zones + a live marker */}
+        <div className="mt-5">
+          <div className="relative h-3 overflow-hidden rounded-full bg-gradient-to-r from-emerald-300 via-amber-300 to-red-400">
+            {markers.map((v, i) => (
+              <span key={i} className="absolute inset-y-0 w-px bg-white/70" style={{ left: `${Math.max(0, Math.min(100, v))}%` }} />
+            ))}
+            {humPct != null && (
+              <div
+                className="absolute top-1/2 h-5 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-900 shadow-md ring-2 ring-white"
+                style={{ left: `${humPct}%` }}
+                title={`${Math.round(hum!)}% humidity`}
+              />
+            )}
+          </div>
+          <div className="mt-1 flex justify-between text-[10px] font-medium text-slate-400">
+            <span>Dry</span>
+            <span>Ideal 30–50%</span>
+            <span>Damp</span>
+          </div>
         </div>
 
-        <div className="mt-2.5 flex items-center justify-between">
+        <div className="mt-4 flex items-center justify-between border-t pt-3">
           <RiskBadge risk={sensor.risk} />
           <p className="text-[11px] text-slate-400">Updated {timeAgo(sensor.lastReadingAt)}</p>
         </div>
