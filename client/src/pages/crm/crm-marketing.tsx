@@ -82,9 +82,14 @@ export default function CrmMarketing() {
           title="Marketing Automation"
           description="Build campaigns that run themselves — trigger, conditions, actions, timing, and safeguards."
           actions={
-            <Button onClick={openNew} className="bg-[#711419] hover:bg-[#5a1014]">
-              <Plus className="mr-1.5 h-4 w-4" /> New automation
-            </Button>
+            <>
+              <Button variant="outline" onClick={() => navigate("/crm/marketing/messages")}>
+                <MessageSquare className="mr-1.5 h-4 w-4" /> Automated messages
+              </Button>
+              <Button onClick={openNew} className="bg-[#711419] hover:bg-[#5a1014]">
+                <Plus className="mr-1.5 h-4 w-4" /> New automation
+              </Button>
+            </>
           }
         />
 
