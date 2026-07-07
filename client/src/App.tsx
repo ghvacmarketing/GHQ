@@ -213,19 +213,10 @@ function GlobalLoader() {
 // CRM inter-page loading placeholder. Kept intentionally quiet: a subtle,
 // fading spinner on the app background (no full-screen "Loading…" banner) so
 // navigating between pages feels like a smooth transition, not a page reload.
+// No visible loader when switching between CRM pages — chunks are cached after
+// first load, so a fallback just flashes. Render nothing for a seamless switch.
 function CrmLoader() {
-  return (
-    <div
-      className="flex min-h-[60vh] items-center justify-center bg-background animate-in fade-in-0 duration-300"
-      data-testid="crm-loader"
-    >
-      {/* Unique, minimalist brand pulse — a maroon dot with an expanding ring. */}
-      <span className="relative flex h-3.5 w-3.5">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#711419] opacity-60" />
-        <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-[#711419]" />
-      </span>
-    </div>
-  );
+  return null;
 }
 
 // Wrapper for lazy-loaded CRM pages

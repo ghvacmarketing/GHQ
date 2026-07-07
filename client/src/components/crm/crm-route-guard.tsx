@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ShieldX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { crmFetch } from "@/lib/crmAuth";
@@ -27,13 +27,26 @@ export default function CrmRouteGuard({ children }: CrmRouteGuardProps) {
     refetchIntervalInBackground: true,
   });
 
+  // Keep the entry loader on screen for at least 500ms when it actually shows,
+  // so the animation reads as intentional instead of flashing. Cached
+  // navigations (not loading at mount) skip it entirely — no artificial delay.
+  const wasLoadingAtMount = useRef(isLoading);
+  const [minDelayDone, setMinDelayDone] = useState(!isLoading);
+  useEffect(() => {
+    if (wasLoadingAtMount.current) {
+      const t = setTimeout(() => setMinDelayDone(true), 500);
+      return () => clearTimeout(t);
+    }
+  }, []);
+  const showLoader = isLoading || (wasLoadingAtMount.current && !minDelayDone);
+
   useEffect(() => {
     if (!isLoading && !currentUser) {
       navigate("/crm/login");
     }
   }, [isLoading, currentUser, navigate]);
 
-  if (isLoading) {
+  if (showLoader) {
     return (
       <div
         className="min-h-screen flex flex-col items-center justify-center gap-6 bg-background"
