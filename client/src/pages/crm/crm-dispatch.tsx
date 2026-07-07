@@ -602,7 +602,6 @@ const SCHEDULE_START_HOUR = 6;
 const SCHEDULE_END_HOUR = 22;
 const SCHEDULE_TOTAL_MINUTES = (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR) * 60;
 const SCHEDULE_INTERVAL = STEP_MINUTES;
-const SCHEDULE_TIMELINE_WIDTH = TIMELINE_WIDTH;
 
 function getScheduleLeftPercent(date: Date): number {
   const local = toLocalTime(date);
@@ -1567,8 +1566,7 @@ function ScheduleRowTimeline({
         droppableRef?.(node);
         onNodeRef?.(node);
       }}
-      className="flex-1 relative py-2"
-      style={{ minWidth: SCHEDULE_TIMELINE_WIDTH }}
+      className="flex-1 relative py-2 min-w-0"
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
     >
@@ -1623,11 +1621,15 @@ interface TechnicianScheduleBoardProps {
 }
 
 function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, dragClickHourOffset = 0, onPreviewTimeChange, onOpenQuickStatus, activeDragDurationHours = 1, onRegisterTimelineNode, activeDragLabel, previewHourByTech = {} }: TechnicianScheduleBoardProps) {
-  // One label per hour *block* (positioned between the gridlines), padded format.
+  // One label per hour *block* (positioned between the gridlines). Compact
+  // form (e.g. "6 AM", "12 PM") so all 16 hours fit any desktop width without
+  // horizontal scroll.
   const hourLabels = useMemo(() => {
     const labels: string[] = [];
     for (let h = SCHEDULE_START_HOUR; h < SCHEDULE_END_HOUR; h++) {
-      labels.push(formatClock(h));
+      const period = h >= 12 ? "PM" : "AM";
+      const hh = h % 12 === 0 ? 12 : h % 12;
+      labels.push(`${hh} ${period}`);
     }
     return labels;
   }, []);
@@ -1655,13 +1657,13 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
 
   return (
     <Card className="bg-white border overflow-hidden">
-      <div className="overflow-x-auto dispatch-timeline-scroll">
-        <div style={{ minWidth: SCHEDULE_TIMELINE_WIDTH + 200 }}>
+      <div className="overflow-x-hidden dispatch-timeline-scroll">
+        <div className="w-full">
           <div className="flex border-b border-slate-200 sticky top-0 bg-white z-20">
-            <div className="w-48 flex-shrink-0 px-4 py-3 border-r border-slate-200 text-sm font-semibold text-slate-700 bg-white sticky left-0 z-30">
+            <div className="w-44 flex-shrink-0 px-4 py-3 border-r border-slate-200 text-sm font-semibold text-slate-700 bg-white sticky left-0 z-30">
               Technicians
             </div>
-            <div className="flex-1 relative" style={{ minWidth: SCHEDULE_TIMELINE_WIDTH }}>
+            <div className="flex-1 relative min-w-0">
               <div className="relative" style={{ height: 32 }}>
                 {hourLabels.map((label, i) => {
                   // Center each label in its hour block (between the gridlines).
@@ -1692,7 +1694,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
               <DroppableScheduleRow key={tech.id} techId={tech.id}>
                 {({ isOver, setDroppableRef }) => (
                   <>
-                    <div className="w-48 flex-shrink-0 px-4 py-3 border-r border-slate-100 flex items-center gap-3 bg-white sticky left-0 z-10">
+                    <div className="w-44 flex-shrink-0 px-4 py-3 border-r border-slate-100 flex items-center gap-3 bg-white sticky left-0 z-10">
                       <div className="w-10 h-10 rounded-lg bg-slate-200 flex items-center justify-center">
                         <User className="w-6 h-6 text-slate-500" />
                       </div>
@@ -1755,11 +1757,8 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
           {/* Empty-day hint — subtle, only when nothing is scheduled */}
           {workOrders.length === 0 && (
             <div className="flex border-t border-slate-100">
-              <div className="w-48 flex-shrink-0 sticky left-0 z-10 bg-white" />
-              <div
-                className="flex-1 px-4 py-5 text-center text-xs text-slate-400"
-                style={{ minWidth: SCHEDULE_TIMELINE_WIDTH }}
-              >
+              <div className="w-44 flex-shrink-0 sticky left-0 z-10 bg-white" />
+              <div className="flex-1 min-w-0 px-4 py-5 text-center text-xs text-slate-400">
                 No work orders scheduled for this day. Create one or drag an unassigned job onto a technician.
               </div>
             </div>
@@ -1767,7 +1766,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
 
           {/* Add-technician action — gives the grid an intentional end instead of blank space */}
           <div className="flex border-t border-slate-200">
-            <div className="w-48 flex-shrink-0 sticky left-0 z-10 bg-white px-2 py-1.5">
+            <div className="w-44 flex-shrink-0 sticky left-0 z-10 bg-white px-2 py-1.5">
               <Link href="/crm/settings/users">
                 <Button
                   variant="ghost"
@@ -1779,7 +1778,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                 </Button>
               </Link>
             </div>
-            <div className="flex-1" style={{ minWidth: SCHEDULE_TIMELINE_WIDTH }} />
+            <div className="flex-1 min-w-0" />
           </div>
         </div>
       </div>
