@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Sparkles, ChevronLeft, ChevronRight, Zap, MessageSquare, Gauge, ZoomIn } from "lucide-react";
+import { Sparkles, ChevronRight, Zap, MessageSquare, Gauge, ZoomIn } from "lucide-react";
 
 type Feature = { icon: any; title: string; body: string; image?: string };
 
@@ -41,46 +41,41 @@ export function WhatsNewPanel() {
           <Sparkles className="h-3.5 w-3.5" /> What's new in GHQ
         </div>
 
-        {/* Screenshot / preview — hover to magnify */}
-        <div
-          className="group relative w-full max-w-2xl overflow-hidden rounded-2xl border border-white/10 bg-black/30 shadow-2xl"
-          onMouseEnter={() => f.image && imgOk && setZoomed(true)}
-          onMouseLeave={() => setZoomed(false)}
-        >
-          <div className={cn("aspect-video w-full", f.image && imgOk && "cursor-zoom-in")}>
-            {f.image && imgOk ? (
-              <img
-                src={f.image}
-                alt={f.title}
-                onError={() => setImgOk(false)}
-                className="h-full w-full object-contain"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-white/10 to-transparent">
-                <f.icon className="h-16 w-16 text-white/35" />
+        {/* Screenshot / preview — hover to magnify, next arrow sits to its right */}
+        <div className="flex w-full max-w-2xl items-center gap-3">
+          <div
+            className="group relative min-w-0 flex-1 overflow-hidden rounded-2xl border border-white/10 bg-black/30 shadow-2xl"
+            onMouseEnter={() => f.image && imgOk && setZoomed(true)}
+            onMouseLeave={() => setZoomed(false)}
+          >
+            <div className={cn("aspect-video w-full", f.image && imgOk && "cursor-zoom-in")}>
+              {f.image && imgOk ? (
+                <img
+                  src={f.image}
+                  alt={f.title}
+                  onError={() => setImgOk(false)}
+                  className="h-full w-full object-contain"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-white/10 to-transparent">
+                  <f.icon className="h-16 w-16 text-white/35" />
+                </div>
+              )}
+            </div>
+
+            {/* Magnify hint */}
+            {f.image && imgOk && (
+              <div className="pointer-events-none absolute right-2.5 top-2.5 flex items-center gap-1 rounded-full bg-black/40 px-2 py-1 text-[10px] font-medium text-white/80 opacity-0 backdrop-blur transition-opacity duration-300 group-hover:opacity-100">
+                <ZoomIn className="h-3 w-3" /> Hover to zoom
               </div>
             )}
           </div>
 
-          {/* Magnify hint */}
-          {f.image && imgOk && (
-            <div className="pointer-events-none absolute right-2.5 top-2.5 flex items-center gap-1 rounded-full bg-black/40 px-2 py-1 text-[10px] font-medium text-white/80 opacity-0 backdrop-blur transition group-hover:opacity-100">
-              <ZoomIn className="h-3 w-3" /> Hover to zoom
-            </div>
-          )}
-
-          {/* Arrows */}
-          <button
-            onClick={() => go(active - 1)}
-            aria-label="Previous"
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 rounded-full bg-black/30 p-1.5 text-white/90 backdrop-blur transition hover:bg-black/50"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
+          {/* Next */}
           <button
             onClick={() => go(active + 1)}
             aria-label="Next"
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full bg-black/30 p-1.5 text-white/90 backdrop-blur transition hover:bg-black/50"
+            className="shrink-0 rounded-full border border-white/15 bg-white/10 p-2 text-white/80 transition hover:bg-white/20 hover:text-white"
           >
             <ChevronRight className="h-5 w-5" />
           </button>
@@ -110,13 +105,22 @@ export function WhatsNewPanel() {
         <p className="mt-9 text-xs text-white/50">giesbrechthvac.com · Powered by GHQ</p>
       </div>
 
-      {/* Magnified overlay — shows the full screenshot large while hovering. */}
-      {zoomed && f.image && imgOk && (
-        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm animate-in fade-in duration-150">
+      {/* Magnified overlay — soft fade + gentle scale on the way in and out.
+          Always mounted so leaving animates too (not an abrupt unmount). */}
+      {f.image && imgOk && (
+        <div
+          className={cn(
+            "pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm transition-opacity duration-500 ease-out",
+            zoomed ? "opacity-100" : "opacity-0"
+          )}
+        >
           <img
             src={f.image}
             alt={f.title}
-            className="max-h-[92vh] max-w-[92vw] rounded-xl border border-white/10 object-contain shadow-2xl"
+            className={cn(
+              "max-h-[92vh] max-w-[92vw] rounded-xl border border-white/10 object-contain shadow-2xl transition-transform duration-500 ease-out",
+              zoomed ? "scale-100" : "scale-95"
+            )}
           />
         </div>
       )}
