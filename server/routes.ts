@@ -22032,7 +22032,10 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           
           // Insert new messages from Textline
           for (const tm of textlineMessages) {
-            if (!existingExternalIds.has(tm.uuid)) {
+            // Skip empty "ghost" posts (no text and no attachments) so they
+            // don't create blank message bubbles.
+            const tmHasContent = !!(tm.body && String(tm.body).trim()) || (Array.isArray(tm.attachments) && tm.attachments.length > 0);
+            if (!existingExternalIds.has(tm.uuid) && tmHasContent) {
               try {
                 await storage.createMessage({
                   conversationId: id,
@@ -25564,7 +25567,10 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           
           // Insert new messages from Textline
           for (const tm of textlineMessages) {
-            if (!existingExternalIds.has(tm.uuid)) {
+            // Skip empty "ghost" posts (no text and no attachments) so they
+            // don't create blank message bubbles.
+            const tmHasContent = !!(tm.body && String(tm.body).trim()) || (Array.isArray(tm.attachments) && tm.attachments.length > 0);
+            if (!existingExternalIds.has(tm.uuid) && tmHasContent) {
               try {
                 await storage.createMessage({
                   conversationId: id,

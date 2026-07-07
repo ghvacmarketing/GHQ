@@ -700,6 +700,13 @@ export default function CrmMessaging() {
                     );
                   }
                   const outbound = msg.direction === "outbound";
+                  const attachments = ((msg.attachments as any[] | undefined) || []).filter((a) => a && a.url);
+                  const hasBody = !!(msg.body && String(msg.body).trim());
+                  // Skip "ghost" messages that carry neither text nor attachments
+                  // (e.g. empty/duplicate rows) so they don't render as a blank bubble.
+                  if (!hasBody && attachments.length === 0) return null;
+                  const isImage = (a: any) =>
+                    (a.contentType || "").startsWith("image/") || /\.(png|jpe?g|gif|webp)$/i.test(a.url || "");
                   return (
                     <div key={msg.id}>
                       {showDateDivider && (
@@ -720,7 +727,24 @@ export default function CrmMessaging() {
                           )}
                           data-testid={`message-${msg.id}`}
                         >
-                          <p className="whitespace-pre-wrap break-words text-[0.9375rem] leading-relaxed">{msg.body}</p>
+                          {attachments.length > 0 && (
+                            <div className="mb-1 space-y-1">
+                              {attachments.map((a, i) =>
+                                isImage(a) ? (
+                                  <a key={i} href={a.url} target="_blank" rel="noopener noreferrer">
+                                    <img src={a.url} alt={a.filename || "attachment"} className="max-h-60 rounded-lg" />
+                                  </a>
+                                ) : (
+                                  <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" className="block text-sm underline">
+                                    {a.filename || "Attachment"}
+                                  </a>
+                                ),
+                              )}
+                            </div>
+                          )}
+                          {hasBody && (
+                            <p className="whitespace-pre-wrap break-words text-[0.9375rem] leading-relaxed">{msg.body}</p>
+                          )}
                         </div>
                         {/* Sender · time · status sit below the bubble, outside the box */}
                         <div
