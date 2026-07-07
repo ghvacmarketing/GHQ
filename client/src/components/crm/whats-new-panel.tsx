@@ -1,20 +1,15 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import {
-  Sparkles, ChevronLeft, ChevronRight, Zap, MessageSquare, Gauge, CalendarClock, Megaphone, LayoutDashboard,
-} from "lucide-react";
+import { Sparkles, ChevronLeft, ChevronRight, Zap, MessageSquare, Gauge } from "lucide-react";
 
 type Feature = { icon: any; title: string; body: string; image?: string };
 
 // Edit this list to post product updates. Drop a screenshot in
 // client/public/whats-new/ and set `image` to "/whats-new/<file>.png".
 const FEATURES: Feature[] = [
+  { icon: MessageSquare, title: "Unified messaging inbox", body: "A three-pane inbox with live customer context — texts, sender names, and instant read receipts in one place.", image: "/whats-new/messaging.png" },
   { icon: Zap, title: "Marketing automations", body: "Build hands-free campaigns: trigger → conditions → actions → timing → safeguards.", image: "/whats-new/automations.png" },
-  { icon: MessageSquare, title: "Faster messaging inbox", body: "Instant read receipts, sender names, image messages, and near-real-time inbound texts.", image: "/whats-new/messaging.png" },
-  { icon: Gauge, title: "Humidity & temp sensors", body: "Big, clear Govee sensor readouts with live gauges and threshold alerts in Analytics.", image: "/whats-new/sensors.png" },
-  { icon: CalendarClock, title: "Cleaner dispatch board", body: "A tidier timeline and a smoother work-order detail panel.", image: "/whats-new/dispatch.png" },
-  { icon: Megaphone, title: "Automated messages hub", body: "Edit every built-in text & email and toggle them on or off in one place.", image: "/whats-new/messages.png" },
-  { icon: LayoutDashboard, title: "Business analytics", body: "Live revenue, quotes, work orders, and technician performance — wired to real CRM data.", image: "/whats-new/analytics.png" },
+  { icon: Gauge, title: "Humidity & temperature sensors", body: "Big, clear live Govee readouts with gauges and threshold alerts in Environment Monitoring.", image: "/whats-new/sensors.png" },
 ];
 
 export function WhatsNewPanel() {
@@ -22,9 +17,9 @@ export function WhatsNewPanel() {
   const [imgOk, setImgOk] = useState(true);
   const len = FEATURES.length;
 
-  // Auto-advance every 15s. Keyed on `active` so manual navigation resets it.
+  // Auto-advance every 10s. Keyed on `active` so manual navigation resets it.
   useEffect(() => {
-    const id = setTimeout(() => setActive((a) => (a + 1) % len), 15000);
+    const id = setTimeout(() => setActive((a) => (a + 1) % len), 10000);
     return () => clearTimeout(id);
   }, [active, len]);
 

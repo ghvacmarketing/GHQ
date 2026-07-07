@@ -66,33 +66,49 @@ function TemplateSection({
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between border-b pb-2">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          <Icon className="h-4 w-4 text-muted-foreground" /> {title}
+          <Icon className="h-4 w-4 text-[#711419]" /> {title}
+          <span className="text-xs font-normal text-muted-foreground">({data?.templates.length ?? 0})</span>
         </h2>
-        <Button size="sm" disabled={!dirty || save.isPending} onClick={() => save.mutate()}>
+        <Button size="sm" variant={dirty ? "default" : "ghost"} disabled={!dirty || save.isPending} onClick={() => save.mutate()}>
           {save.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-          Save changes
+          {dirty ? "Save changes" : "Saved"}
         </Button>
       </div>
       {isLoading ? (
-        <div className="space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-24 rounded-xl" />)}</div>
+        <div className="space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-28 rounded-xl" />)}</div>
       ) : (
         <div className="space-y-3">
-          {data?.templates.map((t) => (
-            <Card key={t.key}>
-              <CardContent className="p-4">
-                <p className="text-sm font-medium text-foreground">{t.description}</p>
-                <Textarea
-                  value={drafts[t.key] ?? t.value}
-                  onChange={(e) => setDrafts((d) => ({ ...d, [t.key]: e.target.value }))}
-                  rows={kind === "email" ? 3 : 2}
-                  className="mt-2 text-sm"
-                />
-                {t.placeholders && <p className="mt-1.5 text-[11px] text-muted-foreground">Placeholders: {t.placeholders}</p>}
-              </CardContent>
-            </Card>
-          ))}
+          {data?.templates.map((t) => {
+            const val = drafts[t.key] ?? t.value;
+            return (
+              <Card key={t.key} className="rounded-xl transition-shadow hover:shadow-sm">
+                <CardContent className="p-4">
+                  <div className="mb-2 flex items-center gap-2.5">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#711419]/8">
+                      <Icon className="h-4 w-4 text-[#711419]" />
+                    </span>
+                    <p className="text-sm font-semibold text-foreground">{t.description}</p>
+                  </div>
+                  <Textarea
+                    value={val}
+                    onChange={(e) => setDrafts((d) => ({ ...d, [t.key]: e.target.value }))}
+                    rows={kind === "email" ? 3 : 2}
+                    className="text-sm"
+                  />
+                  <div className="mt-1.5 flex items-center justify-between gap-3">
+                    {t.placeholders ? (
+                      <p className="truncate text-[11px] text-muted-foreground">Variables: {t.placeholders}</p>
+                    ) : <span />}
+                    {kind === "sms" && (
+                      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{val.length} chars</span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
@@ -127,9 +143,9 @@ export default function CrmAutomatedMessages() {
 
   return (
     <CrmLayout currentUser={currentUser ?? undefined}>
-      <div className="w-full max-w-3xl space-y-6 pb-10">
+      <div className="mx-auto w-full max-w-2xl space-y-8 pb-16">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigate("/crm/marketing")}>
+          <Button variant="ghost" size="sm" className="h-8 w-8 shrink-0 p-0" onClick={() => navigate("/crm/marketing")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
