@@ -12,8 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { setCrmToken, crmFetch } from "@/lib/crmAuth";
-import { ArrowLeft, AlertCircle, Lock, Mail, Loader2 } from "lucide-react";
-import { Link } from "wouter";
+import { AlertCircle, Lock, Mail, Loader2 } from "lucide-react";
 import redlogo from "@assets/redlogo.webp";
 import { WhatsNewPanel } from "@/components/crm/whats-new-panel";
 import type { CrmUser } from "@shared/schema";
@@ -37,7 +36,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function CrmLogin() {
   usePageTitle("CRM Login");
-  const [location, navigate] = useLocation();
+  const [location] = useLocation();
   const { toast } = useToast();
 
   const googleError = useMemo(() => {
@@ -126,10 +125,6 @@ export default function CrmLogin() {
     loginMutation.mutate(data);
   };
 
-  const handleBackToHome = () => {
-    navigate("/");
-  };
-
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#4a0d10] to-slate-900 flex items-center justify-center">
@@ -146,12 +141,6 @@ export default function CrmLogin() {
     <div className="flex min-h-screen bg-background">
       {/* Left — sign in */}
       <div className="relative flex w-full flex-col justify-center px-6 py-10 sm:px-10 lg:w-[46%] lg:px-16">
-        <Link href="/">
-          <Button variant="ghost" size="sm" className="absolute left-4 top-4 text-muted-foreground" data-testid="button-home">
-            <ArrowLeft className="mr-1.5 h-4 w-4" /> Home
-          </Button>
-        </Link>
-
         <div className="mx-auto w-full max-w-sm">
           <img src={redlogo} alt="Giesbrecht HVAC" className="mb-8 h-12" />
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Sign in to GHQ</h1>

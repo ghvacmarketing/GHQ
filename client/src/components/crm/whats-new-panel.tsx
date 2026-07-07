@@ -39,14 +39,14 @@ export function WhatsNewPanel() {
         </div>
 
         {/* Screenshot / preview */}
-        <div className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-black/20 shadow-2xl">
-          <div className="aspect-[16/10] w-full">
+        <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-white/10 bg-black/30 shadow-2xl">
+          <div className="aspect-video w-full">
             {f.image && imgOk ? (
               <img
                 src={f.image}
                 alt={f.title}
                 onError={() => setImgOk(false)}
-                className="h-full w-full object-cover"
+                className="h-full w-full object-contain"
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-white/10 to-transparent">
@@ -73,7 +73,7 @@ export function WhatsNewPanel() {
         </div>
 
         {/* Text */}
-        <div className="mt-6 max-w-xl">
+        <div className="mt-6 max-w-2xl">
           <div className="flex items-center gap-2">
             <f.icon className="h-5 w-5" />
             <h3 className="text-xl font-semibold xl:text-2xl">{f.title}</h3>
