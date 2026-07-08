@@ -226,7 +226,10 @@ export function FleetMap({ vehicles, selectedVehicleId, onVehicleClick }: FleetM
   ];
 
   return (
-    <div className="flex-1 min-h-[400px] relative">
+    // `isolate` traps Leaflet's internal z-indexes (controls/panes go up to
+    // 1000) inside this stacking context, so they can't paint over the portaled
+    // detail Sheet (z-50) and overlap the side panel.
+    <div className="flex-1 min-h-[400px] relative isolate">
       <style>{MAP_STYLES}</style>
 
       {/* Live fleet summary — top left */}
