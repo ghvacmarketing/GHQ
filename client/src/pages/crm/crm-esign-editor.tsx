@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
-  ArrowLeft, Loader2, Plus, Trash2, Send, Save, PenTool, Type, Calendar, UserSquare, Hash, CheckCircle2, Copy,
+  ArrowLeft, Loader2, Plus, Trash2, Send, Save, PenTool, Type, Calendar, UserSquare, Hash, CheckCircle2, Copy, DollarSign,
 } from "lucide-react";
 import type { CrmUser, SignatureDocument, SignatureRecipient, SignatureField } from "@shared/schema";
 
@@ -40,6 +40,9 @@ const FIELD_TYPES = [
   { type: "name", label: "Full Name", icon: UserSquare, w: 0.22, h: 0.04 },
   { type: "date", label: "Date", icon: Calendar, w: 0.16, h: 0.04 },
   { type: "text", label: "Text", icon: Type, w: 0.22, h: 0.04 },
+  // Placed from the Deposit section (not the field palette). Renders as a
+  // "Pay $X" button on the signing page.
+  { type: "payment", label: "Payment", icon: DollarSign, w: 0.26, h: 0.055 },
 ];
 
 export default function CrmEsignEditor() {
@@ -88,16 +91,8 @@ export default function CrmEsignEditor() {
         x: f.x, y: f.y, width: f.width, height: f.height, required: f.required,
       })));
       setDirty(false);
-      // Seed deposit form from the saved document
-      setDepEnabled(!!doc.depositEnabled);
-      setDepMode((doc.depositMode as "percent" | "amount") || "percent");
-      setDepTotal(doc.contractTotalCents ? (doc.contractTotalCents / 100).toString() : "");
-      setDepPct(doc.depositPercentage ? doc.depositPercentage.toString() : "50");
-      setDepAmount(
-        doc.depositMode === "amount" && doc.depositAmountCents
-          ? (doc.depositAmountCents / 100).toString()
-          : "",
-      );
+      // Seed the deposit amount from the saved document
+      setDepAmount(doc.depositAmountCents ? (doc.depositAmountCents / 100).toString() : "");
     }
     if (doc.recipients.length && !activeRecipientId) {
       setActiveRecipientId(doc.recipients[0].id);
@@ -126,31 +121,21 @@ export default function CrmEsignEditor() {
   const [recipName, setRecipName] = useState("");
   const [recipEmail, setRecipEmail] = useState("");
 
-  // ---- Deposit / payment request ----
-  const [depEnabled, setDepEnabled] = useState(false);
-  const [depMode, setDepMode] = useState<"percent" | "amount">("percent");
-  const [depTotal, setDepTotal] = useState("");
-  const [depPct, setDepPct] = useState("50");
+  // ---- Deposit / payment request (simple: just an amount) ----
   const [depAmount, setDepAmount] = useState("");
-
-  const depositPreview = depMode === "percent"
-    ? (parseFloat(depTotal || "0") || 0) * (parseInt(depPct || "0", 10) || 0) / 100
-    : (parseFloat(depAmount || "0") || 0);
+  const depositAmountNum = parseFloat(depAmount || "0") || 0;
 
   const saveDeposit = useMutation({
     mutationFn: async () => {
-      const body = depEnabled
-        ? (depMode === "percent"
-            ? { enabled: true, mode: "percent", contractTotalDollars: parseFloat(depTotal), percentage: parseInt(depPct, 10) }
-            : { enabled: true, mode: "amount", amountDollars: parseFloat(depAmount) })
+      const body = depositAmountNum > 0
+        ? { enabled: true, mode: "amount", amountDollars: depositAmountNum }
         : { enabled: false };
       const res = await apiRequest("PUT", `/api/crm/signature-documents/${docId}/deposit`, body);
-      if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.message || "Failed");
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/signature-documents", docId] });
-      toast({ title: "Deposit settings saved" });
+      toast({ title: depositAmountNum > 0 ? "Amount saved — now place the Pay button" : "Deposit removed" });
     },
     onError: (e: any) => toast({ title: e?.message || "Couldn't save deposit", variant: "destructive" }),
   });
@@ -242,7 +227,7 @@ export default function CrmEsignEditor() {
     const newField: WorkingField = {
       id: (crypto as any).randomUUID ? crypto.randomUUID() : `tmp-${Date.now()}-${Math.random()}`,
       recipientId: activeRecipientId, page: pageNum, type: activeTool,
-      x, y, width: def.w, height: def.h, required: true,
+      x, y, width: def.w, height: def.h, required: activeTool !== "payment",
     };
     setFields((prev) => [...prev, newField]);
     setDirty(true);
@@ -442,7 +427,7 @@ export default function CrmEsignEditor() {
                   </p>
                 )}
                 <div className="grid grid-cols-2 gap-2">
-                  {FIELD_TYPES.map((ft) => {
+                  {FIELD_TYPES.filter((ft) => ft.type !== "payment").map((ft) => {
                     const Icon = ft.icon;
                     const selected = activeTool === ft.type;
                     return (
@@ -461,99 +446,62 @@ export default function CrmEsignEditor() {
               </div>
             )}
 
-            {/* Deposit / payment request — customer can pay this after signing */}
+            {/* Deposit / payment — enter an amount, then drop a Pay button on the doc */}
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Deposit request</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Payment</h3>
               {doc.depositPaidAt ? (
                 <div className="rounded-lg border border-green-200 bg-green-50 p-2.5 text-xs font-medium text-green-700">
-                  Deposit of ${((doc.depositAmountCents || 0) / 100).toFixed(2)} paid.
+                  ${((doc.depositAmountCents || 0) / 100).toFixed(2)} paid.
                 </div>
               ) : (
                 <div className="space-y-2.5 rounded-lg border border-slate-200 bg-white p-2.5">
-                  <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={depEnabled}
-                      onChange={(e) => setDepEnabled(e.target.checked)}
-                      className="h-3.5 w-3.5 accent-[#711419]"
-                      data-testid="checkbox-deposit-enabled"
+                  <div>
+                    <Label className="text-[11px] text-slate-500">Payment amount ($)</Label>
+                    <Input
+                      inputMode="decimal"
+                      value={depAmount}
+                      onChange={(e) => setDepAmount(e.target.value.replace(/[^0-9.]/g, ""))}
+                      placeholder="0.00"
+                      className="h-9"
+                      data-testid="input-deposit-amount"
                     />
-                    Request a deposit after signing
-                  </label>
-
-                  {depEnabled && (
-                    <>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {(["percent", "amount"] as const).map((m) => (
-                          <button
-                            key={m}
-                            type="button"
-                            onClick={() => setDepMode(m)}
-                            className={`rounded-md border px-2 py-1.5 text-[11px] font-medium transition-all ${depMode === m ? "border-[#711419] bg-[#711419]/10 text-[#711419]" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"}`}
-                            data-testid={`deposit-mode-${m}`}
-                          >
-                            {m === "percent" ? "% of total" : "Exact $"}
-                          </button>
-                        ))}
-                      </div>
-
-                      {depMode === "percent" ? (
-                        <div className="space-y-2">
-                          <div>
-                            <Label className="text-[11px] text-slate-500">Contract total ($)</Label>
-                            <Input
-                              inputMode="decimal"
-                              value={depTotal}
-                              onChange={(e) => setDepTotal(e.target.value.replace(/[^0-9.]/g, ""))}
-                              placeholder="0.00"
-                              className="h-9"
-                              data-testid="input-deposit-total"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-[11px] text-slate-500">Deposit %</Label>
-                            <Input
-                              inputMode="numeric"
-                              value={depPct}
-                              onChange={(e) => setDepPct(e.target.value.replace(/[^0-9]/g, ""))}
-                              placeholder="50"
-                              className="h-9"
-                              data-testid="input-deposit-percent"
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <div>
-                          <Label className="text-[11px] text-slate-500">Deposit amount ($)</Label>
-                          <Input
-                            inputMode="decimal"
-                            value={depAmount}
-                            onChange={(e) => setDepAmount(e.target.value.replace(/[^0-9.]/g, ""))}
-                            placeholder="0.00"
-                            className="h-9"
-                            data-testid="input-deposit-amount"
-                          />
-                        </div>
-                      )}
-
-                      <p className="text-[11px] text-slate-500">
-                        Customer pays{" "}
-                        <span className="font-semibold text-slate-800">${depositPreview.toFixed(2)}</span>{" "}
-                        after signing.
-                      </p>
-                    </>
-                  )}
+                  </div>
 
                   <Button
                     size="sm"
-                    className="w-full bg-[#711419] hover:bg-[#5a1014]"
-                    disabled={saveDeposit.isPending || (depEnabled && depositPreview <= 0)}
+                    variant="outline"
+                    className="w-full"
+                    disabled={saveDeposit.isPending}
                     onClick={() => saveDeposit.mutate()}
                     data-testid="button-save-deposit"
                   >
                     {saveDeposit.isPending ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-2 h-3.5 w-3.5" />}
-                    Save deposit
+                    Save amount
                   </Button>
+
+                  {isDraft && depositAmountNum > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!activeRecipientId) {
+                            toast({ title: "Select a recipient first" });
+                            return;
+                          }
+                          setActiveTool("payment");
+                        }}
+                        className={`flex w-full items-center justify-center gap-1.5 rounded-lg border p-2.5 text-xs font-medium transition-all ${activeTool === "payment" ? "border-[#711419] bg-[#711419]/10 text-[#711419] shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"}`}
+                        data-testid="tool-payment"
+                      >
+                        <DollarSign className="h-3.5 w-3.5" /> Place Pay button
+                      </button>
+                      <p className="text-[11px] text-slate-500">
+                        {activeTool === "payment"
+                          ? "Click the document to drop the Pay button, then drag to position it."
+                          : `Customer pays $${depositAmountNum.toFixed(2)}. Click above, then click the doc to place it.`}
+                      </p>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -584,6 +532,7 @@ export default function CrmEsignEditor() {
                         const color = r?.color || "#711419";
                         const ft = FIELD_TYPES.find((t) => t.type === f.type);
                         const Icon = ft?.icon || Type;
+                        const isPayment = f.type === "payment";
                         return (
                           <div
                             key={f.id}
@@ -595,15 +544,16 @@ export default function CrmEsignEditor() {
                             style={{
                               left: `${f.x * 100}%`, top: `${f.y * 100}%`,
                               width: `${f.width * 100}%`, height: `${f.height * 100}%`,
-                              backgroundColor: `${color}22`,
-                              border: `1.5px solid ${color}`,
-                              color,
+                              backgroundColor: isPayment ? "#711419" : `${color}22`,
+                              border: isPayment ? "none" : `1.5px solid ${color}`,
+                              color: isPayment ? "#ffffff" : color,
+                              borderRadius: isPayment ? "6px" : undefined,
                               cursor: isDraft ? "move" : "default",
                             }}
                             data-testid={`field-${f.id}`}
                           >
-                            <span className="flex items-center gap-1 text-[10px] font-medium truncate px-1 pointer-events-none">
-                              <Icon className="h-3 w-3 shrink-0" /> {ft?.label}
+                            <span className="flex items-center gap-1 text-[10px] font-semibold truncate px-1 pointer-events-none">
+                              <Icon className="h-3 w-3 shrink-0" /> {isPayment ? `Pay $${depositAmountNum.toFixed(2)}` : ft?.label}
                             </span>
                             {isDraft && (
                               <button

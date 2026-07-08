@@ -10,7 +10,7 @@ import type { InsertSignatureField, SignatureDocument } from "@shared/schema";
 
 const objectStorageService = new ObjectStorageService();
 
-const FIELD_TYPES = ["signature", "initials", "date", "text", "name"];
+const FIELD_TYPES = ["signature", "initials", "date", "text", "name", "payment"];
 const RECIPIENT_COLORS = ["#711419", "#1d4ed8", "#15803d", "#b45309", "#7c3aed", "#0e7490"];
 
 function baseUrl(req: Request): string {
@@ -313,7 +313,9 @@ export function registerEsignRoutes(app: Express): void {
           y: clamp(f.y),
           width: clamp(f.width),
           height: clamp(f.height),
-          required: f.required !== false,
+          // A payment button is never a "required" fill-in field — it must not
+          // count toward the signer's required-fields check.
+          required: f.type === "payment" ? false : f.required !== false,
           value: null,
         } as any);
       }

@@ -330,29 +330,6 @@ export default function PublicSign() {
         <div className="h-1 w-full bg-slate-100">
           <div className="h-full transition-all duration-300" style={{ width: `${progressPct}%`, backgroundColor: accent }} />
         </div>
-
-        {/* Deposit notice — required to finish. Unlocks once all fields are done. */}
-        {data.deposit?.enabled && !depositPaid && (
-          <div className="border-t border-slate-100 bg-amber-50/70">
-            <div className="max-w-4xl mx-auto flex items-center justify-between gap-3 px-4 py-2">
-              <p className="text-xs text-amber-800">
-                Deposit due: <span className="font-semibold">${data.deposit.amount.toFixed(2)}</span>
-                {data.deposit.mode === "percent" && data.deposit.percentage ? ` (${data.deposit.percentage}%)` : ""}
-                <span className="ml-1 text-amber-700/70">· required to finish</span>
-              </p>
-              <Button
-                size="sm"
-                onClick={() => payDeposit.mutate()}
-                disabled={requiredRemaining > 0 || payDeposit.isPending}
-                className="shrink-0 text-xs bg-[#711419] text-white hover:bg-[#5a1014]"
-                data-testid="button-pay-deposit-bar"
-              >
-                {payDeposit.isPending && <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />}
-                {requiredRemaining > 0 ? "Sign first" : `Pay $${data.deposit.amount.toFixed(2)}`}
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
 
       {data.document.message && (
@@ -388,6 +365,38 @@ export default function PublicSign() {
                   <div ref={(el) => { pageRefs.current[pageNum] = el; }} className="relative rounded-md overflow-hidden shadow-md ring-1 ring-slate-200 bg-white">
                     <Page pageNumber={pageNum} width={pageWidth} renderAnnotationLayer={false} renderTextLayer={false} />
                     {pf.map((f) => {
+                      // Payment button — clickable "Pay $X" placed on the doc.
+                      if (f.type === "payment") {
+                        const amount = data.deposit?.amount ?? 0;
+                        const canPay = requiredRemaining === 0 && !depositPaid;
+                        return (
+                          <button
+                            key={f.id}
+                            type="button"
+                            onClick={() => { if (canPay) payDeposit.mutate(); }}
+                            disabled={!canPay || payDeposit.isPending}
+                            className="absolute flex items-center justify-center gap-1 rounded-md text-[11px] font-semibold text-white shadow transition"
+                            style={{
+                              left: `${f.x * 100}%`, top: `${f.y * 100}%`,
+                              width: `${f.width * 100}%`, height: `${f.height * 100}%`,
+                              backgroundColor: depositPaid ? "#16a34a" : "#711419",
+                              opacity: depositPaid || canPay ? 1 : 0.65,
+                              cursor: canPay ? "pointer" : "default",
+                            }}
+                            data-testid={`pay-field-${f.id}`}
+                          >
+                            {payDeposit.isPending ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : depositPaid ? (
+                              <><CheckCircle2 className="h-3.5 w-3.5" /> Paid</>
+                            ) : requiredRemaining > 0 ? (
+                              "Sign to pay"
+                            ) : (
+                              `Pay $${amount.toFixed(2)}`
+                            )}
+                          </button>
+                        );
+                      }
                       const filled = !!values[f.id];
                       const Icon = ICONS[f.type] || Type;
                       return (
