@@ -55,6 +55,7 @@ import {
   PanelRight,
   Phone,
   CircleUserRound,
+  ImagePlus,
 } from "lucide-react";
 import type {
   CrmMessagingConversation,
@@ -151,6 +152,13 @@ export default function CrmMessaging() {
     localStorage.setItem("crm_msg_context_collapsed", contextCollapsed ? "1" : "0");
   }, [contextCollapsed]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Pending image attachment for the composer (uploaded to object storage,
+  // then sent with the next message as an MMS).
+  type PendingAttachment = { id: string; url: string; filename: string; mimeType: string };
+  const [attachment, setAttachment] = useState<PendingAttachment | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const [newMessageOpen, setNewMessageOpen] = useState(false);
   const [newMessagePhone, setNewMessagePhone] = useState("");
@@ -210,15 +218,17 @@ export default function CrmMessaging() {
   });
 
   const sendMessageMutation = useMutation({
-    mutationFn: async (body: string) => {
+    mutationFn: async ({ body, attachments }: { body: string; attachments?: PendingAttachment[] }) => {
       const res = await apiRequest("POST", `/api/crm/messaging/conversations/${selectedConversationId}/messages`, {
         body,
-        channel: "sms",
+        channel: attachments && attachments.length > 0 ? "mms" : "sms",
+        attachments: attachments && attachments.length > 0 ? attachments : undefined,
       });
       return res.json();
     },
     onSuccess: () => {
       setMessageText("");
+      setAttachment(null);
       queryClient.invalidateQueries({ queryKey: ["/api/crm/messaging/conversations", selectedConversationId] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/messaging/conversations"] });
     },
@@ -377,14 +387,54 @@ export default function CrmMessaging() {
   }, [conversationDetail?.messages]);
 
   const handleSendMessage = () => {
-    if (!messageText.trim() || !selectedConversationId) return;
-    sendMessageMutation.mutate(messageText.trim());
+    if (!selectedConversationId) return;
+    if (!messageText.trim() && !attachment) return;
+    sendMessageMutation.mutate({
+      body: messageText.trim(),
+      attachments: attachment ? [attachment] : undefined,
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+    }
+  };
+
+  // Upload a chosen image to object storage via the presigned-URL flow, then
+  // stage it on the composer so the next send goes out as an MMS.
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (e.target) e.target.value = ""; // allow re-selecting the same file
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Only images can be sent", variant: "destructive" });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Image is too large", description: "Please keep images under 5 MB.", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    try {
+      const reqRes = await apiRequest("POST", "/api/uploads/request-url", {
+        name: file.name,
+        size: file.size,
+        contentType: file.type,
+      });
+      const { uploadURL, objectPath } = await reqRes.json();
+      const putRes = await fetch(uploadURL, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!putRes.ok) throw new Error("upload failed");
+      setAttachment({ id: crypto.randomUUID(), url: objectPath, filename: file.name, mimeType: file.type });
+    } catch {
+      toast({ title: "Couldn't upload image", variant: "destructive" });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -766,7 +816,40 @@ export default function CrmMessaging() {
             </ScrollArea>
 
             <div className="p-3 border-t border-border bg-card">
+              {/* Staged image preview */}
+              {attachment && (
+                <div className="mb-2 inline-flex items-center gap-2 rounded-lg border border-border bg-muted/40 p-1.5 pr-2">
+                  <img src={attachment.url} alt={attachment.filename} className="h-12 w-12 rounded-md object-cover" />
+                  <span className="max-w-[160px] truncate text-xs text-muted-foreground">{attachment.filename}</span>
+                  <button
+                    onClick={() => setAttachment(null)}
+                    className="rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    aria-label="Remove image"
+                    data-testid="button-remove-attachment"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
               <div className="flex gap-2 items-end">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileSelected}
+                  data-testid="input-attachment-file"
+                />
+                <Button
+                  variant="ghost"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading || sendMessageMutation.isPending}
+                  className="h-[42px] w-[42px] p-0 shrink-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+                  title="Attach image"
+                  data-testid="button-attach-image"
+                >
+                  {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
+                </Button>
                 <Textarea
                   placeholder="Type a message…"
                   value={messageText}
@@ -779,7 +862,7 @@ export default function CrmMessaging() {
                 <Button
                   variant="ghost"
                   onClick={handleSendMessage}
-                  disabled={!messageText.trim() || sendMessageMutation.isPending}
+                  disabled={(!messageText.trim() && !attachment) || sendMessageMutation.isPending}
                   className="h-[42px] w-[42px] p-0 shrink-0 rounded-lg text-primary hover:bg-primary/10 hover:text-primary disabled:opacity-40"
                   data-testid="button-send-message"
                 >

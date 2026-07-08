@@ -1,4 +1,5 @@
 import { textlineClient } from "../../textlineClient";
+import { ObjectStorageService } from "../../replit_integrations/object_storage/objectStorage";
 
 export interface MessageAttachment {
   id: string;
@@ -58,9 +59,32 @@ export class TextlineMessagingAdapter implements MessagingAdapter {
     // Always prefer phone number-based sending as it's more reliable
     // The phone number approach finds or creates the conversation automatically
     if (request.recipientPhone) {
+      // Turn any /objects/... attachments into base64 so Textline sends them
+      // as an MMS. Bytes are read from our own object store (Neon/disk/GCS).
+      let textlineAttachments: Array<{ contentType: string; filename: string; base64Data: string }> | undefined;
+      if (request.attachments && request.attachments.length > 0) {
+        const objectStore = new ObjectStorageService();
+        textlineAttachments = [];
+        for (const att of request.attachments) {
+          if (!att?.url) continue;
+          try {
+            const bytes = await objectStore.readObjectBytes(att.url);
+            textlineAttachments.push({
+              contentType: att.mimeType || "application/octet-stream",
+              filename: att.filename || "attachment",
+              base64Data: bytes.toString("base64"),
+            });
+          } catch (err) {
+            console.error("[Textline] Failed to read attachment bytes for", att.url, err);
+          }
+        }
+        if (textlineAttachments.length === 0) textlineAttachments = undefined;
+      }
+
       const result = await textlineClient.sendMessage({
         phoneNumber: request.recipientPhone,
         body: request.body,
+        attachments: textlineAttachments,
       });
 
       if (!result.success) {

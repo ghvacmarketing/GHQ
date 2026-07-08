@@ -22344,8 +22344,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       const adapterResult = await adapter.sendMessage({
         conversationId: id,
         body: body || "",
-        channel: channel || "sms",
+        channel: (msgAttachments && msgAttachments.length > 0 ? "mms" : channel || "sms"),
         recipientPhone: recipientPhone,
+        attachments: msgAttachments || undefined,
         externalConversationId: existing.externalConversationId || undefined,
       });
 
