@@ -406,6 +406,36 @@ export function registerEsignRoutes(app: Express): void {
     }
   });
 
+  // Save in-progress field values WITHOUT finalizing. Lets the signer step out
+  // to pay the deposit without losing the signatures they've already drawn.
+  app.post("/api/sign/:token/save-draft", async (req, res) => {
+    try {
+      const recipient = await storage.getSignatureRecipientByToken(req.params.token);
+      if (!recipient) return res.status(404).json({ message: "Invalid link" });
+      if (recipient.status === "signed") return res.json({ success: true });
+      const values: Record<string, string> = req.body?.values || {};
+      const myFields = await storage.getSignatureFieldsByRecipient(recipient.id);
+      const isImageDataUrl = (v: string) =>
+        /^data:image\/(png|jpe?g);base64,[A-Za-z0-9+/=\s]+$/.test(v) && v.length < 5 * 1024 * 1024;
+      const now = new Date();
+      for (const f of myFields) {
+        const raw = values[f.id];
+        if (raw == null || String(raw).trim().length === 0) continue;
+        const v = String(raw);
+        if (f.type === "signature" || f.type === "initials") {
+          if (!isImageDataUrl(v)) continue;
+          await storage.updateSignatureField(f.id, { value: v, completedAt: now });
+        } else {
+          await storage.updateSignatureField(f.id, { value: v.trim().slice(0, 500), completedAt: now });
+        }
+      }
+      res.json({ success: true });
+    } catch (err) {
+      console.error("[esign] save-draft error:", err);
+      res.status(500).json({ message: "Failed to save progress" });
+    }
+  });
+
   // Submit signed field values
   app.post("/api/sign/:token/submit", async (req, res) => {
     try {
@@ -414,6 +444,12 @@ export function registerEsignRoutes(app: Express): void {
       if (recipient.status === "signed") return res.status(400).json({ message: "You have already signed this document." });
       const doc = await storage.getSignatureDocument(recipient.documentId);
       if (!doc) return res.status(404).json({ message: "Not found" });
+
+      // When a deposit is required, it must be paid before the document can be
+      // completed. Signing alone is not enough.
+      if (doc.depositEnabled && (doc.depositAmountCents ?? 0) > 0 && !doc.depositPaidAt) {
+        return res.status(400).json({ message: "Please pay the required deposit before completing.", requiresPayment: true });
+      }
 
       const values: Record<string, string> = req.body?.values || {};
       const myFields = await storage.getSignatureFieldsByRecipient(recipient.id);
@@ -490,8 +526,12 @@ export function registerEsignRoutes(app: Express): void {
       if (!doc.depositEnabled || !doc.depositAmountCents || doc.depositAmountCents <= 0) {
         return res.status(400).json({ message: "No deposit is requested on this document." });
       }
-      if (recipient.status !== "signed") {
-        return res.status(400).json({ message: "Please sign the document before paying.", requiresSignature: true });
+      // Signing must be complete first: every required field needs a value
+      // (persisted via save-draft before the signer is redirected to pay).
+      const myFields = await storage.getSignatureFieldsByRecipient(recipient.id);
+      const missing = myFields.filter((f) => f.required && (!f.value || String(f.value).trim().length === 0));
+      if (missing.length > 0) {
+        return res.status(400).json({ message: "Please complete all required fields before paying.", requiresSignature: true });
       }
       if (doc.depositPaidAt) {
         return res.json({ paid: true, paymentLinkUrl: null });

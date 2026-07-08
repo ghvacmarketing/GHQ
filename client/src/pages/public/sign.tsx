@@ -103,15 +103,43 @@ export default function PublicSign() {
 
   const payDeposit = useMutation({
     mutationFn: async () => {
+      // Persist the drawn signatures first so nothing is lost across the
+      // redirect to Stripe, then request the payment link.
+      await apiRequest("POST", `/api/sign/${token}/save-draft`, { values });
       const res = await apiRequest("POST", `/api/sign/${token}/payment-link`, {});
       return res.json();
     },
     onSuccess: (r: any) => {
       if (r?.paid) { setDepositPaid(true); return; }
-      if (r?.paymentLinkUrl) { window.location.href = r.paymentLinkUrl; }
+      if (r?.paymentLinkUrl) { leavingForPaymentRef.current = true; window.location.href = r.paymentLinkUrl; }
     },
     onError: (e: Error) => toast({ title: "Couldn't start payment", description: e.message, variant: "destructive" }),
   });
+
+  // Warn before leaving while the document is incomplete (unsigned or unpaid),
+  // unless we're intentionally redirecting to Stripe to pay.
+  const leavingForPaymentRef = useRef(false);
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (done || data?.alreadySigned || leavingForPaymentRef.current) return;
+      const incomplete = requiredRemaining > 0 || (!!data?.deposit?.enabled && !depositPaid);
+      if (incomplete) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [done, data, requiredRemaining, depositPaid]);
+
+  // Restore any previously-saved field values (e.g. after returning from
+  // Stripe) so the signer's work survives the round-trip. User edits win.
+  useEffect(() => {
+    if (!data?.fields) return;
+    const seed: Record<string, string> = {};
+    for (const f of data.fields) if (f.value) seed[f.id] = f.value as string;
+    if (Object.keys(seed).length) setValues((prev) => ({ ...seed, ...prev }));
+  }, [data]);
 
   // Returning from Stripe (?paid=1): confirm and record the deposit.
   useEffect(() => {
@@ -161,6 +189,17 @@ export default function PublicSign() {
     if (!data) return 0;
     return data.fields.filter((f) => f.required && !values[f.id]).length;
   }, [data, values]);
+
+  // Once the deposit is paid and every field is complete, finalize automatically
+  // (e.g. when the signer returns from Stripe). Runs once.
+  const autoSubmittedRef = useRef(false);
+  useEffect(() => {
+    if (!data || done || data.alreadySigned) return;
+    if (!depositPaid || requiredRemaining !== 0) return;
+    if (autoSubmittedRef.current || submit.isPending) return;
+    autoSubmittedRef.current = true;
+    submit.mutate();
+  }, [depositPaid, data, requiredRemaining, done]);
 
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -243,32 +282,66 @@ export default function PublicSign() {
               <p className="text-xs text-slate-500">Signing as {data.recipient.name}</p>
             </div>
           </div>
-          <Button
-            onClick={() => submit.mutate()}
-            disabled={requiredRemaining > 0 || submit.isPending}
-            style={{ backgroundColor: requiredRemaining > 0 ? undefined : accent }}
-            className="text-white hover:opacity-90 shrink-0"
-            data-testid="button-finish"
-          >
-            {submit.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {requiredRemaining > 0 ? `${requiredRemaining} field${requiredRemaining === 1 ? "" : "s"} left` : "Finish & Submit"}
-          </Button>
+          {(() => {
+            const needsPay = !!data.deposit?.enabled && !depositPaid;
+            if (requiredRemaining > 0) {
+              return (
+                <Button disabled className="text-white shrink-0" data-testid="button-finish">
+                  {requiredRemaining} field{requiredRemaining === 1 ? "" : "s"} left
+                </Button>
+              );
+            }
+            if (needsPay) {
+              return (
+                <Button
+                  onClick={() => payDeposit.mutate()}
+                  disabled={payDeposit.isPending}
+                  style={{ backgroundColor: accent }}
+                  className="text-white hover:opacity-90 shrink-0"
+                  data-testid="button-pay-deposit-header"
+                >
+                  {payDeposit.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Pay deposit of ${data.deposit!.amount.toFixed(2)}
+                </Button>
+              );
+            }
+            return (
+              <Button
+                onClick={() => submit.mutate()}
+                disabled={submit.isPending}
+                style={{ backgroundColor: accent }}
+                className="text-white hover:opacity-90 shrink-0"
+                data-testid="button-finish"
+              >
+                {submit.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Finish &amp; Submit
+              </Button>
+            );
+          })()}
         </div>
         {/* Progress bar */}
         <div className="h-1 w-full bg-slate-100">
           <div className="h-full transition-all duration-300" style={{ width: `${progressPct}%`, backgroundColor: accent }} />
         </div>
 
-        {/* Deposit notice — visible but locked until signing is complete */}
+        {/* Deposit notice — required to finish. Unlocks once all fields are done. */}
         {data.deposit?.enabled && !depositPaid && (
           <div className="border-t border-slate-100 bg-amber-50/70">
             <div className="max-w-4xl mx-auto flex items-center justify-between gap-3 px-4 py-2">
               <p className="text-xs text-amber-800">
                 Deposit due: <span className="font-semibold">${data.deposit.amount.toFixed(2)}</span>
                 {data.deposit.mode === "percent" && data.deposit.percentage ? ` (${data.deposit.percentage}%)` : ""}
+                <span className="ml-1 text-amber-700/70">· required to finish</span>
               </p>
-              <Button size="sm" variant="outline" disabled className="shrink-0 text-xs" data-testid="button-pay-locked">
-                Pay after signing
+              <Button
+                size="sm"
+                onClick={() => payDeposit.mutate()}
+                disabled={requiredRemaining > 0 || payDeposit.isPending}
+                className="shrink-0 text-xs bg-[#711419] text-white hover:bg-[#5a1014]"
+                data-testid="button-pay-deposit-bar"
+              >
+                {payDeposit.isPending && <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />}
+                {requiredRemaining > 0 ? "Sign first" : `Pay $${data.deposit.amount.toFixed(2)}`}
               </Button>
             </div>
           </div>
