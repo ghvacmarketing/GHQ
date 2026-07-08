@@ -1418,7 +1418,12 @@ function DraggableScheduleCard({
   };
 
   const visualLeft = leftPercent + resizeOffset.left;
-  const visualWidth = Math.max(widthPercent + resizeOffset.width, 4);
+  // Floor at exactly one snap block, not a fixed 4%. A 30-min job is only
+  // 3.125% of the 6a–10p timeline (30/960), so a 4% floor rendered it ~38 min
+  // wide and made adjacent short jobs overlap. widthPercent is always >= one
+  // block, so this only clamps a live resize — it never inflates a real card.
+  const minBlockPercent = (SCHEDULE_INTERVAL / SCHEDULE_TOTAL_MINUTES) * 100;
+  const visualWidth = Math.max(widthPercent + resizeOffset.width, minBlockPercent);
 
   const style: React.CSSProperties = {
     left: `${visualLeft}%`,
