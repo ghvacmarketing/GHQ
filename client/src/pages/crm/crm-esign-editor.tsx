@@ -73,18 +73,21 @@ export default function CrmEsignEditor() {
   const [pageWidth, setPageWidth] = useState(700);
   const pageRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const dragState = useRef<{ id: string; offsetX: number; offsetY: number; page: number } | null>(null);
+  const seededRef = useRef<string | null>(null);
 
   // Seed local state from server
   useEffect(() => {
-    if (doc) {
+    if (!doc) return;
+    // Seed the editable state (fields + deposit form) only ONCE per document.
+    // Otherwise a refetch — e.g. after saving the deposit or adding a recipient —
+    // re-runs this effect and wipes unsaved field placements the user is mid-edit.
+    if (seededRef.current !== doc.id) {
+      seededRef.current = doc.id;
       setFields(doc.fields.map((f) => ({
         id: f.id, recipientId: f.recipientId, page: f.page, type: f.type,
         x: f.x, y: f.y, width: f.width, height: f.height, required: f.required,
       })));
       setDirty(false);
-      if (doc.recipients.length && !activeRecipientId) {
-        setActiveRecipientId(doc.recipients[0].id);
-      }
       // Seed deposit form from the saved document
       setDepEnabled(!!doc.depositEnabled);
       setDepMode((doc.depositMode as "percent" | "amount") || "percent");
@@ -95,6 +98,9 @@ export default function CrmEsignEditor() {
           ? (doc.depositAmountCents / 100).toString()
           : "",
       );
+    }
+    if (doc.recipients.length && !activeRecipientId) {
+      setActiveRecipientId(doc.recipients[0].id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc]);

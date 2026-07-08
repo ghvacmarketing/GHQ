@@ -598,11 +598,11 @@ export function registerEsignRoutes(app: Express): void {
         if (session.payment_status !== "paid" || session.status !== "complete") continue;
         const piId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id || null;
         if (!piId) continue;
-        const pi = await stripe.paymentIntents.retrieve(piId, { expand: ["charges.data"] });
+        const pi: any = await stripe.paymentIntents.retrieve(piId, { expand: ["charges.data"] });
         if (pi.status !== "succeeded" || (pi.amount_received ?? 0) <= 0) continue;
         const wasRefunded =
           (pi.amount_refunded ?? 0) > 0 ||
-          (pi as any).charges?.data?.some((c: any) => c.refunded || (c.amount_refunded ?? 0) > 0 || c.status !== "succeeded");
+          pi.charges?.data?.some((c: any) => c.refunded || (c.amount_refunded ?? 0) > 0 || c.status !== "succeeded");
         if (wasRefunded) continue;
 
         const now = new Date();

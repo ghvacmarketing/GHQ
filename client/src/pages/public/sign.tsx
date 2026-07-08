@@ -94,6 +94,19 @@ export default function PublicSign() {
     onError: (e: Error) => toast({ title: "Could not submit", description: e.message, variant: "destructive" }),
   });
 
+  // Declared up here because the effects below reference it in their dependency
+  // arrays (a dep array is evaluated eagerly during render, so the value must
+  // already be initialized — otherwise it's a "cannot access before
+  // initialization" crash).
+  const requiredRemaining = useMemo(() => {
+    if (!data) return 0;
+    return data.fields.filter((f) => f.required && !values[f.id]).length;
+  }, [data, values]);
+
+  // Set just before we intentionally send the signer to Stripe, so the
+  // beforeunload guard doesn't warn on that (wanted) navigation.
+  const leavingForPaymentRef = useRef(false);
+
   // Deposit payment (only after signing). depositPaid is seeded from the
   // server and flipped when we return from a successful Stripe checkout.
   const [depositPaid, setDepositPaid] = useState(false);
@@ -118,7 +131,6 @@ export default function PublicSign() {
 
   // Warn before leaving while the document is incomplete (unsigned or unpaid),
   // unless we're intentionally redirecting to Stripe to pay.
-  const leavingForPaymentRef = useRef(false);
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (done || data?.alreadySigned || leavingForPaymentRef.current) return;
@@ -184,11 +196,6 @@ export default function PublicSign() {
     setSigDraft(null);
     setTextDraft("");
   };
-
-  const requiredRemaining = useMemo(() => {
-    if (!data) return 0;
-    return data.fields.filter((f) => f.required && !values[f.id]).length;
-  }, [data, values]);
 
   // Once the deposit is paid and every field is complete, finalize automatically
   // (e.g. when the signer returns from Stripe). Runs once.
