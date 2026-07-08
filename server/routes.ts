@@ -204,6 +204,7 @@ const LEGACY_AUTH_PUBLIC_PATHS: RegExp[] = [
   /^\/api\/employee-portal\/me\b/,
   /^\/api\/portal\//,               // customer portal (its own token auth)
   /^\/api\/public\//,               // token-based public access (quotes/invoices)
+  /^\/api\/sign\//,                 // token-based e-signature signing + deposit pay
   /^\/api\/webhooks\//,             // external webhooks (own signature verification)
   /^\/api\/stripe\/webhook\b/,
   /^\/api\/quickbooks\/callback\b/,
