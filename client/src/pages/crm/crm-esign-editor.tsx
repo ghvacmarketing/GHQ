@@ -85,6 +85,16 @@ export default function CrmEsignEditor() {
       if (doc.recipients.length && !activeRecipientId) {
         setActiveRecipientId(doc.recipients[0].id);
       }
+      // Seed deposit form from the saved document
+      setDepEnabled(!!doc.depositEnabled);
+      setDepMode((doc.depositMode as "percent" | "amount") || "percent");
+      setDepTotal(doc.contractTotalCents ? (doc.contractTotalCents / 100).toString() : "");
+      setDepPct(doc.depositPercentage ? doc.depositPercentage.toString() : "50");
+      setDepAmount(
+        doc.depositMode === "amount" && doc.depositAmountCents
+          ? (doc.depositAmountCents / 100).toString()
+          : "",
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc]);
@@ -109,6 +119,35 @@ export default function CrmEsignEditor() {
   // ---- Recipient mutations ----
   const [recipName, setRecipName] = useState("");
   const [recipEmail, setRecipEmail] = useState("");
+
+  // ---- Deposit / payment request ----
+  const [depEnabled, setDepEnabled] = useState(false);
+  const [depMode, setDepMode] = useState<"percent" | "amount">("percent");
+  const [depTotal, setDepTotal] = useState("");
+  const [depPct, setDepPct] = useState("50");
+  const [depAmount, setDepAmount] = useState("");
+
+  const depositPreview = depMode === "percent"
+    ? (parseFloat(depTotal || "0") || 0) * (parseInt(depPct || "0", 10) || 0) / 100
+    : (parseFloat(depAmount || "0") || 0);
+
+  const saveDeposit = useMutation({
+    mutationFn: async () => {
+      const body = depEnabled
+        ? (depMode === "percent"
+            ? { enabled: true, mode: "percent", contractTotalDollars: parseFloat(depTotal), percentage: parseInt(depPct, 10) }
+            : { enabled: true, mode: "amount", amountDollars: parseFloat(depAmount) })
+        : { enabled: false };
+      const res = await apiRequest("PUT", `/api/crm/signature-documents/${docId}/deposit`, body);
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.message || "Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/signature-documents", docId] });
+      toast({ title: "Deposit settings saved" });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't save deposit", variant: "destructive" }),
+  });
 
   const addRecipient = useMutation({
     mutationFn: async () => {
@@ -415,6 +454,103 @@ export default function CrmEsignEditor() {
                 </div>
               </div>
             )}
+
+            {/* Deposit / payment request — customer can pay this after signing */}
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Deposit request</h3>
+              {doc.depositPaidAt ? (
+                <div className="rounded-lg border border-green-200 bg-green-50 p-2.5 text-xs font-medium text-green-700">
+                  Deposit of ${((doc.depositAmountCents || 0) / 100).toFixed(2)} paid.
+                </div>
+              ) : (
+                <div className="space-y-2.5 rounded-lg border border-slate-200 bg-white p-2.5">
+                  <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={depEnabled}
+                      onChange={(e) => setDepEnabled(e.target.checked)}
+                      className="h-3.5 w-3.5 accent-[#711419]"
+                      data-testid="checkbox-deposit-enabled"
+                    />
+                    Request a deposit after signing
+                  </label>
+
+                  {depEnabled && (
+                    <>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {(["percent", "amount"] as const).map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setDepMode(m)}
+                            className={`rounded-md border px-2 py-1.5 text-[11px] font-medium transition-all ${depMode === m ? "border-[#711419] bg-[#711419]/10 text-[#711419]" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"}`}
+                            data-testid={`deposit-mode-${m}`}
+                          >
+                            {m === "percent" ? "% of total" : "Exact $"}
+                          </button>
+                        ))}
+                      </div>
+
+                      {depMode === "percent" ? (
+                        <div className="space-y-2">
+                          <div>
+                            <Label className="text-[11px] text-slate-500">Contract total ($)</Label>
+                            <Input
+                              inputMode="decimal"
+                              value={depTotal}
+                              onChange={(e) => setDepTotal(e.target.value.replace(/[^0-9.]/g, ""))}
+                              placeholder="0.00"
+                              className="h-9"
+                              data-testid="input-deposit-total"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-[11px] text-slate-500">Deposit %</Label>
+                            <Input
+                              inputMode="numeric"
+                              value={depPct}
+                              onChange={(e) => setDepPct(e.target.value.replace(/[^0-9]/g, ""))}
+                              placeholder="50"
+                              className="h-9"
+                              data-testid="input-deposit-percent"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <Label className="text-[11px] text-slate-500">Deposit amount ($)</Label>
+                          <Input
+                            inputMode="decimal"
+                            value={depAmount}
+                            onChange={(e) => setDepAmount(e.target.value.replace(/[^0-9.]/g, ""))}
+                            placeholder="0.00"
+                            className="h-9"
+                            data-testid="input-deposit-amount"
+                          />
+                        </div>
+                      )}
+
+                      <p className="text-[11px] text-slate-500">
+                        Customer pays{" "}
+                        <span className="font-semibold text-slate-800">${depositPreview.toFixed(2)}</span>{" "}
+                        after signing.
+                      </p>
+                    </>
+                  )}
+
+                  <Button
+                    size="sm"
+                    className="w-full bg-[#711419] hover:bg-[#5a1014]"
+                    disabled={saveDeposit.isPending || (depEnabled && depositPreview <= 0)}
+                    onClick={() => saveDeposit.mutate()}
+                    data-testid="button-save-deposit"
+                  >
+                    {saveDeposit.isPending ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-2 h-3.5 w-3.5" />}
+                    Save deposit
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* PDF canvas */}

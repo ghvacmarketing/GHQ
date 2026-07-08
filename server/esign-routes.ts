@@ -5,7 +5,8 @@ import { storage } from "./storage";
 import { requireCrmAuth, getCurrentCrmUser } from "./crm-auth";
 import { ObjectStorageService, ObjectNotFoundError } from "./replit_integrations/object_storage/objectStorage";
 import { flattenSignedPdf, getPdfPageCount } from "./services/esign-pdf";
-import type { InsertSignatureField } from "@shared/schema";
+import { getUncachableStripeClient } from "./stripeClient";
+import type { InsertSignatureField, SignatureDocument } from "@shared/schema";
 
 const objectStorageService = new ObjectStorageService();
 
@@ -77,6 +78,19 @@ async function sendSigningEmail(opts: {
 
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+}
+
+// Public-facing summary of a document's deposit request (null when none/zero).
+function depositView(doc: SignatureDocument) {
+  if (!doc.depositEnabled || !doc.depositAmountCents || doc.depositAmountCents <= 0) return null;
+  return {
+    enabled: true,
+    amount: doc.depositAmountCents / 100,
+    mode: doc.depositMode || "amount",
+    percentage: doc.depositPercentage || null,
+    paid: !!doc.depositPaidAt,
+    paidAt: doc.depositPaidAt || null,
+  };
 }
 
 export function registerEsignRoutes(app: Express): void {
@@ -161,6 +175,64 @@ export function registerEsignRoutes(app: Express): void {
     } catch (err) {
       console.error("[esign] patch error:", err);
       res.status(500).json({ message: "Failed to update document" });
+    }
+  });
+
+  // Configure the optional deposit / payment request on a document.
+  // Accepts either an exact amount or a percentage of a contract total; the
+  // resolved amount is stored in cents. Changing it clears any existing link
+  // so a fresh one is generated with the new amount.
+  app.put("/api/crm/signature-documents/:id/deposit", requireCrmAuth, async (req, res) => {
+    try {
+      const doc = await storage.getSignatureDocument(req.params.id);
+      if (!doc) return res.status(404).json({ message: "Not found" });
+      if (doc.depositPaidAt) return res.status(400).json({ message: "A deposit has already been paid on this document." });
+
+      const { enabled, mode, amountDollars, contractTotalDollars, percentage } = req.body || {};
+
+      if (!enabled) {
+        const updated = await storage.updateSignatureDocument(doc.id, {
+          depositEnabled: false,
+          stripePaymentLinkId: null,
+          stripePaymentLinkUrl: null,
+        } as any);
+        return res.json(updated);
+      }
+
+      let depositAmountCents = 0;
+      let contractTotalCents: number | null = null;
+      let pct: number | null = null;
+      const resolvedMode = mode === "percent" ? "percent" : "amount";
+
+      if (resolvedMode === "percent") {
+        const total = Number(contractTotalDollars);
+        pct = Math.round(Number(percentage));
+        if (!Number.isFinite(total) || total <= 0) return res.status(400).json({ message: "Enter a valid contract total." });
+        if (!Number.isFinite(pct) || pct < 1 || pct > 100) return res.status(400).json({ message: "Percentage must be between 1 and 100." });
+        contractTotalCents = Math.round(total * 100);
+        depositAmountCents = Math.round((contractTotalCents * pct) / 100);
+      } else {
+        const amt = Number(amountDollars);
+        if (!Number.isFinite(amt) || amt <= 0) return res.status(400).json({ message: "Enter a valid deposit amount." });
+        depositAmountCents = Math.round(amt * 100);
+      }
+
+      if (depositAmountCents < 50) return res.status(400).json({ message: "Deposit must be at least $0.50." });
+
+      const updated = await storage.updateSignatureDocument(doc.id, {
+        depositEnabled: true,
+        depositMode: resolvedMode,
+        contractTotalCents,
+        depositPercentage: pct,
+        depositAmountCents,
+        // regenerate the link next time it's requested
+        stripePaymentLinkId: null,
+        stripePaymentLinkUrl: null,
+      } as any);
+      res.json(updated);
+    } catch (err) {
+      console.error("[esign] deposit config error:", err);
+      res.status(500).json({ message: "Failed to save deposit settings" });
     }
   });
 
@@ -310,6 +382,7 @@ export function registerEsignRoutes(app: Express): void {
         recipient: { id: recipient.id, name: recipient.name, email: recipient.email, status: recipient.status, color: recipient.color },
         fields: myFields,
         alreadySigned: recipient.status === "signed",
+        deposit: depositView(doc),
       });
     } catch (err) {
       console.error("[esign] sign get error:", err);
@@ -402,6 +475,109 @@ export function registerEsignRoutes(app: Express): void {
     } catch (err) {
       console.error("[esign] submit error:", err);
       res.status(500).json({ message: "Failed to submit signature" });
+    }
+  });
+
+  // Generate (or reuse) the Stripe deposit payment link for a signed document.
+  // Signing is required first: the recipient must have completed their signature.
+  app.post("/api/sign/:token/payment-link", async (req, res) => {
+    try {
+      const recipient = await storage.getSignatureRecipientByToken(req.params.token);
+      if (!recipient) return res.status(404).json({ message: "Invalid link" });
+      const doc = await storage.getSignatureDocument(recipient.documentId);
+      if (!doc) return res.status(404).json({ message: "Not found" });
+
+      if (!doc.depositEnabled || !doc.depositAmountCents || doc.depositAmountCents <= 0) {
+        return res.status(400).json({ message: "No deposit is requested on this document." });
+      }
+      if (recipient.status !== "signed") {
+        return res.status(400).json({ message: "Please sign the document before paying.", requiresSignature: true });
+      }
+      if (doc.depositPaidAt) {
+        return res.json({ paid: true, paymentLinkUrl: null });
+      }
+      if (doc.stripePaymentLinkUrl) {
+        return res.json({ paymentLinkUrl: doc.stripePaymentLinkUrl, amount: doc.depositAmountCents / 100 });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const amount = Math.max(50, doc.depositAmountCents);
+      const link = await stripe.paymentLinks.create({
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: `Deposit — ${doc.title}`.slice(0, 250),
+                description: doc.depositMode === "percent" && doc.depositPercentage
+                  ? `${doc.depositPercentage}% deposit`
+                  : "Contract deposit",
+              },
+              unit_amount: amount,
+            },
+            quantity: 1,
+          },
+        ],
+        metadata: { type: "esign_deposit", documentId: doc.id },
+        after_completion: {
+          type: "redirect",
+          redirect: { url: `${signingUrl(req, req.params.token)}?paid=1` },
+        },
+      });
+
+      await storage.updateSignatureDocument(doc.id, {
+        stripePaymentLinkId: link.id,
+        stripePaymentLinkUrl: link.url,
+      } as any);
+
+      res.json({ paymentLinkUrl: link.url, amount: amount / 100 });
+    } catch (err: any) {
+      console.error("[esign] payment-link error:", err);
+      res.status(500).json({ message: err?.message || "Failed to create payment link" });
+    }
+  });
+
+  // Verify a deposit payment on return from Stripe and mark it paid.
+  app.post("/api/sign/:token/verify-payment", async (req, res) => {
+    try {
+      const recipient = await storage.getSignatureRecipientByToken(req.params.token);
+      if (!recipient) return res.status(404).json({ message: "Invalid link" });
+      const doc = await storage.getSignatureDocument(recipient.documentId);
+      if (!doc) return res.status(404).json({ message: "Not found" });
+
+      if (doc.depositPaidAt) {
+        return res.json({ paid: true, paidAt: doc.depositPaidAt, amount: (doc.depositAmountCents || 0) / 100 });
+      }
+      if (!doc.stripePaymentLinkId) {
+        return res.json({ paid: false });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const sessions = await stripe.checkout.sessions.list({ payment_link: doc.stripePaymentLinkId, limit: 10 });
+      for (const session of sessions.data) {
+        if (session.payment_status !== "paid" || session.status !== "complete") continue;
+        const piId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id || null;
+        if (!piId) continue;
+        const pi = await stripe.paymentIntents.retrieve(piId, { expand: ["charges.data"] });
+        if (pi.status !== "succeeded" || (pi.amount_received ?? 0) <= 0) continue;
+        const wasRefunded =
+          (pi.amount_refunded ?? 0) > 0 ||
+          (pi as any).charges?.data?.some((c: any) => c.refunded || (c.amount_refunded ?? 0) > 0 || c.status !== "succeeded");
+        if (wasRefunded) continue;
+
+        const now = new Date();
+        await storage.updateSignatureDocument(doc.id, {
+          depositPaidAt: now,
+          depositAmountCents: pi.amount_received ?? doc.depositAmountCents,
+          stripePaymentIntentId: piId,
+        } as any);
+        return res.json({ paid: true, paidAt: now, amount: (pi.amount_received ?? doc.depositAmountCents ?? 0) / 100 });
+      }
+
+      res.json({ paid: false });
+    } catch (err: any) {
+      console.error("[esign] verify-payment error:", err);
+      res.status(500).json({ message: err?.message || "Failed to verify payment" });
     }
   });
 }

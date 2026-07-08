@@ -4113,6 +4113,19 @@ export const signatureDocuments = pgTable("signature_documents", {
   sentAt: timestamp("sent_at"),
   completedAt: timestamp("completed_at"),
   voidedAt: timestamp("voided_at"),
+  // Optional deposit / payment request attached to the document. The admin
+  // sets it up before sending; the customer can pay after they finish signing.
+  // The entered value (percent-of-total or exact amount) is resolved to
+  // depositAmountCents at save time so the public side just charges that.
+  depositEnabled: boolean("deposit_enabled").notNull().default(false),
+  depositMode: text("deposit_mode"), // "amount" | "percent"
+  contractTotalCents: integer("contract_total_cents"), // percent mode only
+  depositPercentage: integer("deposit_percentage"), // percent mode only
+  depositAmountCents: integer("deposit_amount_cents"), // resolved amount to charge
+  stripePaymentLinkId: text("stripe_payment_link_id"),
+  stripePaymentLinkUrl: text("stripe_payment_link_url"),
+  depositPaidAt: timestamp("deposit_paid_at"),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
 });
 
 export const insertSignatureDocumentSchema = createInsertSchema(signatureDocuments).omit({

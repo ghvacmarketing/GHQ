@@ -18,11 +18,21 @@ import type { SignatureField } from "@shared/schema";
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
+type DepositInfo = {
+  enabled: boolean;
+  amount: number;
+  mode: string;
+  percentage: number | null;
+  paid: boolean;
+  paidAt: string | null;
+};
+
 type SignSession = {
   document: { id: string; title: string; message: string | null; pageCount: number; status: string };
   recipient: { id: string; name: string; email: string; status: string; color: string };
   fields: SignatureField[];
   alreadySigned: boolean;
+  deposit?: DepositInfo | null;
 };
 
 const ICONS: Record<string, any> = { signature: PenTool, initials: Hash, name: UserSquare, date: Calendar, text: Type };
@@ -84,6 +94,41 @@ export default function PublicSign() {
     onError: (e: Error) => toast({ title: "Could not submit", description: e.message, variant: "destructive" }),
   });
 
+  // Deposit payment (only after signing). depositPaid is seeded from the
+  // server and flipped when we return from a successful Stripe checkout.
+  const [depositPaid, setDepositPaid] = useState(false);
+  useEffect(() => {
+    if (data?.deposit?.paid) setDepositPaid(true);
+  }, [data]);
+
+  const payDeposit = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/sign/${token}/payment-link`, {});
+      return res.json();
+    },
+    onSuccess: (r: any) => {
+      if (r?.paid) { setDepositPaid(true); return; }
+      if (r?.paymentLinkUrl) { window.location.href = r.paymentLinkUrl; }
+    },
+    onError: (e: Error) => toast({ title: "Couldn't start payment", description: e.message, variant: "destructive" }),
+  });
+
+  // Returning from Stripe (?paid=1): confirm and record the deposit.
+  useEffect(() => {
+    if (!token) return;
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("paid") !== "1") return;
+    apiRequest("POST", `/api/sign/${token}/verify-payment`, {})
+      .then((r) => r.json())
+      .then((r: any) => {
+        if (r?.paid) {
+          setDepositPaid(true);
+          toast({ title: "Deposit received", description: "Thank you — your payment was successful." });
+        }
+      })
+      .catch(() => {});
+  }, [token]);
+
   const openField = (f: SignatureField) => {
     if (done || data?.alreadySigned) return;
     setActiveField(f);
@@ -134,14 +179,46 @@ export default function PublicSign() {
   }
 
   if (done || data.alreadySigned) {
+    const dep = data.deposit;
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-muted/30">
         <div className="text-center max-w-md bg-white rounded-xl shadow-sm border p-10">
           <CheckCircle2 className="mx-auto h-14 w-14 text-green-600" />
           <h1 className="mt-4 text-xl font-semibold">Thank you, {data.recipient.name}!</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Your signature for <strong>{data.document.title}</strong> has been recorded. You may now close this window.
+            Your signature for <strong>{data.document.title}</strong> has been recorded.
           </p>
+
+          {dep?.enabled && (
+            <div className="mt-6 rounded-xl border bg-muted/30 p-5">
+              {depositPaid ? (
+                <div className="flex items-center justify-center gap-2 text-green-700">
+                  <CheckCircle2 className="h-5 w-5" />
+                  <span className="text-sm font-semibold">Deposit of ${dep.amount.toFixed(2)} paid — thank you!</span>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    A deposit of{" "}
+                    <span className="font-semibold text-foreground">${dep.amount.toFixed(2)}</span>
+                    {dep.mode === "percent" && dep.percentage ? ` (${dep.percentage}% of the contract)` : ""} is due.
+                  </p>
+                  <Button
+                    onClick={() => payDeposit.mutate()}
+                    disabled={payDeposit.isPending}
+                    className="mt-3 w-full bg-[#711419] text-white hover:bg-[#5a1014]"
+                    data-testid="button-pay-deposit"
+                  >
+                    {payDeposit.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Pay deposit of ${dep.amount.toFixed(2)}
+                  </Button>
+                  <p className="mt-2 text-[11px] text-muted-foreground">Secure payment powered by Stripe.</p>
+                </>
+              )}
+            </div>
+          )}
+
+          <p className="mt-6 text-xs text-muted-foreground">You may now close this window.</p>
         </div>
       </div>
     );
@@ -181,6 +258,21 @@ export default function PublicSign() {
         <div className="h-1 w-full bg-slate-100">
           <div className="h-full transition-all duration-300" style={{ width: `${progressPct}%`, backgroundColor: accent }} />
         </div>
+
+        {/* Deposit notice — visible but locked until signing is complete */}
+        {data.deposit?.enabled && !depositPaid && (
+          <div className="border-t border-slate-100 bg-amber-50/70">
+            <div className="max-w-4xl mx-auto flex items-center justify-between gap-3 px-4 py-2">
+              <p className="text-xs text-amber-800">
+                Deposit due: <span className="font-semibold">${data.deposit.amount.toFixed(2)}</span>
+                {data.deposit.mode === "percent" && data.deposit.percentage ? ` (${data.deposit.percentage}%)` : ""}
+              </p>
+              <Button size="sm" variant="outline" disabled className="shrink-0 text-xs" data-testid="button-pay-locked">
+                Pay after signing
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {data.document.message && (
