@@ -4373,7 +4373,25 @@ export default function CrmDispatch() {
                         <span className="text-sm font-medium text-slate-900">{selectedWorkOrder.customerName}</span>
                       )}
                     </div>
-                    
+
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-sm text-slate-500 shrink-0">Address</span>
+                      {selectedWorkOrder.propertyAddress ? (
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedWorkOrder.propertyAddress)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-blue-600 hover:text-blue-700 text-right flex items-start justify-end gap-1"
+                          data-testid="text-property-address"
+                        >
+                          <span>{selectedWorkOrder.propertyAddress}</span>
+                          <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                        </a>
+                      ) : (
+                        <span className="text-sm font-medium text-slate-400">No address</span>
+                      )}
+                    </div>
+
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-500">Visit Type</span>
                       <span className="text-sm font-medium text-slate-900" data-testid="text-visit-type">{visitTypeLabels[selectedWorkOrder.visitType || "SERVICE"] || selectedWorkOrder.visitType || "Service"}</span>
