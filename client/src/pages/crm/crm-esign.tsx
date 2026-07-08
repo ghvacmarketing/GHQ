@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUpload } from "@/hooks/use-upload";
 import {
   PenLine, Plus, FileText, Loader2, Trash2, Upload, CheckCircle2, Send,
-  Download, Clock, Users,
+  Download, Clock, Users, DollarSign,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { CrmUser, SignatureDocument } from "@shared/schema";
@@ -217,6 +217,20 @@ export default function CrmEsign() {
                             {doc.status === "sent" && <Send className="mr-1 h-3 w-3" />}
                             {STATUS_LABELS[doc.status] || doc.status}
                           </Badge>
+                          {doc.depositEnabled && (doc.depositAmountCents ?? 0) > 0 && (
+                            <Badge
+                              variant="outline"
+                              className={doc.depositPaidAt
+                                ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-300"
+                                : "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-300"}
+                              data-testid={`badge-deposit-${doc.id}`}
+                            >
+                              <DollarSign className="mr-0.5 h-3 w-3" />
+                              {doc.depositPaidAt
+                                ? `Deposit paid $${((doc.depositAmountCents ?? 0) / 100).toFixed(2)}`
+                                : `Deposit due $${((doc.depositAmountCents ?? 0) / 100).toFixed(2)}`}
+                            </Badge>
+                          )}
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
