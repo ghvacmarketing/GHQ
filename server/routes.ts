@@ -29610,6 +29610,16 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       }
     });
 
+    // Sensors assigned to a specific customer (shown on the customer detail page).
+    app.get("/api/crm/customers/:id/sensors", requireCrmAuth, async (req, res) => {
+      try {
+        res.json({ sensors: await loadEnrichedSensors(eq(goveeSensors.customerId, req.params.id)) });
+      } catch (e) {
+        console.error("crm/customers/:id/sensors", e);
+        res.status(500).json({ message: "Failed to load sensors" });
+      }
+    });
+
     app.get("/api/crm/analytics/summary", requireCrmAuth, async (_req, res) => {
       try {
         const sensors = await loadEnrichedSensors();

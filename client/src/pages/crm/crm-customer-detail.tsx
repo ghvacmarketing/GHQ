@@ -69,6 +69,7 @@ import {
   Upload,
   ImageIcon,
   ShieldCheck,
+  Droplets,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -78,6 +79,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SensorCard, SensorTrendChart, RiskBadge, type SensorView } from "@/components/analytics/sensor-widgets";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -1818,6 +1820,18 @@ function CustomerTabbedView({
     },
   });
 
+  // Govee sensors assigned to this customer (shown on the overview).
+  const { data: sensorData } = useQuery<{ sensors: SensorView[] }>({
+    queryKey: ['/api/crm/customers', customer.id, 'sensors'],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers/${customer.id}/sensors`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch sensors');
+      return res.json();
+    },
+  });
+  const customerSensors = sensorData?.sensors || [];
+  const [sensorDetail, setSensorDetail] = useState<SensorView | null>(null);
+
   const combinedTimelineEntries = (() => {
     const entries: Array<{ id: string; type: string; title: string; description: string; timestamp: Date; userName?: string }> = [];
     
@@ -2329,6 +2343,65 @@ function CustomerTabbedView({
             </div>
           </CardContent>
         </Card>
+
+        {/* Environment Monitoring — Govee sensors assigned to this customer */}
+        {customerSensors.length > 0 && (
+          <Card data-testid="card-customer-sensors">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Droplets className="h-5 w-5 text-[#711419]" />
+                Environment Monitoring ({customerSensors.length})
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-[#711419]"
+                onClick={() => navigate("/crm/analytics")}
+                data-testid="button-view-all-sensors"
+              >
+                View all <ChevronRight className="h-4 w-4 ml-0.5" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {customerSensors.map((s) => (
+                  <SensorCard key={s.id} sensor={s} onClick={() => setSensorDetail(s)} />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Sensor detail dialog */}
+        <Dialog open={!!sensorDetail} onOpenChange={(o) => !o && setSensorDetail(null)}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            {sensorDetail && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    {sensorDetail.label || sensorDetail.deviceName}
+                    <RiskBadge risk={sensorDetail.risk} />
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="flex items-center gap-6 mb-2">
+                  <div>
+                    <p className="text-3xl font-bold tabular-nums" style={{ color: "#711419" }}>
+                      {sensorDetail.humidity != null ? `${Math.round(sensorDetail.humidity)}%` : "—"}
+                    </p>
+                    <p className="text-xs text-slate-500">Humidity</p>
+                  </div>
+                  <div>
+                    <p className="text-3xl font-bold tabular-nums text-sky-600">
+                      {sensorDetail.temperatureF != null ? `${Math.round(sensorDetail.temperatureF)}°F` : "—"}
+                    </p>
+                    <p className="text-xs text-slate-500">Temperature</p>
+                  </div>
+                </div>
+                <SensorTrendChart readingsUrl={`/api/crm/sensors/${sensorDetail.id}/readings`} thresholds={sensorDetail.thresholds} />
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
       </TabsContent>
 
       {/* Locations Tab */}
