@@ -137,13 +137,13 @@ export function SensorCard({ sensor, onClick }: { sensor: SensorView; onClick?: 
       )}
       data-testid={`sensor-card-${sensor.id}`}
     >
-      <div className="h-1.5" style={{ backgroundColor: meta.color }} />
-      <CardContent className="p-5">
+      <div className="h-1" style={{ backgroundColor: meta.color }} />
+      <CardContent className="p-4">
         {/* Header */}
-        <div className="mb-4 flex items-start justify-between gap-2">
+        <div className="mb-3 flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <p className="truncate text-base font-semibold text-slate-900">
+              <p className="truncate text-sm font-semibold text-slate-900">
                 {sensor.label || sensor.deviceName || "Unnamed sensor"}
               </p>
               {sensor.sku && (
@@ -166,35 +166,35 @@ export function SensorCard({ sensor, onClick }: { sensor: SensorView; onClick?: 
         </div>
 
         {/* Big readings */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2.5">
           {/* Humidity — the hero reading */}
-          <div className="rounded-2xl p-4" style={{ backgroundColor: `${meta.color}12` }}>
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide" style={{ color: meta.color }}>
-              <Droplets className="h-4 w-4" /> Humidity
+          <div className="rounded-xl p-3" style={{ backgroundColor: `${meta.color}12` }}>
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide" style={{ color: meta.color }}>
+              <Droplets className="h-3.5 w-3.5" /> Humidity
             </div>
-            <div className="mt-1.5 flex items-baseline gap-0.5">
-              <span className="text-5xl font-bold leading-none tabular-nums" style={{ color: meta.color }}>
+            <div className="mt-1 flex items-baseline gap-0.5">
+              <span className="text-4xl font-bold leading-none tabular-nums" style={{ color: meta.color }}>
                 {hum != null ? Math.round(hum) : "—"}
               </span>
-              <span className="text-2xl font-semibold" style={{ color: meta.color }}>%</span>
+              <span className="text-xl font-semibold" style={{ color: meta.color }}>%</span>
             </div>
           </div>
           {/* Temperature */}
-          <div className="rounded-2xl bg-slate-50 p-4">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              <Thermometer className="h-4 w-4" /> Temp
+          <div className="rounded-xl bg-slate-50 p-3">
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              <Thermometer className="h-3.5 w-3.5" /> Temp
             </div>
-            <div className="mt-1.5 flex items-baseline gap-0.5">
-              <span className="text-5xl font-bold leading-none tabular-nums text-slate-800">
+            <div className="mt-1 flex items-baseline gap-0.5">
+              <span className="text-4xl font-bold leading-none tabular-nums text-slate-800">
                 {sensor.temperatureF != null ? Math.round(sensor.temperatureF) : "—"}
               </span>
-              <span className="text-2xl font-semibold text-slate-400">°F</span>
+              <span className="text-xl font-semibold text-slate-400">°F</span>
             </div>
           </div>
         </div>
 
         {/* Humidity gauge with safe→danger zones + a live marker */}
-        <div className="mt-5">
+        <div className="mt-4">
           <div className="relative h-3 overflow-hidden rounded-full bg-gradient-to-r from-emerald-300 via-amber-300 to-red-400">
             {markers.map((v, i) => (
               <span key={i} className="absolute inset-y-0 w-px bg-white/70" style={{ left: `${Math.max(0, Math.min(100, v))}%` }} />
@@ -214,7 +214,7 @@ export function SensorCard({ sensor, onClick }: { sensor: SensorView; onClick?: 
           </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-between border-t pt-3">
+        <div className="mt-3 flex items-center justify-between border-t pt-2.5">
           <RiskBadge risk={sensor.risk} />
           <p className="text-[11px] text-slate-400">Updated {timeAgo(sensor.lastReadingAt)}</p>
         </div>
