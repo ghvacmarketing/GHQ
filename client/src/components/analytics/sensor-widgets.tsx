@@ -472,12 +472,13 @@ export function SensorMappingDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Map sensor — {sensor?.deviceName || sensor?.device}</DialogTitle>
+          <DialogTitle>Sensor settings — {sensor?.deviceName || sensor?.device}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <Label className="text-xs">Label</Label>
-            <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Crawlspace Sensor" />
+            <Label className="text-xs">Sensor name</Label>
+            <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Crawlspace Sensor" />
+            <p className="mt-1 text-[11px] text-muted-foreground">Shown on the sensor card and in the customer portal.</p>
           </div>
           <div>
             <Label className="text-xs">Location type</Label>
@@ -517,6 +518,9 @@ export function SensorMappingDialog({
                 )}
               </>
             )}
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              This sensor will appear in this customer's portal under Environment Monitoring.
+            </p>
           </div>
           {customerId && !customerId.startsWith("fieldedge-") && propData && propData.length > 0 && (
             <div>
