@@ -71,6 +71,33 @@ app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+// Digital Asset Links — lets the Android (Play Store) app verify it owns this
+// domain so it runs full-screen with no browser URL bar. After PWABuilder/Play
+// generates the app, paste the signing-key SHA-256 fingerprint(s) into the
+// ANDROID_APP_FINGERPRINTS env var (comma-separated) — no code change needed.
+// Registered here (before the SPA catch-all) so it isn't served the HTML shell.
+app.get("/.well-known/assetlinks.json", (_req, res) => {
+  const packageName = process.env.ANDROID_PACKAGE_NAME || "app.ghvac.twa";
+  const fingerprints = (process.env.ANDROID_APP_FINGERPRINTS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  res.json(
+    fingerprints.length
+      ? [
+          {
+            relation: ["delegate_permission/common.handle_all_urls"],
+            target: {
+              namespace: "android_app",
+              package_name: packageName,
+              sha256_cert_fingerprints: fingerprints,
+            },
+          },
+        ]
+      : [],
+  );
+});
+
 // Stripe webhook route - MUST be before express.json() middleware
 app.post(
   '/api/stripe/webhook',
