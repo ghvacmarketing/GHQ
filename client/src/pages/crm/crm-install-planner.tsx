@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  addMonths, differenceInCalendarDays, eachDayOfInterval, endOfMonth, endOfWeek,
+  addDays, addMonths, differenceInCalendarDays, eachDayOfInterval,
   format, isSameMonth, isToday, parseISO, startOfMonth, startOfWeek,
 } from "date-fns";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -16,11 +16,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { cn } from "@/lib/utils";
 import {
-  ChevronLeft, ChevronRight, Plus, CalendarRange, Loader2, Trash2, CheckCircle2, X, DollarSign,
+  ChevronDown, ChevronLeft, ChevronRight, Plus, CalendarRange, Loader2, Trash2, CheckCircle2, DollarSign,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 
@@ -101,8 +104,11 @@ export default function CrmInstallPlanner() {
   });
 
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
+  const todayStr = iso(new Date());
   const gridStart = startOfWeek(startOfMonth(month));
-  const gridEnd = endOfWeek(endOfMonth(month));
+  // Always render 6 weeks (42 days) so every month's grid is the same size;
+  // shorter months are padded out with the next month's days.
+  const gridEnd = addDays(gridStart, 41);
   const days = useMemo(() => eachDayOfInterval({ start: gridStart, end: gridEnd }), [gridStart, gridEnd]);
 
   const from = iso(gridStart);
@@ -282,6 +288,11 @@ export default function CrmInstallPlanner() {
     ? blocks.filter((b) => b.status !== "lost" && b.startDate <= dayList && b.endDate >= dayList)
     : [];
 
+  // No planning in the past: a block can't start before today. An existing
+  // block that already started in the past may keep its original start date.
+  const original = form.id ? blocks.find((b) => b.id === form.id) : undefined;
+  const startInPast = !!form.startDate && form.startDate < todayStr && form.startDate !== original?.startDate;
+
   if (!currentUser) return null;
 
   return (
@@ -331,10 +342,10 @@ export default function CrmInstallPlanner() {
           </div>
           <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
             <span className="text-muted-foreground/70">Confidence:</span>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-4 rounded border border-dashed border-emerald-400 bg-emerald-100" /> High</span>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-4 rounded border border-dashed border-amber-400 bg-amber-100" /> Medium</span>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-4 rounded border border-dashed border-rose-400 bg-rose-100" /> Low</span>
-            <span className="flex items-center gap-1.5"><span className="h-3 w-4 rounded bg-emerald-600" /> Sold</span>
+            <span className="flex items-center gap-1.5"><span className="h-3 w-4 border border-dashed border-emerald-400 bg-emerald-100" /> High</span>
+            <span className="flex items-center gap-1.5"><span className="h-3 w-4 border border-dashed border-amber-400 bg-amber-100" /> Medium</span>
+            <span className="flex items-center gap-1.5"><span className="h-3 w-4 border border-dashed border-rose-400 bg-rose-100" /> Low</span>
+            <span className="flex items-center gap-1.5"><span className="h-3 w-4 bg-emerald-600" /> Sold</span>
           </div>
         </div>
 
@@ -359,23 +370,25 @@ export default function CrmInstallPlanner() {
                     {weekDays.map((day, ci) => {
                       const dayStr = iso(day);
                       const inMonth = isSameMonth(day, month);
+                      const isPast = dayStr < todayStr;
                       const over = crewsPerDay != null && dayCounts[ci] > crewsPerDay;
                       return (
                         <div
                           key={dayStr}
                           className={cn(
-                            "relative cursor-pointer select-none border-r border-border transition-colors last:border-r-0",
-                            !inMonth && "bg-muted/20",
-                            inDrag(dayStr) ? "bg-[#711419]/10 ring-1 ring-inset ring-[#711419]/40" : "hover:bg-muted/30",
+                            "relative select-none border-r border-border transition-colors last:border-r-0",
+                            isPast ? "cursor-default bg-muted/40" : "cursor-pointer",
+                            !inMonth && !isPast && "bg-muted/20",
+                            inDrag(dayStr) ? "bg-[#711419]/10 ring-1 ring-inset ring-[#711419]/40" : !isPast && "hover:bg-muted/30",
                           )}
-                          onMouseDown={(e) => { e.preventDefault(); setDragRange({ anchor: dayStr, current: dayStr }); }}
-                          onMouseEnter={() => setDragRange((r) => (r ? { ...r, current: dayStr } : r))}
+                          onMouseDown={(e) => { e.preventDefault(); if (!isPast) setDragRange({ anchor: dayStr, current: dayStr }); }}
+                          onMouseEnter={() => { if (!isPast) setDragRange((r) => (r ? { ...r, current: dayStr } : r)); }}
                           data-testid={`day-${dayStr}`}
                         >
                           <div className="flex items-center justify-between px-1.5 pt-1">
                             <span className={cn(
-                              "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium",
-                              isToday(day) ? "bg-[#711419] text-white" : inMonth ? "text-foreground" : "text-muted-foreground/50",
+                              "flex h-6 items-center text-xs",
+                              isToday(day) ? "font-bold text-[#711419]" : inMonth ? "font-medium text-foreground" : "font-medium text-muted-foreground/50",
                             )}>
                               {format(day, "d")}
                             </span>
@@ -414,10 +427,8 @@ export default function CrmInstallPlanner() {
                           <div
                             onClick={() => openEdit(b)}
                             className={cn(
-                              "absolute inset-y-0 flex items-center overflow-hidden text-[11px] font-medium transition",
+                              "absolute inset-y-0 flex items-center overflow-hidden rounded-none text-[11px] font-medium transition",
                               barClass(b),
-                              it.realStart ? "rounded-l-md" : "rounded-l-none",
-                              it.realEnd ? "rounded-r-md" : "rounded-r-none",
                               dragging ? "pointer-events-none" : "pointer-events-auto cursor-pointer hover:brightness-95",
                             )}
                             style={{ left: it.realStart ? 2 : 0, right: it.realEnd ? 2 : 0, paddingLeft: it.realStart ? 8 : 4, paddingRight: it.realEnd ? 8 : 4 }}
@@ -439,7 +450,7 @@ export default function CrmInstallPlanner() {
 
       {/* Create / edit dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="flex max-h-[88vh] max-w-md flex-col gap-0 overflow-hidden p-0">
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-md flex-col gap-0 overflow-hidden p-0">
           <DialogHeader className="border-b px-6 py-4">
             <DialogTitle className="flex items-center gap-2">
               {form.id ? "Edit tentative install" : "New tentative install"}
@@ -466,6 +477,7 @@ export default function CrmInstallPlanner() {
                     numberOfMonths={1}
                     defaultMonth={form.startDate ? parseISO(form.startDate) : new Date()}
                     selected={{ from: parseISO(form.startDate), to: parseISO(form.endDate) }}
+                    disabled={{ before: new Date() }}
                     onSelect={(r: any) => {
                       if (r?.from) {
                         setForm((f) => ({ ...f, startDate: iso(r.from), endDate: iso(r.to ?? r.from) }));
@@ -474,6 +486,7 @@ export default function CrmInstallPlanner() {
                   />
                 </PopoverContent>
               </Popover>
+              {startInPast && <p className="mt-1 text-xs text-red-600">Installs can't be scheduled in the past.</p>}
             </div>
 
             <div>
@@ -530,25 +543,29 @@ export default function CrmInstallPlanner() {
             </div>
           </div>
 
-          <DialogFooter className="flex-col gap-2 border-t px-6 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex gap-2">
-              {form.id && (
-                <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => remove.mutate()} disabled={remove.isPending} data-testid="button-delete-block">
-                  <Trash2 className="mr-1.5 h-4 w-4" /> Remove
-                </Button>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setOpen(false)}><X className="mr-1.5 h-4 w-4" /> Close</Button>
-              {form.id && form.status !== "sold" && (
-                <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => sell.mutate()} disabled={sell.isPending} data-testid="button-sell-block">
-                  {sell.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-1.5 h-4 w-4" />} Mark sold
-                </Button>
-              )}
-              <Button className="bg-[#711419] hover:bg-[#5a1014]" onClick={() => save.mutate()} disabled={save.isPending || !form.title.trim()} data-testid="button-save-block">
-                {save.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null} Save
-              </Button>
-            </div>
+          <DialogFooter className="flex-row items-center justify-end gap-2 border-t px-6 py-3">
+            {form.id && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" data-testid="button-block-options">
+                    Options <ChevronDown className="ml-1.5 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {form.status !== "sold" && (
+                    <DropdownMenuItem onClick={() => sell.mutate()} disabled={sell.isPending} data-testid="button-sell-block">
+                      {sell.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-600" />} Mark sold
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => remove.mutate()} disabled={remove.isPending} data-testid="button-delete-block">
+                    <Trash2 className="mr-2 h-4 w-4" /> Remove
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            <Button className="bg-[#711419] hover:bg-[#5a1014]" onClick={() => save.mutate()} disabled={save.isPending || !form.title.trim() || startInPast} data-testid="button-save-block">
+              {save.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null} Save
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
