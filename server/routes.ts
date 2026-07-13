@@ -87,6 +87,7 @@ import { startGoogleOAuth, handleGoogleOAuthCallback, isGoogleOAuthConfigured } 
 import cookieParser from "cookie-parser";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerEsignRoutes } from "./esign-routes";
+import { registerInstallPlannerRoutes } from "./install-planner-routes";
 import stripePaymentsRouter from "./stripe-payments";
 import { getMessagingAdapter } from "./services/messaging/adapters";
 import { textlineClient } from "./textlineClient";
@@ -732,6 +733,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register e-signature (DocuSign-like) routes
   registerEsignRoutes(app);
+
+  // Register Install Planner (tentative pre-sale scheduling) routes
+  registerInstallPlannerRoutes(app);
 
   // Register Stripe payment routes
   app.use(stripePaymentsRouter);

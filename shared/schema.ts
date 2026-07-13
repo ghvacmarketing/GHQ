@@ -1242,6 +1242,41 @@ export const crmProjects = pgTable("crm_projects", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// ── Install Planner — tentative pre-sale "pencil-in" blocks ──────────────────
+// A lightweight, all-day capacity hold placed on the planner BEFORE a job is
+// sold. Minimum is just a title + date range; optionally linked to a customer/
+// quote. When the job sells it converts into (or links to) a real crm_project.
+export const installPlanStatusEnum = ["tentative", "sold", "lost"] as const;
+export type InstallPlanStatus = typeof installPlanStatusEnum[number];
+
+export const installPlanBlocks = pgTable("install_plan_blocks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  status: text("status").$type<InstallPlanStatus>().notNull().default("tentative"),
+  startDate: date("start_date").notNull(), // YYYY-MM-DD, all-day
+  endDate: date("end_date").notNull(),
+  customerId: varchar("customer_id"), // optional (no FK, mirrors crm_projects)
+  quoteId: varchar("quote_id"), // optional link to the quote/proposal
+  projectId: varchar("project_id"), // set when sold → the created/linked project
+  estimatedValue: decimal("estimated_value", { precision: 10, scale: 2 }),
+  confidence: text("confidence").$type<"high" | "medium" | "low">(),
+  notes: text("notes"),
+  color: text("color"),
+  createdBy: varchar("created_by"),
+  soldAt: timestamp("sold_at"),
+  lostAt: timestamp("lost_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  dateIdx: index("install_plan_blocks_date_idx").on(table.startDate, table.endDate),
+}));
+
+export const insertInstallPlanBlockSchema = createInsertSchema(installPlanBlocks).omit({
+  id: true, createdAt: true, updatedAt: true, soldAt: true, lostAt: true,
+});
+export type InstallPlanBlock = typeof installPlanBlocks.$inferSelect;
+export type InsertInstallPlanBlock = z.infer<typeof insertInstallPlanBlockSchema>;
+
 // CRM Project Tasks (admin task list for project management)
 export const crmProjectTasks = pgTable("crm_project_tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

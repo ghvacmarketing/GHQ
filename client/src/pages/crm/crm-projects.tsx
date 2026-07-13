@@ -1279,9 +1279,14 @@ export default function CrmProjects() {
           description="Manage your project pipeline"
           icon={FolderKanban}
           actions={
-            <Button onClick={() => setCreateDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" /> New Project
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => navigate("/crm/install-planner")} data-testid="button-install-planner">
+                <CalendarDays className="mr-2 h-4 w-4" /> Install Planner
+              </Button>
+              <Button onClick={() => setCreateDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" /> New Project
+              </Button>
+            </div>
           }
         />
 
