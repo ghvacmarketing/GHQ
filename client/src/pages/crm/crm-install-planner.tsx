@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  addDays, addMonths, differenceInCalendarDays, eachDayOfInterval, endOfMonth, endOfWeek,
+  addMonths, differenceInCalendarDays, eachDayOfInterval, endOfMonth, endOfWeek,
   format, isSameMonth, isToday, parseISO, startOfMonth, startOfWeek,
 } from "date-fns";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -51,27 +51,6 @@ const rangeLabel = (start: string, end: string) => {
   const e = parseISO(end);
   return `${format(s, "MMM d")} – ${format(e, "MMM d, yyyy")}`;
 };
-
-// Live move/resize of a block by dragging it (or its edge) across the grid.
-type Interact = {
-  mode: "move" | "resize-start" | "resize-end";
-  blockId: string;
-  grabDay: string;
-  origStart: string;
-  origEnd: string;
-  hover: string;
-};
-
-function previewRange(it: Interact): { start: string; end: string } {
-  if (it.mode === "move") {
-    const delta = differenceInCalendarDays(parseISO(it.hover), parseISO(it.grabDay));
-    return { start: iso(addDays(parseISO(it.origStart), delta)), end: iso(addDays(parseISO(it.origEnd), delta)) };
-  }
-  if (it.mode === "resize-start") {
-    return { start: it.hover <= it.origEnd ? it.hover : it.origEnd, end: it.origEnd };
-  }
-  return { start: it.origStart, end: it.hover >= it.origStart ? it.hover : it.origStart };
-}
 
 // Bar color: sold reads as solid/confirmed; tentative is colored by confidence
 // (green = high, amber = medium, red = low, grey = unset) with a dashed edge.
@@ -141,13 +120,6 @@ export default function CrmInstallPlanner() {
   const blocks = data?.blocks || [];
   const crewsPerDay = data?.crewsPerDay ?? null;
 
-  // Move / resize interaction (drag a block or its edge across day cells).
-  const [interact, setInteract] = useState<Interact | null>(null);
-  const interactRef = useRef<Interact | null>(null);
-  const blocksRef = useRef<Block[]>([]);
-  useEffect(() => { interactRef.current = interact; }, [interact]);
-  useEffect(() => { blocksRef.current = blocks; }, [blocks]);
-
   // ── Dialog / form ──
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm(iso(new Date()), iso(new Date())));
@@ -176,34 +148,12 @@ export default function CrmInstallPlanner() {
   useEffect(() => { dragRef.current = dragRange; }, [dragRange]);
   useEffect(() => {
     const onUp = () => {
-      // Finish a create-drag.
       const d = dragRef.current;
-      if (d) {
-        const lo = d.anchor <= d.current ? d.anchor : d.current;
-        const hi = d.anchor <= d.current ? d.current : d.anchor;
-        setDragRange(null);
-        openCreate(lo, hi);
-        return;
-      }
-      // Finish a move/resize (or treat a no-move grab as an edit click).
-      const it = interactRef.current;
-      if (it) {
-        setInteract(null);
-        if (it.mode === "move" && it.hover === it.grabDay) {
-          const b = blocksRef.current.find((x) => x.id === it.blockId);
-          if (b) openEdit(b);
-          return;
-        }
-        const pr = previewRange(it);
-        if (pr.start !== it.origStart || pr.end !== it.origEnd) {
-          apiRequest("PATCH", `/api/crm/install-planner/${it.blockId}`, { startDate: pr.start, endDate: pr.end })
-            .then(() => queryClient.invalidateQueries({ queryKey: ["/api/crm/install-planner"] }))
-            .catch(() => {
-              queryClient.invalidateQueries({ queryKey: ["/api/crm/install-planner"] });
-              toast({ title: "Couldn't reschedule", variant: "destructive" });
-            });
-        }
-      }
+      if (!d) return;
+      const lo = d.anchor <= d.current ? d.anchor : d.current;
+      const hi = d.anchor <= d.current ? d.current : d.anchor;
+      setDragRange(null);
+      openCreate(lo, hi);
     };
     window.addEventListener("mouseup", onUp);
     return () => window.removeEventListener("mouseup", onUp);
@@ -284,17 +234,12 @@ export default function CrmInstallPlanner() {
     return out;
   }, [days]);
 
-  const effRange = (b: Block) => {
-    const it = interact && interact.blockId === b.id ? interact : null;
-    return it ? previewRange(it) : { start: b.startDate, end: b.endDate };
-  };
-
   const layoutWeek = (weekDays: Date[]) => {
     const wStart = iso(weekDays[0]);
     const wEnd = iso(weekDays[6]);
     const items = blocks
       .filter((b) => b.status !== "lost")
-      .map((b) => ({ b, r: effRange(b) }))
+      .map((b) => ({ b, r: { start: b.startDate, end: b.endDate } }))
       .filter(({ r }) => r.start <= wEnd && r.end >= wStart)
       .map(({ b, r }) => {
         const cs = r.start < wStart ? wStart : r.start;
@@ -406,7 +351,7 @@ export default function CrmInstallPlanner() {
               const lanesH = Math.max(1, laneCount) * (BAR_H + LANE_GAP);
               const hasOverflow = overflowByCol.some((n) => n > 0);
               const weekH = Math.max(96, HEADER_H + lanesH + (hasOverflow ? OVERFLOW_H : 0) + 6);
-              const dragging = !!interact || !!dragRange;
+              const dragging = !!dragRange;
               return (
                 <div key={wi} className="relative border-b border-border last:border-b-0" style={{ minHeight: weekH }}>
                   {/* Day columns: numbers, capacity, interaction surface */}
@@ -424,10 +369,7 @@ export default function CrmInstallPlanner() {
                             inDrag(dayStr) ? "bg-[#711419]/10 ring-1 ring-inset ring-[#711419]/40" : "hover:bg-muted/30",
                           )}
                           onMouseDown={(e) => { e.preventDefault(); setDragRange({ anchor: dayStr, current: dayStr }); }}
-                          onMouseEnter={() => {
-                            setDragRange((r) => (r ? { ...r, current: dayStr } : r));
-                            setInteract((it) => (it ? { ...it, hover: dayStr } : it));
-                          }}
+                          onMouseEnter={() => setDragRange((r) => (r ? { ...r, current: dayStr } : r))}
                           data-testid={`day-${dayStr}`}
                         >
                           <div className="flex items-center justify-between px-1.5 pt-1">
@@ -463,7 +405,6 @@ export default function CrmInstallPlanner() {
                   <div className="pointer-events-none absolute inset-x-0" style={{ top: HEADER_H }}>
                     {visible.map((it) => {
                       const b = it.block;
-                      const activeIt = interact && interact.blockId === b.id;
                       return (
                         <div
                           key={`${b.id}-${wi}`}
@@ -471,39 +412,19 @@ export default function CrmInstallPlanner() {
                           style={{ left: `${(it.colStart / 7) * 100}%`, width: `${((it.colEnd - it.colStart + 1) / 7) * 100}%`, top: it.lane * (BAR_H + LANE_GAP), height: BAR_H }}
                         >
                           <div
-                            onMouseDown={(e) => {
-                              e.stopPropagation(); e.preventDefault();
-                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                              const colW = rect.width / (it.colEnd - it.colStart + 1);
-                              const grabCol = Math.min(it.colEnd, it.colStart + Math.max(0, Math.floor((e.clientX - rect.left) / colW)));
-                              const grabDay = iso(weekDays[grabCol]);
-                              setInteract({ mode: "move", blockId: b.id, grabDay, origStart: b.startDate, origEnd: b.endDate, hover: grabDay });
-                            }}
+                            onClick={() => openEdit(b)}
                             className={cn(
-                              "group absolute inset-y-0 flex items-center overflow-hidden text-[11px] font-medium",
+                              "absolute inset-y-0 flex items-center overflow-hidden text-[11px] font-medium transition",
                               barClass(b),
                               it.realStart ? "rounded-l-md" : "rounded-l-none",
                               it.realEnd ? "rounded-r-md" : "rounded-r-none",
-                              dragging ? "pointer-events-none" : "pointer-events-auto cursor-grab active:cursor-grabbing",
-                              activeIt && "opacity-70 ring-2 ring-[#711419]",
+                              dragging ? "pointer-events-none" : "pointer-events-auto cursor-pointer hover:brightness-95",
                             )}
                             style={{ left: it.realStart ? 2 : 0, right: it.realEnd ? 2 : 0, paddingLeft: it.realStart ? 8 : 4, paddingRight: it.realEnd ? 8 : 4 }}
-                            title={`${b.title}${b.customerName ? ` · ${b.customerName}` : ""} — drag to move, drag edge to resize`}
+                            title={`${b.title}${b.customerName ? ` · ${b.customerName}` : ""}`}
                             data-testid={`block-${b.id}`}
                           >
-                            {it.realStart && (
-                              <span
-                                onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setInteract({ mode: "resize-start", blockId: b.id, grabDay: iso(weekDays[it.colStart]), origStart: b.startDate, origEnd: b.endDate, hover: b.startDate }); }}
-                                className="absolute inset-y-0 left-0 z-10 w-1.5 cursor-ew-resize bg-black/10 opacity-0 group-hover:opacity-100"
-                              />
-                            )}
                             <span className="truncate">{b.title}</span>
-                            {it.realEnd && (
-                              <span
-                                onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setInteract({ mode: "resize-end", blockId: b.id, grabDay: iso(weekDays[it.colEnd]), origStart: b.startDate, origEnd: b.endDate, hover: b.endDate }); }}
-                                className="absolute inset-y-0 right-0 z-10 w-1.5 cursor-ew-resize bg-black/10 opacity-0 group-hover:opacity-100"
-                              />
-                            )}
                           </div>
                         </div>
                       );
@@ -518,14 +439,14 @@ export default function CrmInstallPlanner() {
 
       {/* Create / edit dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[88vh] max-w-md flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="border-b px-6 py-4">
             <DialogTitle className="flex items-center gap-2">
               {form.id ? "Edit tentative install" : "New tentative install"}
               {form.status === "sold" && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Sold</span>}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="flex-1 space-y-3 overflow-y-auto px-6 py-4">
             <div>
               <Label className="text-xs">Install name</Label>
               <Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="e.g. Johnson — Furnace + AC" data-testid="input-block-title" />
@@ -609,7 +530,7 @@ export default function CrmInstallPlanner() {
             </div>
           </div>
 
-          <DialogFooter className="flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <DialogFooter className="flex-col gap-2 border-t px-6 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex gap-2">
               {form.id && (
                 <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => remove.mutate()} disabled={remove.isPending} data-testid="button-delete-block">
