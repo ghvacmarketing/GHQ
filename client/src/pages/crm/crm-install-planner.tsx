@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameMonth, isToday,
-  parseISO, startOfMonth, startOfWeek,
+  addDays, addMonths, differenceInCalendarDays, eachDayOfInterval, endOfMonth, endOfWeek,
+  format, isSameMonth, isToday, parseISO, startOfMonth, startOfWeek,
 } from "date-fns";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -51,6 +51,27 @@ const rangeLabel = (start: string, end: string) => {
   const e = parseISO(end);
   return `${format(s, "MMM d")} – ${format(e, "MMM d, yyyy")}`;
 };
+
+// Live move/resize of a block by dragging it (or its edge) across the grid.
+type Interact = {
+  mode: "move" | "resize-start" | "resize-end";
+  blockId: string;
+  grabDay: string;
+  origStart: string;
+  origEnd: string;
+  hover: string;
+};
+
+function previewRange(it: Interact): { start: string; end: string } {
+  if (it.mode === "move") {
+    const delta = differenceInCalendarDays(parseISO(it.hover), parseISO(it.grabDay));
+    return { start: iso(addDays(parseISO(it.origStart), delta)), end: iso(addDays(parseISO(it.origEnd), delta)) };
+  }
+  if (it.mode === "resize-start") {
+    return { start: it.hover <= it.origEnd ? it.hover : it.origEnd, end: it.origEnd };
+  }
+  return { start: it.origStart, end: it.hover >= it.origStart ? it.hover : it.origStart };
+}
 
 const STATUS_CHIP: Record<Block["status"], string> = {
   tentative: "border border-dashed border-amber-400 bg-amber-100 text-amber-800",
@@ -107,9 +128,23 @@ export default function CrmInstallPlanner() {
   const blocks = data?.blocks || [];
   const crewsPerDay = data?.crewsPerDay ?? null;
 
-  // Blocks active on a given day (inclusive range).
+  // Move / resize interaction (drag a block or its edge across day cells).
+  const [interact, setInteract] = useState<Interact | null>(null);
+  const interactRef = useRef<Interact | null>(null);
+  const blocksRef = useRef<Block[]>([]);
+  useEffect(() => { interactRef.current = interact; }, [interact]);
+  useEffect(() => { blocksRef.current = blocks; }, [blocks]);
+
+  // Blocks active on a given day (inclusive). The block being dragged/resized
+  // renders at its live preview position.
   const blocksOn = (dayStr: string) =>
-    blocks.filter((b) => b.status !== "lost" && b.startDate <= dayStr && b.endDate >= dayStr);
+    blocks.filter((b) => {
+      if (b.status === "lost") return false;
+      const pr = interact && interact.blockId === b.id ? previewRange(interact) : null;
+      const s = pr ? pr.start : b.startDate;
+      const e = pr ? pr.end : b.endDate;
+      return s <= dayStr && dayStr <= e;
+    });
 
   // ── Dialog / form ──
   const [open, setOpen] = useState(false);
@@ -138,12 +173,34 @@ export default function CrmInstallPlanner() {
   useEffect(() => { dragRef.current = dragRange; }, [dragRange]);
   useEffect(() => {
     const onUp = () => {
+      // Finish a create-drag.
       const d = dragRef.current;
-      if (!d) return;
-      const lo = d.anchor <= d.current ? d.anchor : d.current;
-      const hi = d.anchor <= d.current ? d.current : d.anchor;
-      setDragRange(null);
-      openCreate(lo, hi);
+      if (d) {
+        const lo = d.anchor <= d.current ? d.anchor : d.current;
+        const hi = d.anchor <= d.current ? d.current : d.anchor;
+        setDragRange(null);
+        openCreate(lo, hi);
+        return;
+      }
+      // Finish a move/resize (or treat a no-move grab as an edit click).
+      const it = interactRef.current;
+      if (it) {
+        setInteract(null);
+        if (it.mode === "move" && it.hover === it.grabDay) {
+          const b = blocksRef.current.find((x) => x.id === it.blockId);
+          if (b) openEdit(b);
+          return;
+        }
+        const pr = previewRange(it);
+        if (pr.start !== it.origStart || pr.end !== it.origEnd) {
+          apiRequest("PATCH", `/api/crm/install-planner/${it.blockId}`, { startDate: pr.start, endDate: pr.end })
+            .then(() => queryClient.invalidateQueries({ queryKey: ["/api/crm/install-planner"] }))
+            .catch(() => {
+              queryClient.invalidateQueries({ queryKey: ["/api/crm/install-planner"] });
+              toast({ title: "Couldn't reschedule", variant: "destructive" });
+            });
+        }
+      }
     };
     window.addEventListener("mouseup", onUp);
     return () => window.removeEventListener("mouseup", onUp);
@@ -292,7 +349,10 @@ export default function CrmInstallPlanner() {
                     inDrag(dayStr) ? "bg-[#711419]/10 ring-1 ring-inset ring-[#711419]/40" : "hover:bg-muted/30",
                   )}
                   onMouseDown={(e) => { e.preventDefault(); setDragRange({ anchor: dayStr, current: dayStr }); }}
-                  onMouseEnter={() => setDragRange((r) => (r ? { ...r, current: dayStr } : null))}
+                  onMouseEnter={() => {
+                    setDragRange((r) => (r ? { ...r, current: dayStr } : r));
+                    setInteract((it) => (it ? { ...it, hover: dayStr } : it));
+                  }}
                   data-testid={`day-${dayStr}`}
                 >
                   <div className="mb-1 flex items-center justify-between px-0.5">
@@ -309,18 +369,39 @@ export default function CrmInstallPlanner() {
                     )}
                   </div>
                   <div className="space-y-1">
-                    {dayBlocks.slice(0, 4).map((b) => (
-                      <button
-                        key={b.id}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onClick={(e) => { e.stopPropagation(); openEdit(b); }}
-                        className={cn("block w-full truncate rounded px-1.5 py-0.5 text-left text-[11px] font-medium", STATUS_CHIP[b.status])}
-                        title={`${b.title}${b.customerName ? ` · ${b.customerName}` : ""}`}
-                        data-testid={`block-${b.id}`}
-                      >
-                        {b.title}
-                      </button>
-                    ))}
+                    {dayBlocks.slice(0, 4).map((b) => {
+                      const activeIt = interact && interact.blockId === b.id ? interact : null;
+                      const range = activeIt ? previewRange(activeIt) : { start: b.startDate, end: b.endDate };
+                      const isStart = range.start === dayStr;
+                      const isEnd = range.end === dayStr;
+                      return (
+                        <div
+                          key={b.id}
+                          onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setInteract({ mode: "move", blockId: b.id, grabDay: dayStr, origStart: b.startDate, origEnd: b.endDate, hover: dayStr }); }}
+                          className={cn(
+                            "group relative flex items-center rounded px-1.5 py-1 text-[11px] font-medium cursor-grab active:cursor-grabbing",
+                            STATUS_CHIP[b.status],
+                            activeIt && "opacity-70 ring-2 ring-[#711419]",
+                          )}
+                          title={`${b.title}${b.customerName ? ` · ${b.customerName}` : ""} — drag to move, drag edge to resize`}
+                          data-testid={`block-${b.id}`}
+                        >
+                          {isStart && (
+                            <span
+                              onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setInteract({ mode: "resize-start", blockId: b.id, grabDay: dayStr, origStart: b.startDate, origEnd: b.endDate, hover: dayStr }); }}
+                              className="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize rounded-l bg-black/15 opacity-0 group-hover:opacity-100"
+                            />
+                          )}
+                          <span className="truncate">{b.title}</span>
+                          {isEnd && (
+                            <span
+                              onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setInteract({ mode: "resize-end", blockId: b.id, grabDay: dayStr, origStart: b.startDate, origEnd: b.endDate, hover: dayStr }); }}
+                              className="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize rounded-r bg-black/15 opacity-0 group-hover:opacity-100"
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
                     {dayBlocks.length > 4 && (
                       <span className="px-1 text-[10px] text-muted-foreground">+{dayBlocks.length - 4} more</span>
                     )}
