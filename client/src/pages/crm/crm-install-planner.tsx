@@ -73,11 +73,24 @@ function previewRange(it: Interact): { start: string; end: string } {
   return { start: it.origStart, end: it.hover >= it.origStart ? it.hover : it.origStart };
 }
 
-const STATUS_CHIP: Record<Block["status"], string> = {
-  tentative: "border border-dashed border-amber-400 bg-amber-100 text-amber-800",
-  sold: "bg-emerald-600 text-white border border-emerald-600",
-  lost: "bg-slate-100 text-slate-400 line-through border border-slate-200",
-};
+// Bar color: sold reads as solid/confirmed; tentative is colored by confidence
+// (green = high, amber = medium, red = low, grey = unset) with a dashed edge.
+function barClass(b: { status: Block["status"]; confidence: Block["confidence"] }): string {
+  if (b.status === "sold") return "bg-emerald-600 text-white border border-emerald-600";
+  switch (b.confidence) {
+    case "high": return "bg-emerald-100 text-emerald-800 border border-dashed border-emerald-400";
+    case "medium": return "bg-amber-100 text-amber-800 border border-dashed border-amber-400";
+    case "low": return "bg-rose-100 text-rose-700 border border-dashed border-rose-400";
+    default: return "bg-slate-100 text-slate-600 border border-dashed border-slate-300";
+  }
+}
+
+// Month-grid bar layout constants (px).
+const HEADER_H = 22;   // date-number strip height
+const BAR_H = 18;      // one bar's height
+const LANE_GAP = 3;    // gap between stacked bars
+const MAX_LANES = 3;   // visible lanes before overflow ("+N more")
+const OVERFLOW_H = 14;
 
 type FormState = {
   id: string | null;
@@ -135,21 +148,11 @@ export default function CrmInstallPlanner() {
   useEffect(() => { interactRef.current = interact; }, [interact]);
   useEffect(() => { blocksRef.current = blocks; }, [blocks]);
 
-  // Blocks active on a given day (inclusive). The block being dragged/resized
-  // renders at its live preview position.
-  const blocksOn = (dayStr: string) =>
-    blocks.filter((b) => {
-      if (b.status === "lost") return false;
-      const pr = interact && interact.blockId === b.id ? previewRange(interact) : null;
-      const s = pr ? pr.start : b.startDate;
-      const e = pr ? pr.end : b.endDate;
-      return s <= dayStr && dayStr <= e;
-    });
-
   // ── Dialog / form ──
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm(iso(new Date()), iso(new Date())));
   const [custSearch, setCustSearch] = useState("");
+  const [dayList, setDayList] = useState<string | null>(null); // "see all" popup for a crowded day
 
   const openCreate = (start: string, end?: string) => {
     setForm(emptyForm(start, end ?? start));
@@ -274,6 +277,66 @@ export default function CrmInstallPlanner() {
   const [crewsInput, setCrewsInput] = useState<string>("");
   useEffect(() => { setCrewsInput(crewsPerDay != null ? String(crewsPerDay) : ""); }, [crewsPerDay]);
 
+  // Split the 42-day grid into weeks and pack each week's bars into lanes.
+  const weeks = useMemo(() => {
+    const out: Date[][] = [];
+    for (let i = 0; i < days.length; i += 7) out.push(days.slice(i, i + 7));
+    return out;
+  }, [days]);
+
+  const effRange = (b: Block) => {
+    const it = interact && interact.blockId === b.id ? interact : null;
+    return it ? previewRange(it) : { start: b.startDate, end: b.endDate };
+  };
+
+  const layoutWeek = (weekDays: Date[]) => {
+    const wStart = iso(weekDays[0]);
+    const wEnd = iso(weekDays[6]);
+    const items = blocks
+      .filter((b) => b.status !== "lost")
+      .map((b) => ({ b, r: effRange(b) }))
+      .filter(({ r }) => r.start <= wEnd && r.end >= wStart)
+      .map(({ b, r }) => {
+        const cs = r.start < wStart ? wStart : r.start;
+        const ce = r.end > wEnd ? wEnd : r.end;
+        return {
+          block: b,
+          colStart: Math.max(0, Math.min(6, differenceInCalendarDays(parseISO(cs), weekDays[0]))),
+          colEnd: Math.max(0, Math.min(6, differenceInCalendarDays(parseISO(ce), weekDays[0]))),
+          realStart: r.start >= wStart,
+          realEnd: r.end <= wEnd,
+          lane: 0,
+        };
+      })
+      .sort((a, b) => a.colStart - b.colStart || (b.colEnd - b.colStart) - (a.colEnd - a.colStart));
+    const laneEnds: number[] = [];
+    for (const it of items) {
+      let lane = 0;
+      while (lane < laneEnds.length && laneEnds[lane] >= it.colStart) lane++;
+      it.lane = lane;
+      laneEnds[lane] = it.colEnd;
+    }
+    const dayCounts = Array(7).fill(0);
+    const overflowByCol = Array(7).fill(0);
+    for (const it of items) {
+      for (let c = it.colStart; c <= it.colEnd; c++) {
+        dayCounts[c]++;
+        if (it.lane >= MAX_LANES) overflowByCol[c]++;
+      }
+    }
+    return {
+      visible: items.filter((it) => it.lane < MAX_LANES),
+      overflowByCol,
+      dayCounts,
+      laneCount: Math.min(MAX_LANES, laneEnds.length),
+    };
+  };
+
+  // All blocks active on a given day (uncapped) — for the "see all" popup.
+  const dayListBlocks = dayList
+    ? blocks.filter((b) => b.status !== "lost" && b.startDate <= dayList && b.endDate >= dayList)
+    : [];
+
   if (!currentUser) return null;
 
   return (
@@ -321,8 +384,11 @@ export default function CrmInstallPlanner() {
             <h2 className="ml-2 text-sm font-semibold text-foreground">{format(month, "MMMM yyyy")}</h2>
             {isLoading && <Loader2 className="ml-2 h-4 w-4 animate-spin text-muted-foreground" />}
           </div>
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-            <span className="flex items-center gap-1.5"><span className="h-3 w-4 rounded border border-dashed border-amber-400 bg-amber-100" /> Tentative</span>
+          <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+            <span className="text-muted-foreground/70">Confidence:</span>
+            <span className="flex items-center gap-1.5"><span className="h-3 w-4 rounded border border-dashed border-emerald-400 bg-emerald-100" /> High</span>
+            <span className="flex items-center gap-1.5"><span className="h-3 w-4 rounded border border-dashed border-amber-400 bg-amber-100" /> Medium</span>
+            <span className="flex items-center gap-1.5"><span className="h-3 w-4 rounded border border-dashed border-rose-400 bg-rose-100" /> Low</span>
             <span className="flex items-center gap-1.5"><span className="h-3 w-4 rounded bg-emerald-600" /> Sold</span>
           </div>
         </div>
@@ -334,77 +400,114 @@ export default function CrmInstallPlanner() {
               <div key={d} className="px-2 py-2 text-center">{d}</div>
             ))}
           </div>
-          <div className="grid grid-cols-7">
-            {days.map((day) => {
-              const dayStr = iso(day);
-              const inMonth = isSameMonth(day, month);
-              const dayBlocks = blocksOn(dayStr);
-              const over = crewsPerDay != null && dayBlocks.length > crewsPerDay;
+          <div>
+            {weeks.map((weekDays, wi) => {
+              const { visible, overflowByCol, dayCounts, laneCount } = layoutWeek(weekDays);
+              const lanesH = Math.max(1, laneCount) * (BAR_H + LANE_GAP);
+              const hasOverflow = overflowByCol.some((n) => n > 0);
+              const weekH = Math.max(96, HEADER_H + lanesH + (hasOverflow ? OVERFLOW_H : 0) + 6);
+              const dragging = !!interact || !!dragRange;
               return (
-                <div
-                  key={dayStr}
-                  className={cn(
-                    "min-h-[104px] cursor-pointer select-none border-b border-r border-border p-1.5 last:border-r-0 transition-colors",
-                    !inMonth && "bg-muted/20",
-                    inDrag(dayStr) ? "bg-[#711419]/10 ring-1 ring-inset ring-[#711419]/40" : "hover:bg-muted/30",
-                  )}
-                  onMouseDown={(e) => { e.preventDefault(); setDragRange({ anchor: dayStr, current: dayStr }); }}
-                  onMouseEnter={() => {
-                    setDragRange((r) => (r ? { ...r, current: dayStr } : r));
-                    setInteract((it) => (it ? { ...it, hover: dayStr } : it));
-                  }}
-                  data-testid={`day-${dayStr}`}
-                >
-                  <div className="mb-1 flex items-center justify-between px-0.5">
-                    <span className={cn(
-                      "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium",
-                      isToday(day) ? "bg-[#711419] text-white" : inMonth ? "text-foreground" : "text-muted-foreground/50",
-                    )}>
-                      {format(day, "d")}
-                    </span>
-                    {crewsPerDay != null && dayBlocks.length > 0 && (
-                      <span className={cn("rounded px-1 text-[10px] font-semibold tabular-nums", over ? "bg-red-100 text-red-600" : "text-muted-foreground")}>
-                        {dayBlocks.length}/{crewsPerDay}
-                      </span>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    {dayBlocks.slice(0, 4).map((b) => {
-                      const activeIt = interact && interact.blockId === b.id ? interact : null;
-                      const range = activeIt ? previewRange(activeIt) : { start: b.startDate, end: b.endDate };
-                      const isStart = range.start === dayStr;
-                      const isEnd = range.end === dayStr;
+                <div key={wi} className="relative border-b border-border last:border-b-0" style={{ minHeight: weekH }}>
+                  {/* Day columns: numbers, capacity, interaction surface */}
+                  <div className="absolute inset-0 grid h-full grid-cols-7">
+                    {weekDays.map((day, ci) => {
+                      const dayStr = iso(day);
+                      const inMonth = isSameMonth(day, month);
+                      const over = crewsPerDay != null && dayCounts[ci] > crewsPerDay;
                       return (
                         <div
-                          key={b.id}
-                          onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setInteract({ mode: "move", blockId: b.id, grabDay: dayStr, origStart: b.startDate, origEnd: b.endDate, hover: dayStr }); }}
+                          key={dayStr}
                           className={cn(
-                            "group relative flex items-center rounded px-1.5 py-1 text-[11px] font-medium cursor-grab active:cursor-grabbing",
-                            STATUS_CHIP[b.status],
-                            activeIt && "opacity-70 ring-2 ring-[#711419]",
+                            "relative cursor-pointer select-none border-r border-border transition-colors last:border-r-0",
+                            !inMonth && "bg-muted/20",
+                            inDrag(dayStr) ? "bg-[#711419]/10 ring-1 ring-inset ring-[#711419]/40" : "hover:bg-muted/30",
                           )}
-                          title={`${b.title}${b.customerName ? ` · ${b.customerName}` : ""} — drag to move, drag edge to resize`}
-                          data-testid={`block-${b.id}`}
+                          onMouseDown={(e) => { e.preventDefault(); setDragRange({ anchor: dayStr, current: dayStr }); }}
+                          onMouseEnter={() => {
+                            setDragRange((r) => (r ? { ...r, current: dayStr } : r));
+                            setInteract((it) => (it ? { ...it, hover: dayStr } : it));
+                          }}
+                          data-testid={`day-${dayStr}`}
                         >
-                          {isStart && (
-                            <span
-                              onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setInteract({ mode: "resize-start", blockId: b.id, grabDay: dayStr, origStart: b.startDate, origEnd: b.endDate, hover: dayStr }); }}
-                              className="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize rounded-l bg-black/15 opacity-0 group-hover:opacity-100"
-                            />
-                          )}
-                          <span className="truncate">{b.title}</span>
-                          {isEnd && (
-                            <span
-                              onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setInteract({ mode: "resize-end", blockId: b.id, grabDay: dayStr, origStart: b.startDate, origEnd: b.endDate, hover: dayStr }); }}
-                              className="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize rounded-r bg-black/15 opacity-0 group-hover:opacity-100"
-                            />
+                          <div className="flex items-center justify-between px-1.5 pt-1">
+                            <span className={cn(
+                              "flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium",
+                              isToday(day) ? "bg-[#711419] text-white" : inMonth ? "text-foreground" : "text-muted-foreground/50",
+                            )}>
+                              {format(day, "d")}
+                            </span>
+                            {crewsPerDay != null && dayCounts[ci] > 0 && (
+                              <span className={cn("rounded px-1 text-[10px] font-semibold tabular-nums", over ? "bg-red-100 text-red-600" : "text-muted-foreground")}>
+                                {dayCounts[ci]}/{crewsPerDay}
+                              </span>
+                            )}
+                          </div>
+                          {overflowByCol[ci] > 0 && (
+                            <button
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onClick={(e) => { e.stopPropagation(); setDayList(dayStr); }}
+                              className="absolute inset-x-1 text-left text-[10px] font-medium text-[#711419] hover:underline"
+                              style={{ top: HEADER_H + laneCount * (BAR_H + LANE_GAP) }}
+                              data-testid={`more-${dayStr}`}
+                            >
+                              +{overflowByCol[ci]} more
+                            </button>
                           )}
                         </div>
                       );
                     })}
-                    {dayBlocks.length > 4 && (
-                      <span className="px-1 text-[10px] text-muted-foreground">+{dayBlocks.length - 4} more</span>
-                    )}
+                  </div>
+
+                  {/* Continuous spanning bars */}
+                  <div className="pointer-events-none absolute inset-x-0" style={{ top: HEADER_H }}>
+                    {visible.map((it) => {
+                      const b = it.block;
+                      const activeIt = interact && interact.blockId === b.id;
+                      return (
+                        <div
+                          key={`${b.id}-${wi}`}
+                          className="absolute"
+                          style={{ left: `${(it.colStart / 7) * 100}%`, width: `${((it.colEnd - it.colStart + 1) / 7) * 100}%`, top: it.lane * (BAR_H + LANE_GAP), height: BAR_H }}
+                        >
+                          <div
+                            onMouseDown={(e) => {
+                              e.stopPropagation(); e.preventDefault();
+                              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                              const colW = rect.width / (it.colEnd - it.colStart + 1);
+                              const grabCol = Math.min(it.colEnd, it.colStart + Math.max(0, Math.floor((e.clientX - rect.left) / colW)));
+                              const grabDay = iso(weekDays[grabCol]);
+                              setInteract({ mode: "move", blockId: b.id, grabDay, origStart: b.startDate, origEnd: b.endDate, hover: grabDay });
+                            }}
+                            className={cn(
+                              "group absolute inset-y-0 flex items-center overflow-hidden text-[11px] font-medium",
+                              barClass(b),
+                              it.realStart ? "rounded-l-md" : "rounded-l-none",
+                              it.realEnd ? "rounded-r-md" : "rounded-r-none",
+                              dragging ? "pointer-events-none" : "pointer-events-auto cursor-grab active:cursor-grabbing",
+                              activeIt && "opacity-70 ring-2 ring-[#711419]",
+                            )}
+                            style={{ left: it.realStart ? 2 : 0, right: it.realEnd ? 2 : 0, paddingLeft: it.realStart ? 8 : 4, paddingRight: it.realEnd ? 8 : 4 }}
+                            title={`${b.title}${b.customerName ? ` · ${b.customerName}` : ""} — drag to move, drag edge to resize`}
+                            data-testid={`block-${b.id}`}
+                          >
+                            {it.realStart && (
+                              <span
+                                onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setInteract({ mode: "resize-start", blockId: b.id, grabDay: iso(weekDays[it.colStart]), origStart: b.startDate, origEnd: b.endDate, hover: b.startDate }); }}
+                                className="absolute inset-y-0 left-0 z-10 w-1.5 cursor-ew-resize bg-black/10 opacity-0 group-hover:opacity-100"
+                              />
+                            )}
+                            <span className="truncate">{b.title}</span>
+                            {it.realEnd && (
+                              <span
+                                onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setInteract({ mode: "resize-end", blockId: b.id, grabDay: iso(weekDays[it.colEnd]), origStart: b.startDate, origEnd: b.endDate, hover: b.endDate }); }}
+                                className="absolute inset-y-0 right-0 z-10 w-1.5 cursor-ew-resize bg-black/10 opacity-0 group-hover:opacity-100"
+                              />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -526,6 +629,30 @@ export default function CrmInstallPlanner() {
               </Button>
             </div>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* "See all" — every hold on a crowded day */}
+      <Dialog open={!!dayList} onOpenChange={(o) => !o && setDayList(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{dayList ? format(parseISO(dayList), "EEEE, MMM d, yyyy") : ""}</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] space-y-1.5 overflow-y-auto">
+            {dayListBlocks.map((b) => (
+              <button
+                key={b.id}
+                onClick={() => { setDayList(null); openEdit(b); }}
+                className={cn("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm", barClass(b))}
+                data-testid={`daylist-${b.id}`}
+              >
+                <span className="flex-1 truncate font-medium">{b.title}</span>
+                {b.customerName && <span className="truncate text-xs opacity-80">{b.customerName}</span>}
+                {b.status === "sold" && <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />}
+              </button>
+            ))}
+            {dayListBlocks.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">Nothing scheduled.</p>}
+          </div>
         </DialogContent>
       </Dialog>
     </CrmLayout>
