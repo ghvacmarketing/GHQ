@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameMonth, isToday,
-  startOfMonth, startOfWeek,
+  parseISO, startOfMonth, startOfWeek,
 } from "date-fns";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -41,6 +43,14 @@ type CustomerHit = { id: string; name: string };
 
 const iso = (d: Date) => format(d, "yyyy-MM-dd");
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const rangeLabel = (start: string, end: string) => {
+  if (!start) return "Pick dates";
+  const s = parseISO(start);
+  if (start === end) return format(s, "EEE, MMM d, yyyy");
+  const e = parseISO(end);
+  return `${format(s, "MMM d")} – ${format(e, "MMM d, yyyy")}`;
+};
 
 const STATUS_CHIP: Record<Block["status"], string> = {
   tentative: "border border-dashed border-amber-400 bg-amber-100 text-amber-800",
@@ -106,8 +116,8 @@ export default function CrmInstallPlanner() {
   const [form, setForm] = useState<FormState>(emptyForm(iso(new Date()), iso(new Date())));
   const [custSearch, setCustSearch] = useState("");
 
-  const openCreate = (dayStr: string) => {
-    setForm(emptyForm(dayStr, dayStr));
+  const openCreate = (start: string, end?: string) => {
+    setForm(emptyForm(start, end ?? start));
     setCustSearch("");
     setOpen(true);
   };
@@ -120,6 +130,30 @@ export default function CrmInstallPlanner() {
     });
     setCustSearch("");
     setOpen(true);
+  };
+
+  // Drag across day cells to select a range, then open the create dialog.
+  const [dragRange, setDragRange] = useState<{ anchor: string; current: string } | null>(null);
+  const dragRef = useRef<{ anchor: string; current: string } | null>(null);
+  useEffect(() => { dragRef.current = dragRange; }, [dragRange]);
+  useEffect(() => {
+    const onUp = () => {
+      const d = dragRef.current;
+      if (!d) return;
+      const lo = d.anchor <= d.current ? d.anchor : d.current;
+      const hi = d.anchor <= d.current ? d.current : d.anchor;
+      setDragRange(null);
+      openCreate(lo, hi);
+    };
+    window.addEventListener("mouseup", onUp);
+    return () => window.removeEventListener("mouseup", onUp);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const inDrag = (dayStr: string) => {
+    if (!dragRange) return false;
+    const lo = dragRange.anchor <= dragRange.current ? dragRange.anchor : dragRange.current;
+    const hi = dragRange.anchor <= dragRange.current ? dragRange.current : dragRange.anchor;
+    return dayStr >= lo && dayStr <= hi;
   };
 
   const { data: custData } = useQuery<{ customers: CustomerHit[] }>({
@@ -196,7 +230,7 @@ export default function CrmInstallPlanner() {
             </span>
             <div>
               <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Install Planner</h1>
-              <p className="text-sm text-muted-foreground">Pencil in tentative installs before they're sold.</p>
+              <p className="text-sm text-muted-foreground">Drag across days to block out a tentative install before it's sold.</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -253,10 +287,12 @@ export default function CrmInstallPlanner() {
                 <div
                   key={dayStr}
                   className={cn(
-                    "min-h-[104px] border-b border-r border-border p-1.5 last:border-r-0 transition-colors hover:bg-muted/30",
+                    "min-h-[104px] cursor-pointer select-none border-b border-r border-border p-1.5 last:border-r-0 transition-colors",
                     !inMonth && "bg-muted/20",
+                    inDrag(dayStr) ? "bg-[#711419]/10 ring-1 ring-inset ring-[#711419]/40" : "hover:bg-muted/30",
                   )}
-                  onClick={() => openCreate(dayStr)}
+                  onMouseDown={(e) => { e.preventDefault(); setDragRange({ anchor: dayStr, current: dayStr }); }}
+                  onMouseEnter={() => setDragRange((r) => (r ? { ...r, current: dayStr } : null))}
                   data-testid={`day-${dayStr}`}
                 >
                   <div className="mb-1 flex items-center justify-between px-0.5">
@@ -276,6 +312,7 @@ export default function CrmInstallPlanner() {
                     {dayBlocks.slice(0, 4).map((b) => (
                       <button
                         key={b.id}
+                        onMouseDown={(e) => e.stopPropagation()}
                         onClick={(e) => { e.stopPropagation(); openEdit(b); }}
                         className={cn("block w-full truncate rounded px-1.5 py-0.5 text-left text-[11px] font-medium", STATUS_CHIP[b.status])}
                         title={`${b.title}${b.customerName ? ` · ${b.customerName}` : ""}`}
@@ -309,15 +346,29 @@ export default function CrmInstallPlanner() {
               <Label className="text-xs">Install name</Label>
               <Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="e.g. Johnson — Furnace + AC" data-testid="input-block-title" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs">Start</Label>
-                <Input type="date" value={form.startDate} onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value, endDate: f.endDate < e.target.value ? e.target.value : f.endDate }))} data-testid="input-block-start" />
-              </div>
-              <div>
-                <Label className="text-xs">End</Label>
-                <Input type="date" value={form.endDate} min={form.startDate} onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))} data-testid="input-block-end" />
-              </div>
+            <div>
+              <Label className="text-xs">Dates</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="mt-1 w-full justify-start font-normal" data-testid="button-block-dates">
+                    <CalendarRange className="mr-2 h-4 w-4 text-muted-foreground" />
+                    {rangeLabel(form.startDate, form.endDate)}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="z-[60] w-auto p-0" align="start">
+                  <Calendar
+                    mode="range"
+                    numberOfMonths={1}
+                    defaultMonth={form.startDate ? parseISO(form.startDate) : new Date()}
+                    selected={{ from: parseISO(form.startDate), to: parseISO(form.endDate) }}
+                    onSelect={(r: any) => {
+                      if (r?.from) {
+                        setForm((f) => ({ ...f, startDate: iso(r.from), endDate: iso(r.to ?? r.from) }));
+                      }
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div>
