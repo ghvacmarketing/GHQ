@@ -296,10 +296,10 @@ export default function CrmInstallPlanner() {
   if (!currentUser) return null;
 
   return (
-    <CrmLayout currentUser={currentUser}>
-      <div className="w-full space-y-5">
+    <CrmLayout currentUser={currentUser} disableScroll>
+      <div className="flex min-h-0 w-full flex-1 flex-col gap-5">
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#711419]/10">
               <CalendarRange className="h-5 w-5 text-[#711419]" />
@@ -328,7 +328,7 @@ export default function CrmInstallPlanner() {
         </div>
 
         {/* Month nav + legend */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-1">
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setMonth((m) => addMonths(m, -1))} data-testid="button-prev-month">
               <ChevronLeft className="h-4 w-4" />
@@ -349,14 +349,14 @@ export default function CrmInstallPlanner() {
           </div>
         </div>
 
-        {/* Calendar */}
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
-          <div className="grid grid-cols-7 border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {/* Calendar — fills the rest of the viewport; weeks share the extra height */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card">
+          <div className="grid shrink-0 grid-cols-7 border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             {WEEKDAYS.map((d) => (
               <div key={d} className="px-2 py-2 text-center">{d}</div>
             ))}
           </div>
-          <div>
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             {weeks.map((weekDays, wi) => {
               const { visible, overflowByCol, dayCounts, laneCount } = layoutWeek(weekDays);
               const lanesH = Math.max(1, laneCount) * (BAR_H + LANE_GAP);
@@ -364,7 +364,7 @@ export default function CrmInstallPlanner() {
               const weekH = Math.max(96, HEADER_H + lanesH + (hasOverflow ? OVERFLOW_H : 0) + 6);
               const dragging = !!dragRange;
               return (
-                <div key={wi} className="relative border-b border-border last:border-b-0" style={{ minHeight: weekH }}>
+                <div key={wi} className="relative flex-1 border-b border-border last:border-b-0" style={{ minHeight: weekH }}>
                   {/* Day columns: numbers, capacity, interaction surface */}
                   <div className="absolute inset-0 grid h-full grid-cols-7">
                     {weekDays.map((day, ci) => {
