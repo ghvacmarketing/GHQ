@@ -77,7 +77,8 @@ app.get("/health", (_req, res) => {
 // ANDROID_APP_FINGERPRINTS env var (comma-separated) — no code change needed.
 // Registered here (before the SPA catch-all) so it isn't served the HTML shell.
 app.get("/.well-known/assetlinks.json", (_req, res) => {
-  const packageName = process.env.ANDROID_PACKAGE_NAME || "app.ghvac.twa";
+  // Must match the Play Console package name (and the iOS bundle id).
+  const packageName = process.env.ANDROID_PACKAGE_NAME || "app.ghvac.tools";
   const fingerprints = (process.env.ANDROID_APP_FINGERPRINTS || "")
     .split(",")
     .map((s) => s.trim())

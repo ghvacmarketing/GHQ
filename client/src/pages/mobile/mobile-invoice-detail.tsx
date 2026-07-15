@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { format } from "date-fns";
 import { jsPDF } from "jspdf";
+import QRCode from "qrcode";
 import { 
   ArrowLeft, 
   Receipt, 
@@ -19,7 +20,8 @@ import {
   Eye,
   Ban,
   Mail,
-  MessageSquare
+  MessageSquare,
+  QrCode
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,6 +99,8 @@ export default function MobileInvoiceDetail() {
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [emailRecipient, setEmailRecipient] = useState("");
   const [isGeneratingPaymentLink, setIsGeneratingPaymentLink] = useState(false);
+  const [paymentLinkUrl, setPaymentLinkUrl] = useState<string | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [sendViaEmail, setSendViaEmail] = useState(true);
   const [sendViaSms, setSendViaSms] = useState(false);
   const [phoneRecipient, setPhoneRecipient] = useState("");
@@ -119,7 +123,18 @@ export default function MobileInvoiceDetail() {
       return res.json();
     },
     enabled: !!id,
+    // While the QR payment sheet is up, poll so the screen flips to "Paid"
+    // the moment the Stripe webhook marks the invoice.
+    refetchInterval: paymentLinkUrl ? 4000 : false,
   });
+
+  // Render the payment link as a QR code whenever the sheet opens.
+  useEffect(() => {
+    if (!paymentLinkUrl) { setQrDataUrl(null); return; }
+    QRCode.toDataURL(paymentLinkUrl, { width: 560, margin: 1, color: { dark: "#1e293b" } })
+      .then(setQrDataUrl)
+      .catch(() => setQrDataUrl(null));
+  }, [paymentLinkUrl]);
 
   const sendInvoiceEmailMutation = useMutation({
     mutationFn: async (data: { recipientEmail?: string; recipientPhone?: string; sendEmail: boolean; sendSms: boolean }) => {
@@ -289,16 +304,17 @@ export default function MobileInvoiceDetail() {
       }
       
       if (result.paymentLinkUrl) {
-        window.open(result.paymentLinkUrl, '_blank');
+        setPaymentLinkUrl(result.paymentLinkUrl);
       } else {
         throw new Error("No payment link received");
       }
     } catch (error: any) {
-      toast({ 
-        title: "Error", 
-        description: error.message || "Failed to create payment link", 
-        variant: "destructive" 
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create payment link",
+        variant: "destructive"
       });
+    } finally {
       setIsGeneratingPaymentLink(false);
     }
   };
@@ -928,6 +944,86 @@ export default function MobileInvoiceDetail() {
                 </div>
               </div>
             </ScrollArea>
+          </SheetContent>
+        </Sheet>
+
+        {/* QR payment sheet — customer scans with their own phone and pays there */}
+        <Sheet open={!!paymentLinkUrl} onOpenChange={(o) => { if (!o) setPaymentLinkUrl(null); }}>
+          <SheetContent side="bottom" className="h-auto max-h-[92vh] overflow-y-auto pb-8">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2">
+                <QrCode className="h-5 w-5 text-slate-600" />
+                Collect Payment
+              </SheetTitle>
+              <SheetDescription>
+                Invoice {invoice.invoiceNumber} · {invoice.customer?.name || "Customer"}
+              </SheetDescription>
+            </SheetHeader>
+
+            {invoice.status === "paid" ? (
+              <div className="flex flex-col items-center gap-3 py-10 text-center" data-testid="payment-sheet-paid">
+                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                  <CheckCircle2 className="h-9 w-9 text-green-600" />
+                </span>
+                <p className="text-xl font-bold text-green-700">Paid — {formatCurrency(invoice.total || "0")}</p>
+                <p className="text-sm text-slate-500">Payment received. You're all set.</p>
+                <Button className="mt-2 min-h-[48px] w-full bg-green-600 hover:bg-green-700" onClick={() => setPaymentLinkUrl(null)}>
+                  Done
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4 pt-4">
+                <div className="text-center">
+                  <p className="text-sm text-slate-500">Amount due</p>
+                  <p className="text-3xl font-bold text-slate-900" data-testid="payment-sheet-amount">
+                    {formatCurrency(invoice.balanceDue || invoice.total || "0")}
+                  </p>
+                </div>
+
+                <div className="mx-auto w-fit rounded-2xl border-2 border-slate-200 bg-white p-3">
+                  {qrDataUrl ? (
+                    <img src={qrDataUrl} alt="Payment QR code" className="h-64 w-64" data-testid="payment-qr" />
+                  ) : (
+                    <div className="flex h-64 w-64 items-center justify-center">
+                      <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-center text-sm text-slate-600">
+                  Have the customer scan this with their phone camera —<br />
+                  they can pay with Apple Pay, Google Pay, or card.
+                </p>
+                <p className="text-center text-xs text-slate-400">
+                  <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />
+                  Watching for payment — this screen updates automatically.
+                </p>
+
+                <div className="space-y-2">
+                  <Button
+                    className="min-h-[48px] w-full bg-blue-600 hover:bg-blue-700"
+                    onClick={() => paymentLinkUrl && window.open(paymentLinkUrl, "_blank")}
+                    data-testid="button-open-payment-link"
+                  >
+                    <CreditCard className="mr-2 h-4 w-4" /> Pay on this phone
+                  </Button>
+                  {invoice.customer?.phone && (
+                    <Button
+                      variant="outline"
+                      className="min-h-[48px] w-full"
+                      onClick={() => {
+                        const digits = String(invoice.customer?.phone || "").replace(/[^0-9+]/g, "");
+                        const body = encodeURIComponent(`Giesbrecht HVAC — pay invoice ${invoice.invoiceNumber} (${formatCurrency(invoice.balanceDue || invoice.total || "0")}) securely here: ${paymentLinkUrl}`);
+                        window.location.href = `sms:${digits}?&body=${body}`;
+                      }}
+                      data-testid="button-text-payment-link"
+                    >
+                      <MessageSquare className="mr-2 h-4 w-4" /> Text payment link to customer
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
           </SheetContent>
         </Sheet>
 

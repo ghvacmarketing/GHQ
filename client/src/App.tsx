@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 import redLogoUrl from "@assets/redlogo.webp";
 import Home from "@/pages/home";
 import LandingSelect from "@/pages/landing-select";
+import Privacy from "@/pages/privacy";
 import QuoteGenerator from "@/pages/quote-generator";
 import QuoteEdit from "@/pages/quote-edit";
 import QuotesHistory from "@/pages/quotes-history";
@@ -56,6 +57,7 @@ const CrmAgreements = lazy(() => import("@/pages/crm/crm-agreements"));
 const CrmAgreementCreate = lazy(() => import("@/pages/crm/crm-agreement-create"));
 const CrmProjects = lazy(() => import("@/pages/crm/crm-projects"));
 const CrmInstallPlanner = lazy(() => import("@/pages/crm/crm-install-planner"));
+const CrmPhonePop = lazy(() => import("@/pages/crm/crm-phone-pop"));
 const CrmProjectDetail = lazy(() => import("@/pages/crm/crm-project-detail"));
 const CrmProspectFunnel = lazy(() => import("@/pages/crm/crm-prospect-funnel"));
 const CrmAddProspect = lazy(() => import("@/pages/crm/crm-add-prospect"));
@@ -279,6 +281,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={LandingSelect} />
+      <Route path="/privacy" component={Privacy} />
       <Route path="/tools" component={Home} />
       <Route path="/book" component={BookOnline} />
       <Route path="/quote" component={QuoteGenerator} />
@@ -310,6 +313,7 @@ function Router() {
       <Route path="/crm/work-orders">{() => <ProtectedCrmWrapper><CrmWorkOrders /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/accounts/new">{() => <ProtectedCrmWrapper><CrmAccountCreate /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/accounts/:id">{() => <ProtectedCrmWrapper><CrmAccountDetail /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/phone-pop">{() => <ProtectedCrmWrapper><CrmPhonePop /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/customers/:id">{() => <ProtectedCrmWrapper><CrmCustomerDetail /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/customers">{() => <ProtectedCrmWrapper><CrmCustomers /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/invoices/new">{() => <ProtectedCrmWrapper><CrmInvoiceCreate /></ProtectedCrmWrapper>}</Route>
