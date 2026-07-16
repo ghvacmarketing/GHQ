@@ -16,6 +16,16 @@ services:
       - key: NODE_ENV
         value: production
 
+      # ── Android app (Play Store / sideload) ─────────────────────────
+      # Cert fingerprints are public info, safe to commit. First entry is
+      # the local upload/signing key from the PWABuilder package; append
+      # Google's app-signing-key fingerprint (Play Console → App signing)
+      # separated by a comma once retrieved.
+      - key: ANDROID_PACKAGE_NAME
+        value: app.ghvac.tools
+      - key: ANDROID_APP_FINGERPRINTS
+        value: "EA:9D:A0:1B:84:A4:00:AC:9A:59:E3:7C:41:72:79:77:7D:C4:8F:FC:C8:FA:BA:9F:C2:3E:CC:81:23:55:49:B7"
+
       # ── Core (required) ──────────────────────────────────────────────
       - key: DATABASE_URL # Neon pooled connection string
         sync: false
