@@ -115,9 +115,12 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
-      refetchOnWindowFocus: true, // Auto-sync when returning to tab
-      refetchOnMount: false, // Only refetch if data is stale
-      staleTime: 10 * 60 * 1000, // 10 minutes - data stays fresh longer for faster feel
+      // "always" so returning to the app (phone unlock, tab switch) re-syncs every
+      // visible query even if it's within staleTime — edits made on another device
+      // show up on focus instead of after the staleTime window expires.
+      refetchOnWindowFocus: "always",
+      refetchOnMount: true, // Refetch stale data when navigating to a page
+      staleTime: 45 * 1000, // 45s — cached data still renders instantly, then refreshes in background
       gcTime: 30 * 60 * 1000, // 30 minutes - keep unused data in cache longer
       retry: false,
     },

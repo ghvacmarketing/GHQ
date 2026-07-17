@@ -1247,6 +1247,9 @@ function MonthDispatchBoard({ workOrders, selectedDate, onWorkOrderClick, onDayC
 
   return (
     <Card className="bg-white border overflow-hidden">
+      {/* min-w + outer scroll keeps the month grid readable on small screens */}
+      <div className="overflow-x-auto">
+      <div className="min-w-[840px]">
       <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
         {dayNames.map((day) => (
           <div key={day} className="py-2 text-center border-r border-slate-200 last:border-r-0">
@@ -1291,6 +1294,8 @@ function MonthDispatchBoard({ workOrders, selectedDate, onWorkOrderClick, onDayC
             </DroppableMonthCell>
           );
         })}
+      </div>
+      </div>
       </div>
     </Card>
   );
@@ -1662,8 +1667,11 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
 
   return (
     <Card className="bg-white border overflow-hidden">
-      <div className="overflow-x-hidden dispatch-timeline-scroll">
-        <div className="w-full">
+      {/* Horizontal scroll on small screens; the tech column is sticky-left.
+          Below lg the board keeps a wider floor (~80px/hour) so cards stay
+          readable and you swipe sideways instead of squishing 16 hours in. */}
+      <div className="overflow-x-auto dispatch-timeline-scroll">
+        <div className="w-full min-w-[900px] max-lg:min-w-[1450px]">
           <div className="flex border-b border-slate-200 sticky top-0 bg-white z-20">
             <div className="w-44 flex-shrink-0 px-4 py-3 border-r border-slate-200 text-sm font-semibold text-slate-700 bg-white sticky left-0 z-30">
               Technicians
@@ -2661,9 +2669,10 @@ export default function CrmDispatch() {
       return res.json();
     },
     enabled: !!currentUser,
-    staleTime: 2 * 60 * 1000, // Cache for 2 minutes for better performance
-    refetchInterval: 60000, // Refresh every 60 seconds to catch sync updates
+    staleTime: 5000, // near-live board: another dispatcher's change shows within seconds
+    refetchInterval: 10000,
     refetchIntervalInBackground: true, // Keep syncing even when tab is not focused
+    refetchOnWindowFocus: true,
   });
 
   // Time breakdown data for the selected date

@@ -3562,8 +3562,8 @@ export default function MobileJobDetail() {
       return res.json();
     },
     enabled: !!params.id,
-    staleTime: 30 * 1000, // Data considered fresh for 30 seconds
-    refetchInterval: isOnline ? 30 * 1000 : false, // Auto-refresh every 30 seconds when online
+    staleTime: 5 * 1000, // near-live: dispatcher changes reach techs within ~10s
+    refetchInterval: isOnline ? 10 * 1000 : false, // Auto-refresh every 10 seconds when online
     refetchOnWindowFocus: true, // Refresh when app comes back to foreground
   });
 

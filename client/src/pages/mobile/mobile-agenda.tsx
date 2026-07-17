@@ -500,9 +500,9 @@ export default function MobileAgenda() {
       return data.workOrders || [];
     },
     enabled: !!currentUser,
-    staleTime: 30 * 1000, // Data considered fresh for 30 seconds
+    staleTime: 5 * 1000, // near-live: dispatcher changes reach techs within ~10s
     gcTime: 24 * 60 * 60 * 1000,
-    refetchInterval: isOnline ? 30 * 1000 : false, // Auto-refresh every 30 seconds when online
+    refetchInterval: isOnline ? 10 * 1000 : false, // Auto-refresh every 10 seconds when online
     refetchOnWindowFocus: true, // Refresh when app comes back to foreground
     retry: (failureCount, error) => {
       if (error instanceof Error && error.message === "AUTH_REQUIRED") return false;

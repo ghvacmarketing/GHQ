@@ -880,12 +880,14 @@ export default function CrmTaskBoard() {
             </div>
 
             {tasksLoading ? (
-              <div className="flex-1 min-h-0 grid grid-cols-4 gap-3">
-                {COLUMNS.map((col) => (
-                  <div key={col.id}>
-                    <Skeleton className="h-full rounded-lg" />
-                  </div>
-                ))}
+              <div className="flex-1 min-h-0 max-lg:overflow-x-auto">
+                <div className="h-full grid grid-cols-4 gap-3 max-lg:min-w-[1080px]">
+                  {COLUMNS.map((col) => (
+                    <div key={col.id}>
+                      <Skeleton className="h-full rounded-lg" />
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : (
               <DndContext
@@ -894,7 +896,9 @@ export default function CrmTaskBoard() {
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
               >
-                <div className="flex-1 min-h-0 grid grid-cols-4 gap-3">
+                {/* Below lg the 4 columns keep a readable width and scroll sideways */}
+                <div className="flex-1 min-h-0 max-lg:overflow-x-auto">
+                <div className="h-full grid grid-cols-4 gap-3 max-lg:min-w-[1080px]">
                   {COLUMNS.map((column) => (
                     <DroppableColumn
                       key={column.id}
@@ -914,6 +918,7 @@ export default function CrmTaskBoard() {
                       onStopAdding={() => setActiveAddingColumn(null)}
                     />
                   ))}
+                </div>
                 </div>
 
                 <DragOverlay>
