@@ -4,18 +4,21 @@ import { ClipboardList, Wrench, Clock, User, Monitor, ShieldX, MessageSquare, Us
 import type { ReactNode } from "react";
 import type { CrmUser } from "@shared/schema";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface MobileShellProps {
   children: ReactNode;
 }
 
+// Profile lives in the floating avatar (top right), not the nav pill.
 const navTabs = [
   { path: "/mobile", label: "Agenda", icon: ClipboardList },
   { path: "/mobile/job", label: "Job", icon: Wrench },
   { path: "/mobile/customers", label: "Customers", icon: Users },
   { path: "/mobile/messages", label: "Messages", icon: MessageSquare },
   { path: "/mobile/time", label: "Time", icon: Clock },
-  { path: "/mobile/profile", label: "Profile", icon: User },
 ];
 
 // Roles that can access mobile app: owner, supervisor, sales, tech
@@ -81,27 +84,36 @@ export default function MobileShell({ children }: MobileShellProps) {
       style={{ paddingTop: "env(safe-area-inset-top)" }}
       data-testid="mobile-shell"
     >
-      <header
-        className="flex-shrink-0 bg-gradient-to-b from-[#7d1720] to-[#5e1015] px-4 py-3 text-white shadow-md"
-        data-testid="mobile-header"
-      >
-        <div className="flex items-center justify-between">
-          <div className="w-20">
-            {showDesktopLink && (
-              <Link
-                href="/crm"
-                className="flex items-center gap-1 text-white/80 hover:text-white text-xs"
-                data-testid="link-desktop-crm"
-              >
-                <Monitor className="h-4 w-4" />
-                Desktop
+      {/* Floating profile button — replaces the old header strip */}
+      <div className="absolute right-3 z-40" style={{ top: "calc(10px + env(safe-area-inset-top))" }}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white/85 text-sm font-bold text-[#711419] shadow-[0_4px_16px_rgba(0,0,0,0.14)] backdrop-blur-xl transition-transform active:scale-95"
+              data-testid="button-profile-menu"
+              aria-label="Profile menu"
+            >
+              {currentUser?.name
+                ? currentUser.name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("")
+                : <User className="h-5 w-5" />}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="z-50">
+            <DropdownMenuItem asChild data-testid="menu-profile">
+              <Link href="/mobile/profile" className="flex items-center">
+                <User className="mr-2 h-4 w-4" /> My Profile
               </Link>
+            </DropdownMenuItem>
+            {showDesktopLink && (
+              <DropdownMenuItem asChild data-testid="menu-desktop">
+                <Link href="/crm" className="flex items-center">
+                  <Monitor className="mr-2 h-4 w-4" /> Desktop CRM
+                </Link>
+              </DropdownMenuItem>
             )}
-          </div>
-          <h1 className="text-lg font-semibold tracking-tight">GHVAC Tech</h1>
-          <div className="w-20"></div>
-        </div>
-      </header>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       {/* Content scrolls underneath the floating nav pill */}
       <main
