@@ -697,20 +697,21 @@ export default function MobileAgenda() {
         ) : (
           <>
             {/* Up Next — hero card */}
-            {myJobs.length === 0 ? (
-              <div className="space-y-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Today</h3>
-                <div
-                  className="flex flex-col items-center justify-center rounded-2xl bg-white py-10 text-center shadow-sm"
-                  data-testid="agenda-empty"
-                >
-                  <ClipboardList className="mb-2 h-10 w-10 text-slate-300" />
-                  <h3 className="mb-1 text-sm font-medium text-slate-600">No Jobs Today</h3>
-                  <p className="text-xs text-slate-400">You have no work orders scheduled for today.</p>
-                </div>
-              </div>
-            ) : (
+            {(
               <>
+                {!upNext && (
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Up Next</h3>
+                    <div
+                      className="flex flex-col items-center justify-center rounded-2xl bg-white py-8 text-center shadow-sm"
+                      data-testid="agenda-empty"
+                    >
+                      <ClipboardList className="mb-2 h-8 w-8 text-slate-300" />
+                      <p className="text-sm font-medium text-slate-600">Nothing on deck</p>
+                      <p className="text-xs text-slate-400">No jobs scheduled right now.</p>
+                    </div>
+                  </div>
+                )}
                 {upNext && (
                   <div className="space-y-2">
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Up Next</h3>
@@ -768,9 +769,13 @@ export default function MobileAgenda() {
                   </div>
                 )}
 
-                {laterToday.length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Later Today</h3>
+                <div className="space-y-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Later Today</h3>
+                  {laterToday.length === 0 ? (
+                    <p className="rounded-2xl bg-white px-4 py-5 text-center text-xs text-slate-400 shadow-sm" data-testid="agenda-later-empty">
+                      Nothing else scheduled today.
+                    </p>
+                  ) : (
                     <div className="space-y-2" data-testid="agenda-later-today">
                       {laterToday.map((job) => (
                         <button
@@ -800,8 +805,8 @@ export default function MobileAgenda() {
                         </button>
                       ))}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {wrappedUp.length > 0 && (
                   <div className="space-y-2">
