@@ -37,8 +37,11 @@ import {
   AlertTriangle,
   RefreshCw,
   FileCheck,
-  Minus
+  Minus,
+  MessageSquare,
+  Navigation,
 } from "lucide-react";
+import { statusDotColor } from "@/components/ui/status-dot";
 import { useForm } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
@@ -210,26 +213,55 @@ function OverviewTab({
 
   const nextStatus = getNextStatus(displayStatus as WorkOrderStatus);
 
+  const actionBtn = "flex items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white py-3 text-sm font-semibold text-slate-800 shadow-sm transition-transform active:scale-[0.97]";
+
   return (
     <div className="space-y-4">
-      <div className="text-center mb-4 flex items-center justify-center gap-2">
-        {(optimisticPending?.isPending ?? workOrder.isPending) && (
-          <Badge 
-            variant="outline" 
-            className={`text-lg px-4 py-1 bg-amber-100 text-amber-700 border-amber-300 ${optimisticPending ? 'opacity-70' : 'animate-pulse'}`}
-            data-testid="job-pending-badge"
-          >
-            Waiting{optimisticPending ? " (saving...)" : ""}
-          </Badge>
+      {/* Header — name, address/job, status line */}
+      <div className="pt-8" data-testid="job-header">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900" data-testid="job-customer-name">{customerName}</h1>
+        <p className="mt-0.5 text-sm text-slate-500">
+          {workOrder.property?.address1 || address}
+          {workOrder.title ? ` — ${workOrder.title}` : ""}
+        </p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm" data-testid="job-status-badge">
+          <span className={`h-2 w-2 rounded-full ${statusDotColor(status.className)}`} />
+          <span className="font-semibold text-slate-800">{status.label}{optimisticStatus ? "…" : ""}</span>
+          {(optimisticPending?.isPending ?? workOrder.isPending) && (
+            <span className="font-medium text-amber-600" data-testid="job-pending-badge">· Waiting</span>
+          )}
+          {workOrder.scheduledStart && (
+            <span className="text-slate-400">
+              · {format(new Date(workOrder.scheduledStart), "h:mm a")}
+              {workOrder.scheduledEnd ? ` – ${format(new Date(workOrder.scheduledEnd), "h:mm a")}` : ""}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Quick actions */}
+      <div className="grid grid-cols-3 gap-2" data-testid="job-quick-actions">
+        {customerPhone ? (
+          <a href={`tel:${customerPhone}`} className={actionBtn} data-testid="action-call">
+            <Phone className="h-4 w-4 text-[#711419]" /> Call
+          </a>
+        ) : (
+          <span className={`${actionBtn} opacity-40`}>
+            <Phone className="h-4 w-4" /> Call
+          </span>
         )}
-        <Badge 
-          variant="outline" 
-          className={`text-lg px-4 py-1 ${status.className} ${optimisticStatus ? 'opacity-70' : ''}`}
-          data-testid="job-status-badge"
-        >
-          {status.label}
-          {optimisticStatus && " (saving...)"}
-        </Badge>
+        {customerPhone ? (
+          <a href={`sms:${customerPhone}`} className={actionBtn} data-testid="action-text">
+            <MessageSquare className="h-4 w-4 text-[#711419]" /> Text
+          </a>
+        ) : (
+          <span className={`${actionBtn} opacity-40`}>
+            <MessageSquare className="h-4 w-4" /> Text
+          </span>
+        )}
+        <a href={getGoogleMapsUrl(workOrder.property)} target="_blank" rel="noopener noreferrer" className={actionBtn} data-testid="action-navigate">
+          <Navigation className="h-4 w-4 text-[#711419]" /> Navigate
+        </a>
       </div>
 
       {renewalInfo?.isRenewalVisit && renewalInfo.renewalStatus === "pending" && renewalInfo.agreementInfo && (
@@ -318,130 +350,22 @@ function OverviewTab({
         </div>
       )}
 
-      <Card data-testid="customer-info-card">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg" data-testid="customer-name">
-            {customerName}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {customerPhone && (
-            <a 
-              href={`tel:${customerPhone}`}
-              className="flex items-center text-blue-600 hover:underline min-h-[44px]"
-              data-testid="customer-phone"
-            >
-              <Phone className="h-4 w-4 mr-2" />
-              {customerPhone}
-            </a>
-          )}
-          <a 
-            href={getGoogleMapsUrl(workOrder.property)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-start text-slate-600 hover:text-blue-600 min-h-[44px]"
-            data-testid="customer-address"
-          >
-            <MapPin className="h-4 w-4 mr-2 mt-0.5 shrink-0" />
-            <span>{address}</span>
-          </a>
-          {workOrder.scheduledStart && (
-            <div className="flex items-center text-slate-500">
-              <Clock className="h-4 w-4 mr-2" />
-              <span data-testid="scheduled-time">
-                {format(new Date(workOrder.scheduledStart), "h:mm a")}
-                {workOrder.scheduledEnd && ` - ${format(new Date(workOrder.scheduledEnd), "h:mm a")}`}
-              </span>
+      <Card className="rounded-2xl border-slate-100 shadow-sm" data-testid="status-update-card">
+        <CardContent className="space-y-4 pt-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Status</p>
+            <div className="mt-1.5 flex items-center gap-2">
+              <span className={`h-2.5 w-2.5 rounded-full ${statusDotColor(status.className)}`} />
+              <span className="text-base font-bold text-slate-900">{status.label}</span>
             </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Maintenance Agreement Info Card */}
-      {renewalInfo?.visitInfo && renewalInfo.agreementInfo && (
-        <Card className="border-purple-200 bg-purple-50/50" data-testid="card-maintenance-info">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base text-purple-800">
-              <FileCheck className="h-4 w-4" />
-              Maintenance Agreement
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-slate-600">Agreement</span>
-              <span className="font-medium text-sm">{renewalInfo.agreementInfo.agreementNumber}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-slate-600">Visit Progress</span>
-              <span className="font-bold text-purple-700">
-                Visit {renewalInfo.visitInfo.visitNumber} of {renewalInfo.visitInfo.totalVisitsInCycle}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-slate-600">Billing</span>
-              <Badge variant="outline" className="text-xs">
-                {renewalInfo.agreementInfo.billingPreference === "pay_on_visit" ? "Pay on Visit" : "Auto Invoice"}
-              </Badge>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-slate-600">Status</span>
-              <Badge variant="outline" className={`text-xs ${
-                renewalInfo.agreementInfo.status === "active" ? "bg-green-100 text-green-700 border-green-300" :
-                renewalInfo.agreementInfo.status === "pending" ? "bg-amber-100 text-amber-700 border-amber-300" :
-                "bg-slate-100 text-slate-700 border-slate-300"
-              }`}>
-                {renewalInfo.agreementInfo.status === "active" ? "Active" : 
-                 renewalInfo.agreementInfo.status === "pending" ? "Pending Activation" :
-                 renewalInfo.agreementInfo.status || "Unknown"}
-              </Badge>
-            </div>
-            {renewalInfo.agreementInfo.agreementPlan && (
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-600">Plan</span>
-                <span className="text-sm font-medium">{renewalInfo.agreementInfo.agreementPlan}</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {checklistResponse && checklistResponse.checklist && checklistResponse.summary && (
-        <Card className="border-amber-200 bg-amber-50/30" data-testid="card-checklist-summary">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Clipboard className="h-4 w-4 text-amber-600" />
-              Checklist Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-checklist-summary">
-              {checklistResponse.summary}
+            <p className="mt-1.5 text-sm text-slate-500">
+              {displayStatus === "scheduled" && "On the books — mark Dispatched when you pick this job up."}
+              {displayStatus === "dispatched" && "Job's yours. Tap Start Driving when you head out."}
+              {displayStatus === "en_route" && "On the way — tap Start Working when you arrive."}
+              {displayStatus === "on_site" && "You're on site. Wrap up from the Work tab when the checklist is done."}
+              {displayStatus === "completed" && "All done — the completion summary is saved below."}
             </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {workOrder.dispatchNotes && (
-        <Card className="border-amber-200 bg-amber-50/50" data-testid="card-dispatch-notes">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Phone className="h-4 w-4 text-amber-600" />
-              Dispatch Notes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-dispatch-notes">
-              {workOrder.dispatchNotes}
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card data-testid="status-update-card">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Job Status</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </div>
           <div className="flex items-center justify-between" data-testid="status-stepper">
             {statusFlow.map((step, index) => {
               const stepIndex = statusFlow.indexOf(displayStatus as WorkOrderStatus);
@@ -561,6 +485,139 @@ function OverviewTab({
           })()}
         </CardContent>
       </Card>
+
+      {/* Schedule */}
+      <Card className="rounded-2xl border-slate-100 shadow-sm" data-testid="card-schedule">
+        <CardContent className="pt-4">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Schedule</p>
+          <div className="mt-2 space-y-1.5 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Window</span>
+              <span className="font-semibold text-slate-900" data-testid="scheduled-time">
+                {workOrder.scheduledStart
+                  ? `${format(new Date(workOrder.scheduledStart), "h:mm a")}${workOrder.scheduledEnd ? ` – ${format(new Date(workOrder.scheduledEnd), "h:mm a")}` : ""}`
+                  : "Not scheduled"}
+              </span>
+            </div>
+            {workOrder.scheduledStart && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Date</span>
+                <span className="font-semibold text-slate-900">{format(new Date(workOrder.scheduledStart), "EEE, MMM d")}</span>
+              </div>
+            )}
+            {workOrder.createdAt && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Booked</span>
+                <span className="font-semibold text-slate-900">GHQ · {format(new Date(workOrder.createdAt), "MMM d")}</span>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-2xl border-slate-100 shadow-sm" data-testid="customer-info-card">
+        <CardContent className="pt-4">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Customer</p>
+          <div className="mt-2 space-y-2.5">
+            {customerPhone && (
+              <a
+                href={`tel:${customerPhone}`}
+                className="flex items-center text-sm font-semibold text-slate-900"
+                data-testid="customer-phone"
+              >
+                <Phone className="h-4 w-4 mr-2 text-slate-400" />
+                {customerPhone}
+              </a>
+            )}
+            <a
+              href={getGoogleMapsUrl(workOrder.property)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-start text-sm text-slate-700"
+              data-testid="customer-address"
+            >
+              <MapPin className="h-4 w-4 mr-2 mt-0.5 shrink-0 text-slate-400" />
+              <span>{address}</span>
+            </a>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Maintenance Agreement Info Card */}
+      {renewalInfo?.visitInfo && renewalInfo.agreementInfo && (
+        <Card className="border-purple-200 bg-purple-50/50" data-testid="card-maintenance-info">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base text-purple-800">
+              <FileCheck className="h-4 w-4" />
+              Maintenance Agreement
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-slate-600">Agreement</span>
+              <span className="font-medium text-sm">{renewalInfo.agreementInfo.agreementNumber}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-slate-600">Visit Progress</span>
+              <span className="font-bold text-purple-700">
+                Visit {renewalInfo.visitInfo.visitNumber} of {renewalInfo.visitInfo.totalVisitsInCycle}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-slate-600">Billing</span>
+              <Badge variant="outline" className="text-xs">
+                {renewalInfo.agreementInfo.billingPreference === "pay_on_visit" ? "Pay on Visit" : "Auto Invoice"}
+              </Badge>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-slate-600">Status</span>
+              <Badge variant="outline" className={`text-xs ${
+                renewalInfo.agreementInfo.status === "active" ? "bg-green-100 text-green-700 border-green-300" :
+                renewalInfo.agreementInfo.status === "pending" ? "bg-amber-100 text-amber-700 border-amber-300" :
+                "bg-slate-100 text-slate-700 border-slate-300"
+              }`}>
+                {renewalInfo.agreementInfo.status === "active" ? "Active" : 
+                 renewalInfo.agreementInfo.status === "pending" ? "Pending Activation" :
+                 renewalInfo.agreementInfo.status || "Unknown"}
+              </Badge>
+            </div>
+            {renewalInfo.agreementInfo.agreementPlan && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-slate-600">Plan</span>
+                <span className="text-sm font-medium">{renewalInfo.agreementInfo.agreementPlan}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {checklistResponse && checklistResponse.checklist && checklistResponse.summary && (
+        <Card className="border-amber-200 bg-amber-50/30" data-testid="card-checklist-summary">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Clipboard className="h-4 w-4 text-amber-600" />
+              Checklist Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-checklist-summary">
+              {checklistResponse.summary}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {workOrder.dispatchNotes && (
+        <Card className="rounded-2xl border-slate-100 shadow-sm" data-testid="card-dispatch-notes">
+          <CardContent className="pt-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">From Dispatch</p>
+            <p className="mt-2 text-sm leading-relaxed text-slate-700 whitespace-pre-wrap" data-testid="text-dispatch-notes">
+              {workOrder.dispatchNotes}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
 
       {(workOrder.workSubtype || workOrder.description) && (
         <Card data-testid="job-info-card">
@@ -3564,7 +3621,7 @@ export default function MobileJobDetail() {
   };
   const onSwipeStart = (e: React.TouchEvent) => {
     const t = e.touches[0];
-    swipe.current = { x: t.clientX, y: t.clientY, active: t.clientX < window.innerWidth / 2 };
+    swipe.current = { x: t.clientX, y: t.clientY, active: t.clientX < 28 };
   };
   const onSwipeMove = (e: React.TouchEvent) => {
     const st = swipe.current;

@@ -13,6 +13,7 @@ import MobileShell from "./mobile-shell";
 import { useOnlineStatus, OfflineIndicator, usePendingChanges } from "@/hooks/use-online-status";
 import { PerformanceGauge } from "@/components/ui/performance-gauge";
 import { DraggableSheet } from "@/components/mobile/draggable-sheet";
+import { statusDotColor } from "@/components/ui/status-dot";
 import type { CrmWorkOrder, CrmCustomer, CrmProperty, CrmUser } from "@shared/schema";
 
 interface WorkOrderWithDetails extends CrmWorkOrder {
@@ -567,6 +568,8 @@ export default function MobileAgenda() {
     gcTime: 24 * 60 * 60 * 1000,
   });
 
+  const [, navigateMain] = useLocation();
+
   // Agenda is strictly YOUR day; the all-technicians roster lives on the
   // Jobs tab now.
   const shouldFilterByTech = true;
@@ -637,6 +640,13 @@ export default function MobileAgenda() {
   });
 
   const myJobs = todaysOrders;
+  const IN_PROGRESS = ["dispatched", "en_route", "on_site"];
+  const notDone = myJobs.filter((j) => j.status !== "completed" && j.status !== "cancelled");
+  const upNext = notDone.find((j) => IN_PROGRESS.includes(j.status)) || notDone[0] || null;
+  const laterToday = notDone.filter((j) => j.id !== upNext?.id);
+  const wrappedUp = myJobs.filter((j) => j.status === "completed");
+  const mapsUrl = (j: WorkOrderWithDetails) =>
+    `https://maps.google.com/?q=${encodeURIComponent(getPropertyAddress(j.property))}`;
 
   const showCacheWarning = !isOnline || isFromCache;
 
@@ -686,37 +696,147 @@ export default function MobileAgenda() {
           </div>
         ) : (
           <>
-            {/* My Jobs */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
-                  My Jobs
-                </h3>
-                <span className="text-xs font-medium text-slate-400">
-                  {myJobs.length} job{myJobs.length !== 1 ? "s" : ""}
-                </span>
-              </div>
-              {myJobs.length === 0 ? (
+            {/* Up Next — hero card */}
+            {myJobs.length === 0 ? (
+              <div className="space-y-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Today</h3>
                 <div
-                  className="flex flex-col items-center justify-center py-8 text-center bg-slate-50 dark:bg-slate-800/50 rounded-lg"
+                  className="flex flex-col items-center justify-center rounded-2xl bg-white py-10 text-center shadow-sm"
                   data-testid="agenda-empty"
                 >
-                  <ClipboardList className="h-10 w-10 text-slate-300 mb-2" />
-                  <h3 className="text-sm font-medium text-slate-600 mb-1">No Jobs Today</h3>
-                  <p className="text-slate-400 text-xs">You have no work orders scheduled for today.</p>
+                  <ClipboardList className="mb-2 h-10 w-10 text-slate-300" />
+                  <h3 className="mb-1 text-sm font-medium text-slate-600">No Jobs Today</h3>
+                  <p className="text-xs text-slate-400">You have no work orders scheduled for today.</p>
                 </div>
-              ) : (
-                <div className="space-y-3" data-testid="agenda-list">
-                  {myJobs.map((workOrder) => (
-                    <WorkOrderCard
-                      key={workOrder.id}
-                      workOrder={workOrder}
-                      showCacheWarning={showCacheWarning}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <>
+                {upNext && (
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Up Next</h3>
+                    <div
+                      onClick={() => navigateMain(`/mobile/job/${upNext.id}`)}
+                      className="cursor-pointer rounded-3xl bg-gradient-to-b from-[#7d1720] to-[#5e1015] p-4 text-white shadow-[0_12px_32px_rgba(113,20,25,0.35)] transition-transform active:scale-[0.99]"
+                      data-testid="agenda-up-next"
+                    >
+                      <div className="flex items-start justify-between">
+                        <p className="text-3xl font-bold tracking-tight">
+                          {upNext.scheduledStart ? formatLocal(upNext.scheduledStart, "h:mm") : "—"}
+                          <span className="ml-1 text-base font-semibold text-white/70">
+                            {upNext.scheduledStart ? formatLocal(upNext.scheduledStart, "a") : ""}
+                          </span>
+                        </p>
+                        <span className="flex items-center gap-1.5 text-sm font-semibold text-white/90">
+                          <span className={`h-2 w-2 rounded-full ${statusDotColor(statusConfig[upNext.status]?.className)}`} />
+                          {statusConfig[upNext.status]?.label || upNext.status}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xl font-bold" data-testid="up-next-name">
+                        {upNext.customer?.name || upNext.title || "Job"}
+                      </p>
+                      <p className="mt-0.5 text-sm text-white/70">
+                        {upNext.property?.address1 || getPropertyAddress(upNext.property)}
+                        {upNext.title && upNext.customer?.name ? ` — ${upNext.title}` : ""}
+                      </p>
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <a
+                          href={mapsUrl(upNext)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center justify-center gap-1.5 rounded-2xl bg-white py-3 text-sm font-bold text-[#711419] transition-transform active:scale-[0.97]"
+                          data-testid="up-next-navigate"
+                        >
+                          <Navigation className="h-4 w-4" /> Navigate
+                        </a>
+                        {upNext.customer?.phone ? (
+                          <a
+                            href={`tel:${upNext.customer.phone}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center justify-center gap-1.5 rounded-2xl border border-white/30 py-3 text-sm font-semibold text-white transition-transform active:scale-[0.97]"
+                            data-testid="up-next-call"
+                          >
+                            <Phone className="h-4 w-4" /> Call
+                          </a>
+                        ) : (
+                          <span className="flex items-center justify-center gap-1.5 rounded-2xl border border-white/20 py-3 text-sm font-semibold text-white/40">
+                            <Phone className="h-4 w-4" /> Call
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {laterToday.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Later Today</h3>
+                    <div className="space-y-2" data-testid="agenda-later-today">
+                      {laterToday.map((job) => (
+                        <button
+                          key={job.id}
+                          onClick={() => navigateMain(`/mobile/job/${job.id}`)}
+                          className="flex w-full items-center gap-3 rounded-2xl bg-white px-4 py-3 text-left shadow-sm transition-transform active:scale-[0.99]"
+                          data-testid={`agenda-job-${job.id}`}
+                        >
+                          <div className="w-11 shrink-0 text-center">
+                            <p className="text-base font-bold leading-tight text-slate-900">
+                              {job.scheduledStart ? formatLocal(job.scheduledStart, "h:mm") : "—"}
+                            </p>
+                            <p className="text-[11px] font-medium text-slate-400">
+                              {job.scheduledStart ? formatLocal(job.scheduledStart, "a") : ""}
+                            </p>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-bold text-slate-900">{job.customer?.name || job.title || "Job"}</p>
+                            <p className="truncate text-xs text-slate-500">{job.property?.address1 || getPropertyAddress(job.property)}</p>
+                            <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
+                              <span className={`h-1.5 w-1.5 rounded-full ${statusDotColor(statusConfig[job.status]?.className)}`} />
+                              {statusConfig[job.status]?.label || job.status}
+                              {job.title && job.customer?.name && <span className="truncate text-slate-400">· {job.title}</span>}
+                            </p>
+                          </div>
+                          <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {wrappedUp.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Wrapped Up</h3>
+                    <div className="space-y-2" data-testid="agenda-wrapped-up">
+                      {wrappedUp.map((job) => (
+                        <button
+                          key={job.id}
+                          onClick={() => navigateMain(`/mobile/job/${job.id}`)}
+                          className="flex w-full items-center gap-3 rounded-2xl bg-white/70 px-4 py-3 text-left shadow-sm transition-transform active:scale-[0.99]"
+                          data-testid={`agenda-job-${job.id}`}
+                        >
+                          <div className="w-11 shrink-0 text-center">
+                            <p className="text-base font-bold leading-tight text-slate-500">
+                              {job.scheduledStart ? formatLocal(job.scheduledStart, "h:mm") : "—"}
+                            </p>
+                            <p className="text-[11px] font-medium text-slate-400">
+                              {job.scheduledStart ? formatLocal(job.scheduledStart, "a") : ""}
+                            </p>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-slate-600">{job.customer?.name || job.title || "Job"}</p>
+                            <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-400">
+                              <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                              Completed
+                            </p>
+                          </div>
+                          <CheckCircle className="h-4 w-4 shrink-0 text-green-500" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
 
             {/* My Performance */}
             {performanceData && (

@@ -24,7 +24,7 @@ export function SubPage({ backTo = "/mobile", children }: { backTo?: string; chi
 
   const onTouchStart = (e: React.TouchEvent) => {
     const t = e.touches[0];
-    swipe.current = { x: t.clientX, y: t.clientY, active: t.clientX < window.innerWidth / 2 };
+    swipe.current = { x: t.clientX, y: t.clientY, active: t.clientX < 28 };
   };
   const onTouchMove = (e: React.TouchEvent) => {
     const st = swipe.current;
