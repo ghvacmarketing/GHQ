@@ -1,29 +1,37 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ClipboardList, Wrench, Clock, ShieldX, MessageSquare, Users } from "lucide-react";
+import {
+  ClipboardList, Wrench, Clock, ShieldX, MessageSquare, Users, Plus,
+  FileText, Receipt, Camera,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import type { CrmUser } from "@shared/schema";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 interface MobileShellProps {
   children: ReactNode;
 }
 
-// Profile lives in the floating avatar (top right), not the nav pill.
+// Customers/Messages (and quick actions) live in the "+" sheet;
+// Profile lives in the agenda's avatar menu.
 const navTabs = [
   { path: "/mobile", label: "Agenda", icon: ClipboardList },
   { path: "/mobile/job", label: "Job", icon: Wrench },
-  { path: "/mobile/customers", label: "Customers", icon: Users },
-  { path: "/mobile/messages", label: "Messages", icon: MessageSquare },
   { path: "/mobile/time", label: "Time", icon: Clock },
 ];
+
+const SUPERVISOR_ROLES = ["supervisor", "owner"];
 
 // Roles that can access mobile app: owner, supervisor, sales, tech
 // Admin role is desktop-only
 const MOBILE_ALLOWED_ROLES = ["owner", "supervisor", "sales", "tech"];
 
 export default function MobileShell({ children }: MobileShellProps) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const go = (path: string) => { setMoreOpen(false); navigate(path); };
 
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -39,6 +47,7 @@ export default function MobileShell({ children }: MobileShellProps) {
 
   // Check if user can access mobile app
   const canAccessMobile = currentUser && MOBILE_ALLOWED_ROLES.includes(currentUser.role);
+  const isSupervisor = !!currentUser && SUPERVISOR_ROLES.includes(currentUser.role);
 
   // Block admin users from mobile app
   if (currentUser && !canAccessMobile) {
@@ -92,7 +101,7 @@ export default function MobileShell({ children }: MobileShellProps) {
       {/* Floating pill nav — detached from the screen edges */}
       <nav
         className="absolute left-1/2 z-40 -translate-x-1/2 rounded-full border border-slate-900/10 bg-white/90 px-1.5 py-1.5 shadow-[0_8px_28px_rgba(0,0,0,0.16)] backdrop-blur-xl"
-        style={{ bottom: "calc(12px + env(safe-area-inset-bottom))", maxWidth: "calc(100vw - 16px)" }}
+        style={{ bottom: "calc(4px + env(safe-area-inset-bottom))", maxWidth: "calc(100vw - 16px)" }}
         data-testid="mobile-nav"
       >
         <div className="flex items-center gap-0.5">
@@ -104,7 +113,7 @@ export default function MobileShell({ children }: MobileShellProps) {
                 key={tab.path}
                 href={tab.path}
                 data-testid={`nav-tab-${tab.label.toLowerCase()}`}
-                className={`flex min-w-[50px] flex-col items-center justify-center gap-0.5 rounded-full px-2 py-1.5 transition-all duration-200 active:scale-95 ${
+                className={`flex min-w-[54px] flex-col items-center justify-center gap-0.5 rounded-full px-3 py-1.5 transition-all duration-200 active:scale-95 ${
                   active ? "bg-[#711419] text-white shadow-md" : "text-slate-500"
                 }`}
               >
@@ -115,8 +124,63 @@ export default function MobileShell({ children }: MobileShellProps) {
               </Link>
             );
           })}
+          <button
+            onClick={() => setMoreOpen(true)}
+            className="ml-1 flex h-11 w-11 items-center justify-center rounded-full bg-[#711419] text-white shadow-md transition-transform active:scale-95"
+            data-testid="nav-tab-more"
+            aria-label="More"
+          >
+            <Plus className="h-5 w-5 stroke-[2.5]" />
+          </button>
         </div>
       </nav>
+
+      {/* "+" sheet — extra destinations and supervisor quick actions */}
+      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+        <SheetContent
+          side="bottom"
+          className="rounded-t-3xl border-t-0 px-5 pb-8 pt-3"
+          style={{ paddingBottom: "calc(24px + env(safe-area-inset-bottom))" }}
+          data-testid="sheet-more"
+        >
+          <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-slate-300" />
+          <SheetHeader className="sr-only">
+            <SheetTitle>More</SheetTitle>
+          </SheetHeader>
+
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Go to</p>
+          <div className="grid grid-cols-4 gap-3">
+            <SheetTile icon={Users} label="Customers" onClick={() => go("/mobile/customers")} testid="more-customers" />
+            <SheetTile icon={MessageSquare} label="Messages" onClick={() => go("/mobile/messages")} testid="more-messages" />
+          </div>
+
+          {isSupervisor && (
+            <>
+              <p className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-slate-400">Quick actions</p>
+              <div className="grid grid-cols-4 gap-3">
+                <SheetTile icon={FileText} label="New Quote" onClick={() => go("/crm/quotes/new")} testid="more-new-quote" />
+                <SheetTile icon={Receipt} label="New Invoice" onClick={() => go("/crm/invoices/new")} testid="more-new-invoice" />
+                <SheetTile icon={Camera} label="Add Photo" onClick={() => go("/mobile/job")} testid="more-add-photo" />
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
+  );
+}
+
+function SheetTile({
+  icon: Icon, label, onClick, testid,
+}: { icon: typeof Users; label: string; onClick: () => void; testid: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex flex-col items-center gap-1.5 rounded-2xl bg-slate-100 px-1 py-3 transition-all active:scale-95 active:bg-slate-200"
+      data-testid={testid}
+    >
+      <Icon className="h-6 w-6 text-[#711419]" />
+      <span className="text-[11px] font-medium text-slate-700">{label}</span>
+    </button>
   );
 }
