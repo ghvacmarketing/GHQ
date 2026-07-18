@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Wrench, MapPin, Clock, ChevronRight, CheckCircle2, Circle, Plus, Search, Loader2, AlertTriangle, CalendarIcon } from "lucide-react";
+import { Wrench, MapPin, Clock, ChevronRight, CheckCircle2, Circle, Plus, Search, Loader2, AlertTriangle, CalendarIcon, HardHat } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
 import { useToast } from "@/hooks/use-toast";
@@ -305,13 +305,7 @@ export default function MobileJob() {
     queryKey: ["/api/crm/technicians"],
     enabled: !!currentUser && (currentUser.role === 'supervisor' || currentUser.role === 'owner'),
   });
-  const [expandedTechs, setExpandedTechs] = useState<Set<string>>(() => new Set());
-  const toggleTech = (id: string) =>
-    setExpandedTechs((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
+  const [selectedTechId, setSelectedTechId] = useState<string | null>(null);
 
   const handleCreateSubmit = () => {
     if (!selectedCustomer || !selectedProperty || !woTitle.trim() || !woDescription.trim()) {
@@ -624,68 +618,71 @@ export default function MobileJob() {
           </div>
         )}
 
-        {/* All technicians — supervisor & owner: today's jobs per tech, collapsible */}
+        {/* All technicians — supervisor & owner: tap a card to see their day */}
         {isSupervisorPlus && (
           <div className="space-y-3 border-t border-slate-200 pt-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">All Technicians</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">All Technicians</h3>
               <span className="text-xs font-medium text-slate-400">
                 {boardTechs.filter((t) => t.id !== currentUser?.id).length} techs
               </span>
             </div>
-            <div className="space-y-2.5" data-testid="jobs-tech-roster">
+            <div className="grid grid-cols-2 gap-2" data-testid="jobs-tech-roster">
               {boardTechs.filter((t) => t.id !== currentUser?.id).map((tech) => {
                 const techJobs = workOrders
                   .filter((wo) => wo.assignedTechId === tech.id && wo.scheduledStart && isToday(toLocalTime(wo.scheduledStart)))
-                  .sort((a, b) => new Date(a.scheduledStart!).getTime() - new Date(b.scheduledStart!).getTime());
-                const expanded = expandedTechs.has(tech.id);
-                const initials = tech.name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("");
+                  .sort((x, y) => new Date(x.scheduledStart!).getTime() - new Date(y.scheduledStart!).getTime());
+                const selected = selectedTechId === tech.id;
                 return (
-                  <div key={tech.id} data-testid={`jobs-tech-${tech.id}`}>
-                    <button
-                      onClick={() => toggleTech(tech.id)}
-                      className={`flex w-full items-center gap-3 rounded-2xl border bg-white px-3 py-2.5 shadow-sm transition-all active:scale-[0.99] ${
-                        expanded ? "border-[#711419]/30" : "border-slate-200"
-                      }`}
-                      data-testid={`jobs-tech-toggle-${tech.id}`}
-                    >
-                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#711419]/10 text-sm font-bold text-[#711419]">
-                        {initials}
-                      </span>
-                      <span className="flex-1 text-left text-sm font-semibold text-slate-800">{tech.name}</span>
-                      <span className="text-xs text-slate-400">{techJobs.length} today</span>
-                      <ChevronRight className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`} />
-                    </button>
-                    <div className={`grid transition-all duration-300 ease-in-out ${expanded ? "mt-2 grid-rows-[1fr] opacity-100" : "mt-0 grid-rows-[0fr] opacity-0"}`}>
-                      <div className="overflow-hidden">
-                        <div className="ml-2 space-y-1.5 border-l-2 border-slate-200 pb-1 pl-4">
-                          {techJobs.length === 0 ? (
-                            <p className="py-2 text-xs text-slate-400">No jobs scheduled today.</p>
-                          ) : (
-                            techJobs.map((job) => (
-                              <button
-                                key={job.id}
-                                onClick={() => navigate(`/mobile/job/${job.id}`)}
-                                className="flex w-full items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-left shadow-sm transition-all active:scale-[0.99] border border-slate-100"
-                                data-testid={`jobs-roster-job-${job.id}`}
-                              >
-                                <span className="text-xs font-semibold tabular-nums text-slate-500">
-                                  {job.scheduledStart ? format(toLocalTime(job.scheduledStart), "h:mm a") : "—"}
-                                </span>
-                                <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">
-                                  {job.customer?.name || job.title || "Job"}
-                                </span>
-                                <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <button
+                    key={tech.id}
+                    onClick={() => setSelectedTechId(selected ? null : tech.id)}
+                    className={`flex flex-col items-center gap-1.5 rounded-2xl border bg-white px-2 py-4 shadow-sm transition-all active:scale-[0.98] ${
+                      selected ? "border-[#711419] ring-1 ring-[#711419]/30" : "border-slate-200"
+                    }`}
+                    data-testid={`jobs-tech-${tech.id}`}
+                  >
+                    <span className={`flex h-11 w-11 items-center justify-center rounded-full ${selected ? "bg-[#711419] text-white" : "bg-[#711419]/10 text-[#711419]"}`}>
+                      <HardHat className="h-5 w-5" />
+                    </span>
+                    <span className="max-w-full truncate text-sm font-semibold text-slate-800">{tech.name}</span>
+                    <span className="text-xs text-slate-400">{techJobs.length} job{techJobs.length !== 1 ? "s" : ""} today</span>
+                  </button>
                 );
               })}
             </div>
+
+            {selectedTechId && (() => {
+              const tech = boardTechs.find((t) => t.id === selectedTechId);
+              const techJobs = workOrders
+                .filter((wo) => wo.assignedTechId === selectedTechId && wo.scheduledStart && isToday(toLocalTime(wo.scheduledStart)))
+                .sort((x, y) => new Date(x.scheduledStart!).getTime() - new Date(y.scheduledStart!).getTime());
+              return (
+                <div className="space-y-2" data-testid="jobs-tech-day">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">{tech?.name}'s day</h4>
+                  {techJobs.length === 0 ? (
+                    <p className="rounded-2xl bg-white px-4 py-4 text-center text-xs text-slate-400 shadow-sm">No jobs scheduled today.</p>
+                  ) : (
+                    techJobs.map((job) => (
+                      <button
+                        key={job.id}
+                        onClick={() => navigate(`/mobile/job/${job.id}`)}
+                        className="flex w-full items-center gap-2 rounded-2xl border border-slate-100 bg-white px-3 py-2.5 text-left shadow-sm transition-all active:scale-[0.99]"
+                        data-testid={`jobs-roster-job-${job.id}`}
+                      >
+                        <span className="text-xs font-semibold tabular-nums text-slate-500">
+                          {job.scheduledStart ? format(toLocalTime(job.scheduledStart), "h:mm a") : "—"}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">
+                          {job.customer?.name || job.title || "Job"}
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                      </button>
+                    ))
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
