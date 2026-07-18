@@ -123,7 +123,6 @@ function ProfileHeader({ user }: { user: CrmUser }) {
   const [, navigate] = useLocation();
   const [now, setNow] = useState(new Date());
   const [notifOpen, setNotifOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60000);
@@ -189,7 +188,7 @@ function ProfileHeader({ user }: { user: CrmUser }) {
         </button>
         <span className="h-6 w-px bg-slate-200 dark:bg-slate-600" aria-hidden />
         <button
-          onClick={() => setProfileOpen(true)}
+          onClick={() => navigate("/mobile/profile")}
           className="flex h-11 w-12 items-center justify-center rounded-r-full outline-none transition-transform focus:outline-none active:scale-95"
           style={{ WebkitTapHighlightColor: "transparent" }}
           data-testid="button-profile-menu"
@@ -239,27 +238,6 @@ function ProfileHeader({ user }: { user: CrmUser }) {
         </div>
       </DraggableSheet>
 
-      {/* Profile sheet */}
-      <DraggableSheet open={profileOpen} onOpenChange={setProfileOpen} title="Profile" testid="sheet-profile">
-        <div className="mb-4 flex items-center gap-3">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#711419] text-base font-bold text-white">
-            {initials || <User className="h-5 w-5" />}
-          </span>
-          <div>
-            <p className="text-base font-semibold text-slate-900">{user.name}</p>
-            <p className="text-xs text-slate-500">{roleConfig.label}</p>
-          </div>
-        </div>
-        <button
-          onClick={() => { setProfileOpen(false); navigate("/mobile/profile"); }}
-          className="flex w-full items-center gap-3 rounded-2xl bg-slate-100 px-4 py-3.5 text-left transition-all active:scale-[0.98] active:bg-slate-200"
-          data-testid="menu-profile"
-        >
-          <User className="h-5 w-5 text-[#711419]" />
-          <span className="text-sm font-medium text-slate-800">My Profile</span>
-          <ChevronRight className="ml-auto h-4 w-4 text-slate-400" />
-        </button>
-      </DraggableSheet>
     </div>
   );
 }

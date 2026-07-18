@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Camera, ImageIcon, Loader2, MapPin } from "lucide-react";
+import { Camera, ImageIcon, ImagePlus, Loader2, MapPin, X } from "lucide-react";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -65,7 +65,57 @@ export default function MobilePhotos() {
   });
   const photos = (files || []).filter((f) => f.contentType?.startsWith("image/"));
 
-  const handleUpload = async (list: FileList | null) => {
+  // In-app camera: shutter → photo uploads immediately, no confirm/retake step
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [flash, setFlash] = useState(false);
+
+  const openCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1440 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setCameraOpen(true);
+      // Attach after the overlay renders
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(() => {});
+        }
+      }, 50);
+    } catch {
+      // No camera permission/support — fall back to the native picker
+      fileInputRef.current?.click();
+    }
+  };
+
+  const closeCamera = () => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setCameraOpen(false);
+  };
+
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth) return;
+    setFlash(true);
+    setTimeout(() => setFlash(false), 140);
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d")!.drawImage(video, 0, 0);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const file = new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" });
+      // Fire the upload immediately; the camera stays open for the next shot
+      handleUpload([file]);
+    }, "image/jpeg", 0.85);
+  };
+
+  const handleUpload = async (list: FileList | File[] | null) => {
     if (!list || list.length === 0 || !customerId || !selectedJob) return;
     setUploading(true);
     try {
@@ -137,28 +187,38 @@ export default function MobilePhotos() {
           </div>
         )}
 
-        {/* Upload button */}
+        {/* Capture / library */}
         {selectedJob && (
           <>
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              capture="environment"
               multiple
               className="hidden"
               onChange={(e) => handleUpload(e.target.files)}
               data-testid="input-photo-file"
             />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#711419] py-3.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-60"
-              data-testid="button-take-photo"
-            >
-              {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
-              {uploading ? "Uploading…" : "Take / Add Photos"}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={openCamera}
+                disabled={uploading}
+                className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#711419] py-3.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-60"
+                data-testid="button-take-photo"
+              >
+                <Camera className="h-5 w-5" />
+                Take Photo
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 font-semibold text-slate-700 shadow-sm transition-transform active:scale-[0.98] disabled:opacity-60"
+                data-testid="button-add-from-library"
+                aria-label="Add from library"
+              >
+                {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
+              </button>
+            </div>
           </>
         )}
 
@@ -186,6 +246,48 @@ export default function MobilePhotos() {
           )
         )}
       </div>
+
+      {/* Fullscreen in-app camera — every shutter press auto-saves to the account */}
+      {cameraOpen && (
+        <div className="fixed inset-0 z-[60] flex flex-col bg-black" data-testid="camera-overlay">
+          <video
+            ref={videoRef}
+            playsInline
+            muted
+            autoPlay
+            className="min-h-0 flex-1 object-cover"
+          />
+          {flash && <div className="pointer-events-none absolute inset-0 bg-white/80" />}
+          <button
+            onClick={closeCamera}
+            className="absolute left-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur"
+            style={{ top: "calc(12px + env(safe-area-inset-top))" }}
+            data-testid="button-close-camera"
+            aria-label="Close camera"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <div
+            className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 pb-8"
+            style={{ paddingBottom: "calc(32px + env(safe-area-inset-bottom))" }}
+          >
+            <p className="text-xs font-medium text-white/70">
+              Auto-saves to {selectedJob?.customer?.name || "the customer"}
+            </p>
+            <button
+              onClick={capturePhoto}
+              disabled={uploading}
+              className="flex h-[74px] w-[74px] items-center justify-center rounded-full border-4 border-white transition-transform active:scale-90 disabled:opacity-60"
+              data-testid="button-shutter"
+              aria-label="Take photo"
+            >
+              {uploading
+                ? <Loader2 className="h-8 w-8 animate-spin text-white" />
+                : <span className="h-[58px] w-[58px] rounded-full bg-white" />}
+            </button>
+          </div>
+        </div>
+      )}
     </MobileShell>
   );
 }
