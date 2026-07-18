@@ -118,16 +118,16 @@ async function fetchLiveData(needs: string[]): Promise<LiveDataContext> {
         .select({
           id: crmAgreements.id,
           agreementNumber: crmAgreements.agreementNumber,
-          name: crmAgreements.name,
+          name: crmAgreements.agreementPlan,
           status: crmAgreements.status,
           customerName: crmCustomers.name,
-          nextVisitDate: crmAgreements.nextVisitDate,
-          expirationDate: crmAgreements.expirationDate,
+          nextVisitDate: crmAgreements.nextServiceDate,
+          expirationDate: crmAgreements.endDate,
         })
         .from(crmAgreements)
         .leftJoin(crmCustomers, eq(crmAgreements.customerId, crmCustomers.id))
         .where(eq(crmAgreements.status, "active"))
-        .orderBy(crmAgreements.nextVisitDate)
+        .orderBy(crmAgreements.nextServiceDate)
         .limit(15);
       context.activeAgreements = active;
 
@@ -135,7 +135,7 @@ async function fetchLiveData(needs: string[]): Promise<LiveDataContext> {
         .select({
           id: crmAgreements.id,
           agreementNumber: crmAgreements.agreementNumber,
-          name: crmAgreements.name,
+          name: crmAgreements.agreementPlan,
           status: crmAgreements.status,
           customerName: crmCustomers.name,
         })
@@ -149,21 +149,22 @@ async function fetchLiveData(needs: string[]): Promise<LiveDataContext> {
         .select({
           id: crmAgreements.id,
           agreementNumber: crmAgreements.agreementNumber,
-          name: crmAgreements.name,
+          name: crmAgreements.agreementPlan,
           status: crmAgreements.status,
           customerName: crmCustomers.name,
-          expirationDate: crmAgreements.expirationDate,
+          expirationDate: crmAgreements.endDate,
         })
         .from(crmAgreements)
         .leftJoin(crmCustomers, eq(crmAgreements.customerId, crmCustomers.id))
         .where(
           and(
             eq(crmAgreements.status, "active"),
-            lte(crmAgreements.expirationDate, next30Days),
-            gte(crmAgreements.expirationDate, now)
+            // endDate is a date column (string), so compare with YYYY-MM-DD
+            lte(crmAgreements.endDate, next30Days.toISOString().slice(0, 10)),
+            gte(crmAgreements.endDate, now.toISOString().slice(0, 10))
           )
         )
-        .orderBy(crmAgreements.expirationDate)
+        .orderBy(crmAgreements.endDate)
         .limit(10);
       context.expiringAgreements = expiring;
     }
@@ -173,7 +174,7 @@ async function fetchLiveData(needs: string[]): Promise<LiveDataContext> {
         .select({
           id: crmInvoices.id,
           invoiceNumber: crmInvoices.invoiceNumber,
-          totalAmount: crmInvoices.totalAmount,
+          totalAmount: crmInvoices.total,
           status: crmInvoices.status,
           customerName: crmCustomers.name,
           sentAt: crmInvoices.sentAt,
@@ -189,7 +190,7 @@ async function fetchLiveData(needs: string[]): Promise<LiveDataContext> {
         .select({
           id: crmInvoices.id,
           invoiceNumber: crmInvoices.invoiceNumber,
-          totalAmount: crmInvoices.totalAmount,
+          totalAmount: crmInvoices.total,
           status: crmInvoices.status,
           customerName: crmCustomers.name,
         })
@@ -235,7 +236,7 @@ async function fetchLiveData(needs: string[]): Promise<LiveDataContext> {
           quoteNumber: crmQuotes.quoteNumber,
           title: crmQuotes.title,
           status: crmQuotes.status,
-          totalAmount: crmQuotes.totalAmount,
+          totalAmount: crmQuotes.total,
           customerName: crmCustomers.name,
         })
         .from(crmQuotes)

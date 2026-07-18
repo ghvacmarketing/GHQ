@@ -7129,17 +7129,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Get invoices for all jobs to check if all are paid
+      // Get invoices for all jobs to check if all are paid. Invoices don't
+      // reference jobs directly - they link via their work order.
       let invoicesMap: Record<string, Array<{ status: string }>> = {};
       if (allJobIds.length > 0) {
         const invoices = await db.select({
-          jobId: crmInvoices.jobId,
+          jobId: crmWorkOrders.jobId,
           status: crmInvoices.status,
         })
           .from(crmInvoices)
-          .where(inArray(crmInvoices.jobId, allJobIds));
-        
+          .innerJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
+          .where(inArray(crmWorkOrders.jobId, allJobIds));
+
         invoices.forEach(inv => {
+          if (!inv.jobId) return;
           if (!invoicesMap[inv.jobId]) {
             invoicesMap[inv.jobId] = [];
           }
@@ -11588,7 +11591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customAgreementTypeId: crmAgreements.customAgreementTypeId,
         status: crmAgreements.status,
         numberOfSystems: crmAgreements.numberOfSystems,
-        agreementValue: crmAgreements.agreementValue,
+        agreementValue: crmAgreements.price,
         startDate: crmAgreements.startDate,
         endDate: crmAgreements.endDate,
         contractDate: crmAgreements.contractDate,
@@ -11635,8 +11638,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             id: maintenanceVisits.id,
             status: maintenanceVisits.status,
             visitNumber: maintenanceVisits.visitNumber,
-            scheduledDate: maintenanceVisits.scheduledDate,
-            completedDate: maintenanceVisits.completedDate,
+            scheduledDate: maintenanceVisits.targetDate,
+            completedDate: maintenanceVisits.completedAt,
             cycleYear: maintenanceVisits.cycleYear,
           })
             .from(maintenanceVisits)
@@ -16021,7 +16024,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conditions.push(eq(crmInvoices.projectId, projectId as string));
       }
       if (agreementId) {
-        conditions.push(eq(crmInvoices.agreementId, agreementId as string));
+        // Invoices link to agreements through their work order
+        conditions.push(inArray(
+          crmInvoices.workOrderId,
+          db.select({ id: crmWorkOrders.id })
+            .from(crmWorkOrders)
+            .where(eq(crmWorkOrders.agreementId, agreementId as string)),
+        ));
       }
       // Filter by source: "crm" = created in CRM, "imported" = historical/imported
       if (source === "crm") {
@@ -23269,7 +23278,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         // Forward the email to the invoice creator
         let forwardedTo: string | null = null;
         if (invoice.createdBy) {
-          const [createdByUser] = await db.select({ email: crmUsers.email, name: crmUsers.name, displayName: crmUsers.displayName })
+          const [createdByUser] = await db.select({ email: crmUsers.email, name: crmUsers.name })
             .from(crmUsers)
             .where(eq(crmUsers.id, invoice.createdBy))
             .limit(1);
@@ -23334,7 +23343,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       // Forward the email to the assigned salesperson
       let forwardedTo: string | null = null;
       if (quote.assignedToId) {
-        const [assignedUser] = await db.select({ email: crmUsers.email, name: crmUsers.name, displayName: crmUsers.displayName })
+        const [assignedUser] = await db.select({ email: crmUsers.email, name: crmUsers.name })
           .from(crmUsers)
           .where(eq(crmUsers.id, quote.assignedToId))
           .limit(1);

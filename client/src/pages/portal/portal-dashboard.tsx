@@ -179,7 +179,8 @@ export default function PortalDashboard() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="shadow-sm hover:shadow-md transition-shadow" data-testid="card-open-invoices">
+          <Link href="/portal/invoices">
+          <Card className="shadow-sm hover:shadow-md hover:border-[#711419]/40 transition-all cursor-pointer h-full" data-testid="card-open-invoices">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-medium text-slate-500">Open Invoices</CardTitle>
@@ -203,8 +204,10 @@ export default function PortalDashboard() {
               )}
             </CardContent>
           </Card>
+          </Link>
 
-          <Card className="shadow-sm hover:shadow-md transition-shadow" data-testid="card-agreements">
+          <Link href="/portal/agreements">
+          <Card className="shadow-sm hover:shadow-md hover:border-[#711419]/40 transition-all cursor-pointer h-full" data-testid="card-agreements">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-medium text-slate-500">Maintenance Agreements</CardTitle>
@@ -228,8 +231,10 @@ export default function PortalDashboard() {
               )}
             </CardContent>
           </Card>
+          </Link>
 
-          <Card className="shadow-sm hover:shadow-md transition-shadow" data-testid="card-quotes">
+          <Link href="/portal/quotes">
+          <Card className="shadow-sm hover:shadow-md hover:border-[#711419]/40 transition-all cursor-pointer h-full" data-testid="card-quotes">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-medium text-slate-500">Pending Quotes</CardTitle>
@@ -253,8 +258,10 @@ export default function PortalDashboard() {
               )}
             </CardContent>
           </Card>
+          </Link>
 
-          <Card className="shadow-sm hover:shadow-md transition-shadow" data-testid="card-recent-service">
+          <Link href="/portal/service-history">
+          <Card className="shadow-sm hover:shadow-md hover:border-[#711419]/40 transition-all cursor-pointer h-full" data-testid="card-recent-service">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-medium text-slate-500">Recent Service</CardTitle>
@@ -280,6 +287,7 @@ export default function PortalDashboard() {
               )}
             </CardContent>
           </Card>
+          </Link>
         </div>
 
         {/* Upcoming appointments + request service */}

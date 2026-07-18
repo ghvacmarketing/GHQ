@@ -1865,10 +1865,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getInvoices(filters?: { jobId?: string; customerId?: string; status?: string; workOrderId?: string }): Promise<CrmInvoice[]> {
-    const conditions: ReturnType<typeof eq>[] = [];
-    
+    const conditions: (ReturnType<typeof eq> | ReturnType<typeof inArray>)[] = [];
+
     if (filters?.jobId) {
-      conditions.push(eq(crmInvoices.jobId, filters.jobId));
+      // Invoices link to jobs through their work order
+      conditions.push(inArray(
+        crmInvoices.workOrderId,
+        db.select({ id: crmWorkOrders.id })
+          .from(crmWorkOrders)
+          .where(eq(crmWorkOrders.jobId, filters.jobId)),
+      ));
     }
     if (filters?.customerId) {
       conditions.push(eq(crmInvoices.customerId, filters.customerId));
