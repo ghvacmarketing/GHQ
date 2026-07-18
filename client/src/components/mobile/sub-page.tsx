@@ -32,9 +32,11 @@ export function SubPage({ backTo = "/mobile", children }: { backTo?: string; chi
     const t = e.touches[0];
     const dx = t.clientX - st.x;
     const dy = Math.abs(t.clientY - st.y);
-    if (dx > 12 && dx > dy * 1.5) {
-      pageRef.current.style.transition = "none";
-      pageRef.current.style.transform = `translateX(${dx}px)`;
+    // Content stays put while the finger moves; crossing the threshold
+    // commits the back navigation with the whole-page slide.
+    if (dx > 90 && dx > dy * 1.5) {
+      swipe.current = null;
+      goBackAnimated();
     }
   };
   const onTouchEnd = (e: React.TouchEvent) => {
@@ -43,13 +45,7 @@ export function SubPage({ backTo = "/mobile", children }: { backTo?: string; chi
     const el = pageRef.current;
     if (!st?.active || !el) return;
     const dx = e.changedTouches[0].clientX - st.x;
-    if (dx > 110) {
-      goBackAnimated();
-    } else if (el.style.transform) {
-      el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
-      el.style.transform = "translateX(0)";
-      setTimeout(() => { if (el) el.style.transition = ""; }, 260);
-    }
+    if (dx > 90) goBackAnimated();
   };
 
   return (
