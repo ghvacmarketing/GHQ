@@ -4022,7 +4022,34 @@ export default function MobileJobDetail() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto px-4 pb-24" data-testid="mobile-job-detail">
+        {/* Floating quick-link rail — frosted glass, right edge, above content */}
+        <div
+          className="fixed right-2 top-1/2 z-40 -translate-y-1/2 flex flex-col gap-1 rounded-2xl border border-slate-900/10 bg-white/75 p-1 shadow-[0_4px_20px_rgba(0,0,0,0.12)] backdrop-blur-xl"
+          data-testid="job-tab-nav"
+        >
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-xl transition-all duration-200 active:scale-95 ${
+                  isActive
+                    ? "bg-[#711419] text-white shadow-md"
+                    : "text-slate-500"
+                }`}
+                data-testid={`tab-${tab.id}`}
+                aria-label={tab.label}
+              >
+                <Icon className={`h-5 w-5 ${isActive ? "stroke-[2.25]" : ""}`} />
+                <span className="text-[9px] font-semibold leading-none">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex-1 overflow-auto px-4 pb-6" data-testid="mobile-job-detail">
           {activeTab === "overview" && (
             <OverviewTab
               workOrder={workOrder}
@@ -4054,33 +4081,6 @@ export default function MobileJobDetail() {
           )}
         </div>
 
-        <div 
-          className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50"
-          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-          data-testid="job-tab-nav"
-        >
-          <div className="flex justify-around items-center">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex flex-col items-center gap-1 py-3 px-4 min-h-[60px] min-w-[60px] transition-colors ${
-                    isActive 
-                      ? 'text-[#711419]' 
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                  data-testid={`tab-${tab.id}`}
-                >
-                  <Icon className={`h-5 w-5 ${isActive ? 'stroke-2' : ''}`} />
-                  <span className={`text-xs ${isActive ? 'font-semibold' : ''}`}>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
       </div>
 
       <Dialog open={showCompletionModal} onOpenChange={setShowCompletionModal}>

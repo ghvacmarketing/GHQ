@@ -76,20 +76,20 @@ export default function MobileShell({ children }: MobileShellProps) {
   };
 
   return (
-    <div 
-      className="flex flex-col h-screen bg-slate-50"
-      style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}
+    <div
+      className="relative flex h-screen flex-col bg-slate-50"
+      style={{ paddingTop: "env(safe-area-inset-top)" }}
       data-testid="mobile-shell"
     >
-      <header 
-        className="flex-shrink-0 bg-[#711419] text-white px-4 py-3 shadow-md"
+      <header
+        className="flex-shrink-0 bg-gradient-to-b from-[#7d1720] to-[#5e1015] px-4 py-3 text-white shadow-md"
         data-testid="mobile-header"
       >
         <div className="flex items-center justify-between">
           <div className="w-20">
             {showDesktopLink && (
-              <Link 
-                href="/crm" 
+              <Link
+                href="/crm"
                 className="flex items-center gap-1 text-white/80 hover:text-white text-xs"
                 data-testid="link-desktop-crm"
               >
@@ -98,21 +98,26 @@ export default function MobileShell({ children }: MobileShellProps) {
               </Link>
             )}
           </div>
-          <h1 className="text-lg font-semibold">GHVAC Tech</h1>
+          <h1 className="text-lg font-semibold tracking-tight">GHVAC Tech</h1>
           <div className="w-20"></div>
         </div>
       </header>
 
-      <main className="flex-1 overflow-auto" data-testid="mobile-main">
+      {/* Content scrolls underneath the frosted nav bar */}
+      <main
+        className="flex-1 overflow-auto"
+        style={{ paddingBottom: "calc(64px + env(safe-area-inset-bottom))" }}
+        data-testid="mobile-main"
+      >
         {children}
       </main>
 
-      <nav 
-        className="flex-shrink-0 bg-white border-t border-slate-200 shadow-lg"
+      <nav
+        className="absolute inset-x-0 bottom-0 border-t border-slate-900/10 bg-white/80 shadow-[0_-1px_12px_rgba(0,0,0,0.06)] backdrop-blur-xl"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         data-testid="mobile-nav"
       >
-        <div className="flex justify-around items-center">
+        <div className="flex items-center justify-around">
           {navTabs.map((tab) => {
             const active = isActive(tab.path);
             const Icon = tab.icon;
@@ -121,19 +126,20 @@ export default function MobileShell({ children }: MobileShellProps) {
                 key={tab.path}
                 href={tab.path}
                 data-testid={`nav-tab-${tab.label.toLowerCase()}`}
-                className={`flex flex-col items-center justify-center py-2 px-4 min-w-[64px] min-h-[56px] ${
+                className={`flex min-h-[56px] min-w-[56px] flex-col items-center justify-center gap-0.5 px-2 py-1.5 transition-transform active:scale-95 ${
                   active ? "text-[#711419]" : "text-slate-500"
                 }`}
               >
-                <Icon 
-                  className={`h-6 w-6 mb-1 ${active ? "text-[#711419]" : "text-slate-400"}`} 
-                />
-                <span className={`text-xs font-medium ${active ? "text-[#711419]" : "text-slate-500"}`}>
+                <span
+                  className={`flex items-center justify-center rounded-full px-4 py-0.5 transition-colors duration-200 ${
+                    active ? "bg-[#711419]/10" : ""
+                  }`}
+                >
+                  <Icon className={`h-[22px] w-[22px] ${active ? "text-[#711419] stroke-[2.25]" : "text-slate-400"}`} />
+                </span>
+                <span className={`text-[11px] ${active ? "font-semibold text-[#711419]" : "font-medium text-slate-500"}`}>
                   {tab.label}
                 </span>
-                {active && (
-                  <div className="absolute bottom-0 h-0.5 w-8 bg-[#711419] rounded-t-full" />
-                )}
               </Link>
             );
           })}
