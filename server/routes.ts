@@ -22851,96 +22851,17 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
-  // POST /api/crm/messaging/sync-textline - Sync conversations from Textline
+  // POST /api/crm/messaging/sync-textline - Full sync of recent Textline
+  // activity (conversations + inbound/outbound messages). Also runs in the
+  // background every 30s; this endpoint lets the messaging page force it.
   app.post("/api/crm/messaging/sync-textline", requireCrmAuth, async (req, res) => {
     try {
       if (!textlineClient.isConfigured()) {
         return res.status(400).json({ message: "Textline API is not configured" });
       }
-      
-      let created = 0;
-      let updated = 0;
-      let linked = 0;
-      let page = 0;
-      let hasMore = true;
-      
-      while (hasMore) {
-        const result = await textlineClient.getConversations(page, 50);
-        
-        if (result.error) {
-          return res.status(500).json({ message: "Error fetching from Textline: " + result.error });
-        }
-        
-        for (const textlineConvo of result.conversations) {
-          // Skip conversations without a phone number
-          if (!textlineConvo.phone_number) {
-            console.log("[Textline Sync] Skipping conversation without phone number:", textlineConvo.uuid);
-            continue;
-          }
-          
-          // First check by external ID, then check by phone number to avoid duplicates
-          let existingConvo = await storage.getMessagingConversationByExternalId(textlineConvo.uuid, "textline");
-          
-          // If not found by external ID, check by phone number to link existing conversations
-          if (!existingConvo) {
-            existingConvo = await storage.getMessagingConversationByPhone(textlineConvo.phone_number);
-          }
-          
-          let customerId: string | undefined;
-          const customer = await storage.getCrmCustomerByPhone(textlineConvo.phone_number);
-          if (customer) {
-            customerId = customer.id;
-          }
-          
-          if (!existingConvo) {
-            await storage.createMessagingConversation({
-              customerId: customerId || null,
-              phoneNumber: textlineConvo.phone_number,
-              customerName: textlineConvo.contact_name || null,
-              subject: textlineConvo.contact_name || textlineConvo.phone_number,
-              externalSource: "textline" as any,
-              externalConversationId: textlineConvo.uuid,
-              status: textlineConvo.status === "resolved" ? "resolved" as any : "open" as any,
-              lastMessageAt: textlineConvo.last_message_at ? new Date(textlineConvo.last_message_at) : undefined,
-            });
-            created++;
-            if (customerId) linked++;
-          } else {
-            const updates: Record<string, any> = {};
-            if (customerId && !existingConvo.customerId) {
-              updates.customerId = customerId;
-              linked++;
-            }
-            if (textlineConvo.last_message_at) {
-              updates.lastMessageAt = new Date(textlineConvo.last_message_at);
-            }
-            // Update external source and ID if missing (link existing local conversation to Textline)
-            if (!existingConvo.externalConversationId || existingConvo.externalSource !== "textline") {
-              updates.externalSource = "textline";
-              updates.externalConversationId = textlineConvo.uuid;
-            }
-            if (Object.keys(updates).length > 0) {
-              await storage.updateMessagingConversation(existingConvo.id, updates);
-              updated++;
-            }
-          }
-        }
-        
-        hasMore = result.hasMore;
-        page++;
-        
-        if (page > 100) {
-          console.log("[Textline Sync] Stopping after 100 pages (5000 conversations)");
-          break;
-        }
-      }
-      
-      return res.json({
-        message: "Sync completed",
-        created,
-        updated,
-        linked,
-      });
+      const { syncTextlineOnce } = await import("./services/textlineSync");
+      const result = await syncTextlineOnce();
+      return res.json({ message: "Sync completed", ...result });
     } catch (error) {
       console.error("Error syncing Textline conversations:", error);
       return res.status(500).json({ message: "Failed to sync Textline conversations" });

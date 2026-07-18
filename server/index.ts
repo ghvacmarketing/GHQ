@@ -546,6 +546,12 @@ async function runWaterHeaterSeeds() {
     // Start Govee H5103 sensor polling (humidity/temperature) every 5 minutes
     startGoveeBackgroundSync(5);
 
+    // Textline message sync every 30s — keeps inbound AND outbound SMS
+    // flowing into the CRM even when the webhook misses
+    import("./services/textlineSync")
+      .then(({ startTextlineBackgroundSync }) => startTextlineBackgroundSync(30))
+      .catch((e) => console.error("Failed to start Textline sync:", e));
+
     // Start marketing automation scheduler (processes due automation runs).
     // All sends are gated behind the automated_sms/email_enabled settings.
     import("./services/automationEngine")
