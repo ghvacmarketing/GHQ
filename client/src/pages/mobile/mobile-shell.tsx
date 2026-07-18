@@ -19,6 +19,7 @@ interface MobileShellProps {
 const navTabs = [
   { path: "/mobile", label: "Agenda", icon: ClipboardList },
   { path: "/mobile/job", label: "Job", icon: Wrench },
+  { path: "/mobile/photos", label: "Photos", icon: Camera },
   { path: "/mobile/time", label: "Time", icon: Clock },
 ];
 
@@ -145,8 +146,8 @@ export default function MobileShell({ children }: MobileShellProps) {
         style={{ bottom: "calc(4px + env(safe-area-inset-bottom))", maxWidth: "calc(100vw - 12px)" }}
         data-testid="mobile-nav"
       >
-        <nav className="rounded-full border border-slate-900/10 bg-white/90 p-2 shadow-[0_8px_28px_rgba(0,0,0,0.16)] backdrop-blur-xl">
-          <div className="flex items-center gap-1">
+        <nav className="rounded-full border border-slate-900/10 bg-white/90 p-1.5 shadow-[0_8px_28px_rgba(0,0,0,0.16)] backdrop-blur-xl">
+          <div className="flex items-center gap-0.5">
             {navTabs.map((tab) => {
               const active = isActive(tab.path);
               const Icon = tab.icon;
@@ -155,12 +156,12 @@ export default function MobileShell({ children }: MobileShellProps) {
                   key={tab.path}
                   href={tab.path}
                   data-testid={`nav-tab-${tab.label.toLowerCase()}`}
-                  className={`flex min-w-[64px] flex-col items-center justify-center gap-1 rounded-full px-4 py-2 transition-all duration-200 active:scale-95 ${
+                  className={`flex min-w-[58px] flex-col items-center justify-center gap-0.5 rounded-full px-3 py-1.5 transition-all duration-200 active:scale-95 ${
                     active ? "bg-[#711419] text-white shadow-md" : "text-slate-500"
                   }`}
                 >
-                  <Icon className={`h-[22px] w-[22px] ${active ? "stroke-[2.25]" : "text-slate-400"}`} />
-                  <span className={`text-[11px] leading-none ${active ? "font-semibold" : "font-medium"}`}>
+                  <Icon className={`h-5 w-5 ${active ? "stroke-[2.25]" : "text-slate-400"}`} />
+                  <span className={`text-[10px] leading-none ${active ? "font-semibold" : "font-medium"}`}>
                     {tab.label}
                   </span>
                 </Link>
@@ -170,7 +171,7 @@ export default function MobileShell({ children }: MobileShellProps) {
         </nav>
         <button
           onClick={() => setMoreOpen(true)}
-          className="flex h-[56px] w-[56px] shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-[0_8px_28px_rgba(113,20,25,0.45)] transition-transform active:scale-95"
+          className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-[0_8px_28px_rgba(113,20,25,0.45)] transition-transform active:scale-95"
           data-testid="nav-tab-more"
           aria-label="More"
         >

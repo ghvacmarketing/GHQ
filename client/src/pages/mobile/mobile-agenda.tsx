@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { Link, useLocation } from "wouter";
-import { format, isToday } from "date-fns";
+import { format, isToday, formatDistanceToNow } from "date-fns";
 import { getLocalStartOfDay, getLocalEndOfDay, formatLocal, toLocalTime } from "@/lib/timezone";
 import { MapPin, Clock, ClipboardList, WifiOff, CloudOff, LogIn, User, DollarSign, TrendingUp, Wrench, FileText, Users, Target, CheckCircle, XCircle, MessageSquare, Phone, Navigation, ChevronRight, Thermometer, Droplets, Wind, Settings, AlertTriangle, Calendar, Bell, Monitor } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -111,9 +112,18 @@ function greetingForHour(h: number): string {
   return "Good evening";
 }
 
+type NotificationItem = {
+  id: string;
+  title: string;
+  preview: string | null;
+  isRead: boolean;
+  createdAt: string | null;
+};
+
 function ProfileHeader({ user }: { user: CrmUser }) {
-  const [, navigate] = useLocation();
   const [now, setNow] = useState(new Date());
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60000);
@@ -125,44 +135,112 @@ function ProfileHeader({ user }: { user: CrmUser }) {
     refetchInterval: 60 * 1000,
   });
   const unreadCount = unread?.count || 0;
+
+  const { data: notifications, isLoading: notifsLoading } = useQuery<NotificationItem[]>({
+    queryKey: ["/api/crm/notifications", "mobile-bell"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/notifications?limit=15", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load notifications");
+      return res.json();
+    },
+    enabled: notifOpen,
+  });
+
+  const markAllRead = async () => {
+    await fetch("/api/crm/notifications/mark-all-read", { method: "POST", credentials: "include" });
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications", "mobile-bell"] });
+  };
+
   const initials = user.name
     ? user.name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("")
     : null;
   const showDesktopLink = user.role !== "tech";
+  const anyOverlayOpen = notifOpen || menuOpen;
 
   return (
     <div className="flex items-center justify-between" data-testid="profile-header">
+      {/* iOS-style backdrop blur while a menu is open */}
+      {anyOverlayOpen && (
+        <div className="fixed inset-0 z-40 bg-slate-900/15 backdrop-blur-[6px] animate-in fade-in-0 duration-200" aria-hidden />
+      )}
       <div>
         <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100" data-testid="text-greeting">
           {greetingForHour(now.getHours())}
         </h2>
         <p className="text-sm text-slate-500 dark:text-slate-400">{format(now, "EEEE, MMM d")}</p>
       </div>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => navigate("/crm/notifications")}
-          className="relative flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white/85 text-slate-600 shadow-sm backdrop-blur-xl transition-transform active:scale-95 dark:bg-slate-800"
-          data-testid="button-notifications"
-          aria-label="Notifications"
-        >
-          <Bell className="h-5 w-5" />
-          {unreadCount > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </span>
-          )}
-        </button>
-        <DropdownMenu>
+
+      {/* Bell + avatar share one frosted bubble */}
+      <div className="relative z-50 flex items-center rounded-full border border-slate-900/10 bg-white/85 shadow-sm backdrop-blur-xl dark:bg-slate-800">
+        <DropdownMenu open={notifOpen} onOpenChange={setNotifOpen}>
           <DropdownMenuTrigger asChild>
             <button
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white/85 text-sm font-bold text-[#711419] shadow-sm backdrop-blur-xl transition-transform active:scale-95 dark:bg-slate-800"
+              className="relative flex h-11 w-12 items-center justify-center rounded-l-full text-slate-600 transition-transform active:scale-95"
+              data-testid="button-notifications"
+              aria-label="Notifications"
+            >
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="z-50 w-[calc(100vw-2rem)] max-w-sm rounded-2xl p-0" data-testid="dropdown-notifications">
+            <div className="flex items-center justify-between border-b px-4 py-2.5">
+              <span className="text-sm font-semibold text-slate-800">Notifications</span>
+              {unreadCount > 0 && (
+                <button onClick={markAllRead} className="text-xs font-medium text-[#711419]" data-testid="button-mark-all-read">
+                  Mark all read
+                </button>
+              )}
+            </div>
+            <div className="max-h-[55vh] overflow-y-auto">
+              {notifsLoading ? (
+                <p className="px-4 py-6 text-center text-sm text-slate-400">Loading…</p>
+              ) : !notifications || notifications.length === 0 ? (
+                <p className="px-4 py-6 text-center text-sm text-slate-400">You're all caught up.</p>
+              ) : (
+                notifications.map((n) => (
+                  <div
+                    key={n.id}
+                    className={`border-b border-slate-100 px-4 py-3 last:border-b-0 ${n.isRead ? "" : "bg-[#711419]/[0.04]"}`}
+                    data-testid={`notification-${n.id}`}
+                  >
+                    <div className="flex items-start gap-2">
+                      {!n.isRead && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#711419]" />}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium leading-snug text-slate-800">{n.title}</p>
+                        {n.preview && <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{n.preview}</p>}
+                        {n.createdAt && (
+                          <p className="mt-1 text-[11px] text-slate-400">
+                            {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <span className="h-6 w-px bg-slate-200 dark:bg-slate-600" aria-hidden />
+
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="flex h-11 w-12 items-center justify-center rounded-r-full text-sm font-bold text-[#711419] transition-transform active:scale-95"
               data-testid="button-profile-menu"
               aria-label="Profile menu"
             >
               {initials || <User className="h-5 w-5" />}
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="z-50">
             <DropdownMenuItem asChild data-testid="menu-profile">
               <Link href="/mobile/profile" className="flex items-center">
                 <User className="mr-2 h-4 w-4" /> My Profile
@@ -498,6 +576,15 @@ export default function MobileAgenda() {
   const [isFromCache, setIsFromCache] = useState(false);
   // Users with view-all permission can toggle between viewing all techs or just their own work orders
   const [viewAllTechs, setViewAllTechs] = useState<boolean | null>(null);
+  // Collapsible per-tech sections in the grouped view (start collapsed; the
+  // supervisor opens whichever technicians they want to see)
+  const [expandedTechs, setExpandedTechs] = useState<Set<string>>(() => new Set());
+  const toggleTech = (id: string) =>
+    setExpandedTechs((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
 
   const { data: currentUser, isLoading: isLoadingUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -751,40 +838,51 @@ export default function MobileAgenda() {
                   </p>
                 </div>
               ) : showGroupedView && groupedByTech ? (
-                <div className="space-y-4" data-testid="agenda-grouped-list">
+                <div className="space-y-2.5" data-testid="agenda-grouped-list">
                   {sortedTechIds.map((techId) => {
                     const techOrders = groupedByTech[techId];
                     const techName = getTechName(techId);
                     const tech = technicians.find(t => t.id === techId);
                     const roleConfig = tech ? roleLabels[tech.role] : null;
-                    
+                    const expanded = expandedTechs.has(techId);
+                    const initials = techName !== "Unassigned"
+                      ? techName.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("")
+                      : null;
+
                     return (
                       <div key={techId} data-testid={`tech-section-${techId}`}>
-                        <div className="flex items-center gap-2 mb-2 px-1">
-                          <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
-                            <User className="w-4 h-4 text-slate-500" />
+                        <button
+                          onClick={() => toggleTech(techId)}
+                          className={`flex w-full items-center gap-3 rounded-2xl border bg-white px-3 py-2.5 shadow-sm transition-all active:scale-[0.99] dark:bg-slate-800 ${
+                            expanded ? "border-[#711419]/30" : "border-slate-200 dark:border-slate-700"
+                          }`}
+                          data-testid={`tech-toggle-${techId}`}
+                        >
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#711419]/10 text-sm font-bold text-[#711419]">
+                            {initials || <User className="h-4 w-4 text-slate-500" />}
                           </div>
-                          <div className="flex-1">
-                            <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">{techName}</p>
+                          <div className="flex-1 text-left">
+                            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{techName}</p>
                             {roleConfig && (
-                              <Badge className={`text-xs ${roleConfig.className}`}>
-                                {roleConfig.label}
-                              </Badge>
+                              <p className="text-[11px] text-slate-400">{roleConfig.label}</p>
                             )}
                           </div>
                           <Badge variant="outline" className="text-xs">
                             {techOrders.length} job{techOrders.length !== 1 ? 's' : ''}
                           </Badge>
-                        </div>
-                        <div className="space-y-2 ml-2 pl-4 border-l-2 border-slate-200 dark:border-slate-700">
-                          {techOrders.map((workOrder) => (
-                            <WorkOrderCard 
-                              key={workOrder.id} 
-                              workOrder={workOrder} 
-                              showCacheWarning={showCacheWarning} 
-                            />
-                          ))}
-                        </div>
+                          <ChevronRight className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`} />
+                        </button>
+                        {expanded && (
+                          <div className="ml-2 mt-2 space-y-2 border-l-2 border-slate-200 pl-4 dark:border-slate-700">
+                            {techOrders.map((workOrder) => (
+                              <WorkOrderCard
+                                key={workOrder.id}
+                                workOrder={workOrder}
+                                showCacheWarning={showCacheWarning}
+                              />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
