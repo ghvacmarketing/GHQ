@@ -88,6 +88,7 @@ import cookieParser from "cookie-parser";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerEsignRoutes } from "./esign-routes";
 import { registerInstallPlannerRoutes } from "./install-planner-routes";
+import { registerPortalAccountRoutes } from "./portal-account-routes";
 import stripePaymentsRouter from "./stripe-payments";
 import { getMessagingAdapter } from "./services/messaging/adapters";
 import { textlineClient } from "./textlineClient";
@@ -736,6 +737,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register Install Planner (tentative pre-sale scheduling) routes
   registerInstallPlannerRoutes(app);
+
+  // Register customer-portal account routes (password login, signup, profile)
+  registerPortalAccountRoutes(app);
 
   // Register Stripe payment routes
   app.use(stripePaymentsRouter);
@@ -24805,12 +24809,19 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
   // GET /api/portal/auth/me - Get current logged-in customer info
   app.get("/api/portal/auth/me", requireCustomerPortalAuth, async (req: any, res) => {
     const customer = req.portalCustomer;
+    const account = req.portalAccount;
     res.json({
       customer: {
         id: customer.id,
         name: customer.name,
         email: customer.email,
         phone: customer.phone,
+      },
+      account: {
+        email: account.email,
+        phone: account.phone,
+        hasPassword: !!account.passwordHash,
+        phoneVerified: !!account.phoneVerifiedAt,
       },
     });
   });

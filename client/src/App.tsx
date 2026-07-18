@@ -81,6 +81,7 @@ const CrmSettingsLeadClassification = lazy(() => import("@/pages/crm/crm-setting
 const CrmSettingsTime = lazy(() => import("@/pages/crm/crm-settings-time"));
 const CrmSettingsPayments = lazy(() => import("@/pages/crm/crm-settings-payments"));
 const CrmSettingsDispatch = lazy(() => import("@/pages/crm/crm-settings-dispatch"));
+const CrmSettingsCustomerPortal = lazy(() => import("@/pages/crm/crm-settings-customer-portal"));
 const CrmSettingsAppearance = lazy(() => import("@/pages/crm/crm-settings-appearance"));
 const CrmSettingsSystemTools = lazy(() => import("@/pages/crm/crm-settings-system-tools"));
 const CrmSettingsQuickBooks = lazy(() => import("@/pages/crm/crm-settings-quickbooks"));
@@ -121,6 +122,7 @@ const PortalQuotes = lazy(() => import("@/pages/portal/portal-quotes"));
 const PortalAgreements = lazy(() => import("@/pages/portal/portal-agreements"));
 const PortalServiceHistory = lazy(() => import("@/pages/portal/portal-service-history"));
 const PortalSensors = lazy(() => import("@/pages/portal/portal-sensors"));
+const PortalProfile = lazy(() => import("@/pages/portal/portal-profile"));
 
 // Lazy-load Public pages (no auth required)
 const PublicQuoteView = lazy(() => import("@/pages/public/quote-view"));
@@ -350,6 +352,7 @@ function Router() {
       <Route path="/crm/settings/time-logs">{() => <ProtectedCrmWrapper><CrmSettingsTime /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/payments">{() => <ProtectedCrmWrapper><CrmSettingsPayments /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/dispatch">{() => <ProtectedCrmWrapper><CrmSettingsDispatch /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/settings/customer-portal">{() => <ProtectedCrmWrapper><CrmSettingsCustomerPortal /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/appearance">{() => <ProtectedCrmWrapper><CrmSettingsAppearance /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/system-tools">{() => <ProtectedCrmWrapper><CrmSettingsSystemTools /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/quickbooks">{() => <ProtectedCrmWrapper><CrmSettingsQuickBooks /></ProtectedCrmWrapper>}</Route>
@@ -386,6 +389,7 @@ function Router() {
       <Route path="/portal/agreements">{() => <PortalWrapper><PortalAgreements /></PortalWrapper>}</Route>
       <Route path="/portal/service-history">{() => <PortalWrapper><PortalServiceHistory /></PortalWrapper>}</Route>
       <Route path="/portal/sensors">{() => <PortalWrapper><PortalSensors /></PortalWrapper>}</Route>
+      <Route path="/portal/profile">{() => <PortalWrapper><PortalProfile /></PortalWrapper>}</Route>
       <Route path="/quote/:token">{() => <Suspense fallback={<GlobalLoader />}><PublicQuoteView /></Suspense>}</Route>
       <Route path="/q/:token">{() => <Suspense fallback={<GlobalLoader />}><PublicQuoteView /></Suspense>}</Route>
       <Route path="/i/:token">{() => <Suspense fallback={<GlobalLoader />}><PublicInvoiceView /></Suspense>}</Route>

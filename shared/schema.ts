@@ -2743,11 +2743,42 @@ export const customerPortalAccounts = pgTable("customer_portal_accounts", {
   customerId: varchar("customer_id").notNull().references(() => crmCustomers.id, { onDelete: "cascade" }),
   email: text("email"),
   phone: text("phone"),
+  // Login credentials (phone-or-email + password). All nullable so legacy
+  // magic-link-only accounts keep working until they set a password.
+  passwordHash: text("password_hash"),
+  normalizedPhone: text("normalized_phone"), // digits-only, for login matching
+  phoneVerifiedAt: timestamp("phone_verified_at"),
+  emailVerifiedAt: timestamp("email_verified_at"),
+  failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
+  lockedUntil: timestamp("locked_until"),
   isActive: boolean("is_active").notNull().default(true),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  normalizedPhoneIdx: index("customer_portal_accounts_normalized_phone_idx").on(table.normalizedPhone),
+  customerIdIdx: index("customer_portal_accounts_customer_id_idx").on(table.customerId),
+}));
+
+// One-time SMS codes for portal signup, password reset, and phone changes
+export const customerPortalOtpPurposeEnum = ["signup", "reset", "phone_change"] as const;
+export type CustomerPortalOtpPurpose = typeof customerPortalOtpPurposeEnum[number];
+
+export const customerPortalOtpCodes = pgTable("customer_portal_otp_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  normalizedPhone: text("normalized_phone").notNull(),
+  code: text("code").notNull(),
+  purpose: text("purpose").$type<CustomerPortalOtpPurpose>().notNull(),
+  // For phone_change: the account requesting the change
+  accountId: varchar("account_id").references(() => customerPortalAccounts.id, { onDelete: "cascade" }),
+  attempts: integer("attempts").notNull().default(0),
+  verifiedAt: timestamp("verified_at"),
+  consumedAt: timestamp("consumed_at"),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  phonePurposeIdx: index("customer_portal_otp_phone_purpose_idx").on(table.normalizedPhone, table.purpose),
+}));
 
 // Customer portal login tokens - for magic link authentication
 export const customerPortalLoginTokens = pgTable("customer_portal_login_tokens", {
@@ -2790,6 +2821,13 @@ export type InsertCustomerPortalLoginToken = z.infer<typeof insertCustomerPortal
 export type CustomerPortalLoginToken = typeof customerPortalLoginTokens.$inferSelect;
 export type InsertCustomerPortalSession = z.infer<typeof insertCustomerPortalSessionSchema>;
 export type CustomerPortalSession = typeof customerPortalSessions.$inferSelect;
+
+export const insertCustomerPortalOtpCodeSchema = createInsertSchema(customerPortalOtpCodes).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCustomerPortalOtpCode = z.infer<typeof insertCustomerPortalOtpCodeSchema>;
+export type CustomerPortalOtpCode = typeof customerPortalOtpCodes.$inferSelect;
 
 // ============================================
 // CRM Messaging Module

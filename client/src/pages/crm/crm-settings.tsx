@@ -22,6 +22,7 @@ import {
   ChevronRight,
   CalendarClock,
   Palette,
+  Globe,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { PageHeader, SectionCard } from "@/components/crm/ui-kit";
@@ -57,6 +58,7 @@ const sections: SettingsSection[] = [
       { name: "Service Checklists", href: "/crm/checklists", icon: ClipboardList },
       { name: "Package Pricing", href: "/crm/settings/packages", icon: Package },
       { name: "Proposal Templates", href: "/crm/settings/proposal-templates", icon: FileText },
+      { name: "Customer Portal", href: "/crm/settings/customer-portal", icon: Globe },
     ],
   },
   {

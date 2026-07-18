@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, UserCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import ghvacLogo from "@assets/ghvac-logo.png";
 
@@ -34,16 +34,29 @@ export function PortalLayout({ children, showLogout = true }: PortalLayoutProps)
             />
           </Link>
           {showLogout && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
-              className="text-white hover:bg-white/10"
-              data-testid="button-logout"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
+            <div className="flex items-center gap-1">
+              <Link href="/portal/profile">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-white hover:bg-white/10"
+                  data-testid="button-profile"
+                >
+                  <UserCircle className="h-4 w-4 mr-2" />
+                  My Profile
+                </Button>
+              </Link>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className="text-white hover:bg-white/10"
+                data-testid="button-logout"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </div>
           )}
         </div>
       </header>

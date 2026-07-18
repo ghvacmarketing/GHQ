@@ -1731,6 +1731,122 @@ interface CustomerTabbedViewProps {
   setActiveTab: (tab: string) => void;
 }
 
+interface PortalAccountBreakdown {
+  portalEnabled: boolean;
+  account: {
+    id: string;
+    email: string | null;
+    phone: string | null;
+    isActive: boolean;
+    hasPassword: boolean;
+    phoneVerifiedAt: string | null;
+    emailVerifiedAt: string | null;
+    lastLoginAt: string | null;
+    createdAt: string | null;
+    lockedUntil: string | null;
+    activeSessions: number;
+  } | null;
+}
+
+function PortalAccountCard({ customerId }: { customerId: string }) {
+  const { data, isLoading } = useQuery<PortalAccountBreakdown>({
+    queryKey: [`/api/crm/customers/${customerId}/portal-account`],
+  });
+
+  if (isLoading) {
+    return <Skeleton className="h-32 rounded-xl" data-testid="skeleton-portal-card" />;
+  }
+  if (!data) return null;
+
+  const account = data.account;
+  const locked = account?.lockedUntil && new Date(account.lockedUntil) > new Date();
+
+  let loginMethod = "No portal account yet";
+  if (account) {
+    loginMethod = account.hasPassword
+      ? "Password login" + (account.phoneVerifiedAt ? " (verified phone)" : "")
+      : "Invite link only — no password set";
+  }
+
+  return (
+    <Card className="border shadow-sm" data-testid="card-portal-account">
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+            <Key className="h-4 w-4 text-[#711419]" />
+            Customer Portal
+          </h3>
+          <div className="flex items-center gap-2">
+            {data.portalEnabled ? (
+              <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">Enabled</Badge>
+            ) : (
+              <Badge variant="outline" className="text-slate-500">Disabled</Badge>
+            )}
+            {account && !account.isActive && (
+              <Badge variant="outline" className="border-red-200 text-red-600 bg-red-50">Account Inactive</Badge>
+            )}
+            {locked && (
+              <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50">Temporarily Locked</Badge>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Login Method</p>
+            <p className="text-sm text-slate-700" data-testid="text-portal-login-method">{loginMethod}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Last Login</p>
+            <p className="text-sm text-slate-700" data-testid="text-portal-last-login">
+              {account?.lastLoginAt ? formatDate(account.lastLoginAt) : "Never"}
+              {account && account.activeSessions > 0 && (
+                <span className="text-xs text-emerald-600 ml-2">
+                  {account.activeSessions} active session{account.activeSessions === 1 ? "" : "s"}
+                </span>
+              )}
+            </p>
+          </div>
+          {account && (
+            <>
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Portal Login Email</p>
+                <p className="text-sm text-slate-700" data-testid="text-portal-email">
+                  {account.email || <span className="text-slate-400">None</span>}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Portal Login Phone</p>
+                <p className="text-sm text-slate-700 flex items-center gap-1.5" data-testid="text-portal-phone">
+                  {account.phone || <span className="text-slate-400">None</span>}
+                  {account.phoneVerifiedAt && (
+                    <span title="Verified by SMS code">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Account Created</p>
+                <p className="text-sm text-slate-700" data-testid="text-portal-created">
+                  {account.createdAt ? formatDate(account.createdAt) : "—"}
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+
+        {!account && (
+          <p className="text-sm text-slate-400 mt-2">
+            The customer hasn't signed up yet. They can create an account at the portal login page with their phone
+            number, or you can send them an invite link with the Portal toggle above.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function CustomerTabbedView({
   customer,
   customerProperties,
@@ -2139,6 +2255,8 @@ function CustomerTabbedView({
           </CardContent>
         </Card>
 
+        {/* Customer Portal breakdown */}
+        <PortalAccountCard customerId={customer.id} />
 
         {/* Setup Checklist Card - Only for Property Managers */}
         {isPropertyManager && (
