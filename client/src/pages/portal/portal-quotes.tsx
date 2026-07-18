@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Receipt, ExternalLink } from "lucide-react";
@@ -113,7 +114,7 @@ export default function PortalQuotes() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <Table>
+                <Table className="[&_td]:py-4 [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-400">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Quote #</TableHead>
@@ -142,13 +143,12 @@ export default function PortalQuotes() {
                             {formatCurrency(quote.total)}
                           </TableCell>
                           <TableCell className="text-center">
-                            <Badge 
-                              variant="outline" 
-                              className={status.className}
+                            <StatusDot 
+                              pill={status.className}
                               data-testid={`badge-quote-status-${quote.id}`}
                             >
                               {status.label}
-                            </Badge>
+                            </StatusDot>
                           </TableCell>
                           <TableCell className="text-center">
                             {quote.portalCanView && quote.viewToken ? (

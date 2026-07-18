@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, FileText, CheckCircle2, MapPin, Calendar, CreditCard, Loader2, User } from "lucide-react";
@@ -238,13 +239,12 @@ export default function PortalInvoiceDetail() {
                 <p className="text-sm text-slate-500">{formatDate(invoice.createdAt)}</p>
               </div>
               {statusInfo && (
-                <Badge 
-                  variant="outline" 
-                  className={statusInfo.className}
+                <StatusDot 
+                  pill={statusInfo.className}
                   data-testid="badge-status"
                 >
                   {statusInfo.label}
-                </Badge>
+                </StatusDot>
               )}
             </div>
           </CardHeader>

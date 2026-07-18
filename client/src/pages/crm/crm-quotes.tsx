@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import {
   Select,
   SelectContent,
@@ -754,12 +755,11 @@ export default function CrmQuotes() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            className={statusColors[quote.status || "draft"] || statusColors.draft}
+                          <StatusDot
+                            pill={statusColors[quote.status || "draft"] || statusColors.draft}
                           >
                             {statusLabels[quote.status || "draft"] || quote.status}
-                          </Badge>
+                          </StatusDot>
                           {(quote.viewCount || 0) > 0 && (
                             <span className="flex items-center gap-1 text-xs text-purple-600" title={`Viewed ${quote.viewCount} time${quote.viewCount === 1 ? "" : "s"}`}>
                               <Eye className="h-3 w-3" />
@@ -834,13 +834,12 @@ export default function CrmQuotes() {
           {selectedQuote && (
             <div className="space-y-6 mt-6">
               <div className="flex items-center justify-between">
-                <Badge
-                  variant="outline"
-                  className={`text-sm ${statusColors[selectedQuote.status || "draft"] || statusColors.draft}`}
+                <StatusDot
+                  pill={`text-sm ${statusColors[selectedQuote.status || "draft"] || statusColors.draft}`}
                   data-testid="badge-quote-status"
                 >
                   {statusLabels[selectedQuote.status || "draft"] || selectedQuote.status}
-                </Badge>
+                </StatusDot>
                 <div className="flex gap-2">
                   <Button 
                     variant="outline" 

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -261,13 +262,12 @@ export default function CrmSettingsLeadTypes() {
                       <span className="font-medium" data-testid={`lead-type-name-${leadType.id}`}>
                         {leadType.name}
                       </span>
-                      <Badge
-                        variant={leadType.isActive ? "default" : "outline"}
-                        className={leadType.isActive ? "bg-green-100 text-green-700" : ""}
+                      <StatusDot
+                        pill={leadType.isActive ? "bg-green-100 text-green-700" : ""}
                         data-testid={`lead-type-status-${leadType.id}`}
                       >
                         {leadType.isActive ? "Active" : "Inactive"}
-                      </Badge>
+                      </StatusDot>
                       <span className="text-xs text-muted-foreground" data-testid={`lead-type-order-${leadType.id}`}>
                         Order: {leadType.sortOrder ?? 0}
                       </span>

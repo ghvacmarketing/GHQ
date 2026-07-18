@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -620,14 +621,14 @@ function LeadCard({ lead, onClick, isDragging: isDraggingProp }: LeadCardProps) 
             )}
             <div className="flex flex-wrap gap-1 mt-2">
               {lead.leadTempNumericValue && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-blue-50 text-blue-700 border-blue-200">
+                <StatusDot pill="text-[10px] px-1.5 py-0 bg-blue-50 text-blue-700 border-blue-200">
                   T{lead.leadTempNumericValue}
-                </Badge>
+                </StatusDot>
               )}
               {lead.leadDriverLabel && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-purple-50 text-purple-700 border-purple-200">
+                <StatusDot pill="text-[10px] px-1.5 py-0 bg-purple-50 text-purple-700 border-purple-200">
                   {lead.leadDriverLabel.split('-')[0].trim()}
-                </Badge>
+                </StatusDot>
               )}
             </div>
           </div>
@@ -1941,9 +1942,9 @@ export default function CrmProspectFunnel() {
                     Stalled Deals
                   </CardTitle>
                   {overviewAnalytics?.stalledDeals && overviewAnalytics.stalledDeals.length > 0 && (
-                    <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                    <StatusDot pill="bg-amber-50 text-amber-700 border-amber-200">
                       {overviewAnalytics.stalledDeals.length} deals need attention
-                    </Badge>
+                    </StatusDot>
                   )}
                 </div>
               </CardHeader>
@@ -1970,7 +1971,7 @@ export default function CrmProspectFunnel() {
                           <div className="flex-1 min-w-0">
                             <div className="font-medium truncate">{deal.customerName}</div>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <Badge variant="outline" className={`text-xs ${
+                              <StatusDot pill={`text-xs ${
                                 deal.salesStage === 'new' ? 'bg-blue-50 text-blue-700 border-blue-200' :
                                 deal.salesStage === 'contacted' ? 'bg-amber-50 text-amber-700 border-amber-200' :
                                 deal.salesStage === 'quote_sent' ? 'bg-purple-50 text-purple-700 border-purple-200' :
@@ -1978,7 +1979,7 @@ export default function CrmProspectFunnel() {
                                 'bg-slate-50 text-slate-700 border-slate-200'
                               }`}>
                                 {STAGE_LABELS[deal.salesStage as SalesStage] || deal.salesStage}
-                              </Badge>
+                              </StatusDot>
                               <span className="text-red-600 font-medium">{deal.daysSinceActivity} days stalled</span>
                               {deal.assignedSalesRepName && (
                                 <span>· {deal.assignedSalesRepName}</span>
@@ -3132,17 +3133,17 @@ export default function CrmProspectFunnel() {
                                       </div>
                                       <div className="flex items-center gap-2">
                                         {followUp.completedAt ? (
-                                          <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
+                                          <StatusDot pill="text-xs bg-green-100 text-green-700">
                                             Completed
-                                          </Badge>
+                                          </StatusDot>
                                         ) : isOverdue ? (
                                           <Badge variant="destructive" className="text-xs">
                                             Overdue
                                           </Badge>
                                         ) : isDueToday ? (
-                                          <Badge className="text-xs bg-amber-500">
+                                          <StatusDot pill="text-xs bg-amber-500">
                                             Due Today
-                                          </Badge>
+                                          </StatusDot>
                                         ) : (
                                           <Badge variant="outline" className="text-xs">
                                             Scheduled

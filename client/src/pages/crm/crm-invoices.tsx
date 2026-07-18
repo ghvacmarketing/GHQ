@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import {
   Select,
   SelectContent,
@@ -741,12 +742,11 @@ export default function CrmInvoices() {
                         {formatDate(invoice.createdAt)}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={statusColors[invoice.status as CrmInvoiceStatus] || statusColors.draft}
+                        <StatusDot
+                          pill={statusColors[invoice.status as CrmInvoiceStatus] || statusColors.draft}
                         >
                           {statusLabels[invoice.status as CrmInvoiceStatus] || invoice.status}
-                        </Badge>
+                        </StatusDot>
                       </TableCell>
                       <TableCell className="text-right font-medium text-slate-900">
                         {formatCurrency(invoice.total)}

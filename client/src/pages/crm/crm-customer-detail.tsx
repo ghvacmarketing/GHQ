@@ -6,6 +6,7 @@ import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -249,7 +250,7 @@ function ResidentialOverview({ customer, openProjects, upcomingVisits, completed
               <h2 className="text-lg font-semibold text-slate-900">Residential Customer</h2>
               <p className="text-sm text-slate-500 mt-0.5">{customer.name}</p>
             </div>
-            <Badge className="bg-green-100 text-green-700 border-green-200">Residential</Badge>
+            <StatusDot pill="bg-green-100 text-green-700 border-green-200">Residential</StatusDot>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -350,7 +351,7 @@ function PropertyManagerOverview({ customer, openProjects, upcomingVisits, compl
               <h2 className="text-lg font-semibold text-slate-900">Property Manager</h2>
               <p className="text-sm text-slate-500 mt-0.5">{customer.companyName || customer.name}</p>
             </div>
-            <Badge className="bg-purple-100 text-purple-700 border-purple-200">Property Manager</Badge>
+            <StatusDot pill="bg-purple-100 text-purple-700 border-purple-200">Property Manager</StatusDot>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -451,7 +452,7 @@ function CommercialOverview({ customer, openProjects, upcomingVisits, completedP
               <h2 className="text-lg font-semibold text-slate-900">Commercial Customer</h2>
               <p className="text-sm text-slate-500 mt-0.5">{customer.companyName || customer.name}</p>
             </div>
-            <Badge className="bg-blue-100 text-blue-700 border-blue-200">Commercial</Badge>
+            <StatusDot pill="bg-blue-100 text-blue-700 border-blue-200">Commercial</StatusDot>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1132,10 +1133,9 @@ function TimelineTabContent({ customerId }: { customerId: string }) {
             const config = timelineTypeConfig[type];
             const isActive = activeFilters.has(type);
             return (
-              <Badge
+              <StatusDot
                 key={type}
-                variant="outline"
-                className={cn(
+                pill={cn(
                   "cursor-pointer transition-all px-3 py-1.5",
                   isActive
                     ? `${config.bgColor} ${config.textColor} ${config.borderColor}`
@@ -1146,7 +1146,7 @@ function TimelineTabContent({ customerId }: { customerId: string }) {
               >
                 <config.icon className="h-3 w-3 mr-1.5" />
                 {config.label}
-              </Badge>
+              </StatusDot>
             );
           })}
         </div>
@@ -1198,9 +1198,9 @@ function TimelineTabContent({ customerId }: { customerId: string }) {
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <Badge className={cn("text-xs", config.bgColor, config.textColor)}>
+                            <StatusDot pill={cn("text-xs", config.bgColor, config.textColor)}>
                               {config.label}
-                            </Badge>
+                            </StatusDot>
                             {entry.status && (
                               <Badge variant="outline" className="text-xs capitalize">
                                 {entry.status.replace(/_/g, ' ')}
@@ -1394,15 +1394,15 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
               <FileText className="h-5 w-5" />
               Agreement Summary
-              <Badge
-                className={`text-xs ml-auto ${
+              <StatusDot
+                pill={`text-xs ml-auto ${
                   agreementStatusColors[summaryStatus]?.bg || "bg-slate-100"
                 } ${
                   agreementStatusColors[summaryStatus]?.text || "text-slate-700"
                 }`}
               >
                 {agreementStatusLabels[summaryStatus] || summaryStatus}
-              </Badge>
+              </StatusDot>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -1425,9 +1425,8 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Plan</p>
               <div className="flex items-center gap-2">
                 <p className="font-semibold">{agreement.agreementPlan || 'Maintenance Agreement'}</p>
-                <Badge 
-                  variant="outline" 
-                  className={
+                <StatusDot 
+                  pill={
                     agreement.frequency === "weekly" ? "bg-purple-100 text-purple-700 border-purple-200" :
                     agreement.frequency === "monthly" ? "bg-blue-100 text-blue-700 border-blue-200" :
                     "bg-amber-100 text-amber-700 border-amber-200"
@@ -1435,7 +1434,7 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
                 >
                   {agreement.frequency === "weekly" ? "Weekly" : 
                    agreement.frequency === "monthly" ? "Monthly" : "Annual"}
-                </Badge>
+                </StatusDot>
               </div>
             </div>
 
@@ -1477,12 +1476,11 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
                           {visit.status === "completed" ? <CheckCircle className="h-3 w-3" /> : index + 1}
                         </span>
                         <span className="text-sm">{format(new Date(visit.targetDate), 'MMM d, yyyy')}</span>
-                        <Badge 
-                          variant="outline" 
-                          className={`${statusColor.bg} ${statusColor.text} text-xs`}
+                        <StatusDot 
+                          pill={`${statusColor.bg} ${statusColor.text} text-xs`}
                         >
                           {visit.status}
-                        </Badge>
+                        </StatusDot>
                       </div>
                     );
                   })}
@@ -1505,10 +1503,10 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
             {/* Auto-renew badge */}
             <div className="flex items-center gap-2 pt-2">
               {agreement.autoRenew ? (
-                <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
+                <StatusDot pill="bg-green-100 text-green-700 hover:bg-green-100">
                   <CheckCircle className="h-3 w-3 mr-1" />
                   Auto-renew enabled
-                </Badge>
+                </StatusDot>
               ) : (
                 <Badge variant="secondary">
                   Auto-renew disabled
@@ -1559,15 +1557,15 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
                     <h4 className="font-semibold text-slate-900">
                       {agreement.agreementNumber}
                     </h4>
-                    <Badge
-                      className={`text-xs ${
+                    <StatusDot
+                      pill={`text-xs ${
                         agreementStatusColors[calculatedStatus]?.bg || "bg-slate-100"
                       } ${
                         agreementStatusColors[calculatedStatus]?.text || "text-slate-700"
                       }`}
                     >
                       {agreementStatusLabels[calculatedStatus] || calculatedStatus}
-                    </Badge>
+                    </StatusDot>
                   </div>
                   <p className="text-sm text-slate-600">{agreement.agreementPlan}</p>
                   {agreement.address && (
@@ -1651,8 +1649,8 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
                           <span className="font-medium text-slate-700">
                             Visit {visit.visitNumber}
                           </span>
-                          <Badge
-                            className={`text-xs ${
+                          <StatusDot
+                            pill={`text-xs ${
                               visitStatusColors[visit.status]?.bg || "bg-slate-100"
                             } ${
                               visitStatusColors[visit.status]?.text ||
@@ -1661,7 +1659,7 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
                           >
                             {visit.status.charAt(0).toUpperCase() +
                               visit.status.slice(1)}
-                          </Badge>
+                          </StatusDot>
                         </div>
                         <div className="flex items-center gap-4">
                           <span className="text-slate-600">
@@ -1778,15 +1776,15 @@ function PortalAccountCard({ customerId }: { customerId: string }) {
           </h3>
           <div className="flex items-center gap-2">
             {data.portalEnabled ? (
-              <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">Enabled</Badge>
+              <StatusDot pill="bg-emerald-100 text-emerald-700 border-emerald-200">Enabled</StatusDot>
             ) : (
               <Badge variant="outline" className="text-slate-500">Disabled</Badge>
             )}
             {account && !account.isActive && (
-              <Badge variant="outline" className="border-red-200 text-red-600 bg-red-50">Account Inactive</Badge>
+              <StatusDot pill="border-red-200 text-red-600 bg-red-50">Account Inactive</StatusDot>
             )}
             {locked && (
-              <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50">Temporarily Locked</Badge>
+              <StatusDot pill="border-amber-300 text-amber-700 bg-amber-50">Temporarily Locked</StatusDot>
             )}
           </div>
         </div>
@@ -2403,15 +2401,15 @@ function CustomerTabbedView({
                 <p className="text-sm text-slate-500 mt-0.5">{customer.name}</p>
               </div>
               <div className="flex flex-col items-end gap-1.5">
-                <Badge className={getCustomerBadgeColor()}>{customer.customerType}</Badge>
+                <StatusDot pill={getCustomerBadgeColor()}>{customer.customerType}</StatusDot>
                 {customer.protectionPlanLevel && (
-                  <Badge
-                    className="bg-emerald-100 text-emerald-700 border-emerald-200 flex items-center gap-1"
+                  <StatusDot
+                    pill="bg-emerald-100 text-emerald-700 border-emerald-200 flex items-center gap-1"
                     data-testid="badge-protection-plan"
                   >
                     <ShieldCheck className="h-3.5 w-3.5" />
                     {protectionPlanLabel(customer.protectionPlanLevel)} Protection Member
-                  </Badge>
+                  </StatusDot>
                 )}
               </div>
             </div>
@@ -2462,7 +2460,7 @@ function CustomerTabbedView({
                       {parentCustomer.name}
                     </Link>
                     {customer.billToParent && (
-                      <Badge variant="outline" className="text-xs mt-1 border-amber-300 text-amber-700 bg-amber-50">Bills to Parent</Badge>
+                      <StatusDot pill="text-xs mt-1 border-amber-300 text-amber-700 bg-amber-50">Bills to Parent</StatusDot>
                     )}
                   </div>
                 )}
@@ -2520,11 +2518,11 @@ function CustomerTabbedView({
                   <ClipboardList className="h-5 w-5 text-[#711419]" />
                   Setup Checklist
                 </span>
-                <Badge 
-                  className={setupComplete ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}
+                <StatusDot 
+                  pill={setupComplete ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}
                 >
                   {completedSteps}/3 Complete
-                </Badge>
+                </StatusDot>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -2539,7 +2537,7 @@ function CustomerTabbedView({
                     Step 1: Add at least 1 Location/Property
                   </span>
                   {hasAtLeastOneSite && (
-                    <Badge className="bg-green-100 text-green-700 ml-auto">Complete</Badge>
+                    <StatusDot pill="bg-green-100 text-green-700 ml-auto">Complete</StatusDot>
                   )}
                 </div>
                 <div className="flex items-center gap-3" data-testid="checklist-step-2">
@@ -2552,7 +2550,7 @@ function CustomerTabbedView({
                     Step 2: Add Ops Contact (Facilities or Primary)
                   </span>
                   {hasOpsContact && (
-                    <Badge className="bg-green-100 text-green-700 ml-auto">Complete</Badge>
+                    <StatusDot pill="bg-green-100 text-green-700 ml-auto">Complete</StatusDot>
                   )}
                 </div>
                 <div className="flex items-center gap-3" data-testid="checklist-step-3">
@@ -2565,7 +2563,7 @@ function CustomerTabbedView({
                     Step 3: Add AP/Billing Contact
                   </span>
                   {hasAPContact && (
-                    <Badge className="bg-green-100 text-green-700 ml-auto">Complete</Badge>
+                    <StatusDot pill="bg-green-100 text-green-700 ml-auto">Complete</StatusDot>
                   )}
                 </div>
               </div>
@@ -2610,9 +2608,9 @@ function CustomerTabbedView({
                     <TableRow key={job.id} data-testid={`row-history-overview-${job.id}`}>
                       <TableCell className="font-medium">{job.jobType}</TableCell>
                       <TableCell>
-                        <Badge className={`${statusColors[job.status]?.bg} ${statusColors[job.status]?.text}`}>
+                        <StatusDot pill={`${statusColors[job.status]?.bg} ${statusColors[job.status]?.text}`}>
                           {job.status}
-                        </Badge>
+                        </StatusDot>
                       </TableCell>
                       <TableCell>{formatDate(job.completedAt)}</TableCell>
                       <TableCell>{job.assignedTechName || "—"}</TableCell>
@@ -2887,13 +2885,13 @@ function CustomerTabbedView({
                         {wo.visitType.replace(/_/g, " ")}
                       </Badge>
                     </div>
-                    <Badge className={`text-xs ${
+                    <StatusDot pill={`text-xs ${
                       wo.status === "scheduled" ? "bg-blue-100 text-blue-700" :
                       wo.status === "pending" ? "bg-amber-100 text-amber-700" :
                       "bg-slate-100 text-slate-700"
                     }`}>
                       {wo.status}
-                    </Badge>
+                    </StatusDot>
                     {wo.scheduledStart && (
                       <div className="flex items-center gap-1 text-xs text-slate-600 mt-2">
                         <CalendarIcon className="h-3 w-3" />
@@ -2934,9 +2932,9 @@ function CustomerTabbedView({
                         {wo.visitType.replace(/_/g, " ")}
                       </Badge>
                     </div>
-                    <Badge className="text-xs bg-green-100 text-green-700">
+                    <StatusDot pill="text-xs bg-green-100 text-green-700">
                       {wo.status}
-                    </Badge>
+                    </StatusDot>
                   </div>
                 ))}
               </div>
@@ -2962,13 +2960,13 @@ function CustomerTabbedView({
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <h4 className="font-medium text-sm line-clamp-1">{wo.title || wo.visitType}</h4>
-                      <Badge variant="outline" className="text-xs shrink-0 bg-slate-100">
+                      <StatusDot pill="text-xs shrink-0 bg-slate-100">
                         Historical
-                      </Badge>
+                      </StatusDot>
                     </div>
-                    <Badge className="text-xs bg-slate-100 text-slate-600">
+                    <StatusDot pill="text-xs bg-slate-100 text-slate-600">
                       {wo.visitType?.replace(/_/g, " ") || "Service"}
-                    </Badge>
+                    </StatusDot>
                     {wo.scheduledStart && (
                       <div className="flex items-center gap-1 text-xs text-slate-500 mt-2">
                         <CalendarIcon className="h-3 w-3" />
@@ -3030,7 +3028,7 @@ function CustomerTabbedView({
                       </Badge>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
-                      <Badge className={`text-xs ${
+                      <StatusDot pill={`text-xs ${
                         project.status === "lead" ? "bg-slate-100 text-slate-700" :
                         project.status === "proposal_sent" ? "bg-amber-100 text-amber-700" :
                         project.status === "approved" ? "bg-blue-100 text-blue-700" :
@@ -3039,7 +3037,7 @@ function CustomerTabbedView({
                         "bg-slate-100 text-slate-700"
                       }`}>
                         {project.status.replace(/_/g, " ")}
-                      </Badge>
+                      </StatusDot>
                     </div>
                     {project.expectedValue && (
                       <div className="flex items-center gap-1 text-xs text-slate-600">
@@ -3144,7 +3142,7 @@ function CustomerTabbedView({
                       <TableCell className="font-medium">{quote.quoteNumber}</TableCell>
                       <TableCell>{quote.title}</TableCell>
                       <TableCell>
-                        <Badge className={cn(
+                        <StatusDot pill={cn(
                           "text-xs",
                           quote.status === "draft" && "bg-slate-100 text-slate-700",
                           quote.status === "sent" && "bg-blue-100 text-blue-700",
@@ -3153,7 +3151,7 @@ function CustomerTabbedView({
                           quote.status === "expired" && "bg-yellow-100 text-yellow-700"
                         )}>
                           {quote.status === "accepted" ? "Approved" : quote.status?.charAt(0).toUpperCase() + quote.status?.slice(1)}
-                        </Badge>
+                        </StatusDot>
                       </TableCell>
                       <TableCell className="text-right">
                         {quote.total ? `$${Number(quote.total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
@@ -3249,7 +3247,7 @@ function CustomerTabbedView({
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge className={cn(
+                        <StatusDot pill={cn(
                           "text-xs",
                           invoice.status === "draft" && "bg-slate-100 text-slate-700",
                           invoice.status === "sent" && "bg-blue-100 text-blue-700",
@@ -3258,7 +3256,7 @@ function CustomerTabbedView({
                           invoice.status === "void" && "bg-red-100 text-red-700"
                         )}>
                           {invoice.status?.charAt(0).toUpperCase() + invoice.status?.slice(1)}
-                        </Badge>
+                        </StatusDot>
                       </TableCell>
                       <TableCell className="text-right">
                         {invoice.total ? `$${Number(invoice.total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
@@ -3471,9 +3469,9 @@ function CustomerTabbedView({
                     </div>
                     <div className="flex items-center gap-2">
                       {sub.billToParent ? (
-                        <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50">Bills to Parent</Badge>
+                        <StatusDot pill="text-xs border-amber-300 text-amber-700 bg-amber-50">Bills to Parent</StatusDot>
                       ) : (
-                        <Badge variant="outline" className="text-xs border-green-300 text-green-700 bg-green-50">Bills Here</Badge>
+                        <StatusDot pill="text-xs border-green-300 text-green-700 bg-green-50">Bills Here</StatusDot>
                       )}
                     </div>
                   </div>
@@ -6753,9 +6751,9 @@ export default function CrmCustomerDetail() {
                   Preview
                 </Button>
                 {selectedQuoteData && (
-                  <Badge variant="outline" className={quoteStatusColors[selectedQuoteData.status || "draft"]}>
+                  <StatusDot pill={quoteStatusColors[selectedQuoteData.status || "draft"]}>
                     {quoteStatusLabels[selectedQuoteData.status || "draft"] || selectedQuoteData.status}
-                  </Badge>
+                  </StatusDot>
                 )}
               </div>
             </div>
@@ -7059,9 +7057,9 @@ export default function CrmCustomerDetail() {
                       <h2 className="text-2xl font-bold text-slate-900">QUOTE</h2>
                       <p className="text-slate-500">{selectedQuoteData.quoteNumber}</p>
                     </div>
-                    <Badge variant="outline" className={quoteStatusColors[selectedQuoteData.status || "draft"]}>
+                    <StatusDot pill={quoteStatusColors[selectedQuoteData.status || "draft"]}>
                       {quoteStatusLabels[selectedQuoteData.status || "draft"] || selectedQuoteData.status}
-                    </Badge>
+                    </StatusDot>
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-6 mb-8">

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Wrench, Calendar, CheckCircle } from "lucide-react";
 import { PortalLayout } from "./portal-layout";
@@ -159,9 +160,9 @@ export default function PortalServiceHistory() {
                           )}
                         </div>
                       </div>
-                      <Badge variant="outline" className={status.className} data-testid={`badge-wo-status-${wo.id}`}>
+                      <StatusDot pill={status.className} data-testid={`badge-wo-status-${wo.id}`}>
                         {status.label}
-                      </Badge>
+                      </StatusDot>
                     </div>
                   </CardContent>
                 </Card>

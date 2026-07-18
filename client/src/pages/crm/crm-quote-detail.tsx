@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
@@ -2734,9 +2735,9 @@ export default function CrmQuoteDetail() {
               <h1 className="text-2xl font-bold text-slate-900" data-testid="text-quote-number">
                 {quote.quoteNumber}
               </h1>
-              <Badge variant="outline" className={statusColors[status] || "bg-slate-100"}>
+              <StatusDot pill={statusColors[status] || "bg-slate-100"}>
                 {statusLabels[status] || status}
-              </Badge>
+              </StatusDot>
             </div>
             <Button
               onClick={() => setShowPresentation(true)}
@@ -2840,10 +2841,10 @@ export default function CrmQuoteDetail() {
               
               {/* Show deposit status if paid */}
               {quote.depositPaidAt && (
-                <Badge className="bg-green-100 text-green-800 border-green-200">
+                <StatusDot pill="bg-green-100 text-green-800 border-green-200">
                   <CheckCircle className="h-3 w-3 mr-1" />
                   Deposit Paid: ${parseFloat(quote.depositAmount || "0").toFixed(2)}
-                </Badge>
+                </StatusDot>
               )}
               
               <DropdownMenu>
@@ -3984,12 +3985,11 @@ export default function CrmQuoteDetail() {
                                 </div>
                               </div>
                               
-                              <Badge
-                                variant="outline"
-                                className="bg-purple-100 text-purple-700 border-purple-300"
+                              <StatusDot
+                                pill="bg-purple-100 text-purple-700 border-purple-300"
                               >
                                 View #{viewCount}
-                              </Badge>
+                              </StatusDot>
                             </div>
                           </div>
                         </div>
@@ -4032,12 +4032,11 @@ export default function CrmQuoteDetail() {
                               </div>
                             </div>
                             
-                            <Badge
-                              variant="outline"
-                              className="bg-emerald-100 text-emerald-700 border-emerald-300"
+                            <StatusDot
+                              pill="bg-emerald-100 text-emerald-700 border-emerald-300"
                             >
                               Accepted
-                            </Badge>
+                            </StatusDot>
                           </div>
                         </div>
                       </div>
@@ -4078,7 +4077,7 @@ export default function CrmQuoteDetail() {
                                 {isOutgoing ? log.recipientEmail : log.fromEmail || "Customer"}
                               </span>
                               {log.isManual && (
-                                <Badge variant="outline" className="text-xs bg-slate-100">Manual</Badge>
+                                <StatusDot pill="text-xs bg-slate-100">Manual</StatusDot>
                               )}
                             </div>
                             
@@ -4121,9 +4120,8 @@ export default function CrmQuoteDetail() {
                             )}
                           </div>
                           
-                          <Badge
-                            variant="outline"
-                            className={
+                          <StatusDot
+                            pill={
                               isOutgoing
                                 ? log.status === "sent"
                                   ? "bg-blue-100 text-blue-700 border-blue-300"
@@ -4137,7 +4135,7 @@ export default function CrmQuoteDetail() {
                               ? (log.status === "sent" ? "Sent" : log.status === "failed" ? "Failed" : log.status)
                               : "Received"
                             }
-                          </Badge>
+                          </StatusDot>
                         </div>
                       </div>
                       
@@ -5544,10 +5542,10 @@ export default function CrmQuoteDetail() {
                   </div>
                 </div>
                 {tmpl.isDefault && (
-                  <Badge className="bg-amber-100 text-amber-700 border-amber-200 flex-shrink-0 text-xs">
+                  <StatusDot pill="bg-amber-100 text-amber-700 border-amber-200 flex-shrink-0 text-xs">
                     <Star className="h-3 w-3 mr-1" />
                     Default
-                  </Badge>
+                  </StatusDot>
                 )}
               </button>
             ))}

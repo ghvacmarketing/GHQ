@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -817,9 +818,9 @@ export default function CrmAccountCreate() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Customer Type</Label>
-                    <Badge className="w-full justify-center py-2 bg-slate-100 text-slate-700 border-slate-200" data-testid="badge-customer-type">
+                    <StatusDot pill="w-full justify-center py-2 bg-slate-100 text-slate-700 border-slate-200" data-testid="badge-customer-type">
                       {ACCOUNT_TYPES.find(t => t.value === formData.accountType)?.label}
-                    </Badge>
+                    </StatusDot>
                   </div>
                   <div className="space-y-2">
                     <Label>Customer Lead Source</Label>

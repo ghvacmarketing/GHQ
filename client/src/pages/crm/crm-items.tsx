@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -533,9 +534,9 @@ export default function CrmItems() {
                             )}
                             {item.name}
                             {item.category === "discount" && (
-                              <Badge variant="outline" className="text-xs bg-slate-100 text-slate-500 border-slate-200">
+                              <StatusDot pill="text-xs bg-slate-100 text-slate-500 border-slate-200">
                                 System
-                              </Badge>
+                              </StatusDot>
                             )}
                           </div>
                         </TableCell>
@@ -545,14 +546,13 @@ export default function CrmItems() {
                               <div className="prose prose-sm max-w-none line-clamp-2" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.description || "—") }} />
                             </TableCell>
                             <TableCell>
-                              <Badge
-                                variant="outline"
-                                className={item.itemType === "service" 
+                              <StatusDot
+                                pill={item.itemType === "service" 
                                   ? "bg-cyan-100 text-cyan-700 border-cyan-200" 
                                   : "bg-green-100 text-green-700 border-green-200"}
                               >
                                 {item.itemType === "service" ? "Maintenance" : "Promotion"}
-                              </Badge>
+                              </StatusDot>
                             </TableCell>
                             <TableCell className="text-right">
                               <span className="italic text-slate-500">Variable Amount</span>

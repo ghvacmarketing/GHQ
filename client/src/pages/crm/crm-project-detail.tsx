@@ -6,6 +6,7 @@ import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -2406,9 +2407,9 @@ export default function CrmProjectDetail() {
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
-                            <Badge className={`${woStatus.bg} ${woStatus.text} border ${woStatus.border}`}>
+                            <StatusDot pill={`${woStatus.bg} ${woStatus.text} border ${woStatus.border}`}>
                               {wo.status.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
-                            </Badge>
+                            </StatusDot>
                             <ExternalLink className="w-4 h-4 text-muted-foreground" />
                           </div>
                         </div>
@@ -2480,9 +2481,9 @@ export default function CrmProjectDetail() {
                           </div>
                           <div className="flex items-center gap-3">
                             <span className="font-semibold">{formatCurrency(quote.total)}</span>
-                            <Badge className={`${qStatus.bg} ${qStatus.text} border ${qStatus.border}`}>
+                            <StatusDot pill={`${qStatus.bg} ${qStatus.text} border ${qStatus.border}`}>
                               {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
-                            </Badge>
+                            </StatusDot>
                           </div>
                         </div>
                       );
@@ -2592,9 +2593,9 @@ export default function CrmProjectDetail() {
                                   </p>
                                 )}
                               </div>
-                              <Badge className={`${invStatus.bg} ${invStatus.text} border ${invStatus.border}`}>
+                              <StatusDot pill={`${invStatus.bg} ${invStatus.text} border ${invStatus.border}`}>
                                 {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
-                              </Badge>
+                              </StatusDot>
                             </div>
                           </div>
                         );

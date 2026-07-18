@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -432,13 +433,12 @@ export default function CrmSettingsLeadClassification() {
                           <span className="font-medium" data-testid={`temp-option-label-${option.id}`}>
                             {option.label}
                           </span>
-                          <Badge
-                            variant={option.isActive ? "default" : "outline"}
-                            className={option.isActive ? "bg-green-100 text-green-700" : ""}
+                          <StatusDot
+                            pill={option.isActive ? "bg-green-100 text-green-700" : ""}
                             data-testid={`temp-option-status-${option.id}`}
                           >
                             {option.isActive ? "Active" : "Inactive"}
-                          </Badge>
+                          </StatusDot>
                         </div>
                         {option.description && (
                           <p className="text-sm text-muted-foreground mt-1 ml-12" data-testid={`temp-option-desc-${option.id}`}>
@@ -514,13 +514,12 @@ export default function CrmSettingsLeadClassification() {
                           <span className="font-medium" data-testid={`driver-option-label-${option.id}`}>
                             {option.label}
                           </span>
-                          <Badge
-                            variant={option.isActive ? "default" : "outline"}
-                            className={option.isActive ? "bg-green-100 text-green-700" : ""}
+                          <StatusDot
+                            pill={option.isActive ? "bg-green-100 text-green-700" : ""}
                             data-testid={`driver-option-status-${option.id}`}
                           >
                             {option.isActive ? "Active" : "Inactive"}
-                          </Badge>
+                          </StatusDot>
                         </div>
                         {option.description && (
                           <p className="text-sm text-muted-foreground mt-1" data-testid={`driver-option-desc-${option.id}`}>

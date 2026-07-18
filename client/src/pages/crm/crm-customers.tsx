@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import {
   Table,
   TableBody,
@@ -610,9 +611,9 @@ export default function CrmCustomers() {
                               )}
                               {customer.name}
                               {isSubAccount && (
-                                <Badge variant="outline" className="bg-purple-50 text-purple-600 border-purple-200 text-xs">
+                                <StatusDot pill="bg-purple-50 text-purple-600 border-purple-200 text-xs">
                                   Sub
-                                </Badge>
+                                </StatusDot>
                               )}
                             </div>
                           </TableCell>
@@ -655,20 +656,18 @@ export default function CrmCustomers() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge
-                                variant="outline"
-                                className="bg-slate-100 text-slate-600 border-slate-200"
+                              <StatusDot
+                                pill="bg-slate-100 text-slate-600 border-slate-200"
                               >
                                 Project
-                              </Badge>
+                              </StatusDot>
                             </TableCell>
                             <TableCell>
-                              <Badge
-                                variant="outline"
-                                className="bg-blue-50 text-blue-600 border-blue-200"
+                              <StatusDot
+                                pill="bg-blue-50 text-blue-600 border-blue-200"
                               >
                                 {project.status}
-                              </Badge>
+                              </StatusDot>
                             </TableCell>
                             <TableCell className="hidden md:table-cell text-slate-500 max-w-xs truncate">
                               {project.title || "—"}

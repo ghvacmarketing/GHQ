@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -382,9 +383,9 @@ export default function CrmRebatePrograms() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge className={`text-xs border whitespace-nowrap ${APPLICATION_STATUS_COLORS[c.applicationStatus]}`}>
+                          <StatusDot pill={`text-xs border whitespace-nowrap ${APPLICATION_STATUS_COLORS[c.applicationStatus]}`}>
                             {APPLICATION_STATUS_LABELS[c.applicationStatus]}
-                          </Badge>
+                          </StatusDot>
                         </TableCell>
                         <TableCell>
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PRIORITY_COLORS[c.priority]}`}>

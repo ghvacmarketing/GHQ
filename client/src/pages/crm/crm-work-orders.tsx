@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
@@ -1375,12 +1376,12 @@ export default function CrmWorkOrders() {
                       <p className="font-semibold text-slate-900 text-sm truncate flex-1" data-testid={`text-wo-customer-${wo.id}`}>
                         {wo.customer?.name || "—"}
                       </p>
-                      <Badge 
-                        className={`${badgeStyle.bg} ${badgeStyle.text} border ${badgeStyle.border} text-xs shrink-0`}
+                      <StatusDot 
+                        pill={`${badgeStyle.bg} ${badgeStyle.text} border ${badgeStyle.border} text-xs shrink-0`}
                         data-testid={`badge-status-${wo.id}`}
                       >
                         {badgeLabel}
-                      </Badge>
+                      </StatusDot>
                     </div>
 
                     {wo.workSubtype && wo.workSubtype !== "Other" && (

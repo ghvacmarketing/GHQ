@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -342,20 +343,20 @@ export default function CrmSettingsUsers() {
                           <TableCell className="font-medium">{user.name}</TableCell>
                           <TableCell className="text-slate-600">{user.email}</TableCell>
                           <TableCell>
-                            <Badge className={`${config.color} gap-1`}>
+                            <StatusDot pill={`${config.color} gap-1`}>
                               <RoleIcon className="h-3 w-3" />
                               {config.label}
-                            </Badge>
+                            </StatusDot>
                           </TableCell>
                           <TableCell>
                             {user.isActive ? (
-                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              <StatusDot pill="bg-green-50 text-green-700 border-green-200">
                                 Active
-                              </Badge>
+                              </StatusDot>
                             ) : (
-                              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                              <StatusDot pill="bg-red-50 text-red-700 border-red-200">
                                 Inactive
-                              </Badge>
+                              </StatusDot>
                             )}
                           </TableCell>
                           {isAdmin && (

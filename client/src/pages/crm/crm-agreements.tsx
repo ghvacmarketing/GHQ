@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import {
   Table,
   TableBody,
@@ -864,9 +865,9 @@ export default function CrmAgreements() {
                         {(() => {
                           const calculatedStatus = getAgreementStatus(agreement);
                           return (
-                            <Badge className={`border ${statusColors[calculatedStatus] || statusColors.active}`}>
+                            <StatusDot pill={`border ${statusColors[calculatedStatus] || statusColors.active}`}>
                               {statusLabels[calculatedStatus] || calculatedStatus}
-                            </Badge>
+                            </StatusDot>
                           );
                         })()}
                       </TableCell>
@@ -1145,9 +1146,9 @@ export default function CrmAgreements() {
                     <div>
                       <Label className="text-slate-500 text-xs">Status</Label>
                       <div>
-                        <Badge className={`border ${statusColors[selectedAgreement.status] || statusColors.active}`}>
+                        <StatusDot pill={`border ${statusColors[selectedAgreement.status] || statusColors.active}`}>
                           {statusLabels[selectedAgreement.status] || selectedAgreement.status}
-                        </Badge>
+                        </StatusDot>
                       </div>
                     </div>
                   </div>

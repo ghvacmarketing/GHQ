@@ -6,6 +6,7 @@ import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -970,16 +971,16 @@ export default function CrmWorkOrderDetail() {
                   >
                     {workOrder.title || `Work Order #${workOrder.workOrderNumber}`}
                   </h1>
-                  <Badge
-                    className={`${statusColor.bg} ${statusColor.text} border ${statusColor.border}`}
+                  <StatusDot
+                    pill={`${statusColor.bg} ${statusColor.text} border ${statusColor.border}`}
                     data-testid="badge-status"
                   >
                     {statusLabels[workOrder.status] || workOrder.status}
-                  </Badge>
+                  </StatusDot>
                   {workOrder.isPending && (
-                    <Badge className="bg-amber-100 text-amber-800 border border-amber-200">
+                    <StatusDot pill="bg-amber-100 text-amber-800 border border-amber-200">
                       Waiting
-                    </Badge>
+                    </StatusDot>
                   )}
                   <Badge
                     variant="outline"
@@ -987,12 +988,12 @@ export default function CrmWorkOrderDetail() {
                   >
                     {visitTypeLabels[workOrder.visitType || "SERVICE"]}
                   </Badge>
-                  <Badge
-                    className={`${priorityColor.bg} ${priorityColor.text}`}
+                  <StatusDot
+                    pill={`${priorityColor.bg} ${priorityColor.text}`}
                     data-testid="badge-priority"
                   >
                     {(workOrder.priority || "normal").charAt(0).toUpperCase() + (workOrder.priority || "normal").slice(1)} Priority
-                  </Badge>
+                  </StatusDot>
                 </div>
                 {propertyAddress && (
                   <p className="text-sm text-slate-500 mt-1" data-testid="text-property-address">
@@ -1534,7 +1535,7 @@ export default function CrmWorkOrderDetail() {
                               </TableCell>
                               <TableCell>{quote.title}</TableCell>
                               <TableCell>
-                                <Badge className={cn(
+                                <StatusDot pill={cn(
                                   "text-xs",
                                   quote.status === "draft" && "bg-slate-100 text-slate-700",
                                   quote.status === "sent" && "bg-blue-100 text-blue-700",
@@ -1543,7 +1544,7 @@ export default function CrmWorkOrderDetail() {
                                   quote.status === "expired" && "bg-yellow-100 text-yellow-700"
                                 )}>
                                   {quote.status === "accepted" ? "Approved" : quote.status?.charAt(0).toUpperCase() + quote.status?.slice(1)}
-                                </Badge>
+                                </StatusDot>
                               </TableCell>
                               <TableCell className="text-right">
                                 {quote.total ? `$${Number(quote.total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
@@ -1685,7 +1686,7 @@ export default function CrmWorkOrderDetail() {
                             </button>
                           </TableCell>
                           <TableCell>
-                            <Badge className={cn(
+                            <StatusDot pill={cn(
                               "text-xs",
                               invoice.status === "draft" && "bg-slate-100 text-slate-700",
                               invoice.status === "sent" && "bg-blue-100 text-blue-700",
@@ -1694,7 +1695,7 @@ export default function CrmWorkOrderDetail() {
                               invoice.status === "void" && "bg-red-100 text-red-700"
                             )}>
                               {invoice.status?.charAt(0).toUpperCase() + invoice.status?.slice(1)}
-                            </Badge>
+                            </StatusDot>
                           </TableCell>
                           <TableCell className="text-right">
                             {invoice.total ? `$${Number(invoice.total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}

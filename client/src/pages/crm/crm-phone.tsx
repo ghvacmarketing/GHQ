@@ -26,6 +26,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -503,14 +504,14 @@ function CallLogEntry({ log, isHighlighted, entryRef, onEdit, onDelete }: CallLo
               </span>
             )}
             {log.tag && (
-              <Badge variant="secondary" className={cn("text-[10px] h-4 px-1", tagBadgeColors[log.tag] || "")}>
+              <StatusDot pill={cn("text-[10px] h-4 px-1", tagBadgeColors[log.tag] || "")}>
                 {log.tag}
-              </Badge>
+              </StatusDot>
             )}
             {log.billable && (
-              <Badge className="text-[10px] h-4 px-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+              <StatusDot pill="text-[10px] h-4 px-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                 Billable
-              </Badge>
+              </StatusDot>
             )}
             {commentCount > 0 && (
               <Badge 

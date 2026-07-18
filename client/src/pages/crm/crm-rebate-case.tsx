@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -193,9 +194,9 @@ export default function CrmRebateCase() {
           {caseData.caseNumber && (
             <span className="text-slate-400 font-mono text-base">#{caseData.caseNumber}</span>
           )}
-          <Badge className={`text-xs border ${APPLICATION_STATUS_COLORS[caseData.applicationStatus]}`}>
+          <StatusDot pill={`text-xs border ${APPLICATION_STATUS_COLORS[caseData.applicationStatus]}`}>
             {APPLICATION_STATUS_LABELS[caseData.applicationStatus]}
-          </Badge>
+          </StatusDot>
           <Badge variant="outline" className="text-xs">{PROGRAM_TYPE_SHORT[caseData.programType]}</Badge>
           <Badge className={`text-xs ${PRIORITY_COLORS[caseData.priority]}`}>
             {PRIORITY_LABELS[caseData.priority]}
@@ -3119,7 +3120,7 @@ function ActivityTab({ caseData, caseId, users, onInvalidate }: {
                       <div className={`flex-1 p-4 rounded-lg border bg-white ${cfg.borderColor}`}>
                         <div className="flex items-start justify-between gap-2 mb-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <Badge className={`text-xs ${cfg.bgColor} ${cfg.textColor}`}>{cfg.label}</Badge>
+                            <StatusDot pill={`text-xs ${cfg.bgColor} ${cfg.textColor}`}>{cfg.label}</StatusDot>
                             {entry.userId && (
                               <span className="text-xs text-slate-400">
                                 by {usersMap.get(entry.userId) ?? "Unknown"}

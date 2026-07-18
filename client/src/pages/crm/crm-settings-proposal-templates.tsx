@@ -8,6 +8,7 @@ import { CrmLayout } from "@/components/crm/crm-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -535,9 +536,9 @@ export default function CrmSettingsProposalTemplates() {
                       <FileText className="h-4 w-4 text-slate-400 flex-shrink-0" />
                       <span className="text-sm font-medium text-slate-800 truncate">{template.name}</span>
                       {template.isDefault && (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-300 text-amber-600 bg-amber-50 flex-shrink-0">
+                        <StatusDot pill="text-[10px] px-1.5 py-0 border-amber-300 text-amber-600 bg-amber-50 flex-shrink-0">
                           Default
-                        </Badge>
+                        </StatusDot>
                       )}
                     </div>
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -198,17 +199,17 @@ function TaskCard({
           )}
           
           {task.relatedEntityType && task.relatedEntityType !== "none" && (
-            <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+            <StatusDot pill="text-xs bg-purple-50 text-purple-700 border-purple-200">
               <Building className="h-3 w-3 mr-1" />
               {task.relatedEntityType.replace("_", " ")}
-            </Badge>
+            </StatusDot>
           )}
           
           {task.customer && !task.relatedEntityType && (
-            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+            <StatusDot pill="text-xs bg-blue-50 text-blue-700 border-blue-200">
               <User className="h-3 w-3 mr-1" />
               {task.customer.name}
-            </Badge>
+            </StatusDot>
           )}
         </div>
       </div>
@@ -264,9 +265,9 @@ function TaskSection({
             <Icon className={`h-4 w-4 ${config.color}`} />
             <span className={`font-semibold ${config.color}`}>{config.label}</span>
           </div>
-          <Badge variant="secondary" className={`${config.bgColor} ${config.color} border ${config.borderColor}`}>
+          <StatusDot pill={`${config.bgColor} ${config.color} border ${config.borderColor}`}>
             {tasks.length}
-          </Badge>
+          </StatusDot>
         </div>
       </CollapsibleTrigger>
       <CollapsibleContent>

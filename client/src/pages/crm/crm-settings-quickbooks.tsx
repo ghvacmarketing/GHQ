@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -509,9 +510,8 @@ export default function CrmSettingsQuickBooks() {
                     </CardDescription>
                   </div>
                 </div>
-                <Badge 
-                  variant={status?.connected ? "default" : "secondary"}
-                  className={status?.connected ? "bg-green-100 text-green-800" : ""}
+                <StatusDot
+                  pill={status?.connected ? "bg-green-100 text-green-800" : ""}
                 >
                   {status?.connected ? (
                     <>
@@ -524,7 +524,7 @@ export default function CrmSettingsQuickBooks() {
                       Disconnected
                     </>
                   )}
-                </Badge>
+                </StatusDot>
               </div>
             </CardHeader>
             <CardContent>
@@ -803,12 +803,11 @@ export default function CrmSettingsQuickBooks() {
                                         </Badge>
                                       </div>
                                       {children.length > 0 && (
-                                        <Badge 
-                                          variant={mappedChildren.length === children.length ? "default" : "secondary"}
-                                          className={`text-xs ${mappedChildren.length === children.length ? 'bg-green-100 text-green-700 hover:bg-green-100' : ''}`}
+                                        <StatusDot
+                                          pill={`text-xs ${mappedChildren.length === children.length ? 'bg-green-100 text-green-700 hover:bg-green-100' : ''}`}
                                         >
                                           {mappedChildren.length}/{children.length} mapped
-                                        </Badge>
+                                        </StatusDot>
                                       )}
                                     </div>
                                   </AccordionTrigger>

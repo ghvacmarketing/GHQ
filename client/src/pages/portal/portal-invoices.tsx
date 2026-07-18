@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, FileText, CreditCard, Eye } from "lucide-react";
@@ -113,7 +114,7 @@ export default function PortalInvoices() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <Table>
+                <Table className="[&_td]:py-4 [&_th]:text-xs [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-400">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Invoice #</TableHead>
@@ -132,7 +133,7 @@ export default function PortalInvoices() {
                       return (
                         <TableRow
                           key={invoice.id}
-                          className="cursor-pointer"
+                          className="cursor-pointer hover:bg-slate-50"
                           onClick={() => setLocation(`/portal/invoice/${invoice.id}`)}
                           data-testid={`row-invoice-${invoice.id}`}
                         >
@@ -149,13 +150,12 @@ export default function PortalInvoices() {
                             {formatCurrency(invoice.balanceDue)}
                           </TableCell>
                           <TableCell className="text-center">
-                            <Badge
-                              variant="outline"
-                              className={status.className}
+                            <StatusDot
+                              pill={status.className}
                               data-testid={`badge-invoice-status-${invoice.id}`}
                             >
                               {status.label}
-                            </Badge>
+                            </StatusDot>
                           </TableCell>
                           <TableCell className="text-center">
                             <Link href={`/portal/invoice/${invoice.id}`} onClick={(e) => e.stopPropagation()}>

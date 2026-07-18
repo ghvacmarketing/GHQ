@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -615,13 +616,13 @@ export default function CrmSettingsFleet() {
                         <TableCell>{vehicle.licensePlate || "—"}</TableCell>
                         <TableCell>
                           {vehicle.isActive ? (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                            <StatusDot pill="bg-green-50 text-green-700 border-green-200">
                               Active
-                            </Badge>
+                            </StatusDot>
                           ) : (
-                            <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200">
+                            <StatusDot pill="bg-slate-50 text-slate-600 border-slate-200">
                               Inactive
-                            </Badge>
+                            </StatusDot>
                           )}
                         </TableCell>
                         {isAdmin && (

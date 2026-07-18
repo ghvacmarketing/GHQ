@@ -7,6 +7,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -349,14 +350,14 @@ export function EntityTasksTab({ entityType, entityId, customerId, customerName 
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={priorityColors[task.priority as TaskPriority]}>
+                        <StatusDot pill={priorityColors[task.priority as TaskPriority]}>
                           {priorityLabels[task.priority as TaskPriority]}
-                        </Badge>
+                        </StatusDot>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={statusColors[task.status as TaskStatus]}>
+                        <StatusDot pill={statusColors[task.status as TaskStatus]}>
                           {statusLabels[task.status as TaskStatus]}
-                        </Badge>
+                        </StatusDot>
                       </TableCell>
                       <TableCell>
                         {task.assignedToUser ? (

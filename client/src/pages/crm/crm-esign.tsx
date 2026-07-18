@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -212,15 +213,14 @@ export default function CrmEsign() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="truncate font-medium text-foreground" data-testid={`text-title-${doc.id}`}>{doc.title}</span>
-                          <Badge variant="outline" className={STATUS_STYLES[doc.status] || STATUS_STYLES.draft}>
+                          <StatusDot pill={STATUS_STYLES[doc.status] || STATUS_STYLES.draft}>
                             {doc.status === "completed" && <CheckCircle2 className="mr-1 h-3 w-3" />}
                             {doc.status === "sent" && <Send className="mr-1 h-3 w-3" />}
                             {STATUS_LABELS[doc.status] || doc.status}
-                          </Badge>
+                          </StatusDot>
                           {doc.depositEnabled && (doc.depositAmountCents ?? 0) > 0 && (
-                            <Badge
-                              variant="outline"
-                              className={doc.depositPaidAt
+                            <StatusDot
+                              pill={doc.depositPaidAt
                                 ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-300"
                                 : "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-300"}
                               data-testid={`badge-deposit-${doc.id}`}
@@ -229,7 +229,7 @@ export default function CrmEsign() {
                               {doc.depositPaidAt
                                 ? `Deposit paid $${((doc.depositAmountCents ?? 0) / 100).toFixed(2)}`
                                 : `Deposit due $${((doc.depositAmountCents ?? 0) / 100).toFixed(2)}`}
-                            </Badge>
+                            </StatusDot>
                           )}
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -708,9 +709,9 @@ export default function CrmInvoiceDetail() {
             <h1 className="text-2xl font-bold text-slate-900" data-testid="text-invoice-number">
               Invoice {invoice.invoiceNumber}
             </h1>
-            <Badge className={`${statusColors[status]} border`} data-testid="badge-status">
+            <StatusDot pill={`${statusColors[status]} border`} data-testid="badge-status">
               {statusLabels[status]}
-            </Badge>
+            </StatusDot>
           </div>
           
           {/* Second row: Date and Actions */}
@@ -1033,14 +1034,14 @@ export default function CrmInvoiceDetail() {
               Email Inbox
               <div className="ml-auto flex gap-2">
                 {invoice.paymentLinkClickCount && invoice.paymentLinkClickCount > 0 && (
-                  <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                  <StatusDot pill="bg-green-100 text-green-700 border-green-300">
                     Payment link clicked {invoice.paymentLinkClickCount} time{invoice.paymentLinkClickCount > 1 ? 's' : ''}
-                  </Badge>
+                  </StatusDot>
                 )}
                 {invoice.viewCount && invoice.viewCount > 0 && (
-                  <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-300">
+                  <StatusDot pill="bg-purple-100 text-purple-700 border-purple-300">
                     Viewed {invoice.viewCount} time{invoice.viewCount > 1 ? 's' : ''}
-                  </Badge>
+                  </StatusDot>
                 )}
               </div>
             </CardTitle>
@@ -1122,7 +1123,7 @@ export default function CrmInvoiceDetail() {
                                 {isOutgoing ? log.recipientEmail : log.fromEmail || "Customer"}
                               </span>
                               {log.isManual && (
-                                <Badge variant="outline" className="text-xs bg-slate-100">Manual</Badge>
+                                <StatusDot pill="text-xs bg-slate-100">Manual</StatusDot>
                               )}
                             </div>
                             
@@ -1165,9 +1166,8 @@ export default function CrmInvoiceDetail() {
                             )}
                           </div>
                           
-                          <Badge
-                            variant="outline"
-                            className={
+                          <StatusDot
+                            pill={
                               isOutgoing
                                 ? log.status === "sent"
                                   ? "bg-blue-100 text-blue-700 border-blue-300"
@@ -1181,7 +1181,7 @@ export default function CrmInvoiceDetail() {
                               ? (log.status === "sent" ? "Sent" : log.status === "failed" ? "Failed" : log.status)
                               : "Received"
                             }
-                          </Badge>
+                          </StatusDot>
                         </div>
                       </div>
                       

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -402,9 +403,9 @@ function ProjectCard({ project, onClick, isDragging: isDraggingProp }: ProjectCa
               </div>
             )}
             <div className="flex flex-wrap gap-1 mt-2">
-              <Badge className={cn("text-xs border", statusStyle.bg, statusStyle.text, statusStyle.border)}>
+              <StatusDot pill={cn("text-xs border", statusStyle.bg, statusStyle.text, statusStyle.border)}>
                 {statusLabels[project.status] || project.status}
-              </Badge>
+              </StatusDot>
               {showPriority && (
                 <Badge className={cn("text-xs border", priorityStyle.bg, priorityStyle.text, priorityStyle.border)}>
                   {project.priority}
@@ -1488,9 +1489,9 @@ export default function CrmProjects() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="font-medium truncate">{project.title}</span>
-                                <Badge className={cn("text-xs", statusStyle.bg, statusStyle.text, statusStyle.border)}>
+                                <StatusDot pill={cn("text-xs", statusStyle.bg, statusStyle.text, statusStyle.border)}>
                                   {statusLabels[project.status] || project.status}
-                                </Badge>
+                                </StatusDot>
                               </div>
                               <div className="text-sm text-muted-foreground">
                                 {project.customerName || "No customer"} - {formatProjectNumber(project.projectNumber)}
@@ -1614,9 +1615,9 @@ export default function CrmProjects() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge className={cn("text-xs border", statusStyle.bg, statusStyle.text, statusStyle.border)}>
+                              <StatusDot pill={cn("text-xs border", statusStyle.bg, statusStyle.text, statusStyle.border)}>
                                 {statusLabels[status] || status}
-                              </Badge>
+                              </StatusDot>
                             </TableCell>
                             <TableCell>
                               <Badge className={cn("text-xs border", priorityStyle.bg, priorityStyle.text, priorityStyle.border)}>

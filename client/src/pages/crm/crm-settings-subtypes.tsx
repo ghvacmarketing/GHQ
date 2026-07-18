@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
@@ -312,13 +313,12 @@ export default function CrmSettingsSubtypes() {
                               <span className="font-medium" data-testid={`subtype-name-${subtype.id}`}>
                                 {subtype.subtype}
                               </span>
-                              <Badge
-                                variant={subtype.isActive ? "default" : "outline"}
-                                className={subtype.isActive ? "bg-green-100 text-green-700" : ""}
+                              <StatusDot
+                                pill={subtype.isActive ? "bg-green-100 text-green-700" : ""}
                                 data-testid={`subtype-status-${subtype.id}`}
                               >
                                 {subtype.isActive ? "Active" : "Inactive"}
-                              </Badge>
+                              </StatusDot>
                             </div>
                             <div className="flex items-center gap-2">
                               <Button

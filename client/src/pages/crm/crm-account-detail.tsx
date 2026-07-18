@@ -6,6 +6,7 @@ import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -542,12 +543,12 @@ export default function CrmAccountDetail() {
                     </p>
                   )}
                   <div className="flex items-center gap-2 mt-3">
-                    <Badge className={cn(typeColors.bg, typeColors.text, "border-0")} data-testid="badge-account-type">
+                    <StatusDot pill={cn(typeColors.bg, typeColors.text, "border-0")} data-testid="badge-account-type">
                       {account.accountType.replace("_", " ")}
-                    </Badge>
-                    <Badge className={cn(statusColorSet.bg, statusColorSet.text, "border-0")} data-testid="badge-account-status">
+                    </StatusDot>
+                    <StatusDot pill={cn(statusColorSet.bg, statusColorSet.text, "border-0")} data-testid="badge-account-status">
                       {account.accountStatus.replace("_", " ")}
-                    </Badge>
+                    </StatusDot>
                     {account.customerSince && (
                       <div className="flex items-center gap-1 text-sm text-slate-500 ml-2">
                         <Calendar className="h-4 w-4" />
@@ -666,12 +667,12 @@ export default function CrmAccountDetail() {
                       const completedCount = [hasSite, hasOpsContact, hasApContact, hasJob].filter(Boolean).length;
                       const percentage = Math.round((completedCount / 4) * 100);
                       return (
-                        <Badge className={cn(
+                        <StatusDot pill={cn(
                           percentage === 100 ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700",
                           "border-0"
                         )} data-testid="badge-checklist-percentage">
                           {percentage}% Complete
-                        </Badge>
+                        </StatusDot>
                       );
                     })()}
                   </div>
@@ -802,10 +803,10 @@ export default function CrmAccountDetail() {
                           <div className="flex items-center gap-2">
                             {site.siteName && <span className="font-medium">{site.siteName}</span>}
                             {site.isPrimary && (
-                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              <StatusDot pill="bg-green-50 text-green-700 border-green-200">
                                 <Star className="h-3 w-3 mr-1" />
                                 Primary
-                              </Badge>
+                              </StatusDot>
                             )}
                           </div>
                           <p className="text-slate-600 mt-1">
@@ -937,10 +938,10 @@ export default function CrmAccountDetail() {
                           <TableCell>
                             <div className="flex gap-1">
                               {contact.isPrimary && (
-                                <Badge className="bg-green-100 text-green-700 border-0">Primary</Badge>
+                                <StatusDot pill="bg-green-100 text-green-700 border-0">Primary</StatusDot>
                               )}
                               {contact.isPreferred && (
-                                <Badge className="bg-blue-100 text-blue-700 border-0">Preferred</Badge>
+                                <StatusDot pill="bg-blue-100 text-blue-700 border-0">Preferred</StatusDot>
                               )}
                             </div>
                           </TableCell>
@@ -1013,9 +1014,9 @@ export default function CrmAccountDetail() {
                           <TableRow key={job.id} data-testid={`job-row-${job.id}`}>
                             <TableCell className="font-medium">{job.jobType}</TableCell>
                             <TableCell>
-                              <Badge className={cn(colors.bg, colors.text, "border-0 capitalize")}>
+                              <StatusDot pill={cn(colors.bg, colors.text, "border-0 capitalize")}>
                                 {job.status.replace("_", " ")}
-                              </Badge>
+                              </StatusDot>
                             </TableCell>
                             <TableCell className="capitalize">{job.priority}</TableCell>
                             <TableCell>{formatDateTime(job.scheduledStart)}</TableCell>

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, ClipboardCheck, Calendar, RefreshCw, CheckCircle, Clock, ChevronDown, ChevronUp } from "lucide-react";
 import { PortalLayout } from "./portal-layout";
@@ -172,9 +173,9 @@ export default function PortalAgreements() {
                           </p>
                         </div>
                       </div>
-                      <Badge variant="outline" className={status.className} data-testid={`badge-agreement-status-${agreement.id}`}>
+                      <StatusDot pill={status.className} data-testid={`badge-agreement-status-${agreement.id}`}>
                         {status.label}
-                      </Badge>
+                      </StatusDot>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -269,9 +270,9 @@ export default function PortalAgreements() {
                                       </p>
                                     </div>
                                   </div>
-                                  <Badge variant="secondary" className={`text-xs ${visitStatus.className}`}>
+                                  <StatusDot pill={`text-xs ${visitStatus.className}`}>
                                     {visitStatus.label}
-                                  </Badge>
+                                  </StatusDot>
                                 </div>
                               );
                             })}

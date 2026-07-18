@@ -7,6 +7,7 @@ import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -527,9 +528,9 @@ function DraggableQueueCard({ workOrder, onClick, onOpenQuickStatus }: Draggable
       <div className="flex flex-col min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="font-medium text-sm text-slate-900 truncate">{workOrder.customerName}</span>
-          <Badge variant="outline" className={`${visitTypeColor.bg} ${visitTypeColor.text} border-0 text-[10px] flex-shrink-0`}>
+          <StatusDot pill={`${visitTypeColor.bg} ${visitTypeColor.text} border-0 text-[10px] flex-shrink-0`}>
             {visitTypeLabels[workOrder.visitType || "SERVICE"] || workOrder.visitType}
-          </Badge>
+          </StatusDot>
           {workOrder.priority && workOrder.priority !== "normal" && (
             <span className={`ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded flex-shrink-0 ${priorityStyle.bg} ${priorityStyle.text}`}>
               {workOrder.priority.toUpperCase()}
@@ -2215,8 +2216,8 @@ function MobileWorkOrderCard({ workOrder, technician, onClick }: { workOrder: Di
             <p className={`font-semibold text-sm ${jobColors.text}`}>{workOrder.customerName}</p>
             <p className={`text-xs ${jobColors.text} opacity-80`}>{workOrder.propertyAddress || "No address"}</p>
           </div>
-          <Badge
-            className={cn(
+          <StatusDot
+            pill={cn(
               "text-xs font-bold",
               workOrder.priority && workOrder.priority !== "normal" && "mr-12",
               statusBadgeClass(workOrder.status)
@@ -2224,7 +2225,7 @@ function MobileWorkOrderCard({ workOrder, technician, onClick }: { workOrder: Di
             data-testid={`mobile-status-badge-${workOrder.id}`}
           >
             {statusLabels[workOrder.status] || workOrder.status}
-          </Badge>
+          </StatusDot>
         </div>
         <div className="flex items-center gap-4 mt-2 text-xs text-slate-600">
           <div className="flex items-center gap-1">
@@ -4432,16 +4433,16 @@ export default function CrmDispatch() {
                       <span className="text-sm text-slate-500">Status</span>
                       <div className="flex items-center gap-2">
                         {selectedWorkOrder.isPending && (
-                          <Badge className="bg-amber-100 text-amber-800 border border-amber-200">
+                          <StatusDot pill="bg-amber-100 text-amber-800 border border-amber-200">
                             Waiting
-                          </Badge>
+                          </StatusDot>
                         )}
-                        <Badge 
-                          className={`${statusColors[selectedWorkOrder.status]?.bg} ${statusColors[selectedWorkOrder.status]?.text} ${statusColors[selectedWorkOrder.status]?.border} border`}
+                        <StatusDot 
+                          pill={`${statusColors[selectedWorkOrder.status]?.bg} ${statusColors[selectedWorkOrder.status]?.text} ${statusColors[selectedWorkOrder.status]?.border} border`}
                           data-testid="badge-status"
                         >
                           {statusLabels[selectedWorkOrder.status] || selectedWorkOrder.status}
-                        </Badge>
+                        </StatusDot>
                       </div>
                     </div>
                     
@@ -4455,9 +4456,9 @@ export default function CrmDispatch() {
                     {selectedWorkOrder.bookingSource === "online" && (
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-slate-500">Source</span>
-                        <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200">
+                        <StatusDot pill="bg-purple-100 text-purple-700 border-purple-200">
                           Online Booking
-                        </Badge>
+                        </StatusDot>
                       </div>
                     )}
 

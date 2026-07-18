@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { StatusDot } from "@/components/ui/status-dot";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -308,14 +309,13 @@ export default function CrmEsignEditor() {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h1 className="font-semibold text-slate-900 truncate" data-testid="text-doc-title">{doc.title}</h1>
-              <Badge
-                variant="outline"
-                className={doc.status === "draft" ? "bg-slate-100 text-slate-700 border-slate-200" : doc.status === "sent" ? "bg-blue-100 text-blue-700 border-blue-200" : "bg-green-100 text-green-700 border-green-200"}
+              <StatusDot
+                pill={doc.status === "draft" ? "bg-slate-100 text-slate-700 border-slate-200" : doc.status === "sent" ? "bg-blue-100 text-blue-700 border-blue-200" : "bg-green-100 text-green-700 border-green-200"}
               >
                 {doc.status === "completed" && <CheckCircle2 className="mr-1 h-3 w-3" />}
                 {doc.status === "sent" && <Send className="mr-1 h-3 w-3" />}
                 {doc.status === "draft" ? "Draft" : doc.status === "sent" ? "Out for signature" : doc.status === "completed" ? "Completed" : doc.status}
-              </Badge>
+              </StatusDot>
             </div>
             <p className="text-xs text-slate-500">
               {doc.pageCount} page{doc.pageCount === 1 ? "" : "s"} · {doc.recipients.length} recipient{doc.recipients.length === 1 ? "" : "s"} · {fields.length} field{fields.length === 1 ? "" : "s"}
