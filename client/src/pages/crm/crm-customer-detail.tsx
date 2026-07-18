@@ -1729,6 +1729,46 @@ interface CustomerTabbedViewProps {
   setActiveTab: (tab: string) => void;
 }
 
+// Recent job-site photos (uploaded from the mobile app or Files tab) shown
+// right on the customer's detail overview.
+function RecentPhotosCard({ customerId, onViewAll }: { customerId: string; onViewAll: () => void }) {
+  const { data: files } = useQuery<Array<{ id: string; name: string; url: string; contentType: string | null; createdAt: string | null }>>({
+    queryKey: ["/api/crm/customers", customerId, "files"],
+  });
+  const photos = (files || [])
+    .filter((f) => f.contentType?.startsWith("image/"))
+    .slice(0, 8);
+
+  if (photos.length === 0) return null;
+
+  return (
+    <Card className="border shadow-sm" data-testid="card-recent-photos">
+      <CardContent className="p-6">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+            <ImageIcon className="h-4 w-4 text-[#711419]" />
+            Photos
+          </h3>
+          <button
+            onClick={onViewAll}
+            className="text-xs font-medium text-[#711419] hover:underline"
+            data-testid="button-view-all-photos"
+          >
+            View all
+          </button>
+        </div>
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+          {photos.map((p) => (
+            <a key={p.id} href={p.url} target="_blank" rel="noopener" className="block overflow-hidden rounded-lg" title={p.name}>
+              <img src={p.url} alt={p.name} loading="lazy" className="aspect-square w-full object-cover transition-transform hover:scale-105" />
+            </a>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 interface PortalAccountBreakdown {
   portalEnabled: boolean;
   account: {
@@ -2508,6 +2548,9 @@ function CustomerTabbedView({
             </div>
           </CardContent>
         </Card>
+
+        {/* Job-site photos from the field, right under the account details */}
+        <RecentPhotosCard customerId={customer.id} onViewAll={() => setActiveTab("files")} />
 
         {/* Setup Checklist Card - Only for Property Managers */}
         {isPropertyManager && (
