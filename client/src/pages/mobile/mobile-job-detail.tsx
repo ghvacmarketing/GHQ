@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, useSearch } from "wouter";
 import { format, addYears, addMonths } from "date-fns";
@@ -3548,6 +3548,49 @@ export default function MobileJobDetail() {
   };
 
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
+
+  // Slide-out + swipe-right back to the jobs list (iOS-style)
+  const pageRef = useRef<HTMLDivElement | null>(null);
+  const swipe = useRef<{ x: number; y: number; active: boolean } | null>(null);
+  const goBackAnimated = () => {
+    const el = pageRef.current;
+    if (el) {
+      el.style.transition = "transform 0.22s ease-in";
+      el.style.transform = "translateX(100%)";
+      setTimeout(() => navigate("/mobile/job"), 200);
+    } else {
+      navigate("/mobile/job");
+    }
+  };
+  const onSwipeStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    swipe.current = { x: t.clientX, y: t.clientY, active: t.clientX < window.innerWidth / 2 };
+  };
+  const onSwipeMove = (e: React.TouchEvent) => {
+    const st = swipe.current;
+    if (!st?.active || !pageRef.current) return;
+    const t = e.touches[0];
+    const dx = t.clientX - st.x;
+    const dy = Math.abs(t.clientY - st.y);
+    if (dx > 12 && dx > dy * 1.5) {
+      pageRef.current.style.transition = "none";
+      pageRef.current.style.transform = `translateX(${dx}px)`;
+    }
+  };
+  const onSwipeEnd = (e: React.TouchEvent) => {
+    const st = swipe.current;
+    swipe.current = null;
+    const el = pageRef.current;
+    if (!st?.active || !el) return;
+    const dx = e.changedTouches[0].clientX - st.x;
+    if (dx > 110) {
+      goBackAnimated();
+    } else if (el.style.transform) {
+      el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
+      el.style.transform = "translateX(0)";
+      setTimeout(() => { if (el) el.style.transition = ""; }, 260);
+    }
+  };
   const [optimisticStatus, setOptimisticStatus] = useState<WorkOrderStatus | null>(null);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completionSummary, setCompletionSummary] = useState("");
@@ -3971,26 +4014,33 @@ export default function MobileJobDetail() {
   ];
 
   return (
-    <MobileShell>
+    <MobileShell
+      customNav={{
+        tabs: tabs.map((t) => ({ id: t.id, label: t.label, icon: t.icon })),
+        activeId: activeTab,
+        onSelect: (id) => setActiveTab(id as TabType),
+      }}
+    >
       <OfflineIndicator />
-      <div className="flex flex-col h-full">
+      {/* Floating back — tap, or swipe right anywhere from the left half */}
+      <button
+        onClick={goBackAnimated}
+        className="absolute left-3 z-40 flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white/85 text-slate-700 shadow-[0_4px_16px_rgba(0,0,0,0.14)] backdrop-blur-xl transition-transform active:scale-95"
+        style={{ top: "calc(10px + env(safe-area-inset-top))" }}
+        data-testid="button-back"
+        aria-label="Back"
+      >
+        <ArrowLeft className="h-5 w-5" />
+      </button>
+      <div
+        ref={pageRef}
+        className="page-slide-in flex h-full flex-col bg-slate-50"
+        onTouchStart={onSwipeStart}
+        onTouchMove={onSwipeMove}
+        onTouchEnd={onSwipeEnd}
+      >
         <div className="flex-shrink-0 p-4 pb-2">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => {
-                if (activeTab !== "overview") {
-                  setActiveTab("overview");
-                } else {
-                  navigate("/mobile");
-                }
-              }}
-              className="flex items-center text-slate-600 hover:text-slate-800 min-h-[44px] min-w-[44px]"
-              data-testid="button-back"
-            >
-              <ArrowLeft className="h-5 w-5 mr-1" />
-              <span>Back</span>
-            </button>
-            
+          <div className="flex items-center justify-end">
             <div className="flex items-center gap-2">
               {isSupervisor && !isAssignedToMe && (
                 <Button
@@ -4020,33 +4070,6 @@ export default function MobileJobDetail() {
               )}
             </div>
           </div>
-        </div>
-
-        {/* Floating quick-link rail — frosted glass, right edge, above content */}
-        <div
-          className="fixed right-2 top-1/2 z-40 -translate-y-1/2 flex flex-col gap-1 rounded-2xl border border-slate-900/10 bg-white/75 p-1 shadow-[0_4px_20px_rgba(0,0,0,0.12)] backdrop-blur-xl"
-          data-testid="job-tab-nav"
-        >
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex h-12 w-12 flex-col items-center justify-center gap-0.5 rounded-xl transition-all duration-200 active:scale-95 ${
-                  isActive
-                    ? "bg-[#711419] text-white shadow-md"
-                    : "text-slate-500"
-                }`}
-                data-testid={`tab-${tab.id}`}
-                aria-label={tab.label}
-              >
-                <Icon className={`h-5 w-5 ${isActive ? "stroke-[2.25]" : ""}`} />
-                <span className="text-[9px] font-semibold leading-none">{tab.label}</span>
-              </button>
-            );
-          })}
         </div>
 
         <div className="flex-1 overflow-auto px-4 pb-6" data-testid="mobile-job-detail">

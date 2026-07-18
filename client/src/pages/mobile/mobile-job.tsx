@@ -102,7 +102,7 @@ export default function MobileJob() {
   });
 
   // Supervisor, tech, and sales can all see future jobs
-  const canViewFutureJobs = currentUser?.role === 'supervisor' || currentUser?.role === 'tech' || currentUser?.role === 'sales';
+  const canViewFutureJobs = currentUser?.role === 'supervisor' || currentUser?.role === 'tech' || currentUser?.role === 'sales' || currentUser?.role === 'owner';
 
   // Supervisor, tech, and sales see future jobs (next 30 days), others see today only
   const queryDateEnd = canViewFutureJobs ? futureEndStr : todayEnd;

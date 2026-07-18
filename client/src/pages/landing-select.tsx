@@ -45,32 +45,18 @@ export default function LandingSelect() {
   const firstName = firstNameOf(crmUser?.name) || firstNameOf(portalUser?.username);
   const fullText = `Welcome${firstName ? `, ${firstName}` : ""}`;
 
-  const [typed, setTyped] = useState("");
-  const [stage, setStage] = useState(0); // 0: typing, 1: subheading, 2: cards
+  const [stage, setStage] = useState(0); // 0: heading, 1: subheading, 2: cards
 
   useEffect(() => {
     if (!ready) return;
-    setTyped("");
     setStage(0);
-    let i = 0;
-    const interval = setInterval(() => {
-      i += 1;
-      setTyped(fullText.slice(0, i));
-      if (i >= fullText.length) {
-        clearInterval(interval);
-        const t1 = setTimeout(() => setStage(1), 350);
-        const t2 = setTimeout(() => setStage(2), 1000);
-        timeouts.push(t1, t2);
-      }
-    }, 75);
-    const timeouts: ReturnType<typeof setTimeout>[] = [];
+    const t1 = setTimeout(() => setStage(1), 200);
+    const t2 = setTimeout(() => setStage(2), 450);
     return () => {
-      clearInterval(interval);
-      timeouts.forEach(clearTimeout);
+      clearTimeout(t1);
+      clearTimeout(t2);
     };
   }, [ready, fullText]);
-
-  const typingDone = typed.length >= fullText.length && fullText.length > 0;
 
   // While verifying the session (or redirecting an unauthenticated visitor to
   // login), show a loader instead of the app selection screen.
@@ -90,13 +76,8 @@ export default function LandingSelect() {
       <div className="relative z-10 w-full max-w-3xl">
         <div className="text-center mb-10">
           <img src={redlogo} alt="GHVAC" className="h-16 mx-auto mb-6" />
-          <h1 className="text-3xl font-bold text-white mb-2 min-h-[2.5rem]" data-testid="text-welcome">
-            <span>{typed}</span>
-            <span
-              className={`inline-block w-[3px] h-7 align-middle ml-1 bg-[#e08a8f] ${
-                typingDone ? "opacity-0" : "animate-pulse"
-              }`}
-            />
+          <h1 className="text-3xl font-bold text-white mb-2 min-h-[2.5rem] animate-in fade-in-0 slide-in-from-bottom-2 duration-500" data-testid="text-welcome">
+            {fullText}
           </h1>
           <p
             className={`text-slate-300 transition-opacity duration-700 ${

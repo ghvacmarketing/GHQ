@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { User, LogOut, Mail, Shield, Loader2 } from "lucide-react";
+import { User, LogOut, Mail, Shield, Loader2, Monitor, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import MobileShell from "./mobile-shell";
@@ -67,6 +67,18 @@ export default function MobileProfile() {
                 </div>
               </CardContent>
             </Card>
+
+            {currentUser.role !== "tech" && (
+              <button
+                onClick={() => { window.location.href = "/crm"; }}
+                className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-left shadow-sm transition-all active:scale-[0.98]"
+                data-testid="button-desktop-crm"
+              >
+                <Monitor className="h-5 w-5 text-[#711419]" />
+                <span className="text-sm font-medium text-slate-800">Desktop CRM</span>
+                <ChevronRight className="ml-auto h-4 w-4 text-slate-400" />
+              </button>
+            )}
 
             <Card className="border-slate-200">
               <CardContent className="pt-6">

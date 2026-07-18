@@ -426,3 +426,12 @@ gmp-place-autocomplete::part(input)::placeholder {
   0%   { transform: translateX(-120%); }
   100% { transform: translateX(460%); }
 }
+
+/* Mobile page transitions — job detail slides in like an iOS push */
+@keyframes page-slide-in-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+.page-slide-in {
+  animation: page-slide-in-right 0.28s cubic-bezier(0.32, 0.72, 0.34, 1);
+}

@@ -12623,6 +12623,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.ip
       );
 
+      // Tell the assigned tech about their new job (mobile bell feed)
+      if (workOrder.assignedTechId && workOrder.assignedTechId !== user.id) {
+        try {
+          const when = workOrder.scheduledStart
+            ? new Date(workOrder.scheduledStart).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+            : "unscheduled";
+          await db.insert(crmNotifications).values({
+            userId: workOrder.assignedTechId,
+            type: "task_assigned" as any,
+            title: "New job assigned to you",
+            preview: `${workOrder.title || "Work order"} — ${when}`,
+            entityType: "work_order",
+            entityId: workOrder.id,
+            actorId: user.id,
+          });
+        } catch (e) {
+          console.error("WO assignment notification failed:", e);
+        }
+      }
+
       return res.status(201).json(workOrder);
     } catch (error) {
       console.error("Error creating work order:", error);
@@ -12822,6 +12842,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const workOrder = await storage.updateWorkOrder(req.params.id, updateData);
+
+      // Mobile bell feed: tell the tech when dispatch gives them a job or
+      // moves one of theirs (self-changes are silent).
+      try {
+        const fmtWhen = (d: Date | string | null | undefined) =>
+          d ? new Date(d).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "unscheduled";
+        const newTech = updateData.assignedTechId as string | null | undefined;
+        const assignmentChanged = newTech !== undefined && newTech !== existingWorkOrder.assignedTechId;
+        if (assignmentChanged && newTech && newTech !== user.id) {
+          await db.insert(crmNotifications).values({
+            userId: newTech,
+            type: "task_assigned" as any,
+            title: "New job assigned to you",
+            preview: `${workOrder?.title || existingWorkOrder.title || "Work order"} — ${fmtWhen(workOrder?.scheduledStart || existingWorkOrder.scheduledStart)}`,
+            entityType: "work_order",
+            entityId: req.params.id,
+            actorId: user.id,
+          });
+        }
+        const newStart = updateData.scheduledStart as Date | null | undefined;
+        const scheduleChanged = newStart !== undefined &&
+          String(newStart ? new Date(newStart).getTime() : null) !== String(existingWorkOrder.scheduledStart ? new Date(existingWorkOrder.scheduledStart).getTime() : null);
+        const notifyTech = workOrder?.assignedTechId || existingWorkOrder.assignedTechId;
+        if (!assignmentChanged && scheduleChanged && notifyTech && notifyTech !== user.id) {
+          await db.insert(crmNotifications).values({
+            userId: notifyTech,
+            type: "status_change" as any,
+            title: "Your job was rescheduled",
+            preview: `${workOrder?.title || existingWorkOrder.title || "Work order"} — now ${fmtWhen(newStart)}`,
+            entityType: "work_order",
+            entityId: req.params.id,
+            actorId: user.id,
+          });
+        }
+      } catch (e) {
+        console.error("WO change notification failed:", e);
+      }
 
       // Fire marketing automations for the "work order completed" trigger
       // (fire-and-forget; the engine gates all sends behind the settings toggles).

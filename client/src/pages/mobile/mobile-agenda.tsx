@@ -12,9 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import MobileShell from "./mobile-shell";
 import { useOnlineStatus, OfflineIndicator, usePendingChanges } from "@/hooks/use-online-status";
 import { PerformanceGauge } from "@/components/ui/performance-gauge";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import type { CrmWorkOrder, CrmCustomer, CrmProperty, CrmUser } from "@shared/schema";
 
 interface WorkOrderWithDetails extends CrmWorkOrder {
@@ -116,54 +114,56 @@ type NotificationItem = {
   id: string;
   title: string;
   preview: string | null;
+  entityType: string | null;
   isRead: boolean;
   createdAt: string | null;
 };
 
 function ProfileHeader({ user }: { user: CrmUser }) {
+  const [, navigate] = useLocation();
   const [now, setNow] = useState(new Date());
   const [notifOpen, setNotifOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
-  const { data: unread } = useQuery<{ count: number }>({
-    queryKey: ["/api/crm/notifications/unread-count"],
-    refetchInterval: 60 * 1000,
-  });
-  const unreadCount = unread?.count || 0;
-
-  const { data: notifications, isLoading: notifsLoading } = useQuery<NotificationItem[]>({
+  // Field-relevant notifications only: things that touch the technician's
+  // day (job assignments, schedule changes, tasks) - not CRM admin noise.
+  const { data: notifications } = useQuery<NotificationItem[]>({
     queryKey: ["/api/crm/notifications", "mobile-bell"],
     queryFn: async () => {
-      const res = await fetch("/api/crm/notifications?limit=15", { credentials: "include" });
+      const res = await fetch("/api/crm/notifications?limit=30", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load notifications");
       return res.json();
     },
-    enabled: notifOpen,
+    refetchInterval: 60 * 1000,
   });
+  const fieldNotifs = (notifications || []).filter((n) =>
+    n.entityType === "work_order" || n.entityType === "task",
+  );
+  const unreadField = fieldNotifs.filter((n) => !n.isRead);
+  const unreadCount = unreadField.length;
 
   const markAllRead = async () => {
-    await fetch("/api/crm/notifications/mark-all-read", { method: "POST", credentials: "include" });
-    queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
+    await Promise.all(
+      unreadField.map((n) =>
+        fetch(`/api/crm/notifications/${n.id}/read`, { method: "PATCH", credentials: "include" }),
+      ),
+    );
     queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications", "mobile-bell"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/notifications/unread-count"] });
   };
 
   const initials = user.name
     ? user.name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("")
     : null;
-  const showDesktopLink = user.role !== "tech";
-  const anyOverlayOpen = notifOpen || menuOpen;
+  const roleConfig = roleLabels[user.role] || roleLabels.tech;
 
   return (
     <div className="flex items-center justify-between" data-testid="profile-header">
-      {/* iOS-style backdrop blur while a menu is open */}
-      {anyOverlayOpen && (
-        <div className="fixed inset-0 z-40 bg-slate-900/15 backdrop-blur-[6px] animate-in fade-in-0 duration-200" aria-hidden />
-      )}
       <div>
         <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100" data-testid="text-greeting">
           {greetingForHour(now.getHours())}
@@ -172,99 +172,94 @@ function ProfileHeader({ user }: { user: CrmUser }) {
       </div>
 
       {/* Bell + avatar share one frosted bubble */}
-      <div className="relative z-50 flex items-center rounded-full border border-slate-900/10 bg-white/85 shadow-sm backdrop-blur-xl dark:bg-slate-800">
-        <DropdownMenu open={notifOpen} onOpenChange={setNotifOpen}>
-          <DropdownMenuTrigger asChild>
-            <button
-              className="relative flex h-11 w-12 items-center justify-center rounded-l-full text-slate-600 transition-transform active:scale-95"
-              data-testid="button-notifications"
-              aria-label="Notifications"
-            >
-              <Bell className="h-5 w-5" />
-              {unreadCount > 0 && (
-                <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </span>
-              )}
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            className="z-50 w-[calc(100vw-2rem)] max-w-sm origin-[var(--radix-dropdown-menu-content-transform-origin)] rounded-2xl p-0 data-[state=open]:zoom-in-50 data-[state=closed]:zoom-out-50 data-[state=open]:duration-300 data-[state=closed]:duration-200 data-[state=open]:ease-[cubic-bezier(0.34,1.3,0.64,1)]"
-            data-testid="dropdown-notifications"
-          >
-            <div className="flex items-center justify-between border-b px-4 py-2.5">
-              <span className="text-sm font-semibold text-slate-800">Notifications</span>
-              {unreadCount > 0 && (
-                <button onClick={markAllRead} className="text-xs font-medium text-[#711419]" data-testid="button-mark-all-read">
-                  Mark all read
-                </button>
-              )}
-            </div>
-            <div className="max-h-[55vh] overflow-y-auto">
-              {notifsLoading ? (
-                <p className="px-4 py-6 text-center text-sm text-slate-400">Loading…</p>
-              ) : !notifications || notifications.length === 0 ? (
-                <p className="px-4 py-6 text-center text-sm text-slate-400">You're all caught up.</p>
-              ) : (
-                notifications.map((n) => (
-                  <div
-                    key={n.id}
-                    className={`border-b border-slate-100 px-4 py-3 last:border-b-0 ${n.isRead ? "" : "bg-[#711419]/[0.04]"}`}
-                    data-testid={`notification-${n.id}`}
-                  >
-                    <div className="flex items-start gap-2">
-                      {!n.isRead && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#711419]" />}
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium leading-snug text-slate-800">{n.title}</p>
-                        {n.preview && <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{n.preview}</p>}
-                        {n.createdAt && (
-                          <p className="mt-1 text-[11px] text-slate-400">
-                            {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
+      <div className="flex items-center rounded-full border border-slate-900/10 bg-white/85 shadow-sm backdrop-blur-xl dark:bg-slate-800">
+        <button
+          onClick={() => setNotifOpen(true)}
+          className="relative flex h-11 w-12 items-center justify-center rounded-l-full text-slate-600 outline-none transition-transform focus:outline-none active:scale-95"
+          style={{ WebkitTapHighlightColor: "transparent" }}
+          data-testid="button-notifications"
+          aria-label="Notifications"
+        >
+          <Bell className="h-5 w-5" />
+          {unreadCount > 0 && (
+            <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </button>
         <span className="h-6 w-px bg-slate-200 dark:bg-slate-600" aria-hidden />
-
-        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-          <DropdownMenuTrigger asChild>
-            <button
-              className="flex h-11 w-12 items-center justify-center rounded-r-full transition-transform active:scale-95"
-              data-testid="button-profile-menu"
-              aria-label="Profile menu"
-            >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#711419] text-xs font-bold text-white shadow-sm">
-                {initials || <User className="h-4 w-4" />}
-              </span>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            className="z-50 origin-[var(--radix-dropdown-menu-content-transform-origin)] data-[state=open]:zoom-in-50 data-[state=closed]:zoom-out-50 data-[state=open]:duration-300 data-[state=closed]:duration-200 data-[state=open]:ease-[cubic-bezier(0.34,1.3,0.64,1)]"
-          >
-            <DropdownMenuItem asChild data-testid="menu-profile">
-              <Link href="/mobile/profile" className="flex items-center">
-                <User className="mr-2 h-4 w-4" /> My Profile
-              </Link>
-            </DropdownMenuItem>
-            {showDesktopLink && (
-              <DropdownMenuItem asChild data-testid="menu-desktop">
-                <Link href="/crm" className="flex items-center">
-                  <Monitor className="mr-2 h-4 w-4" /> Desktop CRM
-                </Link>
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <button
+          onClick={() => setProfileOpen(true)}
+          className="flex h-11 w-12 items-center justify-center rounded-r-full outline-none transition-transform focus:outline-none active:scale-95"
+          style={{ WebkitTapHighlightColor: "transparent" }}
+          data-testid="button-profile-menu"
+          aria-label="Profile menu"
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#711419] text-xs font-bold text-white shadow-sm">
+            {initials || <User className="h-4 w-4" />}
+          </span>
+        </button>
       </div>
+
+      {/* Notifications sheet */}
+      <DraggableSheet open={notifOpen} onOpenChange={setNotifOpen} title="Notifications" testid="sheet-notifications">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-base font-semibold text-slate-800">Notifications</span>
+          {unreadCount > 0 && (
+            <button onClick={markAllRead} className="text-xs font-medium text-[#711419]" data-testid="button-mark-all-read">
+              Mark all read
+            </button>
+          )}
+        </div>
+        <div className="-mx-5 max-h-[55vh] overflow-y-auto px-5">
+          {fieldNotifs.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">You&apos;re all caught up.</p>
+          ) : (
+            fieldNotifs.map((n) => (
+              <div
+                key={n.id}
+                className="border-b border-slate-100 py-3 last:border-b-0"
+                data-testid={`notification-${n.id}`}
+              >
+                <div className="flex items-start gap-2">
+                  {!n.isRead && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#711419]" />}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium leading-snug text-slate-800">{n.title}</p>
+                    {n.preview && <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{n.preview}</p>}
+                    {n.createdAt && (
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </DraggableSheet>
+
+      {/* Profile sheet */}
+      <DraggableSheet open={profileOpen} onOpenChange={setProfileOpen} title="Profile" testid="sheet-profile">
+        <div className="mb-4 flex items-center gap-3">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#711419] text-base font-bold text-white">
+            {initials || <User className="h-5 w-5" />}
+          </span>
+          <div>
+            <p className="text-base font-semibold text-slate-900">{user.name}</p>
+            <p className="text-xs text-slate-500">{roleConfig.label}</p>
+          </div>
+        </div>
+        <button
+          onClick={() => { setProfileOpen(false); navigate("/mobile/profile"); }}
+          className="flex w-full items-center gap-3 rounded-2xl bg-slate-100 px-4 py-3.5 text-left transition-all active:scale-[0.98] active:bg-slate-200"
+          data-testid="menu-profile"
+        >
+          <User className="h-5 w-5 text-[#711419]" />
+          <span className="text-sm font-medium text-slate-800">My Profile</span>
+          <ChevronRight className="ml-auto h-4 w-4 text-slate-400" />
+        </button>
+      </DraggableSheet>
     </div>
   );
 }
@@ -583,8 +578,6 @@ export default function MobileAgenda() {
   const todayEnd = getLocalEndOfDay(today).toISOString();
   const { isOnline } = useOnlineStatus();
   const [isFromCache, setIsFromCache] = useState(false);
-  // Users with view-all permission can toggle between viewing all techs or just their own work orders
-  const [viewAllTechs, setViewAllTechs] = useState<boolean | null>(null);
   // Collapsible per-tech sections in the grouped view (start collapsed; the
   // supervisor opens whichever technicians they want to see)
   const [expandedTechs, setExpandedTechs] = useState<Set<string>>(() => new Set());
@@ -606,15 +599,10 @@ export default function MobileAgenda() {
     gcTime: 24 * 60 * 60 * 1000,
   });
 
-  // Supervisor, tech, and sales can toggle between viewing all jobs or just their own
-  const canToggleView = currentUser?.role === 'supervisor' || currentUser?.role === 'tech' || currentUser?.role === 'sales';
-  // Owner/admin always see all jobs without needing a toggle
-  const isOwnerOrAdmin = currentUser?.role === 'owner' || currentUser?.role === 'admin';
-  // Set default: supervisors default to All Techs, tech/sales default to My Jobs
-  const effectiveViewAll = viewAllTechs ?? (currentUser?.role === 'supervisor');
-  // Determine if we should filter by tech ID
-  // Owner/admin never filter, toggle users filter based on their selection
-  const shouldFilterByTech = isOwnerOrAdmin ? false : (canToggleView ? !effectiveViewAll : true);
+  // Everyone sees their own jobs first. Supervisors and the owner also get
+  // the full roster below, so they fetch every tech's work orders.
+  const isSupervisorPlus = currentUser?.role === 'supervisor' || currentUser?.role === 'owner' || currentUser?.role === 'admin';
+  const shouldFilterByTech = !isSupervisorPlus;
 
   const { data: workOrders, isLoading: isLoadingOrders, error, isError } = useQuery<WorkOrderWithDetails[]>({
     queryKey: ["/api/crm/work-orders", { dateFrom: todayStart, dateTo: todayEnd, techId: shouldFilterByTech ? currentUser?.id : undefined }],
@@ -678,7 +666,7 @@ export default function MobileAgenda() {
         ['tech', 'sales', 'supervisor', 'owner', 'admin'].includes(u.role) && u.isActive
       );
     },
-    enabled: (canToggleView && effectiveViewAll) || isOwnerOrAdmin,
+    enabled: isSupervisorPlus,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -700,9 +688,10 @@ export default function MobileAgenda() {
   // Group work orders by technician when viewing all techs. Seed with every
   // dispatchable person (tech/sales/supervisor) so people with no jobs today
   // still show up in the roster.
-  const showGroupedView = isOwnerOrAdmin || (canToggleView && effectiveViewAll);
+  const showGroupedView = isSupervisorPlus;
+  const myId = currentUser?.id;
   const groupedByTech = showGroupedView
-    ? todaysOrders.reduce((acc, wo) => {
+    ? todaysOrders.filter((wo) => wo.assignedTechId !== myId).reduce((acc, wo) => {
         const techId = wo.assignedTechId || 'unassigned';
         if (!acc[techId]) {
           acc[techId] = [];
@@ -711,7 +700,7 @@ export default function MobileAgenda() {
         return acc;
       }, Object.fromEntries(
         technicians
-          .filter((t) => ["tech", "sales", "supervisor"].includes(t.role))
+          .filter((t) => ["tech", "sales", "supervisor"].includes(t.role) && t.id !== myId)
           .map((t) => [t.id, [] as WorkOrderWithDetails[]]),
       ) as Record<string, WorkOrderWithDetails[]>)
     : null;
@@ -747,56 +736,29 @@ export default function MobileAgenda() {
       })
     : [];
 
+  const myJobs = todaysOrders.filter((wo) => wo.assignedTechId === myId);
+
   const showCacheWarning = !isOnline || isFromCache;
 
   return (
     <MobileShell>
       <OfflineIndicator />
       
-      <div className="p-4 space-y-4 pb-24" data-testid="mobile-agenda">
+      <div className="p-4 space-y-6 pb-24" data-testid="mobile-agenda">
         {currentUser && <ProfileHeader user={currentUser} />}
         
-        <div className="text-center" data-testid="agenda-date-header">
-          {canToggleView && (
-            <div className="flex items-center justify-center gap-2" data-testid="view-toggle">
-              <button
-                onClick={() => setViewAllTechs(true)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-l-full transition-colors ${
-                  effectiveViewAll 
-                    ? "bg-[#711419] text-white" 
-                    : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-300"
-                }`}
-                data-testid="btn-view-all-techs"
-              >
-                <Users className="h-3 w-3 inline mr-1" />
-                All Techs
-              </button>
-              <button
-                onClick={() => setViewAllTechs(false)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-r-full transition-colors ${
-                  !effectiveViewAll 
-                    ? "bg-[#711419] text-white" 
-                    : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-300"
-                }`}
-                data-testid="btn-view-my-orders"
-              >
-                <User className="h-3 w-3 inline mr-1" />
-                My Jobs
-              </button>
-            </div>
-          )}
-          
-          {showCacheWarning && workOrders && workOrders.length > 0 && (
-            <div 
-              className="mt-3 inline-flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-3 py-1.5 rounded-full font-medium"
+        {(showCacheWarning && workOrders && workOrders.length > 0) && (
+          <div className="text-center" data-testid="agenda-date-header">
+            <div
+              className="inline-flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-3 py-1.5 rounded-full font-medium"
               data-testid="cache-warning"
             >
               <WifiOff className="h-3 w-3" />
               Showing cached data
             </div>
-          )}
-          <GlobalPendingChangesIndicator />
-        </div>
+          </div>
+        )}
+        <GlobalPendingChangesIndicator />
 
         {isAuthError ? (
           <div 
@@ -824,29 +786,73 @@ export default function MobileAgenda() {
           </div>
         ) : (
           <>
+            {/* My Jobs */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
-                  {showGroupedView ? "All Technicians" : "Today's Jobs"}
+                  My Jobs
                 </h3>
                 <span className="text-xs font-medium text-slate-400">
-                  {showGroupedView
-                    ? `${sortedTechIds.filter((id) => id !== "unassigned").length} techs`
-                    : `${todaysOrders.length} job${todaysOrders.length !== 1 ? "s" : ""}`}
+                  {myJobs.length} job{myJobs.length !== 1 ? "s" : ""}
                 </span>
               </div>
-              {!showGroupedView && todaysOrders.length === 0 ? (
+              {myJobs.length === 0 ? (
                 <div
                   className="flex flex-col items-center justify-center py-8 text-center bg-slate-50 dark:bg-slate-800/50 rounded-lg"
                   data-testid="agenda-empty"
                 >
                   <ClipboardList className="h-10 w-10 text-slate-300 mb-2" />
                   <h3 className="text-sm font-medium text-slate-600 mb-1">No Jobs Today</h3>
-                  <p className="text-slate-400 text-xs">
-                    You have no work orders scheduled for today.
-                  </p>
+                  <p className="text-slate-400 text-xs">You have no work orders scheduled for today.</p>
                 </div>
-              ) : showGroupedView && groupedByTech ? (
+              ) : (
+                <div className="space-y-3" data-testid="agenda-list">
+                  {myJobs.map((workOrder) => (
+                    <WorkOrderCard
+                      key={workOrder.id}
+                      workOrder={workOrder}
+                      showCacheWarning={showCacheWarning}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* My Performance */}
+            {performanceData && (
+              <div className="space-y-2 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                  My Performance (MTD)
+                </h3>
+                {isLoadingPerformance ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-32 w-full" />
+                    <div className="grid grid-cols-2 gap-3">
+                      <Skeleton className="h-20" />
+                      <Skeleton className="h-20" />
+                      <Skeleton className="h-20" />
+                      <Skeleton className="h-20" />
+                    </div>
+                  </div>
+                ) : performanceData.role === "tech" ? (
+                  <TechPerformanceSection performance={performanceData as TechPerformance} />
+                ) : performanceData.role === "sales" || performanceData.role === "owner" || performanceData.role === "admin" ? (
+                  <SalesPerformanceSection performance={performanceData as SalesPerformance} />
+                ) : null}
+              </div>
+            )}
+
+            {/* All Technicians — collapsible roster (you're not in it; your jobs are above) */}
+            {showGroupedView && groupedByTech && (
+              <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                    All Technicians
+                  </h3>
+                  <span className="text-xs font-medium text-slate-400">
+                    {sortedTechIds.filter((id) => id !== "unassigned").length} techs
+                  </span>
+                </div>
                 <div className="space-y-2.5" data-testid="agenda-grouped-list">
                   {sortedTechIds.map((techId) => {
                     const techOrders = groupedByTech[techId];
@@ -906,39 +912,6 @@ export default function MobileAgenda() {
                     );
                   })}
                 </div>
-              ) : (
-                <div className="space-y-3" data-testid="agenda-list">
-                  {todaysOrders.map((workOrder) => (
-                    <WorkOrderCard 
-                      key={workOrder.id} 
-                      workOrder={workOrder} 
-                      showCacheWarning={showCacheWarning} 
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {performanceData && (
-              <div className="space-y-2 pt-4 border-t border-slate-200 dark:border-slate-700">
-                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
-                  My Performance (MTD)
-                </h3>
-                {isLoadingPerformance ? (
-                  <div className="space-y-3">
-                    <Skeleton className="h-32 w-full" />
-                    <div className="grid grid-cols-2 gap-3">
-                      <Skeleton className="h-20" />
-                      <Skeleton className="h-20" />
-                      <Skeleton className="h-20" />
-                      <Skeleton className="h-20" />
-                    </div>
-                  </div>
-                ) : performanceData.role === "tech" ? (
-                  <TechPerformanceSection performance={performanceData as TechPerformance} />
-                ) : performanceData.role === "sales" || performanceData.role === "owner" || performanceData.role === "admin" ? (
-                  <SalesPerformanceSection performance={performanceData as SalesPerformance} />
-                ) : null}
               </div>
             )}
           </>

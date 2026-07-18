@@ -8,10 +8,17 @@ import {
 import type { ReactNode } from "react";
 import type { CrmUser } from "@shared/schema";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 
 interface MobileShellProps {
   children: ReactNode;
+  /** Replace the main nav bubbles with page-specific ones (e.g. a job's
+   * Overview/Work/Quote/Invoice). Hides the "+" button while active. */
+  customNav?: {
+    tabs: { id: string; label: string; icon: typeof Wrench }[];
+    activeId: string;
+    onSelect: (id: string) => void;
+  };
 }
 
 // Customers/Messages (and quick actions) live in the "+" sheet;
@@ -29,51 +36,10 @@ const SUPERVISOR_ROLES = ["supervisor", "owner"];
 // Admin role is desktop-only
 const MOBILE_ALLOWED_ROLES = ["owner", "supervisor", "sales", "tech"];
 
-export default function MobileShell({ children }: MobileShellProps) {
+export default function MobileShell({ children, customNav }: MobileShellProps) {
   const [location, navigate] = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
   const go = (path: string) => { setMoreOpen(false); navigate(path); };
-
-  // Drag-to-dismiss for the "+" sheet: grab the handle area, pull down to
-  // close (or let go to spring back). Slight rubber-band when pulling up.
-  const sheetRef = useRef<HTMLDivElement | null>(null);
-  const dragStartY = useRef<number | null>(null);
-  const onHandlePointerDown = (e: React.PointerEvent) => {
-    dragStartY.current = e.clientY;
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-    const el = sheetRef.current;
-    if (el) el.style.transition = "none";
-  };
-  const onHandlePointerMove = (e: React.PointerEvent) => {
-    if (dragStartY.current == null) return;
-    const dy = e.clientY - dragStartY.current;
-    const el = sheetRef.current;
-    if (!el) return;
-    const offset = dy >= 0 ? dy : dy / 4; // resist upward pulls
-    el.style.transform = `translateY(${offset}px)`;
-  };
-  const onHandlePointerUp = (e: React.PointerEvent) => {
-    if (dragStartY.current == null) return;
-    const dy = e.clientY - dragStartY.current;
-    dragStartY.current = null;
-    const el = sheetRef.current;
-    if (!el) return;
-    if (dy > 90) {
-      // Far enough — let it slide away and close.
-      el.style.transition = "transform 0.2s ease-in";
-      el.style.transform = "translateY(100%)";
-      setTimeout(() => {
-        setMoreOpen(false);
-        el.style.transition = "";
-        el.style.transform = "";
-      }, 180);
-    } else {
-      // Spring back up.
-      el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
-      el.style.transform = "translateY(0)";
-      setTimeout(() => { if (el) el.style.transition = ""; }, 260);
-    }
-  };
 
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -148,7 +114,25 @@ export default function MobileShell({ children }: MobileShellProps) {
       >
         <nav className="rounded-full border border-slate-900/10 bg-white/90 p-1.5 shadow-[0_8px_28px_rgba(0,0,0,0.16)] backdrop-blur-xl">
           <div className="flex items-center gap-0.5">
-            {navTabs.map((tab) => {
+            {customNav ? customNav.tabs.map((tab) => {
+              const active = customNav.activeId === tab.id;
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => customNav.onSelect(tab.id)}
+                  data-testid={`nav-tab-${tab.id}`}
+                  className={`flex min-w-[58px] flex-col items-center justify-center gap-0.5 rounded-full px-3 py-1.5 transition-all duration-200 active:scale-95 ${
+                    active ? "bg-[#711419] text-white shadow-md" : "text-slate-500"
+                  }`}
+                >
+                  <Icon className={`h-5 w-5 ${active ? "stroke-[2.25]" : "text-slate-400"}`} />
+                  <span className={`text-[10px] leading-none ${active ? "font-semibold" : "font-medium"}`}>
+                    {tab.label}
+                  </span>
+                </button>
+              );
+            }) : navTabs.map((tab) => {
               const active = isActive(tab.path);
               const Icon = tab.icon;
               return (
@@ -169,39 +153,18 @@ export default function MobileShell({ children }: MobileShellProps) {
             })}
           </div>
         </nav>
-        <button
+        {!customNav && <button
           onClick={() => setMoreOpen(true)}
           className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-[0_8px_28px_rgba(113,20,25,0.45)] transition-transform active:scale-95"
           data-testid="nav-tab-more"
           aria-label="More"
         >
           <Plus className="h-6 w-6 stroke-[2.5]" />
-        </button>
+        </button>}
       </div>
 
       {/* "+" sheet — extra destinations and supervisor quick actions */}
-      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-        <SheetContent
-          ref={sheetRef}
-          side="bottom"
-          className="rounded-t-3xl border-t-0 px-5 pb-8 pt-0 [&>button]:hidden"
-          style={{ paddingBottom: "calc(24px + env(safe-area-inset-bottom))" }}
-          data-testid="sheet-more"
-        >
-          {/* Drag handle — pull down to dismiss, spring back otherwise */}
-          <div
-            className="-mx-5 cursor-grab touch-none px-5 pb-3 pt-3 active:cursor-grabbing"
-            onPointerDown={onHandlePointerDown}
-            onPointerMove={onHandlePointerMove}
-            onPointerUp={onHandlePointerUp}
-            data-testid="sheet-drag-handle"
-          >
-            <div className="mx-auto h-1.5 w-12 rounded-full bg-slate-300" />
-          </div>
-          <SheetHeader className="sr-only">
-            <SheetTitle>More</SheetTitle>
-          </SheetHeader>
-
+      <DraggableSheet open={moreOpen} onOpenChange={setMoreOpen} title="More" testid="sheet-more">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Go to</p>
           <div className="grid grid-cols-4 gap-3">
             <SheetTile icon={Users} label="Customers" onClick={() => go("/mobile/customers")} testid="more-customers" />
@@ -214,12 +177,11 @@ export default function MobileShell({ children }: MobileShellProps) {
               <div className="grid grid-cols-4 gap-3">
                 <SheetTile icon={FileText} label="New Quote" onClick={() => go("/crm/quotes/new")} testid="more-new-quote" />
                 <SheetTile icon={Receipt} label="New Invoice" onClick={() => go("/crm/invoices/new")} testid="more-new-invoice" />
-                <SheetTile icon={Camera} label="Add Photo" onClick={() => go("/mobile/job")} testid="more-add-photo" />
+                <SheetTile icon={Camera} label="Add Photo" onClick={() => go("/mobile/photos")} testid="more-add-photo" />
               </div>
             </>
           )}
-        </SheetContent>
-      </Sheet>
+      </DraggableSheet>
     </div>
   );
 }
