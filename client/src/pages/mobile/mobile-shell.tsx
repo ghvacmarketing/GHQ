@@ -103,21 +103,22 @@ export default function MobileShell({ children }: MobileShellProps) {
         </div>
       </header>
 
-      {/* Content scrolls underneath the frosted nav bar */}
+      {/* Content scrolls underneath the floating nav pill */}
       <main
         className="flex-1 overflow-auto"
-        style={{ paddingBottom: "calc(64px + env(safe-area-inset-bottom))" }}
+        style={{ paddingBottom: "calc(88px + env(safe-area-inset-bottom))" }}
         data-testid="mobile-main"
       >
         {children}
       </main>
 
+      {/* Floating pill nav — detached from the screen edges */}
       <nav
-        className="absolute inset-x-0 bottom-0 border-t border-slate-900/10 bg-white/80 shadow-[0_-1px_12px_rgba(0,0,0,0.06)] backdrop-blur-xl"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        className="absolute left-1/2 z-40 -translate-x-1/2 rounded-full border border-slate-900/10 bg-white/90 px-1.5 py-1.5 shadow-[0_8px_28px_rgba(0,0,0,0.16)] backdrop-blur-xl"
+        style={{ bottom: "calc(12px + env(safe-area-inset-bottom))", maxWidth: "calc(100vw - 16px)" }}
         data-testid="mobile-nav"
       >
-        <div className="flex items-center justify-around">
+        <div className="flex items-center gap-0.5">
           {navTabs.map((tab) => {
             const active = isActive(tab.path);
             const Icon = tab.icon;
@@ -126,18 +127,12 @@ export default function MobileShell({ children }: MobileShellProps) {
                 key={tab.path}
                 href={tab.path}
                 data-testid={`nav-tab-${tab.label.toLowerCase()}`}
-                className={`flex min-h-[56px] min-w-[56px] flex-col items-center justify-center gap-0.5 px-2 py-1.5 transition-transform active:scale-95 ${
-                  active ? "text-[#711419]" : "text-slate-500"
+                className={`flex min-w-[50px] flex-col items-center justify-center gap-0.5 rounded-full px-2 py-1.5 transition-all duration-200 active:scale-95 ${
+                  active ? "bg-[#711419] text-white shadow-md" : "text-slate-500"
                 }`}
               >
-                <span
-                  className={`flex items-center justify-center rounded-full px-4 py-0.5 transition-colors duration-200 ${
-                    active ? "bg-[#711419]/10" : ""
-                  }`}
-                >
-                  <Icon className={`h-[22px] w-[22px] ${active ? "text-[#711419] stroke-[2.25]" : "text-slate-400"}`} />
-                </span>
-                <span className={`text-[11px] ${active ? "font-semibold text-[#711419]" : "font-medium text-slate-500"}`}>
+                <Icon className={`h-5 w-5 ${active ? "stroke-[2.25]" : "text-slate-400"}`} />
+                <span className={`text-[10px] leading-none ${active ? "font-semibold" : "font-medium"}`}>
                   {tab.label}
                 </span>
               </Link>
