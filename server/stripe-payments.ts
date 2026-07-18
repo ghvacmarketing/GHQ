@@ -170,6 +170,10 @@ router.post("/api/stripe/invoice/:invoiceId/payment-link", async (req, res) => {
     if (invoice.status === "void") {
       return res.status(400).json({ error: "This invoice has been voided" });
     }
+    // Drafts aren't customer-facing yet - don't let one be paid
+    if (invoice.status === "draft") {
+      return res.status(400).json({ error: "This invoice isn't finalized yet" });
+    }
 
     // Use balance due if available, otherwise use total
     const amountDue = parseFloat(invoice.balanceDue?.toString() || invoice.total?.toString() || "0");

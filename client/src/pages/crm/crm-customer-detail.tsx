@@ -1839,11 +1839,259 @@ function PortalAccountCard({ customerId }: { customerId: string }) {
         {!account && (
           <p className="text-sm text-slate-400 mt-2">
             The customer hasn't signed up yet. They can create an account at the portal login page with their phone
-            number, or you can send them an invite link with the Portal toggle above.
+            number, or you can send them an invite link from the access controls below.
           </p>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+interface PortalItemsData {
+  invoices: Array<{
+    id: string;
+    invoiceNumber: string;
+    total: string | null;
+    balanceDue: string | null;
+    status: string;
+    portalVisible: boolean;
+    createdAt: string | null;
+  }>;
+  quotes: Array<{
+    id: string;
+    quoteNumber: string;
+    title: string | null;
+    total: string | null;
+    status: string;
+    portalVisible: boolean;
+    portalCanView: boolean;
+    createdAt: string | null;
+  }>;
+}
+
+function PortalTabContent({ customerId, portalEnabled }: { customerId: string; portalEnabled: boolean }) {
+  const { toast } = useToast();
+
+  const { data: items, isLoading: itemsLoading } = useQuery<PortalItemsData>({
+    queryKey: [`/api/crm/customers/${customerId}/portal-items`],
+  });
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${customerId}/portal-items`] });
+    queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${customerId}/portal-account`] });
+    queryClient.invalidateQueries({ queryKey: [`/api/crm/customers/${customerId}`] });
+  };
+
+  const toggleAccess = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await fetch(`/api/crm/customers/${customerId}/portal-access`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Failed to update portal access");
+      return data;
+    },
+    onSuccess: (_, enabled) => {
+      toast({
+        title: enabled ? "Portal enabled" : "Portal disabled",
+        description: enabled
+          ? "The customer can log in and see their portal."
+          : "The customer can no longer log into the portal.",
+      });
+      invalidate();
+    },
+    onError: (e: Error) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
+  });
+
+  const generateLink = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/admin/portal/generate-link/${customerId}`);
+      return res.json();
+    },
+    onSuccess: async (data) => {
+      const url = `${window.location.origin}${data.loginUrl}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast({ title: "Invite link copied", description: "Send it to the customer — it logs them in and asks them to set a password." });
+      } catch {
+        toast({ title: "Invite link created", description: url });
+      }
+    },
+    onError: (e: Error) => toast({ title: "Failed to create link", description: e.message, variant: "destructive" }),
+  });
+
+  const setInvoiceVisibility = useMutation({
+    mutationFn: async ({ id, portalVisible }: { id: string; portalVisible: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/crm/invoices/${id}/portal-visibility`, { portalVisible });
+      return res.json();
+    },
+    onSuccess: invalidate,
+    onError: (e: Error) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
+  });
+
+  const setQuoteVisibility = useMutation({
+    mutationFn: async ({ id, ...flags }: { id: string; portalVisible?: boolean; portalCanView?: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/crm/quotes/${id}/portal-visibility`, flags);
+      return res.json();
+    },
+    onSuccess: invalidate,
+    onError: (e: Error) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
+  });
+
+  const statusBadge = (status: string) => (
+    <Badge variant="outline" className="text-xs capitalize">{status.replace(/_/g, " ")}</Badge>
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Access controls */}
+      <Card data-testid="card-portal-access">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Key className="h-5 w-5 text-[#711419]" />
+            Portal Access
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between rounded-lg border border-slate-200 p-4">
+            <div>
+              <p className="font-medium text-slate-900">Portal enabled</p>
+              <p className="text-sm text-slate-500">
+                Master switch — when off, the customer can't log in at all.
+              </p>
+            </div>
+            <Switch
+              checked={portalEnabled}
+              onCheckedChange={(checked) => toggleAccess.mutate(checked)}
+              disabled={toggleAccess.isPending}
+              data-testid="switch-portal-enabled"
+            />
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-slate-200 p-4">
+            <div>
+              <p className="font-medium text-slate-900">Invite link</p>
+              <p className="text-sm text-slate-500">
+                One-time login link — the customer sets a password on first use.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => generateLink.mutate()}
+              disabled={generateLink.isPending || !portalEnabled}
+              data-testid="button-copy-invite-link"
+            >
+              {generateLink.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+                <><Link2 className="h-4 w-4 mr-1.5" /> Copy Invite Link</>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Account breakdown */}
+      <PortalAccountCard customerId={customerId} />
+
+      {/* Per-item visibility */}
+      <Card data-testid="card-portal-invoices-visibility">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Receipt className="h-5 w-5 text-[#711419]" />
+            Invoices in Portal
+          </CardTitle>
+          <p className="text-sm text-slate-500">
+            Hidden invoices don't appear in the customer's portal at all. Drafts are never shown regardless.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {itemsLoading ? (
+            <Skeleton className="h-24" />
+          ) : (items?.invoices?.length || 0) === 0 ? (
+            <p className="text-sm text-slate-400 py-2">No invoices for this customer.</p>
+          ) : (
+            <div className="space-y-2">
+              {items!.invoices.map((inv) => (
+                <div key={inv.id} className="flex items-center justify-between rounded-lg border border-slate-200 p-3" data-testid={`portal-invoice-${inv.id}`}>
+                  <div className="min-w-0 flex items-center gap-3">
+                    <span className="font-medium text-slate-900">#{inv.invoiceNumber}</span>
+                    {statusBadge(inv.status)}
+                    <span className="text-sm text-slate-500">${inv.total || "0.00"}</span>
+                    {inv.status === "draft" && (
+                      <span className="text-xs text-amber-600">draft — never shown</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs text-slate-400">{inv.portalVisible ? "Visible" : "Hidden"}</span>
+                    <Switch
+                      checked={inv.portalVisible}
+                      onCheckedChange={(checked) => setInvoiceVisibility.mutate({ id: inv.id, portalVisible: checked })}
+                      disabled={setInvoiceVisibility.isPending}
+                      data-testid={`switch-invoice-visible-${inv.id}`}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card data-testid="card-portal-quotes-visibility">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <FileText className="h-5 w-5 text-[#711419]" />
+            Quotes in Portal
+          </CardTitle>
+          <p className="text-sm text-slate-500">
+            "Listed" shows the quote in the portal; "Can open & sign" additionally lets the customer view the full
+            quote, sign it, and pay a deposit. Drafts are never shown regardless.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {itemsLoading ? (
+            <Skeleton className="h-24" />
+          ) : (items?.quotes?.length || 0) === 0 ? (
+            <p className="text-sm text-slate-400 py-2">No quotes for this customer.</p>
+          ) : (
+            <div className="space-y-2">
+              {items!.quotes.map((q) => (
+                <div key={q.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 p-3" data-testid={`portal-quote-${q.id}`}>
+                  <div className="min-w-0 flex items-center gap-3">
+                    <span className="font-medium text-slate-900">#{q.quoteNumber}</span>
+                    {statusBadge(q.status)}
+                    <span className="text-sm text-slate-500 truncate max-w-[180px]">{q.title || ""}</span>
+                    <span className="text-sm text-slate-500">${q.total || "0.00"}</span>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                      Listed
+                      <Switch
+                        checked={q.portalVisible}
+                        onCheckedChange={(checked) => setQuoteVisibility.mutate({ id: q.id, portalVisible: checked })}
+                        disabled={setQuoteVisibility.isPending}
+                        data-testid={`switch-quote-visible-${q.id}`}
+                      />
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                      Can open &amp; sign
+                      <Switch
+                        checked={q.portalCanView}
+                        onCheckedChange={(checked) => setQuoteVisibility.mutate({ id: q.id, portalCanView: checked })}
+                        disabled={setQuoteVisibility.isPending}
+                        data-testid={`switch-quote-canview-${q.id}`}
+                      />
+                    </label>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -2101,13 +2349,21 @@ function CustomerTabbedView({
           <History className="h-4 w-4 mr-2" />
           Timeline
         </TabsTrigger>
-        <TabsTrigger 
-          value="settings" 
+        <TabsTrigger
+          value="settings"
           className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
           data-testid="tab-settings"
         >
           <ClipboardList className="h-4 w-4 mr-2" />
           Settings
+        </TabsTrigger>
+        <TabsTrigger
+          value="portal"
+          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          data-testid="tab-portal"
+        >
+          <Key className="h-4 w-4 mr-2" />
+          Portal
         </TabsTrigger>
         {/* Sub-Account tab — only shown when this customer IS a sub-account */}
         {customer?.parentCustomerId && (
@@ -2254,9 +2510,6 @@ function CustomerTabbedView({
             </div>
           </CardContent>
         </Card>
-
-        {/* Customer Portal breakdown */}
-        <PortalAccountCard customerId={customer.id} />
 
         {/* Setup Checklist Card - Only for Property Managers */}
         {isPropertyManager && (
@@ -3082,6 +3335,11 @@ function CustomerTabbedView({
             </div>
           </CardContent>
         </Card>
+      </TabsContent>
+
+      {/* Customer Portal Tab */}
+      <TabsContent value="portal" className="space-y-6" data-testid="tab-content-portal">
+        <PortalTabContent customerId={customer.id} portalEnabled={!!customer.portalEnabled} />
       </TabsContent>
 
       {/* Sub-Account Tab — visible only when this customer is a sub-account */}
@@ -4726,57 +4984,6 @@ export default function CrmCustomerDetail() {
     setDeleteReason("");
   };
 
-  const generatePortalLinkMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/admin/portal/generate-link/${customerId}`);
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to generate portal link");
-      }
-      return res.json();
-    },
-    onSuccess: async (data: { loginUrl: string }) => {
-      const fullUrl = window.location.origin + data.loginUrl;
-      await navigator.clipboard.writeText(fullUrl);
-      toast({ title: "Portal link copied to clipboard", description: "Share this link with the customer to give them portal access." });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to generate portal link",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const togglePortalMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      const res = await fetch(`/api/crm/customers/${customerId}/portal-access`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ enabled }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to update portal access");
-      }
-      return res.json();
-    },
-    onSuccess: (_, enabled) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId] });
-      toast({
-        title: enabled ? "Portal Enabled" : "Portal Disabled",
-        description: enabled 
-          ? "Customer can now access the customer portal." 
-          : "Customer portal access has been disabled.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
   const openEditDialog = () => {
     if (customer) {
       setEditName(customer.name || "");
@@ -5112,32 +5319,7 @@ export default function CrmCustomerDetail() {
                 Edit
               </Button>
             )}
-            {currentUser && ["admin", "owner", "sales"].includes(currentUser.role) && (customer as any).source !== 'fieldedge' && (
-              <div className="flex items-center gap-2 px-2">
-                <span className="text-xs text-slate-400">Portal</span>
-                <Switch
-                  checked={customer.portalEnabled}
-                  onCheckedChange={(checked) => togglePortalMutation.mutate(checked)}
-                  disabled={togglePortalMutation.isPending}
-                  data-testid="switch-portal-access"
-                />
-                {customer.portalEnabled && (
-                  <button
-                    onClick={() => generatePortalLinkMutation.mutate()}
-                    disabled={generatePortalLinkMutation.isPending}
-                    className="text-slate-400 hover:text-slate-600 transition-colors"
-                    data-testid="button-generate-portal-link"
-                    title="Copy portal link"
-                  >
-                    {generatePortalLinkMutation.isPending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Link2 className="h-3.5 w-3.5" />
-                    )}
-                  </button>
-                )}
-              </div>
-            )}
+            {/* Portal controls now live in the customer's Portal tab */}
             {canDeleteCustomer && (customer as any).source !== 'fieldedge' && (
               <Button
                 variant="ghost"

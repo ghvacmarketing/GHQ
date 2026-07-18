@@ -208,6 +208,7 @@ export default function CrmQuoteDetail() {
   const [sendEmailMessage, setSendEmailMessage] = useState("");
   const [sendViaEmail, setSendViaEmail] = useState(true);
   const [sendViaSms, setSendViaSms] = useState(false);
+  const [sendPortalView, setSendPortalView] = useState(true);
   const [sendPhoneRecipient, setSendPhoneRecipient] = useState("");
   const [expandedEmailIds, setExpandedEmailIds] = useState<Set<string>>(new Set());
   const [showMarkAsSentDialog, setShowMarkAsSentDialog] = useState(false);
@@ -396,7 +397,7 @@ export default function CrmQuoteDetail() {
   });
 
   const sendEmailMutation = useMutation({
-    mutationFn: async (data: { recipientEmail?: string; recipientPhone?: string; personalMessage?: string; sendEmail: boolean; sendSms: boolean }) => {
+    mutationFn: async (data: { recipientEmail?: string; recipientPhone?: string; personalMessage?: string; sendEmail: boolean; sendSms: boolean; portalCanView?: boolean }) => {
       const res = await fetch(`/api/crm/quotes/${quoteId}/send-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1521,6 +1522,7 @@ export default function CrmQuoteDetail() {
       personalMessage: sendEmailMessage.trim() || undefined,
       sendEmail: sendViaEmail,
       sendSms: sendViaSms,
+      portalCanView: sendPortalView,
     });
   };
 
@@ -4225,6 +4227,17 @@ export default function CrmQuoteDetail() {
                 />
               </div>
             )}
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="send-portal-view"
+                checked={sendPortalView}
+                onCheckedChange={(c) => setSendPortalView(!!c)}
+                data-testid="checkbox-portal-view"
+              />
+              <Label htmlFor="send-portal-view" className="cursor-pointer">
+                Customer can open &amp; sign this quote in their portal
+              </Label>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="personal-message">Personal Message (optional)</Label>
               <Textarea

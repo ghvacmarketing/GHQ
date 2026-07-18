@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import RichTextEditor from "@/components/rich-text-editor";
 import {
   Dialog,
@@ -151,6 +152,7 @@ export default function CrmQuoteCreate() {
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomer | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [portalCanView, setPortalCanView] = useState(false);
   const [hasSelectedQuoteType, setHasSelectedQuoteType] = useState(false);
 
   // CRM Items catalog state
@@ -646,6 +648,7 @@ export default function CrmQuoteCreate() {
         projectId: projectIdFromUrl || undefined,
         assignedToId: formData.assignedToId || undefined,
         sourceType: sourceTypeFromUrl || undefined,
+        portalCanView,
         lineItems: validLineItems.map(item => ({
           description: item.description,
           quantity: item.quantity,
@@ -1236,11 +1239,25 @@ export default function CrmQuoteCreate() {
                       <div>
                         <span className="text-slate-500">Assigned To:</span>{" "}
                         <span className="font-medium" data-testid="review-assigned-to">
-                          {formData.assignedToId 
+                          {formData.assignedToId
                             ? assignableUsers?.find(u => u.id === formData.assignedToId)?.displayName || "—"
                             : "Not assigned"}
                         </span>
                       </div>
+                    </div>
+                    <div className="mt-3 flex items-center gap-2 border-t border-slate-200 pt-3">
+                      <Checkbox
+                        id="quote-portal-view"
+                        checked={portalCanView}
+                        onCheckedChange={(c) => setPortalCanView(!!c)}
+                        data-testid="checkbox-quote-portal-view"
+                      />
+                      <Label htmlFor="quote-portal-view" className="cursor-pointer text-sm">
+                        Customer can open &amp; sign this quote in their portal right away
+                        <span className="block text-xs text-slate-500 font-normal">
+                          Off by default — sending the quote later will offer this option again.
+                        </span>
+                      </Label>
                     </div>
                   </div>
                   <div className="p-4 bg-slate-50 rounded-lg">

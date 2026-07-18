@@ -1,4 +1,4 @@
-// One-off: apply migrations/0003_customer_portal_auth.sql to the DATABASE_URL DB.
+// One-off: apply migrations/0004_portal_item_visibility.sql to the DATABASE_URL DB.
 // Run with: npx tsx --env-file=.env server/scripts/apply-portal-auth-migration.ts
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
@@ -15,7 +15,7 @@ async function main() {
   if (!url) throw new Error("DATABASE_URL not set");
   const pool = new Pool({ connectionString: url });
 
-  const file = join(__dirname, "..", "..", "migrations", "0003_customer_portal_auth.sql");
+  const file = join(__dirname, "..", "..", "migrations", process.argv[2] || "0004_portal_item_visibility.sql");
   const contents = readFileSync(file, "utf8")
     .split(/\r?\n/)
     .filter((line) => !line.trim().startsWith("--"))

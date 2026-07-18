@@ -66,7 +66,7 @@ import { sendCrmInvoiceEmail } from "./services/crmInvoiceEmail";
 import { sendQuoteSms, sendInvoiceSms } from "./services/documentSmsService";
 import { twilioService } from "./sms";
 import { pool, db } from "./db";
-import { eq, inArray, desc, sql, and, or, ilike, asc, count, isNull, lt, gt, gte, lte, ne, isNotNull } from "drizzle-orm";
+import { eq, inArray, notInArray, desc, sql, and, or, ilike, asc, count, isNull, lt, gt, gte, lte, ne, isNotNull } from "drizzle-orm";
 import { randomUUID, createHmac, randomBytes, timingSafeEqual } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
@@ -18676,7 +18676,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const { customerId, title, description, notes, lineItems, workOrderId, propertyId, projectId, assignedToId, sourceType } = req.body;
+      const { customerId, title, description, notes, lineItems, workOrderId, propertyId, projectId, assignedToId, sourceType, portalCanView } = req.body;
 
       if (!customerId) {
         return res.status(400).json({ message: "Customer is required" });
@@ -18725,6 +18725,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         quoteType: "quick",
         assignedToId: assignedToId || null,
         sourceType: sourceType || null,
+        portalCanView: portalCanView === true,
       }).returning();
 
       // Create line items
@@ -19119,7 +19120,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .set({
           status: 'sent',
           sentAt: new Date(),
-          updatedAt: new Date()
+          updatedAt: new Date(),
+          // Optionally open (or close) portal viewing as part of sending
+          ...(typeof req.body?.portalCanView === "boolean" ? { portalCanView: req.body.portalCanView } : {}),
         })
         .where(eq(crmQuotes.id, req.params.id))
         .returning();
@@ -19639,6 +19642,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let [quote] = await db.select().from(crmQuotes).where(eq(crmQuotes.id, req.params.id)).limit(1);
       if (!quote) {
         return res.status(404).json({ message: "Quote not found" });
+      }
+
+      // Optionally open (or close) portal viewing as part of sending
+      if (typeof req.body.portalCanView === "boolean" && req.body.portalCanView !== quote.portalCanView) {
+        await db.update(crmQuotes)
+          .set({ portalCanView: req.body.portalCanView })
+          .where(eq(crmQuotes.id, quote.id));
+        quote.portalCanView = req.body.portalCanView;
       }
 
       // Validate email if sendEmail is true
@@ -24865,7 +24876,11 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         createdAt: crmInvoices.createdAt,
       })
         .from(crmInvoices)
-        .where(eq(crmInvoices.customerId, customerId))
+        .where(and(
+          eq(crmInvoices.customerId, customerId),
+          eq(crmInvoices.portalVisible, true),
+          notInArray(crmInvoices.status, ["draft", "void"]),
+        ))
         .orderBy(desc(crmInvoices.createdAt));
 
       // Calculate open invoices (not paid, not void)
@@ -24909,9 +24924,13 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         total: crmQuotes.total,
       })
         .from(crmQuotes)
-        .where(eq(crmQuotes.customerId, customerId));
+        .where(and(
+          eq(crmQuotes.customerId, customerId),
+          eq(crmQuotes.portalVisible, true),
+          ne(crmQuotes.status, "draft"),
+        ));
 
-      const pendingQuotes = allQuotes.filter(q => q.status === "sent" || q.status === "draft");
+      const pendingQuotes = allQuotes.filter(q => q.status === "sent");
       const pendingQuotesTotal = pendingQuotes.reduce((sum, q) => sum + parseFloat(q.total || "0"), 0);
 
       res.json({
@@ -24962,7 +24981,11 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         createdAt: crmInvoices.createdAt,
       })
         .from(crmInvoices)
-        .where(eq(crmInvoices.customerId, customerId))
+        .where(and(
+          eq(crmInvoices.customerId, customerId),
+          eq(crmInvoices.portalVisible, true),
+          notInArray(crmInvoices.status, ["draft", "void"]),
+        ))
         .orderBy(desc(crmInvoices.createdAt));
 
       res.json({ invoices });
@@ -24982,6 +25005,11 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         .where(eq(crmInvoices.id, id));
 
       if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      // Drafts and portal-hidden invoices are not customer-facing
+      if (invoice.status === "draft" || !invoice.portalVisible) {
         return res.status(404).json({ message: "Invoice not found" });
       }
 
@@ -25077,15 +25105,20 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         validUntil: crmQuotes.validUntil,
         title: crmQuotes.title,
         viewToken: crmQuotes.viewToken,
+        portalCanView: crmQuotes.portalCanView,
       })
         .from(crmQuotes)
-        .where(eq(crmQuotes.customerId, customerId))
+        .where(and(
+          eq(crmQuotes.customerId, customerId),
+          eq(crmQuotes.portalVisible, true),
+          ne(crmQuotes.status, "draft"),
+        ))
         .orderBy(desc(crmQuotes.createdAt));
 
-      // Quotes that were never "sent" (e.g. accepted in person) may have no view
-      // token yet — mint one so the customer can open them from the portal.
+      // Quotes opened from the portal need a view token; mint one for viewable
+      // quotes that were never "sent" (e.g. accepted in person).
       for (const quote of quotesResult) {
-        if (!quote.viewToken && quote.status !== "draft") {
+        if (quote.portalCanView && !quote.viewToken) {
           const token = randomUUID();
           await db.update(crmQuotes)
             .set({ viewToken: token })

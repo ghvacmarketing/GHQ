@@ -19,6 +19,7 @@ interface PortalQuote {
   validUntil: string | null;
   title: string | null;
   viewToken?: string | null;
+  portalCanView?: boolean;
 }
 
 interface QuotesResponse {
@@ -150,7 +151,7 @@ export default function PortalQuotes() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-center">
-                            {quote.viewToken && quote.status !== "draft" && (
+                            {quote.portalCanView && quote.viewToken ? (
                               <Link href={`/quote/${quote.viewToken}`}>
                                 <Button
                                   variant="ghost"
@@ -162,6 +163,10 @@ export default function PortalQuotes() {
                                   {quote.status === "sent" ? "View & Accept" : "View"}
                                 </Button>
                               </Link>
+                            ) : (
+                              <span className="text-xs text-slate-400" data-testid={`text-quote-contact-${quote.id}`}>
+                                Contact us to review
+                              </span>
                             )}
                           </TableCell>
                         </TableRow>

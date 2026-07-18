@@ -1521,6 +1521,10 @@ export const crmQuotes = pgTable("crm_quotes", {
   quoteType: text("quote_type").$type<CrmQuoteType>(),
   // Customer viewing and e-signature fields
   viewToken: text("view_token"),
+  // Portal exposure: listed in the customer portal at all, and whether the
+  // customer may open the full quote (and sign it) from the portal
+  portalVisible: boolean("portal_visible").notNull().default(true),
+  portalCanView: boolean("portal_can_view").notNull().default(false),
   signatureImage: text("signature_image"),
   signerName: text("signer_name"),
   signerIp: text("signer_ip"),
@@ -1631,6 +1635,8 @@ export const crmInvoices = pgTable("crm_invoices", {
   // Deposit invoice tracking
   isDepositInvoice: boolean("is_deposit_invoice").default(false),
   quoteId: varchar("quote_id"),
+  // Whether this invoice appears in the customer portal
+  portalVisible: boolean("portal_visible").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   viewedAt: timestamp("viewed_at"),

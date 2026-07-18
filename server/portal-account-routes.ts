@@ -8,6 +8,8 @@ import {
   crmNotifications,
   crmWorkOrders,
   crmAgreements,
+  crmInvoices,
+  crmQuotes,
   maintenanceVisits,
   customerPortalAccounts,
   customerPortalSessions,
@@ -21,6 +23,7 @@ import {
   comparePasswords,
   requireCrmAuth,
   requireCrmAdmin,
+  requireCrmSalesOrAbove,
   logCrmAudit,
 } from "./crm-auth-middleware";
 import { storage } from "./storage";
@@ -1084,6 +1087,102 @@ export function registerPortalAccountRoutes(app: Express) {
     } catch (error) {
       console.error("Portal account breakdown error:", error);
       res.status(500).json({ message: "Failed to load portal account" });
+    }
+  });
+
+  // GET /api/crm/customers/:id/portal-items - invoices/quotes with visibility flags
+  app.get("/api/crm/customers/:id/portal-items", requireCrmAuth, async (req, res) => {
+    try {
+      const customerId = req.params.id;
+      const invoices = await db.select({
+        id: crmInvoices.id,
+        invoiceNumber: crmInvoices.invoiceNumber,
+        total: crmInvoices.total,
+        balanceDue: crmInvoices.balanceDue,
+        status: crmInvoices.status,
+        portalVisible: crmInvoices.portalVisible,
+        createdAt: crmInvoices.createdAt,
+      })
+        .from(crmInvoices)
+        .where(eq(crmInvoices.customerId, customerId))
+        .orderBy(desc(crmInvoices.createdAt));
+
+      const quotes = await db.select({
+        id: crmQuotes.id,
+        quoteNumber: crmQuotes.quoteNumber,
+        title: crmQuotes.title,
+        total: crmQuotes.total,
+        status: crmQuotes.status,
+        portalVisible: crmQuotes.portalVisible,
+        portalCanView: crmQuotes.portalCanView,
+        createdAt: crmQuotes.createdAt,
+      })
+        .from(crmQuotes)
+        .where(eq(crmQuotes.customerId, customerId))
+        .orderBy(desc(crmQuotes.createdAt));
+
+      res.json({ invoices, quotes });
+    } catch (error) {
+      console.error("Portal items error:", error);
+      res.status(500).json({ message: "Failed to load portal items" });
+    }
+  });
+
+  // PATCH /api/crm/invoices/:id/portal-visibility
+  app.patch("/api/crm/invoices/:id/portal-visibility", requireCrmAuth, requireCrmSalesOrAbove, async (req: any, res) => {
+    try {
+      const { portalVisible } = req.body || {};
+      if (typeof portalVisible !== "boolean") {
+        return res.status(400).json({ message: "portalVisible must be a boolean" });
+      }
+      const [updated] = await db.update(crmInvoices)
+        .set({ portalVisible, updatedAt: new Date() })
+        .where(eq(crmInvoices.id, req.params.id))
+        .returning({ id: crmInvoices.id, customerId: crmInvoices.customerId });
+      if (!updated) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      await logCrmAudit(req.crmUser?.id || null, "portal_item_visibility_changed", "invoice", updated.id, {
+        portalVisible,
+        customerId: updated.customerId,
+      });
+      res.json({ success: true, portalVisible });
+    } catch (error) {
+      console.error("Invoice portal visibility error:", error);
+      res.status(500).json({ message: "Failed to update visibility" });
+    }
+  });
+
+  // PATCH /api/crm/quotes/:id/portal-visibility
+  app.patch("/api/crm/quotes/:id/portal-visibility", requireCrmAuth, requireCrmSalesOrAbove, async (req: any, res) => {
+    try {
+      const { portalVisible, portalCanView } = req.body || {};
+      const updates: Record<string, unknown> = {};
+      if (typeof portalVisible === "boolean") updates.portalVisible = portalVisible;
+      if (typeof portalCanView === "boolean") updates.portalCanView = portalCanView;
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: "portalVisible or portalCanView required" });
+      }
+      const [updated] = await db.update(crmQuotes)
+        .set(updates)
+        .where(eq(crmQuotes.id, req.params.id))
+        .returning({
+          id: crmQuotes.id,
+          customerId: crmQuotes.customerId,
+          portalVisible: crmQuotes.portalVisible,
+          portalCanView: crmQuotes.portalCanView,
+        });
+      if (!updated) {
+        return res.status(404).json({ message: "Quote not found" });
+      }
+      await logCrmAudit(req.crmUser?.id || null, "portal_item_visibility_changed", "quote", updated.id, {
+        ...updates,
+        customerId: updated.customerId,
+      });
+      res.json({ success: true, portalVisible: updated.portalVisible, portalCanView: updated.portalCanView });
+    } catch (error) {
+      console.error("Quote portal visibility error:", error);
+      res.status(500).json({ message: "Failed to update visibility" });
     }
   });
 
