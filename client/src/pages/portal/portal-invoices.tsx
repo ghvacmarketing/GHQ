@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, FileText } from "lucide-react";
+import { ArrowLeft, FileText, CreditCard, Eye } from "lucide-react";
 import { PortalLayout } from "./portal-layout";
 
 interface PortalInvoice {
@@ -121,13 +121,21 @@ export default function PortalInvoices() {
                       <TableHead className="text-right">Total</TableHead>
                       <TableHead className="text-right">Balance</TableHead>
                       <TableHead className="text-center">Status</TableHead>
+                      <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {invoices.map((invoice) => {
                       const status = statusConfig[invoice.status] || statusConfig.sent;
+                      const payable = invoice.status !== "paid" && invoice.status !== "void" &&
+                        parseFloat(invoice.balanceDue || "0") > 0;
                       return (
-                        <TableRow key={invoice.id} data-testid={`row-invoice-${invoice.id}`}>
+                        <TableRow
+                          key={invoice.id}
+                          className="cursor-pointer"
+                          onClick={() => setLocation(`/portal/invoice/${invoice.id}`)}
+                          data-testid={`row-invoice-${invoice.id}`}
+                        >
                           <TableCell className="font-medium" data-testid={`text-invoice-number-${invoice.id}`}>
                             {invoice.invoiceNumber}
                           </TableCell>
@@ -148,6 +156,24 @@ export default function PortalInvoices() {
                             >
                               {status.label}
                             </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Link href={`/portal/invoice/${invoice.id}`} onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant={payable ? "default" : "ghost"}
+                                size="sm"
+                                className={payable
+                                  ? "text-white bg-[#711419] hover:bg-[#5a1014]"
+                                  : "text-[#711419] hover:text-[#711419] hover:bg-[#711419]/10"}
+                                data-testid={`button-invoice-action-${invoice.id}`}
+                              >
+                                {payable ? (
+                                  <><CreditCard className="h-4 w-4 mr-1" /> View &amp; Pay</>
+                                ) : (
+                                  <><Eye className="h-4 w-4 mr-1" /> View</>
+                                )}
+                              </Button>
+                            </Link>
                           </TableCell>
                         </TableRow>
                       );
