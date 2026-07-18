@@ -764,7 +764,8 @@ function CustomerFilesTab({ customerId }: { customerId: string }) {
           headers: { "Content-Type": file.type },
         });
 
-        const fileUrl = `/objects/${objectPath}`;
+        // objectPath may already carry the /objects prefix (Neon store mode)
+        const fileUrl = objectPath.startsWith("/objects") ? objectPath : `/objects/${objectPath}`;
         await apiRequest("POST", `/api/crm/customers/${customerId}/files`, {
           name: file.name,
           url: fileUrl,

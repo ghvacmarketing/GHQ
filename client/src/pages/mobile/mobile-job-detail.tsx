@@ -40,6 +40,7 @@ import {
   Minus,
   MessageSquare,
   Navigation,
+  ChevronLeft,
 } from "lucide-react";
 import { statusDotColor } from "@/components/ui/status-dot";
 import { useForm } from "react-hook-form";
@@ -3577,7 +3578,30 @@ export default function MobileJobDetail() {
       navigate("/mobile/job");
     }
   };
-  const swipeDrag = useRef<{ x: number; y: number; engaged: boolean; active: boolean } | null>(null);
+  const swipeDrag = useRef<{ x: number; y: number; engaged: boolean; active: boolean; section: boolean } | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const tabScroll = useRef<Record<string, number>>({});
+
+  // Switch tabs preserving each tab's scroll position; sections animate in.
+  const switchTab = (next: TabType, animateFrom: "right" | "left" | null = "right") => {
+    const el = contentRef.current;
+    if (el) tabScroll.current[activeTab] = el.scrollTop;
+    setActiveTab(next);
+    requestAnimationFrame(() => {
+      const el2 = contentRef.current;
+      if (!el2) return;
+      el2.scrollTop = tabScroll.current[next] || 0;
+      if (animateFrom) {
+        el2.animate(
+          [
+            { transform: `translateX(${animateFrom === "right" ? 24 : -24}px)`, opacity: 0.5 },
+            { transform: "translateX(0)", opacity: 1 },
+          ],
+          { duration: 200, easing: "cubic-bezier(0.32, 0.72, 0.34, 1)" },
+        );
+      }
+    });
+  };
   const springBack = () => {
     const el = pageRef.current;
     if (!el) return;
@@ -3586,8 +3610,10 @@ export default function MobileJobDetail() {
     setTimeout(() => { if (el) el.style.transition = ""; }, 290);
   };
   const onSwipeStart = (e: React.PointerEvent) => {
-    if (e.clientX > 32) { swipeDrag.current = null; return; }
-    swipeDrag.current = { x: e.clientX, y: e.clientY, engaged: false, active: true };
+    if (e.clientX > 28) { swipeDrag.current = null; return; }
+    // In a section (Work/Quote/Invoice) the edge swipe returns to the
+    // Overview hub; on the hub itself it leaves to the jobs list.
+    swipeDrag.current = { x: e.clientX, y: e.clientY, engaged: false, active: true, section: activeTab !== "overview" };
     pageRef.current?.setPointerCapture?.(e.pointerId);
   };
   const onSwipeMove = (e: React.PointerEvent) => {
@@ -3597,18 +3623,45 @@ export default function MobileJobDetail() {
     const dx = e.clientX - st.x;
     const dy = Math.abs(e.clientY - st.y);
     if (!st.engaged) {
-      if (dx > 8 && dx > dy) { st.engaged = true; el.style.transition = "none"; }
+      if (dx > 8 && dx > dy) {
+        st.engaged = true;
+        const target = st.section ? contentRef.current : el;
+        if (target) target.style.transition = "none";
+      }
       else if (dy > 14) { st.active = false; return; }
     }
-    if (st.engaged) el.style.transform = `translateX(${Math.max(0, dx)}px)`;
+    if (st.engaged) {
+      const target = st.section ? contentRef.current : el;
+      if (target) target.style.transform = `translateX(${Math.max(0, dx)}px)`;
+    }
   };
   const onSwipeEnd = (e: React.PointerEvent) => {
     const st = swipeDrag.current;
     swipeDrag.current = null;
     if (!st?.engaged) return;
     const dx = e.clientX - st.x;
-    if (dx > Math.min(140, window.innerWidth * 0.33)) goBackAnimated();
-    else springBack();
+    const commit = dx > Math.min(140, window.innerWidth * 0.33);
+    if (st.section) {
+      const el = contentRef.current;
+      if (!el) return;
+      if (commit) {
+        el.style.transition = "transform 0.16s ease-in";
+        el.style.transform = "translateX(100%)";
+        setTimeout(() => {
+          el.style.transition = "";
+          el.style.transform = "";
+          switchTab("overview", "left");
+        }, 150);
+      } else {
+        el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
+        el.style.transform = "translateX(0)";
+        setTimeout(() => { el.style.transition = ""; }, 260);
+      }
+    } else if (commit) {
+      goBackAnimated();
+    } else {
+      springBack();
+    }
   };
 
 
@@ -4039,19 +4092,19 @@ export default function MobileJobDetail() {
       customNav={{
         tabs: tabs.map((t) => ({ id: t.id, label: t.label, icon: t.icon })),
         activeId: activeTab,
-        onSelect: (id) => setActiveTab(id as TabType),
+        onSelect: (id) => switchTab(id as TabType),
       }}
     >
       <OfflineIndicator />
       {/* Floating back — tap, or swipe right anywhere from the left half */}
       <button
-        onClick={goBackAnimated}
+        onClick={() => { if (activeTab !== "overview") switchTab("overview", "left"); else goBackAnimated(); }}
         className="absolute left-3 z-40 flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white/85 text-slate-700 shadow-[0_4px_16px_rgba(0,0,0,0.14)] backdrop-blur-xl transition-transform active:scale-95"
         style={{ top: "calc(10px + env(safe-area-inset-top))" }}
         data-testid="button-back"
         aria-label="Back"
       >
-        <ArrowLeft className="h-5 w-5" />
+        <ChevronLeft className="h-6 w-6" />
       </button>
       <div
         ref={pageRef}
@@ -4095,10 +4148,10 @@ export default function MobileJobDetail() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto px-4 pb-28" data-testid="mobile-job-detail">
+        <div ref={contentRef} className="flex-1 overflow-auto px-4 pb-28" data-testid="mobile-job-detail">
           {activeTab === "overview" && (
             <OverviewTab
-              onGoTab={(t) => setActiveTab(t as TabType)}
+              onGoTab={(t) => switchTab(t as TabType)}
               workOrder={workOrder}
               checklistResponse={checklistResponse}
               optimisticStatus={optimisticStatus}
@@ -4112,20 +4165,20 @@ export default function MobileJobDetail() {
               optimisticPending={optimisticPending}
             />
           )}
-          {activeTab === "work" && (
+          <div className={activeTab === "work" ? "block" : "hidden"}>
             <WorkTab workOrder={workOrder} checklistResponse={checklistResponse} />
-          )}
-          {activeTab === "quote" && (
+          </div>
+          <div className={activeTab === "quote" ? "block" : "hidden"}>
             <QuoteTab workOrder={workOrder} />
-          )}
-          {activeTab === "invoice" && (
+          </div>
+          <div className={activeTab === "invoice" ? "block" : "hidden"}>
             <InvoiceTab 
               workOrder={workOrder} 
               renewalInfo={renewalInfo}
               onCollectRenewal={() => setShowCollectRenewalDialog(true)}
               onDeclineRenewal={() => setShowDeclineRenewalDialog(true)}
             />
-          )}
+          </div>
         </div>
 
       </div>

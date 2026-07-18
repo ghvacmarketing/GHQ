@@ -21959,6 +21959,48 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         const salesOpportunity = serviceRevenue + quotedAmount;
         const potential = salesOpportunity > 0 ? salesOpportunity : techGoal;
 
+        // Weekly revenue buckets + invoicing summary for the mobile analytics
+        const weeksInMonth = Math.ceil(daysInMonth / 7);
+        const weekBuckets = Array(weeksInMonth).fill(0) as number[];
+        let invoicing = { collected: serviceRevenue, outstanding: 0, openCount: 0 };
+        if (workOrderIds.length > 0) {
+          const paidRows = await db.select({
+            total: crmInvoices.total,
+            at: sql<string>`COALESCE(${crmInvoices.paidAt}, ${crmInvoices.updatedAt})`,
+          })
+            .from(crmInvoices)
+            .where(and(
+              inArray(crmInvoices.workOrderId, workOrderIds),
+              eq(crmInvoices.status, "paid"),
+              sql`COALESCE(${crmInvoices.paidAt}, ${crmInvoices.updatedAt}) >= ${startOfMonth}`
+            ));
+          for (const r of paidRows) {
+            const d = new Date(r.at);
+            const w = Math.min(weeksInMonth - 1, Math.floor((d.getDate() - 1) / 7));
+            weekBuckets[w] += parseFloat(r.total || "0");
+          }
+          const [open] = await db.select({
+            outstanding: sql<string>`COALESCE(SUM(CAST(${crmInvoices.balanceDue} AS DECIMAL(10,2))), 0)`,
+            cnt: sql<number>`COUNT(*)::int`,
+          })
+            .from(crmInvoices)
+            .where(and(
+              inArray(crmInvoices.workOrderId, workOrderIds),
+              inArray(crmInvoices.status, ["sent", "viewed", "partial"]),
+            ));
+          invoicing = {
+            collected: serviceRevenue,
+            outstanding: parseFloat(open?.outstanding || "0"),
+            openCount: open?.cnt || 0,
+          };
+        }
+        const currentWeek = Math.floor((dayOfMonth - 1) / 7);
+        const weeklyRevenue = weekBuckets.slice(0, currentWeek + 1).map((v, i) => ({
+          label: i === currentWeek ? "NOW" : `WK ${i + 1}`,
+          revenue: v,
+          current: i === currentWeek,
+        }));
+
         res.json({
           role: "tech",
           serviceRevenue,
@@ -21968,6 +22010,10 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           maintenanceAgreements: maintenanceAgreementsCount[0]?.count || 0,
           goal: potential,
           goalTarget: techGoal,
+          weeklyRevenue,
+          invoicing,
+          dayOfMonth,
+          daysInMonth,
         });
       } else if (user.role === "sales" || user.role === "owner" || user.role === "admin") {
         // Sales performance data
@@ -21987,6 +22033,8 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         const salesQuotes = await db.select({
           total: crmQuotes.total,
           status: crmQuotes.status,
+          acceptedAt: crmQuotes.acceptedAt,
+          createdAt: crmQuotes.createdAt,
         })
           .from(crmQuotes)
           .where(and(
@@ -22046,6 +22094,25 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         const closingRate = closedDeals > 0 ? (wonCount / closedDeals) * 100 : 0;
         const averageSale = wonCount > 0 ? acceptedQuotesTotal / wonCount : 0;
 
+        // Weekly sold buckets (accepted quotes by week of month)
+        const daysInMonthS = new Date(year, month, 0).getDate();
+        const dayOfMonthS = now.getDate();
+        const weeksS = Math.ceil(daysInMonthS / 7);
+        const soldBuckets = Array(weeksS).fill(0) as number[];
+        for (const quote of salesQuotes) {
+          if (quote.status !== "accepted") continue;
+          const at = quote.acceptedAt || quote.createdAt;
+          if (!at) continue;
+          const w = Math.min(weeksS - 1, Math.floor((new Date(at).getDate() - 1) / 7));
+          soldBuckets[w] += parseFloat(quote.total || "0");
+        }
+        const curWS = Math.floor((dayOfMonthS - 1) / 7);
+        const weeklyRevenueS = soldBuckets.slice(0, curWS + 1).map((v, i) => ({
+          label: i === curWS ? "NOW" : `WK ${i + 1}`,
+          revenue: v,
+          current: i === curWS,
+        }));
+
         res.json({
           role: "sales",
           leadsReceived: leadsReceived[0]?.count || 0,
@@ -22059,6 +22126,9 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           sold: acceptedQuotesTotal,
           quoted: sentQuotesTotal,
           goal: individualInstallGoal, // Divided by number of salespeople like tech goal
+          weeklyRevenue: weeklyRevenueS,
+          dayOfMonth: dayOfMonthS,
+          daysInMonth: daysInMonthS,
         });
       } else {
         res.json({ role: user.role, message: "No performance data for this role" });

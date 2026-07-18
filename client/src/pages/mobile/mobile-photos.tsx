@@ -127,9 +127,11 @@ export default function MobilePhotos() {
         });
         const { uploadURL, objectPath } = await presignRes.json();
         await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+        // objectPath may already carry the /objects prefix (Neon store mode)
+        const fileUrl = objectPath.startsWith("/objects") ? objectPath : `/objects/${objectPath}`;
         await apiRequest("POST", `/api/crm/customers/${customerId}/files`, {
           name: `WO-${selectedJob.workOrderNumber ?? ""} ${file.name}`.trim(),
-          url: `/objects/${objectPath}`,
+          url: fileUrl,
           objectPath,
           contentType: file.type,
           size: file.size,

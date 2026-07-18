@@ -1,6 +1,6 @@
 import { useRef, type ReactNode } from "react";
 import { useLocation } from "wouter";
-import { ArrowLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 
 /**
  * Mobile sub-page chrome: slides in like an iOS push; floating back arrow;
@@ -89,7 +89,7 @@ export function SubPage({ backTo = "/mobile", children }: { backTo?: string; chi
         data-testid="button-back"
         aria-label="Back"
       >
-        <ArrowLeft className="h-5 w-5" />
+        <ChevronLeft className="h-6 w-6" />
       </button>
       {children}
     </div>

@@ -21,8 +21,15 @@ interface WorkOrderWithDetails extends CrmWorkOrder {
   property: CrmProperty | null;
 }
 
+type WeeklyRevenue = { label: string; revenue: number; current: boolean };
+type InvoicingSummary = { collected: number; outstanding: number; openCount: number };
+
 interface TechPerformance {
   role: "tech";
+  weeklyRevenue?: WeeklyRevenue[];
+  invoicing?: InvoicingSummary;
+  dayOfMonth?: number;
+  daysInMonth?: number;
   serviceRevenue: number;
   quotedAmount: number;
   serviceJobs: number;
@@ -34,6 +41,9 @@ interface TechPerformance {
 
 interface SalesPerformance {
   role: "sales";
+  weeklyRevenue?: WeeklyRevenue[];
+  dayOfMonth?: number;
+  daysInMonth?: number;
   leadsReceived: number;
   salesVisits: number;
   quotesGenerated: number;
@@ -101,6 +111,93 @@ function GlobalPendingChangesIndicator() {
     >
       <CloudOff className="h-3 w-3" />
       {pendingCount} change{pendingCount !== 1 ? 's' : ''} pending sync
+    </div>
+  );
+}
+
+function RingStat({ pct, center, label, sub, color = "#711419" }: {
+  pct: number; center: string; label: string; sub?: string; color?: string;
+}) {
+  const r = 24;
+  const c = 2 * Math.PI * r;
+  const clamped = Math.max(0, Math.min(1, pct));
+  return (
+    <div className="flex flex-col items-center rounded-2xl bg-white px-2 py-4 shadow-sm">
+      <div className="relative h-16 w-16">
+        <svg viewBox="0 0 60 60" className="h-16 w-16 -rotate-90">
+          <circle cx="30" cy="30" r={r} fill="none" stroke="#e2e8f0" strokeWidth="5" />
+          <circle
+            cx="30" cy="30" r={r} fill="none" stroke={color} strokeWidth="5" strokeLinecap="round"
+            strokeDasharray={`${c * clamped} ${c}`}
+            className="transition-[stroke-dasharray] duration-700"
+          />
+        </svg>
+        <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-slate-900">{center}</span>
+      </div>
+      <p className="mt-1.5 text-center text-xs font-semibold text-slate-700">{label}</p>
+      {sub && <p className="text-center text-[11px] text-slate-400">{sub}</p>}
+    </div>
+  );
+}
+
+function WeeklyBars({ weeks }: { weeks: WeeklyRevenue[] }) {
+  const max = Math.max(1, ...weeks.map((w) => w.revenue));
+  const best = weeks.reduce((b, w) => (w.revenue > (b?.revenue ?? -1) && !w.current ? w : b), null as WeeklyRevenue | null);
+  const fmtK = (v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${Math.round(v)}`);
+  return (
+    <div className="rounded-2xl bg-white p-4 shadow-sm" data-testid="perf-weekly">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#711419]">Revenue by Week</p>
+        {best && best.revenue > 0 && (
+          <p className="text-[11px] font-semibold text-[#711419]">best: {best.label.toLowerCase()}</p>
+        )}
+      </div>
+      <div className="mt-3 flex items-end gap-2" style={{ height: 96 }}>
+        {weeks.map((w) => {
+          const h = Math.max(10, Math.round((w.revenue / max) * 64));
+          const isBest = best && w.label === best.label && w.revenue > 0;
+          return (
+            <div key={w.label} className="flex flex-1 flex-col items-center justify-end gap-1">
+              <span className="text-xs font-bold text-slate-700">{fmtK(w.revenue)}</span>
+              <div
+                className={`w-full rounded-lg ${
+                  w.current
+                    ? "bg-[repeating-linear-gradient(45deg,#e9d5c8,#e9d5c8_5px,#f6ede6_5px,#f6ede6_10px)]"
+                    : isBest
+                      ? "bg-[#711419]"
+                      : "bg-slate-200"
+                }`}
+                style={{ height: h }}
+              />
+              <span className={`text-[10px] font-semibold ${w.current ? "text-[#711419]" : "text-slate-400"}`}>{w.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function InvoicingBar({ inv }: { inv: InvoicingSummary }) {
+  const total = inv.collected + inv.outstanding;
+  const pct = total > 0 ? Math.round((inv.collected / total) * 100) : 100;
+  const fmt = (v: number) => `$${Math.round(v).toLocaleString("en-US")}`;
+  return (
+    <div className="rounded-2xl bg-white p-4 shadow-sm" data-testid="perf-invoicing">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#711419]">Invoicing</p>
+        <p className="text-xs font-bold text-green-600">{pct}% collected</p>
+      </div>
+      <div className="mt-2.5 flex h-2.5 overflow-hidden rounded-full bg-slate-100">
+        <span className="rounded-l-full bg-green-600" style={{ width: `${pct}%` }} />
+        <span className="bg-amber-500" style={{ width: `${100 - pct}%` }} />
+      </div>
+      <div className="mt-2 flex items-center justify-between text-xs">
+        <span className="font-medium text-slate-600">{fmt(inv.collected)} collected</span>
+        <span className="font-semibold text-amber-600">
+          {fmt(inv.outstanding)} outstanding{inv.openCount > 0 ? ` · ${inv.openCount} invoice${inv.openCount === 1 ? "" : "s"}` : ""}
+        </span>
+      </div>
     </div>
   );
 }
@@ -844,29 +941,77 @@ export default function MobileAgenda() {
             )}
 
             {/* My Performance */}
-            {performanceData && (
-              <div className="space-y-2 pt-4 border-t border-slate-200 dark:border-slate-700">
-                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
-                  My Performance (MTD)
-                </h3>
-                {isLoadingPerformance ? (
-                  <div className="space-y-3">
-                    <Skeleton className="h-32 w-full" />
-                    <div className="grid grid-cols-2 gap-3">
-                      <Skeleton className="h-20" />
-                      <Skeleton className="h-20" />
-                      <Skeleton className="h-20" />
-                      <Skeleton className="h-20" />
-                    </div>
+            {performanceData && (performanceData.role === "tech" || performanceData.role === "sales" || performanceData.role === "owner" || performanceData.role === "admin") && (() => {
+              const pd = performanceData as any;
+              const isTech = pd.role === "tech";
+              const revenue = isTech ? pd.serviceRevenue : pd.sold;
+              const goalTarget = isTech ? pd.goalTarget : pd.goal;
+              const pct = goalTarget > 0 ? Math.round((revenue / goalTarget) * 100) : 0;
+              const monthPace = pd.daysInMonth ? (pd.dayOfMonth || 0) / pd.daysInMonth : 0;
+              const paceTarget = isTech ? goalTarget : goalTarget * monthPace;
+              const onPace = revenue >= paceTarget;
+              const fmt = (v: number) => `$${Math.round(v).toLocaleString("en-US")}`;
+              return (
+                <div className="space-y-2.5 border-t border-slate-200 pt-4" data-testid="perf-section">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">My Performance</h3>
+                    <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-500 shadow-sm">
+                      {format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), "MMM d")}–{format(new Date(), "d")}
+                    </span>
                   </div>
-                ) : performanceData.role === "tech" ? (
-                  <TechPerformanceSection performance={performanceData as TechPerformance} />
-                ) : performanceData.role === "sales" || performanceData.role === "owner" || performanceData.role === "admin" ? (
-                  <SalesPerformanceSection performance={performanceData as SalesPerformance} />
-                ) : null}
-              </div>
-            )}
 
+                  {/* Revenue generated */}
+                  <div className="rounded-2xl bg-white p-4 pb-3 shadow-sm" data-testid="perf-revenue">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[#711419]">Revenue Generated</p>
+                    {isLoadingPerformance ? (
+                      <Skeleton className="mt-3 h-28 w-full" />
+                    ) : (
+                      <>
+                        <div className="mt-1 flex justify-center">
+                          <PerformanceGauge sold={revenue} quoted={isTech ? pd.quotedAmount : pd.quoted} goal={isTech ? pd.goal : pd.goal} goalTarget={goalTarget} />
+                        </div>
+                        <p className="text-center text-3xl font-bold tracking-tight text-slate-900" data-testid="perf-revenue-value">
+                          {fmt(revenue)}
+                        </p>
+                        {goalTarget > 0 && (
+                          <p className="mt-0.5 text-center text-sm text-slate-500">
+                            {pct}% of {fmt(goalTarget)} {isTech ? "goal to date" : "monthly goal"} ·{" "}
+                            <span className={onPace ? "font-semibold text-green-600" : "font-semibold text-amber-600"}>
+                              {onPace ? "on pace" : "behind pace"}
+                            </span>
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Ring tiles */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {isTech ? (
+                      <>
+                        <RingStat pct={goalTarget > 0 ? revenue / goalTarget : 0} center={String(pd.serviceJobs)} label="Jobs closed" sub="paid this month" />
+                        <RingStat pct={Math.min(1, pd.perTicketAvg / 1000)} center={`$${Math.round(pd.perTicketAvg)}`} label="Avg ticket" color="#16a34a" />
+                        <RingStat pct={Math.min(1, pd.maintenanceAgreements / 5)} center={String(pd.maintenanceAgreements)} label="Maintenance" sub="visits done" color="#334e8f" />
+                      </>
+                    ) : (
+                      <>
+                        <RingStat pct={pd.closingRate / 100} center={`${Math.round(pd.closingRate)}%`} label="Close rate" sub={`${pd.wonCount} won`} />
+                        <RingStat pct={Math.min(1, pd.averageSale / 15000)} center={pd.averageSale >= 1000 ? `$${(pd.averageSale / 1000).toFixed(1)}k` : `$${Math.round(pd.averageSale)}`} label="Avg sale" color="#16a34a" />
+                        <RingStat pct={Math.min(1, pd.quotesGenerated / 20)} center={String(pd.quotesGenerated)} label="Quotes" sub={`${pd.leadsReceived} leads`} color="#334e8f" />
+                      </>
+                    )}
+                  </div>
+
+                  {/* Weekly revenue */}
+                  {pd.weeklyRevenue && pd.weeklyRevenue.length > 0 && <WeeklyBars weeks={pd.weeklyRevenue} />}
+
+                  {/* Invoicing (techs) */}
+                  {isTech && pd.invoicing && (pd.invoicing.collected > 0 || pd.invoicing.outstanding > 0) && (
+                    <InvoicingBar inv={pd.invoicing} />
+                  )}
+                </div>
+              );
+            })()}
           </>
         )}
       </div>
