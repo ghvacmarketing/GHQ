@@ -110,7 +110,6 @@ export default function CrmInstallPlanner() {
   // the month boundary is seamless (it's just the next week row).
   const gridStart = startOfWeek(startOfMonth(month));
   const gridEnd = endOfWeek(endOfMonth(month2));
-  const days = useMemo(() => eachDayOfInterval({ start: gridStart, end: gridEnd }), [+gridStart, +gridEnd]);
 
   const from = iso(gridStart);
   const to = iso(gridEnd);
@@ -185,7 +184,6 @@ export default function CrmInstallPlanner() {
   const opRef = useRef<BlockOp | null>(null);
   const previewRef = useRef<typeof preview>(null);
   const justDraggedRef = useRef(false);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => { opRef.current = blockOp; }, [blockOp]);
   useEffect(() => { previewRef.current = preview; }, [preview]);
 
@@ -220,13 +218,6 @@ export default function CrmInstallPlanner() {
     const onMove = (e: PointerEvent) => {
       const op = opRef.current;
       if (!op) return;
-      // Auto-scroll the calendar when dragging near its top/bottom edge.
-      const sc = scrollRef.current;
-      if (sc) {
-        const r = sc.getBoundingClientRect();
-        if (e.clientY < r.top + 48) sc.scrollTop -= 14;
-        else if (e.clientY > r.bottom - 48) sc.scrollTop += 14;
-      }
       const day = dayUnderPointer(e.clientX, e.clientY);
       if (!day) return;
       const { block } = op;
@@ -344,12 +335,42 @@ export default function CrmInstallPlanner() {
   const [crewsInput, setCrewsInput] = useState<string>("");
   useEffect(() => { setCrewsInput(crewsPerDay != null ? String(crewsPerDay) : ""); }, [crewsPerDay]);
 
-  // Split the 42-day grid into weeks and pack each week's bars into lanes.
-  const weeks = useMemo(() => {
+  // One grid per month. Idle shows just the current month (no scrolling);
+  // any drag squeezes it and slides the next month in underneath so a hold
+  // can be dragged straight across the boundary.
+  const chunkWeeks = (start: Date, end: Date) => {
+    const ds = eachDayOfInterval({ start, end });
     const out: Date[][] = [];
-    for (let i = 0; i < days.length; i += 7) out.push(days.slice(i, i + 7));
+    for (let i = 0; i < ds.length; i += 7) out.push(ds.slice(i, i + 7));
     return out;
-  }, [days]);
+  };
+  const weeks1 = useMemo(
+    () => chunkWeeks(startOfWeek(startOfMonth(month)), endOfWeek(endOfMonth(month))),
+    [+month],
+  );
+  const weeks2 = useMemo(
+    () => chunkWeeks(startOfWeek(startOfMonth(month2)), endOfWeek(endOfMonth(month2))),
+    [+month2],
+  );
+
+  const dragActive = !!dragRange || !!blockOp;
+  // Compress rows/bars while both months are on screen
+  const BARH = dragActive ? 13 : BAR_H;
+  const MAXL = dragActive ? 2 : MAX_LANES;
+  const HEADH = dragActive ? 18 : HEADER_H;
+
+  const chipText = (() => {
+    if (blockOp) {
+      const d = preview || { startDate: blockOp.block.startDate, endDate: blockOp.block.endDate };
+      return `${blockOp.mode === "move" ? "Moving" : "Resizing"}: ${rangeLabel(d.startDate, d.endDate)}`;
+    }
+    if (dragRange) {
+      const lo = dragRange.anchor <= dragRange.current ? dragRange.anchor : dragRange.current;
+      const hi = dragRange.anchor <= dragRange.current ? dragRange.current : dragRange.anchor;
+      return `New hold: ${rangeLabel(lo, hi)}`;
+    }
+    return "";
+  })();
 
   const layoutWeek = (weekDays: Date[]) => {
     const wStart = iso(weekDays[0]);
@@ -383,14 +404,14 @@ export default function CrmInstallPlanner() {
     for (const it of items) {
       for (let c = it.colStart; c <= it.colEnd; c++) {
         dayCounts[c]++;
-        if (it.lane >= MAX_LANES) overflowByCol[c]++;
+        if (it.lane >= MAXL) overflowByCol[c]++;
       }
     }
     return {
-      visible: items.filter((it) => it.lane < MAX_LANES),
+      visible: items.filter((it) => it.lane < MAXL),
       overflowByCol,
       dayCounts,
-      laneCount: Math.min(MAX_LANES, laneEnds.length),
+      laneCount: Math.min(MAXL, laneEnds.length),
     };
   };
 
@@ -403,6 +424,123 @@ export default function CrmInstallPlanner() {
   // block that already started in the past may keep its original start date.
   const original = form.id ? blocks.find((b) => b.id === form.id) : undefined;
   const startInPast = !!form.startDate && form.startDate < todayStr && form.startDate !== original?.startDate;
+
+  const renderWeeks = (weeksArr: Date[][], gridMonth: Date, keyPrefix: string) =>
+    weeksArr.map((weekDays, wi) => {
+      const { visible, overflowByCol, dayCounts, laneCount } = layoutWeek(weekDays);
+      return (
+        <div
+          key={`${keyPrefix}-${wi}`}
+          className="relative flex-1 border-b border-border last:border-b-0"
+          style={{ minHeight: dragActive ? 40 : 72 }}
+        >
+          {/* Day columns: numbers, capacity, interaction surface */}
+          <div className="absolute inset-0 grid h-full grid-cols-7">
+            {weekDays.map((day, ci) => {
+              const dayStr = iso(day);
+              const inRange = isSameMonth(day, gridMonth);
+              const firstOfMonth = day.getDate() === 1;
+              const isPast = dayStr < todayStr;
+              const over = crewsPerDay != null && dayCounts[ci] > crewsPerDay;
+              return (
+                <div
+                  key={dayStr}
+                  data-day={dayStr}
+                  className={cn(
+                    "relative select-none border-r border-border transition-colors last:border-r-0",
+                    isPast ? "cursor-default bg-muted/40" : "cursor-pointer",
+                    !inRange && !isPast && "bg-muted/20",
+                    inDrag(dayStr) ? "bg-[#711419]/10 ring-1 ring-inset ring-[#711419]/40" : !isPast && !blockOp && "hover:bg-muted/30",
+                  )}
+                  onMouseDown={(e) => { e.preventDefault(); if (!isPast && !blockOp) setDragRange({ anchor: dayStr, current: dayStr }); }}
+                  onMouseEnter={() => { if (!isPast) setDragRange((r) => (r ? { ...r, current: dayStr } : r)); }}
+                  data-testid={`day-${keyPrefix}-${dayStr}`}
+                >
+                  <div className="flex items-center justify-between px-1.5 pt-0.5">
+                    <span className={cn(
+                      "flex h-5 items-center text-xs",
+                      isToday(day) ? "font-bold text-[#711419]" : inRange ? "font-medium text-foreground" : "font-medium text-muted-foreground/50",
+                      firstOfMonth && "font-bold",
+                    )}>
+                      {firstOfMonth ? format(day, "MMM d") : format(day, "d")}
+                    </span>
+                    {crewsPerDay != null && dayCounts[ci] > 0 && (
+                      <span className={cn("rounded px-1 text-[10px] font-semibold tabular-nums", over ? "bg-red-100 text-red-600" : "text-muted-foreground")}>
+                        {dayCounts[ci]}/{crewsPerDay}
+                      </span>
+                    )}
+                  </div>
+                  {!dragActive && overflowByCol[ci] > 0 && (
+                    <button
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => { e.stopPropagation(); setDayList(dayStr); }}
+                      className="absolute inset-x-1 text-left text-[10px] font-medium text-[#711419] hover:underline"
+                      style={{ top: HEADH + laneCount * (BARH + LANE_GAP) }}
+                      data-testid={`more-${dayStr}`}
+                    >
+                      +{overflowByCol[ci]} more
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Continuous spanning bars */}
+          <div className="pointer-events-none absolute inset-x-0" style={{ top: HEADH }}>
+            {visible.map((it) => {
+              const b = it.block;
+              const isPreviewed = preview?.id === b.id;
+              const movable = b.status !== "sold";
+              return (
+                <div
+                  key={`${b.id}-${keyPrefix}${wi}`}
+                  className="absolute"
+                  style={{ left: `${(it.colStart / 7) * 100}%`, width: `${((it.colEnd - it.colStart + 1) / 7) * 100}%`, top: it.lane * (BARH + LANE_GAP), height: BARH }}
+                >
+                  <div
+                    onClick={() => { if (!justDraggedRef.current) openEdit(b); }}
+                    onPointerDown={(e) => startBlockOp(e, b, "move")}
+                    className={cn(
+                      "group absolute inset-y-0 flex items-center overflow-hidden text-[11px] font-medium transition",
+                      it.realStart && "rounded-l-md",
+                      it.realEnd && "rounded-r-md",
+                      barClass(b),
+                      isPreviewed && "z-10 shadow-lg ring-2 ring-[#711419]/60",
+                      dragActive && !isPreviewed && "opacity-50 saturate-50",
+                      dragActive ? "pointer-events-none" : cn("pointer-events-auto hover:brightness-95", movable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"),
+                    )}
+                    style={{ left: it.realStart ? 2 : 0, right: it.realEnd ? 2 : 0, paddingLeft: it.realStart ? 10 : 4, paddingRight: it.realEnd ? 10 : 4, touchAction: "none" }}
+                    title={`${b.title}${b.customerName ? ` · ${b.customerName}` : ""}${movable ? " — drag to move, edges to resize" : ""}`}
+                    data-testid={`block-${b.id}`}
+                  >
+                    <span className="truncate">{b.title}</span>
+                    {movable && it.realStart && (
+                      <span
+                        onPointerDown={(e) => startBlockOp(e, b, "resize-start")}
+                        className="absolute inset-y-0 left-0 w-2.5 cursor-ew-resize"
+                        data-testid={`resize-start-${b.id}`}
+                      >
+                        <span className="absolute inset-y-[3px] left-[3px] w-[3px] rounded-full bg-current opacity-0 transition-opacity group-hover:opacity-40" />
+                      </span>
+                    )}
+                    {movable && it.realEnd && (
+                      <span
+                        onPointerDown={(e) => startBlockOp(e, b, "resize-end")}
+                        className="absolute inset-y-0 right-0 w-2.5 cursor-ew-resize"
+                        data-testid={`resize-end-${b.id}`}
+                      >
+                        <span className="absolute inset-y-[3px] right-[3px] w-[3px] rounded-full bg-current opacity-0 transition-opacity group-hover:opacity-40" />
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    });
 
   if (!currentUser) return null;
 
@@ -446,9 +584,9 @@ export default function CrmInstallPlanner() {
               <ChevronRight className="h-4 w-4" />
             </Button>
             <h2 className="ml-2 text-sm font-semibold text-foreground">
-              {format(month, "yyyy") === format(month2, "yyyy")
-                ? `${format(month, "MMMM")} – ${format(month2, "MMMM yyyy")}`
-                : `${format(month, "MMM yyyy")} – ${format(month2, "MMM yyyy")}`}
+              {dragActive
+                ? `${format(month, "MMM")} – ${format(month2, "MMM yyyy")}`
+                : format(month, "MMMM yyyy")}
             </h2>
             {isLoading && <Loader2 className="ml-2 h-4 w-4 animate-spin text-muted-foreground" />}
           </div>
@@ -461,128 +599,37 @@ export default function CrmInstallPlanner() {
           </div>
         </div>
 
-        {/* Calendar — fills the rest of the viewport; weeks share the extra height */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card">
+        {/* Calendar — no scrolling; a drag reveals the next month underneath */}
+        <div
+          className={cn(
+            "relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card transition-shadow duration-200",
+            dragActive && "ring-2 ring-[#711419]/25",
+          )}
+        >
+          {dragActive && (
+            <div className="pointer-events-none absolute left-1/2 top-2 z-30 -translate-x-1/2 rounded-full bg-[#711419] px-3 py-1 text-xs font-semibold text-white shadow-lg" data-testid="drag-chip">
+              {chipText}
+            </div>
+          )}
           <div className="grid shrink-0 grid-cols-7 border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             {WEEKDAYS.map((d) => (
               <div key={d} className="px-2 py-2 text-center">{d}</div>
             ))}
           </div>
-          <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-            {weeks.map((weekDays, wi) => {
-              const { visible, overflowByCol, dayCounts, laneCount } = layoutWeek(weekDays);
-              const lanesH = Math.max(1, laneCount) * (BAR_H + LANE_GAP);
-              const hasOverflow = overflowByCol.some((n) => n > 0);
-              const weekH = Math.max(96, HEADER_H + lanesH + (hasOverflow ? OVERFLOW_H : 0) + 6);
-              const dragging = !!dragRange || !!blockOp;
-              return (
-                <div key={wi} className="relative flex-1 border-b border-border last:border-b-0" style={{ minHeight: weekH }}>
-                  {/* Day columns: numbers, capacity, interaction surface */}
-                  <div className="absolute inset-0 grid h-full grid-cols-7">
-                    {weekDays.map((day, ci) => {
-                      const dayStr = iso(day);
-                      const inRange = isSameMonth(day, month) || isSameMonth(day, month2);
-                      const firstOfMonth = day.getDate() === 1;
-                      const isPast = dayStr < todayStr;
-                      const over = crewsPerDay != null && dayCounts[ci] > crewsPerDay;
-                      return (
-                        <div
-                          key={dayStr}
-                          data-day={dayStr}
-                          className={cn(
-                            "relative select-none border-r border-border transition-colors last:border-r-0",
-                            isPast ? "cursor-default bg-muted/40" : "cursor-pointer",
-                            !inRange && !isPast && "bg-muted/20",
-                            inDrag(dayStr) ? "bg-[#711419]/10 ring-1 ring-inset ring-[#711419]/40" : !isPast && !blockOp && "hover:bg-muted/30",
-                          )}
-                          onMouseDown={(e) => { e.preventDefault(); if (!isPast && !blockOp) setDragRange({ anchor: dayStr, current: dayStr }); }}
-                          onMouseEnter={() => { if (!isPast) setDragRange((r) => (r ? { ...r, current: dayStr } : r)); }}
-                          data-testid={`day-${dayStr}`}
-                        >
-                          <div className="flex items-center justify-between px-1.5 pt-1">
-                            <span className={cn(
-                              "flex h-6 items-center text-xs",
-                              isToday(day) ? "font-bold text-[#711419]" : inRange ? "font-medium text-foreground" : "font-medium text-muted-foreground/50",
-                              firstOfMonth && "font-bold",
-                            )}>
-                              {firstOfMonth ? format(day, "MMM d") : format(day, "d")}
-                            </span>
-                            {crewsPerDay != null && dayCounts[ci] > 0 && (
-                              <span className={cn("rounded px-1 text-[10px] font-semibold tabular-nums", over ? "bg-red-100 text-red-600" : "text-muted-foreground")}>
-                                {dayCounts[ci]}/{crewsPerDay}
-                              </span>
-                            )}
-                          </div>
-                          {overflowByCol[ci] > 0 && (
-                            <button
-                              onMouseDown={(e) => e.stopPropagation()}
-                              onClick={(e) => { e.stopPropagation(); setDayList(dayStr); }}
-                              className="absolute inset-x-1 text-left text-[10px] font-medium text-[#711419] hover:underline"
-                              style={{ top: HEADER_H + laneCount * (BAR_H + LANE_GAP) }}
-                              data-testid={`more-${dayStr}`}
-                            >
-                              +{overflowByCol[ci]} more
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Continuous spanning bars */}
-                  <div className="pointer-events-none absolute inset-x-0" style={{ top: HEADER_H }}>
-                    {visible.map((it) => {
-                      const b = it.block;
-                      const isPreviewed = preview?.id === b.id;
-                      const movable = b.status !== "sold";
-                      return (
-                        <div
-                          key={`${b.id}-${wi}`}
-                          className="absolute"
-                          style={{ left: `${(it.colStart / 7) * 100}%`, width: `${((it.colEnd - it.colStart + 1) / 7) * 100}%`, top: it.lane * (BAR_H + LANE_GAP), height: BAR_H }}
-                        >
-                          <div
-                            onClick={() => { if (!justDraggedRef.current) openEdit(b); }}
-                            onPointerDown={(e) => startBlockOp(e, b, "move")}
-                            className={cn(
-                              "group absolute inset-y-0 flex items-center overflow-hidden text-[11px] font-medium transition",
-                              it.realStart && "rounded-l-md",
-                              it.realEnd && "rounded-r-md",
-                              barClass(b),
-                              isPreviewed && "opacity-80 ring-2 ring-[#711419]/50",
-                              dragging ? "pointer-events-none" : cn("pointer-events-auto hover:brightness-95", movable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"),
-                            )}
-                            style={{ left: it.realStart ? 2 : 0, right: it.realEnd ? 2 : 0, paddingLeft: it.realStart ? 10 : 4, paddingRight: it.realEnd ? 10 : 4, touchAction: "none" }}
-                            title={`${b.title}${b.customerName ? ` · ${b.customerName}` : ""}${movable ? " — drag to move, edges to resize" : ""}`}
-                            data-testid={`block-${b.id}`}
-                          >
-                            <span className="truncate">{b.title}</span>
-                            {movable && it.realStart && (
-                              <span
-                                onPointerDown={(e) => startBlockOp(e, b, "resize-start")}
-                                className="absolute inset-y-0 left-0 w-2.5 cursor-ew-resize"
-                                data-testid={`resize-start-${b.id}`}
-                              >
-                                <span className="absolute inset-y-[3px] left-[3px] w-[3px] rounded-full bg-current opacity-0 transition-opacity group-hover:opacity-40" />
-                              </span>
-                            )}
-                            {movable && it.realEnd && (
-                              <span
-                                onPointerDown={(e) => startBlockOp(e, b, "resize-end")}
-                                className="absolute inset-y-0 right-0 w-2.5 cursor-ew-resize"
-                                data-testid={`resize-end-${b.id}`}
-                              >
-                                <span className="absolute inset-y-[3px] right-[3px] w-[3px] rounded-full bg-current opacity-0 transition-opacity group-hover:opacity-40" />
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex min-h-0 flex-col transition-[flex-grow] duration-300 ease-out" style={{ flexGrow: 1, flexBasis: 0 }}>
+              {renderWeeks(weeks1, month, "m1")}
+            </div>
+            <div
+              className="flex min-h-0 flex-col overflow-hidden transition-[flex-grow,opacity] duration-300 ease-out"
+              style={{ flexGrow: dragActive ? 1 : 0.0001, flexBasis: 0, opacity: dragActive ? 1 : 0, pointerEvents: dragActive ? "auto" : "none" }}
+              data-testid="next-month-grid"
+            >
+              <div className="shrink-0 border-y border-border bg-muted/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {format(month2, "MMMM yyyy")}
+              </div>
+              {renderWeeks(weeks2, month2, "m2")}
+            </div>
           </div>
         </div>
       </div>
