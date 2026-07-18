@@ -18,6 +18,7 @@ const PUBLIC_ROUTES = [
   /^\/sign\/[^/]+$/,        // /sign/:token - public e-signature signing (token-based)
   /^\/portal(\/|$)/,        // /portal/* - customer portal (has its own auth)
   /^\/book-online/,         // /book-online - public booking page
+  /^\/book(\/|$)/,          // /book - same public booking page (canonical route)
   /^\/auth-verify/,         // /auth-verify - SMS magic link verification
   // Sign-in screens are safe without the shared password: each one requires a
   // real credential, and every data API is enforced server-side regardless.

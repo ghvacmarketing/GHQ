@@ -286,6 +286,7 @@ function Router() {
       <Route path="/privacy" component={Privacy} />
       <Route path="/tools" component={Home} />
       <Route path="/book" component={BookOnline} />
+      <Route path="/book-online" component={BookOnline} />
       <Route path="/quote" component={QuoteGenerator} />
       <Route path="/quote/edit/:id" component={QuoteEdit} />
       <Route path="/history" component={QuotesHistory} />

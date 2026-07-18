@@ -98,7 +98,7 @@ const navSections: NavSection[] = [
     title: "Operations",
     items: [
       { label: "Work Orders", href: "/crm/work-orders", icon: ClipboardList },
-      { label: "Analytics", href: "/crm/analytics", icon: Activity },
+      { label: "Environment Monitoring", href: "/crm/analytics", icon: Activity },
       { label: "Projects", href: "/crm/projects", icon: FolderKanban },
       { label: "Tasks", href: "/crm/tasks/board", icon: ListTodo },
       { label: "Rebate Programs", href: "/crm/rebate-programs", icon: Award },

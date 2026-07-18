@@ -25064,14 +25064,26 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         total: crmQuotes.total,
         subtotal: crmQuotes.subtotal,
         status: crmQuotes.status,
-        quoteDate: crmQuotes.quoteDate,
+        quoteDate: sql<Date | null>`COALESCE(${crmQuotes.sentAt}, ${crmQuotes.createdAt})`,
         validUntil: crmQuotes.validUntil,
         title: crmQuotes.title,
-        publicToken: crmQuotes.publicToken,
+        viewToken: crmQuotes.viewToken,
       })
         .from(crmQuotes)
         .where(eq(crmQuotes.customerId, customerId))
-        .orderBy(desc(crmQuotes.quoteDate));
+        .orderBy(desc(crmQuotes.createdAt));
+
+      // Quotes that were never "sent" (e.g. accepted in person) may have no view
+      // token yet — mint one so the customer can open them from the portal.
+      for (const quote of quotesResult) {
+        if (!quote.viewToken && quote.status !== "draft") {
+          const token = randomUUID();
+          await db.update(crmQuotes)
+            .set({ viewToken: token })
+            .where(eq(crmQuotes.id, quote.id));
+          quote.viewToken = token;
+        }
+      }
 
       res.json({ quotes: quotesResult });
     } catch (error) {
@@ -25144,14 +25156,14 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       const workOrders = await db.select({
         id: crmWorkOrders.id,
-        orderNumber: crmWorkOrders.orderNumber,
+        orderNumber: crmWorkOrders.workOrderNumber,
         title: crmWorkOrders.title,
         status: crmWorkOrders.status,
         visitType: crmWorkOrders.visitType,
         scheduledStart: crmWorkOrders.scheduledStart,
         scheduledEnd: crmWorkOrders.scheduledEnd,
         completedAt: crmWorkOrders.completedAt,
-        summary: crmWorkOrders.summary,
+        summary: crmWorkOrders.completionSummary,
       })
         .from(crmWorkOrders)
         .where(and(

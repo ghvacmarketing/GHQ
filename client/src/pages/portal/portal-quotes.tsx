@@ -18,7 +18,7 @@ interface PortalQuote {
   quoteDate: string | null;
   validUntil: string | null;
   title: string | null;
-  publicToken?: string;
+  viewToken?: string | null;
 }
 
 interface QuotesResponse {
@@ -150,8 +150,8 @@ export default function PortalQuotes() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-center">
-                            {quote.publicToken && (quote.status === "sent" || quote.status === "accepted") && (
-                              <Link href={`/quote/${quote.publicToken}`}>
+                            {quote.viewToken && quote.status !== "draft" && (
+                              <Link href={`/quote/${quote.viewToken}`}>
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -159,7 +159,7 @@ export default function PortalQuotes() {
                                   data-testid={`button-view-quote-${quote.id}`}
                                 >
                                   <ExternalLink className="h-4 w-4 mr-1" />
-                                  View
+                                  {quote.status === "sent" ? "View & Accept" : "View"}
                                 </Button>
                               </Link>
                             )}
