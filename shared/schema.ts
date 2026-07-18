@@ -839,8 +839,17 @@ export const crmUsers = pgTable("crm_users", {
   role: text("role").$type<CrmUserRole>().notNull().default("tech"),
   passwordHash: text("password_hash").notNull(),
   isActive: boolean("is_active").notNull().default(true),
+  // Dispatch-board membership override. null = role default (tech/supervisor
+  // on, everyone else off); true/false forces membership either way.
+  onDispatchBoard: boolean("on_dispatch_board"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+/** Whether a user appears on the dispatch board (and mobile tech rosters). */
+export function isOnDispatchBoard(u: { role: string; onDispatchBoard?: boolean | null }): boolean {
+  if (u.onDispatchBoard != null) return u.onDispatchBoard;
+  return u.role === "tech" || u.role === "supervisor";
+}
 
 // CRM Sessions
 export const crmSessions = pgTable("crm_sessions", {

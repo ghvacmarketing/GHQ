@@ -7654,7 +7654,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/crm/technicians - List field workers for dispatch (techs, sales, and supervisors who do field work)
   app.get("/api/crm/technicians", requireCrmAuth, async (req, res) => {
     try {
-      // Include tech, sales, and supervisor roles - they all do field work
+      // Dispatch-board membership: tech/supervisor by default, anyone else
+      // (e.g. sales) only when explicitly added; owner can force anyone off.
       const technicians = await db.select({
         id: crmUsers.id,
         name: crmUsers.name,
@@ -7662,7 +7663,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: crmUsers.role,
       }).from(crmUsers)
         .where(and(
-          sql`${crmUsers.role} IN ('tech', 'sales', 'supervisor')`,
+          sql`(
+            (${crmUsers.role} IN ('tech', 'supervisor') AND ${crmUsers.onDispatchBoard} IS DISTINCT FROM false)
+            OR ${crmUsers.onDispatchBoard} = true
+          )`,
           eq(crmUsers.isActive, true)
         ))
         .orderBy(crmUsers.name);
@@ -7670,6 +7674,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching technicians:", error);
       return res.status(500).json({ message: "Failed to fetch technicians" });
+    }
+  });
+
+  // GET /api/crm/dispatch-board/members - all active users with computed
+  // board membership + upcoming-job counts (settings UI)
+  app.get("/api/crm/dispatch-board/members", requireCrmAuth, requireCrmAdmin, async (req, res) => {
+    try {
+      const users = await db.select({
+        id: crmUsers.id,
+        name: crmUsers.name,
+        role: crmUsers.role,
+        onDispatchBoard: crmUsers.onDispatchBoard,
+      }).from(crmUsers)
+        .where(eq(crmUsers.isActive, true))
+        .orderBy(crmUsers.name);
+
+      const counts = await db.select({
+        techId: crmWorkOrders.assignedTechId,
+        count: sql<number>`count(*)::int`,
+      })
+        .from(crmWorkOrders)
+        .where(inArray(crmWorkOrders.status, ["scheduled", "dispatched", "en_route", "on_site"]))
+        .groupBy(crmWorkOrders.assignedTechId);
+      const countMap = new Map(counts.map((c) => [c.techId, c.count]));
+
+      res.json(users.map((u) => ({
+        ...u,
+        onBoard: u.onDispatchBoard != null ? u.onDispatchBoard : (u.role === "tech" || u.role === "supervisor"),
+        alwaysOnByRole: u.role === "tech" || u.role === "supervisor",
+        openJobs: countMap.get(u.id) || 0,
+      })));
+    } catch (error) {
+      console.error("Error fetching board members:", error);
+      res.status(500).json({ message: "Failed to fetch board members" });
+    }
+  });
+
+  // PATCH /api/crm/users/:id/dispatch-board - add/remove a user from the board.
+  // Guards: removing a tech/supervisor, or anyone with open scheduled jobs,
+  // requires the OWNER to explicitly force the override.
+  app.patch("/api/crm/users/:id/dispatch-board", requireCrmAuth, requireCrmAdmin, async (req: any, res) => {
+    try {
+      const { onBoard, force } = req.body || {};
+      if (typeof onBoard !== "boolean") {
+        return res.status(400).json({ message: "onBoard must be a boolean" });
+      }
+      const [target] = await db.select().from(crmUsers).where(eq(crmUsers.id, req.params.id));
+      if (!target || !target.isActive) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (!onBoard) {
+        const alwaysOnByRole = target.role === "tech" || target.role === "supervisor";
+        const [jobRow] = await db.select({ count: sql<number>`count(*)::int` })
+          .from(crmWorkOrders)
+          .where(and(
+            eq(crmWorkOrders.assignedTechId, target.id),
+            inArray(crmWorkOrders.status, ["scheduled", "dispatched", "en_route", "on_site"]),
+          ));
+        const openJobs = jobRow?.count || 0;
+
+        if (alwaysOnByRole || openJobs > 0) {
+          const isOwner = req.crmUser?.role === "owner";
+          if (!isOwner) {
+            return res.status(403).json({
+              message: alwaysOnByRole
+                ? "Techs and supervisors are always on the board — only the owner can override this."
+                : `${target.name} has ${openJobs} open scheduled job${openJobs === 1 ? "" : "s"} — only the owner can remove them.`,
+            });
+          }
+          if (!force) {
+            return res.status(409).json({
+              requiresOverride: true,
+              alwaysOnByRole,
+              openJobs,
+              message: alwaysOnByRole
+                ? `${target.name} is a ${target.role} (always on the board)${openJobs > 0 ? ` and has ${openJobs} open job${openJobs === 1 ? "" : "s"}` : ""}. Remove anyway?`
+                : `${target.name} has ${openJobs} open scheduled job${openJobs === 1 ? "" : "s"}. Removing them hides their column but keeps the jobs assigned. Remove anyway?`,
+            });
+          }
+        }
+      }
+
+      await db.update(crmUsers)
+        .set({ onDispatchBoard: onBoard })
+        .where(eq(crmUsers.id, target.id));
+      await logCrmAudit(req.crmUser?.id || null, "dispatch_board_changed", "crm_user", target.id, {
+        onBoard,
+        forced: !!force,
+        role: target.role,
+      });
+      res.json({ success: true, onBoard });
+    } catch (error) {
+      console.error("Error updating dispatch board membership:", error);
+      res.status(500).json({ message: "Failed to update board membership" });
     }
   });
 

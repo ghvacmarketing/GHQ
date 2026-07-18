@@ -2325,6 +2325,15 @@ export default function CrmDispatch() {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [localWorkOrders, setLocalWorkOrders] = useState<DispatchWorkOrder[]>([]);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
+  const [panelClosing, setPanelClosing] = useState(false);
+  // Slide the drawer out, then unmount it
+  const closePanel = () => {
+    setPanelClosing(true);
+    setTimeout(() => {
+      setSelectedWorkOrderId(null);
+      setPanelClosing(false);
+    }, 220);
+  };
   const [newNote, setNewNote] = useState("");
   const [dispatchNote, setDispatchNote] = useState("");
   const [workOrderDescription, setWorkOrderDescription] = useState("");
@@ -4335,8 +4344,19 @@ export default function CrmDispatch() {
             order is clicked; closes with the X. No collapse rail/arrow: it
             overlaps the board so open/close never shifts the layout. */}
         {selectedWorkOrder && (
+          <>
+          {/* Click anywhere outside the drawer to close it */}
           <div
-            className="fixed right-0 top-0 z-50 h-full w-[400px] max-w-[92vw] flex-shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-right duration-300"
+            className="fixed inset-0 z-40"
+            onClick={closePanel}
+            data-testid="workorder-panel-backdrop"
+          />
+          <div
+            className={`fixed right-0 top-0 z-50 h-full w-[400px] max-w-[92vw] flex-shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-hidden shadow-2xl ${
+              panelClosing
+                ? "translate-x-full transition-transform duration-200 ease-in"
+                : "animate-in slide-in-from-right duration-300 ease-[cubic-bezier(0.32,0.72,0.34,1)]"
+            }`}
             data-testid="workorder-detail-panel"
           >
           {false ? null : (
@@ -4353,7 +4373,7 @@ export default function CrmDispatch() {
               </div>
               <div className="flex items-center gap-0.5">
                 <button
-                  onClick={() => setSelectedWorkOrderId(null)}
+                  onClick={closePanel}
                   className="p-1.5 hover:bg-white/20 rounded-full transition-colors opacity-80 hover:opacity-100"
                   aria-label="Close panel"
                 >
@@ -4691,6 +4711,7 @@ export default function CrmDispatch() {
           </div>
           )}
           </div>
+          </>
         )}
       </div>
 

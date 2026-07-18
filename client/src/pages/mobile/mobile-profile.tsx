@@ -3,6 +3,7 @@ import { User, LogOut, Mail, Shield, Loader2, Monitor, ChevronRight } from "luci
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import MobileShell from "./mobile-shell";
+import { SubPage } from "@/components/mobile/sub-page";
 import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
 import { clearCrmToken } from "@/lib/crmAuth";
 import type { CrmUser } from "@shared/schema";
@@ -40,7 +41,8 @@ export default function MobileProfile() {
 
   return (
     <MobileShell>
-      <div className="p-4 space-y-4" data-testid="mobile-profile">
+      <SubPage backTo="/mobile">
+      <div className="p-4 pt-16 space-y-4" data-testid="mobile-profile">
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-[#711419]" />
@@ -113,6 +115,7 @@ export default function MobileProfile() {
           </div>
         )}
       </div>
+      </SubPage>
     </MobileShell>
   );
 }

@@ -108,14 +108,15 @@ export default function MobileJob() {
   const queryDateEnd = canViewFutureJobs ? futureEndStr : todayEnd;
   
   const { data: workOrders = [], isLoading: ordersLoading } = useQuery<WorkOrderWithDetails[]>({
-    queryKey: ["/api/crm/work-orders", { dateFrom: todayStart, dateTo: queryDateEnd, techId: (currentUser?.role === 'tech' || currentUser?.role === 'sales' || currentUser?.role === 'supervisor') ? currentUser?.id : undefined }],
+    queryKey: ["/api/crm/work-orders", { dateFrom: todayStart, dateTo: queryDateEnd, techId: (currentUser?.role === 'tech' || currentUser?.role === 'sales') ? currentUser?.id : undefined }],
     queryFn: async () => {
       const params = new URLSearchParams({
         dateFrom: todayStart,
         dateTo: queryDateEnd,
       });
-      // Tech, sales, and supervisor roles only see their own jobs on the Jobs tab
-      if ((currentUser?.role === 'tech' || currentUser?.role === 'sales' || currentUser?.role === 'supervisor') && currentUser?.id) {
+      // Tech and sales fetch only their own; supervisors/owner fetch everyone
+      // (their own list + the tech roster below both come from one query).
+      if ((currentUser?.role === 'tech' || currentUser?.role === 'sales') && currentUser?.id) {
         params.set('techId', currentUser.id);
       }
       const res = await fetch(`/api/crm/work-orders?${params}`, { credentials: "include" });
@@ -299,6 +300,19 @@ export default function MobileJob() {
     }
   }, [customerProperties, selectedProperty]);
 
+  // Collapsible per-tech roster (supervisor and owner)
+  const { data: boardTechs = [] } = useQuery<{ id: string; name: string; role: string }[]>({
+    queryKey: ["/api/crm/technicians"],
+    enabled: !!currentUser && (currentUser.role === 'supervisor' || currentUser.role === 'owner'),
+  });
+  const [expandedTechs, setExpandedTechs] = useState<Set<string>>(() => new Set());
+  const toggleTech = (id: string) =>
+    setExpandedTechs((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+
   const handleCreateSubmit = () => {
     if (!selectedCustomer || !selectedProperty || !woTitle.trim() || !woDescription.trim()) {
       toast({ title: "Please fill all required fields", variant: "destructive" });
@@ -312,15 +326,16 @@ export default function MobileJob() {
     createWorkOrderMutation.mutate();
   };
 
-  const activeJob = useMemo(() => {
-    return workOrders.find(wo => 
-      wo.status === "on_site" || wo.status === "en_route" || wo.status === "dispatched"
-    );
-  }, [workOrders]);
+  // The main list is ALWAYS the signed-in user's own jobs.
+  const myJobs = useMemo(
+    () => workOrders.filter((wo) => wo.assignedTechId === currentUser?.id),
+    [workOrders, currentUser?.id],
+  );
+  const isSupervisorPlus = currentUser?.role === 'supervisor' || currentUser?.role === 'owner';
 
   // For users who can view future jobs: show all jobs (today + future), for others: only today
   const displayedJobs = useMemo(() => {
-    return workOrders
+    return myJobs
       .filter(wo => {
         if (!wo.scheduledStart) return false;
         // For those who can't view future jobs, filter to today only
@@ -339,7 +354,7 @@ export default function MobileJob() {
         const bStart = b.scheduledStart ? new Date(b.scheduledStart).getTime() : 0;
         return aStart - bStart;
       });
-  }, [workOrders, canViewFutureJobs]);
+  }, [myJobs, canViewFutureJobs]);
 
   // Group jobs by date for users who can view future jobs
   const groupedJobsByDate = useMemo(() => {
@@ -385,12 +400,6 @@ export default function MobileJob() {
     return groups;
   }, [displayedJobs, canViewFutureJobs]);
 
-  useEffect(() => {
-    if (activeJob) {
-      navigate(`/mobile/job/${activeJob.id}`);
-    }
-  }, [activeJob, navigate]);
-
   if (userLoading || ordersLoading) {
     return (
       <MobileShell>
@@ -406,16 +415,6 @@ export default function MobileJob() {
       <MobileShell>
         <div className="p-4 text-center">
           <p className="text-slate-600">Please log in to view your jobs</p>
-        </div>
-      </MobileShell>
-    );
-  }
-
-  if (activeJob) {
-    return (
-      <MobileShell>
-        <div className="flex items-center justify-center h-full">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#711419]" />
         </div>
       </MobileShell>
     );
@@ -622,6 +621,71 @@ export default function MobileJob() {
                 </Card>
               );
             })}
+          </div>
+        )}
+
+        {/* All technicians — supervisor & owner: today's jobs per tech, collapsible */}
+        {isSupervisorPlus && (
+          <div className="space-y-3 border-t border-slate-200 pt-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">All Technicians</h3>
+              <span className="text-xs font-medium text-slate-400">
+                {boardTechs.filter((t) => t.id !== currentUser?.id).length} techs
+              </span>
+            </div>
+            <div className="space-y-2.5" data-testid="jobs-tech-roster">
+              {boardTechs.filter((t) => t.id !== currentUser?.id).map((tech) => {
+                const techJobs = workOrders
+                  .filter((wo) => wo.assignedTechId === tech.id && wo.scheduledStart && isToday(toLocalTime(wo.scheduledStart)))
+                  .sort((a, b) => new Date(a.scheduledStart!).getTime() - new Date(b.scheduledStart!).getTime());
+                const expanded = expandedTechs.has(tech.id);
+                const initials = tech.name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("");
+                return (
+                  <div key={tech.id} data-testid={`jobs-tech-${tech.id}`}>
+                    <button
+                      onClick={() => toggleTech(tech.id)}
+                      className={`flex w-full items-center gap-3 rounded-2xl border bg-white px-3 py-2.5 shadow-sm transition-all active:scale-[0.99] ${
+                        expanded ? "border-[#711419]/30" : "border-slate-200"
+                      }`}
+                      data-testid={`jobs-tech-toggle-${tech.id}`}
+                    >
+                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#711419]/10 text-sm font-bold text-[#711419]">
+                        {initials}
+                      </span>
+                      <span className="flex-1 text-left text-sm font-semibold text-slate-800">{tech.name}</span>
+                      <span className="text-xs text-slate-400">{techJobs.length} today</span>
+                      <ChevronRight className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`} />
+                    </button>
+                    <div className={`grid transition-all duration-300 ease-in-out ${expanded ? "mt-2 grid-rows-[1fr] opacity-100" : "mt-0 grid-rows-[0fr] opacity-0"}`}>
+                      <div className="overflow-hidden">
+                        <div className="ml-2 space-y-1.5 border-l-2 border-slate-200 pb-1 pl-4">
+                          {techJobs.length === 0 ? (
+                            <p className="py-2 text-xs text-slate-400">No jobs scheduled today.</p>
+                          ) : (
+                            techJobs.map((job) => (
+                              <button
+                                key={job.id}
+                                onClick={() => navigate(`/mobile/job/${job.id}`)}
+                                className="flex w-full items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-left shadow-sm transition-all active:scale-[0.99] border border-slate-100"
+                                data-testid={`jobs-roster-job-${job.id}`}
+                              >
+                                <span className="text-xs font-semibold tabular-nums text-slate-500">
+                                  {job.scheduledStart ? format(toLocalTime(job.scheduledStart), "h:mm a") : "—"}
+                                </span>
+                                <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">
+                                  {job.customer?.name || job.title || "Job"}
+                                </span>
+                                <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

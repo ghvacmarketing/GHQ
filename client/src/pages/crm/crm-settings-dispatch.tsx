@@ -1,13 +1,19 @@
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { getQueryFn } from "@/lib/queryClient";
+import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { ArrowLeft, Check, Clock } from "lucide-react";
+import { ArrowLeft, Check, Clock, Users } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { SectionCard } from "@/components/crm/ui-kit";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { CrmUser } from "@shared/schema";
@@ -26,6 +32,34 @@ export default function CrmSettingsDispatch() {
   const { data: currentUser, isLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
+  });
+
+  const { data: members = [] } = useQuery<Array<{
+    id: string; name: string; role: string; onBoard: boolean; alwaysOnByRole: boolean; openJobs: number;
+  }>>({
+    queryKey: ["/api/crm/dispatch-board/members"],
+    enabled: !!currentUser,
+  });
+  const [override, setOverride] = useState<{ id: string; name: string; message: string } | null>(null);
+
+  const toggleMember = useMutation({
+    mutationFn: async (p: { id: string; onBoard: boolean; force?: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/crm/users/${p.id}/dispatch-board`, { onBoard: p.onBoard, force: p.force });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch-board/members"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/technicians"] });
+      setOverride(null);
+    },
+    onError: (err: any, vars) => {
+      if (err?.requiresOverride && currentUser?.role === "owner") {
+        const m = members.find((x) => x.id === vars.id);
+        setOverride({ id: vars.id, name: m?.name || "this user", message: err.message });
+      } else {
+        toast({ title: "Couldn't update board", description: err?.message || "Try again", variant: "destructive" });
+      }
+    },
   });
 
   const [increment, setIncrement] = useState<15 | 30>(() => {
@@ -107,7 +141,58 @@ export default function CrmSettingsDispatch() {
             Changes apply the next time the dispatch board loads.
           </p>
         </SectionCard>
+
+        <SectionCard
+          title={
+            <span className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" /> Board members
+            </span>
+          }
+          description="Techs and supervisors are always on the board. Anyone else (e.g. sales) can be added here. Removing someone with open scheduled jobs — or any tech/supervisor — is an owner-only override; their jobs stay assigned either way."
+        >
+          <div className="space-y-2">
+            {members.map((m) => (
+              <div key={m.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5" data-testid={`board-member-${m.id}`}>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">{m.name}</p>
+                  <p className="text-xs text-muted-foreground capitalize">
+                    {m.role}
+                    {m.openJobs > 0 && ` · ${m.openJobs} open job${m.openJobs === 1 ? "" : "s"}`}
+                    {m.alwaysOnByRole && " · always on"}
+                  </p>
+                </div>
+                <Switch
+                  checked={m.onBoard}
+                  onCheckedChange={(checked) => toggleMember.mutate({ id: m.id, onBoard: checked })}
+                  disabled={toggleMember.isPending}
+                  data-testid={`switch-board-${m.id}`}
+                />
+              </div>
+            ))}
+            {members.length === 0 && <Skeleton className="h-24 w-full" />}
+          </div>
+        </SectionCard>
       </div>
+
+      {/* Owner override confirm */}
+      <AlertDialog open={!!override} onOpenChange={(o) => !o && setOverride(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {override?.name} from the board?</AlertDialogTitle>
+            <AlertDialogDescription>{override?.message}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-override">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => override && toggleMember.mutate({ id: override.id, onBoard: false, force: true })}
+              data-testid="button-confirm-override"
+            >
+              Remove anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </CrmLayout>
   );
 }

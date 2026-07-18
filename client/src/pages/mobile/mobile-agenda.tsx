@@ -556,16 +556,6 @@ export default function MobileAgenda() {
   const todayEnd = getLocalEndOfDay(today).toISOString();
   const { isOnline } = useOnlineStatus();
   const [isFromCache, setIsFromCache] = useState(false);
-  // Collapsible per-tech sections in the grouped view (start collapsed; the
-  // supervisor opens whichever technicians they want to see)
-  const [expandedTechs, setExpandedTechs] = useState<Set<string>>(() => new Set());
-  const toggleTech = (id: string) =>
-    setExpandedTechs((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-
   const { data: currentUser, isLoading: isLoadingUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: async () => {
@@ -577,10 +567,9 @@ export default function MobileAgenda() {
     gcTime: 24 * 60 * 60 * 1000,
   });
 
-  // Everyone sees their own jobs first. Supervisors and the owner also get
-  // the full roster below, so they fetch every tech's work orders.
-  const isSupervisorPlus = currentUser?.role === 'supervisor' || currentUser?.role === 'owner' || currentUser?.role === 'admin';
-  const shouldFilterByTech = !isSupervisorPlus;
+  // Agenda is strictly YOUR day; the all-technicians roster lives on the
+  // Jobs tab now.
+  const shouldFilterByTech = true;
 
   const { data: workOrders, isLoading: isLoadingOrders, error, isError } = useQuery<WorkOrderWithDetails[]>({
     queryKey: ["/api/crm/work-orders", { dateFrom: todayStart, dateTo: todayEnd, techId: shouldFilterByTech ? currentUser?.id : undefined }],
@@ -632,22 +621,6 @@ export default function MobileAgenda() {
     refetchOnWindowFocus: true,
   });
 
-  // Fetch all technicians when viewing all techs
-  const { data: technicians = [] } = useQuery<{ id: string; name: string; role: string }[]>({
-    queryKey: ["/api/crm/users", "technicians-for-agenda"],
-    queryFn: async () => {
-      const res = await fetch("/api/crm/users", { credentials: "include" });
-      if (!res.ok) return [];
-      const users = await res.json();
-      // Filter to tech, sales, supervisor roles that can have work orders assigned
-      return users.filter((u: CrmUser) => 
-        ['tech', 'sales', 'supervisor', 'owner', 'admin'].includes(u.role) && u.isActive
-      );
-    },
-    enabled: isSupervisorPlus,
-    staleTime: 5 * 60 * 1000,
-  });
-
   const isLoading = isLoadingUser || isLoadingOrders;
 
   const isAuthError = isError && error instanceof Error && error.message === "AUTH_REQUIRED";
@@ -663,58 +636,7 @@ export default function MobileAgenda() {
     return aTime - bTime;
   });
 
-  // Group work orders by technician when viewing all techs. Seed with every
-  // dispatchable person (tech/sales/supervisor) so people with no jobs today
-  // still show up in the roster.
-  const showGroupedView = isSupervisorPlus;
-  const myId = currentUser?.id;
-  const groupedByTech = showGroupedView
-    ? todaysOrders.filter((wo) => wo.assignedTechId !== myId).reduce((acc, wo) => {
-        const techId = wo.assignedTechId || 'unassigned';
-        if (!acc[techId]) {
-          acc[techId] = [];
-        }
-        acc[techId].push(wo);
-        return acc;
-      }, Object.fromEntries(
-        technicians
-          .filter((t) => ["tech", "sales", "supervisor"].includes(t.role) && t.id !== myId)
-          .map((t) => [t.id, [] as WorkOrderWithDetails[]]),
-      ) as Record<string, WorkOrderWithDetails[]>)
-    : null;
-
-  // Sort work orders within each tech group by scheduled start time
-  if (groupedByTech) {
-    Object.keys(groupedByTech).forEach((techId) => {
-      groupedByTech[techId].sort((a, b) => {
-        const aTime = a.scheduledStart ? new Date(a.scheduledStart).getTime() : Infinity;
-        const bTime = b.scheduledStart ? new Date(b.scheduledStart).getTime() : Infinity;
-        return aTime - bTime;
-      });
-    });
-  }
-
-  // Get tech name by ID
-  const getTechName = (techId: string): string => {
-    if (techId === 'unassigned') return 'Unassigned';
-    const tech = technicians.find(t => t.id === techId);
-    return tech?.name || 'Unknown';
-  };
-
-  // Sort technicians: those with work orders first, then alphabetical; the
-  // unassigned bucket always sinks to the bottom.
-  const sortedTechIds = groupedByTech
-    ? Object.keys(groupedByTech).sort((a, b) => {
-        if (a === 'unassigned') return 1;
-        if (b === 'unassigned') return -1;
-        const aHasJobs = groupedByTech[a].length > 0 ? 0 : 1;
-        const bHasJobs = groupedByTech[b].length > 0 ? 0 : 1;
-        if (aHasJobs !== bHasJobs) return aHasJobs - bHasJobs;
-        return getTechName(a).localeCompare(getTechName(b));
-      })
-    : [];
-
-  const myJobs = todaysOrders.filter((wo) => wo.assignedTechId === myId);
+  const myJobs = todaysOrders;
 
   const showCacheWarning = !isOnline || isFromCache;
 
@@ -820,78 +742,6 @@ export default function MobileAgenda() {
               </div>
             )}
 
-            {/* All Technicians — collapsible roster (you're not in it; your jobs are above) */}
-            {showGroupedView && groupedByTech && (
-              <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-700">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
-                    All Technicians
-                  </h3>
-                  <span className="text-xs font-medium text-slate-400">
-                    {sortedTechIds.filter((id) => id !== "unassigned").length} techs
-                  </span>
-                </div>
-                <div className="space-y-2.5" data-testid="agenda-grouped-list">
-                  {sortedTechIds.map((techId) => {
-                    const techOrders = groupedByTech[techId];
-                    const techName = getTechName(techId);
-                    const tech = technicians.find(t => t.id === techId);
-                    const roleConfig = tech ? roleLabels[tech.role] : null;
-                    const expanded = expandedTechs.has(techId);
-                    const initials = techName !== "Unassigned"
-                      ? techName.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("")
-                      : null;
-
-                    return (
-                      <div key={techId} data-testid={`tech-section-${techId}`}>
-                        <button
-                          onClick={() => toggleTech(techId)}
-                          className={`flex w-full items-center gap-3 rounded-2xl border bg-white px-3 py-2.5 shadow-sm transition-all active:scale-[0.99] dark:bg-slate-800 ${
-                            expanded ? "border-[#711419]/30" : "border-slate-200 dark:border-slate-700"
-                          }`}
-                          data-testid={`tech-toggle-${techId}`}
-                        >
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#711419]/10 text-sm font-bold text-[#711419]">
-                            {initials || <User className="h-4 w-4 text-slate-500" />}
-                          </div>
-                          <div className="flex-1 text-left">
-                            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{techName}</p>
-                            {roleConfig && (
-                              <p className="text-[11px] text-slate-400">{roleConfig.label}</p>
-                            )}
-                          </div>
-                          <Badge variant="outline" className="text-xs">
-                            {techOrders.length} job{techOrders.length !== 1 ? 's' : ''}
-                          </Badge>
-                          <ChevronRight className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`} />
-                        </button>
-                        <div
-                          className={`grid transition-all duration-300 ease-in-out ${
-                            expanded ? "mt-2 grid-rows-[1fr] opacity-100" : "mt-0 grid-rows-[0fr] opacity-0"
-                          }`}
-                        >
-                          <div className="overflow-hidden">
-                            <div className="ml-2 space-y-2 border-l-2 border-slate-200 pl-4 pb-1 dark:border-slate-700">
-                              {techOrders.length === 0 ? (
-                                <p className="py-2 text-xs text-slate-400">No jobs scheduled today.</p>
-                              ) : (
-                                techOrders.map((workOrder) => (
-                                  <WorkOrderCard
-                                    key={workOrder.id}
-                                    workOrder={workOrder}
-                                    showCacheWarning={showCacheWarning}
-                                  />
-                                ))
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>
