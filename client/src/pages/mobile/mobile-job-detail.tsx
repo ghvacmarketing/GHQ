@@ -3579,29 +3579,91 @@ export default function MobileJobDetail() {
     }
   };
   const swipeDrag = useRef<{ x: number; y: number; engaged: boolean; active: boolean; section: boolean } | null>(null);
-  const contentRef = useRef<HTMLDivElement | null>(null);
+  const overviewRef = useRef<HTMLDivElement | null>(null);
+  const sectionsRef = useRef<HTMLDivElement | null>(null);
+  const scrimRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = sectionsRef; // sections layer is the swipe/scroll target
   const tabScroll = useRef<Record<string, number>>({});
 
-  // Switch tabs preserving each tab's scroll position; sections animate in.
-  const switchTab = (next: TabType, animateFrom: "right" | "left" | null = "right") => {
-    const el = contentRef.current;
-    if (el) tabScroll.current[activeTab] = el.scrollTop;
+  // Parallax layer states: while a section is open, the Overview sits
+  // beneath it shifted left with a light scrim — exactly like an iOS
+  // navigation stack, so swiping a section away reveals it dynamically.
+  const setOpenLayerStyles = () => {
+    if (overviewRef.current) overviewRef.current.style.transform = "translateX(-25%)";
+    if (scrimRef.current) scrimRef.current.style.opacity = "0.18";
+    if (sectionsRef.current) sectionsRef.current.style.transform = "";
+  };
+  const setClosedLayerStyles = () => {
+    if (overviewRef.current) overviewRef.current.style.transform = "";
+    if (scrimRef.current) scrimRef.current.style.opacity = "0";
+  };
+
+  // Animate the section layer away (from an optional drag offset) and land
+  // on the Overview — used by swipe commit, the back button, and the nav pill.
+  const closeSectionAnimated = (fromDx = 0) => {
+    const sec = sectionsRef.current;
+    const ov = overviewRef.current;
+    const scrim = scrimRef.current;
+    if (!sec || activeTab === "overview") { setActiveTab("overview"); return; }
+    tabScroll.current[activeTab] = sec.scrollTop;
+    const w = sec.clientWidth || window.innerWidth;
+    const startP = Math.max(0, Math.min(1, fromDx / w));
+    const dur = 180 * (1 - startP) + 40;
+    sec.animate(
+      [{ transform: `translateX(${fromDx}px)` }, { transform: "translateX(100%)" }],
+      { duration: dur, easing: "ease-in" },
+    );
+    ov?.animate(
+      [{ transform: `translateX(${-25 * (1 - startP)}%)` }, { transform: "translateX(0)" }],
+      { duration: dur, easing: "ease-out" },
+    );
+    scrim?.animate(
+      [{ opacity: String(0.18 * (1 - startP)) }, { opacity: "0" }],
+      { duration: dur, easing: "linear" },
+    );
+    setTimeout(() => {
+      setClosedLayerStyles();
+      if (sectionsRef.current) sectionsRef.current.style.transform = "";
+      setActiveTab("overview");
+    }, dur - 10);
+  };
+
+  // Switch tabs preserving each section's scroll position.
+  const switchTab = (next: TabType) => {
+    if (next === activeTab) return;
+    if (next === "overview") { closeSectionAnimated(); return; }
+    const sec = sectionsRef.current;
+    const fromOverview = activeTab === "overview";
+    if (sec && !fromOverview) tabScroll.current[activeTab] = sec.scrollTop;
     setActiveTab(next);
     requestAnimationFrame(() => {
-      const el2 = contentRef.current;
-      if (!el2) return;
-      el2.scrollTop = tabScroll.current[next] || 0;
-      if (animateFrom) {
-        el2.animate(
-          [
-            { transform: `translateX(${animateFrom === "right" ? 24 : -24}px)`, opacity: 0.5 },
-            { transform: "translateX(0)", opacity: 1 },
-          ],
-          { duration: 200, easing: "cubic-bezier(0.32, 0.72, 0.34, 1)" },
+      const sec2 = sectionsRef.current;
+      if (!sec2) return;
+      sec2.scrollTop = tabScroll.current[next] || 0;
+      if (fromOverview) {
+        // Push the section in over the parallaxing Overview
+        sec2.animate(
+          [{ transform: "translateX(100%)" }, { transform: "translateX(0)" }],
+          { duration: 240, easing: "cubic-bezier(0.32, 0.72, 0.34, 1)" },
+        );
+        overviewRef.current?.animate(
+          [{ transform: "translateX(0)" }, { transform: "translateX(-25%)" }],
+          { duration: 240, easing: "cubic-bezier(0.32, 0.72, 0.34, 1)" },
+        );
+        scrimRef.current?.animate(
+          [{ opacity: "0" }, { opacity: "0.18" }],
+          { duration: 240, easing: "linear" },
+        );
+        setTimeout(setOpenLayerStyles, 230);
+      } else {
+        sec2.animate(
+          [{ transform: "translateX(16px)", opacity: 0.6 }, { transform: "translateX(0)", opacity: 1 }],
+          { duration: 180, easing: "cubic-bezier(0.32, 0.72, 0.34, 1)" },
         );
       }
     });
   };
+
   const springBack = () => {
     const el = pageRef.current;
     if (!el) return;
@@ -3625,14 +3687,23 @@ export default function MobileJobDetail() {
     if (!st.engaged) {
       if (dx > 8 && dx > dy) {
         st.engaged = true;
-        const target = st.section ? contentRef.current : el;
+        const target = st.section ? sectionsRef.current : el;
         if (target) target.style.transition = "none";
       }
       else if (dy > 14) { st.active = false; return; }
     }
     if (st.engaged) {
-      const target = st.section ? contentRef.current : el;
-      if (target) target.style.transform = `translateX(${Math.max(0, dx)}px)`;
+      const off = Math.max(0, dx);
+      if (st.section) {
+        const sec = sectionsRef.current;
+        const w = sec?.clientWidth || window.innerWidth;
+        const pr = Math.max(0, Math.min(1, off / w));
+        if (sec) sec.style.transform = `translateX(${off}px)`;
+        if (overviewRef.current) overviewRef.current.style.transform = `translateX(${-25 * (1 - pr)}%)`;
+        if (scrimRef.current) scrimRef.current.style.opacity = String(0.18 * (1 - pr));
+      } else {
+        el.style.transform = `translateX(${off}px)`;
+      }
     }
   };
   const onSwipeEnd = (e: React.PointerEvent) => {
@@ -3642,20 +3713,22 @@ export default function MobileJobDetail() {
     const dx = e.clientX - st.x;
     const commit = dx > Math.min(140, window.innerWidth * 0.33);
     if (st.section) {
-      const el = contentRef.current;
-      if (!el) return;
+      const sec = sectionsRef.current;
+      if (!sec) return;
+      const dxNow = e.clientX - st.x;
       if (commit) {
-        el.style.transition = "transform 0.16s ease-in";
-        el.style.transform = "translateX(100%)";
-        setTimeout(() => {
-          el.style.transition = "";
-          el.style.transform = "";
-          switchTab("overview", "left");
-        }, 150);
+        closeSectionAnimated(Math.max(0, dxNow));
       } else {
-        el.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
-        el.style.transform = "translateX(0)";
-        setTimeout(() => { el.style.transition = ""; }, 260);
+        sec.style.transition = "transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1)";
+        sec.style.transform = "translateX(0)";
+        overviewRef.current?.animate(
+          [{ transform: overviewRef.current.style.transform || "translateX(-25%)" }, { transform: "translateX(-25%)" }],
+          { duration: 250, easing: "ease-out" },
+        );
+        setTimeout(() => {
+          if (sec) sec.style.transition = "";
+          setOpenLayerStyles();
+        }, 260);
       }
     } else if (commit) {
       goBackAnimated();
@@ -4098,7 +4171,7 @@ export default function MobileJobDetail() {
       <OfflineIndicator />
       {/* Floating back — tap, or swipe right anywhere from the left half */}
       <button
-        onClick={() => { if (activeTab !== "overview") switchTab("overview", "left"); else goBackAnimated(); }}
+        onClick={() => { if (activeTab !== "overview") closeSectionAnimated(); else goBackAnimated(); }}
         className="absolute left-3 z-40 flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white/85 text-slate-700 shadow-[0_4px_16px_rgba(0,0,0,0.14)] backdrop-blur-xl transition-transform active:scale-95"
         style={{ top: "calc(10px + env(safe-area-inset-top))" }}
         data-testid="button-back"
@@ -4148,8 +4221,10 @@ export default function MobileJobDetail() {
           </div>
         </div>
 
-        <div ref={contentRef} className="flex-1 overflow-auto px-4 pb-28" data-testid="mobile-job-detail">
-          {activeTab === "overview" && (
+        <div className="relative min-h-0 flex-1" data-testid="mobile-job-detail">
+          {/* Base layer: the Overview hub — always mounted so it parallaxes
+              beneath a section while you swipe it away */}
+          <div ref={overviewRef} className="absolute inset-0 overflow-auto px-4 pb-28">
             <OverviewTab
               onGoTab={(t) => switchTab(t as TabType)}
               workOrder={workOrder}
@@ -4164,20 +4239,29 @@ export default function MobileJobDetail() {
               pendingMutation={pendingMutation}
               optimisticPending={optimisticPending}
             />
-          )}
-          <div className={activeTab === "work" ? "block" : "hidden"}>
-            <WorkTab workOrder={workOrder} checklistResponse={checklistResponse} />
           </div>
-          <div className={activeTab === "quote" ? "block" : "hidden"}>
-            <QuoteTab workOrder={workOrder} />
-          </div>
-          <div className={activeTab === "invoice" ? "block" : "hidden"}>
-            <InvoiceTab 
-              workOrder={workOrder} 
-              renewalInfo={renewalInfo}
-              onCollectRenewal={() => setShowCollectRenewalDialog(true)}
-              onDeclineRenewal={() => setShowDeclineRenewalDialog(true)}
-            />
+          <div ref={scrimRef} className="pointer-events-none absolute inset-0 z-10 bg-black" style={{ opacity: 0 }} />
+          {/* Section layer: slides over the Overview; stays mounted so entered
+              data and scroll positions survive round trips */}
+          <div
+            ref={sectionsRef}
+            className="absolute inset-0 z-20 overflow-auto bg-slate-50 px-4 pb-28 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
+            style={{ visibility: activeTab === "overview" ? "hidden" : "visible" }}
+          >
+            <div className={activeTab === "work" ? "block" : "hidden"}>
+              <WorkTab workOrder={workOrder} checklistResponse={checklistResponse} />
+            </div>
+            <div className={activeTab === "quote" ? "block" : "hidden"}>
+              <QuoteTab workOrder={workOrder} />
+            </div>
+            <div className={activeTab === "invoice" ? "block" : "hidden"}>
+              <InvoiceTab
+                workOrder={workOrder}
+                renewalInfo={renewalInfo}
+                onCollectRenewal={() => setShowCollectRenewalDialog(true)}
+                onDeclineRenewal={() => setShowDeclineRenewalDialog(true)}
+              />
+            </div>
           </div>
         </div>
 
