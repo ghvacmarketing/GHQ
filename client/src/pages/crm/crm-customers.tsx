@@ -618,14 +618,14 @@ export default function CrmCustomers() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <span className={`inline-flex items-center rounded-sm px-2 py-0.5 text-xs font-medium ${getCustomerTypeBadgeClass(customer.customerType)}`}>
+                            <StatusDot pill={getCustomerTypeBadgeClass(customer.customerType)}>
                               {formatCustomerType(customer.customerType)}
-                            </span>
+                            </StatusDot>
                           </TableCell>
                           <TableCell>
-                            <span className={`inline-flex items-center rounded-sm px-2 py-0.5 text-xs font-medium ${getStatusBadgeClass(customer.customerStatus)}`}>
+                            <StatusDot pill={getStatusBadgeClass(customer.customerStatus)}>
                               {formatCustomerStatus(customer.customerStatus)}
-                            </span>
+                            </StatusDot>
                           </TableCell>
                           <TableCell className="hidden md:table-cell text-slate-600 max-w-xs truncate">
                             {formatAddress(customer)}
