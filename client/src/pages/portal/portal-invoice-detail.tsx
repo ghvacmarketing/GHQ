@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, FileText, CheckCircle2, MapPin, Calendar, CreditCard, Loader2 } from "lucide-react";
+import { ArrowLeft, FileText, CheckCircle2, MapPin, Calendar, CreditCard, Loader2, User } from "lucide-react";
 import ghvacLogo from "@assets/ghvac-logo.png";
 
 const BRAND_COLOR = "#711419";
@@ -231,16 +231,11 @@ export default function PortalInvoiceDetail() {
         <Card className="shadow-lg border-0" data-testid="card-invoice">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg" style={{ backgroundColor: `${BRAND_COLOR}15` }}>
-                  <FileText className="h-6 w-6" style={{ color: BRAND_COLOR }} />
-                </div>
-                <div>
-                  <CardTitle className="text-xl" data-testid="text-invoice-number">
-                    Invoice #{invoice.invoiceNumber}
-                  </CardTitle>
-                  <p className="text-sm text-slate-500">{formatDate(invoice.createdAt)}</p>
-                </div>
+              <div>
+                <CardTitle className="text-xl" data-testid="text-invoice-number">
+                  Invoice #{invoice.invoiceNumber}
+                </CardTitle>
+                <p className="text-sm text-slate-500">{formatDate(invoice.createdAt)}</p>
               </div>
               {statusInfo && (
                 <Badge 
@@ -257,7 +252,7 @@ export default function PortalInvoiceDetail() {
             <div className="bg-slate-50 rounded-lg p-4 space-y-3">
               <div className="flex items-start gap-3">
                 <div className="text-slate-400 mt-0.5">
-                  <FileText className="h-4 w-4" />
+                  <User className="h-4 w-4" />
                 </div>
                 <div>
                   <p className="text-sm text-slate-500">Customer</p>
