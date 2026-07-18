@@ -19,6 +19,13 @@ const PUBLIC_ROUTES = [
   /^\/portal(\/|$)/,        // /portal/* - customer portal (has its own auth)
   /^\/book-online/,         // /book-online - public booking page
   /^\/auth-verify/,         // /auth-verify - SMS magic link verification
+  // Sign-in screens are safe without the shared password: each one requires a
+  // real credential, and every data API is enforced server-side regardless.
+  // This lets a fresh install (e.g. the Play Store app) go straight to login.
+  /^\/$/,                   // root landing (redirects to /crm/login when signed out)
+  /^\/crm\/login/,          // CRM sign-in
+  /^\/login/,               // GHVAC Tools SMS magic-link sign-in
+  /^\/employee-portal\/login/, // employee portal sign-in
 ];
 
 function isPublicRoute(pathname: string): boolean {

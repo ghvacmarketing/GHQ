@@ -1,10 +1,17 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, ClipboardCheck, Wrench, ArrowRight, DollarSign, Receipt, Droplets } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import {
+  FileText, ClipboardCheck, Wrench, ArrowRight, DollarSign, Receipt, Droplets,
+  CalendarDays, CalendarPlus, Loader2, Truck,
+} from "lucide-react";
 import { PortalLayout } from "./portal-layout";
 
 interface PortalCustomer {
@@ -38,6 +45,33 @@ interface PortalDashboardData {
   } | null;
 }
 
+interface PortalAppointments {
+  workOrders: Array<{
+    id: string;
+    orderNumber: string | null;
+    title: string | null;
+    status: string;
+    visitType: string | null;
+    scheduledStart: string | null;
+    scheduledEnd: string | null;
+  }>;
+  maintenanceVisits: Array<{
+    id: string;
+    visitNumber: number;
+    totalVisitsInCycle: number;
+    targetDate: string;
+    status: string;
+    agreementPlan: string | null;
+  }>;
+}
+
+const WORK_ORDER_STATUS_LABELS: Record<string, string> = {
+  scheduled: "Scheduled",
+  dispatched: "Technician assigned",
+  en_route: "Technician en route",
+  on_site: "Technician on site",
+};
+
 export default function PortalDashboard() {
   const [, setLocation] = useLocation();
 
@@ -50,6 +84,36 @@ export default function PortalDashboard() {
     queryKey: ["/api/portal/dashboard"],
     enabled: !!customer,
     retry: false,
+  });
+
+  const { data: appointments, isLoading: appointmentsLoading } = useQuery<PortalAppointments>({
+    queryKey: ["/api/portal/appointments"],
+    enabled: !!customer,
+    retry: false,
+  });
+
+  const { toast } = useToast();
+  const [requestMessage, setRequestMessage] = useState("");
+  const [preferredTime, setPreferredTime] = useState("");
+
+  const serviceRequest = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/portal/service-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: requestMessage, preferredTime }),
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Failed to submit request");
+      return data;
+    },
+    onSuccess: () => {
+      toast({ title: "Request sent", description: "Our office will reach out shortly to get you scheduled." });
+      setRequestMessage("");
+      setPreferredTime("");
+    },
+    onError: (e: Error) => toast({ title: "Request failed", description: e.message, variant: "destructive" }),
   });
 
   useEffect(() => {
@@ -90,6 +154,17 @@ export default function PortalDashboard() {
       month: "short",
       day: "numeric",
       year: "numeric",
+    });
+  };
+
+  const formatDateTime = (dateString: string | null) => {
+    if (!dateString) return "Date TBD";
+    return new Date(dateString).toLocaleString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
     });
   };
 
@@ -203,6 +278,132 @@ export default function PortalDashboard() {
               ) : (
                 <p className="text-sm text-slate-400">No recent service</p>
               )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Upcoming appointments + request service */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card className="shadow-sm" data-testid="card-upcoming-appointments">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <CalendarDays className="h-5 w-5 text-[#711419]" />
+                Upcoming Appointments
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {appointmentsLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-14" />
+                  <Skeleton className="h-14" />
+                </div>
+              ) : (appointments?.workOrders?.length || 0) === 0 && (appointments?.maintenanceVisits?.length || 0) === 0 ? (
+                <p className="text-sm text-slate-400 py-4 text-center" data-testid="text-no-appointments">
+                  Nothing scheduled right now.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {appointments?.workOrders?.map((wo) => (
+                    <li
+                      key={wo.id}
+                      className="flex items-start gap-3 rounded-lg border border-slate-200 p-3"
+                      data-testid={`appointment-${wo.id}`}
+                    >
+                      <div className="p-2 bg-blue-100 rounded-lg shrink-0">
+                        <Truck className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">
+                          {wo.title || wo.visitType || "Service visit"}
+                        </p>
+                        <p className="text-sm text-slate-500">
+                          {formatDateTime(wo.scheduledStart)}
+                          <span className="ml-2 text-xs text-emerald-600">
+                            {WORK_ORDER_STATUS_LABELS[wo.status] || wo.status}
+                          </span>
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                  {appointments?.maintenanceVisits?.map((v) => (
+                    <li
+                      key={v.id}
+                      className="flex items-start gap-3 rounded-lg border border-slate-200 p-3"
+                      data-testid={`visit-${v.id}`}
+                    >
+                      <div className="p-2 bg-green-100 rounded-lg shrink-0">
+                        <ClipboardCheck className="h-4 w-4 text-green-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">
+                          Maintenance visit {v.visitNumber} of {v.totalVisitsInCycle}
+                          {v.agreementPlan ? ` — ${v.agreementPlan}` : ""}
+                        </p>
+                        <p className="text-sm text-slate-500">
+                          Target: {formatDate(v.targetDate)}
+                          {v.status === "pending" && (
+                            <span className="ml-2 text-xs text-amber-600">Call us to schedule</span>
+                          )}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm" data-testid="card-request-service">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <CalendarPlus className="h-5 w-5 text-[#711419]" />
+                Need Service?
+              </CardTitle>
+              <CardDescription>
+                Book online and pick a time, or send us a note and we'll call you.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <a href="/book-online" target="_blank" rel="noopener">
+                <Button className="w-full text-white" style={{ backgroundColor: "#711419" }} data-testid="button-book-online">
+                  <CalendarDays className="h-4 w-4 mr-2" />
+                  Book a Visit Online
+                </Button>
+              </a>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-200" /></div>
+                <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-slate-400">or request a callback</span></div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="service-request">What's going on?</Label>
+                <Textarea
+                  id="service-request"
+                  rows={2}
+                  placeholder="e.g. AC isn't cooling upstairs..."
+                  value={requestMessage}
+                  onChange={(e) => setRequestMessage(e.target.value)}
+                  data-testid="input-service-request"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="preferred-time">Preferred day/time (optional)</Label>
+                <Input
+                  id="preferred-time"
+                  placeholder="e.g. weekday mornings"
+                  value={preferredTime}
+                  onChange={(e) => setPreferredTime(e.target.value)}
+                  data-testid="input-preferred-time"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => serviceRequest.mutate()}
+                disabled={serviceRequest.isPending || !requestMessage.trim()}
+                className="w-full"
+                data-testid="button-send-service-request"
+              >
+                {serviceRequest.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send Request"}
+              </Button>
             </CardContent>
           </Card>
         </div>

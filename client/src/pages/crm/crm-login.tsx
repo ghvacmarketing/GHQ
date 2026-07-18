@@ -195,6 +195,19 @@ export default function CrmLogin() {
               {loginMutation.isPending ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Signing in…</> : "Sign in"}
             </Button>
           </form>
+
+          <div className="mt-8 border-t pt-5 text-center">
+            <p className="text-sm text-muted-foreground">
+              Giesbrecht HVAC customer?{" "}
+              <a
+                href="/portal/login"
+                className="font-medium text-[#711419] hover:underline"
+                data-testid="link-customer-portal"
+              >
+                Sign in to the Customer Portal
+              </a>
+            </p>
+          </div>
         </div>
       </div>
 

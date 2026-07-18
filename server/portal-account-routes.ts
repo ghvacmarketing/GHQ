@@ -6,13 +6,16 @@ import {
   crmProperties,
   crmUsers,
   crmNotifications,
+  crmWorkOrders,
+  crmAgreements,
+  maintenanceVisits,
   customerPortalAccounts,
   customerPortalSessions,
   customerPortalOtpCodes,
   type CustomerPortalAccount,
   type CustomerPortalOtpPurpose,
 } from "@shared/schema";
-import { and, eq, gt, desc, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, eq, gt, gte, desc, asc, inArray, isNotNull, sql } from "drizzle-orm";
 import {
   hashPassword,
   comparePasswords,
@@ -911,6 +914,93 @@ export function registerPortalAccountRoutes(app: Express) {
     } catch (error) {
       console.error("Portal phone change verify error:", error);
       res.status(500).json({ message: "Failed to verify code" });
+    }
+  });
+
+  // GET /api/portal/appointments - upcoming scheduled work + maintenance visits
+  app.get("/api/portal/appointments", requirePortalAccountAuth, async (req: any, res) => {
+    try {
+      const customerId = req.portalCustomer.id;
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+
+      const workOrders = await db.select({
+        id: crmWorkOrders.id,
+        orderNumber: crmWorkOrders.workOrderNumber,
+        title: crmWorkOrders.title,
+        status: crmWorkOrders.status,
+        visitType: crmWorkOrders.visitType,
+        scheduledStart: crmWorkOrders.scheduledStart,
+        scheduledEnd: crmWorkOrders.scheduledEnd,
+      })
+        .from(crmWorkOrders)
+        .where(and(
+          eq(crmWorkOrders.customerId, customerId),
+          inArray(crmWorkOrders.status, ["scheduled", "dispatched", "en_route", "on_site"]),
+          gte(crmWorkOrders.scheduledStart, startOfToday),
+        ))
+        .orderBy(asc(crmWorkOrders.scheduledStart))
+        .limit(10);
+
+      // Upcoming maintenance visits that aren't already tied to a listed work order
+      const visits = await db.select({
+        id: maintenanceVisits.id,
+        visitNumber: maintenanceVisits.visitNumber,
+        totalVisitsInCycle: maintenanceVisits.totalVisitsInCycle,
+        targetDate: maintenanceVisits.targetDate,
+        status: maintenanceVisits.status,
+        workOrderId: maintenanceVisits.workOrderId,
+        agreementPlan: crmAgreements.agreementPlan,
+      })
+        .from(maintenanceVisits)
+        .innerJoin(crmAgreements, eq(maintenanceVisits.agreementId, crmAgreements.id))
+        .where(and(
+          eq(crmAgreements.customerId, customerId),
+          inArray(maintenanceVisits.status, ["pending", "scheduled"]),
+          gte(maintenanceVisits.targetDate, startOfToday.toISOString().slice(0, 10)),
+        ))
+        .orderBy(asc(maintenanceVisits.targetDate))
+        .limit(5);
+
+      const scheduledWorkOrderIds = new Set(workOrders.map((w) => w.id));
+      res.json({
+        workOrders,
+        maintenanceVisits: visits.filter((v) => !v.workOrderId || !scheduledWorkOrderIds.has(v.workOrderId)),
+      });
+    } catch (error) {
+      console.error("Portal appointments error:", error);
+      res.status(500).json({ message: "Failed to load appointments" });
+    }
+  });
+
+  // POST /api/portal/service-request - quick "we need service" note to the office
+  app.post("/api/portal/service-request", requirePortalAccountAuth, async (req: any, res) => {
+    try {
+      const { message, preferredTime } = req.body || {};
+      if (!message || typeof message !== "string" || !message.trim()) {
+        return res.status(400).json({ message: "Please describe what you need" });
+      }
+      if (rateLimitExceeded(`svc-req:${req.portalAccount.id}`, 5, 60 * 60 * 1000)) {
+        return res.status(429).json({ message: "Too many requests. Please call us instead." });
+      }
+      const customer = req.portalCustomer;
+      const details = [
+        message.trim().slice(0, 500),
+        preferredTime && typeof preferredTime === "string" && preferredTime.trim()
+          ? `Preferred time: ${preferredTime.trim().slice(0, 120)}`
+          : null,
+        customer.phone ? `Phone: ${customer.phone}` : null,
+      ].filter(Boolean).join(" — ");
+
+      await notifyAdmins(`Service request from ${customer.name}`, details, customer.id);
+      await logCrmAudit(null, "portal_service_requested", "customer", customer.id, {
+        message: message.trim().slice(0, 1000),
+        preferredTime: typeof preferredTime === "string" ? preferredTime.trim().slice(0, 200) : null,
+      });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Portal service request error:", error);
+      res.status(500).json({ message: "Failed to submit request" });
     }
   });
 
