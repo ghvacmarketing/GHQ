@@ -28,7 +28,9 @@ interface InvoicesResponse {
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   paid: { label: "Paid", className: "bg-green-100 text-green-700 border-green-200" },
-  sent: { label: "Pending", className: "bg-amber-100 text-amber-700 border-amber-200" },
+  sent: { label: "Awaiting Payment", className: "bg-amber-100 text-amber-700 border-amber-200" },
+  viewed: { label: "Awaiting Payment", className: "bg-amber-100 text-amber-700 border-amber-200" },
+  partial: { label: "Partially Paid", className: "bg-blue-100 text-blue-700 border-blue-200" },
   draft: { label: "Draft", className: "bg-slate-100 text-slate-700 border-slate-200" },
   void: { label: "Void", className: "bg-red-100 text-red-700 border-red-200" },
 };
