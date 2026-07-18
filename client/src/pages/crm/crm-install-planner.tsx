@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  addDays, addMonths, differenceInCalendarDays, eachDayOfInterval,
+  addDays, addMonths, differenceInCalendarDays, eachDayOfInterval, endOfMonth, endOfWeek,
   format, isSameMonth, isToday, parseISO, startOfMonth, startOfWeek,
 } from "date-fns";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -104,12 +104,13 @@ export default function CrmInstallPlanner() {
   });
 
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
+  const month2 = addMonths(month, 1);
   const todayStr = iso(new Date());
+  // One continuous grid covering TWO months, so moving/resizing a block across
+  // the month boundary is seamless (it's just the next week row).
   const gridStart = startOfWeek(startOfMonth(month));
-  // Always render 6 weeks (42 days) so every month's grid is the same size;
-  // shorter months are padded out with the next month's days.
-  const gridEnd = addDays(gridStart, 41);
-  const days = useMemo(() => eachDayOfInterval({ start: gridStart, end: gridEnd }), [gridStart, gridEnd]);
+  const gridEnd = endOfWeek(endOfMonth(month2));
+  const days = useMemo(() => eachDayOfInterval({ start: gridStart, end: gridEnd }), [+gridStart, +gridEnd]);
 
   const from = iso(gridStart);
   const to = iso(gridEnd);
@@ -171,6 +172,116 @@ export default function CrmInstallPlanner() {
     const hi = dragRange.anchor <= dragRange.current ? dragRange.current : dragRange.anchor;
     return dayStr >= lo && dayStr <= hi;
   };
+
+  // ── Move / resize existing blocks by dragging ──
+  type BlockOp = {
+    mode: "move" | "resize-start" | "resize-end";
+    block: Block;
+    grabOffset: number; // days between grabbed day and block start (move only)
+    moved: boolean;
+  };
+  const [blockOp, setBlockOp] = useState<BlockOp | null>(null);
+  const [preview, setPreview] = useState<{ id: string; startDate: string; endDate: string } | null>(null);
+  const opRef = useRef<BlockOp | null>(null);
+  const previewRef = useRef<typeof preview>(null);
+  const justDraggedRef = useRef(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => { opRef.current = blockOp; }, [blockOp]);
+  useEffect(() => { previewRef.current = preview; }, [preview]);
+
+  const dayUnderPointer = (x: number, y: number): string | null => {
+    const el = document.elementFromPoint(x, y);
+    const cell = el?.closest?.("[data-day]") as HTMLElement | null;
+    return cell?.dataset.day || null;
+  };
+
+  const startBlockOp = (e: React.PointerEvent, block: Block, mode: BlockOp["mode"]) => {
+    if (e.button !== 0 || block.status === "sold") return;
+    e.stopPropagation();
+    e.preventDefault();
+    const grabbed = dayUnderPointer(e.clientX, e.clientY) || block.startDate;
+    setBlockOp({
+      mode,
+      block,
+      grabOffset: differenceInCalendarDays(parseISO(grabbed), parseISO(block.startDate)),
+      moved: false,
+    });
+  };
+
+  const commitBlockDates = useMutation({
+    mutationFn: async (p: { id: string; startDate: string; endDate: string }) =>
+      (await apiRequest("PATCH", `/api/crm/install-planner/${p.id}`, { startDate: p.startDate, endDate: p.endDate })).json(),
+    onSettled: () => { invalidate(); setPreview(null); },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't move the block", variant: "destructive" }),
+  });
+
+  useEffect(() => {
+    if (!blockOp) return;
+    const onMove = (e: PointerEvent) => {
+      const op = opRef.current;
+      if (!op) return;
+      // Auto-scroll the calendar when dragging near its top/bottom edge.
+      const sc = scrollRef.current;
+      if (sc) {
+        const r = sc.getBoundingClientRect();
+        if (e.clientY < r.top + 48) sc.scrollTop -= 14;
+        else if (e.clientY > r.bottom - 48) sc.scrollTop += 14;
+      }
+      const day = dayUnderPointer(e.clientX, e.clientY);
+      if (!day) return;
+      const { block } = op;
+      const duration = differenceInCalendarDays(parseISO(block.endDate), parseISO(block.startDate));
+      let start = block.startDate;
+      let end = block.endDate;
+      if (op.mode === "move") {
+        let s = addDays(parseISO(day), -op.grabOffset);
+        if (iso(s) < todayStr) s = parseISO(todayStr);
+        start = iso(s);
+        end = iso(addDays(s, duration));
+      } else if (op.mode === "resize-start") {
+        start = day < todayStr ? todayStr : day;
+        if (start > block.endDate) start = block.endDate;
+      } else {
+        end = day < block.startDate ? block.startDate : day;
+      }
+      if (start !== block.startDate || end !== block.endDate) {
+        if (!op.moved) setBlockOp({ ...op, moved: true });
+        setPreview({ id: block.id, startDate: start, endDate: end });
+      } else {
+        setPreview(null);
+      }
+    };
+    const onUp = () => {
+      const op = opRef.current;
+      const p = previewRef.current;
+      setBlockOp(null);
+      if (!op) return;
+      if (op.moved && p) {
+        justDraggedRef.current = true;
+        setTimeout(() => { justDraggedRef.current = false; }, 0);
+        // Optimistic: paint the new dates into the cache before the PATCH lands.
+        queryClient.setQueryData(["/api/crm/install-planner", from, to], (old: any) =>
+          old ? { ...old, blocks: old.blocks.map((x: Block) => (x.id === p.id ? { ...x, startDate: p.startDate, endDate: p.endDate } : x)) } : old,
+        );
+        commitBlockDates.mutate(p);
+      } else {
+        setPreview(null);
+      }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!blockOp]);
+
+  // Blocks with any in-flight drag preview applied.
+  const effBlocks = useMemo(
+    () => (preview ? blocks.map((b) => (b.id === preview.id ? { ...b, startDate: preview.startDate, endDate: preview.endDate } : b)) : blocks),
+    [blocks, preview],
+  );
 
   const { data: custData } = useQuery<{ customers: CustomerHit[] }>({
     queryKey: ["/api/crm/customers/merged", "planner", custSearch],
@@ -243,7 +354,7 @@ export default function CrmInstallPlanner() {
   const layoutWeek = (weekDays: Date[]) => {
     const wStart = iso(weekDays[0]);
     const wEnd = iso(weekDays[6]);
-    const items = blocks
+    const items = effBlocks
       .filter((b) => b.status !== "lost")
       .map((b) => ({ b, r: { start: b.startDate, end: b.endDate } }))
       .filter(({ r }) => r.start <= wEnd && r.end >= wStart)
@@ -302,7 +413,9 @@ export default function CrmInstallPlanner() {
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Install Planner</h1>
-            <p className="text-sm text-muted-foreground">Drag across days to block out a tentative install before it's sold.</p>
+            <p className="text-sm text-muted-foreground">
+              Drag empty days to plan a hold · drag a block to move it · drag its edges to resize.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5">
@@ -332,7 +445,11 @@ export default function CrmInstallPlanner() {
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setMonth((m) => addMonths(m, 1))} data-testid="button-next-month">
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <h2 className="ml-2 text-sm font-semibold text-foreground">{format(month, "MMMM yyyy")}</h2>
+            <h2 className="ml-2 text-sm font-semibold text-foreground">
+              {format(month, "yyyy") === format(month2, "yyyy")
+                ? `${format(month, "MMMM")} – ${format(month2, "MMMM yyyy")}`
+                : `${format(month, "MMM yyyy")} – ${format(month2, "MMM yyyy")}`}
+            </h2>
             {isLoading && <Loader2 className="ml-2 h-4 w-4 animate-spin text-muted-foreground" />}
           </div>
           <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
@@ -351,41 +468,44 @@ export default function CrmInstallPlanner() {
               <div key={d} className="px-2 py-2 text-center">{d}</div>
             ))}
           </div>
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             {weeks.map((weekDays, wi) => {
               const { visible, overflowByCol, dayCounts, laneCount } = layoutWeek(weekDays);
               const lanesH = Math.max(1, laneCount) * (BAR_H + LANE_GAP);
               const hasOverflow = overflowByCol.some((n) => n > 0);
               const weekH = Math.max(96, HEADER_H + lanesH + (hasOverflow ? OVERFLOW_H : 0) + 6);
-              const dragging = !!dragRange;
+              const dragging = !!dragRange || !!blockOp;
               return (
                 <div key={wi} className="relative flex-1 border-b border-border last:border-b-0" style={{ minHeight: weekH }}>
                   {/* Day columns: numbers, capacity, interaction surface */}
                   <div className="absolute inset-0 grid h-full grid-cols-7">
                     {weekDays.map((day, ci) => {
                       const dayStr = iso(day);
-                      const inMonth = isSameMonth(day, month);
+                      const inRange = isSameMonth(day, month) || isSameMonth(day, month2);
+                      const firstOfMonth = day.getDate() === 1;
                       const isPast = dayStr < todayStr;
                       const over = crewsPerDay != null && dayCounts[ci] > crewsPerDay;
                       return (
                         <div
                           key={dayStr}
+                          data-day={dayStr}
                           className={cn(
                             "relative select-none border-r border-border transition-colors last:border-r-0",
                             isPast ? "cursor-default bg-muted/40" : "cursor-pointer",
-                            !inMonth && !isPast && "bg-muted/20",
-                            inDrag(dayStr) ? "bg-[#711419]/10 ring-1 ring-inset ring-[#711419]/40" : !isPast && "hover:bg-muted/30",
+                            !inRange && !isPast && "bg-muted/20",
+                            inDrag(dayStr) ? "bg-[#711419]/10 ring-1 ring-inset ring-[#711419]/40" : !isPast && !blockOp && "hover:bg-muted/30",
                           )}
-                          onMouseDown={(e) => { e.preventDefault(); if (!isPast) setDragRange({ anchor: dayStr, current: dayStr }); }}
+                          onMouseDown={(e) => { e.preventDefault(); if (!isPast && !blockOp) setDragRange({ anchor: dayStr, current: dayStr }); }}
                           onMouseEnter={() => { if (!isPast) setDragRange((r) => (r ? { ...r, current: dayStr } : r)); }}
                           data-testid={`day-${dayStr}`}
                         >
                           <div className="flex items-center justify-between px-1.5 pt-1">
                             <span className={cn(
                               "flex h-6 items-center text-xs",
-                              isToday(day) ? "font-bold text-[#711419]" : inMonth ? "font-medium text-foreground" : "font-medium text-muted-foreground/50",
+                              isToday(day) ? "font-bold text-[#711419]" : inRange ? "font-medium text-foreground" : "font-medium text-muted-foreground/50",
+                              firstOfMonth && "font-bold",
                             )}>
-                              {format(day, "d")}
+                              {firstOfMonth ? format(day, "MMM d") : format(day, "d")}
                             </span>
                             {crewsPerDay != null && dayCounts[ci] > 0 && (
                               <span className={cn("rounded px-1 text-[10px] font-semibold tabular-nums", over ? "bg-red-100 text-red-600" : "text-muted-foreground")}>
@@ -413,6 +533,8 @@ export default function CrmInstallPlanner() {
                   <div className="pointer-events-none absolute inset-x-0" style={{ top: HEADER_H }}>
                     {visible.map((it) => {
                       const b = it.block;
+                      const isPreviewed = preview?.id === b.id;
+                      const movable = b.status !== "sold";
                       return (
                         <div
                           key={`${b.id}-${wi}`}
@@ -420,17 +542,39 @@ export default function CrmInstallPlanner() {
                           style={{ left: `${(it.colStart / 7) * 100}%`, width: `${((it.colEnd - it.colStart + 1) / 7) * 100}%`, top: it.lane * (BAR_H + LANE_GAP), height: BAR_H }}
                         >
                           <div
-                            onClick={() => openEdit(b)}
+                            onClick={() => { if (!justDraggedRef.current) openEdit(b); }}
+                            onPointerDown={(e) => startBlockOp(e, b, "move")}
                             className={cn(
-                              "absolute inset-y-0 flex items-center overflow-hidden rounded-none text-[11px] font-medium transition",
+                              "group absolute inset-y-0 flex items-center overflow-hidden text-[11px] font-medium transition",
+                              it.realStart && "rounded-l-md",
+                              it.realEnd && "rounded-r-md",
                               barClass(b),
-                              dragging ? "pointer-events-none" : "pointer-events-auto cursor-pointer hover:brightness-95",
+                              isPreviewed && "opacity-80 ring-2 ring-[#711419]/50",
+                              dragging ? "pointer-events-none" : cn("pointer-events-auto hover:brightness-95", movable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"),
                             )}
-                            style={{ left: it.realStart ? 2 : 0, right: it.realEnd ? 2 : 0, paddingLeft: it.realStart ? 8 : 4, paddingRight: it.realEnd ? 8 : 4 }}
-                            title={`${b.title}${b.customerName ? ` · ${b.customerName}` : ""}`}
+                            style={{ left: it.realStart ? 2 : 0, right: it.realEnd ? 2 : 0, paddingLeft: it.realStart ? 10 : 4, paddingRight: it.realEnd ? 10 : 4, touchAction: "none" }}
+                            title={`${b.title}${b.customerName ? ` · ${b.customerName}` : ""}${movable ? " — drag to move, edges to resize" : ""}`}
                             data-testid={`block-${b.id}`}
                           >
                             <span className="truncate">{b.title}</span>
+                            {movable && it.realStart && (
+                              <span
+                                onPointerDown={(e) => startBlockOp(e, b, "resize-start")}
+                                className="absolute inset-y-0 left-0 w-2.5 cursor-ew-resize"
+                                data-testid={`resize-start-${b.id}`}
+                              >
+                                <span className="absolute inset-y-[3px] left-[3px] w-[3px] rounded-full bg-current opacity-0 transition-opacity group-hover:opacity-40" />
+                              </span>
+                            )}
+                            {movable && it.realEnd && (
+                              <span
+                                onPointerDown={(e) => startBlockOp(e, b, "resize-end")}
+                                className="absolute inset-y-0 right-0 w-2.5 cursor-ew-resize"
+                                data-testid={`resize-end-${b.id}`}
+                              >
+                                <span className="absolute inset-y-[3px] right-[3px] w-[3px] rounded-full bg-current opacity-0 transition-opacity group-hover:opacity-40" />
+                              </span>
+                            )}
                           </div>
                         </div>
                       );
