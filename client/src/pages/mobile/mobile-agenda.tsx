@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { format, isToday } from "date-fns";
 import { getLocalStartOfDay, getLocalEndOfDay, formatLocal, toLocalTime } from "@/lib/timezone";
-import { MapPin, Clock, ClipboardList, WifiOff, CloudOff, LogIn, User, DollarSign, TrendingUp, Wrench, FileText, Users, Target, CheckCircle, XCircle, MessageSquare, Phone, Navigation, ChevronRight, Thermometer, Droplets, Wind, Settings, AlertTriangle, Calendar } from "lucide-react";
+import { MapPin, Clock, ClipboardList, WifiOff, CloudOff, LogIn, User, DollarSign, TrendingUp, Wrench, FileText, Users, Target, CheckCircle, XCircle, MessageSquare, Phone, Navigation, ChevronRight, Thermometer, Droplets, Wind, Settings, AlertTriangle, Calendar, Bell, Monitor } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,6 +11,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import MobileShell from "./mobile-shell";
 import { useOnlineStatus, OfflineIndicator, usePendingChanges } from "@/hooks/use-online-status";
 import { PerformanceGauge } from "@/components/ui/performance-gauge";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { CrmWorkOrder, CrmCustomer, CrmProperty, CrmUser } from "@shared/schema";
 
 interface WorkOrderWithDetails extends CrmWorkOrder {
@@ -102,36 +105,78 @@ function GlobalPendingChangesIndicator() {
   );
 }
 
+function greetingForHour(h: number): string {
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 function ProfileHeader({ user }: { user: CrmUser }) {
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [, navigate] = useLocation();
+  const [now, setNow] = useState(new Date());
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    const timer = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
-  const roleConfig = roleLabels[user.role] || roleLabels.tech;
+  const { data: unread } = useQuery<{ count: number }>({
+    queryKey: ["/api/crm/notifications/unread-count"],
+    refetchInterval: 60 * 1000,
+  });
+  const unreadCount = unread?.count || 0;
+  const initials = user.name
+    ? user.name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("")
+    : null;
+  const showDesktopLink = user.role !== "tech";
 
   return (
-    <div className="flex items-center justify-between bg-white dark:bg-slate-800 rounded-lg p-3 shadow-sm border border-slate-200 dark:border-slate-700" data-testid="profile-header">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-          <User className="w-5 h-5 text-slate-600 dark:text-slate-300" />
-        </div>
-        <div>
-          <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-sm" data-testid="user-name">{user.name}</h3>
-          <Badge className={`text-xs ${roleConfig.className}`} data-testid="user-role-badge">
-            {roleConfig.label}
-          </Badge>
-        </div>
+    <div className="flex items-center justify-between" data-testid="profile-header">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100" data-testid="text-greeting">
+          {greetingForHour(now.getHours())}
+        </h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">{format(now, "EEEE, MMM d")}</p>
       </div>
-      <div className="text-right">
-        <p className="text-lg font-semibold text-slate-800 dark:text-slate-200" data-testid="current-time">
-          {format(currentTime, "h:mm a")}
-        </p>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          {format(currentTime, "MMM d")}
-        </p>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => navigate("/crm/notifications")}
+          className="relative flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white/85 text-slate-600 shadow-sm backdrop-blur-xl transition-transform active:scale-95 dark:bg-slate-800"
+          data-testid="button-notifications"
+          aria-label="Notifications"
+        >
+          <Bell className="h-5 w-5" />
+          {unreadCount > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white/85 text-sm font-bold text-[#711419] shadow-sm backdrop-blur-xl transition-transform active:scale-95 dark:bg-slate-800"
+              data-testid="button-profile-menu"
+              aria-label="Profile menu"
+            >
+              {initials || <User className="h-5 w-5" />}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem asChild data-testid="menu-profile">
+              <Link href="/mobile/profile" className="flex items-center">
+                <User className="mr-2 h-4 w-4" /> My Profile
+              </Link>
+            </DropdownMenuItem>
+            {showDesktopLink && (
+              <DropdownMenuItem asChild data-testid="menu-desktop">
+                <Link href="/crm" className="flex items-center">
+                  <Monitor className="mr-2 h-4 w-4" /> Desktop CRM
+                </Link>
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

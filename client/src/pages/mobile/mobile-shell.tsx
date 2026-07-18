@@ -1,12 +1,9 @@
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ClipboardList, Wrench, Clock, User, Monitor, ShieldX, MessageSquare, Users } from "lucide-react";
+import { ClipboardList, Wrench, Clock, ShieldX, MessageSquare, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import type { CrmUser } from "@shared/schema";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 interface MobileShellProps {
   children: ReactNode;
@@ -42,7 +39,6 @@ export default function MobileShell({ children }: MobileShellProps) {
 
   // Check if user can access mobile app
   const canAccessMobile = currentUser && MOBILE_ALLOWED_ROLES.includes(currentUser.role);
-  const showDesktopLink = currentUser && currentUser.role !== "tech";
 
   // Block admin users from mobile app
   if (currentUser && !canAccessMobile) {
@@ -84,37 +80,6 @@ export default function MobileShell({ children }: MobileShellProps) {
       style={{ paddingTop: "env(safe-area-inset-top)" }}
       data-testid="mobile-shell"
     >
-      {/* Floating profile button — replaces the old header strip */}
-      <div className="absolute right-3 z-40" style={{ top: "calc(10px + env(safe-area-inset-top))" }}>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-900/10 bg-white/85 text-sm font-bold text-[#711419] shadow-[0_4px_16px_rgba(0,0,0,0.14)] backdrop-blur-xl transition-transform active:scale-95"
-              data-testid="button-profile-menu"
-              aria-label="Profile menu"
-            >
-              {currentUser?.name
-                ? currentUser.name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join("")
-                : <User className="h-5 w-5" />}
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="z-50">
-            <DropdownMenuItem asChild data-testid="menu-profile">
-              <Link href="/mobile/profile" className="flex items-center">
-                <User className="mr-2 h-4 w-4" /> My Profile
-              </Link>
-            </DropdownMenuItem>
-            {showDesktopLink && (
-              <DropdownMenuItem asChild data-testid="menu-desktop">
-                <Link href="/crm" className="flex items-center">
-                  <Monitor className="mr-2 h-4 w-4" /> Desktop CRM
-                </Link>
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
       {/* Content scrolls underneath the floating nav pill */}
       <main
         className="flex-1 overflow-auto"
