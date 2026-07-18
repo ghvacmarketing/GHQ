@@ -183,6 +183,7 @@ function OverviewTab({
   onPendingChange,
   pendingMutation,
   optimisticPending,
+  onGoTab,
 }: {
   workOrder: WorkOrderDetail;
   checklistResponse: ChecklistResponseData | null | undefined;
@@ -195,6 +196,7 @@ function OverviewTab({
   onPendingChange: (isPending: boolean, reason?: string, isReasonChange?: boolean) => void;
   pendingMutation: any;
   optimisticPending: { isPending: boolean; reason?: string } | null;
+  onGoTab: (tab: string) => void;
 }) {
   const [checklistAnswersOpen, setChecklistAnswersOpen] = useState(false);
   const displayStatus = optimisticStatus || workOrder.status;
@@ -215,54 +217,125 @@ function OverviewTab({
 
   const actionBtn = "flex items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white py-3 text-sm font-semibold text-slate-800 shadow-sm transition-transform active:scale-[0.97]";
 
+  const [, goNavigate] = useLocation();
+  const flowIndex = statusFlow.indexOf(displayStatus as WorkOrderStatus);
+  const isPendingNow = optimisticPending?.isPending ?? workOrder.isPending ?? false;
+  const pendingReasonNow = optimisticPending?.reason ?? workOrder.pendingReason ?? "waiting_on_parts";
+
   return (
     <div className="space-y-4">
-      {/* Header — name, address/job, status line */}
-      <div className="pt-8" data-testid="job-header">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900" data-testid="job-customer-name">{customerName}</h1>
-        <p className="mt-0.5 text-sm text-slate-500">
-          {workOrder.property?.address1 || address}
-          {workOrder.title ? ` — ${workOrder.title}` : ""}
+      {/* Top row — job number + type, status pill */}
+      <div className="relative flex items-center justify-center pt-1" data-testid="job-topline">
+        <p className="text-sm font-semibold text-slate-600">
+          Job #{workOrder.workOrderNumber ?? ""} · {(workOrder.visitType || "SERVICE").charAt(0) + (workOrder.visitType || "SERVICE").slice(1).toLowerCase()}
         </p>
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm" data-testid="job-status-badge">
-          <span className={`h-2 w-2 rounded-full ${statusDotColor(status.className)}`} />
-          <span className="font-semibold text-slate-800">{status.label}{optimisticStatus ? "…" : ""}</span>
-          {(optimisticPending?.isPending ?? workOrder.isPending) && (
-            <span className="font-medium text-amber-600" data-testid="job-pending-badge">· Waiting</span>
-          )}
+        <span
+          className="absolute right-4 rounded-full bg-[#711419] px-3 py-1 text-xs font-bold text-white shadow-sm"
+          data-testid="job-status-badge"
+        >
+          {status.label}{optimisticStatus ? "…" : ""}
+        </span>
+      </div>
+
+      {/* Header */}
+      <div data-testid="job-header">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900" data-testid="job-customer-name">{customerName}</h1>
+        <p className="mt-1 text-sm text-slate-600">
+          {workOrder.title || "Service visit"}
           {workOrder.scheduledStart && (
-            <span className="text-slate-400">
-              · {format(new Date(workOrder.scheduledStart), "h:mm a")}
-              {workOrder.scheduledEnd ? ` – ${format(new Date(workOrder.scheduledEnd), "h:mm a")}` : ""}
-            </span>
+            <> · arrival window {format(new Date(workOrder.scheduledStart), "h:mm")}{workOrder.scheduledEnd ? `–${format(new Date(workOrder.scheduledEnd), "h:mm a")}` : format(new Date(workOrder.scheduledStart), " a")}</>
           )}
+        </p>
+        <p className="mt-0.5 text-sm text-slate-400">
+          {workOrder.property?.address1 || address}
+          {isPendingNow && <span className="font-medium text-amber-600" data-testid="job-pending-badge"> · Waiting</span>}
+        </p>
+      </div>
+
+      {/* Progress rail */}
+      <div data-testid="job-progress">
+        <div className="flex gap-1.5">
+          {statusFlow.map((step, i) => (
+            <span
+              key={step}
+              className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${i <= flowIndex ? "bg-[#711419]" : "bg-slate-200"}`}
+            />
+          ))}
+        </div>
+        <div className="mt-1.5 flex">
+          {statusFlow.map((step, i) => (
+            <span
+              key={step}
+              className={`flex-1 text-center text-[10px] ${i === flowIndex ? "font-bold text-[#711419]" : "font-medium text-slate-400"}`}
+            >
+              {statusConfig[step]?.label}
+            </span>
+          ))}
         </div>
       </div>
 
-      {/* Quick actions */}
-      <div className="grid grid-cols-3 gap-2" data-testid="job-quick-actions">
-        {customerPhone ? (
-          <a href={`tel:${customerPhone}`} className={actionBtn} data-testid="action-call">
-            <Phone className="h-4 w-4 text-[#711419]" /> Call
-          </a>
-        ) : (
-          <span className={`${actionBtn} opacity-40`}>
-            <Phone className="h-4 w-4" /> Call
-          </span>
-        )}
-        {customerPhone ? (
-          <a href={`sms:${customerPhone}`} className={actionBtn} data-testid="action-text">
-            <MessageSquare className="h-4 w-4 text-[#711419]" /> Text
-          </a>
-        ) : (
-          <span className={`${actionBtn} opacity-40`}>
-            <MessageSquare className="h-4 w-4" /> Text
-          </span>
-        )}
-        <a href={getGoogleMapsUrl(workOrder.property)} target="_blank" rel="noopener noreferrer" className={actionBtn} data-testid="action-navigate">
-          <Navigation className="h-4 w-4 text-[#711419]" /> Navigate
-        </a>
-      </div>
+      {/* Primary action */}
+      {nextStatus && displayStatus !== "completed" && (
+        <button
+          onClick={() => handleStatusChange(nextStatus)}
+          disabled={updateStatusMutation.isPending}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#711419] py-4 text-base font-bold text-white shadow-[0_8px_24px_rgba(113,20,25,0.35)] transition-transform active:scale-[0.98] disabled:opacity-60"
+          data-testid={`button-status-${nextStatus}`}
+        >
+          {updateStatusMutation.isPending && <Loader2 className="h-5 w-5 animate-spin" />}
+          {nextStatus === "dispatched" && "Take This Job"}
+          {nextStatus === "en_route" && "Start Driving"}
+          {nextStatus === "on_site" && "I've Arrived"}
+          {nextStatus === "completed" && "Complete Job"}
+        </button>
+      )}
+      {displayStatus === "completed" && (
+        <div className="flex items-center justify-center gap-2 rounded-2xl bg-green-50 py-3.5 text-sm font-bold text-green-700" data-testid="job-completed-banner">
+          <CheckCircle2 className="h-5 w-5" /> Job Completed
+        </div>
+      )}
+
+      {/* Waiting toggle */}
+      {displayStatus !== "completed" && displayStatus !== "scheduled" && (
+        <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm" data-testid="pending-toggle-section">
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <Clock className="h-4 w-4 text-amber-600" /> Mark as Waiting
+            </span>
+            <Switch
+              checked={isPendingNow}
+              onCheckedChange={(checked) => onPendingChange(checked, checked ? "waiting_on_parts" : undefined, false)}
+              disabled={pendingMutation.isPending}
+              data-testid="pending-toggle"
+            />
+          </div>
+          {isPendingNow && (
+            <div className="mt-3 space-y-2">
+              <Select
+                value={pendingReasonNow}
+                onValueChange={(value) => onPendingChange(true, value, true)}
+                disabled={pendingMutation.isPending}
+              >
+                <SelectTrigger className="w-full" data-testid="pending-reason-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="waiting_on_parts">Waiting on Parts</SelectItem>
+                  <SelectItem value="waiting_on_customer">Waiting on Customer</SelectItem>
+                  <SelectItem value="waiting_for_next_job">Waiting for Next Job</SelectItem>
+                  <SelectItem value="lunch_break">Lunch Break</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+              {workOrder.pendingStartedAt && !optimisticPending && (
+                <p className="text-xs text-amber-600">
+                  Waiting since {format(new Date(workOrder.pendingStartedAt), "h:mm a")}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {renewalInfo?.isRenewalVisit && renewalInfo.renewalStatus === "pending" && renewalInfo.agreementInfo && (
         <Card className={renewalInfo.paymentType === "initial" ? "border-green-400 bg-green-50" : "border-amber-400 bg-amber-50"} data-testid="renewal-banner">
@@ -350,141 +423,40 @@ function OverviewTab({
         </div>
       )}
 
-      <Card className="rounded-2xl border-slate-100 shadow-sm" data-testid="status-update-card">
-        <CardContent className="space-y-4 pt-4">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Status</p>
-            <div className="mt-1.5 flex items-center gap-2">
-              <span className={`h-2.5 w-2.5 rounded-full ${statusDotColor(status.className)}`} />
-              <span className="text-base font-bold text-slate-900">{status.label}</span>
+      {/* Brief — what dispatch wants you to know */}
+      {(workOrder.dispatchNotes || workOrder.description) && (
+        <Card className="rounded-2xl border-slate-100 shadow-sm" data-testid="card-dispatch-notes">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[#711419]">Brief</p>
+              <p className="text-[11px] text-slate-400">from dispatch</p>
             </div>
-            <p className="mt-1.5 text-sm text-slate-500">
-              {displayStatus === "scheduled" && "On the books — mark Dispatched when you pick this job up."}
-              {displayStatus === "dispatched" && "Job's yours. Tap Start Driving when you head out."}
-              {displayStatus === "en_route" && "On the way — tap Start Working when you arrive."}
-              {displayStatus === "on_site" && "You're on site. Wrap up from the Work tab when the checklist is done."}
-              {displayStatus === "completed" && "All done — the completion summary is saved below."}
+            <p className="mt-2 text-sm leading-relaxed text-slate-700 whitespace-pre-wrap" data-testid="text-dispatch-notes">
+              {workOrder.dispatchNotes || workOrder.description}
             </p>
-          </div>
-          <div className="flex items-center justify-between" data-testid="status-stepper">
-            {statusFlow.map((step, index) => {
-              const stepIndex = statusFlow.indexOf(displayStatus as WorkOrderStatus);
-              const isCompleted = index < stepIndex;
-              const isCurrent = index === stepIndex;
-              const stepIcons: Record<WorkOrderStatus, any> = {
-                scheduled: Clock,
-                dispatched: ClipboardCheck,
-                en_route: Car,
-                on_site: Wrench,
-                completed: CheckCircle2,
-                cancelled: X,
-              };
-              const StepIcon = stepIcons[step];
-              
-              return (
-                <div key={step} className="flex flex-col items-center" data-testid={`status-step-${step}`}>
-                  <div 
-                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                      isCompleted 
-                        ? 'bg-green-500 text-white' 
-                        : isCurrent 
-                          ? 'bg-[#711419] text-white ring-2 ring-offset-2 ring-[#711419]' 
-                          : 'bg-slate-200 text-slate-400'
-                    }`}
-                  >
-                    <StepIcon className="h-5 w-5" />
-                  </div>
-                  <span className={`text-xs mt-1 text-center ${
-                    isCurrent ? 'font-semibold text-[#711419]' : 'text-slate-500'
-                  }`}>
-                    {statusConfig[step]?.label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          
-          {nextStatus && displayStatus !== "completed" && (
-            <Button
-              className="w-full min-h-[48px] bg-[#711419] hover:bg-[#5a1014]"
-              onClick={() => handleStatusChange(nextStatus)}
-              disabled={updateStatusMutation.isPending}
-              data-testid={`button-status-${nextStatus}`}
-            >
-              {updateStatusMutation.isPending ? (
-                <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              ) : null}
-              {nextStatus === "dispatched" && "Mark Dispatched"}
-              {nextStatus === "en_route" && "Start Driving"}
-              {nextStatus === "on_site" && "Start Working"}
-              {nextStatus === "completed" && "Complete Job"}
-            </Button>
-          )}
+          </CardContent>
+        </Card>
+      )}
 
-          {displayStatus === "completed" && (
-            <div className="text-center py-2">
-              <Badge className="bg-green-100 text-green-700 border-green-300">
-                <CheckCircle2 className="h-4 w-4 mr-1" />
-                Job Completed
-              </Badge>
-            </div>
-          )}
-
-          {displayStatus !== "completed" && displayStatus !== "scheduled" && (() => {
-            const isPending = optimisticPending?.isPending ?? workOrder.isPending ?? false;
-            const pendingReason = optimisticPending?.reason ?? workOrder.pendingReason ?? "waiting_on_parts";
-            return (
-              <div className="border-t pt-4 mt-4" data-testid="pending-toggle-section">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-amber-600" />
-                    <span className="text-sm font-medium">Mark as Waiting</span>
-                  </div>
-                  <Switch
-                    checked={isPending}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        onPendingChange(true, "waiting_on_parts", false);
-                      } else {
-                        onPendingChange(false, undefined, false);
-                      }
-                    }}
-                    disabled={pendingMutation.isPending}
-                    data-testid="pending-toggle"
-                  />
-                </div>
-                
-                {isPending && (
-                  <div className="space-y-2">
-                    <Label className="text-sm text-slate-500">Reason</Label>
-                    <Select
-                      value={pendingReason}
-                      onValueChange={(value) => onPendingChange(true, value, true)}
-                      disabled={pendingMutation.isPending}
-                    >
-                      <SelectTrigger className="w-full" data-testid="pending-reason-select">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="waiting_on_parts">Waiting on Parts</SelectItem>
-                        <SelectItem value="waiting_on_customer">Waiting on Customer</SelectItem>
-                        <SelectItem value="waiting_for_next_job">Waiting for Next Job</SelectItem>
-                        <SelectItem value="lunch_break">Lunch Break</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {workOrder.pendingStartedAt && !optimisticPending && (
-                      <p className="text-xs text-amber-600">
-                        Waiting since {format(new Date(workOrder.pendingStartedAt), "h:mm a")}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-        </CardContent>
-      </Card>
+      {/* Section tiles */}
+      <div className="grid grid-cols-2 gap-2" data-testid="job-tiles">
+        <button onClick={() => onGoTab("work")} className="rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition-transform active:scale-[0.98]" data-testid="tile-checklist">
+          <p className="text-sm font-bold text-slate-900">Checklist</p>
+          <p className="mt-0.5 text-xs text-slate-500">Tasks, notes & wrap-up</p>
+        </button>
+        <button onClick={() => goNavigate("/mobile/photos")} className="rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition-transform active:scale-[0.98]" data-testid="tile-photos">
+          <p className="text-sm font-bold text-slate-900">Photos</p>
+          <p className="mt-0.5 text-xs text-slate-500">Job-site photos</p>
+        </button>
+        <button onClick={() => onGoTab("quote")} className="rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition-transform active:scale-[0.98]" data-testid="tile-quote">
+          <p className="text-sm font-bold text-slate-900">Quote</p>
+          <p className="mt-0.5 text-xs text-slate-500">Build & present</p>
+        </button>
+        <button onClick={() => onGoTab("invoice")} className="rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition-transform active:scale-[0.98]" data-testid="tile-invoice">
+          <p className="text-sm font-bold text-slate-900">Invoice</p>
+          <p className="mt-0.5 text-xs text-slate-500">Collect payment</p>
+        </button>
+      </div>
 
       {/* Schedule */}
       <Card className="rounded-2xl border-slate-100 shadow-sm" data-testid="card-schedule">
@@ -515,16 +487,13 @@ function OverviewTab({
         </CardContent>
       </Card>
 
+      {/* Customer */}
       <Card className="rounded-2xl border-slate-100 shadow-sm" data-testid="customer-info-card">
         <CardContent className="pt-4">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Customer</p>
           <div className="mt-2 space-y-2.5">
             {customerPhone && (
-              <a
-                href={`tel:${customerPhone}`}
-                className="flex items-center text-sm font-semibold text-slate-900"
-                data-testid="customer-phone"
-              >
+              <a href={`tel:${customerPhone}`} className="flex items-center text-sm font-semibold text-slate-900" data-testid="customer-phone">
                 <Phone className="h-4 w-4 mr-2 text-slate-400" />
                 {customerPhone}
               </a>
@@ -602,17 +571,6 @@ function OverviewTab({
           <CardContent>
             <p className="text-sm text-slate-700 whitespace-pre-wrap" data-testid="text-checklist-summary">
               {checklistResponse.summary}
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {workOrder.dispatchNotes && (
-        <Card className="rounded-2xl border-slate-100 shadow-sm" data-testid="card-dispatch-notes">
-          <CardContent className="pt-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">From Dispatch</p>
-            <p className="mt-2 text-sm leading-relaxed text-slate-700 whitespace-pre-wrap" data-testid="text-dispatch-notes">
-              {workOrder.dispatchNotes}
             </p>
           </CardContent>
         </Card>
@@ -3619,31 +3577,41 @@ export default function MobileJobDetail() {
       navigate("/mobile/job");
     }
   };
-  const onSwipeStart = (e: React.TouchEvent) => {
-    const t = e.touches[0];
-    swipe.current = { x: t.clientX, y: t.clientY, active: t.clientX < 28 };
+  const swipeDrag = useRef<{ x: number; y: number; engaged: boolean; active: boolean } | null>(null);
+  const springBack = () => {
+    const el = pageRef.current;
+    if (!el) return;
+    el.style.transition = "transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1)";
+    el.style.transform = "translateX(0)";
+    setTimeout(() => { if (el) el.style.transition = ""; }, 290);
   };
-  const onSwipeMove = (e: React.TouchEvent) => {
-    const st = swipe.current;
-    if (!st?.active || !pageRef.current) return;
-    const t = e.touches[0];
-    const dx = t.clientX - st.x;
-    const dy = Math.abs(t.clientY - st.y);
-    // Content stays put while the finger moves; crossing the threshold
-    // commits the back navigation with the whole-page slide.
-    if (dx > 90 && dx > dy * 1.5) {
-      swipe.current = null;
-      goBackAnimated();
-    }
+  const onSwipeStart = (e: React.PointerEvent) => {
+    if (e.clientX > 32) { swipeDrag.current = null; return; }
+    swipeDrag.current = { x: e.clientX, y: e.clientY, engaged: false, active: true };
+    pageRef.current?.setPointerCapture?.(e.pointerId);
   };
-  const onSwipeEnd = (e: React.TouchEvent) => {
-    const st = swipe.current;
-    swipe.current = null;
+  const onSwipeMove = (e: React.PointerEvent) => {
+    const st = swipeDrag.current;
     const el = pageRef.current;
     if (!st?.active || !el) return;
-    const dx = e.changedTouches[0].clientX - st.x;
-    if (dx > 90) goBackAnimated();
+    const dx = e.clientX - st.x;
+    const dy = Math.abs(e.clientY - st.y);
+    if (!st.engaged) {
+      if (dx > 8 && dx > dy) { st.engaged = true; el.style.transition = "none"; }
+      else if (dy > 14) { st.active = false; return; }
+    }
+    if (st.engaged) el.style.transform = `translateX(${Math.max(0, dx)}px)`;
   };
+  const onSwipeEnd = (e: React.PointerEvent) => {
+    const st = swipeDrag.current;
+    swipeDrag.current = null;
+    if (!st?.engaged) return;
+    const dx = e.clientX - st.x;
+    if (dx > Math.min(140, window.innerWidth * 0.33)) goBackAnimated();
+    else springBack();
+  };
+
+
   const [optimisticStatus, setOptimisticStatus] = useState<WorkOrderStatus | null>(null);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completionSummary, setCompletionSummary] = useState("");
@@ -4088,9 +4056,11 @@ export default function MobileJobDetail() {
       <div
         ref={pageRef}
         className="page-slide-in flex h-full flex-col bg-slate-50"
-        onTouchStart={onSwipeStart}
-        onTouchMove={onSwipeMove}
-        onTouchEnd={onSwipeEnd}
+        style={{ touchAction: "pan-y" }}
+        onPointerDown={onSwipeStart}
+        onPointerMove={onSwipeMove}
+        onPointerUp={onSwipeEnd}
+        onPointerCancel={onSwipeEnd}
       >
         <div className="flex-shrink-0 p-4 pb-2">
           <div className="flex items-center justify-end">
@@ -4125,9 +4095,10 @@ export default function MobileJobDetail() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto px-4 pb-6" data-testid="mobile-job-detail">
+        <div className="flex-1 overflow-auto px-4 pb-28" data-testid="mobile-job-detail">
           {activeTab === "overview" && (
             <OverviewTab
+              onGoTab={(t) => setActiveTab(t as TabType)}
               workOrder={workOrder}
               checklistResponse={checklistResponse}
               optimisticStatus={optimisticStatus}

@@ -117,7 +117,7 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
       {/* Content scrolls underneath the floating nav pill */}
       <main
         className="flex-1 overflow-auto"
-        style={{ paddingBottom: "calc(88px + env(safe-area-inset-bottom))" }}
+        style={{ paddingBottom: "calc(100px + env(safe-area-inset-bottom))" }}
         data-testid="mobile-main"
       >
         {children}
