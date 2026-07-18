@@ -184,7 +184,7 @@ export default function MobileShell({ children }: MobileShellProps) {
         <SheetContent
           ref={sheetRef}
           side="bottom"
-          className="rounded-t-3xl border-t-0 px-5 pb-8 pt-0"
+          className="rounded-t-3xl border-t-0 px-5 pb-8 pt-0 [&>button]:hidden"
           style={{ paddingBottom: "calc(24px + env(safe-area-inset-bottom))" }}
           data-testid="sheet-more"
         >

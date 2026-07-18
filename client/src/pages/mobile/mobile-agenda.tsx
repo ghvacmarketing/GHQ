@@ -188,7 +188,11 @@ function ProfileHeader({ user }: { user: CrmUser }) {
               )}
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="z-50 w-[calc(100vw-2rem)] max-w-sm rounded-2xl p-0" data-testid="dropdown-notifications">
+          <DropdownMenuContent
+            align="end"
+            className="z-50 w-[calc(100vw-2rem)] max-w-sm origin-[var(--radix-dropdown-menu-content-transform-origin)] rounded-2xl p-0 data-[state=open]:zoom-in-50 data-[state=closed]:zoom-out-50 data-[state=open]:duration-300 data-[state=closed]:duration-200 data-[state=open]:ease-[cubic-bezier(0.34,1.3,0.64,1)]"
+            data-testid="dropdown-notifications"
+          >
             <div className="flex items-center justify-between border-b px-4 py-2.5">
               <span className="text-sm font-semibold text-slate-800">Notifications</span>
               {unreadCount > 0 && (
@@ -233,14 +237,19 @@ function ProfileHeader({ user }: { user: CrmUser }) {
         <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>
             <button
-              className="flex h-11 w-12 items-center justify-center rounded-r-full text-sm font-bold text-[#711419] transition-transform active:scale-95"
+              className="flex h-11 w-12 items-center justify-center rounded-r-full transition-transform active:scale-95"
               data-testid="button-profile-menu"
               aria-label="Profile menu"
             >
-              {initials || <User className="h-5 w-5" />}
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#711419] text-xs font-bold text-white shadow-sm">
+                {initials || <User className="h-4 w-4" />}
+              </span>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="z-50">
+          <DropdownMenuContent
+            align="end"
+            className="z-50 origin-[var(--radix-dropdown-menu-content-transform-origin)] data-[state=open]:zoom-in-50 data-[state=closed]:zoom-out-50 data-[state=open]:duration-300 data-[state=closed]:duration-200 data-[state=open]:ease-[cubic-bezier(0.34,1.3,0.64,1)]"
+          >
             <DropdownMenuItem asChild data-testid="menu-profile">
               <Link href="/mobile/profile" className="flex items-center">
                 <User className="mr-2 h-4 w-4" /> My Profile
@@ -688,9 +697,11 @@ export default function MobileAgenda() {
     return aTime - bTime;
   });
 
-  // Group work orders by technician when viewing all techs
+  // Group work orders by technician when viewing all techs. Seed with every
+  // dispatchable person (tech/sales/supervisor) so people with no jobs today
+  // still show up in the roster.
   const showGroupedView = isOwnerOrAdmin || (canToggleView && effectiveViewAll);
-  const groupedByTech = showGroupedView 
+  const groupedByTech = showGroupedView
     ? todaysOrders.reduce((acc, wo) => {
         const techId = wo.assignedTechId || 'unassigned';
         if (!acc[techId]) {
@@ -698,7 +709,11 @@ export default function MobileAgenda() {
         }
         acc[techId].push(wo);
         return acc;
-      }, {} as Record<string, WorkOrderWithDetails[]>)
+      }, Object.fromEntries(
+        technicians
+          .filter((t) => ["tech", "sales", "supervisor"].includes(t.role))
+          .map((t) => [t.id, [] as WorkOrderWithDetails[]]),
+      ) as Record<string, WorkOrderWithDetails[]>)
     : null;
 
   // Sort work orders within each tech group by scheduled start time
@@ -719,11 +734,15 @@ export default function MobileAgenda() {
     return tech?.name || 'Unknown';
   };
 
-  // Sort technicians: those with work orders first, alphabetically within each group
-  const sortedTechIds = groupedByTech 
+  // Sort technicians: those with work orders first, then alphabetical; the
+  // unassigned bucket always sinks to the bottom.
+  const sortedTechIds = groupedByTech
     ? Object.keys(groupedByTech).sort((a, b) => {
         if (a === 'unassigned') return 1;
         if (b === 'unassigned') return -1;
+        const aHasJobs = groupedByTech[a].length > 0 ? 0 : 1;
+        const bHasJobs = groupedByTech[b].length > 0 ? 0 : 1;
+        if (aHasJobs !== bHasJobs) return aHasJobs - bHasJobs;
         return getTechName(a).localeCompare(getTechName(b));
       })
     : [];
@@ -737,19 +756,9 @@ export default function MobileAgenda() {
       <div className="p-4 space-y-4 pb-24" data-testid="mobile-agenda">
         {currentUser && <ProfileHeader user={currentUser} />}
         
-        <div className="text-center bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-800/50 rounded-xl p-4 shadow-sm" data-testid="agenda-date-header">
-          <div className="flex items-center justify-center gap-2 mb-1">
-            <Calendar className="w-5 h-5 text-slate-500" />
-            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">
-              {formatLocal(today, "EEEE")}
-            </h2>
-          </div>
-          <p className="text-slate-500 dark:text-slate-400">
-            {formatLocal(today, "MMMM d, yyyy")}
-          </p>
-          
+        <div className="text-center" data-testid="agenda-date-header">
           {canToggleView && (
-            <div className="mt-3 flex items-center justify-center gap-2" data-testid="view-toggle">
+            <div className="flex items-center justify-center gap-2" data-testid="view-toggle">
               <button
                 onClick={() => setViewAllTechs(true)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-l-full transition-colors ${
@@ -820,21 +829,21 @@ export default function MobileAgenda() {
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
                   {showGroupedView ? "All Technicians" : "Today's Jobs"}
                 </h3>
-                <Badge variant="secondary" className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold">
-                  {todaysOrders.length}
-                </Badge>
+                <span className="text-xs font-medium text-slate-400">
+                  {showGroupedView
+                    ? `${sortedTechIds.filter((id) => id !== "unassigned").length} techs`
+                    : `${todaysOrders.length} job${todaysOrders.length !== 1 ? "s" : ""}`}
+                </span>
               </div>
-              {todaysOrders.length === 0 ? (
-                <div 
+              {!showGroupedView && todaysOrders.length === 0 ? (
+                <div
                   className="flex flex-col items-center justify-center py-8 text-center bg-slate-50 dark:bg-slate-800/50 rounded-lg"
                   data-testid="agenda-empty"
                 >
                   <ClipboardList className="h-10 w-10 text-slate-300 mb-2" />
                   <h3 className="text-sm font-medium text-slate-600 mb-1">No Jobs Today</h3>
                   <p className="text-slate-400 text-xs">
-                    {showGroupedView 
-                      ? "No work orders scheduled for any technician today." 
-                      : "You have no work orders scheduled for today."}
+                    You have no work orders scheduled for today.
                   </p>
                 </div>
               ) : showGroupedView && groupedByTech ? (
@@ -872,17 +881,27 @@ export default function MobileAgenda() {
                           </Badge>
                           <ChevronRight className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`} />
                         </button>
-                        {expanded && (
-                          <div className="ml-2 mt-2 space-y-2 border-l-2 border-slate-200 pl-4 dark:border-slate-700">
-                            {techOrders.map((workOrder) => (
-                              <WorkOrderCard
-                                key={workOrder.id}
-                                workOrder={workOrder}
-                                showCacheWarning={showCacheWarning}
-                              />
-                            ))}
+                        <div
+                          className={`grid transition-all duration-300 ease-in-out ${
+                            expanded ? "mt-2 grid-rows-[1fr] opacity-100" : "mt-0 grid-rows-[0fr] opacity-0"
+                          }`}
+                        >
+                          <div className="overflow-hidden">
+                            <div className="ml-2 space-y-2 border-l-2 border-slate-200 pl-4 pb-1 dark:border-slate-700">
+                              {techOrders.length === 0 ? (
+                                <p className="py-2 text-xs text-slate-400">No jobs scheduled today.</p>
+                              ) : (
+                                techOrders.map((workOrder) => (
+                                  <WorkOrderCard
+                                    key={workOrder.id}
+                                    workOrder={workOrder}
+                                    showCacheWarning={showCacheWarning}
+                                  />
+                                ))
+                              )}
+                            </div>
                           </div>
-                        )}
+                        </div>
                       </div>
                     );
                   })}
