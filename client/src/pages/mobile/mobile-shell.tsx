@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -40,6 +40,23 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
   const [location, navigate] = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
   const go = (path: string) => { setMoreOpen(false); navigate(path); };
+
+  // Suppress the browser/PWA edge-swipe history navigation inside the app.
+  // Top-level tabs must not slide back; sub-pages implement their own gesture
+  // (their touch listeners still fire — preventDefault only blocks the
+  // browser's native swipe-nav). Taps on controls near the edge are exempt.
+  useEffect(() => {
+    const guard = (e: TouchEvent) => {
+      const x = e.touches[0]?.clientX ?? 0;
+      const nearEdge = x < 32 || x > window.innerWidth - 32;
+      if (!nearEdge) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.("button, a, input, textarea, select, [role=button]")) return;
+      e.preventDefault();
+    };
+    document.addEventListener("touchstart", guard, { passive: false });
+    return () => document.removeEventListener("touchstart", guard);
+  }, []);
 
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],

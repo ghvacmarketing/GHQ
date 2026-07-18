@@ -435,3 +435,8 @@ gmp-place-autocomplete::part(input)::placeholder {
 .page-slide-in {
   animation: page-slide-in-right 0.28s cubic-bezier(0.32, 0.72, 0.34, 1);
 }
+
+/* No horizontal overscroll/history-swipe rubber-banding */
+html, body {
+  overscroll-behavior-x: none;
+}
