@@ -35,6 +35,7 @@ import {
   Smartphone,
   MessageSquare,
   Bell,
+  Camera,
   ListTodo,
   Award,
   PenLine,
@@ -92,6 +93,7 @@ const navSections: NavSection[] = [
       { label: "Agreements", href: "/crm/agreements", icon: FileCheck },
       { label: "Quotes", href: "/crm/quotes", icon: FileText },
       { label: "Invoices", href: "/crm/invoices", icon: Receipt },
+      { label: "Photo Gallery", href: "/crm/photos", icon: Camera },
     ],
   },
   {

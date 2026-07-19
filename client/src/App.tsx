@@ -82,6 +82,7 @@ const CrmSettingsTime = lazy(() => import("@/pages/crm/crm-settings-time"));
 const CrmSettingsPayments = lazy(() => import("@/pages/crm/crm-settings-payments"));
 const CrmSettingsDispatch = lazy(() => import("@/pages/crm/crm-settings-dispatch"));
 const CrmSettingsCustomerPortal = lazy(() => import("@/pages/crm/crm-settings-customer-portal"));
+const CrmPhotoGallery = lazy(() => import("@/pages/crm/crm-photo-gallery"));
 const CrmSettingsAppearance = lazy(() => import("@/pages/crm/crm-settings-appearance"));
 const CrmSettingsSystemTools = lazy(() => import("@/pages/crm/crm-settings-system-tools"));
 const CrmSettingsQuickBooks = lazy(() => import("@/pages/crm/crm-settings-quickbooks"));
@@ -355,6 +356,7 @@ function Router() {
       <Route path="/crm/settings/payments">{() => <ProtectedCrmWrapper><CrmSettingsPayments /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/dispatch">{() => <ProtectedCrmWrapper><CrmSettingsDispatch /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/customer-portal">{() => <ProtectedCrmWrapper><CrmSettingsCustomerPortal /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/photos">{() => <ProtectedCrmWrapper><CrmPhotoGallery /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/appearance">{() => <ProtectedCrmWrapper><CrmSettingsAppearance /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/system-tools">{() => <ProtectedCrmWrapper><CrmSettingsSystemTools /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/settings/quickbooks">{() => <ProtectedCrmWrapper><CrmSettingsQuickBooks /></ProtectedCrmWrapper>}</Route>

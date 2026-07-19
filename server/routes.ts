@@ -11970,6 +11970,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/customers/:id/files - Save file metadata after upload
+  // GET /api/crm/photos/feed - live company-wide photo feed (admin monitoring)
+  app.get("/api/crm/photos/feed", requireCrmAuth, requireCrmAdmin, async (req, res) => {
+    try {
+      const rows = await db.select({
+        id: customerFiles.id,
+        name: customerFiles.name,
+        url: customerFiles.url,
+        contentType: customerFiles.contentType,
+        createdAt: customerFiles.createdAt,
+        customerId: customerFiles.customerId,
+        customerName: crmCustomers.name,
+        uploadedByName: crmUsers.name,
+      })
+        .from(customerFiles)
+        .leftJoin(crmCustomers, eq(customerFiles.customerId, crmCustomers.id))
+        .leftJoin(crmUsers, eq(customerFiles.uploadedBy, crmUsers.id))
+        .where(sql`${customerFiles.contentType} LIKE 'image/%'`)
+        .orderBy(desc(customerFiles.createdAt))
+        .limit(120);
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching photo feed:", error);
+      res.status(500).json({ message: "Failed to load photo feed" });
+    }
+  });
+
   app.post("/api/crm/customers/:id/files", requireCrmAuth, async (req, res) => {
     try {
       const { name, url, objectPath, contentType, size } = req.body;

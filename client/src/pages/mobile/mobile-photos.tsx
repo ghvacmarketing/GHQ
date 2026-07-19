@@ -7,6 +7,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import MobileShell from "./mobile-shell";
+import { PhotoViewer } from "@/components/mobile/photo-viewer";
 import type { CrmUser, CrmWorkOrder, CrmCustomer, CustomerFile } from "@shared/schema";
 
 type WorkOrderWithDetails = CrmWorkOrder & { customer?: CrmCustomer | null };
@@ -70,6 +71,9 @@ export default function MobilePhotos() {
   const streamRef = useRef<MediaStream | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [flash, setFlash] = useState(false);
+  // Shots appear instantly with a local preview while uploading in the background
+  const [pendingShots, setPendingShots] = useState<Array<{ id: string; url: string; status: "uploading" | "done" | "error" }>>([]);
+  const [viewer, setViewer] = useState<{ src: string; name: string } | null>(null);
 
   const openCamera = async () => {
     try {
@@ -102,7 +106,7 @@ export default function MobilePhotos() {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return;
     setFlash(true);
-    setTimeout(() => setFlash(false), 140);
+    setTimeout(() => setFlash(false), 120);
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -110,9 +114,36 @@ export default function MobilePhotos() {
     canvas.toBlob((blob) => {
       if (!blob) return;
       const file = new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" });
-      // Fire the upload immediately; the camera stays open for the next shot
-      handleUpload([file]);
+      // INSTANT: the shot shows up immediately with a local preview; the
+      // upload runs in the background and the shutter never blocks.
+      const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const localUrl = URL.createObjectURL(blob);
+      setPendingShots((prev) => [{ id: localId, url: localUrl, status: "uploading" as const }, ...prev]);
+      uploadOne(file)
+        .then(() => setPendingShots((prev) => prev.map((ps) => (ps.id === localId ? { ...ps, status: "done" as const } : ps))))
+        .catch(() => setPendingShots((prev) => prev.map((ps) => (ps.id === localId ? { ...ps, status: "error" as const } : ps))));
     }, "image/jpeg", 0.85);
+  };
+
+  // Single-file background upload used by the camera (no global blocking)
+  const uploadOne = async (file: File) => {
+    if (!customerId || !selectedJob) throw new Error("no job");
+    const presignRes = await apiRequest("POST", "/api/uploads/request-url", {
+      name: file.name,
+      size: file.size,
+      contentType: file.type,
+    });
+    const { uploadURL, objectPath } = await presignRes.json();
+    await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+    const fileUrl = objectPath.startsWith("/objects") ? objectPath : `/objects/${objectPath}`;
+    await apiRequest("POST", `/api/crm/customers/${customerId}/files`, {
+      name: `WO-${selectedJob.workOrderNumber ?? ""} ${file.name}`.trim(),
+      url: fileUrl,
+      objectPath,
+      contentType: file.type,
+      size: file.size,
+    });
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "files"] });
   };
 
   const handleUpload = async (list: FileList | File[] | null) => {
@@ -240,14 +271,30 @@ export default function MobilePhotos() {
           ) : (
             <div className="grid grid-cols-3 gap-2" data-testid="photo-grid">
               {photos.map((p) => (
-                <a key={p.id} href={p.url} target="_blank" rel="noopener" className="block overflow-hidden rounded-xl">
+                <button
+                  key={p.id}
+                  onClick={() => setViewer({ src: p.url, name: p.name })}
+                  className="block overflow-hidden rounded-xl"
+                  data-testid={`photo-${p.id}`}
+                >
                   <img src={p.url} alt={p.name} loading="lazy" className="aspect-square w-full object-cover transition-transform active:scale-95" />
-                </a>
+                </button>
               ))}
             </div>
           )
         )}
       </div>
+
+      {/* Fullscreen viewer + markup editor */}
+      {viewer && (
+        <PhotoViewer
+          src={viewer.src}
+          name={viewer.name}
+          customerId={customerId}
+          onClose={() => setViewer(null)}
+          onSaved={() => queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "files"] })}
+        />
+      )}
 
       {/* Fullscreen in-app camera — every shutter press auto-saves to the account */}
       {cameraOpen && (
@@ -270,22 +317,39 @@ export default function MobilePhotos() {
             <X className="h-5 w-5" />
           </button>
           <div
-            className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 pb-8"
-            style={{ paddingBottom: "calc(32px + env(safe-area-inset-bottom))" }}
+            className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 bg-gradient-to-t from-black via-black/80 to-transparent pt-10"
+            style={{ paddingBottom: "calc(28px + env(safe-area-inset-bottom))" }}
           >
+            {pendingShots.length > 0 && (
+              <div className="flex w-full items-center gap-2 overflow-x-auto px-4 pb-1" data-testid="camera-session-strip">
+                {pendingShots.map((ps) => (
+                  <div key={ps.id} className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-white/25">
+                    <img src={ps.url} alt="" className="h-full w-full object-cover" />
+                    {ps.status === "uploading" && (
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/40">
+                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                      </span>
+                    )}
+                    {ps.status === "error" && (
+                      <span className="absolute inset-0 flex items-center justify-center bg-red-600/60 text-[10px] font-bold text-white">!</span>
+                    )}
+                  </div>
+                ))}
+                <span className="ml-1 shrink-0 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold text-white">
+                  {pendingShots.length} this session
+                </span>
+              </div>
+            )}
             <p className="text-xs font-medium text-white/70">
               Auto-saves to {selectedJob?.customer?.name || "the customer"}
             </p>
             <button
               onClick={capturePhoto}
-              disabled={uploading}
-              className="flex h-[74px] w-[74px] items-center justify-center rounded-full border-4 border-white transition-transform active:scale-90 disabled:opacity-60"
+              className="flex h-[74px] w-[74px] items-center justify-center rounded-full border-4 border-white transition-transform active:scale-90"
               data-testid="button-shutter"
               aria-label="Take photo"
             >
-              {uploading
-                ? <Loader2 className="h-8 w-8 animate-spin text-white" />
-                : <span className="h-[58px] w-[58px] rounded-full bg-white" />}
+              <span className="h-[58px] w-[58px] rounded-full bg-white" />
             </button>
           </div>
         </div>
