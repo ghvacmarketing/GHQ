@@ -769,8 +769,12 @@ export default function CrmInstallPlanner() {
             </div>
           )}
           <div className="flex min-h-0 flex-1">
-            {/* Current month */}
-            <div className="flex min-w-0 flex-col transition-[flex-grow] duration-300 ease-out" style={{ flexGrow: 1, flexBasis: 0 }}>
+            {/* Current month — gains a right edge when the next month is shown,
+                so the two read as separate calendars (drags still cross the gap) */}
+            <div
+              className="flex min-w-0 flex-col border-border transition-[flex-grow] duration-300 ease-out"
+              style={{ flexGrow: 1, flexBasis: 0, borderRightWidth: showNext ? 1 : 0 }}
+            >
               {/* Always present so the structure matches the next-month panel and
                   nothing jumps when it slides in — both stay perfectly inline. */}
               <div className="shrink-0 truncate border-b border-border bg-muted/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -795,13 +799,14 @@ export default function CrmInstallPlanner() {
             </div>
             {/* Next month slides in on the right during a drag */}
             <div
-              className="flex min-w-0 flex-col overflow-hidden transition-[flex-grow,opacity,margin-left] duration-300 ease-out"
+              className="flex min-w-0 flex-col overflow-hidden border-border transition-[flex-grow,opacity,margin-left] duration-300 ease-out"
               style={{
                 flexGrow: showNext ? 1 : 0.0001,
                 flexBasis: 0,
                 opacity: showNext ? 1 : 0,
                 pointerEvents: showNext ? "auto" : "none",
                 marginLeft: showNext ? 12 : 0,
+                borderLeftWidth: showNext ? 1 : 0,
               }}
               data-testid="next-month-grid"
             >
