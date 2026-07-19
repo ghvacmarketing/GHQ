@@ -65,6 +65,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { queueMutation, usePendingNotes } from "@/lib/offline-queue";
 import { useOnlineStatus, OfflineIndicator } from "@/hooks/use-online-status";
 import MobileShell from "./mobile-shell";
+import MobileJob from "./mobile-job";
 import type { CrmWorkOrder, CrmCustomer, CrmProperty, WorkOrderStatus, CrmQuote, CrmInvoice, CrmInvoiceLineItem, CrmItem, CrmQuoteLineItem, CrmUser } from "@shared/schema";
 
 interface WorkOrderDetail extends CrmWorkOrder {
@@ -3576,18 +3577,32 @@ export default function MobileJobDetail() {
   // Slide-out + swipe-right back to the jobs list (iOS-style)
   const pageRef = useRef<HTMLDivElement | null>(null);
   const swipe = useRef<{ x: number; y: number; active: boolean } | null>(null);
-  const goBackAnimated = () => {
+  const goBackAnimated = (fromDx = 0) => {
     const el = pageRef.current;
-    if (el) {
-      el.style.transition = "transform 0.22s ease-in";
+    if (!el) return navigate("/mobile/job");
+    const w = el.clientWidth || window.innerWidth;
+    const startP = Math.max(0, Math.min(1, fromDx / w));
+    const dur = 200 * (1 - startP) + 40;
+    setShowUnderlay(true);
+    requestAnimationFrame(() => {
+      el.style.transition = `transform ${dur}ms ease-in`;
       el.style.transform = "translateX(100%)";
-      setTimeout(() => navigate("/mobile/job"), 200);
-    } else {
-      navigate("/mobile/job");
-    }
+      pageUnderlayRef.current?.animate(
+        [{ transform: `translateX(${-25 * (1 - startP)}%)` }, { transform: "translateX(0)" }],
+        { duration: dur, easing: "ease-out", fill: "forwards" },
+      );
+      pageScrimRef.current?.animate(
+        [{ opacity: String(0.18 * (1 - startP)) }, { opacity: "0" }],
+        { duration: dur, easing: "linear", fill: "forwards" },
+      );
+      setTimeout(() => navigate("/mobile/job"), dur - 10);
+    });
   };
   const swipeDrag = useRef<{ x: number; y: number; engaged: boolean; active: boolean; section: boolean } | null>(null);
   const overviewRef = useRef<HTMLDivElement | null>(null);
+  const pageUnderlayRef = useRef<HTMLDivElement | null>(null);
+  const pageScrimRef = useRef<HTMLDivElement | null>(null);
+  const [showUnderlay, setShowUnderlay] = useState(false);
   const sectionsRef = useRef<HTMLDivElement | null>(null);
   const scrimRef = useRef<HTMLDivElement | null>(null);
   const contentRef = sectionsRef; // sections layer is the swipe/scroll target
@@ -3697,6 +3712,7 @@ export default function MobileJobDetail() {
         st.engaged = true;
         const target = st.section ? sectionsRef.current : el;
         if (target) target.style.transition = "none";
+        if (!st.section) setShowUnderlay(true);
       }
       else if (dy > 14) { st.active = false; return; }
     }
@@ -3711,6 +3727,10 @@ export default function MobileJobDetail() {
         if (scrimRef.current) scrimRef.current.style.opacity = String(0.18 * (1 - pr));
       } else {
         el.style.transform = `translateX(${off}px)`;
+        const w = el.clientWidth || window.innerWidth;
+        const pr = Math.max(0, Math.min(1, off / w));
+        if (pageUnderlayRef.current) pageUnderlayRef.current.style.transform = `translateX(${-25 * (1 - pr)}%)`;
+        if (pageScrimRef.current) pageScrimRef.current.style.opacity = String(0.18 * (1 - pr));
       }
     }
   };
@@ -3739,9 +3759,18 @@ export default function MobileJobDetail() {
         }, 260);
       }
     } else if (commit) {
-      goBackAnimated();
+      goBackAnimated(Math.max(0, e.clientX - st.x));
     } else {
       springBack();
+      pageUnderlayRef.current?.animate(
+        [{ transform: pageUnderlayRef.current.style.transform || "translateX(-25%)" }, { transform: "translateX(-25%)" }],
+        { duration: 260, easing: "ease-out", fill: "forwards" },
+      );
+      pageScrimRef.current?.animate(
+        [{ opacity: pageScrimRef.current.style.opacity || "0.18" }, { opacity: "0.18" }],
+        { duration: 260, easing: "linear", fill: "forwards" },
+      );
+      setTimeout(() => setShowUnderlay(false), 320);
     }
   };
 
@@ -4177,6 +4206,16 @@ export default function MobileJobDetail() {
       }}
     >
       <OfflineIndicator />
+      {/* Real Jobs page beneath the detail — visible/parallaxing while
+          swiping the whole job away, exactly like the section stack */}
+      {showUnderlay && (
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden>
+          <div ref={pageUnderlayRef} className="h-full w-full" style={{ transform: "translateX(-25%)" }}>
+            <MobileJob />
+          </div>
+          <div ref={pageScrimRef} className="absolute inset-0 bg-black" style={{ opacity: 0.18 }} />
+        </div>
+      )}
       {/* Floating back — tap, or swipe right anywhere from the left half */}
       <button
         onClick={() => { if (activeTab !== "overview") closeSectionAnimated(); else goBackAnimated(); }}
@@ -4189,7 +4228,7 @@ export default function MobileJobDetail() {
       </button>
       <div
         ref={pageRef}
-        className="page-slide-in flex h-full flex-col bg-slate-50"
+        className="page-slide-in relative z-10 flex h-full flex-col bg-slate-50 shadow-[-14px_0_32px_rgba(0,0,0,0.12)]"
         style={{ touchAction: "pan-y" }}
         onPointerDown={onSwipeStart}
         onPointerMove={onSwipeMove}
