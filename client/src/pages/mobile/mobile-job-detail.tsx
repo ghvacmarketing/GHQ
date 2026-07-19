@@ -259,7 +259,9 @@ function OverviewTab({
           {statusFlow.map((step, i) => (
             <span
               key={step}
-              className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${i <= flowIndex ? "bg-[#711419]" : "bg-slate-200"}`}
+              className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
+                i < flowIndex ? "bg-[#711419]" : i === flowIndex ? "bg-[#711419]/40" : "bg-slate-200"
+              }`}
             />
           ))}
         </div>
