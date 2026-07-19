@@ -86,6 +86,7 @@ export default function MobileJob() {
   const [visitType, setVisitType] = useState<string>("SERVICE");
   const [workSubtype, setWorkSubtype] = useState<string>("");
   const [priority, setPriority] = useState<string>("normal");
+  const [assignTechId, setAssignTechId] = useState<string>(""); // "" = assign to myself
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedSlot, setSelectedSlot] = useState<{ start: string; end: string } | null>(null);
   const [selectedStartTime, setSelectedStartTime] = useState<string>("");
@@ -102,7 +103,7 @@ export default function MobileJob() {
   });
 
   // Supervisor, tech, and sales can all see future jobs
-  const canViewFutureJobs = currentUser?.role === 'supervisor' || currentUser?.role === 'tech' || currentUser?.role === 'sales' || currentUser?.role === 'owner';
+  const canViewFutureJobs = currentUser?.role === 'supervisor' || currentUser?.role === 'tech' || currentUser?.role === 'sales' || currentUser?.role === 'admin' || currentUser?.role === 'owner';
 
   // Supervisor, tech, and sales see future jobs (next 30 days), others see today only
   const queryDateEnd = canViewFutureJobs ? futureEndStr : todayEnd;
@@ -230,7 +231,7 @@ export default function MobileJob() {
         visitType,
         workSubtype: workSubtype || null,
         priority,
-        assignedTechId: currentUser.id, // Self-assign
+        assignedTechId: assignTechId || currentUser.id, // default: self-assign
         scheduledStart: selectedSlot?.start || null,
         scheduledEnd: selectedSlot?.end || null,
         status: "scheduled",
@@ -238,10 +239,16 @@ export default function MobileJob() {
       return res.json();
     },
     onSuccess: (data: { id?: string }) => {
+      const assigneeName = assignTechId && assignTechId !== currentUser?.id
+        ? boardTechs.find((t) => t.id === assignTechId)?.name
+        : null;
       setShowCreateDialog(false);
       resetCreateForm();
       queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
-      toast({ title: "Work order created", description: "The job has been scheduled to you" });
+      toast({
+        title: "Work order created",
+        description: assigneeName ? `The job has been scheduled to ${assigneeName}` : "The job has been scheduled to you",
+      });
       if (data?.id) {
         navigate(`/mobile/job/${data.id}`);
       }
@@ -260,7 +267,9 @@ export default function MobileJob() {
         error?.message?.includes("NO_MAINTENANCE_AGREEMENT");
       
       if (isConflict) {
-        setConflictError("You already have a job scheduled at this time. Please choose a different time slot.");
+        setConflictError(assignTechId && assignTechId !== currentUser?.id
+          ? "That teammate already has a job scheduled at this time. Please choose a different time slot."
+          : "You already have a job scheduled at this time. Please choose a different time slot.");
       } else if (noAgreement) {
         toast({ 
           title: "No Maintenance Agreement", 
@@ -286,6 +295,7 @@ export default function MobileJob() {
     setVisitType("SERVICE");
     setWorkSubtype("");
     setPriority("normal");
+    setAssignTechId("");
     setSelectedDate(undefined);
     setSelectedSlot(null);
     setSelectedStartTime("");
@@ -303,7 +313,7 @@ export default function MobileJob() {
   // Collapsible per-tech roster (supervisor and owner)
   const { data: boardTechs = [] } = useQuery<{ id: string; name: string; role: string }[]>({
     queryKey: ["/api/crm/technicians"],
-    enabled: !!currentUser && (currentUser.role === 'supervisor' || currentUser.role === 'owner'),
+    enabled: !!currentUser && (currentUser.role === 'supervisor' || currentUser.role === 'admin' || currentUser.role === 'owner'),
   });
   const [selectedTechId, setSelectedTechId] = useState<string | null>(null);
 
@@ -325,7 +335,7 @@ export default function MobileJob() {
     () => workOrders.filter((wo) => wo.assignedTechId === currentUser?.id),
     [workOrders, currentUser?.id],
   );
-  const isSupervisorPlus = currentUser?.role === 'supervisor' || currentUser?.role === 'owner';
+  const isSupervisorPlus = currentUser?.role === 'supervisor' || currentUser?.role === 'admin' || currentUser?.role === 'owner';
 
   // For users who can view future jobs: show all jobs (today + future), for others: only today
   const displayedJobs = useMemo(() => {
@@ -424,8 +434,8 @@ export default function MobileJob() {
               {canViewFutureJobs ? "My Jobs" : "Today's Jobs"}
             </h1>
           </div>
-          {currentUser?.role === 'supervisor' && (
-            <Button 
+          {isSupervisorPlus && (
+            <Button
               onClick={() => setShowCreateDialog(true)}
               className="bg-[#711419] hover:bg-[#5a1014]"
               data-testid="button-create-work-order"
@@ -696,7 +706,7 @@ export default function MobileJob() {
           <DialogHeader>
             <DialogTitle>Create New Job</DialogTitle>
             <DialogDescription>
-              Create a work order and schedule it for yourself
+              Create a work order and assign it to yourself or a teammate
             </DialogDescription>
           </DialogHeader>
 
@@ -865,6 +875,24 @@ export default function MobileJob() {
                   <SelectItem value="low">Low</SelectItem>
                   <SelectItem value="normal">Normal</SelectItem>
                   <SelectItem value="high">High</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Assign to */}
+            <div className="space-y-2">
+              <Label>Assign to</Label>
+              <Select value={assignTechId || "me"} onValueChange={(val) => setAssignTechId(val === "me" ? "" : val)}>
+                <SelectTrigger data-testid="select-assign-tech">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="me">Myself{currentUser?.name ? ` (${currentUser.name})` : ""}</SelectItem>
+                  {boardTechs
+                    .filter((t) => t.id !== currentUser?.id)
+                    .map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
