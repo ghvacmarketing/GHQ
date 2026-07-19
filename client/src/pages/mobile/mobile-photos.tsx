@@ -74,6 +74,33 @@ export default function MobilePhotos() {
   const isSupervisorPlus = !!currentUser && ["supervisor", "admin", "owner"].includes(currentUser.role);
   const [confirmDelete, setConfirmDelete] = useState<CustomerFile | null>(null);
 
+  // Long-press a tile (iOS context-menu style): the photo zooms up with
+  // Download / Delete beneath it. The native browser callout is suppressed.
+  const [actionSheet, setActionSheet] = useState<CustomerFile | null>(null);
+  const pressTimer = useRef<number | undefined>(undefined);
+  const pressStart = useRef<{ x: number; y: number } | null>(null);
+  const suppressClick = useRef(false);
+
+  const startPress = (p: CustomerFile, e: React.PointerEvent) => {
+    if (!isSupervisorPlus) return;
+    pressStart.current = { x: e.clientX, y: e.clientY };
+    window.clearTimeout(pressTimer.current);
+    pressTimer.current = window.setTimeout(() => {
+      suppressClick.current = true;
+      window.setTimeout(() => { suppressClick.current = false; }, 600);
+      navigator.vibrate?.(10);
+      setActionSheet(p);
+    }, 450);
+  };
+  const cancelPress = () => {
+    window.clearTimeout(pressTimer.current);
+    pressStart.current = null;
+  };
+  const movePress = (e: React.PointerEvent) => {
+    const s = pressStart.current;
+    if (s && (Math.abs(e.clientX - s.x) > 10 || Math.abs(e.clientY - s.y) > 10)) cancelPress();
+  };
+
   const deletePhoto = useMutation({
     mutationFn: async (p: CustomerFile) =>
       apiRequest("DELETE", `/api/crm/customers/${customerId}/files/${p.id}`),
@@ -310,38 +337,73 @@ export default function MobilePhotos() {
               {photos.map((p) => (
                 <div key={p.id} className="relative overflow-hidden rounded-xl">
                   <button
-                    onClick={() => setViewer({ src: p.url, name: p.name })}
-                    className="block w-full"
+                    onClick={() => {
+                      if (suppressClick.current) { suppressClick.current = false; return; }
+                      setViewer({ src: p.url, name: p.name });
+                    }}
+                    onPointerDown={(e) => startPress(p, e)}
+                    onPointerMove={movePress}
+                    onPointerUp={cancelPress}
+                    onPointerCancel={cancelPress}
+                    onPointerLeave={cancelPress}
+                    onContextMenu={(e) => e.preventDefault()}
+                    className="block w-full select-none"
+                    style={{ WebkitTouchCallout: "none" }}
                     data-testid={`photo-${p.id}`}
                   >
-                    <img src={p.url} alt={p.name} loading="lazy" className="aspect-square w-full object-cover transition-transform active:scale-95" />
+                    <img
+                      src={p.url}
+                      alt={p.name}
+                      loading="lazy"
+                      draggable={false}
+                      className="pointer-events-none aspect-square w-full select-none object-cover transition-transform active:scale-95"
+                      style={{ WebkitTouchCallout: "none" }}
+                    />
                   </button>
-                  {isSupervisorPlus && (
-                    <div className="absolute right-1 top-1 flex gap-1">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); downloadPhoto(p); }}
-                        className="rounded-md bg-black/55 p-1.5 text-white active:bg-black/80"
-                        aria-label="Download photo"
-                        data-testid={`download-photo-${p.id}`}
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setConfirmDelete(p); }}
-                        className="rounded-md bg-black/55 p-1.5 text-white active:bg-red-600"
-                        aria-label="Delete photo"
-                        data-testid={`delete-photo-${p.id}`}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
           )
         )}
       </div>
+
+      {/* Long-press action sheet: zoomed photo + Download / Delete */}
+      {actionSheet && (
+        <div
+          className="fixed inset-0 z-[65] flex flex-col items-center justify-center bg-black/60 p-8 backdrop-blur-sm"
+          onClick={() => setActionSheet(null)}
+          data-testid="photo-action-sheet"
+        >
+          <img
+            src={actionSheet.url}
+            alt={actionSheet.name}
+            draggable={false}
+            className="max-h-[55vh] max-w-full select-none rounded-2xl object-contain shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+            style={{ WebkitTouchCallout: "none" }}
+            onContextMenu={(e) => e.preventDefault()}
+          />
+          <div
+            className="mt-3 w-60 overflow-hidden rounded-2xl bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => { downloadPhoto(actionSheet); setActionSheet(null); }}
+              className="flex w-full items-center justify-between px-4 py-3.5 text-sm font-medium text-slate-800 active:bg-slate-100"
+              data-testid="action-download"
+            >
+              Download <Download className="h-4 w-4 text-slate-500" />
+            </button>
+            <div className="h-px bg-slate-100" />
+            <button
+              onClick={() => { setConfirmDelete(actionSheet); setActionSheet(null); }}
+              className="flex w-full items-center justify-between px-4 py-3.5 text-sm font-medium text-red-600 active:bg-red-50"
+              data-testid="action-delete"
+            >
+              Delete <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Delete confirmation (supervisor+) */}
       <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>

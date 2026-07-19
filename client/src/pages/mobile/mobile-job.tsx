@@ -88,6 +88,7 @@ export default function MobileJob() {
   const [workSubtype, setWorkSubtype] = useState<string>("");
   const [priority, setPriority] = useState<string>("normal");
   const [assignTechId, setAssignTechId] = useState<string>(""); // "" = assign to myself
+  const [dateOpen, setDateOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedSlot, setSelectedSlot] = useState<{ start: string; end: string } | null>(null);
   const [selectedStartTime, setSelectedStartTime] = useState<string>("");
@@ -882,7 +883,7 @@ export default function MobileJob() {
               <Label>Schedule *</Label>
               
               {/* Date Picker */}
-              <Popover>
+              <Popover open={dateOpen} onOpenChange={setDateOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
@@ -902,6 +903,7 @@ export default function MobileJob() {
                       // Wheels always show a value, so seed a sensible default window.
                       setSelectedStartTime((t) => t || "09:00");
                       setSelectedEndTime((t) => t || "11:00");
+                      if (date) setDateOpen(false); // picking a date closes the calendar
                     }}
                     disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                     initialFocus
