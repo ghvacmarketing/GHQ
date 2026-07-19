@@ -1287,6 +1287,16 @@ export const insertInstallPlanBlockSchema = createInsertSchema(installPlanBlocks
 export type InstallPlanBlock = typeof installPlanBlocks.$inferSelect;
 export type InsertInstallPlanBlock = z.infer<typeof insertInstallPlanBlockSchema>;
 
+// Install crews — planner-specific crew list managed inside the Install
+// Planner (separate from dispatch-board users/technicians).
+export const installCrews = pgTable("install_crews", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export type InstallCrew = typeof installCrews.$inferSelect;
+
 // CRM Project Tasks (admin task list for project management)
 export const crmProjectTasks = pgTable("crm_project_tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

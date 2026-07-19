@@ -3,7 +3,7 @@ import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "./db";
 import { storage } from "./storage";
 import { requireCrmAuth, getCurrentCrmUser } from "./crm-auth";
-import { installPlanBlocks, crmProjects, crmCustomers } from "@shared/schema";
+import { installPlanBlocks, installCrews, crmProjects, crmCustomers } from "@shared/schema";
 
 const CREWS_SETTING_KEY = "install_planner_crews_per_day";
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -36,6 +36,57 @@ async function enrich(blocks: (typeof installPlanBlocks.$inferSelect)[]) {
 }
 
 export function registerInstallPlannerRoutes(app: Express): void {
+  // ── Install crews (planner-managed crew list, separate from dispatch users) ──
+  app.get("/api/crm/install-planner/crews", requireCrmAuth, async (_req: Request, res: Response) => {
+    try {
+      const rows = await db.select().from(installCrews).orderBy(installCrews.sortOrder, installCrews.createdAt);
+      res.json(rows);
+    } catch (e) {
+      console.error("[install-planner] crews list error:", e);
+      res.status(500).json({ message: "Failed to load crews" });
+    }
+  });
+
+  app.post("/api/crm/install-planner/crews", requireCrmAuth, async (req: Request, res: Response) => {
+    try {
+      const name = String(req.body?.name || "").trim();
+      if (!name) return res.status(400).json({ message: "A crew name is required" });
+      const [row] = await db.insert(installCrews).values({ name: name.slice(0, 100) }).returning();
+      res.status(201).json(row);
+    } catch (e) {
+      console.error("[install-planner] crew create error:", e);
+      res.status(500).json({ message: "Failed to create crew" });
+    }
+  });
+
+  app.patch("/api/crm/install-planner/crews/:id", requireCrmAuth, async (req: Request, res: Response) => {
+    try {
+      const name = String(req.body?.name || "").trim();
+      if (!name) return res.status(400).json({ message: "A crew name is required" });
+      const [row] = await db.update(installCrews)
+        .set({ name: name.slice(0, 100) })
+        .where(eq(installCrews.id, req.params.id))
+        .returning();
+      if (!row) return res.status(404).json({ message: "Not found" });
+      res.json(row);
+    } catch (e) {
+      console.error("[install-planner] crew rename error:", e);
+      res.status(500).json({ message: "Failed to rename crew" });
+    }
+  });
+
+  app.delete("/api/crm/install-planner/crews/:id", requireCrmAuth, async (req: Request, res: Response) => {
+    try {
+      // Unassign the crew's holds rather than orphaning them.
+      await db.update(installPlanBlocks).set({ crewId: null }).where(eq(installPlanBlocks.crewId, req.params.id));
+      const r = await db.delete(installCrews).where(eq(installCrews.id, req.params.id)).returning();
+      res.json({ success: r.length > 0 });
+    } catch (e) {
+      console.error("[install-planner] crew delete error:", e);
+      res.status(500).json({ message: "Failed to delete crew" });
+    }
+  });
+
   // List blocks overlapping [from, to] (defaults to everything if omitted).
   app.get("/api/crm/install-planner", requireCrmAuth, async (req: Request, res: Response) => {
     try {

@@ -195,6 +195,20 @@ async function runInstallPlannerMigrations() {
     const { db } = await import("./db");
     const { sql } = await import("drizzle-orm");
     await db.execute(sql`ALTER TABLE install_plan_blocks ADD COLUMN IF NOT EXISTS crew_id varchar`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS install_crews (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        name text NOT NULL,
+        sort_order integer NOT NULL DEFAULT 0,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    // Crew assignments must point at install_crews; clear anything else
+    // (e.g. legacy assignments to dispatch-board user ids). Idempotent.
+    await db.execute(sql`
+      UPDATE install_plan_blocks SET crew_id = NULL
+      WHERE crew_id IS NOT NULL AND crew_id NOT IN (SELECT id FROM install_crews)
+    `);
   } catch (err) {
     console.error("Install planner migration error (non-fatal):", err);
   }

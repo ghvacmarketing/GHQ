@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
-  AlertTriangle, CheckCircle2, ChevronDown, Clock, Filter, SignalHigh, SignalLow, SignalMedium,
+  AlertTriangle, CheckCircle2, ChevronDown, Clock, Filter, Pencil, Plus, SignalHigh, SignalLow, SignalMedium,
 } from "lucide-react";
 
 export type PlannerBlock = {
@@ -109,11 +109,13 @@ type Props = {
   onEdit: (b: PlannerBlock) => void;
   onCreate: (startDate: string, crewId: string | null) => void;
   onCommit: (id: string, next: Proposal, prev: Proposal) => void;
+  onAddCrew: () => void;
+  onEditCrew: (crew: Crew) => void;
 };
 
 export function InstallTimeline({
   blocks, crews, crewsPerDay, rangeStart, days, rangeWeeks, onRangeWeeksChange,
-  onExtend, todayStr, todayNonce, onEdit, onCreate, onCommit,
+  onExtend, todayStr, todayNonce, onEdit, onCreate, onCommit, onAddCrew, onEditCrew,
 }: Props) {
   const [zoom, setZoom] = useState<Zoom>(() => (localStorage.getItem("ip.zoom") === "week" ? "week" : "day"));
   const [groupBy, setGroupBy] = useState<GroupBy>(() => {
@@ -589,49 +591,65 @@ export function InstallTimeline({
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent align="start" className="w-64 space-y-3 text-sm">
-            <div>
-              <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Status</p>
-              {[["tentative", "Tentative (holds)"], ["sold", "Sold"]].map(([v, label]) => (
-                <label key={v} className="flex items-center gap-2 py-0.5 text-xs">
-                  <Checkbox checked={fStatus.has(v)} onCheckedChange={() => toggleSet(fStatus, v, setFStatus)} /> {label}
-                </label>
-              ))}
-            </div>
-            <div>
-              <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Confidence</p>
-              {[["high", "High"], ["medium", "Medium"], ["low", "Low"], ["none", "Not set"]].map(([v, label]) => (
-                <label key={v} className="flex items-center gap-2 py-0.5 text-xs">
-                  <Checkbox checked={fConf.has(v)} onCheckedChange={() => toggleSet(fConf, v, setFConf)} /> {label}
-                </label>
-              ))}
-            </div>
-            <div>
-              <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Crew</p>
-              <div className="max-h-32 overflow-y-auto">
-                {[...crews.map((c) => [c.id, c.name] as const), ["none", "Unassigned"] as const].map(([v, label]) => (
-                  <label key={v} className="flex items-center gap-2 py-0.5 text-xs">
-                    <Checkbox checked={fCrew.has(v)} onCheckedChange={() => toggleSet(fCrew, v, setFCrew)} /> {label}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Date range</p>
-              <div className="flex items-center gap-1.5">
-                <Input type="date" value={fFrom} onChange={(e) => setFFrom(e.target.value)} className="h-7 text-xs" />
-                <span className="text-muted-foreground">–</span>
-                <Input type="date" value={fTo} onChange={(e) => setFTo(e.target.value)} className="h-7 text-xs" />
-              </div>
-            </div>
-            {filterCount > 0 && (
-              <Button
-                variant="ghost" size="sm" className="h-7 w-full text-xs"
+          <PopoverContent align="start" className="w-72 p-0">
+            <div className="flex items-center justify-between border-b border-border px-3 py-2">
+              <p className="text-sm font-semibold text-foreground">Filters</p>
+              <button
                 onClick={() => { setFStatus(new Set()); setFConf(new Set()); setFCrew(new Set()); setFFrom(""); setFTo(""); }}
+                className={cn("text-xs font-medium text-[#711419] hover:underline", filterCount === 0 && "invisible")}
+                data-testid="button-clear-filters"
               >
-                Clear filters
-              </Button>
-            )}
+                Clear all
+              </button>
+            </div>
+            <div className="max-h-[60vh] space-y-4 overflow-y-auto p-3">
+              <div>
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Status</p>
+                <div className="grid grid-cols-2 gap-x-2">
+                  {[["tentative", "Tentative"], ["sold", "Sold"]].map(([v, label]) => (
+                    <label key={v} className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 text-xs text-foreground hover:bg-muted">
+                      <Checkbox checked={fStatus.has(v)} onCheckedChange={() => toggleSet(fStatus, v, setFStatus)} />
+                      <span className="truncate">{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Confidence</p>
+                <div className="grid grid-cols-2 gap-x-2">
+                  {[["high", "High"], ["medium", "Medium"], ["low", "Low"], ["none", "Not set"]].map(([v, label]) => (
+                    <label key={v} className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 text-xs text-foreground hover:bg-muted">
+                      <Checkbox checked={fConf.has(v)} onCheckedChange={() => toggleSet(fConf, v, setFConf)} />
+                      <span className="truncate">{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Crew</p>
+                <div className="max-h-36 overflow-y-auto">
+                  {[...crews.map((c) => [c.id, c.name] as const), ["none", "Unassigned"] as const].map(([v, label]) => (
+                    <label key={v} className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 text-xs text-foreground hover:bg-muted">
+                      <Checkbox checked={fCrew.has(v)} onCheckedChange={() => toggleSet(fCrew, v, setFCrew)} />
+                      <span className="truncate">{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Date range</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">From</Label>
+                    <Input type="date" value={fFrom} onChange={(e) => setFFrom(e.target.value)} className="mt-0.5 h-8 text-xs" data-testid="filter-date-from" />
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">To</Label>
+                    <Input type="date" value={fTo} onChange={(e) => setFTo(e.target.value)} className="mt-0.5 h-8 text-xs" data-testid="filter-date-to" />
+                  </div>
+                </div>
+              </div>
+            </div>
           </PopoverContent>
         </Popover>
         <span className="ml-auto hidden text-[11px] text-muted-foreground sm:block">
@@ -751,21 +769,35 @@ export function InstallTimeline({
             return (
               <section key={g.key} {...(g.hasCrewTarget ? { "data-crewgroup": g.key, "data-crewid": g.crewId ?? "" } : {})}>
                 <div className="flex border-b border-border" style={{ height: GROUP_H }}>
-                  <button
-                    onClick={() => {
-                      const next = new Set(collapsed);
-                      next.has(g.key) ? next.delete(g.key) : next.add(g.key);
-                      setCollapsed(next);
-                    }}
-                    className="sticky left-0 z-20 flex shrink-0 items-center gap-1.5 border-r border-border bg-muted/70 px-2 text-left backdrop-blur"
+                  <div
+                    className="group/hdr sticky left-0 z-20 flex shrink-0 items-center border-r border-border bg-muted/70 backdrop-blur"
                     style={{ width: effLeftW }}
-                    data-testid={`group-${g.key}`}
                   >
-                    <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform", isCollapsed && "-rotate-90")} />
-                    <span className="truncate text-xs font-semibold text-foreground">{g.label}</span>
-                    <span className="text-[10px] tabular-nums text-muted-foreground">{g.blocks.length}</span>
-                    {groupConflicts && <AlertTriangle className="h-3 w-3 shrink-0 text-red-500" />}
-                  </button>
+                    <button
+                      onClick={() => {
+                        const next = new Set(collapsed);
+                        next.has(g.key) ? next.delete(g.key) : next.add(g.key);
+                        setCollapsed(next);
+                      }}
+                      className="flex h-full min-w-0 flex-1 items-center gap-1.5 px-2 text-left"
+                      data-testid={`group-${g.key}`}
+                    >
+                      <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform", isCollapsed && "-rotate-90")} />
+                      <span className="truncate text-xs font-semibold text-foreground">{g.label}</span>
+                      <span className="text-[10px] tabular-nums text-muted-foreground">{g.blocks.length}</span>
+                      {groupConflicts && <AlertTriangle className="h-3 w-3 shrink-0 text-red-500" />}
+                    </button>
+                    {groupBy === "crew" && g.crewId && (
+                      <button
+                        onClick={() => onEditCrew({ id: g.crewId!, name: g.label })}
+                        className="mr-1.5 rounded p-1 text-muted-foreground opacity-100 hover:bg-muted hover:text-foreground sm:opacity-0 sm:group-hover/hdr:opacity-100"
+                        title="Rename or delete crew"
+                        data-testid={`edit-crew-${g.crewId}`}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
                   <div className="shrink-0 bg-muted/40" style={{ width: timelineW }} />
                 </div>
 
@@ -917,9 +949,26 @@ export function InstallTimeline({
             );
           })}
 
+          {groupBy === "crew" && (
+            <div className="flex" style={{ height: EMPTY_ROW_H }}>
+              <div className="sticky left-0 z-20 flex shrink-0 items-center border-r border-border bg-card" style={{ width: effLeftW }}>
+                <button
+                  onClick={onAddCrew}
+                  className="flex items-center gap-1 px-2 text-xs font-medium text-[#711419] hover:underline"
+                  data-testid="button-add-crew"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add crew
+                </button>
+              </div>
+              <div className="shrink-0" style={{ width: timelineW }} />
+            </div>
+          )}
+
           {filtered.length === 0 && (
             <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
-              No installs in this range{filterCount > 0 ? " match the filters" : ""}.
+              {crews.length === 0 && groupBy === "crew"
+                ? "No install crews yet — use “Add crew” to set up your crews, then drag holds onto them."
+                : `No installs in this range${filterCount > 0 ? " match the filters" : ""}.`}
             </div>
           )}
         </div>

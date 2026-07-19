@@ -138,13 +138,38 @@ export default function CrmInstallPlanner() {
   const blocks = data?.blocks || [];
   const crewsPerDay = data?.crewsPerDay ?? null;
 
-  // Dispatch-board users double as install crews.
-  const { data: technicians = [] } = useQuery<{ id: string; name: string; email: string; role: string }[]>({
-    queryKey: ["/api/crm/technicians"],
+  // Install crews are managed inside the planner (separate from dispatch users).
+  const { data: crews = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ["/api/crm/install-planner/crews"],
     enabled: !!currentUser,
   });
   const crewLabel = (id: string | null | undefined) =>
-    id == null ? "Unassigned" : technicians.find((t) => t.id === id)?.name ?? "Unknown crew";
+    id == null ? "Unassigned" : crews.find((c) => c.id === id)?.name ?? "Unknown crew";
+
+  // Add / rename / delete crews
+  const [crewDialog, setCrewDialog] = useState<{ id: string | null; name: string } | null>(null);
+  const [crewDeleteConfirm, setCrewDeleteConfirm] = useState(false);
+  const invalidateCrews = () => queryClient.invalidateQueries({ queryKey: ["/api/crm/install-planner/crews"] });
+  const saveCrew = useMutation({
+    mutationFn: async (p: { id: string | null; name: string }) =>
+      (await apiRequest(
+        p.id ? "PATCH" : "POST",
+        p.id ? `/api/crm/install-planner/crews/${p.id}` : "/api/crm/install-planner/crews",
+        { name: p.name },
+      )).json(),
+    onSuccess: () => { invalidateCrews(); setCrewDialog(null); },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't save crew", variant: "destructive" }),
+  });
+  const deleteCrew = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/crm/install-planner/crews/${id}`),
+    onSuccess: () => {
+      invalidateCrews();
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/install-planner"] });
+      setCrewDialog(null);
+      setCrewDeleteConfirm(false);
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't delete crew", variant: "destructive" }),
+  });
 
   // ── Dialog / form ──
   const [open, setOpen] = useState(false);
@@ -709,7 +734,9 @@ export default function CrmInstallPlanner() {
         {view === "timeline" && (
           <InstallTimeline
             blocks={blocks}
-            crews={technicians}
+            crews={crews}
+            onAddCrew={() => { setCrewDeleteConfirm(false); setCrewDialog({ id: null, name: "" }); }}
+            onEditCrew={(c) => { setCrewDeleteConfirm(false); setCrewDialog({ id: c.id, name: c.name }); }}
             crewsPerDay={crewsPerDay}
             rangeStart={anchor}
             days={tlDays}
@@ -855,8 +882,8 @@ export default function CrmInstallPlanner() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Unassigned</SelectItem>
-                  {technicians.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  {crews.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -941,6 +968,55 @@ export default function CrmInstallPlanner() {
             ))}
             {dayListBlocks.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">Nothing scheduled.</p>}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add / edit install crew */}
+      <Dialog open={!!crewDialog} onOpenChange={(o) => { if (!o) { setCrewDialog(null); setCrewDeleteConfirm(false); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{crewDialog?.id ? "Edit crew" : "Add install crew"}</DialogTitle>
+          </DialogHeader>
+          <div>
+            <Label className="text-xs">Crew name</Label>
+            <Input
+              value={crewDialog?.name || ""}
+              onChange={(e) => setCrewDialog((d) => (d ? { ...d, name: e.target.value } : d))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && crewDialog?.name.trim()) saveCrew.mutate({ id: crewDialog.id, name: crewDialog.name.trim() });
+              }}
+              placeholder="e.g. Geoffrey's crew"
+              autoFocus
+              data-testid="input-crew-name"
+            />
+          </div>
+          <DialogFooter className="flex-row items-center justify-between gap-2 sm:justify-between">
+            {crewDialog?.id ? (
+              crewDeleteConfirm ? (
+                <Button
+                  variant="destructive"
+                  onClick={() => deleteCrew.mutate(crewDialog.id!)}
+                  disabled={deleteCrew.isPending}
+                  data-testid="button-confirm-delete-crew"
+                >
+                  {deleteCrew.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+                  Confirm — holds become unassigned
+                </Button>
+              ) : (
+                <Button variant="outline" className="text-red-600 hover:text-red-600" onClick={() => setCrewDeleteConfirm(true)} data-testid="button-delete-crew">
+                  <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+                </Button>
+              )
+            ) : <span />}
+            <Button
+              className="bg-[#711419] hover:bg-[#5a1014]"
+              onClick={() => crewDialog && saveCrew.mutate({ id: crewDialog.id, name: crewDialog.name.trim() })}
+              disabled={saveCrew.isPending || !crewDialog?.name.trim()}
+              data-testid="button-save-crew"
+            >
+              {saveCrew.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null} Save
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </CrmLayout>
