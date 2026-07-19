@@ -82,6 +82,8 @@ export default function MobilePhotos() {
   const MOVE_TOLERANCE = 12;
   const [preview, setPreview] = useState<CustomerFile | null>(null);
   const [previewW, setPreviewW] = useState<number | undefined>(undefined);
+  const [actionsTop, setActionsTop] = useState<number | null>(null);
+  const previewImgRef = useRef<HTMLImageElement | null>(null);
   const [pressedId, setPressedId] = useState<string | null>(null);
   const lastPreviewRef = useRef<CustomerFile | null>(null);
   if (preview) lastPreviewRef.current = preview;
@@ -104,14 +106,14 @@ export default function MobilePhotos() {
   const startPress = (p: CustomerFile, e: React.PointerEvent) => {
     if (!isSupervisorPlus) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     pressStart.current = { x: e.clientX, y: e.clientY };
     setPressedId(p.id);
     window.clearTimeout(pressTimer.current);
     pressTimer.current = window.setTimeout(() => {
       suppressClick.current = true;
       window.setTimeout(() => { suppressClick.current = false; }, 600);
-      setPreviewW(Math.min(rect.width * 1.6, window.innerWidth * 0.88));
+      // A tile is tiny — enlarge to a real preview, capped by the CSS max sizes.
+      setPreviewW(Math.min(window.innerWidth * 0.88, 720));
       navigator.vibrate?.(10);
       setPressedId(null);
       setPreview(p);
@@ -126,6 +128,19 @@ export default function MobilePhotos() {
     const s = pressStart.current;
     if (s && Math.hypot(e.clientX - s.x, e.clientY - s.y) > MOVE_TOLERANCE) cancelPress();
   };
+
+  // Pin the action menu just under the image's rendered height (the image is
+  // centered at 50%/50%), clamping so the menu never runs off screen.
+  const placeActions = () => {
+    const img = previewImgRef.current;
+    if (!img || !previewW) return;
+    const nw = img.naturalWidth || 1;
+    const nh = img.naturalHeight || 1;
+    const w = Math.min(previewW, window.innerWidth * 0.88, 720);
+    const h = Math.min((w * nh) / nw, window.innerHeight * 0.78);
+    setActionsTop(Math.min(window.innerHeight / 2 + h / 2 + 14, window.innerHeight - 160));
+  };
+  useEffect(() => { if (preview) placeActions(); }, [preview, previewW]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const deletePhoto = useMutation({
     mutationFn: async (p: CustomerFile) =>
@@ -401,16 +416,23 @@ export default function MobilePhotos() {
         data-testid="photo-preview-backdrop"
       />
       <img
+        ref={previewImgRef}
         className="ios-preview-item"
         src={shownPreview?.url}
         alt={shownPreview?.name || ""}
         draggable={false}
         decoding="async"
+        onLoad={placeActions}
         style={{ left: "50%", top: "50%", width: previewW, WebkitTouchCallout: "none" }}
         onContextMenu={(e) => e.preventDefault()}
         data-testid="photo-preview-item"
       />
-      <div className="ios-preview-actions liquid-glass" onClick={(e) => e.stopPropagation()} data-testid="photo-preview-actions">
+      <div
+        className="ios-preview-actions liquid-glass"
+        style={actionsTop != null ? { top: actionsTop, bottom: "auto" } : undefined}
+        onClick={(e) => e.stopPropagation()}
+        data-testid="photo-preview-actions"
+      >
         <button
           onClick={() => { if (shownPreview) downloadPhoto(shownPreview); setPreview(null); }}
           className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-[16px] text-slate-900 active:bg-white/40"
