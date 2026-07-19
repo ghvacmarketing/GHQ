@@ -382,7 +382,7 @@ export default function CrmInstallPlanner() {
   useEffect(() => { setCrewsInput(crewsPerDay != null ? String(crewsPerDay) : ""); }, [crewsPerDay]);
 
   // One grid per month. Idle shows just the current month (no scrolling);
-  // any drag squeezes it and slides the next month in underneath so a hold
+  // any drag narrows it and slides the next month in on the right so a hold
   // can be dragged straight across the boundary.
   const chunkWeeks = (start: Date, end: Date) => {
     const ds = eachDayOfInterval({ start, end });
@@ -400,10 +400,10 @@ export default function CrmInstallPlanner() {
   );
 
   const dragActive = !!dragRange || !!blockOp;
-  // Compress rows/bars while both months are on screen
-  const BARH = dragActive ? 13 : BAR_H;
-  const MAXL = dragActive ? 2 : MAX_LANES;
-  const HEADH = dragActive ? 18 : HEADER_H;
+  // Months sit side by side during a drag, so rows keep their full height.
+  const BARH = BAR_H;
+  const MAXL = MAX_LANES;
+  const HEADH = HEADER_H;
 
   const chipText = (() => {
     if (blockOp) {
@@ -478,7 +478,7 @@ export default function CrmInstallPlanner() {
         <div
           key={`${keyPrefix}-${wi}`}
           className="relative flex-1 border-b border-border last:border-b-0"
-          style={{ minHeight: dragActive ? 40 : 72 }}
+          style={{ minHeight: 72 }}
         >
           {/* Day columns: numbers, capacity, interaction surface */}
           <div className="absolute inset-0 grid h-full grid-cols-7">
@@ -714,7 +714,7 @@ export default function CrmInstallPlanner() {
           />
         )}
 
-        {/* Calendar — no scrolling; a drag reveals the next month underneath */}
+        {/* Calendar — no scrolling; a drag reveals the next month on the right */}
         {view === "calendar" && (
         <div
           className={cn(
@@ -727,24 +727,46 @@ export default function CrmInstallPlanner() {
               {chipText}
             </div>
           )}
-          <div className="grid shrink-0 grid-cols-7 border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {WEEKDAYS.map((d) => (
-              <div key={d} className="px-2 py-2 text-center">{d}</div>
-            ))}
-          </div>
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div className="flex min-h-0 flex-col transition-[flex-grow] duration-300 ease-out" style={{ flexGrow: 1, flexBasis: 0 }}>
-              {renderWeeks(weeks1, month, "m1")}
+          <div className="flex min-h-0 flex-1">
+            {/* Current month */}
+            <div className="flex min-w-0 flex-col transition-[flex-grow] duration-300 ease-out" style={{ flexGrow: 1, flexBasis: 0 }}>
+              {dragActive && (
+                <div className="shrink-0 truncate border-b border-border bg-muted/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {format(month, "MMMM yyyy")}
+                </div>
+              )}
+              <div className="grid shrink-0 grid-cols-7 border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {WEEKDAYS.map((d) => (
+                  <div key={d} className="truncate px-1 py-2 text-center">{d}</div>
+                ))}
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col">
+                {renderWeeks(weeks1, month, "m1")}
+              </div>
             </div>
+            {/* Next month slides in on the right during a drag */}
             <div
-              className="flex min-h-0 flex-col overflow-hidden transition-[flex-grow,opacity] duration-300 ease-out"
-              style={{ flexGrow: dragActive ? 1 : 0.0001, flexBasis: 0, opacity: dragActive ? 1 : 0, pointerEvents: dragActive ? "auto" : "none" }}
+              className="flex min-w-0 flex-col overflow-hidden border-border transition-[flex-grow,opacity] duration-300 ease-out"
+              style={{
+                flexGrow: dragActive ? 1 : 0.0001,
+                flexBasis: 0,
+                opacity: dragActive ? 1 : 0,
+                pointerEvents: dragActive ? "auto" : "none",
+                borderLeftWidth: dragActive ? 1 : 0,
+              }}
               data-testid="next-month-grid"
             >
-              <div className="shrink-0 border-y border-border bg-muted/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <div className="shrink-0 truncate border-b border-border bg-muted/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {format(month2, "MMMM yyyy")}
               </div>
-              {renderWeeks(weeks2, month2, "m2")}
+              <div className="grid shrink-0 grid-cols-7 border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {WEEKDAYS.map((d) => (
+                  <div key={d} className="truncate px-1 py-2 text-center">{d}</div>
+                ))}
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col">
+                {renderWeeks(weeks2, month2, "m2")}
+              </div>
             </div>
           </div>
         </div>
