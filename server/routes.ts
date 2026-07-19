@@ -22251,40 +22251,37 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
 
       const conversations = await storage.getMessagingConversations(filters);
 
-      // Attach customer info + a short preview of the most recent message to each
-      // conversation so the inbox list can render readable cards.
-      const conversationsWithCustomers = await Promise.all(
-        conversations.map(async (conv) => {
-          let customer = null;
-          if (conv.customerId) {
-            const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, conv.customerId));
-            customer = cust || null;
-          }
-          const [lastMessage] = await db
-            .select({
-              body: crmMessagingMessages.body,
-              direction: crmMessagingMessages.direction,
-              createdAt: crmMessagingMessages.createdAt,
-              authorUserId: crmMessagingMessages.authorUserId,
-            })
-            .from(crmMessagingMessages)
-            .where(eq(crmMessagingMessages.conversationId, conv.id))
-            .orderBy(desc(crmMessagingMessages.createdAt))
-            .limit(1);
-          return {
-            ...conv,
-            customer,
-            lastMessagePreview: lastMessage?.body || null,
-            lastMessageDirection: lastMessage?.direction || null,
-            lastMessageAuthorId: lastMessage?.authorUserId || null,
-          };
-        })
+      // Attach customer info + a short preview of the most recent message.
+      // Batched: one customers query + one DISTINCT ON last-message query,
+      // instead of 2 round-trips per conversation (Neon RTTs add up fast).
+      const customerIds = Array.from(
+        new Set(conversations.map((c) => c.customerId).filter((v): v is string => !!v)),
       );
+      const customerById = new Map<string, any>();
+      if (customerIds.length > 0) {
+        const custs = await db.select().from(crmCustomers).where(inArray(crmCustomers.id, customerIds));
+        for (const c of custs) customerById.set(c.id, c);
+      }
+
+      const convIds = conversations.map((c) => c.id);
+      const lastMessageByConv = new Map<string, { body: string | null; direction: string | null; authorUserId: string | null }>();
+      if (convIds.length > 0) {
+        const lastMsgs = await db.execute(sql`
+          SELECT DISTINCT ON (conversation_id)
+            conversation_id AS "conversationId", body, direction, author_user_id AS "authorUserId"
+          FROM crm_messaging_messages
+          WHERE conversation_id = ANY(${convIds})
+          ORDER BY conversation_id, created_at DESC
+        `);
+        for (const row of lastMsgs.rows as any[]) {
+          lastMessageByConv.set(row.conversationId, row);
+        }
+      }
 
       // Resolve the last outbound message's sender name (shared inbox: show who
       // on the team sent it, e.g. "Kylee:" instead of a generic "You:").
       const lastAuthorIds = Array.from(
-        new Set(conversationsWithCustomers.map((c) => c.lastMessageAuthorId).filter((v): v is string => !!v)),
+        new Set(Array.from(lastMessageByConv.values()).map((m) => m.authorUserId).filter((v): v is string => !!v)),
       );
       const lastAuthorNameById = new Map<string, string>();
       if (lastAuthorIds.length > 0) {
@@ -22294,10 +22291,17 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           .where(inArray(crmUsers.id, lastAuthorIds));
         for (const a of authors) lastAuthorNameById.set(a.id, a.name);
       }
-      const result = conversationsWithCustomers.map(({ lastMessageAuthorId, ...c }) => ({
-        ...c,
-        lastMessageAuthorName: lastMessageAuthorId ? lastAuthorNameById.get(lastMessageAuthorId) ?? null : null,
-      }));
+
+      const result = conversations.map((conv) => {
+        const lastMessage = lastMessageByConv.get(conv.id);
+        return {
+          ...conv,
+          customer: conv.customerId ? customerById.get(conv.customerId) ?? null : null,
+          lastMessagePreview: lastMessage?.body || null,
+          lastMessageDirection: lastMessage?.direction || null,
+          lastMessageAuthorName: lastMessage?.authorUserId ? lastAuthorNameById.get(lastMessage.authorUserId) ?? null : null,
+        };
+      });
 
       return res.json(result);
     } catch (error) {
@@ -22322,6 +22326,77 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     }
   });
 
+  // Background Textline catch-up for a single conversation. The local cache is
+  // already kept fresh by the webhook + the 30s background sync, so this is a
+  // belt-and-braces refresh that must never delay first paint: the GET below
+  // responds straight from the DB and any newly discovered messages land on
+  // the client's next poll. Throttled per conversation so the 6s thread poll
+  // doesn't stack redundant Textline API calls.
+  const textlineRefreshAt = new Map<string, number>();
+  const refreshTextlineConversation = async (conversation: any, id: string) => {
+    try {
+      let textlineMessages: any[] = [];
+
+      // Try phone number first (more reliable), fall back to UUID
+      if (conversation.phoneNumber) {
+        try {
+          const phoneResult = await textlineClient.getConversationMessagesByPhone(conversation.phoneNumber);
+          if (!phoneResult.error) {
+            textlineMessages = phoneResult.messages;
+          }
+        } catch (e) {
+          console.error("[Textline] Phone lookup failed, will try UUID:", e);
+        }
+      }
+
+      if (textlineMessages.length === 0 && conversation.externalConversationId) {
+        try {
+          const uuidResult = await textlineClient.getConversationMessages(conversation.externalConversationId);
+          if (!uuidResult.error) {
+            textlineMessages = uuidResult.messages;
+          }
+        } catch (e) {
+          console.error("[Textline] UUID lookup failed:", e);
+        }
+      }
+
+      if (textlineMessages.length > 0) {
+        // Get existing message external IDs to avoid duplicates
+        const existingMessages = await storage.getMessagesForConversation(id);
+        const existingExternalIds = new Set(existingMessages.map(m => m.externalMessageId).filter(Boolean));
+
+        for (const tm of textlineMessages) {
+          // Skip empty "ghost" posts (no text and no attachments) so they
+          // don't create blank message bubbles.
+          const tmHasContent = !!(tm.body && String(tm.body).trim()) || (Array.isArray(tm.attachments) && tm.attachments.length > 0);
+          if (!existingExternalIds.has(tm.uuid) && tmHasContent) {
+            try {
+              await storage.createMessage({
+                conversationId: id,
+                body: tm.body,
+                direction: tm.direction as any,
+                channel: "sms" as any,
+                status: "delivered" as any,
+                externalMessageId: tm.uuid,
+                // Preserve the real message time so ordering + display are
+                // correct (otherwise createdAt defaults to the sync time).
+                createdAt: tm.created_at ? new Date(tm.created_at) : undefined,
+                sentAt: tm.created_at ? new Date(tm.created_at) : undefined,
+                deliveredAt: tm.delivered_at ? new Date(tm.delivered_at) : undefined,
+                readAt: tm.read_at ? new Date(tm.read_at) : undefined,
+                attachments: tm.attachments?.map(a => ({ url: a.url, filename: a.filename, contentType: a.content_type })) as any,
+              });
+            } catch (e) {
+              console.error("[Textline] Error caching message:", e);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[Textline] Background conversation refresh failed:", e);
+    }
+  };
+
   // GET /api/crm/messaging/conversations/:id - Get single conversation with messages
   app.get("/api/crm/messaging/conversations/:id", requireCrmAuth, async (req, res) => {
     try {
@@ -22332,72 +22407,22 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Conversation not found" });
       }
 
-      // If this is a Textline conversation, fetch messages from Textline and cache them
-      // Try phone number first (more reliable), fall back to UUID
+      // Fire-and-forget Textline catch-up (throttled) — never blocks the response
       if (conversation.externalSource === "textline" && textlineClient.isConfigured()) {
-        let textlineMessages: any[] = [];
-        
-        // Try phone number first if available
-        if (conversation.phoneNumber) {
-          try {
-            const phoneResult = await textlineClient.getConversationMessagesByPhone(conversation.phoneNumber);
-            if (!phoneResult.error) {
-              textlineMessages = phoneResult.messages;
-            }
-          } catch (e) {
-            console.error("[Textline] Phone lookup failed, will try UUID:", e);
-          }
-        }
-        
-        // Fall back to UUID if phone failed or wasn't available
-        if (textlineMessages.length === 0 && conversation.externalConversationId) {
-          try {
-            const uuidResult = await textlineClient.getConversationMessages(conversation.externalConversationId);
-            if (!uuidResult.error) {
-              textlineMessages = uuidResult.messages;
-            }
-          } catch (e) {
-            console.error("[Textline] UUID lookup failed:", e);
-          }
-        }
-        
-        if (textlineMessages.length > 0) {
-          // Get existing message external IDs to avoid duplicates
-          const existingMessages = await storage.getMessagesForConversation(id);
-          const existingExternalIds = new Set(existingMessages.map(m => m.externalMessageId).filter(Boolean));
-          
-          // Insert new messages from Textline
-          for (const tm of textlineMessages) {
-            // Skip empty "ghost" posts (no text and no attachments) so they
-            // don't create blank message bubbles.
-            const tmHasContent = !!(tm.body && String(tm.body).trim()) || (Array.isArray(tm.attachments) && tm.attachments.length > 0);
-            if (!existingExternalIds.has(tm.uuid) && tmHasContent) {
-              try {
-                await storage.createMessage({
-                  conversationId: id,
-                  body: tm.body,
-                  direction: tm.direction as any,
-                  channel: "sms" as any,
-                  status: "delivered" as any,
-                  externalMessageId: tm.uuid,
-                  // Preserve the real message time so ordering + display are
-                  // correct (otherwise createdAt defaults to the sync time).
-                  createdAt: tm.created_at ? new Date(tm.created_at) : undefined,
-                  sentAt: tm.created_at ? new Date(tm.created_at) : undefined,
-                  deliveredAt: tm.delivered_at ? new Date(tm.delivered_at) : undefined,
-                  readAt: tm.read_at ? new Date(tm.read_at) : undefined,
-                  attachments: tm.attachments?.map(a => ({ url: a.url, filename: a.filename, contentType: a.content_type })) as any,
-                });
-              } catch (e) {
-                console.error("[Textline] Error caching message:", e);
-              }
-            }
-          }
+        const last = textlineRefreshAt.get(id) ?? 0;
+        if (Date.now() - last > 20_000) {
+          textlineRefreshAt.set(id, Date.now());
+          void refreshTextlineConversation(conversation, id);
         }
       }
 
-      const rawMessages = await storage.getMessagesForConversation(id);
-      const tags = await storage.getConversationTags(id);
+      const [rawMessages, tags, customer] = await Promise.all([
+        storage.getMessagesForConversation(id),
+        storage.getConversationTags(id),
+        conversation.customerId
+          ? db.select().from(crmCustomers).where(eq(crmCustomers.id, conversation.customerId)).then((r) => r[0] ?? null)
+          : Promise.resolve(null),
+      ]);
 
       // Attach the sending staff member's name to outbound messages so the UI
       // can show "sent from Kylee". Looked up once per distinct author.
@@ -22416,12 +22441,6 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         ...m,
         authorName: m.authorUserId ? authorNameById.get(m.authorUserId) ?? null : null,
       }));
-
-      let customer = null;
-      if (conversation.customerId) {
-        const [cust] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, conversation.customerId));
-        customer = cust || null;
-      }
 
       return res.json({ conversation, messages, tags, customer });
     } catch (error) {
