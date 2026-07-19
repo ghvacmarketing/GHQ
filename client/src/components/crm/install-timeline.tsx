@@ -667,7 +667,7 @@ export function InstallTimeline({
           {/* Today marker + past shading (under the sticky header/panel) */}
           {todayIdx >= 0 && todayIdx < days && (
             <div
-              className="pointer-events-none absolute inset-y-0 z-10 border-l-2 border-[#711419]/70 bg-[#711419]/[0.04]"
+              className="pointer-events-none absolute inset-y-0 z-10 bg-[#711419]/[0.07]"
               style={{ left: effLeftW + todayIdx * dayW, width: dayW }}
             />
           )}
@@ -698,7 +698,7 @@ export function InstallTimeline({
               {!narrow && (
                 <div
                   onPointerDown={onResizeLeftDown}
-                  className="absolute inset-y-0 right-0 w-1.5 cursor-col-resize hover:bg-[#711419]/30"
+                  className="absolute inset-y-0 right-0 w-1.5 cursor-col-resize hover:bg-slate-300/70"
                   title="Drag to resize"
                   data-testid="left-panel-resize"
                 />
