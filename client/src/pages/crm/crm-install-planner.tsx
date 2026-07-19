@@ -783,17 +783,25 @@ export default function CrmInstallPlanner() {
               </div>
               <div className="flex min-h-0 flex-1 flex-col">
                 {renderWeeks(weeks1, month, "m1")}
+                {/* Shorter month: hatch the leftover space so it doesn't read as days */}
+                {showNext && weeks1.length < maxWeeks && (
+                  <div
+                    className="flex-1 bg-muted/40"
+                    style={{ backgroundImage: "repeating-linear-gradient(135deg, rgba(100,116,139,0.10) 0 8px, transparent 8px 16px)" }}
+                    data-testid="blocked-filler-m1"
+                  />
+                )}
               </div>
             </div>
             {/* Next month slides in on the right during a drag */}
             <div
-              className="flex min-w-0 flex-col overflow-hidden border-border transition-[flex-grow,opacity] duration-300 ease-out"
+              className="flex min-w-0 flex-col overflow-hidden transition-[flex-grow,opacity,margin-left] duration-300 ease-out"
               style={{
                 flexGrow: showNext ? 1 : 0.0001,
                 flexBasis: 0,
                 opacity: showNext ? 1 : 0,
                 pointerEvents: showNext ? "auto" : "none",
-                borderLeftWidth: showNext ? 1 : 0,
+                marginLeft: showNext ? 12 : 0,
               }}
               data-testid="next-month-grid"
             >
@@ -807,6 +815,13 @@ export default function CrmInstallPlanner() {
               </div>
               <div className="flex min-h-0 flex-1 flex-col">
                 {renderWeeks(weeks2, month2, "m2")}
+                {showNext && weeks2.length < maxWeeks && (
+                  <div
+                    className="flex-1 bg-muted/40"
+                    style={{ backgroundImage: "repeating-linear-gradient(135deg, rgba(100,116,139,0.10) 0 8px, transparent 8px 16px)" }}
+                    data-testid="blocked-filler-m2"
+                  />
+                )}
               </div>
             </div>
           </div>
