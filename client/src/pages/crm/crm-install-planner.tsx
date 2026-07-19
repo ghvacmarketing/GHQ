@@ -504,14 +504,18 @@ export default function CrmInstallPlanner() {
   const original = form.id ? blocks.find((b) => b.id === form.id) : undefined;
   const startInPast = !!form.startDate && form.startDate < todayStr && form.startDate !== original?.startDate;
 
+  // Both months share one row height (based on whichever has more weeks) so
+  // their week rows line up side by side; a shorter month leaves space below.
+  const maxWeeks = showNext ? Math.max(weeks1.length, weeks2.length) : weeks1.length;
+
   const renderWeeks = (weeksArr: Date[][], gridMonth: Date, keyPrefix: string) =>
     weeksArr.map((weekDays, wi) => {
       const { visible, overflowByCol, dayCounts, laneCount } = layoutWeek(weekDays);
       return (
         <div
           key={`${keyPrefix}-${wi}`}
-          className="relative flex-1 border-b border-border last:border-b-0"
-          style={{ minHeight: 72 }}
+          className="relative shrink-0 border-b border-border transition-[height] duration-300 ease-out last:border-b-0"
+          style={{ height: `${100 / maxWeeks}%`, minHeight: 72 }}
         >
           {/* Day columns: numbers, capacity, interaction surface */}
           <div className="absolute inset-0 grid h-full grid-cols-7">
