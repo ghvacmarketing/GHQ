@@ -7680,6 +7680,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/crm/technicians - List field workers for dispatch (techs, sales, and supervisors who do field work)
+  // Dispatch scheduling increment — stored server-side so a change made by an
+  // admin/owner applies to every user (dispatch board grid + mobile pickers).
+  app.get("/api/crm/dispatch-settings", requireCrmAuth, async (req, res) => {
+    try {
+      const s = await storage.getSetting("crm_dispatch_step_minutes");
+      const n = s ? parseInt(s.value, 10) : 30;
+      res.json({ stepMinutes: n === 15 ? 15 : 30 });
+    } catch (error) {
+      console.error("Error fetching dispatch settings:", error);
+      res.status(500).json({ message: "Failed to load dispatch settings" });
+    }
+  });
+
+  app.put("/api/crm/dispatch-settings", requireCrmAdmin, async (req, res) => {
+    try {
+      const n = parseInt(req.body?.stepMinutes, 10);
+      if (n !== 15 && n !== 30) {
+        return res.status(400).json({ message: "stepMinutes must be 15 or 30" });
+      }
+      await storage.setSetting("crm_dispatch_step_minutes", String(n));
+      res.json({ stepMinutes: n });
+    } catch (error) {
+      console.error("Error saving dispatch settings:", error);
+      res.status(500).json({ message: "Failed to save dispatch settings" });
+    }
+  });
+
   app.get("/api/crm/technicians", requireCrmAuth, async (req, res) => {
     try {
       // Dispatch-board membership: tech/supervisor by default, anyone else

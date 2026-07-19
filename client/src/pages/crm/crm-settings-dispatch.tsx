@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -62,9 +62,37 @@ export default function CrmSettingsDispatch() {
     },
   });
 
+  // The increment lives server-side so it applies to every user; localStorage
+  // is kept in sync as a cache for the dispatch board's load-time read.
+  const { data: dispatchSettings } = useQuery<{ stepMinutes: 15 | 30 }>({
+    queryKey: ["/api/crm/dispatch-settings"],
+    enabled: !!currentUser,
+  });
   const [increment, setIncrement] = useState<15 | 30>(() => {
     if (typeof window === "undefined") return 30;
     return Number(localStorage.getItem(STORAGE_KEY)) === 15 ? 15 : 30;
+  });
+  useEffect(() => {
+    if (dispatchSettings) {
+      setIncrement(dispatchSettings.stepMinutes);
+      localStorage.setItem(STORAGE_KEY, String(dispatchSettings.stepMinutes));
+    }
+  }, [dispatchSettings]);
+
+  const saveIncrement = useMutation({
+    mutationFn: async (value: 15 | 30) =>
+      (await apiRequest("PUT", "/api/crm/dispatch-settings", { stepMinutes: value })).json(),
+    onSuccess: (r: { stepMinutes: 15 | 30 }) => {
+      setIncrement(r.stepMinutes);
+      localStorage.setItem(STORAGE_KEY, String(r.stepMinutes));
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch-settings"] });
+      toast({
+        title: "Saved for everyone",
+        description: `Scheduling now snaps to ${r.stepMinutes}-minute increments on the dispatch board and in mobile. Open boards apply it on their next load.`,
+      });
+    },
+    onError: (e: any) =>
+      toast({ title: "Couldn't save", description: e?.message || "Admin access is required to change this.", variant: "destructive" }),
   });
 
   if (isLoading) {
@@ -80,14 +108,7 @@ export default function CrmSettingsDispatch() {
     return null;
   }
 
-  const apply = (value: 15 | 30) => {
-    setIncrement(value);
-    localStorage.setItem(STORAGE_KEY, String(value));
-    toast({
-      title: "Saved",
-      description: `Dispatch board set to ${value}-minute increments. Reload the dispatch board to apply.`,
-    });
-  };
+  const apply = (value: 15 | 30) => saveIncrement.mutate(value);
 
   return (
     <CrmLayout currentUser={currentUser}>

@@ -233,11 +233,25 @@ function getInitials(name: string): string {
 const START_HOUR = 6;
 const END_HOUR = 22;
 // Dispatch board snap increment — configurable in Settings → Dispatch Board.
-// Read once at load (changing it takes effect on next page load).
+// The authoritative value lives server-side (applies to all users); localStorage
+// caches it for this synchronous load-time read. syncStepMinutes() below checks
+// the server and reloads once if this cached value is stale.
 const STEP_MINUTES: 15 | 30 = (() => {
   if (typeof window === "undefined") return 30;
   return Number(localStorage.getItem("crm_dispatch_step_minutes")) === 15 ? 15 : 30;
 })();
+
+function syncStepMinutes() {
+  fetch("/api/crm/dispatch-settings", { credentials: "include" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((s) => {
+      if (s && (s.stepMinutes === 15 || s.stepMinutes === 30) && s.stepMinutes !== STEP_MINUTES) {
+        localStorage.setItem("crm_dispatch_step_minutes", String(s.stepMinutes));
+        window.location.reload();
+      }
+    })
+    .catch(() => {});
+}
 const TOTAL_SLOTS = ((END_HOUR - START_HOUR) * 60) / STEP_MINUTES;
 
 // Zero-padded 12-hour clock, e.g. 7 -> "07:00 AM", 13.5h -> "01:30 PM".
@@ -2307,10 +2321,15 @@ export default function CrmDispatch() {
   const [searchInput, setSearchInput] = useState("");
 
   // The schedule grid derives from STEP_MINUTES (read once at module load). If the
-  // configured increment (Settings → Dispatch Board) changed, reload once to apply it.
+  // configured increment (Settings → Dispatch Board) changed — locally or by an
+  // admin on another machine — reload once to apply it.
   useEffect(() => {
     const desired = Number(localStorage.getItem("crm_dispatch_step_minutes")) === 15 ? 15 : 30;
-    if (desired !== STEP_MINUTES) window.location.reload();
+    if (desired !== STEP_MINUTES) {
+      window.location.reload();
+      return;
+    }
+    syncStepMinutes();
   }, []);
   const debouncedSearch = useDebounce(searchInput, 300);
   const [activeId, setActiveId] = useState<string | null>(null);

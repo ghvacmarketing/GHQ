@@ -16,6 +16,7 @@ import { format, isToday } from "date-fns";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { WheelTimePicker } from "@/components/mobile/wheel-time-picker";
 import type { CrmWorkOrder, CrmCustomer, CrmUser, CrmProperty } from "@shared/schema";
 
 interface WorkOrderWithDetails extends CrmWorkOrder {
@@ -154,45 +155,20 @@ export default function MobileJob() {
     enabled: !!selectedCustomer?.id,
   });
 
-  // Generate time options for dropdowns (8:00 AM to 8:00 PM in 30-minute increments)
-  const startTimeOptions = useMemo(() => {
-    const options: { value: string; label: string }[] = [];
-    for (let hour = 8; hour <= 19; hour++) {
-      for (let min = 0; min < 60; min += 30) {
-        const h24 = hour.toString().padStart(2, '0');
-        const m = min.toString().padStart(2, '0');
-        const value = `${h24}:${m}`;
-        const h12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        const label = `${h12}:${m.padStart(2, '0')} ${ampm}`;
-        options.push({ value, label });
-      }
-    }
-    return options;
-  }, []);
+  // Scheduling increment comes from the shared dispatch-board setting so the
+  // mobile picker snaps to the same grid as the board (15 or 30 minutes).
+  const { data: dispatchSettings } = useQuery<{ stepMinutes: number }>({
+    queryKey: ["/api/crm/dispatch-settings"],
+    enabled: !!currentUser,
+  });
+  const stepMinutes = dispatchSettings?.stepMinutes === 15 ? 15 : 30;
 
-  const endTimeOptions = useMemo(() => {
-    const options: { value: string; label: string }[] = [];
-    for (let hour = 8; hour <= 20; hour++) {
-      for (let min = 0; min < 60; min += 30) {
-        if (hour === 8 && min === 0) continue; // Start at 8:30 AM for end time
-        if (hour === 20 && min === 30) continue; // Stop at 8:00 PM
-        const h24 = hour.toString().padStart(2, '0');
-        const m = min.toString().padStart(2, '0');
-        const value = `${h24}:${m}`;
-        const h12 = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        const label = `${h12}:${m.padStart(2, '0')} ${ampm}`;
-        options.push({ value, label });
-      }
-    }
-    return options;
-  }, []);
-
-  const filteredEndTimeOptions = useMemo(() => {
-    if (!selectedStartTime) return endTimeOptions;
-    return endTimeOptions.filter(opt => opt.value > selectedStartTime);
-  }, [endTimeOptions, selectedStartTime]);
+  // Add minutes to an "HH:mm" string, capped at end of day.
+  const addMinutesTo = (hhmm: string, minutes: number) => {
+    const [h, m] = hhmm.split(":").map(Number);
+    const t = Math.min(h * 60 + m + minutes, 23 * 60 + 30);
+    return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+  };
 
   // Update selectedSlot when date and times are selected, and clear any conflict error
   useEffect(() => {
@@ -324,6 +300,10 @@ export default function MobileJob() {
     }
     if (!selectedSlot) {
       toast({ title: "Please select a date and time slot", variant: "destructive" });
+      return;
+    }
+    if (selectedEndTime <= selectedStartTime) {
+      toast({ title: "End time must be after the start time", variant: "destructive" });
       return;
     }
     setConflictError(null);
@@ -919,8 +899,9 @@ export default function MobileJob() {
                     selected={selectedDate}
                     onSelect={(date) => {
                       setSelectedDate(date);
-                      setSelectedStartTime("");
-                      setSelectedEndTime("");
+                      // Wheels always show a value, so seed a sensible default window.
+                      setSelectedStartTime((t) => t || "09:00");
+                      setSelectedEndTime((t) => t || "11:00");
                     }}
                     disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                     initialFocus
@@ -928,52 +909,32 @@ export default function MobileJob() {
                 </PopoverContent>
               </Popover>
 
-              {/* Time Selection Dropdowns */}
+              {/* Time selection — alarm-style wheels snapping to the shared increment */}
               {selectedDate && (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-500">Start Time</Label>
-                      <Select 
-                        value={selectedStartTime} 
-                        onValueChange={(val) => {
-                          setSelectedStartTime(val);
-                          if (selectedEndTime && val >= selectedEndTime) {
-                            setSelectedEndTime("");
-                          }
-                        }}
-                      >
-                        <SelectTrigger data-testid="select-start-time">
-                          <SelectValue placeholder="Select start" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {startTimeOptions.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-500">End Time</Label>
-                      <Select 
-                        value={selectedEndTime} 
-                        onValueChange={setSelectedEndTime}
-                        disabled={!selectedStartTime}
-                      >
-                        <SelectTrigger data-testid="select-end-time">
-                          <SelectValue placeholder="Select end" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {filteredEndTimeOptions.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-slate-500">Start Time</Label>
+                    <WheelTimePicker
+                      value={selectedStartTime}
+                      stepMinutes={stepMinutes}
+                      onChange={(v) => {
+                        setSelectedStartTime(v);
+                        // Keep the window valid: push the end past the new start.
+                        if (!selectedEndTime || selectedEndTime <= v) {
+                          setSelectedEndTime(addMinutesTo(v, 120));
+                        }
+                      }}
+                      testId="wheel-start-time"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-slate-500">End Time</Label>
+                    <WheelTimePicker
+                      value={selectedEndTime}
+                      stepMinutes={stepMinutes}
+                      onChange={setSelectedEndTime}
+                      testId="wheel-end-time"
+                    />
                   </div>
                 </div>
               )}
