@@ -6155,12 +6155,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const total = Number(countResult?.count) || 0;
 
+      // Rank matches by relevance: exact name → name prefix → word prefix →
+      // substring → email/phone/address-only, so searching "ry" puts "Ryan"
+      // above customers who merely contain "ry" somewhere.
+      const nameRank = searchTerm
+        ? sql`CASE
+            WHEN LOWER(${crmCustomers.name}) = ${searchTerm} THEN 0
+            WHEN LOWER(${crmCustomers.name}) LIKE ${searchTerm + "%"} THEN 1
+            WHEN LOWER(${crmCustomers.name}) LIKE ${"% " + searchTerm + "%"} THEN 2
+            WHEN LOWER(${crmCustomers.name}) LIKE ${"%" + searchTerm + "%"} THEN 3
+            ELSE 4
+          END`
+        : null;
+
       // Get paginated results
       const customerResults = await db
         .select()
         .from(crmCustomers)
         .where(whereClause)
-        .orderBy(desc(crmCustomers.createdAt))
+        .orderBy(...(nameRank ? [nameRank, desc(crmCustomers.createdAt)] : [desc(crmCustomers.createdAt)]))
         .limit(limitNum)
         .offset(offset);
 
@@ -6216,8 +6229,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             parentCustomerId: null,
             billToParent: false,
           }));
+        // Re-rank the combined list so a FieldEdge exact/prefix match beats a
+        // CRM substring match instead of always being appended at the end.
+        const rank = (name: string | null | undefined) => {
+          const n = (name || "").toLowerCase();
+          if (!n) return 5;
+          if (n === searchTerm) return 0;
+          if (n.startsWith(searchTerm)) return 1;
+          if (n.includes(` ${searchTerm}`)) return 2;
+          if (n.includes(searchTerm)) return 3;
+          return 4; // matched on email/phone/address only
+        };
         mergedTotal = total + feMatches.length;
-        mergedCustomers = [...transformedCustomers, ...feMatches].slice(0, limitNum);
+        mergedCustomers = [...transformedCustomers, ...feMatches]
+          .sort((a, b) =>
+            rank(a.name) - rank(b.name) ||
+            new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+          .slice(0, limitNum);
       }
 
       return res.json({
