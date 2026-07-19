@@ -681,7 +681,7 @@ export function InstallTimeline({
           {/* Sticky two-level date header */}
           <div className="sticky top-0 z-30 flex border-b border-border bg-card">
             <div
-              className="sticky left-0 z-40 flex shrink-0 flex-col justify-end border-r border-border bg-card px-2 pb-1"
+              className="sticky left-0 z-40 flex shrink-0 flex-col justify-end bg-card px-2 pb-1"
               style={{ width: effLeftW }}
             >
               <div className="flex items-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -770,7 +770,7 @@ export function InstallTimeline({
               <section key={g.key} {...(g.hasCrewTarget ? { "data-crewgroup": g.key, "data-crewid": g.crewId ?? "" } : {})}>
                 <div className="flex border-b border-border" style={{ height: GROUP_H }}>
                   <div
-                    className="group/hdr sticky left-0 z-20 flex shrink-0 items-center border-r border-border bg-muted/70 backdrop-blur"
+                    className="group/hdr sticky left-0 z-20 flex shrink-0 items-center bg-muted/70 backdrop-blur"
                     style={{ width: effLeftW }}
                   >
                     <button
@@ -814,7 +814,7 @@ export function InstallTimeline({
                         <div key={b.id} className="flex border-b border-border/60" style={{ height: ROW_H }}>
                           <button
                             onClick={() => onEdit(b)}
-                            className="sticky left-0 z-20 flex shrink-0 items-center border-r border-border bg-card px-2 text-left hover:bg-muted/40"
+                            className="sticky left-0 z-20 flex shrink-0 items-center bg-card px-2 text-left hover:bg-muted/40"
                             style={{ width: effLeftW }}
                             data-testid={`row-${b.id}`}
                           >
@@ -925,7 +925,7 @@ export function InstallTimeline({
 
                     {/* Empty drop/create strip at the bottom of every group */}
                     <div className="flex border-b border-border/60" style={{ height: EMPTY_ROW_H }}>
-                      <div className="sticky left-0 z-20 shrink-0 border-r border-border bg-card" style={{ width: effLeftW }} />
+                      <div className="sticky left-0 z-20 shrink-0 bg-card" style={{ width: effLeftW }} />
                       <div
                         className="relative shrink-0 cursor-pointer transition-colors hover:bg-muted/30"
                         style={{ width: timelineW, ...rowBg }}
@@ -951,7 +951,7 @@ export function InstallTimeline({
 
           {groupBy === "crew" && (
             <div className="flex" style={{ height: EMPTY_ROW_H }}>
-              <div className="sticky left-0 z-20 flex shrink-0 items-center border-r border-border bg-card" style={{ width: effLeftW }}>
+              <div className="sticky left-0 z-20 flex shrink-0 items-center bg-card" style={{ width: effLeftW }}>
                 <button
                   onClick={onAddCrew}
                   className="flex items-center gap-1 px-2 text-xs font-medium text-[#711419] hover:underline"
