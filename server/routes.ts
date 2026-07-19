@@ -22270,7 +22270,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           SELECT DISTINCT ON (conversation_id)
             conversation_id AS "conversationId", body, direction, author_user_id AS "authorUserId"
           FROM crm_messaging_messages
-          WHERE conversation_id = ANY(${convIds})
+          WHERE conversation_id IN ${convIds}
           ORDER BY conversation_id, created_at DESC
         `);
         for (const row of lastMsgs.rows as any[]) {
