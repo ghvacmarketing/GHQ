@@ -370,39 +370,46 @@ export default function MobilePhotos() {
       {/* Long-press action sheet: zoomed photo + Download / Delete */}
       {actionSheet && (
         <div
-          className="fixed inset-0 z-[65] flex flex-col items-center justify-center bg-black/40 p-8 backdrop-blur-md"
+          className="fixed inset-0 z-[65] animate-ios-fade bg-black/40 backdrop-blur-md"
           onClick={() => setActionSheet(null)}
           data-testid="photo-action-sheet"
         >
-          <img
-            src={actionSheet.url}
-            alt={actionSheet.name}
-            draggable={false}
-            className="max-h-[55vh] max-w-full select-none rounded-2xl object-contain shadow-2xl animate-ios-pop"
-            style={{ WebkitTouchCallout: "none" }}
-            onContextMenu={(e) => e.preventDefault()}
-          />
-          {/* iOS-material menu: translucent, heavily blurred, hairline separator */}
           <div
-            className="mt-3 w-60 origin-top animate-ios-pop overflow-hidden rounded-2xl bg-white/70 shadow-2xl backdrop-blur-xl"
-            style={{ animationDelay: "50ms" }}
-            onClick={(e) => e.stopPropagation()}
+            className="flex h-full flex-col items-center gap-4 p-5"
+            style={{ paddingBottom: "calc(20px + env(safe-area-inset-bottom))" }}
           >
-            <button
-              onClick={() => { downloadPhoto(actionSheet); setActionSheet(null); }}
-              className="flex w-full items-center justify-between px-4 py-3.5 text-sm font-medium text-slate-900 active:bg-black/5"
-              data-testid="action-download"
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              <img
+                src={actionSheet.url}
+                alt={actionSheet.name}
+                draggable={false}
+                decoding="async"
+                className="max-h-full max-w-full select-none rounded-2xl object-contain shadow-2xl animate-ios-pop will-change-transform"
+                style={{ WebkitTouchCallout: "none" }}
+                onContextMenu={(e) => e.preventDefault()}
+              />
+            </div>
+            {/* Native-style action sheet: translucent material rising from the bottom */}
+            <div
+              className="w-full max-w-sm shrink-0 animate-ios-sheet overflow-hidden rounded-2xl bg-white/80 shadow-2xl backdrop-blur-xl will-change-transform"
+              onClick={(e) => e.stopPropagation()}
             >
-              Download <Download className="h-4 w-4 text-slate-600" />
-            </button>
-            <div className="h-px bg-slate-400/25" />
-            <button
-              onClick={() => { setConfirmDelete(actionSheet); setActionSheet(null); }}
-              className="flex w-full items-center justify-between px-4 py-3.5 text-sm font-medium text-red-600 active:bg-black/5"
-              data-testid="action-delete"
-            >
-              Delete <Trash2 className="h-4 w-4" />
-            </button>
+              <button
+                onClick={() => { downloadPhoto(actionSheet); setActionSheet(null); }}
+                className="flex w-full items-center justify-between px-5 py-4 text-[15px] text-slate-900 active:bg-black/5"
+                data-testid="action-download"
+              >
+                Download <Download className="h-5 w-5 text-slate-700" />
+              </button>
+              <div className="h-px bg-slate-400/30" />
+              <button
+                onClick={() => { setConfirmDelete(actionSheet); setActionSheet(null); }}
+                className="flex w-full items-center justify-between px-5 py-4 text-[15px] text-red-600 active:bg-black/5"
+                data-testid="action-delete"
+              >
+                Delete <Trash2 className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         </div>
       )}

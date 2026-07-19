@@ -97,15 +97,26 @@ export default {
         },
         // iOS context-menu pop: grow with a slight overshoot, then settle.
         "ios-pop": {
-          "0%": { opacity: "0", transform: "scale(0.65)" },
-          "70%": { opacity: "1", transform: "scale(1.03)" },
-          "100%": { opacity: "1", transform: "scale(1)" },
+          "0%": { opacity: "0", transform: "scale(0.65) translateZ(0)" },
+          "70%": { opacity: "1", transform: "scale(1.03) translateZ(0)" },
+          "100%": { opacity: "1", transform: "scale(1) translateZ(0)" },
+        },
+        // iOS action sheet: rise from the bottom and settle.
+        "ios-sheet": {
+          "0%": { opacity: "0", transform: "translateY(28px) scale(0.97)" },
+          "100%": { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+        "ios-fade": {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "ios-pop": "ios-pop 0.34s cubic-bezier(0.16, 1, 0.3, 1) both",
+        "ios-sheet": "ios-sheet 0.32s cubic-bezier(0.16, 1, 0.3, 1) both",
+        "ios-fade": "ios-fade 0.2s ease-out both",
       },
     },
   },
