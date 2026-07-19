@@ -374,41 +374,39 @@ export default function MobilePhotos() {
           onClick={() => setActionSheet(null)}
           data-testid="photo-action-sheet"
         >
-          <div
-            className="flex h-full flex-col items-center gap-4 p-5"
-            style={{ paddingBottom: "calc(20px + env(safe-area-inset-bottom))" }}
-          >
-            <div className="flex min-h-0 flex-1 items-center justify-center">
+          <div className="flex h-full flex-col items-center justify-center p-6">
+            {/* Image + menu animate as one unit, like the iOS context menu */}
+            <div className="flex max-h-full w-full max-w-sm animate-ios-pop flex-col items-center will-change-transform">
               <img
                 src={actionSheet.url}
                 alt={actionSheet.name}
                 draggable={false}
                 decoding="async"
-                className="max-h-full max-w-full select-none rounded-2xl object-contain shadow-2xl animate-ios-pop will-change-transform"
+                className="max-h-[58vh] max-w-full select-none rounded-2xl object-contain shadow-2xl"
                 style={{ WebkitTouchCallout: "none" }}
                 onContextMenu={(e) => e.preventDefault()}
               />
-            </div>
-            {/* Native-style action sheet: translucent material rising from the bottom */}
-            <div
-              className="w-full max-w-sm shrink-0 animate-ios-sheet overflow-hidden rounded-2xl bg-white/80 shadow-2xl backdrop-blur-xl will-change-transform"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                onClick={() => { downloadPhoto(actionSheet); setActionSheet(null); }}
-                className="flex w-full items-center justify-between px-5 py-4 text-[15px] text-slate-900 active:bg-black/5"
-                data-testid="action-download"
+              {/* iOS menu material: light-gray translucency with saturated blur */}
+              <div
+                className="mt-3 w-64 overflow-hidden rounded-2xl bg-[#F2F2F7]/85 shadow-xl backdrop-blur-2xl backdrop-saturate-150"
+                onClick={(e) => e.stopPropagation()}
               >
-                Download <Download className="h-5 w-5 text-slate-700" />
-              </button>
-              <div className="h-px bg-slate-400/30" />
-              <button
-                onClick={() => { setConfirmDelete(actionSheet); setActionSheet(null); }}
-                className="flex w-full items-center justify-between px-5 py-4 text-[15px] text-red-600 active:bg-black/5"
-                data-testid="action-delete"
-              >
-                Delete <Trash2 className="h-5 w-5" />
-              </button>
+                <button
+                  onClick={() => { downloadPhoto(actionSheet); setActionSheet(null); }}
+                  className="flex w-full items-center justify-between px-4 py-3 text-[16px] text-slate-900 active:bg-black/5"
+                  data-testid="action-download"
+                >
+                  Download <Download className="h-5 w-5 text-slate-700" />
+                </button>
+                <div className="h-px bg-[#3C3C43]/20" />
+                <button
+                  onClick={() => { setConfirmDelete(actionSheet); setActionSheet(null); }}
+                  className="flex w-full items-center justify-between px-4 py-3 text-[16px] text-red-600 active:bg-black/5"
+                  data-testid="action-delete"
+                >
+                  Delete <Trash2 className="h-5 w-5" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
