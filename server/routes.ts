@@ -22766,12 +22766,13 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       const creatorType = post?.creator?.type;
       const isInbound = direction === "inbound" || creatorType === "customer";
       
-      // Check for various webhook event types
-      const isMessageEvent = webhookType === "new_customer_post" || 
-                            eventType === "message.created" || 
+      // Check for various webhook event types (inbound AND outbound posts)
+      const isMessageEvent = webhookType === "new_customer_post" ||
+                            webhookType === "new_outbound_post" ||
+                            eventType === "message.created" ||
                             eventType === "post.created";
-      
-      if (isMessageEvent && isInbound) {
+
+      if (isMessageEvent && post) {
         const conversationUuid = conversation?.uuid;
         const phoneNumber = conversation?.phone_number || conversation?.customer?.phone_number;
         const contactName = conversation?.contact_name || conversation?.customer?.name;
@@ -22830,15 +22831,20 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         if (!isDuplicate) {
           await storage.createMessage({
             conversationId: localConversation.id,
-            direction: "inbound" as any,
+            direction: (isInbound ? "inbound" : "outbound") as any,
             channel: "sms" as any,
             body: messageBody,
             externalMessageId: messageUuid,
             status: "delivered" as any,
             sentAt: createdAt,
           });
-          
-          console.log("[Textline Webhook] Created inbound message for conversation:", localConversation.id);
+          await storage.updateMessagingConversation(localConversation.id, {
+            lastMessageAt: createdAt,
+            ...(isInbound
+              ? { unreadInboundCount: (localConversation.unreadInboundCount || 0) + 1, status: "open" as any }
+              : {}),
+          });
+          console.log(`[Textline Webhook] Created ${isInbound ? "inbound" : "outbound"} message for conversation:`, localConversation.id);
         } else {
           console.log("[Textline Webhook] Skipped duplicate message:", messageUuid);
         }
