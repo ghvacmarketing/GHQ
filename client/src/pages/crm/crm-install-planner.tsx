@@ -169,6 +169,11 @@ export default function CrmInstallPlanner() {
     setOpen(true);
   };
 
+  // The next-month panel stays hidden until a drag actually reaches the last
+  // day of the current month; once revealed it latches for the rest of the drag.
+  const [revealNext, setRevealNext] = useState(false);
+  const lastDayStr = iso(endOfMonth(month));
+
   // Drag across day cells to select a range, then open the create dialog.
   const [dragRange, setDragRange] = useState<{ anchor: string; current: string } | null>(null);
   const dragRef = useRef<{ anchor: string; current: string } | null>(null);
@@ -280,6 +285,7 @@ export default function CrmInstallPlanner() {
       } else {
         end = day < block.startDate ? block.startDate : day;
       }
+      if (day >= lastDayStr || end >= lastDayStr) setRevealNext(true);
       if (start !== block.startDate || end !== block.endDate) {
         if (!op.moved) setBlockOp({ ...op, moved: true });
         setPreview({ id: block.id, startDate: start, endDate: end });
@@ -400,6 +406,8 @@ export default function CrmInstallPlanner() {
   );
 
   const dragActive = !!dragRange || !!blockOp;
+  const showNext = dragActive && revealNext;
+  useEffect(() => { if (!dragActive) setRevealNext(false); }, [dragActive]);
   // Months sit side by side during a drag, so rows keep their full height.
   const BARH = BAR_H;
   const MAXL = MAX_LANES;
@@ -499,7 +507,11 @@ export default function CrmInstallPlanner() {
                     inDrag(dayStr) ? "bg-[#711419]/10 ring-1 ring-inset ring-[#711419]/40" : !isPast && !blockOp && "hover:bg-muted/30",
                   )}
                   onMouseDown={(e) => { e.preventDefault(); if (!isPast && !blockOp) setDragRange({ anchor: dayStr, current: dayStr }); }}
-                  onMouseEnter={() => { if (!isPast) setDragRange((r) => (r ? { ...r, current: dayStr } : r)); }}
+                  onMouseEnter={() => {
+                    if (isPast) return;
+                    setDragRange((r) => (r ? { ...r, current: dayStr } : r));
+                    if (dragRef.current && dayStr >= lastDayStr) setRevealNext(true);
+                  }}
                   data-testid={`day-${keyPrefix}-${dayStr}`}
                 >
                   <div className="flex items-center justify-between px-1.5 pt-0.5">
@@ -671,7 +683,7 @@ export default function CrmInstallPlanner() {
             <h2 className="ml-2 text-sm font-semibold text-foreground">
               {view === "timeline"
                 ? `${format(parseISO(anchor), "MMM d")} – ${format(parseISO(to), "MMM d, yyyy")}`
-                : dragActive
+                : showNext
                   ? `${format(month, "MMM")} – ${format(month2, "MMM yyyy")}`
                   : format(month, "MMMM yyyy")}
             </h2>
@@ -728,7 +740,7 @@ export default function CrmInstallPlanner() {
           <div className="flex min-h-0 flex-1">
             {/* Current month */}
             <div className="flex min-w-0 flex-col transition-[flex-grow] duration-300 ease-out" style={{ flexGrow: 1, flexBasis: 0 }}>
-              {dragActive && (
+              {showNext && (
                 <div className="shrink-0 truncate border-b border-border bg-muted/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   {format(month, "MMMM yyyy")}
                 </div>
@@ -746,11 +758,11 @@ export default function CrmInstallPlanner() {
             <div
               className="flex min-w-0 flex-col overflow-hidden border-border transition-[flex-grow,opacity] duration-300 ease-out"
               style={{
-                flexGrow: dragActive ? 1 : 0.0001,
+                flexGrow: showNext ? 1 : 0.0001,
                 flexBasis: 0,
-                opacity: dragActive ? 1 : 0,
-                pointerEvents: dragActive ? "auto" : "none",
-                borderLeftWidth: dragActive ? 1 : 0,
+                opacity: showNext ? 1 : 0,
+                pointerEvents: showNext ? "auto" : "none",
+                borderLeftWidth: showNext ? 1 : 0,
               }}
               data-testid="next-month-grid"
             >
