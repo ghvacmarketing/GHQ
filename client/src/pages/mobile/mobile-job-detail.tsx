@@ -255,15 +255,21 @@ function OverviewTab({
 
       {/* Progress rail */}
       <div data-testid="job-progress">
-        <div className="flex gap-1.5">
-          {statusFlow.map((step, i) => (
-            <span
-              key={step}
-              className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
-                i < flowIndex ? "bg-[#711419]" : i === flowIndex ? "bg-[#711419]/40" : "bg-slate-200"
-              }`}
-            />
-          ))}
+        {/* One continuous bar: solid fill = steps done, lighter tip = the step in progress */}
+        <div className="flex h-2 overflow-hidden rounded-md bg-slate-200">
+          <div
+            className="bg-[#711419] transition-all duration-300"
+            style={{ width: `${(Math.min(flowIndex, statusFlow.length - 1) / statusFlow.length) * 100}%` }}
+          />
+          <div
+            className="transition-all duration-300"
+            style={{
+              width: `${100 / statusFlow.length}%`,
+              // In-progress step shows as a lighter tip; on the final step the
+              // whole bar reads solid (done).
+              backgroundColor: flowIndex >= statusFlow.length - 1 ? "#711419" : "rgba(113, 20, 25, 0.4)",
+            }}
+          />
         </div>
         <div className="mt-1.5 flex">
           {statusFlow.map((step, i) => (
