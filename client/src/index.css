@@ -619,6 +619,17 @@ body.ios-preview-open * {
   user-select: none;
 }
 
+/* Blanket native-gesture suppression for the photo grid: no selection, no
+   copy callout, no tap flash, no image drag — nothing turns blue. */
+.photo-grid-noselect,
+.photo-grid-noselect * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-user-drag: none;
+}
+
 .ios-press-source.is-pressed {
   transform: scale(0.94);
 }

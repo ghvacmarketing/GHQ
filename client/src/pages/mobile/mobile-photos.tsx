@@ -83,6 +83,9 @@ export default function MobilePhotos() {
   const [preview, setPreview] = useState<CustomerFile | null>(null);
   const [previewW, setPreviewW] = useState<number | undefined>(undefined);
   const [actionsTop, setActionsTop] = useState<number | null>(null);
+  // While set, the preview is pinned (untransitioned) at the source tile's
+  // position/scale; clearing it lets the CSS transition morph it to center.
+  const [morph, setMorph] = useState<string | null>(null);
   const previewImgRef = useRef<HTMLImageElement | null>(null);
   const [pressedId, setPressedId] = useState<string | null>(null);
   const lastPreviewRef = useRef<CustomerFile | null>(null);
@@ -125,9 +128,16 @@ export default function MobilePhotos() {
       // the menu correctly on the very first frame (no bottom-anchor flash).
       const gridImg = target.querySelector("img");
       if (gridImg) setActionsTop(computeActionsTop(gridImg.naturalWidth, gridImg.naturalHeight, w));
+      // Lift from the tile itself: start the preview at the tile's position
+      // and scale, then release so it morphs smoothly to center.
+      const r = target.getBoundingClientRect();
+      const dx = r.left + r.width / 2 - window.innerWidth / 2;
+      const dy = r.top + r.height / 2 - window.innerHeight / 2;
+      setMorph(`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(${r.width / w})`);
       navigator.vibrate?.(10);
       setPressedId(null);
       setPreview(p);
+      requestAnimationFrame(() => requestAnimationFrame(() => setMorph(null)));
     }, LONG_PRESS_DELAY);
   };
   const cancelPress = () => {
@@ -380,7 +390,7 @@ export default function MobilePhotos() {
               <p className="text-sm text-slate-400">No photos yet for {selectedJob?.customer?.name || "this customer"}.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-2" data-testid="photo-grid">
+            <div className="photo-grid-noselect grid grid-cols-3 gap-2" data-testid="photo-grid">
               {photos.map((p) => (
                 <div key={p.id} className="relative overflow-hidden rounded-xl">
                   <button
@@ -394,7 +404,7 @@ export default function MobilePhotos() {
                     onPointerCancel={cancelPress}
                     onPointerLeave={cancelPress}
                     onContextMenu={(e) => e.preventDefault()}
-                    className={`ios-press-source block w-full select-none ${pressedId === p.id ? "is-pressed" : ""}`}
+                    className={`ios-press-source block w-full select-none overflow-hidden rounded-xl ${pressedId === p.id ? "is-pressed" : ""}`}
                     style={{ WebkitTouchCallout: "none" }}
                     data-testid={`photo-${p.id}`}
                   >
@@ -403,7 +413,7 @@ export default function MobilePhotos() {
                       alt={p.name}
                       loading="lazy"
                       draggable={false}
-                      className="pointer-events-none aspect-square w-full select-none object-cover"
+                      className="pointer-events-none aspect-square w-full select-none rounded-xl object-cover"
                       style={{ WebkitTouchCallout: "none" }}
                     />
                   </button>
@@ -429,7 +439,13 @@ export default function MobilePhotos() {
         draggable={false}
         decoding="async"
         onLoad={placeActions}
-        style={{ left: "50%", top: "50%", width: previewW, WebkitTouchCallout: "none" }}
+        style={{
+          left: "50%",
+          top: "50%",
+          width: previewW,
+          WebkitTouchCallout: "none",
+          ...(morph ? { transform: morph, transition: "none" } : {}),
+        }}
         onContextMenu={(e) => e.preventDefault()}
         data-testid="photo-preview-item"
       />
