@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Camera, User, ImageIcon, Download, Trash2 } from "lucide-react";
+import { User, ImageIcon, Download, Trash2 } from "lucide-react";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -89,8 +89,7 @@ export default function CrmPhotoGallery() {
       <div className="space-y-5">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground flex items-center gap-2">
-              <Camera className="h-5 w-5 text-[#711419]" />
+            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">
               Photo Gallery
             </h1>
             <p className="mt-0.5 text-sm text-muted-foreground">

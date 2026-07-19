@@ -1,11 +1,15 @@
 import { useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Camera, ImageIcon, ImagePlus, Loader2, MapPin, X } from "lucide-react";
+import { Camera, Download, ImageIcon, ImagePlus, Loader2, MapPin, Trash2, X } from "lucide-react";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import MobileShell from "./mobile-shell";
 import { PhotoViewer } from "@/components/mobile/photo-viewer";
 import type { CrmUser, CrmWorkOrder, CrmCustomer, CustomerFile } from "@shared/schema";
@@ -65,6 +69,39 @@ export default function MobilePhotos() {
     enabled: !!customerId,
   });
   const photos = (files || []).filter((f) => f.contentType?.startsWith("image/"));
+
+  // Supervisor+ can pull photos down or remove bad shots from the record.
+  const isSupervisorPlus = !!currentUser && ["supervisor", "admin", "owner"].includes(currentUser.role);
+  const [confirmDelete, setConfirmDelete] = useState<CustomerFile | null>(null);
+
+  const deletePhoto = useMutation({
+    mutationFn: async (p: CustomerFile) =>
+      apiRequest("DELETE", `/api/crm/customers/${customerId}/files/${p.id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/customers", customerId, "files"] });
+      setConfirmDelete(null);
+      toast({ title: "Photo deleted" });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't delete the photo", variant: "destructive" }),
+  });
+
+  const downloadPhoto = async (p: { url: string; name: string }) => {
+    try {
+      const res = await fetch(p.url, { credentials: "include" });
+      if (!res.ok) throw new Error("fetch failed");
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = p.name || "photo";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(href);
+    } catch {
+      window.open(p.url, "_blank");
+    }
+  };
 
   // In-app camera: shutter → photo uploads immediately, no confirm/retake step
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -271,19 +308,63 @@ export default function MobilePhotos() {
           ) : (
             <div className="grid grid-cols-3 gap-2" data-testid="photo-grid">
               {photos.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setViewer({ src: p.url, name: p.name })}
-                  className="block overflow-hidden rounded-xl"
-                  data-testid={`photo-${p.id}`}
-                >
-                  <img src={p.url} alt={p.name} loading="lazy" className="aspect-square w-full object-cover transition-transform active:scale-95" />
-                </button>
+                <div key={p.id} className="relative overflow-hidden rounded-xl">
+                  <button
+                    onClick={() => setViewer({ src: p.url, name: p.name })}
+                    className="block w-full"
+                    data-testid={`photo-${p.id}`}
+                  >
+                    <img src={p.url} alt={p.name} loading="lazy" className="aspect-square w-full object-cover transition-transform active:scale-95" />
+                  </button>
+                  {isSupervisorPlus && (
+                    <div className="absolute right-1 top-1 flex gap-1">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); downloadPhoto(p); }}
+                        className="rounded-md bg-black/55 p-1.5 text-white active:bg-black/80"
+                        aria-label="Download photo"
+                        data-testid={`download-photo-${p.id}`}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setConfirmDelete(p); }}
+                        className="rounded-md bg-black/55 p-1.5 text-white active:bg-red-600"
+                        aria-label="Delete photo"
+                        data-testid={`delete-photo-${p.id}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           )
         )}
       </div>
+
+      {/* Delete confirmation (supervisor+) */}
+      <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this photo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{confirmDelete?.name}” will be removed from the customer's files. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deletePhoto.isPending}
+              onClick={() => confirmDelete && deletePhoto.mutate(confirmDelete)}
+              data-testid="confirm-delete-photo"
+            >
+              {deletePhoto.isPending ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Fullscreen viewer + markup editor */}
       {viewer && (

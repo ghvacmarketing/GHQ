@@ -229,7 +229,7 @@ export default function MobileJob() {
         title: woTitle.trim(),
         description: woDescription.trim(),
         visitType,
-        workSubtype: workSubtype || null,
+        workSubtype: workSubtype || "OTHER", // subtype is required by the schema; default when left blank
         priority,
         assignedTechId: assignTechId || currentUser.id, // default: self-assign
         scheduledStart: selectedSlot?.start || null,
