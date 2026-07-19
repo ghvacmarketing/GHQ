@@ -49,7 +49,6 @@ function Wheel({
 
   return (
     <div className={`relative overflow-hidden ${className}`} style={{ height: WHEEL_H }}>
-      <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 rounded-lg bg-slate-100" style={{ height: ITEM_H }} />
       <div
         ref={ref}
         onScroll={onScroll}
@@ -110,7 +109,9 @@ export function WheelTimePicker({
   };
 
   return (
-    <div className="flex items-stretch rounded-xl border border-slate-200 bg-white px-2" data-testid={testId}>
+    <div className="relative flex items-stretch rounded-xl border border-slate-200 bg-white px-2" data-testid={testId}>
+      {/* One continuous selection band across all columns */}
+      <div className="pointer-events-none absolute inset-x-2 top-1/2 -translate-y-1/2 rounded-lg bg-slate-100" style={{ height: ITEM_H }} />
       <Wheel
         options={hourOptions}
         value={String(h12)}
