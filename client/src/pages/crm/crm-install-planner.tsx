@@ -767,11 +767,11 @@ export default function CrmInstallPlanner() {
           <div className="flex min-h-0 flex-1">
             {/* Current month */}
             <div className="flex min-w-0 flex-col transition-[flex-grow] duration-300 ease-out" style={{ flexGrow: 1, flexBasis: 0 }}>
-              {showNext && (
-                <div className="shrink-0 truncate border-b border-border bg-muted/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  {format(month, "MMMM yyyy")}
-                </div>
-              )}
+              {/* Always present so the structure matches the next-month panel and
+                  nothing jumps when it slides in — both stay perfectly inline. */}
+              <div className="shrink-0 truncate border-b border-border bg-muted/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {format(month, "MMMM yyyy")}
+              </div>
               <div className="grid shrink-0 grid-cols-7 border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {WEEKDAYS.map((d) => (
                   <div key={d} className="truncate px-1 py-2 text-center">{d}</div>
