@@ -595,30 +595,13 @@ export default function CrmInstallPlanner() {
       <div className="flex min-h-0 w-full flex-1 flex-col gap-5">
         {/* Header */}
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-4">
-            <div>
-              <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Install Planner</h1>
-              <p className="text-sm text-muted-foreground">
-                {view === "calendar"
-                  ? "Drag empty days to plan a hold · drag a block to move it · drag its edges to resize."
-                  : "Gantt-style crew schedule · drag bars across dates and crews."}
-              </p>
-            </div>
-            <div className="flex items-center overflow-hidden rounded-md border">
-              {(["calendar", "timeline"] as const).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => setView(v)}
-                  className={cn(
-                    "px-3 py-1.5 text-xs font-medium capitalize transition-colors",
-                    view === v ? "bg-[#711419] text-white" : "text-muted-foreground hover:bg-muted",
-                  )}
-                  data-testid={`view-${v}`}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
+          <div>
+            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Install Planner</h1>
+            <p className="text-sm text-muted-foreground">
+              {view === "calendar"
+                ? "Drag empty days to plan a hold · drag a block to move it · drag its edges to resize."
+                : "Gantt-style crew schedule · drag bars across dates and crews."}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5">
@@ -641,6 +624,21 @@ export default function CrmInstallPlanner() {
         {/* Month nav + legend */}
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-1">
+            <div className="mr-2 flex items-center overflow-hidden rounded-md border">
+              {(["calendar", "timeline"] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setView(v)}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-medium capitalize transition-colors",
+                    view === v ? "bg-[#711419] text-white" : "text-muted-foreground hover:bg-muted",
+                  )}
+                  data-testid={`view-${v}`}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
             <Button
               variant="outline" size="icon" className="h-8 w-8"
               onClick={() => {
