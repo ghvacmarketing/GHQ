@@ -370,7 +370,7 @@ export default function MobilePhotos() {
       {/* Long-press action sheet: zoomed photo + Download / Delete */}
       {actionSheet && (
         <div
-          className="fixed inset-0 z-[65] flex flex-col items-center justify-center bg-black/60 p-8 backdrop-blur-sm"
+          className="fixed inset-0 z-[65] flex flex-col items-center justify-center bg-black/40 p-8 backdrop-blur-md"
           onClick={() => setActionSheet(null)}
           data-testid="photo-action-sheet"
         >
@@ -378,25 +378,27 @@ export default function MobilePhotos() {
             src={actionSheet.url}
             alt={actionSheet.name}
             draggable={false}
-            className="max-h-[55vh] max-w-full select-none rounded-2xl object-contain shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+            className="max-h-[55vh] max-w-full select-none rounded-2xl object-contain shadow-2xl animate-ios-pop"
             style={{ WebkitTouchCallout: "none" }}
             onContextMenu={(e) => e.preventDefault()}
           />
+          {/* iOS-material menu: translucent, heavily blurred, hairline separator */}
           <div
-            className="mt-3 w-60 overflow-hidden rounded-2xl bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150"
+            className="mt-3 w-60 origin-top animate-ios-pop overflow-hidden rounded-2xl bg-white/70 shadow-2xl backdrop-blur-xl"
+            style={{ animationDelay: "50ms" }}
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={() => { downloadPhoto(actionSheet); setActionSheet(null); }}
-              className="flex w-full items-center justify-between px-4 py-3.5 text-sm font-medium text-slate-800 active:bg-slate-100"
+              className="flex w-full items-center justify-between px-4 py-3.5 text-sm font-medium text-slate-900 active:bg-black/5"
               data-testid="action-download"
             >
-              Download <Download className="h-4 w-4 text-slate-500" />
+              Download <Download className="h-4 w-4 text-slate-600" />
             </button>
-            <div className="h-px bg-slate-100" />
+            <div className="h-px bg-slate-400/25" />
             <button
               onClick={() => { setConfirmDelete(actionSheet); setActionSheet(null); }}
-              className="flex w-full items-center justify-between px-4 py-3.5 text-sm font-medium text-red-600 active:bg-red-50"
+              className="flex w-full items-center justify-between px-4 py-3.5 text-sm font-medium text-red-600 active:bg-black/5"
               data-testid="action-delete"
             >
               Delete <Trash2 className="h-4 w-4" />

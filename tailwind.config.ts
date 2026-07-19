@@ -95,10 +95,17 @@ export default {
             height: "0",
           },
         },
+        // iOS context-menu pop: grow with a slight overshoot, then settle.
+        "ios-pop": {
+          "0%": { opacity: "0", transform: "scale(0.65)" },
+          "70%": { opacity: "1", transform: "scale(1.03)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "ios-pop": "ios-pop 0.34s cubic-bezier(0.16, 1, 0.3, 1) both",
       },
     },
   },
