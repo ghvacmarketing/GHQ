@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Camera, Download, ImageIcon, ImagePlus, Loader2, MapPin, Trash2, X } from "lucide-react";
@@ -74,31 +74,57 @@ export default function MobilePhotos() {
   const isSupervisorPlus = !!currentUser && ["supervisor", "admin", "owner"].includes(currentUser.role);
   const [confirmDelete, setConfirmDelete] = useState<CustomerFile | null>(null);
 
-  // Long-press a tile (iOS context-menu style): the photo zooms up with
-  // Download / Delete beneath it. The native browser callout is suppressed.
-  const [actionSheet, setActionSheet] = useState<CustomerFile | null>(null);
+  // iOS-style long-press preview: deliberate press compresses the tile, then
+  // the photo lifts to a centered preview over a blurred, dimmed backdrop with
+  // a Liquid Glass action surface. Driven by body.ios-preview-open so the CSS
+  // transitions (not a modal fade) do the work.
+  const LONG_PRESS_DELAY = 380;
+  const MOVE_TOLERANCE = 12;
+  const [preview, setPreview] = useState<CustomerFile | null>(null);
+  const [previewW, setPreviewW] = useState<number | undefined>(undefined);
+  const [pressedId, setPressedId] = useState<string | null>(null);
+  const lastPreviewRef = useRef<CustomerFile | null>(null);
+  if (preview) lastPreviewRef.current = preview;
+  const shownPreview = preview ?? lastPreviewRef.current; // keeps content during the close transition
   const pressTimer = useRef<number | undefined>(undefined);
   const pressStart = useRef<{ x: number; y: number } | null>(null);
   const suppressClick = useRef(false);
 
+  useEffect(() => {
+    document.body.classList.toggle("ios-preview-open", !!preview);
+    return () => document.body.classList.remove("ios-preview-open");
+  }, [preview]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setPreview(null); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
   const startPress = (p: CustomerFile, e: React.PointerEvent) => {
     if (!isSupervisorPlus) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     pressStart.current = { x: e.clientX, y: e.clientY };
+    setPressedId(p.id);
     window.clearTimeout(pressTimer.current);
     pressTimer.current = window.setTimeout(() => {
       suppressClick.current = true;
       window.setTimeout(() => { suppressClick.current = false; }, 600);
+      setPreviewW(Math.min(rect.width * 1.6, window.innerWidth * 0.88));
       navigator.vibrate?.(10);
-      setActionSheet(p);
-    }, 450);
+      setPressedId(null);
+      setPreview(p);
+    }, LONG_PRESS_DELAY);
   };
   const cancelPress = () => {
     window.clearTimeout(pressTimer.current);
     pressStart.current = null;
+    setPressedId(null);
   };
   const movePress = (e: React.PointerEvent) => {
     const s = pressStart.current;
-    if (s && (Math.abs(e.clientX - s.x) > 10 || Math.abs(e.clientY - s.y) > 10)) cancelPress();
+    if (s && Math.hypot(e.clientX - s.x, e.clientY - s.y) > MOVE_TOLERANCE) cancelPress();
   };
 
   const deletePhoto = useMutation({
@@ -347,7 +373,7 @@ export default function MobilePhotos() {
                     onPointerCancel={cancelPress}
                     onPointerLeave={cancelPress}
                     onContextMenu={(e) => e.preventDefault()}
-                    className="block w-full select-none"
+                    className={`ios-press-source block w-full select-none ${pressedId === p.id ? "is-pressed" : ""}`}
                     style={{ WebkitTouchCallout: "none" }}
                     data-testid={`photo-${p.id}`}
                   >
@@ -356,7 +382,7 @@ export default function MobilePhotos() {
                       alt={p.name}
                       loading="lazy"
                       draggable={false}
-                      className="pointer-events-none aspect-square w-full select-none object-cover transition-transform active:scale-95"
+                      className="pointer-events-none aspect-square w-full select-none object-cover"
                       style={{ WebkitTouchCallout: "none" }}
                     />
                   </button>
@@ -367,56 +393,40 @@ export default function MobilePhotos() {
         )}
       </div>
 
-      {/* Long-press action sheet: zoomed photo + Download / Delete */}
-      {actionSheet && (
-        <div
-          className="fixed inset-0 z-[65] animate-ios-fade bg-black/40 backdrop-blur-md"
-          onClick={() => setActionSheet(null)}
-          data-testid="photo-action-sheet"
+      {/* iOS-style long-press preview: always mounted so the CSS transitions
+          run; visibility is driven by body.ios-preview-open */}
+      <div
+        className="ios-preview-backdrop"
+        onClick={() => setPreview(null)}
+        data-testid="photo-preview-backdrop"
+      />
+      <img
+        className="ios-preview-item"
+        src={shownPreview?.url}
+        alt={shownPreview?.name || ""}
+        draggable={false}
+        decoding="async"
+        style={{ left: "50%", top: "50%", width: previewW, WebkitTouchCallout: "none" }}
+        onContextMenu={(e) => e.preventDefault()}
+        data-testid="photo-preview-item"
+      />
+      <div className="ios-preview-actions liquid-glass" onClick={(e) => e.stopPropagation()} data-testid="photo-preview-actions">
+        <button
+          onClick={() => { if (shownPreview) downloadPhoto(shownPreview); setPreview(null); }}
+          className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-[16px] text-slate-900 active:bg-white/40"
+          data-testid="action-download"
         >
-          <div className="flex h-full flex-col items-center justify-center p-6">
-            {/* Image + menu animate as one unit, like the iOS context menu */}
-            <div className="flex max-h-full w-full max-w-sm animate-ios-pop flex-col items-center will-change-transform">
-              <img
-                src={actionSheet.url}
-                alt={actionSheet.name}
-                draggable={false}
-                decoding="async"
-                className="max-h-[58vh] max-w-full select-none rounded-2xl object-contain shadow-2xl"
-                style={{ WebkitTouchCallout: "none" }}
-                onContextMenu={(e) => e.preventDefault()}
-              />
-              {/* Liquid-glass menu: near-clear material with saturated blur and a specular edge */}
-              <div
-                className="mt-3 w-64 overflow-hidden rounded-[22px] border border-white/30 bg-white/20 backdrop-blur-2xl backdrop-saturate-[180%]"
-                style={{
-                  boxShadow:
-                    "inset 0 1px 0 rgba(255,255,255,0.45), inset 0 0 24px rgba(255,255,255,0.12), 0 12px 40px rgba(0,0,0,0.35)",
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  onClick={() => { downloadPhoto(actionSheet); setActionSheet(null); }}
-                  className="flex w-full items-center justify-between px-4 py-3.5 text-[16px] text-white active:bg-white/15"
-                  style={{ textShadow: "0 1px 2px rgba(0,0,0,0.25)" }}
-                  data-testid="action-download"
-                >
-                  Download <Download className="h-5 w-5 text-white/90" />
-                </button>
-                <div className="h-px bg-white/25" />
-                <button
-                  onClick={() => { setConfirmDelete(actionSheet); setActionSheet(null); }}
-                  className="flex w-full items-center justify-between px-4 py-3.5 text-[16px] text-red-300 active:bg-white/15"
-                  style={{ textShadow: "0 1px 2px rgba(0,0,0,0.25)" }}
-                  data-testid="action-delete"
-                >
-                  Delete <Trash2 className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+          Download <Download className="h-5 w-5 text-slate-700" />
+        </button>
+        <div className="mx-2 h-px bg-slate-900/10" />
+        <button
+          onClick={() => { if (shownPreview) setConfirmDelete(shownPreview); setPreview(null); }}
+          className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-[16px] text-red-600 active:bg-white/40"
+          data-testid="action-delete"
+        >
+          Delete <Trash2 className="h-5 w-5" />
+        </button>
+      </div>
 
       {/* Delete confirmation (supervisor+) */}
       <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
