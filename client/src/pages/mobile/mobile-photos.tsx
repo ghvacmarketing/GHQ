@@ -386,22 +386,28 @@ export default function MobilePhotos() {
                 style={{ WebkitTouchCallout: "none" }}
                 onContextMenu={(e) => e.preventDefault()}
               />
-              {/* iOS menu material: light-gray translucency with saturated blur */}
+              {/* Liquid-glass menu: near-clear material with saturated blur and a specular edge */}
               <div
-                className="mt-3 w-64 overflow-hidden rounded-2xl bg-[#F2F2F7]/85 shadow-xl backdrop-blur-2xl backdrop-saturate-150"
+                className="mt-3 w-64 overflow-hidden rounded-[22px] border border-white/30 bg-white/20 backdrop-blur-2xl backdrop-saturate-[180%]"
+                style={{
+                  boxShadow:
+                    "inset 0 1px 0 rgba(255,255,255,0.45), inset 0 0 24px rgba(255,255,255,0.12), 0 12px 40px rgba(0,0,0,0.35)",
+                }}
                 onClick={(e) => e.stopPropagation()}
               >
                 <button
                   onClick={() => { downloadPhoto(actionSheet); setActionSheet(null); }}
-                  className="flex w-full items-center justify-between px-4 py-3 text-[16px] text-slate-900 active:bg-black/5"
+                  className="flex w-full items-center justify-between px-4 py-3.5 text-[16px] text-white active:bg-white/15"
+                  style={{ textShadow: "0 1px 2px rgba(0,0,0,0.25)" }}
                   data-testid="action-download"
                 >
-                  Download <Download className="h-5 w-5 text-slate-700" />
+                  Download <Download className="h-5 w-5 text-white/90" />
                 </button>
-                <div className="h-px bg-[#3C3C43]/20" />
+                <div className="h-px bg-white/25" />
                 <button
                   onClick={() => { setConfirmDelete(actionSheet); setActionSheet(null); }}
-                  className="flex w-full items-center justify-between px-4 py-3 text-[16px] text-red-600 active:bg-black/5"
+                  className="flex w-full items-center justify-between px-4 py-3.5 text-[16px] text-red-300 active:bg-white/15"
+                  style={{ textShadow: "0 1px 2px rgba(0,0,0,0.25)" }}
                   data-testid="action-delete"
                 >
                   Delete <Trash2 className="h-5 w-5" />

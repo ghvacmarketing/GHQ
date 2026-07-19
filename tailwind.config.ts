@@ -98,7 +98,7 @@ export default {
         // iOS context-menu pop: a single springy curve (overshoot lives in the
         // bezier, not the keyframes) so the whole motion is one smooth arc.
         "ios-pop": {
-          "0%": { opacity: "0", transform: "scale(0.86) translateZ(0)" },
+          "0%": { opacity: "0", transform: "scale(0.6) translateZ(0)" },
           "100%": { opacity: "1", transform: "scale(1) translateZ(0)" },
         },
         // iOS action sheet: rise from the bottom and settle.
@@ -114,9 +114,9 @@ export default {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "ios-pop": "ios-pop 0.38s cubic-bezier(0.32, 1.2, 0.32, 1) both",
+        "ios-pop": "ios-pop 0.55s cubic-bezier(0.3, 1.15, 0.35, 1) both",
         "ios-sheet": "ios-sheet 0.32s cubic-bezier(0.16, 1, 0.3, 1) both",
-        "ios-fade": "ios-fade 0.25s ease-out both",
+        "ios-fade": "ios-fade 0.45s ease-out both",
       },
     },
   },
