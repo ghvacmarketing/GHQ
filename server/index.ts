@@ -190,6 +190,16 @@ async function runTaggedCommentMigrations() {
   }
 }
 
+async function runInstallPlannerMigrations() {
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`ALTER TABLE install_plan_blocks ADD COLUMN IF NOT EXISTS crew_id varchar`);
+  } catch (err) {
+    console.error("Install planner migration error (non-fatal):", err);
+  }
+}
+
 async function runSalesbookMigrations() {
   try {
     const { db } = await import("./db");
@@ -477,6 +487,7 @@ async function runWaterHeaterSeeds() {
 
 (async () => {
   await runTaggedCommentMigrations();
+  await runInstallPlannerMigrations();
   await runSalesbookMigrations();
   await runProposalTemplateMigrations();
   await runAgreementVisitFrequencyMigration();

@@ -69,6 +69,7 @@ export function registerInstallPlannerRoutes(app: Express): void {
         endDate: b.endDate,
         customerId: b.customerId || null,
         quoteId: b.quoteId || null,
+        crewId: b.crewId || null,
         estimatedValue: b.estimatedValue != null && b.estimatedValue !== "" ? String(b.estimatedValue) : null,
         confidence: ["high", "medium", "low"].includes(b.confidence) ? b.confidence : null,
         notes: b.notes ? String(b.notes).slice(0, 2000) : null,
@@ -92,6 +93,7 @@ export function registerInstallPlannerRoutes(app: Express): void {
       if (b.endDate !== undefined && DATE_RE.test(b.endDate)) updates.endDate = b.endDate;
       if (b.customerId !== undefined) updates.customerId = b.customerId || null;
       if (b.quoteId !== undefined) updates.quoteId = b.quoteId || null;
+      if (b.crewId !== undefined) updates.crewId = b.crewId || null;
       if (b.estimatedValue !== undefined) updates.estimatedValue = b.estimatedValue === "" || b.estimatedValue == null ? null : String(b.estimatedValue);
       if (b.confidence !== undefined) updates.confidence = ["high", "medium", "low"].includes(b.confidence) ? b.confidence : null;
       if (b.notes !== undefined) updates.notes = b.notes ? String(b.notes).slice(0, 2000) : null;

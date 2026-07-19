@@ -19,6 +19,11 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { InstallTimeline } from "@/components/crm/install-timeline";
+import type { PlannerBlock } from "@/components/crm/install-timeline";
 import { useToast } from "@/hooks/use-toast";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { cn } from "@/lib/utils";
@@ -27,20 +32,7 @@ import {
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 
-type Block = {
-  id: string;
-  title: string;
-  status: "tentative" | "sold" | "lost";
-  startDate: string; // yyyy-MM-dd
-  endDate: string;
-  customerId: string | null;
-  customerName: string | null;
-  quoteId: string | null;
-  projectId: string | null;
-  estimatedValue: string | null;
-  confidence: "high" | "medium" | "low" | null;
-  notes: string | null;
-};
+type Block = PlannerBlock;
 
 type CustomerHit = { id: string; name: string };
 
@@ -81,6 +73,7 @@ type FormState = {
   endDate: string;
   customerId: string;
   customerName: string;
+  crewId: string | null;
   estimatedValue: string;
   confidence: "" | "high" | "medium" | "low";
   notes: string;
@@ -90,7 +83,7 @@ type FormState = {
 
 const emptyForm = (start: string, end: string): FormState => ({
   id: null, title: "", startDate: start, endDate: end, customerId: "", customerName: "",
-  estimatedValue: "", confidence: "", notes: "", status: "tentative", projectId: null,
+  crewId: null, estimatedValue: "", confidence: "", notes: "", status: "tentative", projectId: null,
 });
 
 export default function CrmInstallPlanner() {
@@ -111,8 +104,27 @@ export default function CrmInstallPlanner() {
   const gridStart = startOfWeek(startOfMonth(month));
   const gridEnd = endOfWeek(endOfMonth(month2));
 
-  const from = iso(gridStart);
-  const to = iso(gridEnd);
+  // ── Calendar vs Timeline view (persisted preference) ──
+  const [view, setView] = useState<"calendar" | "timeline">(() =>
+    localStorage.getItem("installPlanner.view") === "timeline" ? "timeline" : "calendar",
+  );
+  useEffect(() => localStorage.setItem("installPlanner.view", view), [view]);
+
+  // Timeline window: a week-aligned anchor plus 2/4/8 rendered weeks. extraWeeks
+  // grows when a drag auto-scrolls past the right end, so the drag never dies.
+  const [anchor, setAnchor] = useState(() => iso(startOfWeek(new Date())));
+  const [rangeWeeks, setRangeWeeks] = useState<number>(() => {
+    const n = parseInt(localStorage.getItem("ip.rangeWeeks") || "", 10);
+    if (n === 2 || n === 4 || n === 8) return n;
+    return typeof window !== "undefined" && window.innerWidth < 640 ? 2 : 4;
+  });
+  useEffect(() => localStorage.setItem("ip.rangeWeeks", String(rangeWeeks)), [rangeWeeks]);
+  const [extraWeeks, setExtraWeeks] = useState(0);
+  const [todayNonce, setTodayNonce] = useState(0);
+  const tlDays = (rangeWeeks + extraWeeks) * 7;
+
+  const from = view === "calendar" ? iso(gridStart) : anchor;
+  const to = view === "calendar" ? iso(gridEnd) : iso(addDays(parseISO(anchor), tlDays - 1));
 
   const { data, isLoading } = useQuery<{ blocks: Block[]; crewsPerDay: number | null }>({
     queryKey: ["/api/crm/install-planner", from, to],
@@ -126,14 +138,22 @@ export default function CrmInstallPlanner() {
   const blocks = data?.blocks || [];
   const crewsPerDay = data?.crewsPerDay ?? null;
 
+  // Dispatch-board users double as install crews.
+  const { data: technicians = [] } = useQuery<{ id: string; name: string; email: string; role: string }[]>({
+    queryKey: ["/api/crm/technicians"],
+    enabled: !!currentUser,
+  });
+  const crewLabel = (id: string | null | undefined) =>
+    id == null ? "Unassigned" : technicians.find((t) => t.id === id)?.name ?? "Unknown crew";
+
   // ── Dialog / form ──
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm(iso(new Date()), iso(new Date())));
   const [custSearch, setCustSearch] = useState("");
   const [dayList, setDayList] = useState<string | null>(null); // "see all" popup for a crowded day
 
-  const openCreate = (start: string, end?: string) => {
-    setForm(emptyForm(start, end ?? start));
+  const openCreate = (start: string, end?: string, crewId: string | null = null) => {
+    setForm({ ...emptyForm(start, end ?? start), crewId });
     setCustSearch("");
     setOpen(true);
   };
@@ -141,6 +161,7 @@ export default function CrmInstallPlanner() {
     setForm({
       id: b.id, title: b.title, startDate: b.startDate, endDate: b.endDate,
       customerId: b.customerId || "", customerName: b.customerName || "",
+      crewId: b.crewId ?? null,
       estimatedValue: b.estimatedValue || "", confidence: b.confidence || "",
       notes: b.notes || "", status: b.status, projectId: b.projectId,
     });
@@ -207,11 +228,35 @@ export default function CrmInstallPlanner() {
   };
 
   const commitBlockDates = useMutation({
-    mutationFn: async (p: { id: string; startDate: string; endDate: string }) =>
-      (await apiRequest("PATCH", `/api/crm/install-planner/${p.id}`, { startDate: p.startDate, endDate: p.endDate })).json(),
+    mutationFn: async (p: { id: string; startDate: string; endDate: string; crewId?: string | null }) =>
+      (await apiRequest("PATCH", `/api/crm/install-planner/${p.id}`, {
+        startDate: p.startDate, endDate: p.endDate,
+        ...(p.crewId !== undefined ? { crewId: p.crewId } : {}),
+      })).json(),
     onSettled: () => { invalidate(); setPreview(null); },
     onError: (e: any) => toast({ title: e?.message || "Couldn't move the block", variant: "destructive" }),
   });
+
+  // Optimistically paint the change, PATCH it, and offer a ~5s Undo.
+  const commitWithUndo = (
+    id: string,
+    next: { startDate: string; endDate: string; crewId?: string | null },
+    prev: { startDate: string; endDate: string; crewId?: string | null },
+  ) => {
+    queryClient.setQueryData(["/api/crm/install-planner", from, to], (old: any) =>
+      old ? { ...old, blocks: old.blocks.map((x: Block) => (x.id === id ? { ...x, ...next } : x)) } : old,
+    );
+    commitBlockDates.mutate({ id, ...next });
+    toast({
+      title: "Install updated",
+      description: `${rangeLabel(next.startDate, next.endDate)}${next.crewId !== undefined ? ` · ${crewLabel(next.crewId)}` : ""}`,
+      action: (
+        <Button size="sm" variant="outline" onClick={() => commitBlockDates.mutate({ id, ...prev })}>
+          Undo
+        </Button>
+      ),
+    });
+  };
 
   useEffect(() => {
     if (!blockOp) return;
@@ -250,11 +295,11 @@ export default function CrmInstallPlanner() {
       if (op.moved && p) {
         justDraggedRef.current = true;
         setTimeout(() => { justDraggedRef.current = false; }, 0);
-        // Optimistic: paint the new dates into the cache before the PATCH lands.
-        queryClient.setQueryData(["/api/crm/install-planner", from, to], (old: any) =>
-          old ? { ...old, blocks: old.blocks.map((x: Block) => (x.id === p.id ? { ...x, startDate: p.startDate, endDate: p.endDate } : x)) } : old,
+        commitWithUndo(
+          p.id,
+          { startDate: p.startDate, endDate: p.endDate },
+          { startDate: op.block.startDate, endDate: op.block.endDate },
         );
-        commitBlockDates.mutate(p);
       } else {
         setPreview(null);
       }
@@ -293,6 +338,7 @@ export default function CrmInstallPlanner() {
         startDate: form.startDate,
         endDate: form.endDate,
         customerId: form.customerId || null,
+        crewId: form.crewId,
         estimatedValue: form.estimatedValue || null,
         confidence: form.confidence || null,
         notes: form.notes || null,
@@ -549,11 +595,30 @@ export default function CrmInstallPlanner() {
       <div className="flex min-h-0 w-full flex-1 flex-col gap-5">
         {/* Header */}
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Install Planner</h1>
-            <p className="text-sm text-muted-foreground">
-              Drag empty days to plan a hold · drag a block to move it · drag its edges to resize.
-            </p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Install Planner</h1>
+              <p className="text-sm text-muted-foreground">
+                {view === "calendar"
+                  ? "Drag empty days to plan a hold · drag a block to move it · drag its edges to resize."
+                  : "Gantt-style crew schedule · drag bars across dates and crews."}
+              </p>
+            </div>
+            <div className="flex items-center overflow-hidden rounded-md border">
+              {(["calendar", "timeline"] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setView(v)}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-medium capitalize transition-colors",
+                    view === v ? "bg-[#711419] text-white" : "text-muted-foreground hover:bg-muted",
+                  )}
+                  data-testid={`view-${v}`}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5">
@@ -576,17 +641,41 @@ export default function CrmInstallPlanner() {
         {/* Month nav + legend */}
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setMonth((m) => addMonths(m, -1))} data-testid="button-prev-month">
+            <Button
+              variant="outline" size="icon" className="h-8 w-8"
+              onClick={() => {
+                if (view === "calendar") setMonth((m) => addMonths(m, -1));
+                else { setAnchor((a) => iso(addDays(parseISO(a), -7))); setExtraWeeks(0); }
+              }}
+              data-testid="button-prev-month"
+            >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="sm" className="h-8" onClick={() => setMonth(startOfMonth(new Date()))}>Today</Button>
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setMonth((m) => addMonths(m, 1))} data-testid="button-next-month">
+            <Button
+              variant="outline" size="sm" className="h-8"
+              onClick={() => {
+                if (view === "calendar") setMonth(startOfMonth(new Date()));
+                else { setAnchor(iso(startOfWeek(new Date()))); setExtraWeeks(0); setTodayNonce((n) => n + 1); }
+              }}
+            >
+              Today
+            </Button>
+            <Button
+              variant="outline" size="icon" className="h-8 w-8"
+              onClick={() => {
+                if (view === "calendar") setMonth((m) => addMonths(m, 1));
+                else { setAnchor((a) => iso(addDays(parseISO(a), 7))); setExtraWeeks(0); }
+              }}
+              data-testid="button-next-month"
+            >
               <ChevronRight className="h-4 w-4" />
             </Button>
             <h2 className="ml-2 text-sm font-semibold text-foreground">
-              {dragActive
-                ? `${format(month, "MMM")} – ${format(month2, "MMM yyyy")}`
-                : format(month, "MMMM yyyy")}
+              {view === "timeline"
+                ? `${format(parseISO(anchor), "MMM d")} – ${format(parseISO(to), "MMM d, yyyy")}`
+                : dragActive
+                  ? `${format(month, "MMM")} – ${format(month2, "MMM yyyy")}`
+                  : format(month, "MMMM yyyy")}
             </h2>
             {isLoading && <Loader2 className="ml-2 h-4 w-4 animate-spin text-muted-foreground" />}
           </div>
@@ -596,10 +685,37 @@ export default function CrmInstallPlanner() {
             <span className="flex items-center gap-1.5"><span className="h-3 w-4 border border-dashed border-amber-400 bg-amber-100" /> Medium</span>
             <span className="flex items-center gap-1.5"><span className="h-3 w-4 border border-dashed border-rose-400 bg-rose-100" /> Low</span>
             <span className="flex items-center gap-1.5"><span className="h-3 w-4 bg-emerald-600" /> Sold</span>
+            <span className="flex items-center gap-1.5">
+              <span
+                className="h-3 w-4 border border-dashed border-slate-400 bg-slate-100"
+                style={{ backgroundImage: "repeating-linear-gradient(135deg, rgba(100,116,139,0.25) 0 3px, transparent 3px 6px)" }}
+              />
+              Hold
+            </span>
           </div>
         </div>
 
+        {/* Timeline (Gantt-style crew schedule) */}
+        {view === "timeline" && (
+          <InstallTimeline
+            blocks={blocks}
+            crews={technicians}
+            crewsPerDay={crewsPerDay}
+            rangeStart={anchor}
+            days={tlDays}
+            rangeWeeks={rangeWeeks}
+            onRangeWeeksChange={(w) => { setRangeWeeks(w); setExtraWeeks(0); }}
+            onExtend={() => setExtraWeeks((x) => Math.min(x + 2, 26))}
+            todayStr={todayStr}
+            todayNonce={todayNonce}
+            onEdit={openEdit}
+            onCreate={(d, crewId) => openCreate(d, d, crewId)}
+            onCommit={commitWithUndo}
+          />
+        )}
+
         {/* Calendar — no scrolling; a drag reveals the next month underneath */}
+        {view === "calendar" && (
         <div
           className={cn(
             "relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card transition-shadow duration-200",
@@ -632,6 +748,7 @@ export default function CrmInstallPlanner() {
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* Create / edit dialog */}
@@ -696,6 +813,21 @@ export default function CrmInstallPlanner() {
                   )}
                 </>
               )}
+            </div>
+
+            <div>
+              <Label className="text-xs">Crew</Label>
+              <Select value={form.crewId ?? "none"} onValueChange={(v) => setForm((f) => ({ ...f, crewId: v === "none" ? null : v }))}>
+                <SelectTrigger className="mt-1" data-testid="select-block-crew">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Unassigned</SelectItem>
+                  {technicians.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid grid-cols-2 gap-3">

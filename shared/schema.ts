@@ -1267,6 +1267,7 @@ export const installPlanBlocks = pgTable("install_plan_blocks", {
   customerId: varchar("customer_id"), // optional (no FK, mirrors crm_projects)
   quoteId: varchar("quote_id"), // optional link to the quote/proposal
   projectId: varchar("project_id"), // set when sold → the created/linked project
+  crewId: varchar("crew_id"), // dispatch-board user assigned to run the install; null = unassigned
   estimatedValue: decimal("estimated_value", { precision: 10, scale: 2 }),
   confidence: text("confidence").$type<"high" | "medium" | "low">(),
   notes: text("notes"),
