@@ -103,9 +103,15 @@ export default function MobilePhotos() {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
+  const computeActionsTop = (nw: number, nh: number, w: number) => {
+    const h = Math.min((w * (nh || 1)) / (nw || 1), window.innerHeight * 0.78);
+    return Math.min(window.innerHeight / 2 + h / 2 + 14, window.innerHeight - 160);
+  };
+
   const startPress = (p: CustomerFile, e: React.PointerEvent) => {
     if (!isSupervisorPlus) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    const target = e.currentTarget as HTMLElement;
     pressStart.current = { x: e.clientX, y: e.clientY };
     setPressedId(p.id);
     window.clearTimeout(pressTimer.current);
@@ -113,7 +119,12 @@ export default function MobilePhotos() {
       suppressClick.current = true;
       window.setTimeout(() => { suppressClick.current = false; }, 600);
       // A tile is tiny — enlarge to a real preview, capped by the CSS max sizes.
-      setPreviewW(Math.min(window.innerWidth * 0.88, 720));
+      const w = Math.min(window.innerWidth * 0.88, 720);
+      setPreviewW(w);
+      // The grid thumbnail is already loaded, so its natural size lets us pin
+      // the menu correctly on the very first frame (no bottom-anchor flash).
+      const gridImg = target.querySelector("img");
+      if (gridImg) setActionsTop(computeActionsTop(gridImg.naturalWidth, gridImg.naturalHeight, w));
       navigator.vibrate?.(10);
       setPressedId(null);
       setPreview(p);
@@ -129,18 +140,13 @@ export default function MobilePhotos() {
     if (s && Math.hypot(e.clientX - s.x, e.clientY - s.y) > MOVE_TOLERANCE) cancelPress();
   };
 
-  // Pin the action menu just under the image's rendered height (the image is
-  // centered at 50%/50%), clamping so the menu never runs off screen.
+  // Correct the menu position once the full-size preview has loaded (in case
+  // the thumbnail's natural size differed or was unavailable).
   const placeActions = () => {
     const img = previewImgRef.current;
-    if (!img || !previewW) return;
-    const nw = img.naturalWidth || 1;
-    const nh = img.naturalHeight || 1;
-    const w = Math.min(previewW, window.innerWidth * 0.88, 720);
-    const h = Math.min((w * nh) / nw, window.innerHeight * 0.78);
-    setActionsTop(Math.min(window.innerHeight / 2 + h / 2 + 14, window.innerHeight - 160));
+    if (!img || !previewW || !img.naturalWidth) return;
+    setActionsTop(computeActionsTop(img.naturalWidth, img.naturalHeight, Math.min(previewW, window.innerWidth * 0.88, 720)));
   };
-  useEffect(() => { if (preview) placeActions(); }, [preview, previewW]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const deletePhoto = useMutation({
     mutationFn: async (p: CustomerFile) =>
