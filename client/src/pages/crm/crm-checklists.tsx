@@ -1115,7 +1115,7 @@ export default function CrmChecklists() {
                 onPointerCancel={onCanvasPointerUp}
                 data-testid="checklist-canvas"
               >
-                <div style={{ width: worldSize.w * zoom, height: worldSize.h * zoom }}>
+                <div className="mx-auto" style={{ width: worldSize.w * zoom, height: worldSize.h * zoom }}>
                 <div
                   ref={worldRef}
                   className="relative select-none"
