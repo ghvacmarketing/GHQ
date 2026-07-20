@@ -3,6 +3,7 @@ import { getUncachableStripeClient } from "./stripeClient";
 import { storage } from "./storage";
 import { db } from "./db";
 import { crmQuotes, crmInvoices, crmQuoteLineItems } from "@shared/schema";
+import { surchargeFor, surchargeLabel, type PaymentMethod } from "@shared/payment-fees";
 import { eq } from "drizzle-orm";
 
 const router = Router();
@@ -30,6 +31,8 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
   try {
     const { quoteId } = req.params;
     const { depositOverride, selectedOption, signatureImage, signerName } = req.body;
+    // Chosen payment method drives the surcharge and which method the link allows.
+    const paymentMethod: PaymentMethod = req.body?.paymentMethod === "ach" ? "ach" : "card";
 
     // Validate signature is provided - required before generating payment link
     if (!signatureImage || !signerName?.trim()) {
@@ -98,21 +101,28 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
       return res.status(400).json({ error: "Quote total must be greater than 0" });
     }
 
+    // Surcharge the price for the chosen payment method (passes the processing
+    // fee to the customer), then take the deposit from the surcharged total.
+    const surchargeAmount = surchargeFor(paymentMethod, total);
+    const surchargedTotal = total + surchargeAmount;
+
     // Calculate deposit amount (minimum 50 cents per Stripe's requirement)
     const depositPct = depositOverride || await getDepositPercentage();
-    const depositAmount = Math.max(50, Math.round((total * depositPct / 100) * 100)); // Convert to cents
+    const depositAmount = Math.max(50, Math.round((surchargedTotal * depositPct / 100) * 100)); // Convert to cents
 
+    const methodLabel = paymentMethod === "ach" ? "bank transfer (ACH)" : "credit/debit card";
     const stripe = await getUncachableStripeClient();
 
-    // Create a Payment Link with Stripe
+    // Create a Payment Link with Stripe, restricted to the chosen method.
     const paymentLink = await stripe.paymentLinks.create({
+      payment_method_types: paymentMethod === "ach" ? ["us_bank_account"] : ["card"],
       line_items: [
         {
           price_data: {
             currency: 'usd',
             product_data: {
               name: `Deposit for Quote #${quote.quoteNumber}`,
-              description: `${depositPct}% deposit for ${optionDescription}`,
+              description: `${depositPct}% deposit for ${optionDescription} — includes ${surchargeLabel(paymentMethod)} ${methodLabel} processing fee`,
             },
             unit_amount: depositAmount,
           },
@@ -125,6 +135,8 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
         type: 'quote_deposit',
         depositPercentage: depositPct.toString(),
         selectedOption: selectedOption || '',
+        paymentMethod,
+        surchargeAmount: surchargeAmount.toFixed(2),
       },
       after_completion: {
         type: 'redirect',
@@ -145,6 +157,9 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
       depositAmount: depositAmount / 100, // Return in dollars
       depositPercentage: depositPct,
       quoteTotal: total,
+      paymentMethod,
+      surchargeAmount,
+      surchargedTotal,
     });
   } catch (error: any) {
     console.error("Error creating quote payment link:", error);

@@ -8,7 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { sanitizeHtml } from "@/lib/sanitize-html";
-import { CheckCircle2, FileText, AlertCircle, Loader2, CreditCard, ExternalLink } from "lucide-react";
+import { CheckCircle2, FileText, AlertCircle, Loader2, CreditCard, ExternalLink, Landmark } from "lucide-react";
+import { surchargeFor, surchargeLabel, type PaymentMethod } from "@shared/payment-fees";
 import type { CrmQuote, CrmQuoteLineItem } from "@shared/schema";
 import ghvacLogo from "@assets/ghvac-logo.png";
 
@@ -405,6 +406,7 @@ export default function PublicQuoteView() {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [isAccepted, setIsAccepted] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
   const [paymentLinkLoading, setPaymentLinkLoading] = useState(false);
   const [depositAmount, setDepositAmount] = useState<number>(0);
   const [depositPaidAt, setDepositPaidAt] = useState<Date | null>(null);
@@ -553,10 +555,11 @@ export default function PublicQuoteView() {
       const response = await fetch(`/api/stripe/quote/${quote.id}/payment-link`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           selectedOption,
           signatureImage: signatureData,
           signerName: printedName.trim(),
+          paymentMethod,
         }),
       });
       if (response.ok) {
@@ -654,6 +657,18 @@ export default function PublicQuoteView() {
   
   // Get deposit percentage from API response (default to 50 if not provided)
   const depositPercentage = (quoteData as any).depositPercentage ?? 50;
+
+  // The amount the surcharge/deposit is based on: the selected option's total for
+  // multi-option quotes, otherwise the whole quote total.
+  const effectiveTotal = (() => {
+    if (quoteData.quoteMode === "options" && selectedOption) {
+      const items = lineItems.filter((i) => i.optionTag === selectedOption);
+      if (items.length) return items.reduce((s, i) => s + parseFloat(i.lineTotal?.toString() || "0"), 0);
+    }
+    return parseFloat(quoteData.total?.toString() || "0");
+  })();
+  const surchargedTotal = effectiveTotal + surchargeFor(paymentMethod, effectiveTotal);
+  const depositDue = Math.max(0.5, (surchargedTotal * depositPercentage) / 100);
 
   if (quoteData.status === "accepted") {
     return <QuoteAlreadyAccepted quote={quoteData} lineItems={lineItems} />;
@@ -899,6 +914,20 @@ export default function PublicQuoteView() {
                       <span data-testid="text-quote-monthly">{formatCurrency(monthlyFinancing(quoteData.total))}/mo</span>
                     </div>
                   )}
+                  {isInstallQuote && effectiveTotal > 0 && (
+                    <div className="border-t border-slate-200 pt-2 mt-1 text-sm">
+                      <p className="mb-1.5 font-semibold text-slate-600">Payment method fees</p>
+                      <div className="flex justify-between text-slate-600">
+                        <span className="flex items-center gap-1.5"><CreditCard className="h-3.5 w-3.5" /> Credit/debit card (+{surchargeLabel("card")})</span>
+                        <span className="font-medium">+{formatCurrency(surchargeFor("card", effectiveTotal))}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-600 mt-1">
+                        <span className="flex items-center gap-1.5"><Landmark className="h-3.5 w-3.5" /> Bank transfer / ACH (+{surchargeLabel("ach")})</span>
+                        <span className="font-medium">+{formatCurrency(surchargeFor("ach", effectiveTotal))}</span>
+                      </div>
+                      <p className="mt-1.5 text-[11px] text-slate-500">The processing fee for your chosen method is added at checkout. Choose your method below before signing.</p>
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -1013,6 +1042,40 @@ export default function PublicQuoteView() {
                     <p className="text-sm text-amber-700 mb-3">
                       A {depositPercentage}% deposit is required before accepting this quote.
                     </p>
+
+                    {/* Choose payment method — surcharge and deposit update live */}
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-800">Choose payment method</p>
+                    <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {([
+                        { m: "card" as PaymentMethod, icon: CreditCard, label: "Credit / debit card" },
+                        { m: "ach" as PaymentMethod, icon: Landmark, label: "Bank transfer (ACH)" },
+                      ]).map(({ m, icon: Icon, label }) => {
+                        const active = paymentMethod === m;
+                        const fee = surchargeFor(m, effectiveTotal);
+                        return (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setPaymentMethod(m)}
+                            className={`rounded-lg border-2 p-3 text-left transition-colors ${active ? "border-green-600 bg-white" : "border-amber-200 bg-white/60 hover:border-amber-300"}`}
+                            data-testid={`payment-method-${m}`}
+                          >
+                            <span className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                              <Icon className="h-4 w-4" /> {label}
+                              {active && <CheckCircle2 className="ml-auto h-4 w-4 text-green-600" />}
+                            </span>
+                            <span className="mt-0.5 block text-xs text-slate-500">
+                              +{formatCurrency(fee)} fee ({surchargeLabel(m)})
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="mb-3 rounded-lg bg-white/70 p-3 text-sm">
+                      <div className="flex justify-between text-slate-600"><span>Selected total</span><span>{formatCurrency(effectiveTotal)}</span></div>
+                      <div className="flex justify-between text-slate-600"><span>{paymentMethod === "ach" ? "Bank transfer" : "Card"} fee ({surchargeLabel(paymentMethod)})</span><span>+{formatCurrency(surchargeFor(paymentMethod, effectiveTotal))}</span></div>
+                      <div className="mt-1 flex justify-between border-t border-slate-200 pt-1 font-semibold text-slate-800"><span>{depositPercentage}% deposit due now</span><span data-testid="text-deposit-due">{formatCurrency(depositDue)}</span></div>
+                    </div>
                     <Button
                       onClick={handlePayDeposit}
                       disabled={paymentLinkLoading || (quoteData.quoteMode === "options" && !selectedOption)}
@@ -1026,12 +1089,14 @@ export default function PublicQuoteView() {
                         </>
                       ) : (
                         <>
-                          <CreditCard className="mr-2 h-5 w-5" />
-                          Pay {depositPercentage}% Deposit Now
+                          {paymentMethod === "ach" ? <Landmark className="mr-2 h-5 w-5" /> : <CreditCard className="mr-2 h-5 w-5" />}
+                          Pay {formatCurrency(depositDue)} Deposit Now
                         </>
                       )}
                     </Button>
-                    <p className="text-xs text-amber-600 mt-2">Secure payment powered by Stripe</p>
+                    <p className="text-xs text-amber-600 mt-2">
+                      {paymentMethod === "ach" ? "Pay directly from your bank account" : "Secure payment powered by Stripe"} · {depositPercentage}% deposit
+                    </p>
                     
                     {financingData?.financingLink && (
                       <>
