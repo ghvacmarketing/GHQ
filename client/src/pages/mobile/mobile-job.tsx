@@ -900,9 +900,9 @@ export default function MobileJob() {
                     selected={selectedDate}
                     onSelect={(date) => {
                       setSelectedDate(date);
-                      // Wheels always show a value, so seed a sensible default window.
+                      // Wheels always show a value, so seed a default 1-hour window.
                       setSelectedStartTime((t) => t || "09:00");
-                      setSelectedEndTime((t) => t || "11:00");
+                      setSelectedEndTime((t) => t || "10:00");
                       if (date) setDateOpen(false); // picking a date closes the calendar
                     }}
                     disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
@@ -921,10 +921,10 @@ export default function MobileJob() {
                       stepMinutes={stepMinutes}
                       onChange={(v) => {
                         setSelectedStartTime(v);
-                        // Keep the window valid: push the end past the new start.
-                        if (!selectedEndTime || selectedEndTime <= v) {
-                          setSelectedEndTime(addMinutesTo(v, 120));
-                        }
+                        // Default the end to 1 hour after the start. 60 min is a
+                        // clean multiple of both 15- and 30-min boards, so it
+                        // always lands on a valid slot.
+                        setSelectedEndTime(addMinutesTo(v, 60));
                       }}
                       testId="wheel-start-time"
                     />
