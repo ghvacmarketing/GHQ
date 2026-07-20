@@ -30190,6 +30190,16 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       }
     });
 
+    // Debug: raw + parsed state for every mapped device (diagnose models that
+    // aren't reading, e.g. H5111). Open in a browser while signed in.
+    app.get("/api/crm/govee/debug", requireCrmAuth, async (_req, res) => {
+      try {
+        res.json({ configured: goveeService.isConfigured(), devices: await goveeService.debugAll() });
+      } catch (e) {
+        res.status(500).json({ message: (e as Error).message });
+      }
+    });
+
     app.get("/api/crm/sensors", requireCrmAuth, async (_req, res) => {
       try {
         res.json({ sensors: await loadEnrichedSensors() });

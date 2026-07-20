@@ -90,6 +90,41 @@ class GoveeService {
     return parsed;
   }
 
+  /** Raw device/state response for one device (debugging unrecognized models). */
+  async getRawDeviceState(sku: string, device: string): Promise<any> {
+    return this.request(GOVEE_STATE_PATH, "POST", {
+      requestId: randomUUID(),
+      payload: { sku, device },
+    });
+  }
+
+  /** Debug helper: raw + parsed state for every device, to map new models. */
+  async debugAll(): Promise<any[]> {
+    const sensors = await db.select().from(goveeSensors);
+    const out: any[] = [];
+    for (const s of sensors) {
+      try {
+        const raw = await this.getRawDeviceState(s.sku, s.device);
+        out.push({
+          label: s.label,
+          deviceName: s.deviceName,
+          sku: s.sku,
+          device: s.device,
+          isActive: s.isActive,
+          parsed: parseGoveeState(raw?.payload?.capabilities),
+          capabilities: (raw?.payload?.capabilities ?? []).map((c: any) => ({
+            type: c?.type,
+            instance: c?.instance,
+            value: c?.state?.value,
+          })),
+        });
+      } catch (e) {
+        out.push({ label: s.label, sku: s.sku, device: s.device, isActive: s.isActive, error: (e as Error).message });
+      }
+    }
+    return out;
+  }
+
   /** Discover devices and upsert into govee_sensors WITHOUT clobbering mapping/labels. */
   async syncDevices(): Promise<{ created: number; total: number }> {
     const devices = await this.listDevices();
