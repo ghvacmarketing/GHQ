@@ -181,57 +181,49 @@ function SignaturePad({ onSignatureChange }: { onSignatureChange: (dataUrl: stri
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
+  const hasSigRef = useRef(false);
+
+  // Convert a pointer event to canvas-space coordinates. The backing store is
+  // sized to the displayed size (× device pixel ratio), so we scale the CSS
+  // offset by the ratio of backing pixels to displayed pixels — this keeps the
+  // ink exactly under the cursor/finger regardless of how the canvas is sized.
+  const getPos = (e: React.MouseEvent | React.TouchEvent) => {
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    const p = "touches" in e ? e.touches[0] : e;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return { x: (p.clientX - rect.left) * scaleX, y: (p.clientY - rect.top) * scaleY };
+  };
+
+  const lineWidth = () => 2 * (typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1);
 
   const startDrawing = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    if ("touches" in e) e.preventDefault();
     setIsDrawing(true);
-    const rect = canvas.getBoundingClientRect();
-    let clientX: number, clientY: number;
-
-    if ("touches" in e) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
-
+    const { x, y } = getPos(e);
     ctx.beginPath();
-    ctx.moveTo(clientX - rect.left, clientY - rect.top);
+    ctx.moveTo(x, y);
   }, []);
 
   const draw = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing) return;
     const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const rect = canvas.getBoundingClientRect();
-    let clientX: number, clientY: number;
-
-    if ("touches" in e) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-      e.preventDefault();
-    } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
-
-    ctx.lineTo(clientX - rect.left, clientY - rect.top);
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    if ("touches" in e) e.preventDefault();
+    const { x, y } = getPos(e);
+    ctx.lineTo(x, y);
     ctx.strokeStyle = "#000";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = lineWidth();
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.stroke();
     setHasSignature(true);
+    hasSigRef.current = true;
   }, [isDrawing]);
 
   const stopDrawing = useCallback(() => {
@@ -244,25 +236,43 @@ function SignaturePad({ onSignatureChange }: { onSignatureChange: (dataUrl: stri
 
   const clearSignature = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     setHasSignature(false);
+    hasSigRef.current = false;
     onSignatureChange("");
   };
 
+  // Size the canvas backing store to its displayed size (DPR-aware) so drawing
+  // stays aligned and crisp. Re-fits on resize, preserving any existing ink.
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    const fit = () => {
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const dpr = window.devicePixelRatio || 1;
+      const w = Math.round(rect.width * dpr);
+      const h = Math.round(rect.height * dpr);
+      if (canvas.width === w && canvas.height === h) return;
+      const prev = hasSigRef.current ? canvas.toDataURL("image/png") : null;
+      canvas.width = w;
+      canvas.height = h;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, w, h);
+      if (prev) {
+        const img = new Image();
+        img.onload = () => ctx.drawImage(img, 0, 0, w, h);
+        img.src = prev;
+      }
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(canvas);
+    return () => ro.disconnect();
   }, []);
 
   return (
