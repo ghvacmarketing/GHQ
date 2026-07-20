@@ -2212,6 +2212,28 @@ export const insertChecklistQuestionSchema = createInsertSchema(checklistQuestio
 export type InsertChecklistQuestion = z.infer<typeof insertChecklistQuestionSchema>;
 export type ChecklistQuestion = typeof checklistQuestions.$inferSelect;
 
+// Checklist Photo Steps — required image captures for a checklist. Each photo
+// step can be linked to a specific question ("check capacitor" → capacitor
+// photo) which the builder renders as an arrow in the flow canvas.
+export const checklistPhotoSteps = pgTable("checklist_photo_steps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  checklistId: varchar("checklist_id").notNull().references(() => serviceCallChecklists.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  instructions: text("instructions"),
+  isRequired: boolean("is_required").notNull().default(true),
+  linkedQuestionId: varchar("linked_question_id").references(() => checklistQuestions.id, { onDelete: "set null" }),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertChecklistPhotoStepSchema = createInsertSchema(checklistPhotoSteps).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertChecklistPhotoStep = z.infer<typeof insertChecklistPhotoStepSchema>;
+export type ChecklistPhotoStep = typeof checklistPhotoSteps.$inferSelect;
+
 // Work Order Checklist Responses (completed checklists linked to work orders)
 export const workOrderChecklistResponses = pgTable("work_order_checklist_responses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

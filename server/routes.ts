@@ -48,7 +48,7 @@ function effectiveVisitFrequency(record: {
 }
 
 import { storage } from "./storage";
-import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, crmNotifications, crmComments, crmCommentMentions, insertCrmNotificationSchema, insertCrmCommentSchema, insertCrmCommentMentionSchema, type CrmNotification, type InsertCrmNotification, type CrmComment, type InsertCrmComment, type CrmCommentMention, type InsertCrmCommentMention, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry, crmLeads, crmLeadTypes, insertCrmLeadSchema, insertCrmLeadTypeSchema, type CrmLead, type CrmLeadType, type InsertCrmLead, type InsertCrmLeadType, crmLeadTempOptions, crmLeadDriverOptions, insertCrmLeadTempOptionSchema, insertCrmLeadDriverOptionSchema, type CrmLeadTempOption, type CrmLeadDriverOption, type InsertCrmLeadTempOption, type InsertCrmLeadDriverOption, tasks, taskTypes, taskActivity, insertTaskSchema, insertTaskTypeSchema, insertTaskActivitySchema, type Task, type TaskType, type TaskActivity, type InsertTask, type InsertTaskType, type InsertTaskActivity, crmTaggedComments, crmTaggedCommentRecipients, salesbookBookmarks, insertSalesbookBookmarkSchema, customerFiles, insertCustomerFileSchema, type CustomerFile, rebateCases, insertRebateCaseSchema, type RebateCase, type InsertRebateCase, insertRebateCaseDocumentSchema, insertRebateCaseScopeChecklistSchema, rebateProgramTypeEnum, rebateApplicationStatusEnum, rebateWorkflowStepStatusEnum, rebateDocumentCategoryEnum } from "@shared/schema";
+import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, crmNotifications, crmComments, crmCommentMentions, insertCrmNotificationSchema, insertCrmCommentSchema, insertCrmCommentMentionSchema, type CrmNotification, type InsertCrmNotification, type CrmComment, type InsertCrmComment, type CrmCommentMention, type InsertCrmCommentMention, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, checklistPhotoSteps, insertChecklistPhotoStepSchema, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry, crmLeads, crmLeadTypes, insertCrmLeadSchema, insertCrmLeadTypeSchema, type CrmLead, type CrmLeadType, type InsertCrmLead, type InsertCrmLeadType, crmLeadTempOptions, crmLeadDriverOptions, insertCrmLeadTempOptionSchema, insertCrmLeadDriverOptionSchema, type CrmLeadTempOption, type CrmLeadDriverOption, type InsertCrmLeadTempOption, type InsertCrmLeadDriverOption, tasks, taskTypes, taskActivity, insertTaskSchema, insertTaskTypeSchema, insertTaskActivitySchema, type Task, type TaskType, type TaskActivity, type InsertTask, type InsertTaskType, type InsertTaskActivity, crmTaggedComments, crmTaggedCommentRecipients, salesbookBookmarks, insertSalesbookBookmarkSchema, customerFiles, insertCustomerFileSchema, type CustomerFile, rebateCases, insertRebateCaseSchema, type RebateCase, type InsertRebateCase, insertRebateCaseDocumentSchema, insertRebateCaseScopeChecklistSchema, rebateProgramTypeEnum, rebateApplicationStatusEnum, rebateWorkflowStepStatusEnum, rebateDocumentCategoryEnum } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { goveeSensors, goveeSensorReadings, goveeSensorAlerts, type GoveeSensor } from "@shared/schema";
 import { automationCampaigns, insertAutomationCampaignSchema } from "@shared/schema";
@@ -21181,18 +21181,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/crm/checklists", requireCrmAuth, async (req, res) => {
     try {
       const checklists = await db.select().from(serviceCallChecklists).orderBy(asc(serviceCallChecklists.serviceType), asc(serviceCallChecklists.name));
-      
-      const checklistsWithQuestions = await Promise.all(
-        checklists.map(async (checklist) => {
-          const questions = await db.select()
-            .from(checklistQuestions)
-            .where(eq(checklistQuestions.checklistId, checklist.id))
-            .orderBy(asc(checklistQuestions.sortOrder));
-          return { ...checklist, questions };
-        })
-      );
-      
-      res.json(checklistsWithQuestions);
+
+      // Batched: all questions + photo steps in two queries, grouped in memory
+      const [allQuestions, allPhotoSteps] = await Promise.all([
+        db.select().from(checklistQuestions).orderBy(asc(checklistQuestions.sortOrder)),
+        db.select().from(checklistPhotoSteps).orderBy(asc(checklistPhotoSteps.sortOrder)),
+      ]);
+      const questionsByChecklist = new Map<string, typeof allQuestions>();
+      for (const q of allQuestions) {
+        const arr = questionsByChecklist.get(q.checklistId) ?? [];
+        arr.push(q);
+        questionsByChecklist.set(q.checklistId, arr);
+      }
+      const photoStepsByChecklist = new Map<string, typeof allPhotoSteps>();
+      for (const ps of allPhotoSteps) {
+        const arr = photoStepsByChecklist.get(ps.checklistId) ?? [];
+        arr.push(ps);
+        photoStepsByChecklist.set(ps.checklistId, arr);
+      }
+
+      res.json(checklists.map((checklist) => ({
+        ...checklist,
+        questions: questionsByChecklist.get(checklist.id) ?? [],
+        photoSteps: photoStepsByChecklist.get(checklist.id) ?? [],
+      })));
     } catch (error) {
       console.error("Error fetching checklists:", error);
       res.status(500).json({ message: "Failed to fetch checklists" });
@@ -21220,12 +21232,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Checklist not found for this service type" });
       }
       
-      const questions = await db.select()
-        .from(checklistQuestions)
-        .where(eq(checklistQuestions.checklistId, checklist.id))
-        .orderBy(asc(checklistQuestions.sortOrder));
-      
-      res.json({ ...checklist, questions });
+      const [questions, photoSteps] = await Promise.all([
+        db.select()
+          .from(checklistQuestions)
+          .where(eq(checklistQuestions.checklistId, checklist.id))
+          .orderBy(asc(checklistQuestions.sortOrder)),
+        db.select()
+          .from(checklistPhotoSteps)
+          .where(eq(checklistPhotoSteps.checklistId, checklist.id))
+          .orderBy(asc(checklistPhotoSteps.sortOrder)),
+      ]);
+
+      res.json({ ...checklist, questions, photoSteps });
     } catch (error) {
       console.error("Error fetching checklist by service type:", error);
       res.status(500).json({ message: "Failed to fetch checklist" });
@@ -21390,6 +21408,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting question:", error);
       res.status(500).json({ message: "Failed to delete question" });
+    }
+  });
+
+  // POST /api/crm/checklists/:checklistId/photo-steps - Add a required-photo step
+  app.post("/api/crm/checklists/:checklistId/photo-steps", requireCrmAuth, async (req, res) => {
+    try {
+      const { checklistId } = req.params;
+      const [checklist] = await db.select().from(serviceCallChecklists).where(eq(serviceCallChecklists.id, checklistId)).limit(1);
+      if (!checklist) {
+        return res.status(404).json({ message: "Checklist not found" });
+      }
+
+      const parsed = insertChecklistPhotoStepSchema.safeParse({ ...req.body, checklistId });
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid photo step data", errors: parsed.error.errors });
+      }
+
+      const [created] = await db.insert(checklistPhotoSteps).values(parsed.data).returning();
+      res.status(201).json(created);
+    } catch (error) {
+      console.error("Error creating photo step:", error);
+      res.status(500).json({ message: "Failed to create photo step" });
+    }
+  });
+
+  // PUT /api/crm/checklists/photo-steps/:photoStepId - Update a photo step
+  // (also how the builder links/unlinks a photo step to a question)
+  app.put("/api/crm/checklists/photo-steps/:photoStepId", requireCrmAuth, async (req, res) => {
+    try {
+      const { photoStepId } = req.params;
+      const [existing] = await db.select().from(checklistPhotoSteps).where(eq(checklistPhotoSteps.id, photoStepId)).limit(1);
+      if (!existing) {
+        return res.status(404).json({ message: "Photo step not found" });
+      }
+
+      const updateSchema = insertChecklistPhotoStepSchema.partial().omit({ checklistId: true });
+      const parsed = updateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid photo step data", errors: parsed.error.errors });
+      }
+
+      // A link must point at a question on the same checklist
+      if (parsed.data.linkedQuestionId) {
+        const [q] = await db.select().from(checklistQuestions).where(eq(checklistQuestions.id, parsed.data.linkedQuestionId)).limit(1);
+        if (!q || q.checklistId !== existing.checklistId) {
+          return res.status(400).json({ message: "Linked question must belong to the same checklist" });
+        }
+      }
+
+      const [updated] = await db.update(checklistPhotoSteps)
+        .set(parsed.data)
+        .where(eq(checklistPhotoSteps.id, photoStepId))
+        .returning();
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating photo step:", error);
+      res.status(500).json({ message: "Failed to update photo step" });
+    }
+  });
+
+  // DELETE /api/crm/checklists/photo-steps/:photoStepId - Delete a photo step
+  app.delete("/api/crm/checklists/photo-steps/:photoStepId", requireCrmAuth, async (req, res) => {
+    try {
+      const { photoStepId } = req.params;
+      const [existing] = await db.select().from(checklistPhotoSteps).where(eq(checklistPhotoSteps.id, photoStepId)).limit(1);
+      if (!existing) {
+        return res.status(404).json({ message: "Photo step not found" });
+      }
+      await db.delete(checklistPhotoSteps).where(eq(checklistPhotoSteps.id, photoStepId));
+      res.json({ message: "Photo step deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting photo step:", error);
+      res.status(500).json({ message: "Failed to delete photo step" });
     }
   });
 

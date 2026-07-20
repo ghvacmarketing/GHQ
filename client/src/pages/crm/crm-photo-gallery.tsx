@@ -344,7 +344,7 @@ export default function CrmPhotoGallery() {
         ) : view === "list" ? (
           <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-sm" data-testid="photo-feed-list">
             {filtered.map((p) => (
-              <div key={p.id} className="flex items-center gap-3 p-2.5" data-testid={`feed-row-${p.id}`}>
+              <div key={p.id} className="group flex items-center gap-3 p-2.5" data-testid={`feed-row-${p.id}`}>
                 <button onClick={() => setLightbox(p)} className="shrink-0 overflow-hidden rounded-lg">
                   <img src={p.url} alt={p.name} loading="lazy" className="h-14 w-14 object-cover" />
                 </button>
@@ -377,7 +377,7 @@ export default function CrmPhotoGallery() {
                     )}
                   </p>
                 </div>
-                <div className="flex shrink-0 gap-1">{photoActions(p)}</div>
+                <div className="flex shrink-0 gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">{photoActions(p)}</div>
               </div>
             ))}
           </div>
@@ -396,21 +396,22 @@ export default function CrmPhotoGallery() {
                 <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
                   {photoActions(p)}
                 </div>
-                {size !== SMALLEST && (
-                  <div className="space-y-0.5 p-2.5">
-                    <p className="truncate text-xs font-semibold text-foreground" title={p.name}>{p.name}</p>
-                    {p.customerName && (
-                      <Link href={`/crm/customers/${p.customerId}`} className="block truncate text-xs text-[#711419] hover:underline">
-                        {p.customerName}
-                      </Link>
-                    )}
-                    <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground">
-                      <User className="h-3 w-3 shrink-0" />
-                      {p.uploadedByName || "Unknown"}
-                      {p.createdAt && <> · {format(new Date(p.createdAt), "MMM d, h:mm a")}</>}
-                    </p>
-                  </div>
-                )}
+                <div className={size === SMALLEST ? "space-y-0.5 p-1.5" : "space-y-0.5 p-2.5"}>
+                  <p className={`truncate font-semibold text-foreground ${size === SMALLEST ? "text-[10px]" : "text-xs"}`} title={p.name}>{p.name}</p>
+                  {p.customerName && (
+                    <Link
+                      href={`/crm/customers/${p.customerId}`}
+                      className={`block truncate text-[#711419] hover:underline ${size === SMALLEST ? "text-[10px]" : "text-xs"}`}
+                    >
+                      {p.customerName}
+                    </Link>
+                  )}
+                  <p className={`flex items-center gap-1 truncate text-muted-foreground ${size === SMALLEST ? "text-[9px]" : "text-[11px]"}`}>
+                    <User className="h-3 w-3 shrink-0" />
+                    {p.uploadedByName || "Unknown"}
+                    {p.createdAt && <> · {format(new Date(p.createdAt), "MMM d, h:mm a")}</>}
+                  </p>
+                </div>
               </div>
             ))}
           </div>

@@ -214,6 +214,27 @@ async function runInstallPlannerMigrations() {
   }
 }
 
+async function runChecklistPhotoStepsMigration() {
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS checklist_photo_steps (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        checklist_id varchar NOT NULL REFERENCES service_call_checklists(id) ON DELETE CASCADE,
+        label text NOT NULL,
+        instructions text,
+        is_required boolean NOT NULL DEFAULT true,
+        linked_question_id varchar REFERENCES checklist_questions(id) ON DELETE SET NULL,
+        sort_order integer NOT NULL DEFAULT 0,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+  } catch (err) {
+    console.error("Checklist photo steps migration error (non-fatal):", err);
+  }
+}
+
 async function runSalesbookMigrations() {
   try {
     const { db } = await import("./db");
@@ -502,6 +523,7 @@ async function runWaterHeaterSeeds() {
 (async () => {
   await runTaggedCommentMigrations();
   await runInstallPlannerMigrations();
+  await runChecklistPhotoStepsMigration();
   await runSalesbookMigrations();
   await runProposalTemplateMigrations();
   await runAgreementVisitFrequencyMigration();
