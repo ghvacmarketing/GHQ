@@ -81,6 +81,7 @@ type ChecklistQuestion = {
   options: string[] | null;
   isRequired: boolean;
   helpText?: string | null;
+  section?: string | null;
 };
 
 type AssignedChecklistTemplate = {
@@ -682,6 +683,22 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
   const setAnswer = (id: string, value: string | number) =>
     setAnswers((prev) => ({ ...prev, [id]: value }));
 
+  // Group questions into their builder-defined sections (phases)
+  const groupedQuestions = (() => {
+    const groups: Array<{ name: string | null; qs: AssignedChecklistTemplate["questions"] }> = [];
+    const gIdx = new Map<string, number>();
+    for (const q of template.questions) {
+      const name = q.section?.trim() || null;
+      const key = name ?? "__none__";
+      if (!gIdx.has(key)) {
+        gIdx.set(key, groups.length);
+        groups.push({ name, qs: [] });
+      }
+      groups[gIdx.get(key)!].qs.push(q);
+    }
+    return groups.flatMap((g) => g.qs.map((q, i) => ({ q, header: i === 0 ? g.name : null })));
+  })();
+
   return (
     <div className="space-y-4">
       <Card className="border-amber-200 bg-amber-50/30" data-testid="card-checklist-fill">
@@ -696,10 +713,14 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
           {template.description && <p className="text-sm text-amber-700 mt-1">{template.description}</p>}
         </CardHeader>
         <CardContent className="pt-4 space-y-3">
-          {template.questions.map((q) => {
+          {groupedQuestions.map(({ q, header }) => {
             const value = answers[q.id];
             return (
-              <div key={q.id} className="rounded-xl border border-amber-200 bg-white p-3.5" data-testid={`fill-question-${q.id}`}>
+              <div key={q.id}>
+                {header && (
+                  <p className="pb-1.5 pt-1 text-[11px] font-bold uppercase tracking-wider text-amber-700/80">{header}</p>
+                )}
+              <div className="rounded-xl border border-amber-200 bg-white p-3.5" data-testid={`fill-question-${q.id}`}>
                 <p className="text-sm font-medium text-slate-800">
                   {q.question}
                   {q.isRequired && <span className="ml-1 text-red-500">*</span>}
@@ -783,6 +804,7 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
                     </div>
                   )}
                 </div>
+              </div>
               </div>
             );
           })}

@@ -2197,6 +2197,8 @@ export type ServiceCallChecklist = typeof serviceCallChecklists.$inferSelect;
 export const checklistQuestions = pgTable("checklist_questions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   checklistId: varchar("checklist_id").notNull().references(() => serviceCallChecklists.id, { onDelete: "cascade" }),
+  // Steps sharing a section name group into a collapsible phase on the canvas
+  section: text("section"),
   question: text("question").notNull(),
   questionType: text("question_type").$type<ChecklistQuestionType>().notNull().default("text"),
   options: json("options").$type<string[]>(),

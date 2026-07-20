@@ -138,7 +138,9 @@ export default function CrmChecklists() {
     isRequired: false,
     options: "",
     helpText: "",
+    section: "",
   });
+  const [renameSec, setRenameSec] = useState<{ old: string; name: string } | null>(null);
 
   // Start-flow dialog (type -> subtype -> checklist, asked when starting a flow)
   const [startOpen, setStartOpen] = useState(false);
@@ -159,7 +161,8 @@ export default function CrmChecklists() {
   const [flowPos, setFlowPos] = useState<XY>(DEFAULT_FLOW);
   const [photoPos, setPhotoPos] = useState<Record<string, XY>>({});
   const [localOrder, setLocalOrder] = useState<string[] | null>(null);
-  const [reorder, setReorder] = useState<{ id: string; ghostY: number; gap: number; h: number } | null>(null);
+  const [reorder, setReorder] = useState<{ id: string; ghostY: number; gap: number; h: number; sectionKey: string | null } | null>(null);
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const [dragLink, setDragLink] = useState<{ stepId: string; from: XY; to: XY } | null>(null);
   const [hoverPhotoId, setHoverPhotoId] = useState<string | null>(null);
 
@@ -169,6 +172,8 @@ export default function CrmChecklists() {
   const stepRefs = useRef(new Map<string, HTMLDivElement>());
   const photoRefs = useRef(new Map<string, HTMLDivElement>());
   const stepGeom = useRef(new Map<string, { top: number; h: number }>());
+  const sectionHeaderRefs = useRef(new Map<string, HTMLDivElement>());
+  const sectionGeom = useRef(new Map<string, { top: number; h: number }>());
   const photoGeom = useRef(new Map<string, { w: number; h: number }>());
   const dragRef = useRef<DragState | null>(null);
   const flowPosRef = useRef(flowPos);
@@ -233,11 +238,30 @@ export default function CrmChecklists() {
     () => (checklist?.photoSteps ? [...checklist.photoSteps].sort((a, b) => a.sortOrder - b.sortOrder) : []),
     [checklist],
   );
+  // Steps grouped into sections (phases) by their section label, groups in
+  // first-occurrence order, steps within a group in sort order.
+  const sections = useMemo(() => {
+    const out: Array<{ key: string; name: string | null; steps: ChecklistQuestion[] }> = [];
+    const idx = new Map<string, number>();
+    for (const q of orderedSteps) {
+      const name = q.section?.trim() || null;
+      const key = name ?? "__ungrouped__";
+      if (!idx.has(key)) {
+        idx.set(key, out.length);
+        out.push({ key, name, steps: [] });
+      }
+      out[idx.get(key)!].steps.push(q);
+    }
+    return out;
+  }, [orderedSteps]);
+  const sectionNames = useMemo(() => sections.filter((x) => x.name).map((x) => x.name!), [sections]);
+  const displaySteps = useMemo(() => sections.flatMap((x) => x.steps), [sections]);
+  const stepById = useMemo(() => new Map(orderedSteps.map((q) => [q.id, q])), [orderedSteps]);
   const stepNumberById = useMemo(() => {
     const m = new Map<string, number>();
-    orderedSteps.forEach((s, i) => m.set(s.id, i + 1));
+    displaySteps.forEach((s, i) => m.set(s.id, i + 1));
     return m;
-  }, [orderedSteps]);
+  }, [displaySteps]);
 
   // Auto-select the first checklist when the type/subtype combo changes
   useEffect(() => {
@@ -265,20 +289,22 @@ export default function CrmChecklists() {
         setFlowPos(layout.flow ?? DEFAULT_FLOW);
         setPhotoPos(layout.photos ?? {});
         setZoom(layout.zoom ?? 1);
+        setCollapsedSections(layout.collapsedSections ?? {});
         return;
       }
     } catch {}
     setFlowPos(DEFAULT_FLOW);
     setPhotoPos({});
+    setCollapsedSections({});
   }, [checklistId]);
 
   // Persist layout
   useEffect(() => {
     if (!checklistId) return;
     try {
-      localStorage.setItem(`checklist-canvas:${checklistId}`, JSON.stringify({ flow: flowPos, photos: photoPos, zoom }));
+      localStorage.setItem(`checklist-canvas:${checklistId}`, JSON.stringify({ flow: flowPos, photos: photoPos, zoom, collapsedSections }));
     } catch {}
-  }, [flowPos, photoPos, zoom, checklistId]);
+  }, [flowPos, photoPos, zoom, collapsedSections, checklistId]);
 
   // Give new photo steps a default spot to the right of the flow
   useEffect(() => {
@@ -348,12 +374,17 @@ export default function CrmChecklists() {
       const r = el.getBoundingClientRect();
       stepGeom.current.set(id, { top: (r.top - fRect.top) / z, h: r.height / z });
     }
+    sectionGeom.current.clear();
+    for (const [name, el] of Array.from(sectionHeaderRefs.current.entries())) {
+      const r = el.getBoundingClientRect();
+      sectionGeom.current.set(name, { top: (r.top - fRect.top) / z, h: r.height / z });
+    }
     photoGeom.current.clear();
     for (const [id, el] of Array.from(photoRefs.current.entries())) {
       photoGeom.current.set(id, { w: el.offsetWidth, h: el.offsetHeight });
     }
     setArrowTick((t) => t + 1);
-  }, [orderedSteps, photoSteps, checklist?.id, reorder !== null]);
+  }, [orderedSteps, photoSteps, checklist?.id, reorder !== null, collapsedSections]);
 
   // ----- mutations -----
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["/api/crm/checklists"] });
@@ -415,6 +446,7 @@ export default function CrmChecklists() {
         questionType: stepForm.questionType,
         isRequired: stepForm.isRequired,
         helpText: stepForm.helpText || null,
+        section: stepForm.section.trim() || null,
         options:
           (stepForm.questionType === "select" || stepForm.questionType === "multi_select") && stepForm.options
             ? stepForm.options.split(",").map((o) => o.trim()).filter(Boolean)
@@ -447,6 +479,23 @@ export default function CrmChecklists() {
     mutationFn: async (orderedIds: string[]) =>
       apiRequest("POST", `/api/crm/checklists/${checklistId}/questions/reorder`, { orderedIds }),
     onSuccess: invalidate,
+    onError,
+  });
+
+  const renameSection = useMutation({
+    mutationFn: async () => {
+      if (!renameSec) return;
+      const newName = renameSec.name.trim() || null;
+      const affected = orderedSteps.filter((q) => (q.section?.trim() || null) === renameSec.old);
+      for (const q of affected) {
+        await apiRequest("PUT", `/api/crm/checklists/questions/${q.id}`, { section: newName });
+      }
+    },
+    onSuccess: () => {
+      invalidate();
+      setRenameSec(null);
+      toast({ title: "Section updated" });
+    },
     onError,
   });
 
@@ -587,10 +636,14 @@ export default function CrmChecklists() {
     setDragLink({ stepId, from, to: worldPoint(e) });
   };
 
+  // Reorder happens within the step's own section; moving a step to a
+  // different section is done from its edit dialog.
   const computeGap = (clientY: number, draggedId: string) => {
+    const dKey = stepById.get(draggedId)?.section?.trim() || null;
     const centers: number[] = [];
     for (const q of orderedSteps) {
       if (q.id === draggedId) continue;
+      if ((q.section?.trim() || null) !== dKey) continue;
       const el = stepRefs.current.get(q.id);
       if (!el) continue;
       const r = el.getBoundingClientRect();
@@ -624,7 +677,13 @@ export default function CrmChecklists() {
       case "step-pending": {
         if (Math.hypot(e.clientX - st.sx, e.clientY - st.sy) > DRAG_THRESHOLD) {
           dragRef.current = { kind: "reorder", id: st.id, grabY: st.grabY, h: st.h };
-          setReorder({ id: st.id, ghostY: worldPoint(e).y - st.grabY, gap: computeGap(e.clientY, st.id), h: st.h });
+          setReorder({
+            id: st.id,
+            ghostY: worldPoint(e).y - st.grabY,
+            gap: computeGap(e.clientY, st.id),
+            h: st.h,
+            sectionKey: stepById.get(st.id)?.section?.trim() || null,
+          });
         }
         break;
       }
@@ -667,10 +726,18 @@ export default function CrmChecklists() {
       }
       case "reorder": {
         if (reorder) {
-          const rest = orderedSteps.filter((s) => s.id !== reorder.id).map((s) => s.id);
-          rest.splice(reorder.gap, 0, reorder.id);
-          setLocalOrder(rest);
-          reorderSteps.mutate(rest);
+          const flat: string[] = [];
+          for (const sec of sections) {
+            if ((sec.name ?? null) === reorder.sectionKey) {
+              const rest = sec.steps.filter((q) => q.id !== reorder.id).map((q) => q.id);
+              rest.splice(reorder.gap, 0, reorder.id);
+              flat.push(...rest);
+            } else {
+              flat.push(...sec.steps.map((q) => q.id));
+            }
+          }
+          setLocalOrder(flat);
+          reorderSteps.mutate(flat);
         }
         setReorder(null);
         break;
@@ -756,6 +823,12 @@ export default function CrmChecklists() {
   };
 
   const stepRectOf = (stepId: string): Rect | null => {
+    const secName = stepById.get(stepId)?.section?.trim() || null;
+    if (secName && collapsedSections[secName]) {
+      const sg = sectionGeom.current.get(secName);
+      if (!sg) return null;
+      return { x: flowPos.x, y: flowPos.y + sg.top, w: FLOW_W, h: sg.h };
+    }
     const sg = stepGeom.current.get(stepId);
     if (!sg) return null;
     return { x: flowPos.x, y: flowPos.y + sg.top, w: FLOW_W, h: sg.h };
@@ -774,7 +847,7 @@ export default function CrmChecklists() {
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photoSteps, photoPos, flowPos, arrowTick]);
+  }, [photoSteps, photoPos, flowPos, arrowTick, collapsedSections]);
 
   const worldSize = useMemo(() => {
     let w = WORLD_W_MIN;
@@ -856,9 +929,9 @@ export default function CrmChecklists() {
     setShowEditChecklist(true);
   };
 
-  const openNewStep = () => {
+  const openNewStep = (section = "") => {
     setEditingStep(null);
-    setStepForm({ question: "", questionType: "yes_no", isRequired: false, options: "", helpText: "" });
+    setStepForm({ question: "", questionType: "yes_no", isRequired: false, options: "", helpText: "", section });
     setStepDialogOpen(true);
   };
 
@@ -870,6 +943,7 @@ export default function CrmChecklists() {
       isRequired: q.isRequired,
       options: q.options?.join(", ") || "",
       helpText: q.helpText || "",
+      section: q.section || "",
     });
     setStepDialogOpen(true);
   };
@@ -948,35 +1022,81 @@ export default function CrmChecklists() {
     </div>
   );
 
-  // Chain rendering (with a gap placeholder while reordering)
-  const chainSteps = reorder ? orderedSteps.filter((s) => s.id !== reorder.id) : orderedSteps;
+  // Chain rendering: sections as collapsible phase headers, steps beneath,
+  // with a gap placeholder while reordering (within the dragged section)
+  const gapNode = (key: string) => (
+    <div key={key} className="flex w-full flex-col items-center">
+      <div className="h-6 w-px bg-slate-300" />
+      <div style={{ height: reorder?.h ?? 64 }} className="w-full rounded-lg border-2 border-dashed border-[#711419]/40 bg-[#711419]/5" />
+    </div>
+  );
   const chainItems: React.ReactNode[] = [];
-  chainSteps.forEach((q, i) => {
-    if (reorder && reorder.gap === i) {
+  sections.forEach((sec) => {
+    const isCollapsed = !!sec.name && !!collapsedSections[sec.name];
+    if (sec.name) {
+      const requiredCount = sec.steps.filter((q) => q.isRequired).length;
       chainItems.push(
-        <div key="gap" className="flex w-full flex-col items-center">
+        <div key={`sec-${sec.key}`} className="flex w-full flex-col items-center">
           <div className="h-6 w-px bg-slate-300" />
-          <div style={{ height: reorder.h }} className="w-full rounded-lg border-2 border-dashed border-[#711419]/40 bg-[#711419]/5" />
+          <div
+            ref={(el) => {
+              if (el) sectionHeaderRefs.current.set(sec.name!, el);
+              else sectionHeaderRefs.current.delete(sec.name!);
+            }}
+            className={`group/sec flex w-full items-center gap-1.5 rounded-lg border px-2.5 py-2 transition-colors ${
+              isCollapsed ? "border-slate-300 bg-white shadow-sm" : "border-slate-300 bg-slate-100"
+            }`}
+            data-testid={`section-${sec.key}`}
+          >
+            <button
+              onClick={() => setCollapsedSections((prev) => ({ ...prev, [sec.name!]: !prev[sec.name!] }))}
+              className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+              data-testid={`section-toggle-${sec.key}`}
+            >
+              <ChevronDown
+                className={`h-3.5 w-3.5 shrink-0 text-slate-500 transition-transform ${isCollapsed ? "-rotate-90" : ""}`}
+              />
+              <span className="truncate text-[11px] font-bold uppercase tracking-wide text-slate-600">{sec.name}</span>
+              <span className="shrink-0 text-[11px] text-slate-400">
+                {sec.steps.length} {sec.steps.length === 1 ? "step" : "steps"}
+                {isCollapsed && requiredCount > 0 ? ` · ${requiredCount} req` : ""}
+              </span>
+            </button>
+            <button
+              onClick={() => setRenameSec({ old: sec.name!, name: sec.name! })}
+              className="rounded p-1 text-slate-400 opacity-0 transition-opacity hover:text-slate-700 group-hover/sec:opacity-100"
+              title="Rename section"
+              data-testid={`section-rename-${sec.key}`}
+            >
+              <Pencil className="h-3 w-3" />
+            </button>
+            <button
+              onClick={() => openNewStep(sec.name!)}
+              className="rounded p-1 text-slate-400 opacity-0 transition-opacity hover:text-[#711419] group-hover/sec:opacity-100"
+              title="Add step to this section"
+              data-testid={`section-add-${sec.key}`}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>,
       );
     }
-    const number = reorder ? (i >= reorder.gap ? i + 2 : i + 1) : i + 1;
-    chainItems.push(
-      <div key={q.id} className="flex w-full flex-col items-center">
-        <div className="h-6 w-px bg-slate-300" />
-        {renderStepCard(q, number)}
-      </div>,
-    );
+    if (isCollapsed) return;
+    const inReorder = !!reorder && reorder.sectionKey === (sec.name ?? null);
+    const visible = inReorder ? sec.steps.filter((q) => q.id !== reorder!.id) : sec.steps;
+    visible.forEach((q, i) => {
+      if (inReorder && reorder!.gap === i) chainItems.push(gapNode(`gap-${sec.key}`));
+      chainItems.push(
+        <div key={q.id} className="flex w-full flex-col items-center">
+          <div className="h-6 w-px bg-slate-300" />
+          {renderStepCard(q, stepNumberById.get(q.id) ?? 0)}
+        </div>,
+      );
+    });
+    if (inReorder && reorder!.gap >= visible.length) chainItems.push(gapNode(`gap-end-${sec.key}`));
   });
-  if (reorder && reorder.gap >= chainSteps.length) {
-    chainItems.push(
-      <div key="gap" className="flex w-full flex-col items-center">
-        <div className="h-6 w-px bg-slate-300" />
-        <div style={{ height: reorder.h }} className="w-full rounded-lg border-2 border-dashed border-[#711419]/40 bg-[#711419]/5" />
-      </div>,
-    );
-  }
-  const draggedStep = reorder ? orderedSteps.find((s) => s.id === reorder.id) : null;
+  const draggedStep = reorder ? orderedSteps.find((q) => q.id === reorder.id) : null;
 
   return (
     <CrmLayout currentUser={currentUser} disableScroll flush>
@@ -1184,7 +1304,7 @@ export default function CrmChecklists() {
 
                     <div className="h-6 w-px bg-slate-300" />
                     <button
-                      onClick={openNewStep}
+                      onClick={() => openNewStep()}
                       className="flex w-full items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-slate-300 bg-white/60 py-2.5 text-[13px] font-medium text-slate-500 transition-colors hover:border-[#711419] hover:text-[#711419]"
                       data-testid="button-add-step"
                     >
@@ -1198,7 +1318,7 @@ export default function CrmChecklists() {
                       className="pointer-events-none absolute z-30"
                       style={{ left: flowPos.x, top: reorder.ghostY, width: FLOW_W }}
                     >
-                      {renderStepCard(draggedStep, reorder.gap + 1, true)}
+                      {renderStepCard(draggedStep, stepNumberById.get(draggedStep.id) ?? 0, true)}
                     </div>
                   )}
 
@@ -1588,6 +1708,24 @@ export default function CrmChecklists() {
                 data-testid="input-question-help-text"
               />
             </div>
+            <div className="space-y-2">
+              <Label>Section (optional)</Label>
+              <Input
+                list="checklist-section-names"
+                placeholder="e.g., Diagnostics"
+                value={stepForm.section}
+                onChange={(e) => setStepForm({ ...stepForm, section: e.target.value })}
+                data-testid="input-question-section"
+              />
+              <datalist id="checklist-section-names">
+                {sectionNames.map((n) => (
+                  <option key={n} value={n} />
+                ))}
+              </datalist>
+              <p className="text-xs text-muted-foreground">
+                Steps with the same section group into a collapsible phase on the canvas and for the tech.
+              </p>
+            </div>
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="step-required"
@@ -1661,6 +1799,37 @@ export default function CrmChecklists() {
             >
               {savePhoto.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editingPhoto ? "Save" : "Add photo step"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename section */}
+      <Dialog open={!!renameSec} onOpenChange={(o) => !o && setRenameSec(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename section</DialogTitle>
+            <DialogDescription>Applies to every step in "{renameSec?.old}".</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label>Section name</Label>
+            <Input
+              value={renameSec?.name ?? ""}
+              onChange={(e) => setRenameSec((prev) => (prev ? { ...prev, name: e.target.value } : prev))}
+              data-testid="input-rename-section"
+            />
+            <p className="text-xs text-muted-foreground">Leave empty to ungroup these steps.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameSec(null)}>Cancel</Button>
+            <Button
+              onClick={() => renameSection.mutate()}
+              disabled={renameSection.isPending}
+              className="bg-[#711419] hover:bg-[#8a1a1f]"
+              data-testid="button-rename-section"
+            >
+              {renameSection.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>
