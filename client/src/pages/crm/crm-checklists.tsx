@@ -1485,7 +1485,15 @@ export default function CrmChecklists() {
               <div
                 ref={viewportRef}
                 className="relative h-full w-full overflow-hidden overscroll-contain bg-slate-50"
-                style={{ cursor: panning ? "grabbing" : spaceHeld ? "grab" : undefined }}
+                style={{
+                  cursor: panning ? "grabbing" : spaceHeld ? "grab" : undefined,
+                  // Dot grid lives on the viewport so it fills the whole canvas
+                  // at any pan/zoom; it scrolls + scales with the content.
+                  backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
+                  backgroundSize: `${22 * zoom}px ${22 * zoom}px`,
+                  backgroundPosition: `${pan.x}px ${pan.y}px`,
+                  transition: panning ? "none" : "background-position 0.18s ease-out, background-size 0.18s ease-out",
+                }}
                 onPointerDown={onCanvasPointerDown}
                 onPointerMove={onCanvasPointerMove}
                 onPointerUp={onCanvasPointerUp}
@@ -1501,8 +1509,6 @@ export default function CrmChecklists() {
                     transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                     transformOrigin: "0 0",
                     transition: panning ? "none" : "transform 0.18s ease-out",
-                    backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
-                    backgroundSize: "22px 22px",
                   }}
                 >
                   {/* Arrows (step → photo) */}
