@@ -52,6 +52,9 @@ import {
   ZoomIn,
   ZoomOut,
   Crosshair,
+  Layers,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
@@ -111,6 +114,8 @@ type DragState =
   | { kind: "photo"; id: string; ox: number; oy: number }
   | { kind: "step-pending"; id: string; sx: number; sy: number; grabY: number; h: number }
   | { kind: "reorder"; id: string; grabY: number; h: number }
+  | { kind: "panel-pending"; id: string; sx: number; sy: number }
+  | { kind: "panel"; id: string }
   | { kind: "link"; stepId: string };
 
 export default function CrmChecklists() {
@@ -163,6 +168,12 @@ export default function CrmChecklists() {
   const [localOrder, setLocalOrder] = useState<string[] | null>(null);
   const [reorder, setReorder] = useState<{ id: string; ghostY: number; gap: number; h: number; sectionKey: string | null } | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const [layersOpen, setLayersOpen] = useState(true);
+  const [panelDragId, setPanelDragId] = useState<string | null>(null);
+  const [panelDrop, setPanelDrop] = useState<{ key: string | null; index: number } | null>(null);
+  const [flashStepId, setFlashStepId] = useState<string | null>(null);
+  // Optimistic section moves from the layers panel until the server catches up
+  const [sectionOverrides, setSectionOverrides] = useState<Record<string, string | null>>({});
   const [dragLink, setDragLink] = useState<{ stepId: string; from: XY; to: XY } | null>(null);
   const [hoverPhotoId, setHoverPhotoId] = useState<string | null>(null);
 
@@ -173,6 +184,8 @@ export default function CrmChecklists() {
   const photoRefs = useRef(new Map<string, HTMLDivElement>());
   const stepGeom = useRef(new Map<string, { top: number; h: number }>());
   const sectionHeaderRefs = useRef(new Map<string, HTMLDivElement>());
+  const panelSecRefs = useRef(new Map<string, HTMLDivElement>());
+  const panelStepRefs = useRef(new Map<string, HTMLDivElement>());
   const sectionGeom = useRef(new Map<string, { top: number; h: number }>());
   const photoGeom = useRef(new Map<string, { w: number; h: number }>());
   const dragRef = useRef<DragState | null>(null);
@@ -240,10 +253,17 @@ export default function CrmChecklists() {
   );
   // Steps grouped into sections (phases) by their section label, groups in
   // first-occurrence order, steps within a group in sort order.
+  const effectiveSteps = useMemo(
+    () =>
+      orderedSteps.map((q) =>
+        sectionOverrides[q.id] !== undefined ? ({ ...q, section: sectionOverrides[q.id] } as ChecklistQuestion) : q,
+      ),
+    [orderedSteps, sectionOverrides],
+  );
   const sections = useMemo(() => {
     const out: Array<{ key: string; name: string | null; steps: ChecklistQuestion[] }> = [];
     const idx = new Map<string, number>();
-    for (const q of orderedSteps) {
+    for (const q of effectiveSteps) {
       const name = q.section?.trim() || null;
       const key = name ?? "__ungrouped__";
       if (!idx.has(key)) {
@@ -253,10 +273,10 @@ export default function CrmChecklists() {
       out[idx.get(key)!].steps.push(q);
     }
     return out;
-  }, [orderedSteps]);
+  }, [effectiveSteps]);
   const sectionNames = useMemo(() => sections.filter((x) => x.name).map((x) => x.name!), [sections]);
   const displaySteps = useMemo(() => sections.flatMap((x) => x.steps), [sections]);
-  const stepById = useMemo(() => new Map(orderedSteps.map((q) => [q.id, q])), [orderedSteps]);
+  const stepById = useMemo(() => new Map(effectiveSteps.map((q) => [q.id, q])), [effectiveSteps]);
   const stepNumberById = useMemo(() => {
     const m = new Map<string, number>();
     displaySteps.forEach((s, i) => m.set(s.id, i + 1));
@@ -290,21 +310,24 @@ export default function CrmChecklists() {
         setPhotoPos(layout.photos ?? {});
         setZoom(layout.zoom ?? 1);
         setCollapsedSections(layout.collapsedSections ?? {});
+        if (layout.layersOpen !== undefined) setLayersOpen(!!layout.layersOpen);
+        setSectionOverrides({});
         return;
       }
     } catch {}
     setFlowPos(DEFAULT_FLOW);
     setPhotoPos({});
     setCollapsedSections({});
+    setSectionOverrides({});
   }, [checklistId]);
 
   // Persist layout
   useEffect(() => {
     if (!checklistId) return;
     try {
-      localStorage.setItem(`checklist-canvas:${checklistId}`, JSON.stringify({ flow: flowPos, photos: photoPos, zoom, collapsedSections }));
+      localStorage.setItem(`checklist-canvas:${checklistId}`, JSON.stringify({ flow: flowPos, photos: photoPos, zoom, collapsedSections, layersOpen }));
     } catch {}
-  }, [flowPos, photoPos, zoom, collapsedSections, checklistId]);
+  }, [flowPos, photoPos, zoom, collapsedSections, layersOpen, checklistId]);
 
   // Give new photo steps a default spot to the right of the flow
   useEffect(() => {
@@ -461,6 +484,13 @@ export default function CrmChecklists() {
     onSuccess: () => {
       invalidate();
       setStepDialogOpen(false);
+      if (editingStep) {
+        setSectionOverrides((prev) => {
+          const next = { ...prev };
+          delete next[editingStep.id];
+          return next;
+        });
+      }
       setEditingStep(null);
     },
     onError,
@@ -636,12 +666,97 @@ export default function CrmChecklists() {
     setDragLink({ stepId, from, to: worldPoint(e) });
   };
 
+  const scrollToStep = (id: string) => {
+    const vp = viewportRef.current;
+    const sr = stepRectOf(id);
+    if (!vp || !sr) return;
+    const z = zoomRef.current;
+    vp.scrollTo({
+      left: Math.max(0, (sr.x + sr.w / 2) * z - vp.clientWidth / 2),
+      top: Math.max(0, (sr.y + sr.h / 2) * z - vp.clientHeight / 2),
+      behavior: "smooth",
+    });
+    setFlashStepId(id);
+    window.setTimeout(() => setFlashStepId((cur) => (cur === id ? null : cur)), 1400);
+  };
+
+  const scrollToSection = (name: string) => {
+    const vp = viewportRef.current;
+    const sg = sectionGeom.current.get(name);
+    if (!vp || !sg) return;
+    const z = zoomRef.current;
+    vp.scrollTo({
+      left: Math.max(0, (flowPos.x + FLOW_W / 2) * z - vp.clientWidth / 2),
+      top: Math.max(0, (flowPos.y + sg.top) * z - 120),
+      behavior: "smooth",
+    });
+  };
+
+  const startPanelDrag = (q: ChecklistQuestion, e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    e.preventDefault();
+    dragRef.current = { kind: "panel-pending", id: q.id, sx: e.clientX, sy: e.clientY };
+  };
+
+  // Nearest insertion slot in the layers panel (slots exclude the dragged row)
+  const computePanelDrop = (clientY: number, draggedId: string) => {
+    let best: { key: string | null; index: number } | null = null;
+    let bestDist = Infinity;
+    for (const sec of sections) {
+      const slots: Array<{ index: number; y: number }> = [];
+      const headerEl = panelSecRefs.current.get(sec.key);
+      if (headerEl) slots.push({ index: 0, y: headerEl.getBoundingClientRect().bottom });
+      let vis = 0;
+      for (const q of sec.steps) {
+        if (q.id === draggedId) continue;
+        const el = panelStepRefs.current.get(q.id);
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        if (slots.length === 0 && vis === 0) slots.push({ index: 0, y: r.top });
+        slots.push({ index: vis + 1, y: r.bottom });
+        vis++;
+      }
+      for (const sl of slots) {
+        const d = Math.abs(clientY - sl.y);
+        if (d < bestDist) {
+          bestDist = d;
+          best = { key: sec.name ?? null, index: sl.index };
+        }
+      }
+    }
+    return best;
+  };
+
+  const applyPanelMove = (draggedId: string, targetKey: string | null, targetIndex: number) => {
+    const dragged = stepById.get(draggedId);
+    if (!dragged) return;
+    const curKey = dragged.section?.trim() || null;
+    const secList = sections.map((sec) => ({
+      key: sec.name ?? null,
+      ids: sec.steps.map((q) => q.id).filter((id) => id !== draggedId),
+    }));
+    const to = secList.find((x) => x.key === targetKey);
+    if (!to) return;
+    const idx = Math.max(0, Math.min(targetIndex, to.ids.length));
+    to.ids.splice(idx, 0, draggedId);
+    const flat = secList.flatMap((x) => x.ids);
+    setLocalOrder(flat);
+    if (targetKey !== curKey) {
+      setSectionOverrides((prev) => ({ ...prev, [draggedId]: targetKey }));
+      apiRequest("PUT", `/api/crm/checklists/questions/${draggedId}`, { section: targetKey })
+        .then(() => reorderSteps.mutate(flat))
+        .catch((e: any) => onError(e));
+    } else {
+      reorderSteps.mutate(flat);
+    }
+  };
+
   // Reorder happens within the step's own section; moving a step to a
-  // different section is done from its edit dialog.
+  // different section is done from its edit dialog or the layers panel.
   const computeGap = (clientY: number, draggedId: string) => {
     const dKey = stepById.get(draggedId)?.section?.trim() || null;
     const centers: number[] = [];
-    for (const q of orderedSteps) {
+    for (const q of effectiveSteps) {
       if (q.id === draggedId) continue;
       if ((q.section?.trim() || null) !== dKey) continue;
       const el = stepRefs.current.get(q.id);
@@ -693,6 +808,18 @@ export default function CrmChecklists() {
         );
         break;
       }
+      case "panel-pending": {
+        if (Math.hypot(e.clientX - st.sx, e.clientY - st.sy) > DRAG_THRESHOLD) {
+          dragRef.current = { kind: "panel", id: st.id };
+          setPanelDragId(st.id);
+          setPanelDrop(computePanelDrop(e.clientY, st.id));
+        }
+        break;
+      }
+      case "panel": {
+        setPanelDrop(computePanelDrop(e.clientY, st.id));
+        break;
+      }
       case "link": {
         setDragLink((prev) => (prev ? { ...prev, to: worldPoint(e) } : prev));
         let hover: string | null = null;
@@ -740,6 +867,16 @@ export default function CrmChecklists() {
           reorderSteps.mutate(flat);
         }
         setReorder(null);
+        break;
+      }
+      case "panel-pending": {
+        scrollToStep(st.id);
+        break;
+      }
+      case "panel": {
+        if (panelDrop) applyPanelMove(st.id, panelDrop.key, panelDrop.index);
+        setPanelDragId(null);
+        setPanelDrop(null);
         break;
       }
       case "link": {
@@ -975,7 +1112,9 @@ export default function CrmChecklists() {
       className={`group relative w-full cursor-pointer rounded-lg border bg-white p-3 shadow-sm transition-colors ${
         ghost
           ? "rotate-1 border-[#711419]/50 shadow-xl"
-          : "border-slate-200 hover:border-slate-300"
+          : flashStepId === q.id
+            ? "border-[#711419]/60 ring-2 ring-[#711419]/35"
+            : "border-slate-200 hover:border-slate-300"
       }`}
       style={{ touchAction: "none" }}
       data-testid={ghost ? undefined : `step-node-${q.id}`}
@@ -1215,7 +1354,112 @@ export default function CrmChecklists() {
               </button>
             </div>
           ) : (
-            <>
+            <div className="flex h-full min-h-0">
+              {layersOpen && (
+                <div className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white" data-testid="layers-panel">
+                  <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                      <Layers className="h-3.5 w-3.5 text-[#711419]" /> Layers
+                    </span>
+                    <button
+                      onClick={() => setLayersOpen(false)}
+                      className="rounded p-1 text-slate-400 hover:text-slate-700"
+                      title="Hide layers"
+                      data-testid="layers-collapse"
+                    >
+                      <PanelLeftClose className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="scrollbar-hide flex-1 overflow-y-auto p-2">
+                    {sections.map((sec) => {
+                      const isUngroupedOnly = !sec.name && sections.length === 1;
+                      const secCollapsed = !!sec.name && !!collapsedSections[sec.name];
+                      const rows = panelDragId ? sec.steps.filter((q) => q.id !== panelDragId) : sec.steps;
+                      const dropHere = panelDrop && panelDrop.key === (sec.name ?? null);
+                      const dropLine = <div className="mx-1.5 my-0.5 h-0.5 rounded bg-[#711419]" />;
+                      return (
+                        <div key={sec.key} className="mb-1">
+                          {!isUngroupedOnly && (
+                            <div
+                              ref={(el) => {
+                                if (el) panelSecRefs.current.set(sec.key, el);
+                                else panelSecRefs.current.delete(sec.key);
+                              }}
+                              className="group/lsec flex items-center gap-1 rounded-md px-1.5 py-1.5"
+                              data-testid={`layers-section-${sec.key}`}
+                            >
+                              <button
+                                onClick={() => sec.name && setCollapsedSections((prev) => ({ ...prev, [sec.name!]: !prev[sec.name!] }))}
+                                className="p-0.5 text-slate-400 hover:text-slate-600"
+                                title={secCollapsed ? "Expand" : "Collapse"}
+                              >
+                                <ChevronDown className={`h-3 w-3 transition-transform ${secCollapsed ? "-rotate-90" : ""}`} />
+                              </button>
+                              <button
+                                onClick={() => sec.name && scrollToSection(sec.name)}
+                                className="min-w-0 flex-1 truncate text-left text-[11px] font-bold uppercase tracking-wide text-slate-500 hover:text-slate-800"
+                              >
+                                {sec.name ?? "No section"}
+                              </button>
+                              <span className="text-[10px] text-slate-400">{sec.steps.length}</span>
+                              {sec.name && (
+                                <button
+                                  onClick={() => openNewStep(sec.name!)}
+                                  className="rounded p-0.5 text-slate-400 opacity-0 transition-opacity hover:text-[#711419] group-hover/lsec:opacity-100"
+                                  title="Add step to this section"
+                                  data-testid={`layers-add-${sec.key}`}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          {!secCollapsed &&
+                            rows.map((q, i) => (
+                              <div key={q.id}>
+                                {dropHere && panelDrop!.index === i && dropLine}
+                                <div
+                                  ref={(el) => {
+                                    if (el) panelStepRefs.current.set(q.id, el);
+                                    else panelStepRefs.current.delete(q.id);
+                                  }}
+                                  onPointerDown={(e) => startPanelDrag(q, e)}
+                                  className={`flex cursor-pointer items-center gap-1.5 rounded-md py-1.5 pl-1.5 pr-1 text-[12px] transition-colors hover:bg-slate-50 ${
+                                    panelDragId === q.id ? "opacity-40" : ""
+                                  }`}
+                                  style={{ touchAction: "none" }}
+                                  data-testid={`layers-step-${q.id}`}
+                                >
+                                  <GripVertical className="h-3 w-3 shrink-0 text-slate-300" />
+                                  <span className="w-4 shrink-0 text-center text-[10px] font-bold text-[#711419]">
+                                    {stepNumberById.get(q.id)}
+                                  </span>
+                                  <span className="min-w-0 flex-1 truncate text-slate-700">{q.question}</span>
+                                  {q.isRequired && <span className="shrink-0 text-[#711419]">*</span>}
+                                </div>
+                              </div>
+                            ))}
+                          {!secCollapsed && dropHere && panelDrop!.index >= rows.length && dropLine}
+                          {secCollapsed && dropHere && dropLine}
+                        </div>
+                      );
+                    })}
+                    {orderedSteps.length === 0 && (
+                      <p className="px-2 py-6 text-center text-xs text-muted-foreground">No steps yet</p>
+                    )}
+                  </div>
+                  <div className="border-t border-slate-100 p-2">
+                    <button
+                      onClick={() => openNewStep()}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-300 py-2 text-xs font-medium text-slate-500 transition-colors hover:border-[#711419] hover:text-[#711419]"
+                      data-testid="layers-add-step"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Add step
+                    </button>
+                  </div>
+                </div>
+              )}
+              <div className="relative min-h-0 flex-1">
               <div
                 ref={viewportRef}
                 className="scrollbar-hide h-full w-full overflow-auto overscroll-contain bg-slate-50"
@@ -1429,9 +1673,21 @@ export default function CrmChecklists() {
 
               {/* Floating canvas controls */}
               <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex items-start justify-between px-4">
-                <span className="pointer-events-auto rounded-full bg-white/85 px-3 py-1.5 text-[11px] font-medium text-slate-500 shadow-sm backdrop-blur">
-                  Hold <kbd className="rounded bg-slate-100 px-1 font-semibold">Space</kbd> + drag to pan · click a card to edit · drag a step's ● onto a photo
-                </span>
+                <div className="flex items-center gap-2">
+                  {!layersOpen && (
+                    <button
+                      onClick={() => setLayersOpen(true)}
+                      className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-600 shadow-sm backdrop-blur transition-colors hover:text-slate-900"
+                      title="Show layers"
+                      data-testid="layers-expand"
+                    >
+                      <PanelLeftOpen className="h-4 w-4" />
+                    </button>
+                  )}
+                  <span className="pointer-events-auto rounded-full bg-white/85 px-3 py-1.5 text-[11px] font-medium text-slate-500 shadow-sm backdrop-blur">
+                    Hold <kbd className="rounded bg-slate-100 px-1 font-semibold">Space</kbd> + drag to pan · click a card to edit · drag a step's ● onto a photo
+                  </span>
+                </div>
                 <Button
                   size="sm"
                   onClick={openNewPhoto}
@@ -1441,7 +1697,8 @@ export default function CrmChecklists() {
                   <Camera className="mr-1.5 h-3.5 w-3.5" /> Add photo step
                 </Button>
               </div>
-            </>
+              </div>
+            </div>
           )}
         </div>
       </div>
