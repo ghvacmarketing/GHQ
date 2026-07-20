@@ -22,6 +22,8 @@ import ProposalEditor from "@/components/proposal-editor";
 import redlogo from "@assets/redlogo.webp";
 import { generateContractTemplate, applyTemplateVariables } from "@/lib/contract-template";
 import { protectionDiscountLabel } from "@/lib/protection-discount";
+import { cardFee, achFee, cardFeeLabel, achFeeLabel } from "@shared/payment-fees";
+import { CreditCard, Landmark } from "lucide-react";
 import type { ProposalTemplate, ProposalTemplateImage } from "@shared/schema";
 
 // ─── Types (mirrored from crm-proposal-builder) ──────────────────────────────
@@ -131,6 +133,48 @@ const getAssetUrl = (path: string | undefined | null): string => {
 const formatPrice = (p: number) => "$" + p.toLocaleString();
 const formatPriceRange = (low: number, high: number) =>
   low === high ? "$" + low.toLocaleString() : "$" + low.toLocaleString() + " – $" + high.toLocaleString();
+
+const feeMoney = (n: number) => "$" + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const feeRange = (lo: number, hi: number, fn: (n: number) => number) =>
+  lo === hi ? feeMoney(fn(hi)) : `${feeMoney(fn(lo))} – ${feeMoney(fn(hi))}`;
+
+// Display-only payment-method fee estimate. Shows the customer what card vs ACH
+// would add; financing is shown separately via the monthly figures. Not added
+// to the actual charge.
+function PaymentFeeBreakdown({ low, high, compact = false }: { low: number; high: number; compact?: boolean }) {
+  if (!(high > 0)) return null;
+  if (compact) {
+    return (
+      <p className="mt-0.5 text-[11px] text-muted-foreground">
+        Card +{feeMoney(cardFee(high))} · ACH +{feeMoney(achFee(high))}
+      </p>
+    );
+  }
+  return (
+    <div className="mt-3 rounded-lg border border-border bg-muted/30 p-3">
+      <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Payment options</p>
+      <div className="space-y-1.5 text-sm">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <CreditCard className="h-3.5 w-3.5" /> Credit/debit card
+            <span className="text-[11px] text-muted-foreground/70">({cardFeeLabel()})</span>
+          </span>
+          <span className="font-medium">+{feeRange(low, high, cardFee)}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <Landmark className="h-3.5 w-3.5" /> ACH bank transfer
+            <span className="text-[11px] text-muted-foreground/70">({achFeeLabel()})</span>
+          </span>
+          <span className="font-medium">+{feeRange(low, high, achFee)}</span>
+        </div>
+      </div>
+      <p className="mt-2 text-[11px] text-muted-foreground/80">
+        Processing fees are estimates shown for your reference. Pay by check or bank transfer (ACH) to minimize fees, or ask about monthly financing above.
+      </p>
+    </div>
+  );
+}
 
 function isCrawlspaceItem(item: CartItem): item is CrawlspaceCartItem {
   return "isCrawlspace" in item && (item as any).isCrawlspace === true;
@@ -809,12 +853,14 @@ export default function CrmProposalPreview() {
                         <div className="text-right">
                           <p className="text-lg font-bold text-primary">{formatPrice(optionPrice)}</p>
                           <p className="text-xs text-muted-foreground">{formatPrice(optionMonthly)}/mo</p>
+                          <PaymentFeeBreakdown low={optionPrice} high={optionPrice} compact />
                         </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
+              <PaymentFeeBreakdown low={cartTotalAfterDiscount.low} high={cartTotalAfterDiscount.high} />
               {hasEstimatedItems && (
                 <p className="text-xs text-muted-foreground mt-2">* Includes estimated pricing for custom builds</p>
               )}
@@ -861,6 +907,7 @@ export default function CrmProposalPreview() {
                 <span className="text-sm text-muted-foreground">Monthly Payment (with approved financing)</span>
                 <span className="text-sm font-medium">{formatPriceRange(cartMonthlyTotalRange.low, cartMonthlyTotalRange.high)}/mo</span>
               </div>
+              <PaymentFeeBreakdown low={cartTotalAfterDiscount.low} high={cartTotalAfterDiscount.high} />
               {cartEliteDiscountAmount > 0 && (
                 <p className="text-xs text-muted-foreground italic mt-2">
                   You save {formatPrice(cartEliteDiscountAmount)} with Elite Package!

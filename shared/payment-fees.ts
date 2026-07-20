@@ -1,0 +1,40 @@
+// Payment-method processing fees shown on quotes/proposals so the customer can
+// see what each method costs. DISPLAY ONLY — these are not added to the actual
+// Stripe charge (Stripe deducts its fee from us). Defaults are Stripe's
+// standard US rates; adjust here if your negotiated rates differ.
+
+export interface PaymentFeeConfig {
+  cardPercent: number; // % of amount
+  cardFixed: number;   // flat $ per transaction
+  achPercent: number;  // % of amount
+  achCapUsd: number;   // ACH fee capped at this many dollars
+}
+
+export const PAYMENT_FEE_DEFAULTS: PaymentFeeConfig = {
+  cardPercent: 2.9,
+  cardFixed: 0.3,
+  achPercent: 0.8,
+  achCapUsd: 5,
+};
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Credit/debit card processing fee for an amount. */
+export function cardFee(amount: number, cfg: PaymentFeeConfig = PAYMENT_FEE_DEFAULTS): number {
+  if (!(amount > 0)) return 0;
+  return round2(amount * (cfg.cardPercent / 100) + cfg.cardFixed);
+}
+
+/** ACH bank-transfer fee for an amount (capped). */
+export function achFee(amount: number, cfg: PaymentFeeConfig = PAYMENT_FEE_DEFAULTS): number {
+  if (!(amount > 0)) return 0;
+  return round2(Math.min(amount * (cfg.achPercent / 100), cfg.achCapUsd));
+}
+
+/** Short human labels for the fee structure, e.g. "2.9% + $0.30". */
+export function cardFeeLabel(cfg: PaymentFeeConfig = PAYMENT_FEE_DEFAULTS): string {
+  return `${cfg.cardPercent}% + $${cfg.cardFixed.toFixed(2)}`;
+}
+export function achFeeLabel(cfg: PaymentFeeConfig = PAYMENT_FEE_DEFAULTS): string {
+  return `${cfg.achPercent}%, max $${cfg.achCapUsd}`;
+}
