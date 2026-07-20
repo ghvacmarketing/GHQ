@@ -1040,6 +1040,11 @@ export const goveeSensors = pgTable("govee_sensors", {
   humidityCritical: decimal("humidity_critical", { precision: 5, scale: 2 }).default("75"),
   tempLowF: decimal("temp_low_f", { precision: 6, scale: 2 }).default("40"),
   tempHighF: decimal("temp_high_f", { precision: 6, scale: 2 }), // configurable; null = disabled
+  // Calibration offsets — the Govee Platform API returns the RAW reading, while
+  // the Govee app can show a user-calibrated value. These offsets are added to
+  // the raw reading so the CRM matches the app exactly.
+  tempOffsetF: decimal("temp_offset_f", { precision: 5, scale: 2 }).notNull().default("0"),
+  humidityOffset: decimal("humidity_offset", { precision: 5, scale: 2 }).notNull().default("0"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({

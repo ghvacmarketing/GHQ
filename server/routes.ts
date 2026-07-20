@@ -671,6 +671,10 @@ function shapeGoveeSensor(
       tempLowF: s.tempLowF != null ? Number(s.tempLowF) : null,
       tempHighF: s.tempHighF != null ? Number(s.tempHighF) : null,
     },
+    calibration: {
+      tempOffsetF: s.tempOffsetF != null ? Number(s.tempOffsetF) : 0,
+      humidityOffset: s.humidityOffset != null ? Number(s.humidityOffset) : 0,
+    },
     propertyAddress: prop ? `${prop.address1}, ${prop.city}, ${prop.state} ${prop.zip}` : null,
     customerName: customerName ?? null,
   };
@@ -30338,6 +30342,10 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         if (body.isActive !== undefined) updates.isActive = !!body.isActive;
         for (const key of ["humidityWatch", "humidityHigh", "humidityCritical", "tempLowF", "tempHighF"]) {
           if (body[key] !== undefined) updates[key] = body[key] === null || body[key] === "" ? null : String(body[key]);
+        }
+        // Calibration offsets default to 0 (never null — the column is NOT NULL).
+        for (const key of ["tempOffsetF", "humidityOffset"]) {
+          if (body[key] !== undefined) updates[key] = body[key] === null || body[key] === "" ? "0" : String(body[key]);
         }
         // If mapping to a property without an explicit customer, inherit the property's customer.
         if (updates.propertyId && body.customerId === undefined) {

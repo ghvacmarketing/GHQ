@@ -58,6 +58,10 @@ export interface SensorView {
     tempLowF: number | null;
     tempHighF: number | null;
   };
+  calibration?: {
+    tempOffsetF: number;
+    humidityOffset: number;
+  };
   propertyAddress: string | null;
   customerName: string | null;
 }
@@ -412,6 +416,8 @@ export function SensorMappingDialog({
   const [humidityHigh, setHumidityHigh] = useState("");
   const [humidityCritical, setHumidityCritical] = useState("");
   const [tempHighF, setTempHighF] = useState("");
+  const [tempOffsetF, setTempOffsetF] = useState("");
+  const [humidityOffset, setHumidityOffset] = useState("");
 
   // Seed form when the sensor changes
   const seededFor = sensor?.id;
@@ -426,6 +432,8 @@ export function SensorMappingDialog({
     setHumidityHigh(sensor.thresholds.humidityHigh != null ? String(sensor.thresholds.humidityHigh) : "");
     setHumidityCritical(sensor.thresholds.humidityCritical != null ? String(sensor.thresholds.humidityCritical) : "");
     setTempHighF(sensor.thresholds.tempHighF != null ? String(sensor.thresholds.tempHighF) : "");
+    setTempOffsetF(sensor.calibration?.tempOffsetF ? String(sensor.calibration.tempOffsetF) : "");
+    setHumidityOffset(sensor.calibration?.humidityOffset ? String(sensor.calibration.humidityOffset) : "");
     setSearch("");
   }
 
@@ -459,6 +467,8 @@ export function SensorMappingDialog({
         humidityHigh: humidityHigh === "" ? null : humidityHigh,
         humidityCritical: humidityCritical === "" ? null : humidityCritical,
         tempHighF: tempHighF === "" ? null : tempHighF,
+        tempOffsetF: tempOffsetF === "" ? "0" : tempOffsetF,
+        humidityOffset: humidityOffset === "" ? "0" : humidityOffset,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/sensors"] });
@@ -548,6 +558,28 @@ export function SensorMappingDialog({
               <Label className="text-xs">Temp high °F</Label>
               <Input value={tempHighF} onChange={(e) => setTempHighF(e.target.value)} placeholder="—" />
             </div>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+            <p className="text-xs font-semibold text-slate-700">Calibration</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              Govee returns the raw reading; the Govee app can show a calibrated value. If they differ,
+              set the offset (app value − CRM value) so they match. E.g. app 5°, CRM 7° → temp offset −2.
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">Temp offset °F</Label>
+                <Input value={tempOffsetF} onChange={(e) => setTempOffsetF(e.target.value.replace(/[^0-9.-]/g, ""))} placeholder="0" data-testid="input-temp-offset" />
+              </div>
+              <div>
+                <Label className="text-xs">Humidity offset %</Label>
+                <Input value={humidityOffset} onChange={(e) => setHumidityOffset(e.target.value.replace(/[^0-9.-]/g, ""))} placeholder="0" data-testid="input-humidity-offset" />
+              </div>
+            </div>
+            {sensor?.temperatureF != null && (
+              <p className="mt-1.5 text-[11px] text-muted-foreground">
+                Current CRM reading: {Math.round(sensor.temperatureF)}°F{sensor.humidity != null ? ` · ${Math.round(sensor.humidity)}%` : ""} (already includes any saved offset).
+              </p>
+            )}
           </div>
         </div>
         <DialogFooter>

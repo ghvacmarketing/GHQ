@@ -165,6 +165,11 @@ class GoveeService {
         limit(async () => {
           try {
             const state = await this.getDeviceState(sensor.sku, sensor.device);
+            // Apply per-sensor calibration so stored values match the Govee app.
+            const tOff = numOr(sensor.tempOffsetF, 0);
+            const hOff = numOr(sensor.humidityOffset, 0);
+            if (state.temperatureF != null && tOff !== 0) state.temperatureF = Math.round((state.temperatureF + tOff) * 100) / 100;
+            if (state.humidity != null && hOff !== 0) state.humidity = Math.round((state.humidity + hOff) * 100) / 100;
             const now = new Date();
             await db.insert(goveeSensorReadings).values({
               sensorId: sensor.id,

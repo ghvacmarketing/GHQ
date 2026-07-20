@@ -222,6 +222,9 @@ async function runInstallPlannerMigrations() {
       )
     `);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS dispatch_blackouts_tech_idx ON dispatch_blackouts (tech_id, start_at)`);
+    // Govee per-sensor calibration offsets (match the Govee app's calibrated values).
+    await db.execute(sql`ALTER TABLE govee_sensors ADD COLUMN IF NOT EXISTS temp_offset_f numeric(5,2) NOT NULL DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE govee_sensors ADD COLUMN IF NOT EXISTS humidity_offset numeric(5,2) NOT NULL DEFAULT 0`);
   } catch (err) {
     console.error("Install planner migration error (non-fatal):", err);
   }
