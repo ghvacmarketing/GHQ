@@ -916,16 +916,16 @@ export default function PublicQuoteView() {
                   )}
                   {isInstallQuote && effectiveTotal > 0 && (
                     <div className="border-t border-slate-200 pt-2 mt-1 text-sm">
-                      <p className="mb-1.5 font-semibold text-slate-600">Payment method fees</p>
+                      <p className="mb-1.5 font-semibold text-slate-600">Online payment convenience fee</p>
                       <div className="flex justify-between text-slate-600">
-                        <span className="flex items-center gap-1.5"><CreditCard className="h-3.5 w-3.5" /> Credit/debit card (+{surchargeLabel("card")})</span>
+                        <span className="flex items-center gap-1.5"><CreditCard className="h-3.5 w-3.5" /> Credit/debit card ({surchargeLabel("card")})</span>
                         <span className="font-medium">+{formatCurrency(surchargeFor("card", effectiveTotal))}</span>
                       </div>
                       <div className="flex justify-between text-slate-600 mt-1">
-                        <span className="flex items-center gap-1.5"><Landmark className="h-3.5 w-3.5" /> Bank transfer / ACH (+{surchargeLabel("ach")})</span>
+                        <span className="flex items-center gap-1.5"><Landmark className="h-3.5 w-3.5" /> Bank transfer / ACH ({surchargeLabel("ach")})</span>
                         <span className="font-medium">+{formatCurrency(surchargeFor("ach", effectiveTotal))}</span>
                       </div>
-                      <p className="mt-1.5 text-[11px] text-slate-500">The processing fee for your chosen method is added at checkout. Choose your method below before signing.</p>
+                      <p className="mt-1.5 text-[11px] text-slate-500">Paying online is an optional convenience; a small fee for your chosen method is added at checkout. Prefer no fee? You can pay by check or in person — just contact us.</p>
                     </div>
                   )}
                 </div>
@@ -1043,7 +1043,7 @@ export default function PublicQuoteView() {
                       A {depositPercentage}% deposit is required before accepting this quote.
                     </p>
 
-                    {/* Choose payment method — surcharge and deposit update live */}
+                    {/* Choose payment method — convenience fee and deposit update live */}
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-800">Choose payment method</p>
                     <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {([
@@ -1065,7 +1065,7 @@ export default function PublicQuoteView() {
                               {active && <CheckCircle2 className="ml-auto h-4 w-4 text-green-600" />}
                             </span>
                             <span className="mt-0.5 block text-xs text-slate-500">
-                              +{formatCurrency(fee)} fee ({surchargeLabel(m)})
+                              +{formatCurrency(fee)} convenience fee ({surchargeLabel(m)})
                             </span>
                           </button>
                         );
@@ -1073,7 +1073,7 @@ export default function PublicQuoteView() {
                     </div>
                     <div className="mb-3 rounded-lg bg-white/70 p-3 text-sm">
                       <div className="flex justify-between text-slate-600"><span>Selected total</span><span>{formatCurrency(effectiveTotal)}</span></div>
-                      <div className="flex justify-between text-slate-600"><span>{paymentMethod === "ach" ? "Bank transfer" : "Card"} fee ({surchargeLabel(paymentMethod)})</span><span>+{formatCurrency(surchargeFor(paymentMethod, effectiveTotal))}</span></div>
+                      <div className="flex justify-between text-slate-600"><span>Online convenience fee ({surchargeLabel(paymentMethod)})</span><span>+{formatCurrency(surchargeFor(paymentMethod, effectiveTotal))}</span></div>
                       <div className="mt-1 flex justify-between border-t border-slate-200 pt-1 font-semibold text-slate-800"><span>{depositPercentage}% deposit due now</span><span data-testid="text-deposit-due">{formatCurrency(depositDue)}</span></div>
                     </div>
                     <Button

@@ -111,6 +111,7 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
     const depositAmount = Math.max(50, Math.round((surchargedTotal * depositPct / 100) * 100)); // Convert to cents
 
     const methodLabel = paymentMethod === "ach" ? "bank transfer (ACH)" : "credit/debit card";
+    const feeNote = surchargeAmount > 0 ? ` (includes ${surchargeLabel(paymentMethod)} online payment convenience fee for ${methodLabel})` : "";
     const stripe = await getUncachableStripeClient();
 
     // Create a Payment Link with Stripe, restricted to the chosen method.
@@ -122,7 +123,7 @@ router.post("/api/stripe/quote/:quoteId/payment-link", async (req, res) => {
             currency: 'usd',
             product_data: {
               name: `Deposit for Quote #${quote.quoteNumber}`,
-              description: `${depositPct}% deposit for ${optionDescription} — includes ${surchargeLabel(paymentMethod)} ${methodLabel} processing fee`,
+              description: `${depositPct}% deposit for ${optionDescription}${feeNote}`,
             },
             unit_amount: depositAmount,
           },
