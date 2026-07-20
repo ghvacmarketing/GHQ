@@ -1696,9 +1696,11 @@ function ScheduleRowTimeline({
               width: `${widthPct}%`,
               backgroundImage: "repeating-linear-gradient(135deg, rgba(71,85,105,0.28) 0 6px, transparent 6px 12px)",
             }}
-            title={`Blocked off · ${formatClock(Math.floor(startHour), Math.round((startHour % 1) * 60))} – ${formatClock(Math.floor(endHour), Math.round((endHour % 1) * 60))}`}
+            title={`${b.reason ? b.reason + " · " : ""}Blocked off · ${formatClock(Math.floor(startHour), Math.round((startHour % 1) * 60))} – ${formatClock(Math.floor(endHour), Math.round((endHour % 1) * 60))}`}
           >
-            <span className="pointer-events-none select-none text-[10px] font-semibold uppercase tracking-wide text-slate-600">Blocked</span>
+            <span className="pointer-events-none select-none truncate px-2 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+              {b.reason || "Blocked"}
+            </span>
             <button
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => { e.stopPropagation(); onDeleteBlackout?.(b.id); }}
@@ -2875,10 +2877,18 @@ export default function CrmDispatch() {
   const blackoutsRef = useRef(blackouts);
   blackoutsRef.current = blackouts;
 
+  // A painted range awaiting its reason before it's saved as a block-out.
+  const [pendingBlackout, setPendingBlackout] = useState<{ techId: string; startAt: string; endAt: string; techName: string; label: string } | null>(null);
+  const [blackoutReason, setBlackoutReason] = useState("");
+
   const createBlackout = useMutation({
-    mutationFn: async (p: { techId: string; startAt: string; endAt: string }) =>
+    mutationFn: async (p: { techId: string; startAt: string; endAt: string; reason: string }) =>
       (await apiRequest("POST", "/api/crm/dispatch-blackouts", p)).json(),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch-blackouts"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch-blackouts"] });
+      setPendingBlackout(null);
+      setBlackoutReason("");
+    },
     onError: (e: any) => toast({ title: e?.message || "Couldn't block out time", variant: "destructive" }),
   });
   const deleteBlackout = useMutation({
@@ -4471,7 +4481,15 @@ export default function CrmDispatch() {
                     const eh = Math.floor(endHour), em = Math.round((endHour % 1) * 60);
                     const startAt = createLocalDateTime(selectedDate, sh, sm).toISOString();
                     const endAt = createLocalDateTime(selectedDate, eh, em).toISOString();
-                    createBlackout.mutate({ techId, startAt, endAt });
+                    // Capture a reason before saving the block-out.
+                    setBlackoutReason("");
+                    setPendingBlackout({
+                      techId,
+                      startAt,
+                      endAt,
+                      techName: technicians.find((t) => t.id === techId)?.name || "this technician",
+                      label: `${formatClock(sh, sm)} – ${formatClock(eh, em)}`,
+                    });
                   }}
                   onDeleteBlackout={(id) => deleteBlackout.mutate(id)}
                   onRegisterTimelineNode={(techId, node) => {
@@ -5831,6 +5849,53 @@ export default function CrmDispatch() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { setTimePickerOpen(false); setPendingDrop(null); }}>Cancel</Button>
             <Button onClick={confirmTimePickerDrop}>Schedule</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Block-out reason — required before the block is saved to the board */}
+      <Dialog open={!!pendingBlackout} onOpenChange={(o) => { if (!o) { setPendingBlackout(null); setBlackoutReason(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Block out time</DialogTitle>
+          </DialogHeader>
+          {pendingBlackout && (
+            <p className="text-sm text-muted-foreground">
+              {pendingBlackout.techName} · {pendingBlackout.label}
+            </p>
+          )}
+          <div className="space-y-1.5">
+            <Label className="text-xs">What is this time for?</Label>
+            <Textarea
+              value={blackoutReason}
+              onChange={(e) => setBlackoutReason(e.target.value)}
+              placeholder="e.g. Vacation, training, truck maintenance, doctor appt"
+              rows={2}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && blackoutReason.trim() && pendingBlackout) {
+                  e.preventDefault();
+                  const { techId, startAt, endAt } = pendingBlackout;
+                  createBlackout.mutate({ techId, startAt, endAt, reason: blackoutReason.trim() });
+                }
+              }}
+              data-testid="input-blackout-reason"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setPendingBlackout(null); setBlackoutReason(""); }}>Cancel</Button>
+            <Button
+              className="bg-[#711419] hover:bg-[#5a1014]"
+              disabled={!blackoutReason.trim() || createBlackout.isPending}
+              onClick={() => {
+                if (!pendingBlackout) return;
+                const { techId, startAt, endAt } = pendingBlackout;
+                createBlackout.mutate({ techId, startAt, endAt, reason: blackoutReason.trim() });
+              }}
+              data-testid="button-save-blackout"
+            >
+              {createBlackout.isPending ? "Blocking…" : "Block out time"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
