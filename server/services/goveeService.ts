@@ -78,7 +78,16 @@ class GoveeService {
       requestId: randomUUID(),
       payload: { sku, device },
     });
-    return parseGoveeState(json?.payload?.capabilities);
+    const capabilities = json?.payload?.capabilities;
+    const parsed = parseGoveeState(capabilities);
+    // If a device returns capabilities but we couldn't read temp OR humidity,
+    // log the raw instances so an unrecognized model (e.g. a new H5111 payload
+    // shape) can be mapped precisely.
+    if (parsed.temperatureF == null && parsed.humidity == null && Array.isArray(capabilities) && capabilities.length > 0) {
+      const shapes = capabilities.map((c: any) => `${c?.instance}=${JSON.stringify(c?.state?.value)}`).join(", ");
+      console.warn(`[Govee] ${sku}/${device} returned no temp/humidity. Raw capabilities: ${shapes}`);
+    }
+    return parsed;
   }
 
   /** Discover devices and upsert into govee_sensors WITHOUT clobbering mapping/labels. */

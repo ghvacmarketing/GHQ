@@ -9,11 +9,39 @@ export const GOVEE_DEVICES_PATH = "/router/api/v1/user/devices";
 export const GOVEE_STATE_PATH = "/router/api/v1/device/state";
 
 // Capability `instance` names returned by the Platform API for thermo-hygrometers.
+// Models vary: newer hygrometers (e.g. H5111) may report under alternate
+// instance names, so each field accepts several aliases.
 export const GOVEE_CAP = {
   online: "online",
   temperature: "sensorTemperature",
   humidity: "sensorHumidity",
 } as const;
+
+// Accepted instance-name aliases per reading (lower-cased match).
+const TEMPERATURE_INSTANCES = ["sensortemperature", "temperature"];
+const HUMIDITY_INSTANCES = ["sensorhumidity", "humidity"];
+const ONLINE_INSTANCES = ["online"];
+
+// Govee sends the reading value as a plain number, a numeric string, or a
+// nested object keyed by e.g. currentTemperature/currentHumidity. Coerce all.
+function coerceReading(value: unknown): number | null {
+  if (value == null) return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    for (const key of ["currentTemperature", "currentHumidity", "value", "current", "measurement"]) {
+      if (obj[key] != null) {
+        const n = coerceReading(obj[key]);
+        if (n != null) return n;
+      }
+    }
+  }
+  return null;
+}
 
 export type RiskLevel = "normal" | "watch" | "high" | "critical";
 
@@ -84,17 +112,27 @@ export function parseGoveeState(
   capabilities: Array<{ instance?: string; state?: { value?: unknown } }> | undefined,
 ): ParsedSensorState {
   let online = false;
+  let sawOnlineCap = false;
   let temperatureF: number | null = null;
   let humidity: number | null = null;
   for (const cap of capabilities ?? []) {
+    const instance = String(cap?.instance ?? "").toLowerCase();
     const value = cap?.state?.value;
-    if (cap?.instance === GOVEE_CAP.online) {
+    if (ONLINE_INSTANCES.includes(instance)) {
+      sawOnlineCap = true;
       online = Boolean(value);
-    } else if (cap?.instance === GOVEE_CAP.temperature && value != null) {
-      temperatureF = Number(value);
-    } else if (cap?.instance === GOVEE_CAP.humidity && value != null) {
-      humidity = Number(value);
+    } else if (TEMPERATURE_INSTANCES.includes(instance)) {
+      const n = coerceReading(value);
+      if (n != null) temperatureF = n;
+    } else if (HUMIDITY_INSTANCES.includes(instance)) {
+      const n = coerceReading(value);
+      if (n != null) humidity = n;
     }
+  }
+  // Some models omit an explicit online capability; treat a fresh reading as
+  // online so the sensor doesn't get flagged offline just for lacking the cap.
+  if (!sawOnlineCap && (temperatureF != null || humidity != null)) {
+    online = true;
   }
   return { online, temperatureF, humidity };
 }
