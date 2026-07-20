@@ -605,8 +605,8 @@ async function runWaterHeaterSeeds() {
     // Start booking email reminder scheduler (checks every 30 min for 2-hour reminders)
     scheduleBookingReminders();
 
-    // Start Govee H5103 sensor polling (humidity/temperature) every 5 minutes
-    startGoveeBackgroundSync(5);
+    // Start Govee sensor polling (humidity/temperature) every minute
+    startGoveeBackgroundSync(1);
 
     // Textline message sync every 30s — keeps inbound AND outbound SMS
     // flowing into the CRM even when the webhook misses
