@@ -21411,6 +21411,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/crm/checklists/:checklistId/questions/reorder - Persist a drag-reorder
+  app.post("/api/crm/checklists/:checklistId/questions/reorder", requireCrmAuth, async (req, res) => {
+    try {
+      const { checklistId } = req.params;
+      const { orderedIds } = req.body as { orderedIds?: unknown };
+      if (!Array.isArray(orderedIds) || orderedIds.some((id) => typeof id !== "string")) {
+        return res.status(400).json({ message: "orderedIds must be an array of question ids" });
+      }
+
+      const questions = await db.select().from(checklistQuestions).where(eq(checklistQuestions.checklistId, checklistId));
+      const validIds = new Set(questions.map((q) => q.id));
+      const ids = (orderedIds as string[]).filter((id) => validIds.has(id));
+
+      for (let i = 0; i < ids.length; i++) {
+        await db.update(checklistQuestions)
+          .set({ sortOrder: i + 1 })
+          .where(and(eq(checklistQuestions.id, ids[i]), eq(checklistQuestions.checklistId, checklistId)));
+      }
+      res.json({ message: "Reordered" });
+    } catch (error) {
+      console.error("Error reordering questions:", error);
+      res.status(500).json({ message: "Failed to reorder questions" });
+    }
+  });
+
   // POST /api/crm/checklists/:checklistId/photo-steps - Add a required-photo step
   app.post("/api/crm/checklists/:checklistId/photo-steps", requireCrmAuth, async (req, res) => {
     try {

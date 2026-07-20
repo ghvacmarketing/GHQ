@@ -38,7 +38,6 @@ import {
   Plus,
   Pencil,
   Trash2,
-  ChevronUp,
   ChevronDown,
   ChevronRight,
   Loader2,
@@ -47,7 +46,7 @@ import {
   Hash,
   List,
   Camera,
-  Flag,
+  GripVertical,
   Unlink,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -84,15 +83,29 @@ const QUESTION_TYPE_LABELS: Record<ChecklistQuestionType, string> = {
 };
 
 const QUESTION_TYPE_ICONS: Record<ChecklistQuestionType, React.ReactNode> = {
-  yes_no: <CheckCircle className="h-3.5 w-3.5" />,
-  text: <Type className="h-3.5 w-3.5" />,
-  number: <Hash className="h-3.5 w-3.5" />,
-  select: <List className="h-3.5 w-3.5" />,
+  yes_no: <CheckCircle className="h-3 w-3" />,
+  text: <Type className="h-3 w-3" />,
+  number: <Hash className="h-3 w-3" />,
+  select: <List className="h-3 w-3" />,
 };
 
 const MAROON = "#711419";
+const FLOW_W = 280;
+const PHOTO_W = 220;
+const WORLD_W_MIN = 3200;
+const DEFAULT_FLOW: XY = { x: WORLD_W_MIN / 2 - FLOW_W / 2 - 160, y: 120 };
+const DRAG_THRESHOLD = 5;
 
 type XY = { x: number; y: number };
+
+type DragState =
+  | { kind: "pan"; sx: number; sy: number; sl: number; st: number }
+  | { kind: "flow"; ox: number; oy: number }
+  | { kind: "photo-pending"; id: string; sx: number; sy: number; ox: number; oy: number }
+  | { kind: "photo"; id: string; ox: number; oy: number }
+  | { kind: "step-pending"; id: string; sx: number; sy: number; grabY: number; h: number }
+  | { kind: "reorder"; id: string; grabY: number; h: number }
+  | { kind: "link"; stepId: string };
 
 export default function CrmChecklists() {
   usePageTitle("Checklist Canvas");
@@ -126,15 +139,27 @@ export default function CrmChecklists() {
   const [deletingPhoto, setDeletingPhoto] = useState<ChecklistPhotoStep | null>(null);
   const [photoForm, setPhotoForm] = useState({ label: "", instructions: "", isRequired: true });
 
-  // Link-drag state (drawing an arrow from a photo step to a checklist step)
-  const [dragLink, setDragLink] = useState<{ photoId: string; from: XY; to: XY } | null>(null);
-  const [hoverStepId, setHoverStepId] = useState<string | null>(null);
+  // Canvas state
+  const [spaceHeld, setSpaceHeld] = useState(false);
+  const [panning, setPanning] = useState(false);
+  const [flowPos, setFlowPos] = useState<XY>(DEFAULT_FLOW);
+  const [photoPos, setPhotoPos] = useState<Record<string, XY>>({});
+  const [localOrder, setLocalOrder] = useState<string[] | null>(null);
+  const [reorder, setReorder] = useState<{ id: string; ghostY: number; gap: number; h: number } | null>(null);
+  const [dragLink, setDragLink] = useState<{ stepId: string; from: XY; to: XY } | null>(null);
+  const [hoverPhotoId, setHoverPhotoId] = useState<string | null>(null);
 
-  // Canvas geometry
-  const contentRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const worldRef = useRef<HTMLDivElement | null>(null);
+  const flowBlockRef = useRef<HTMLDivElement | null>(null);
   const stepRefs = useRef(new Map<string, HTMLDivElement>());
   const photoRefs = useRef(new Map<string, HTMLDivElement>());
-  const [layoutTick, setLayoutTick] = useState(0);
+  const stepGeom = useRef(new Map<string, { top: number; h: number }>());
+  const photoGeom = useRef(new Map<string, { w: number; h: number }>());
+  const dragRef = useRef<DragState | null>(null);
+  const flowPosRef = useRef(flowPos);
+  flowPosRef.current = flowPos;
+  const [arrowTick, setArrowTick] = useState(0);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -176,19 +201,27 @@ export default function CrmChecklists() {
     [checklists, checklistId],
   );
 
-  const steps = useMemo(
+  const serverSteps = useMemo(
     () => (checklist ? [...checklist.questions].sort((a, b) => a.sortOrder - b.sortOrder) : []),
     [checklist],
   );
+  // Optimistic ordering after a drag-reorder, until the server catches up
+  const orderedSteps = useMemo(() => {
+    if (!localOrder) return serverSteps;
+    const byId = new Map(serverSteps.map((s) => [s.id, s]));
+    if (localOrder.length !== serverSteps.length || localOrder.some((id) => !byId.has(id))) return serverSteps;
+    return localOrder.map((id) => byId.get(id)!);
+  }, [serverSteps, localOrder]);
+
   const photoSteps = useMemo(
     () => (checklist?.photoSteps ? [...checklist.photoSteps].sort((a, b) => a.sortOrder - b.sortOrder) : []),
     [checklist],
   );
   const stepNumberById = useMemo(() => {
     const m = new Map<string, number>();
-    steps.forEach((s, i) => m.set(s.id, i + 1));
+    orderedSteps.forEach((s, i) => m.set(s.id, i + 1));
     return m;
-  }, [steps]);
+  }, [orderedSteps]);
 
   // Auto-select the first checklist when the type/subtype combo changes
   useEffect(() => {
@@ -205,19 +238,103 @@ export default function CrmChecklists() {
     if (!authLoading && !currentUser) navigate("/crm/login");
   }, [authLoading, currentUser, navigate]);
 
-  // Recompute arrow geometry whenever layout can have changed
-  useLayoutEffect(() => {
-    const el = contentRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setLayoutTick((t) => t + 1));
-    ro.observe(el);
-    const onResize = () => setLayoutTick((t) => t + 1);
-    window.addEventListener("resize", onResize);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", onResize);
+  // Load the saved canvas layout for this checklist (positions are per-device)
+  useEffect(() => {
+    setLocalOrder(null);
+    if (!checklistId) return;
+    try {
+      const raw = localStorage.getItem(`checklist-canvas:${checklistId}`);
+      if (raw) {
+        const layout = JSON.parse(raw);
+        setFlowPos(layout.flow ?? DEFAULT_FLOW);
+        setPhotoPos(layout.photos ?? {});
+        return;
+      }
+    } catch {}
+    setFlowPos(DEFAULT_FLOW);
+    setPhotoPos({});
+  }, [checklistId]);
+
+  // Persist layout
+  useEffect(() => {
+    if (!checklistId) return;
+    try {
+      localStorage.setItem(`checklist-canvas:${checklistId}`, JSON.stringify({ flow: flowPos, photos: photoPos }));
+    } catch {}
+  }, [flowPos, photoPos, checklistId]);
+
+  // Give new photo steps a default spot to the right of the flow
+  useEffect(() => {
+    if (photoSteps.length === 0) return;
+    setPhotoPos((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      let slot = 0;
+      for (const ps of photoSteps) {
+        if (!next[ps.id]) {
+          next[ps.id] = {
+            x: flowPosRef.current.x + FLOW_W + 240,
+            y: flowPosRef.current.y + 30 + slot * 120,
+          };
+          changed = true;
+        }
+        slot++;
+      }
+      return changed ? next : prev;
+    });
+  }, [photoSteps]);
+
+  // Center the viewport on the flow when a checklist opens
+  useEffect(() => {
+    if (!checklistId) return;
+    requestAnimationFrame(() => {
+      const vp = viewportRef.current;
+      if (!vp) return;
+      vp.scrollTo({
+        left: Math.max(0, flowPosRef.current.x - (vp.clientWidth - FLOW_W) / 2 + 120),
+        top: Math.max(0, flowPosRef.current.y - 70),
+      });
+    });
+  }, [checklistId]);
+
+  // Space bar = pan mode
+  useEffect(() => {
+    const isTyping = (t: EventTarget | null) =>
+      t instanceof HTMLElement &&
+      (["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(t.tagName) || t.isContentEditable);
+    const down = (e: KeyboardEvent) => {
+      if (e.code === "Space" && !isTyping(e.target)) {
+        e.preventDefault();
+        setSpaceHeld(true);
+      }
     };
-  }, [checklist?.id]);
+    const up = (e: KeyboardEvent) => {
+      if (e.code === "Space") setSpaceHeld(false);
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+    };
+  }, []);
+
+  // Measure node geometry (arrow anchor points) after every layout change
+  useLayoutEffect(() => {
+    const flowEl = flowBlockRef.current;
+    if (!flowEl) return;
+    const fRect = flowEl.getBoundingClientRect();
+    stepGeom.current.clear();
+    for (const [id, el] of Array.from(stepRefs.current.entries())) {
+      const r = el.getBoundingClientRect();
+      stepGeom.current.set(id, { top: r.top - fRect.top, h: r.height });
+    }
+    photoGeom.current.clear();
+    for (const [id, el] of Array.from(photoRefs.current.entries())) {
+      photoGeom.current.set(id, { w: el.offsetWidth, h: el.offsetHeight });
+    }
+    setArrowTick((t) => t + 1);
+  }, [orderedSteps, photoSteps, checklist?.id, reorder !== null]);
 
   // ----- mutations -----
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["/api/crm/checklists"] });
@@ -283,7 +400,7 @@ export default function CrmChecklists() {
           stepForm.questionType === "select" && stepForm.options
             ? stepForm.options.split(",").map((o) => o.trim()).filter(Boolean)
             : null,
-        ...(editingStep ? {} : { sortOrder: (steps[steps.length - 1]?.sortOrder ?? 0) + 1 }),
+        ...(editingStep ? {} : { sortOrder: (serverSteps[serverSteps.length - 1]?.sortOrder ?? 0) + 1 }),
       };
       if (editingStep) {
         return apiRequest("PUT", `/api/crm/checklists/questions/${editingStep.id}`, data);
@@ -307,11 +424,9 @@ export default function CrmChecklists() {
     onError,
   });
 
-  const moveStep = useMutation({
-    mutationFn: async ({ a, b }: { a: ChecklistQuestion; b: ChecklistQuestion }) => {
-      await apiRequest("PUT", `/api/crm/checklists/questions/${a.id}`, { sortOrder: b.sortOrder });
-      await apiRequest("PUT", `/api/crm/checklists/questions/${b.id}`, { sortOrder: a.sortOrder });
-    },
+  const reorderSteps = useMutation({
+    mutationFn: async (orderedIds: string[]) =>
+      apiRequest("POST", `/api/crm/checklists/${checklistId}/questions/reorder`, { orderedIds }),
     onSuccess: invalidate,
     onError,
   });
@@ -353,72 +468,231 @@ export default function CrmChecklists() {
     onError,
   });
 
-  // ----- link-drag (arrow drawing) -----
-  const contentPoint = (clientX: number, clientY: number): XY => {
-    const rect = contentRef.current!.getBoundingClientRect();
-    return { x: clientX - rect.left, y: clientY - rect.top };
+  // ----- canvas pointer logic -----
+  const worldPoint = (e: { clientX: number; clientY: number }): XY => {
+    const r = worldRef.current!.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
 
-  const startLinkDrag = (photoId: string, e: React.PointerEvent) => {
-    if (!contentRef.current) return;
+  const stepHandlePoint = (stepId: string): XY => {
+    const sg = stepGeom.current.get(stepId);
+    const fp = flowPosRef.current;
+    return { x: fp.x + FLOW_W + 3, y: fp.y + (sg ? sg.top + sg.h / 2 : 0) };
+  };
+
+  const onCanvasPointerDown = (e: React.PointerEvent) => {
+    const bg = e.target === worldRef.current || e.target === viewportRef.current;
+    if (!spaceHeld && !bg) return;
+    const vp = viewportRef.current!;
+    dragRef.current = { kind: "pan", sx: e.clientX, sy: e.clientY, sl: vp.scrollLeft, st: vp.scrollTop };
+    vp.setPointerCapture(e.pointerId);
+    setPanning(true);
+  };
+
+  const onCanvasPointerMove = (e: React.PointerEvent) => {
+    const st = dragRef.current;
+    if (st?.kind !== "pan") return;
+    const vp = viewportRef.current!;
+    vp.scrollLeft = st.sl - (e.clientX - st.sx);
+    vp.scrollTop = st.st - (e.clientY - st.sy);
+  };
+
+  const onCanvasPointerUp = () => {
+    if (dragRef.current?.kind === "pan") dragRef.current = null;
+    setPanning(false);
+  };
+
+  const startFlowDrag = (e: React.PointerEvent) => {
+    if (spaceHeld) return;
     e.preventDefault();
     e.stopPropagation();
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    const p = contentPoint(e.clientX, e.clientY);
-    setDragLink({ photoId, from: p, to: p });
+    const p = worldPoint(e);
+    dragRef.current = { kind: "flow", ox: p.x - flowPos.x, oy: p.y - flowPos.y };
   };
 
-  const moveLinkDrag = (e: React.PointerEvent) => {
-    if (!dragLink || !contentRef.current) return;
-    setDragLink({ ...dragLink, to: contentPoint(e.clientX, e.clientY) });
-    let hover: string | null = null;
-    for (const [id, el] of Array.from(stepRefs.current.entries())) {
+  const startPhotoDrag = (ps: ChecklistPhotoStep, e: React.PointerEvent) => {
+    if (spaceHeld) return;
+    if ((e.target as HTMLElement).closest("button")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const p = worldPoint(e);
+    const pos = photoPos[ps.id] ?? { x: 0, y: 0 };
+    dragRef.current = { kind: "photo-pending", id: ps.id, sx: e.clientX, sy: e.clientY, ox: p.x - pos.x, oy: p.y - pos.y };
+  };
+
+  const startStepDrag = (q: ChecklistQuestion, e: React.PointerEvent) => {
+    if (spaceHeld) return;
+    if ((e.target as HTMLElement).closest("button")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const el = stepRefs.current.get(q.id);
+    const h = el?.offsetHeight ?? 64;
+    const grabY = el ? e.clientY - el.getBoundingClientRect().top : h / 2;
+    dragRef.current = { kind: "step-pending", id: q.id, sx: e.clientX, sy: e.clientY, grabY, h };
+  };
+
+  const startLinkDrag = (stepId: string, e: React.PointerEvent) => {
+    if (spaceHeld) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragRef.current = { kind: "link", stepId };
+    const from = stepHandlePoint(stepId);
+    setDragLink({ stepId, from, to: worldPoint(e) });
+  };
+
+  const computeGap = (clientY: number, draggedId: string) => {
+    const centers: number[] = [];
+    for (const q of orderedSteps) {
+      if (q.id === draggedId) continue;
+      const el = stepRefs.current.get(q.id);
+      if (!el) continue;
       const r = el.getBoundingClientRect();
-      if (e.clientX >= r.left - 12 && e.clientX <= r.right + 12 && e.clientY >= r.top && e.clientY <= r.bottom) {
-        hover = id;
+      centers.push(r.top + r.height / 2);
+    }
+    let gap = 0;
+    for (const c of centers) if (clientY > c) gap++;
+    return gap;
+  };
+
+  const onNodePointerMove = (e: { clientX: number; clientY: number }) => {
+    const st = dragRef.current;
+    if (!st) return;
+    switch (st.kind) {
+      case "flow": {
+        const p = worldPoint(e);
+        setFlowPos({ x: Math.max(0, p.x - st.ox), y: Math.max(0, p.y - st.oy) });
+        break;
+      }
+      case "photo-pending": {
+        if (Math.hypot(e.clientX - st.sx, e.clientY - st.sy) > DRAG_THRESHOLD) {
+          dragRef.current = { kind: "photo", id: st.id, ox: st.ox, oy: st.oy };
+        }
+        break;
+      }
+      case "photo": {
+        const p = worldPoint(e);
+        setPhotoPos((prev) => ({ ...prev, [st.id]: { x: Math.max(0, p.x - st.ox), y: Math.max(0, p.y - st.oy) } }));
+        break;
+      }
+      case "step-pending": {
+        if (Math.hypot(e.clientX - st.sx, e.clientY - st.sy) > DRAG_THRESHOLD) {
+          dragRef.current = { kind: "reorder", id: st.id, grabY: st.grabY, h: st.h };
+          setReorder({ id: st.id, ghostY: worldPoint(e).y - st.grabY, gap: computeGap(e.clientY, st.id), h: st.h });
+        }
+        break;
+      }
+      case "reorder": {
+        setReorder((prev) =>
+          prev ? { ...prev, ghostY: worldPoint(e).y - st.grabY, gap: computeGap(e.clientY, st.id) } : prev,
+        );
+        break;
+      }
+      case "link": {
+        setDragLink((prev) => (prev ? { ...prev, to: worldPoint(e) } : prev));
+        let hover: string | null = null;
+        for (const [id, el] of Array.from(photoRefs.current.entries())) {
+          const r = el.getBoundingClientRect();
+          if (e.clientX >= r.left - 10 && e.clientX <= r.right + 10 && e.clientY >= r.top - 6 && e.clientY <= r.bottom + 6) {
+            hover = id;
+            break;
+          }
+        }
+        setHoverPhotoId(hover);
         break;
       }
     }
-    setHoverStepId(hover);
   };
 
-  const endLinkDrag = () => {
-    if (dragLink && hoverStepId) {
-      setPhotoLink.mutate({ photoId: dragLink.photoId, questionId: hoverStepId });
+  const onNodePointerUp = () => {
+    const st = dragRef.current;
+    dragRef.current = null;
+    if (!st) return;
+    switch (st.kind) {
+      case "photo-pending": {
+        const ps = photoSteps.find((p) => p.id === st.id);
+        if (ps) openEditPhoto(ps);
+        break;
+      }
+      case "step-pending": {
+        const q = orderedSteps.find((s) => s.id === st.id);
+        if (q) openEditStep(q);
+        break;
+      }
+      case "reorder": {
+        if (reorder) {
+          const rest = orderedSteps.filter((s) => s.id !== reorder.id).map((s) => s.id);
+          rest.splice(reorder.gap, 0, reorder.id);
+          setLocalOrder(rest);
+          reorderSteps.mutate(rest);
+        }
+        setReorder(null);
+        break;
+      }
+      case "link": {
+        if (dragLink && hoverPhotoId) {
+          setPhotoLink.mutate({ photoId: hoverPhotoId, questionId: dragLink.stepId });
+        }
+        setDragLink(null);
+        setHoverPhotoId(null);
+        break;
+      }
     }
-    setDragLink(null);
-    setHoverStepId(null);
   };
 
-  // Arrow endpoints for saved links, in canvas-content coordinates
-  const links = useMemo(() => {
-    void layoutTick; // geometry depends on rendered layout
-    const content = contentRef.current;
-    if (!content) return [] as Array<{ photoId: string; stepId: string; from: XY; to: XY }>;
-    const cRect = content.getBoundingClientRect();
-    const out: Array<{ photoId: string; stepId: string; from: XY; to: XY }> = [];
+  // Node drags are tracked at window level (a reorder unmounts the dragged
+  // card, which would kill element-level pointer capture mid-drag). The
+  // latest-ref pattern keeps the handlers' closures current.
+  const moveRef = useRef(onNodePointerMove);
+  moveRef.current = onNodePointerMove;
+  const upRef = useRef(onNodePointerUp);
+  upRef.current = onNodePointerUp;
+  useEffect(() => {
+    const move = (e: PointerEvent) => { if (dragRef.current && dragRef.current.kind !== "pan") moveRef.current(e); };
+    const up = () => { if (dragRef.current && dragRef.current.kind !== "pan") upRef.current(); };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+  }, []);
+
+  // ----- arrows -----
+  const arrows = useMemo(() => {
+    void arrowTick;
+    const out: Array<{ id: string; from: XY; to: XY }> = [];
     for (const ps of photoSteps) {
       if (!ps.linkedQuestionId) continue;
-      const photoEl = photoRefs.current.get(ps.id);
-      const stepEl = stepRefs.current.get(ps.linkedQuestionId);
-      if (!photoEl || !stepEl) continue;
-      const pRect = photoEl.getBoundingClientRect();
-      const sRect = stepEl.getBoundingClientRect();
+      const sg = stepGeom.current.get(ps.linkedQuestionId);
+      const pp = photoPos[ps.id];
+      const pg = photoGeom.current.get(ps.id);
+      if (!sg || !pp || !pg) continue;
       out.push({
-        photoId: ps.id,
-        stepId: ps.linkedQuestionId,
-        from: { x: pRect.left - cRect.left, y: pRect.top - cRect.top + pRect.height / 2 },
-        to: { x: sRect.right - cRect.left, y: sRect.top - cRect.top + sRect.height / 2 },
+        id: ps.id,
+        from: { x: flowPos.x + FLOW_W + 3, y: flowPos.y + sg.top + sg.h / 2 },
+        to: { x: pp.x - 3, y: pp.y + pg.h / 2 },
       });
     }
     return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photoSteps, steps, layoutTick, checklist?.id]);
+  }, [photoSteps, photoPos, flowPos, arrowTick]);
 
-  const curve = (from: XY, to: XY) => {
-    const dx = Math.max(48, Math.abs(from.x - to.x) * 0.45);
-    return `M ${from.x} ${from.y} C ${from.x - dx} ${from.y}, ${to.x + dx} ${to.y}, ${to.x + 6} ${to.y}`;
+  const curve = (a: XY, b: XY) => {
+    const dx = Math.max(48, Math.abs(b.x - a.x) * 0.45);
+    return `M ${a.x} ${a.y} C ${a.x + dx} ${a.y}, ${b.x - dx} ${b.y}, ${b.x - 6} ${b.y}`;
   };
+
+  const worldSize = useMemo(() => {
+    let w = WORLD_W_MIN;
+    let h = Math.max(1600, flowPos.y + orderedSteps.length * 150 + 600);
+    for (const pos of Object.values(photoPos)) {
+      w = Math.max(w, pos.x + PHOTO_W + 400);
+      h = Math.max(h, pos.y + 400);
+    }
+    w = Math.max(w, flowPos.x + FLOW_W + 800);
+    return { w, h };
+  }, [flowPos, photoPos, orderedSteps.length]);
 
   // ----- dialog openers -----
   const openNewChecklist = () => {
@@ -474,6 +748,88 @@ export default function CrmChecklists() {
       </div>
     );
   }
+
+  const renderStepCard = (q: ChecklistQuestion, number: number, ghost = false) => (
+    <div
+      ref={ghost ? undefined : (el) => { if (el) stepRefs.current.set(q.id, el); else stepRefs.current.delete(q.id); }}
+      onPointerDown={ghost ? undefined : (e) => startStepDrag(q, e)}
+      className={`group relative w-full cursor-pointer rounded-lg border bg-white p-3 shadow-sm transition-colors ${
+        ghost
+          ? "rotate-1 border-[#711419]/50 shadow-xl"
+          : "border-slate-200 hover:border-slate-300"
+      }`}
+      style={{ touchAction: "none" }}
+      data-testid={ghost ? undefined : `step-node-${q.id}`}
+    >
+      <div className="flex items-start gap-2.5 pr-2">
+        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#711419] text-[10px] font-bold text-white">
+          {number}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-medium leading-snug text-slate-900">{q.question}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-1 py-0.5">
+              {QUESTION_TYPE_ICONS[q.questionType]}
+              {QUESTION_TYPE_LABELS[q.questionType]}
+            </span>
+            {q.isRequired && (
+              <span className="rounded bg-[#711419]/10 px-1 py-0.5 font-semibold text-[#711419]">Required</span>
+            )}
+          </div>
+        </div>
+        {!ghost && (
+          <button
+            className="rounded p-1 text-slate-300 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); setDeletingStep(q); }}
+            data-testid={`step-delete-${q.id}`}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      {/* Link handle: drag from the step onto a photo card */}
+      {!ghost && (
+        <button
+          onPointerDown={(e) => startLinkDrag(q.id, e)}
+          className="absolute -right-2 top-1/2 z-20 h-4 w-4 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-white bg-[#711419] shadow transition-transform hover:scale-125"
+          style={{ touchAction: "none" }}
+          title="Drag onto a photo step to require it here"
+          data-testid={`step-handle-${q.id}`}
+        />
+      )}
+    </div>
+  );
+
+  // Chain rendering (with a gap placeholder while reordering)
+  const chainSteps = reorder ? orderedSteps.filter((s) => s.id !== reorder.id) : orderedSteps;
+  const chainItems: React.ReactNode[] = [];
+  chainSteps.forEach((q, i) => {
+    if (reorder && reorder.gap === i) {
+      chainItems.push(
+        <div key="gap" className="flex w-full flex-col items-center">
+          <div className="h-6 w-px bg-slate-300" />
+          <div style={{ height: reorder.h }} className="w-full rounded-lg border-2 border-dashed border-[#711419]/40 bg-[#711419]/5" />
+        </div>,
+      );
+    }
+    const number = reorder ? (i >= reorder.gap ? i + 2 : i + 1) : i + 1;
+    chainItems.push(
+      <div key={q.id} className="flex w-full flex-col items-center">
+        <div className="h-6 w-px bg-slate-300" />
+        {renderStepCard(q, number)}
+      </div>,
+    );
+  });
+  if (reorder && reorder.gap >= chainSteps.length) {
+    chainItems.push(
+      <div key="gap" className="flex w-full flex-col items-center">
+        <div className="h-6 w-px bg-slate-300" />
+        <div style={{ height: reorder.h }} className="w-full rounded-lg border-2 border-dashed border-[#711419]/40 bg-[#711419]/5" />
+      </div>,
+    );
+  }
+  const draggedStep = reorder ? orderedSteps.find((s) => s.id === reorder.id) : null;
 
   return (
     <CrmLayout currentUser={currentUser}>
@@ -571,16 +927,12 @@ export default function CrmChecklists() {
         </div>
 
         {/* Canvas */}
-        <div
-          className="relative flex-1 overflow-auto bg-slate-50"
-          style={{
-            backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
-            backgroundSize: "22px 22px",
-          }}
-          data-testid="checklist-canvas"
-        >
+        <div className="relative min-h-0 flex-1">
           {!visitType || !subtype ? (
-            <div className="flex h-full items-center justify-center">
+            <div
+              className="flex h-full items-center justify-center bg-slate-50"
+              style={{ backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)", backgroundSize: "22px 22px" }}
+            >
               <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-white/70 px-10 py-8 text-center backdrop-blur-sm">
                 <ClipboardList className="mx-auto mb-3 h-8 w-8 text-slate-400" />
                 <p className="text-sm font-semibold text-slate-700">Start your flow</p>
@@ -590,7 +942,10 @@ export default function CrmChecklists() {
               </div>
             </div>
           ) : !checklist ? (
-            <div className="flex h-full items-center justify-center">
+            <div
+              className="flex h-full items-center justify-center bg-slate-50"
+              style={{ backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)", backgroundSize: "22px 22px" }}
+            >
               <button
                 onClick={openNewChecklist}
                 className="rounded-2xl border-2 border-dashed border-[#711419]/40 bg-white/70 px-10 py-8 text-center backdrop-blur-sm transition-colors hover:border-[#711419] hover:bg-white"
@@ -604,216 +959,185 @@ export default function CrmChecklists() {
               </button>
             </div>
           ) : (
-            <div
-              ref={contentRef}
-              className={`relative flex min-h-full w-max min-w-full items-start gap-28 px-12 py-10 ${dragLink ? "select-none" : ""}`}
-              onPointerMove={moveLinkDrag}
-              onPointerUp={endLinkDrag}
-              onPointerCancel={endLinkDrag}
-            >
-              {/* Arrows (photo step → checklist step) */}
-              <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full">
-                <defs>
-                  <marker id="arrowhead" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
-                    <path d="M 0 0 L 8 4.5 L 0 9 z" fill={MAROON} />
-                  </marker>
-                  <marker id="arrowhead-live" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
-                    <path d="M 0 0 L 8 4.5 L 0 9 z" fill="#b45309" />
-                  </marker>
-                </defs>
-                {links.map((l) => (
-                  <path
-                    key={`${l.photoId}-${l.stepId}`}
-                    d={curve(l.from, l.to)}
-                    fill="none"
-                    stroke={MAROON}
-                    strokeWidth={2}
-                    strokeOpacity={0.55}
-                    markerEnd="url(#arrowhead)"
-                  />
-                ))}
-                {dragLink && (
-                  <path
-                    d={curve(dragLink.from, dragLink.to)}
-                    fill="none"
-                    stroke="#b45309"
-                    strokeWidth={2}
-                    strokeDasharray="6 5"
-                    markerEnd="url(#arrowhead-live)"
-                  />
-                )}
-              </svg>
+            <>
+              <div
+                ref={viewportRef}
+                className="h-full w-full overflow-auto overscroll-contain bg-slate-50"
+                style={{ cursor: panning ? "grabbing" : spaceHeld ? "grab" : undefined }}
+                onPointerDown={onCanvasPointerDown}
+                onPointerMove={onCanvasPointerMove}
+                onPointerUp={onCanvasPointerUp}
+                onPointerCancel={onCanvasPointerUp}
+                data-testid="checklist-canvas"
+              >
+                <div
+                  ref={worldRef}
+                  className="relative select-none"
+                  style={{
+                    width: worldSize.w,
+                    height: worldSize.h,
+                    backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
+                    backgroundSize: "22px 22px",
+                  }}
+                >
+                  {/* Arrows (step → photo) */}
+                  <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full">
+                    <defs>
+                      <marker id="arrowhead" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+                        <path d="M 0 0 L 8 4.5 L 0 9 z" fill={MAROON} />
+                      </marker>
+                      <marker id="arrowhead-live" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+                        <path d="M 0 0 L 8 4.5 L 0 9 z" fill="#b45309" />
+                      </marker>
+                    </defs>
+                    {arrows.map((l) => (
+                      <path
+                        key={l.id}
+                        d={curve(l.from, l.to)}
+                        fill="none"
+                        stroke={MAROON}
+                        strokeWidth={2}
+                        strokeOpacity={0.55}
+                        markerEnd="url(#arrowhead)"
+                      />
+                    ))}
+                    {dragLink && (
+                      <path
+                        d={curve(dragLink.from, dragLink.to)}
+                        fill="none"
+                        stroke="#b45309"
+                        strokeWidth={2}
+                        strokeDasharray="6 5"
+                        markerEnd="url(#arrowhead-live)"
+                      />
+                    )}
+                  </svg>
 
-              {/* Main flow: the checklist steps */}
-              <div className="relative z-10 flex w-[380px] shrink-0 flex-col items-center">
-                <div className="flex items-center gap-2 rounded-full bg-[#711419] px-5 py-2 text-sm font-semibold text-white shadow-md" data-testid="flow-start-node">
-                  <Flag className="h-4 w-4" />
-                  {VISIT_TYPE_LABELS[visitType as ChecklistVisitType]} · {subtype}
-                </div>
-
-                {steps.map((q, i) => (
-                  <div key={q.id} className="flex w-full flex-col items-center">
-                    <div className="h-7 w-px bg-slate-300" />
+                  {/* Flow block: the checklist steps */}
+                  <div
+                    ref={flowBlockRef}
+                    className="absolute z-10 flex flex-col items-center"
+                    style={{ left: flowPos.x, top: flowPos.y, width: FLOW_W }}
+                  >
                     <div
-                      ref={(el) => { if (el) stepRefs.current.set(q.id, el); else stepRefs.current.delete(q.id); }}
-                      className={`group w-full rounded-xl border bg-white p-4 shadow-sm transition-all ${
-                        hoverStepId === q.id
-                          ? "border-amber-500 ring-2 ring-amber-400/60"
-                          : "border-slate-200 hover:border-slate-300"
-                      }`}
-                      data-testid={`step-node-${q.id}`}
+                      onPointerDown={startFlowDrag}
+                      className="flex cursor-grab items-center gap-1.5 rounded-full bg-[#711419] px-4 py-1.5 text-xs font-semibold text-white shadow-md active:cursor-grabbing"
+                      style={{ touchAction: "none" }}
+                      data-testid="flow-start-node"
                     >
-                      <div className="flex items-start gap-3">
-                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#711419] text-xs font-bold text-white">
-                          {i + 1}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium leading-snug text-slate-900">{q.question}</p>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5">
-                              {QUESTION_TYPE_ICONS[q.questionType]}
-                              {QUESTION_TYPE_LABELS[q.questionType]}
-                            </span>
-                            {q.isRequired && (
-                              <span className="rounded-md bg-[#711419]/10 px-1.5 py-0.5 font-semibold text-[#711419]">Required</span>
-                            )}
-                            {q.questionType === "select" && q.options && <span>{q.options.length} options</span>}
+                      <GripVertical className="h-3.5 w-3.5 opacity-70" />
+                      {VISIT_TYPE_LABELS[visitType as ChecklistVisitType]} · {subtype}
+                    </div>
+
+                    {chainItems}
+
+                    <div className="h-6 w-px bg-slate-300" />
+                    <button
+                      onClick={openNewStep}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-slate-300 bg-white/60 py-2.5 text-[13px] font-medium text-slate-500 transition-colors hover:border-[#711419] hover:text-[#711419]"
+                      data-testid="button-add-step"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Add step
+                    </button>
+                  </div>
+
+                  {/* Reorder ghost */}
+                  {reorder && draggedStep && (
+                    <div
+                      className="pointer-events-none absolute z-30"
+                      style={{ left: flowPos.x, top: reorder.ghostY, width: FLOW_W }}
+                    >
+                      {renderStepCard(draggedStep, reorder.gap + 1, true)}
+                    </div>
+                  )}
+
+                  {/* Photo step nodes (freeform) */}
+                  {photoSteps.map((ps) => {
+                    const pos = photoPos[ps.id];
+                    if (!pos) return null;
+                    return (
+                      <div
+                        key={ps.id}
+                        ref={(el) => { if (el) photoRefs.current.set(ps.id, el); else photoRefs.current.delete(ps.id); }}
+                        onPointerDown={(e) => startPhotoDrag(ps, e)}
+                        className={`group absolute z-10 cursor-pointer rounded-lg border bg-white p-2.5 shadow-sm transition-colors ${
+                          hoverPhotoId === ps.id
+                            ? "border-amber-500 ring-2 ring-amber-400/60"
+                            : "border-slate-200 hover:border-slate-300"
+                        }`}
+                        style={{ left: pos.x, top: pos.y, width: PHOTO_W, touchAction: "none" }}
+                        data-testid={`photo-node-${ps.id}`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#711419]/10 text-[#711419]">
+                            <Camera className="h-3.5 w-3.5" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[13px] font-medium leading-snug text-slate-900">{ps.label}</p>
+                            <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px]">
+                              {ps.isRequired && (
+                                <span className="rounded bg-[#711419]/10 px-1 py-0.5 font-semibold text-[#711419]">Required</span>
+                              )}
+                              {ps.linkedQuestionId && stepNumberById.has(ps.linkedQuestionId) ? (
+                                <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1 py-0.5 font-medium text-amber-700">
+                                  Step {stepNumberById.get(ps.linkedQuestionId)}
+                                  <button
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => { e.stopPropagation(); setPhotoLink.mutate({ photoId: ps.id, questionId: null }); }}
+                                    className="text-amber-500 hover:text-amber-800"
+                                    title="Unlink"
+                                    data-testid={`photo-unlink-${ps.id}`}
+                                  >
+                                    <Unlink className="h-3 w-3" />
+                                  </button>
+                                </span>
+                              ) : (
+                                <span className="rounded bg-slate-100 px-1 py-0.5 text-slate-500">Whole visit</span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex flex-col gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                           <button
-                            className="rounded p-1 text-slate-400 hover:text-slate-800 disabled:opacity-30"
-                            disabled={i === 0}
-                            onClick={() => moveStep.mutate({ a: q, b: steps[i - 1] })}
-                            data-testid={`step-up-${q.id}`}
-                          >
-                            <ChevronUp className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            className="rounded p-1 text-slate-400 hover:text-slate-800 disabled:opacity-30"
-                            disabled={i === steps.length - 1}
-                            onClick={() => moveStep.mutate({ a: q, b: steps[i + 1] })}
-                            data-testid={`step-down-${q.id}`}
-                          >
-                            <ChevronDown className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                        <div className="flex flex-col gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                          <button
-                            className="rounded p-1 text-slate-400 hover:text-slate-800"
-                            onClick={() => openEditStep(q)}
-                            data-testid={`step-edit-${q.id}`}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            className="rounded p-1 text-slate-400 hover:text-red-600"
-                            onClick={() => setDeletingStep(q)}
-                            data-testid={`step-delete-${q.id}`}
+                            className="rounded p-0.5 text-slate-300 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); setDeletingPhoto(ps); }}
+                            data-testid={`photo-delete-${ps.id}`}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
+                    );
+                  })}
 
-                <div className="h-7 w-px bg-slate-300" />
-                <button
-                  onClick={openNewStep}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-white/60 py-3.5 text-sm font-medium text-slate-500 transition-colors hover:border-[#711419] hover:text-[#711419]"
-                  data-testid="button-add-step"
-                >
-                  <Plus className="h-4 w-4" /> Add step
-                </button>
+                  {/* Hint when there are no photo steps yet */}
+                  {photoSteps.length === 0 && (
+                    <button
+                      onClick={openNewPhoto}
+                      className="absolute z-10 flex w-[220px] items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-slate-300 bg-white/60 py-3 text-[13px] font-medium text-slate-500 transition-colors hover:border-[#711419] hover:text-[#711419]"
+                      style={{ left: flowPos.x + FLOW_W + 240, top: flowPos.y + 30 }}
+                      data-testid="button-add-first-photo"
+                    >
+                      <Camera className="h-3.5 w-3.5" /> Add photo step
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {/* Photo lane: required image steps */}
-              <div className="relative z-10 flex w-[300px] shrink-0 flex-col gap-3 pt-1">
-                <div>
-                  <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
-                    <Camera className="h-4 w-4 text-[#711419]" /> Photo steps
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Drag a card's <span className="font-semibold">●</span> handle onto a step to require that photo there.
-                  </p>
-                </div>
-
-                {photoSteps.map((ps) => (
-                  <div
-                    key={ps.id}
-                    ref={(el) => { if (el) photoRefs.current.set(ps.id, el); else photoRefs.current.delete(ps.id); }}
-                    className="group relative rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm transition-colors hover:border-slate-300"
-                    data-testid={`photo-node-${ps.id}`}
-                  >
-                    {/* Link handle */}
-                    <button
-                      onPointerDown={(e) => startLinkDrag(ps.id, e)}
-                      className="absolute -left-2.5 top-1/2 z-20 h-5 w-5 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-white bg-[#711419] shadow transition-transform hover:scale-125"
-                      style={{ touchAction: "none" }}
-                      title="Drag onto a step to link"
-                      data-testid={`photo-handle-${ps.id}`}
-                    />
-                    <div className="flex items-start gap-2.5">
-                      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#711419]/10 text-[#711419]">
-                        <Camera className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium leading-snug text-slate-900">{ps.label}</p>
-                        {ps.instructions && (
-                          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{ps.instructions}</p>
-                        )}
-                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
-                          {ps.isRequired && (
-                            <span className="rounded-md bg-[#711419]/10 px-1.5 py-0.5 font-semibold text-[#711419]">Required</span>
-                          )}
-                          {ps.linkedQuestionId && stepNumberById.has(ps.linkedQuestionId) ? (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 font-medium text-amber-700">
-                              → Step {stepNumberById.get(ps.linkedQuestionId)}
-                              <button
-                                onClick={() => setPhotoLink.mutate({ photoId: ps.id, questionId: null })}
-                                className="ml-0.5 text-amber-500 hover:text-amber-800"
-                                title="Unlink"
-                                data-testid={`photo-unlink-${ps.id}`}
-                              >
-                                <Unlink className="h-3 w-3" />
-                              </button>
-                            </span>
-                          ) : (
-                            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-slate-500">Whole visit</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                        <button
-                          className="rounded p-1 text-slate-400 hover:text-slate-800"
-                          onClick={() => openEditPhoto(ps)}
-                          data-testid={`photo-edit-${ps.id}`}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          className="rounded p-1 text-slate-400 hover:text-red-600"
-                          onClick={() => setDeletingPhoto(ps)}
-                          data-testid={`photo-delete-${ps.id}`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                <button
+              {/* Floating canvas controls */}
+              <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex items-start justify-between px-4">
+                <span className="pointer-events-auto rounded-full bg-white/85 px-3 py-1.5 text-[11px] font-medium text-slate-500 shadow-sm backdrop-blur">
+                  Hold <kbd className="rounded bg-slate-100 px-1 font-semibold">Space</kbd> + drag to pan · click a card to edit · drag a step's ● onto a photo
+                </span>
+                <Button
+                  size="sm"
                   onClick={openNewPhoto}
-                  className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-white/60 py-3 text-sm font-medium text-slate-500 transition-colors hover:border-[#711419] hover:text-[#711419]"
+                  className="pointer-events-auto h-8 bg-[#711419] shadow-md hover:bg-[#8a1a1f]"
                   data-testid="button-add-photo-step"
                 >
-                  <Camera className="h-4 w-4" /> Add photo step
-                </button>
+                  <Camera className="mr-1.5 h-3.5 w-3.5" /> Add photo step
+                </Button>
               </div>
-            </div>
+            </>
           )}
         </div>
       </div>
@@ -997,7 +1321,7 @@ export default function CrmChecklists() {
           <DialogHeader>
             <DialogTitle>{editingPhoto ? "Edit photo step" : "Add photo step"}</DialogTitle>
             <DialogDescription>
-              A photo the tech must capture. Link it to a step by dragging its handle on the canvas.
+              A photo the tech must capture. Link it by dragging a step's handle onto this card.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
