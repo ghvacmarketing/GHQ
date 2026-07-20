@@ -2394,7 +2394,7 @@ export default function CrmDispatch() {
   const [workSubtype, setWorkSubtype] = useState<WorkSubtype>("No Cool");
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
   const [startTime, setStartTime] = useState("08:00");
-  const [endTime, setEndTime] = useState("10:00");
+  const [endTime, setEndTime] = useState("09:00");
   const [assignedTechId, setAssignedTechId] = useState<string>("unassigned");
   const [immediateAction, setImmediateAction] = useState<ImmediateAction>("create_now");
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
@@ -2410,8 +2410,9 @@ export default function CrmDispatch() {
   
   const timeOptions = useMemo(() => {
     const options: { value: string; label: string }[] = [];
+    // Slots snap to the shared dispatch increment (15 or 30 min).
     for (let hour = SCHEDULE_START_HOUR; hour <= SCHEDULE_END_HOUR; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
+      for (let minute = 0; minute < 60; minute += STEP_MINUTES) {
         if (hour === SCHEDULE_END_HOUR && minute > 0) break;
         const hourStr = hour.toString().padStart(2, "0");
         const minuteStr = minute.toString().padStart(2, "0");
@@ -2424,6 +2425,15 @@ export default function CrmDispatch() {
     }
     return options;
   }, []);
+
+  // Default the end to 1 hour after the start, clamped to the schedule window.
+  // 60 min is a clean multiple of both the 15- and 30-min increments, so the
+  // result always lands on a real slot.
+  const addOneHour = (hhmm: string) => {
+    const [h, m] = hhmm.split(":").map(Number);
+    const total = Math.min(h * 60 + m + 60, SCHEDULE_END_HOUR * 60);
+    return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+  };
   const [priority, setPriority] = useState<string>("normal");
   
   // Service call checklist state
@@ -2800,7 +2810,7 @@ export default function CrmDispatch() {
     setWorkSubtype("Other");
     setScheduledDate(selectedDate);
     setStartTime("08:00");
-    setEndTime("17:00");
+    setEndTime("09:00");
     setAssignedTechId("unassigned");
     setPriority("normal");
     setCustomerSearch("");
@@ -5541,7 +5551,14 @@ export default function CrmDispatch() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Start Time</Label>
-                    <Select value={startTime} onValueChange={setStartTime}>
+                    <Select
+                      value={startTime}
+                      onValueChange={(v) => {
+                        setStartTime(v);
+                        // Keep a 1-hour default duration as the start moves.
+                        setEndTime(addOneHour(v));
+                      }}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
