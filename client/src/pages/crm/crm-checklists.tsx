@@ -387,7 +387,7 @@ export default function CrmChecklists() {
   }, []);
 
   // Measure node geometry (arrow anchor points) after every layout change
-  useLayoutEffect(() => {
+  const measureGeom = () => {
     const flowEl = flowBlockRef.current;
     if (!flowEl) return;
     const fRect = flowEl.getBoundingClientRect();
@@ -407,7 +407,21 @@ export default function CrmChecklists() {
       photoGeom.current.set(id, { w: el.offsetWidth, h: el.offsetHeight });
     }
     setArrowTick((t) => t + 1);
+  };
+  const measureRef = useRef(measureGeom);
+  measureRef.current = measureGeom;
+  useLayoutEffect(() => {
+    measureRef.current();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderedSteps, photoSteps, checklist?.id, reorder !== null, collapsedSections]);
+
+  // Collapse/expand animates (grid-rows 0fr <-> 1fr); re-anchor the arrows
+  // mid-animation and once it settles.
+  const toggleSection = (name: string) => {
+    setCollapsedSections((prev) => ({ ...prev, [name]: !prev[name] }));
+    window.setTimeout(() => measureRef.current(), 160);
+    window.setTimeout(() => measureRef.current(), 340);
+  };
 
   // ----- mutations -----
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["/api/crm/checklists"] });
@@ -706,8 +720,9 @@ export default function CrmChecklists() {
       const slots: Array<{ index: number; y: number }> = [];
       const headerEl = panelSecRefs.current.get(sec.key);
       if (headerEl) slots.push({ index: 0, y: headerEl.getBoundingClientRect().bottom });
+      const secCollapsed = !!sec.name && !!collapsedSections[sec.name];
       let vis = 0;
-      for (const q of sec.steps) {
+      for (const q of secCollapsed ? [] : sec.steps) {
         if (q.id === draggedId) continue;
         const el = panelStepRefs.current.get(q.id);
         if (!el) continue;
@@ -741,6 +756,8 @@ export default function CrmChecklists() {
     to.ids.splice(idx, 0, draggedId);
     const flat = secList.flatMap((x) => x.ids);
     setLocalOrder(flat);
+    setFlashStepId(draggedId);
+    window.setTimeout(() => setFlashStepId((cur) => (cur === draggedId ? null : cur)), 1400);
     if (targetKey !== curKey) {
       setSectionOverrides((prev) => ({ ...prev, [draggedId]: targetKey }));
       apiRequest("PUT", `/api/crm/checklists/questions/${draggedId}`, { section: targetKey })
@@ -1188,7 +1205,7 @@ export default function CrmChecklists() {
             data-testid={`section-${sec.key}`}
           >
             <button
-              onClick={() => setCollapsedSections((prev) => ({ ...prev, [sec.name!]: !prev[sec.name!] }))}
+              onClick={() => toggleSection(sec.name!)}
               className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
               data-testid={`section-toggle-${sec.key}`}
             >
@@ -1221,19 +1238,28 @@ export default function CrmChecklists() {
         </div>,
       );
     }
-    if (isCollapsed) return;
     const inReorder = !!reorder && reorder.sectionKey === (sec.name ?? null);
     const visible = inReorder ? sec.steps.filter((q) => q.id !== reorder!.id) : sec.steps;
+    const stepNodes: React.ReactNode[] = [];
     visible.forEach((q, i) => {
-      if (inReorder && reorder!.gap === i) chainItems.push(gapNode(`gap-${sec.key}`));
-      chainItems.push(
+      if (inReorder && reorder!.gap === i) stepNodes.push(gapNode(`gap-${sec.key}`));
+      stepNodes.push(
         <div key={q.id} className="flex w-full flex-col items-center">
           <div className="h-6 w-px bg-slate-300" />
           {renderStepCard(q, stepNumberById.get(q.id) ?? 0)}
         </div>,
       );
     });
-    if (inReorder && reorder!.gap >= visible.length) chainItems.push(gapNode(`gap-end-${sec.key}`));
+    if (inReorder && reorder!.gap >= visible.length) stepNodes.push(gapNode(`gap-end-${sec.key}`));
+    chainItems.push(
+      <div
+        key={`body-${sec.key}`}
+        className="grid w-full transition-[grid-template-rows,opacity] duration-300 ease-out"
+        style={{ gridTemplateRows: isCollapsed ? "0fr" : "1fr", opacity: isCollapsed ? 0 : 1 }}
+      >
+        <div className="flex min-h-0 w-full flex-col items-center overflow-hidden">{stepNodes}</div>
+      </div>,
+    );
   });
   const draggedStep = reorder ? orderedSteps.find((q) => q.id === reorder.id) : null;
 
@@ -1389,7 +1415,7 @@ export default function CrmChecklists() {
                               data-testid={`layers-section-${sec.key}`}
                             >
                               <button
-                                onClick={() => sec.name && setCollapsedSections((prev) => ({ ...prev, [sec.name!]: !prev[sec.name!] }))}
+                                onClick={() => sec.name && toggleSection(sec.name!)}
                                 className="p-0.5 text-slate-400 hover:text-slate-600"
                                 title={secCollapsed ? "Expand" : "Collapse"}
                               >
@@ -1414,32 +1440,42 @@ export default function CrmChecklists() {
                               )}
                             </div>
                           )}
-                          {!secCollapsed &&
-                            rows.map((q, i) => (
-                              <div key={q.id}>
-                                {dropHere && panelDrop!.index === i && dropLine}
-                                <div
-                                  ref={(el) => {
-                                    if (el) panelStepRefs.current.set(q.id, el);
-                                    else panelStepRefs.current.delete(q.id);
-                                  }}
-                                  onPointerDown={(e) => startPanelDrag(q, e)}
-                                  className={`flex cursor-pointer items-center gap-1.5 rounded-md py-1.5 pl-1.5 pr-1 text-[12px] transition-colors hover:bg-slate-50 ${
-                                    panelDragId === q.id ? "opacity-40" : ""
-                                  }`}
-                                  style={{ touchAction: "none" }}
-                                  data-testid={`layers-step-${q.id}`}
-                                >
-                                  <GripVertical className="h-3 w-3 shrink-0 text-slate-300" />
-                                  <span className="w-4 shrink-0 text-center text-[10px] font-bold text-[#711419]">
-                                    {stepNumberById.get(q.id)}
-                                  </span>
-                                  <span className="min-w-0 flex-1 truncate text-slate-700">{q.question}</span>
-                                  {q.isRequired && <span className="shrink-0 text-[#711419]">*</span>}
+                          <div
+                            className="grid transition-[grid-template-rows,opacity] duration-300 ease-out"
+                            style={{ gridTemplateRows: secCollapsed ? "0fr" : "1fr", opacity: secCollapsed ? 0 : 1 }}
+                          >
+                            <div className="min-h-0 overflow-hidden">
+                              {rows.map((q, i) => (
+                                <div key={q.id}>
+                                  {dropHere && panelDrop!.index === i && dropLine}
+                                  <div
+                                    ref={(el) => {
+                                      if (el) panelStepRefs.current.set(q.id, el);
+                                      else panelStepRefs.current.delete(q.id);
+                                    }}
+                                    onPointerDown={(e) => startPanelDrag(q, e)}
+                                    className={`flex cursor-pointer items-center gap-1.5 rounded-md py-1.5 pl-1.5 pr-1 text-[12px] transition-colors hover:bg-slate-50 ${
+                                      panelDragId === q.id
+                                        ? "opacity-40"
+                                        : flashStepId === q.id
+                                          ? "bg-[#711419]/10"
+                                          : ""
+                                    }`}
+                                    style={{ touchAction: "none" }}
+                                    data-testid={`layers-step-${q.id}`}
+                                  >
+                                    <GripVertical className="h-3 w-3 shrink-0 text-slate-300" />
+                                    <span className="w-4 shrink-0 text-center text-[10px] font-bold text-[#711419]">
+                                      {stepNumberById.get(q.id)}
+                                    </span>
+                                    <span className="min-w-0 flex-1 truncate text-slate-700">{q.question}</span>
+                                    {q.isRequired && <span className="shrink-0 text-[#711419]">*</span>}
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
-                          {!secCollapsed && dropHere && panelDrop!.index >= rows.length && dropLine}
+                              ))}
+                              {dropHere && panelDrop!.index >= rows.length && dropLine}
+                            </div>
+                          </div>
                           {secCollapsed && dropHere && dropLine}
                         </div>
                       );
