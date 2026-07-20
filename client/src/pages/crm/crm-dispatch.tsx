@@ -86,6 +86,7 @@ import {
   Pause,
   Ban,
   Check,
+  X,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { addDays, endOfMonth, endOfWeek, format, formatDistanceToNow, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
@@ -1470,6 +1471,7 @@ function DraggableScheduleCard({
       className={`absolute top-2 bottom-2 cursor-grab transition-all group rounded-md border border-slate-300 ${bgColor} shadow-sm hover:shadow-md overflow-hidden ${isResizing ? 'cursor-ew-resize' : ''}`}
       title={isCompactCard ? `${workOrder.customerName}\n${workOrder.propertyAddress || "No address"}\n${statusLabels[workOrder.status] || workOrder.status}` : undefined}
       data-testid={`schedule-card-${workOrder.id}`}
+      data-dispatch-card="true"
       {...attributes}
       {...dragListeners}
       onClick={(e) => {
@@ -1530,6 +1532,9 @@ function ScheduleRowTimeline({
   onNodeRef,
   activeDragLabel,
   externalPreviewHour,
+  blackouts = [],
+  onPaintBlackout,
+  onDeleteBlackout,
 }: {
   children: React.ReactNode;
   isDragActive: boolean;
@@ -1541,12 +1546,55 @@ function ScheduleRowTimeline({
   onNodeRef?: (node: HTMLDivElement | null) => void;
   activeDragLabel?: string;
   externalPreviewHour?: number | null;
+  blackouts?: Array<{ id: string; startAt: string; endAt: string; reason: string | null }>;
+  onPaintBlackout?: (startHour: number, endHour: number) => void;
+  onDeleteBlackout?: (id: string) => void;
 }) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const [localPreviewLeft, setLocalPreviewLeft] = useState<number | null>(null);
   const [localPreviewStartHour, setLocalPreviewStartHour] = useState<number>(0);
   const totalHours = SCHEDULE_END_HOUR - SCHEDULE_START_HOUR;
   const previewWidthPercent = (previewDurationHours / totalHours) * 100;
+
+  // ── Block-out painting: click-and-hold-drag across empty timeline ──
+  const [paint, setPaint] = useState<{ a: number; b: number } | null>(null);
+  const paintStartRef = useRef<number | null>(null);
+  const STEP_H = STEP_MINUTES / 60;
+
+  const clientXToHour = useCallback((clientX: number) => {
+    const rect = timelineRef.current?.getBoundingClientRect();
+    if (!rect) return SCHEDULE_START_HOUR;
+    const rel = (clientX - rect.left) / rect.width;
+    const raw = SCHEDULE_START_HOUR + rel * totalHours;
+    const snapped = Math.round(raw / STEP_H) * STEP_H;
+    return Math.max(SCHEDULE_START_HOUR, Math.min(SCHEDULE_END_HOUR, snapped));
+  }, [totalHours, STEP_H]);
+
+  const handlePaintDown = useCallback((e: React.PointerEvent) => {
+    if (isDragActive || e.button !== 0) return;
+    // Ignore presses on cards, blackout blocks, or their controls.
+    if ((e.target as HTMLElement).closest('[data-dispatch-card],[data-blackout]')) return;
+    const startHour = clientXToHour(e.clientX);
+    paintStartRef.current = startHour;
+    setPaint({ a: startHour, b: startHour });
+    timelineRef.current?.setPointerCapture?.(e.pointerId);
+  }, [isDragActive, clientXToHour]);
+
+  const handlePaintMove = useCallback((clientX: number) => {
+    if (paintStartRef.current === null) return;
+    const cur = clientXToHour(clientX);
+    const start = paintStartRef.current;
+    setPaint({ a: Math.min(start, cur), b: Math.max(start, cur) });
+  }, [clientXToHour]);
+
+  const handlePaintUp = useCallback(() => {
+    const start = paintStartRef.current;
+    paintStartRef.current = null;
+    setPaint((p) => {
+      if (start !== null && p && p.b - p.a >= STEP_H) onPaintBlackout?.(p.a, p.b);
+      return null;
+    });
+  }, [STEP_H, onPaintBlackout]);
 
   const hasExternalPreview = externalPreviewHour !== undefined && externalPreviewHour !== null;
   const previewLeft = hasExternalPreview
@@ -1570,6 +1618,7 @@ function ScheduleRowTimeline({
   };
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (paintStartRef.current !== null) { handlePaintMove(e.clientX); return; }
     if (!isDragActive || !timelineRef.current) return;
     const rect = timelineRef.current.getBoundingClientRect();
     const clampedHour = computeDropHourOffset(e.clientX, rect, dragClickHourOffset, previewDurationHours);
@@ -1578,7 +1627,7 @@ function ScheduleRowTimeline({
     setLocalPreviewLeft(Math.max(0, Math.min(snappedPercent, maxLeftPercent)));
     setLocalPreviewStartHour(SCHEDULE_START_HOUR + clampedHour);
     onPreviewTimeChange?.(clampedHour);
-  }, [isDragActive, onPreviewTimeChange, totalHours, dragClickHourOffset, previewDurationHours]);
+  }, [isDragActive, onPreviewTimeChange, totalHours, dragClickHourOffset, previewDurationHours, handlePaintMove]);
 
   const handlePointerLeave = useCallback(() => {
     setLocalPreviewLeft(null);
@@ -1593,7 +1642,10 @@ function ScheduleRowTimeline({
         onNodeRef?.(node);
       }}
       className="flex-1 relative py-2 min-w-0"
+      onPointerDown={handlePaintDown}
       onPointerMove={handlePointerMove}
+      onPointerUp={handlePaintUp}
+      onPointerCancel={handlePaintUp}
       onPointerLeave={handlePointerLeave}
     >
       {Array.from({ length: totalHours }, (_, i) => {
@@ -1625,6 +1677,52 @@ function ScheduleRowTimeline({
         />
       )}
 
+      {/* Existing block-out ranges (grey hatched, non-schedulable) */}
+      {blackouts.map((b) => {
+        const s = toLocalTime(new Date(b.startAt));
+        const e2 = toLocalTime(new Date(b.endAt));
+        const startHour = s.getHours() + s.getMinutes() / 60;
+        const endHour = e2.getHours() + e2.getMinutes() / 60;
+        const leftPct = ((Math.max(SCHEDULE_START_HOUR, startHour) - SCHEDULE_START_HOUR) / totalHours) * 100;
+        const widthPct = ((Math.min(SCHEDULE_END_HOUR, endHour) - Math.max(SCHEDULE_START_HOUR, startHour)) / totalHours) * 100;
+        if (widthPct <= 0) return null;
+        return (
+          <div
+            key={b.id}
+            data-blackout="true"
+            className="group/blackout absolute top-1 bottom-1 z-[6] flex items-center justify-center rounded-md border border-slate-400/70 bg-slate-500/15"
+            style={{
+              left: `${leftPct}%`,
+              width: `${widthPct}%`,
+              backgroundImage: "repeating-linear-gradient(135deg, rgba(71,85,105,0.28) 0 6px, transparent 6px 12px)",
+            }}
+            title={`Blocked off · ${formatClock(Math.floor(startHour), Math.round((startHour % 1) * 60))} – ${formatClock(Math.floor(endHour), Math.round((endHour % 1) * 60))}`}
+          >
+            <span className="pointer-events-none select-none text-[10px] font-semibold uppercase tracking-wide text-slate-600">Blocked</span>
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onDeleteBlackout?.(b.id); }}
+              className="absolute right-0.5 top-0.5 rounded bg-white/80 p-0.5 text-slate-600 opacity-0 transition-opacity hover:bg-white hover:text-red-600 group-hover/blackout:opacity-100"
+              title="Remove block-out"
+              data-testid={`delete-blackout-${b.id}`}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        );
+      })}
+
+      {/* Live paint selection */}
+      {paint && paint.b > paint.a && (
+        <div
+          className="pointer-events-none absolute top-1 bottom-1 z-[7] rounded-md border-2 border-slate-500/70 bg-slate-500/20"
+          style={{
+            left: `${((paint.a - SCHEDULE_START_HOUR) / totalHours) * 100}%`,
+            width: `${((paint.b - paint.a) / totalHours) * 100}%`,
+          }}
+        />
+      )}
+
       {children}
     </div>
   );
@@ -1644,9 +1742,12 @@ interface TechnicianScheduleBoardProps {
   onRegisterTimelineNode?: (techId: string, node: HTMLElement | null) => void;
   activeDragLabel?: string;
   previewHourByTech?: Record<string, number>;
+  blackouts?: Array<{ id: string; techId: string; startAt: string; endAt: string; reason: string | null }>;
+  onPaintBlackout?: (techId: string, startHour: number, endHour: number) => void;
+  onDeleteBlackout?: (id: string) => void;
 }
 
-function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, dragClickHourOffset = 0, onPreviewTimeChange, onOpenQuickStatus, activeDragDurationHours = 1, onRegisterTimelineNode, activeDragLabel, previewHourByTech = {} }: TechnicianScheduleBoardProps) {
+function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, dragClickHourOffset = 0, onPreviewTimeChange, onOpenQuickStatus, activeDragDurationHours = 1, onRegisterTimelineNode, activeDragLabel, previewHourByTech = {}, blackouts = [], onPaintBlackout, onDeleteBlackout }: TechnicianScheduleBoardProps) {
   // One label per hour *block* (positioned between the gridlines). Compact
   // form (e.g. "6 AM", "12 PM") so all 16 hours fit any desktop width without
   // horizontal scroll.
@@ -1743,6 +1844,9 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                       onNodeRef={(node) => onRegisterTimelineNode?.(tech.id, node)}
                       activeDragLabel={activeDragLabel}
                       externalPreviewHour={previewHourByTech[tech.id] ?? null}
+                      blackouts={blackouts.filter((b) => b.techId === tech.id)}
+                      onPaintBlackout={(sh, eh) => onPaintBlackout?.(tech.id, sh, eh)}
+                      onDeleteBlackout={onDeleteBlackout}
                     >
                       {techWorkOrders.map((wo) => {
                         if (!wo.scheduledStart) return null;
@@ -2756,6 +2860,37 @@ export default function CrmDispatch() {
     color: techColors[idx % techColors.length],
   }));
 
+  // ── Dispatch blackouts (block-out time) ──
+  const blackoutFrom = getLocalStartOfDay(selectedDate).toISOString();
+  const blackoutTo = getLocalEndOfDay(selectedDate).toISOString();
+  const { data: blackouts = [] } = useQuery<Array<{ id: string; techId: string; startAt: string; endAt: string; reason: string | null }>>({
+    queryKey: ["/api/crm/dispatch-blackouts", blackoutFrom, blackoutTo],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/dispatch-blackouts?from=${encodeURIComponent(blackoutFrom)}&to=${encodeURIComponent(blackoutTo)}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load blackouts");
+      return res.json();
+    },
+    enabled: !!currentUser,
+  });
+  const blackoutsRef = useRef(blackouts);
+  blackoutsRef.current = blackouts;
+
+  const createBlackout = useMutation({
+    mutationFn: async (p: { techId: string; startAt: string; endAt: string }) =>
+      (await apiRequest("POST", "/api/crm/dispatch-blackouts", p)).json(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch-blackouts"] }),
+    onError: (e: any) => toast({ title: e?.message || "Couldn't block out time", variant: "destructive" }),
+  });
+  const deleteBlackout = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/crm/dispatch-blackouts/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/crm/dispatch-blackouts"] }),
+  });
+
+  // Proposed [start,end) overlaps a blackout for this tech? (reads a ref so
+  // scheduling callbacks don't need blackouts in their dependency arrays)
+  const blackoutConflict = useCallback((techId: string, start: Date, end: Date) =>
+    blackoutsRef.current.find((b) => b.techId === techId && new Date(b.startAt) < end && new Date(b.endAt) > start) || null, []);
+
   const updateWorkOrderMutation = useMutation({
     mutationFn: async (data: { workOrderId: string; updates: any }) => {
       const res = await apiRequest("PATCH", `/api/crm/work-orders/${data.workOrderId}`, data.updates);
@@ -2992,6 +3127,11 @@ export default function CrmDispatch() {
         scheduledEndUTC = createLocalDateTime(scheduledDate, endHours, endMinutes);
 
         if (effectiveTechId) {
+          const blocked = blackoutConflict(effectiveTechId, scheduledStartUTC, scheduledEndUTC);
+          if (blocked) {
+            const techName = technicians.find(t => t.id === effectiveTechId)?.name || "This technician";
+            throw new Error(`${techName}'s time is blocked out at that slot. Remove the block-out to schedule here.`);
+          }
           const conflict = checkSchedulingConflict(localWorkOrders, effectiveTechId, scheduledStartUTC, scheduledEndUTC);
           if (conflict) {
             const techName = technicians.find(t => t.id === effectiveTechId)?.name || "This technician";
@@ -3228,6 +3368,11 @@ export default function CrmDispatch() {
     const endDateUTC = createLocalDateTime(selectedDate, 9, 0);
     
     // Check for scheduling conflict before assigning
+    const blockedAssign = blackoutConflict(techId, startDateUTC, endDateUTC);
+    if (blockedAssign) {
+      toast({ title: "Time is blocked out", description: `${newTech?.name || 'This technician'}'s time is blocked at that slot.`, variant: "destructive" });
+      return;
+    }
     const conflict = checkSchedulingConflict(localWorkOrders, techId, startDateUTC, endDateUTC, workOrderId);
     if (conflict) {
       const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "hh:mm a") : "unknown time";
@@ -3270,6 +3415,11 @@ export default function CrmDispatch() {
     // Check for scheduling conflict if work order has an assigned tech
     const wo = localWorkOrders.find(w => w.id === workOrderId);
     if (wo?.assignedTechId) {
+      const blockedSched = blackoutConflict(wo.assignedTechId, startDateUTC, endDateUTC);
+      if (blockedSched) {
+        toast({ title: "Time is blocked out", description: "That time is blocked off for this technician.", variant: "destructive" });
+        return;
+      }
       const conflict = checkSchedulingConflict(localWorkOrders, wo.assignedTechId, startDateUTC, endDateUTC, workOrderId);
       if (conflict) {
         const techName = wo.techName || technicians.find(t => t.id === wo.assignedTechId)?.name || "This technician";
@@ -3627,6 +3777,11 @@ export default function CrmDispatch() {
         const startDate = createLocalDateTime(selectedDate, startHourInt, startMinutes);
         const endDate = createLocalDateTime(selectedDate, endHourInt, endMinutes);
         
+        const blocked = blackoutConflict(newTechId, startDate, endDate);
+        if (blocked) {
+          toast({ title: "Time is blocked out", description: "That time is blocked off for this technician. Remove the block-out to schedule here.", variant: "destructive" });
+          return;
+        }
         const conflict = checkSchedulingConflict(localWorkOrders, newTechId, startDate, endDate, workOrderId);
         if (conflict) {
           const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "hh:mm a") : "unknown time";
@@ -3694,6 +3849,11 @@ export default function CrmDispatch() {
         
         const newTech = technicians.find(t => t.id === newTechId);
         
+        const blocked = blackoutConflict(newTechId, startDate, endDate);
+        if (blocked) {
+          toast({ title: "Time is blocked out", description: "That time is blocked off for this technician. Remove the block-out to schedule here.", variant: "destructive" });
+          return;
+        }
         const conflict = checkSchedulingConflict(localWorkOrders, newTechId, startDate, endDate, workOrderId);
         if (conflict) {
           const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "hh:mm a") : "unknown time";
@@ -3817,6 +3977,11 @@ export default function CrmDispatch() {
     }
 
     if (techId) {
+      const blockedDrop = blackoutConflict(techId, startDate, endDate);
+      if (blockedDrop) {
+        toast({ title: "Time is blocked out", description: `${techName || 'This technician'}'s time is blocked at that slot.`, variant: "destructive" });
+        return;
+      }
       const conflict = checkSchedulingConflict(localWorkOrders, techId, startDate, endDate, workOrderId);
       if (conflict) {
         const conflictStart = conflict.scheduledStart ? formatLocal(conflict.scheduledStart, "hh:mm a") : "unknown time";
@@ -4300,6 +4465,15 @@ export default function CrmDispatch() {
                   activeDragDurationHours={activeDragDurationHours}
                   activeDragLabel={activeDragLabel}
                   previewHourByTech={previewHourByTech}
+                  blackouts={blackouts}
+                  onPaintBlackout={(techId, startHour, endHour) => {
+                    const sh = Math.floor(startHour), sm = Math.round((startHour % 1) * 60);
+                    const eh = Math.floor(endHour), em = Math.round((endHour % 1) * 60);
+                    const startAt = createLocalDateTime(selectedDate, sh, sm).toISOString();
+                    const endAt = createLocalDateTime(selectedDate, eh, em).toISOString();
+                    createBlackout.mutate({ techId, startAt, endAt });
+                  }}
+                  onDeleteBlackout={(id) => deleteBlackout.mutate(id)}
                   onRegisterTimelineNode={(techId, node) => {
                     if (node) {
                       techTimelineNodesRef.current[techId] = node;

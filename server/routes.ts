@@ -51,6 +51,7 @@ import { storage } from "./storage";
 import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, crmNotifications, crmComments, crmCommentMentions, insertCrmNotificationSchema, insertCrmCommentSchema, insertCrmCommentMentionSchema, type CrmNotification, type InsertCrmNotification, type CrmComment, type InsertCrmComment, type CrmCommentMention, type InsertCrmCommentMention, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, checklistPhotoSteps, insertChecklistPhotoStepSchema, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry, crmLeads, crmLeadTypes, insertCrmLeadSchema, insertCrmLeadTypeSchema, type CrmLead, type CrmLeadType, type InsertCrmLead, type InsertCrmLeadType, crmLeadTempOptions, crmLeadDriverOptions, insertCrmLeadTempOptionSchema, insertCrmLeadDriverOptionSchema, type CrmLeadTempOption, type CrmLeadDriverOption, type InsertCrmLeadTempOption, type InsertCrmLeadDriverOption, tasks, taskTypes, taskActivity, insertTaskSchema, insertTaskTypeSchema, insertTaskActivitySchema, type Task, type TaskType, type TaskActivity, type InsertTask, type InsertTaskType, type InsertTaskActivity, crmTaggedComments, crmTaggedCommentRecipients, salesbookBookmarks, insertSalesbookBookmarkSchema, customerFiles, insertCustomerFileSchema, type CustomerFile, rebateCases, insertRebateCaseSchema, type RebateCase, type InsertRebateCase, insertRebateCaseDocumentSchema, insertRebateCaseScopeChecklistSchema, rebateProgramTypeEnum, rebateApplicationStatusEnum, rebateWorkflowStepStatusEnum, rebateDocumentCategoryEnum } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { goveeSensors, goveeSensorReadings, goveeSensorAlerts, type GoveeSensor } from "@shared/schema";
+import { dispatchBlackouts } from "@shared/schema";
 import { automationCampaigns, insertAutomationCampaignSchema } from "@shared/schema";
 import { runAutomationTrigger, fireAutomationForCustomer, fireAutomationForLead } from "./services/automationEngine";
 import { goveeService } from "./services/goveeService";
@@ -7704,6 +7705,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error saving dispatch settings:", error);
       res.status(500).json({ message: "Failed to save dispatch settings" });
+    }
+  });
+
+  // ── Dispatch blackouts (block-out time on the dispatch board) ──
+  app.get("/api/crm/dispatch-blackouts", requireCrmAuth, async (req, res) => {
+    try {
+      const from = String(req.query.from || "");
+      const to = String(req.query.to || "");
+      let rows;
+      if (from && to) {
+        const fromD = new Date(from);
+        const toD = new Date(to);
+        rows = await db.select().from(dispatchBlackouts)
+          .where(and(lt(dispatchBlackouts.startAt, toD), gt(dispatchBlackouts.endAt, fromD)))
+          .orderBy(dispatchBlackouts.startAt);
+      } else {
+        rows = await db.select().from(dispatchBlackouts).orderBy(dispatchBlackouts.startAt);
+      }
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching dispatch blackouts:", error);
+      res.status(500).json({ message: "Failed to load blackouts" });
+    }
+  });
+
+  app.post("/api/crm/dispatch-blackouts", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const { techId, startAt, endAt, reason } = req.body || {};
+      if (!techId || !startAt || !endAt) {
+        return res.status(400).json({ message: "techId, startAt and endAt are required" });
+      }
+      const start = new Date(startAt);
+      const end = new Date(endAt);
+      if (!(end > start)) {
+        return res.status(400).json({ message: "End must be after start" });
+      }
+      const [row] = await db.insert(dispatchBlackouts).values({
+        techId: String(techId),
+        startAt: start,
+        endAt: end,
+        reason: reason ? String(reason).slice(0, 200) : null,
+        createdBy: user?.id ?? null,
+      }).returning();
+      res.status(201).json(row);
+    } catch (error) {
+      console.error("Error creating dispatch blackout:", error);
+      res.status(500).json({ message: "Failed to create blackout" });
+    }
+  });
+
+  app.delete("/api/crm/dispatch-blackouts/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const r = await db.delete(dispatchBlackouts).where(eq(dispatchBlackouts.id, req.params.id)).returning();
+      res.json({ success: r.length > 0 });
+    } catch (error) {
+      console.error("Error deleting dispatch blackout:", error);
+      res.status(500).json({ message: "Failed to delete blackout" });
     }
   });
 

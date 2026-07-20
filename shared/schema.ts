@@ -1297,6 +1297,21 @@ export const installCrews = pgTable("install_crews", {
 });
 export type InstallCrew = typeof installCrews.$inferSelect;
 
+// Dispatch blackouts — painted time blocks on the dispatch board that reserve a
+// technician's time so no work order can be scheduled or dragged into them.
+export const dispatchBlackouts = pgTable("dispatch_blackouts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  techId: varchar("tech_id").notNull(),
+  startAt: timestamp("start_at").notNull(),
+  endAt: timestamp("end_at").notNull(),
+  reason: text("reason"),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  techIdx: index("dispatch_blackouts_tech_idx").on(table.techId, table.startAt),
+}));
+export type DispatchBlackout = typeof dispatchBlackouts.$inferSelect;
+
 // CRM Project Tasks (admin task list for project management)
 export const crmProjectTasks = pgTable("crm_project_tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

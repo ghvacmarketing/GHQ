@@ -209,6 +209,19 @@ async function runInstallPlannerMigrations() {
       UPDATE install_plan_blocks SET crew_id = NULL
       WHERE crew_id IS NOT NULL AND crew_id NOT IN (SELECT id FROM install_crews)
     `);
+    // Dispatch blackouts (painted "block out time" ranges per technician).
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS dispatch_blackouts (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        tech_id varchar NOT NULL,
+        start_at timestamp NOT NULL,
+        end_at timestamp NOT NULL,
+        reason text,
+        created_by varchar,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS dispatch_blackouts_tech_idx ON dispatch_blackouts (tech_id, start_at)`);
   } catch (err) {
     console.error("Install planner migration error (non-fatal):", err);
   }
