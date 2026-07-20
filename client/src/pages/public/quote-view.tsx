@@ -918,7 +918,7 @@ export default function PublicQuoteView() {
                     <div className="border-t border-slate-200 pt-2 mt-1 text-sm">
                       <p className="mb-1.5 font-semibold text-slate-600">Online payment convenience fee</p>
                       <div className="flex justify-between text-slate-600">
-                        <span className="flex items-center gap-1.5"><CreditCard className="h-3.5 w-3.5" /> Credit/debit card ({surchargeLabel("card")})</span>
+                        <span className="flex items-center gap-1.5"><CreditCard className="h-3.5 w-3.5" /> Card, Apple Pay &amp; Google Pay ({surchargeLabel("card")})</span>
                         <span className="font-medium">+{formatCurrency(surchargeFor("card", effectiveTotal))}</span>
                       </div>
                       <div className="flex justify-between text-slate-600 mt-1">
@@ -1047,7 +1047,7 @@ export default function PublicQuoteView() {
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-800">Choose payment method</p>
                     <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {([
-                        { m: "card" as PaymentMethod, icon: CreditCard, label: "Credit / debit card" },
+                        { m: "card" as PaymentMethod, icon: CreditCard, label: "Card · Apple Pay · Google Pay" },
                         { m: "ach" as PaymentMethod, icon: Landmark, label: "Bank transfer (ACH)" },
                       ]).map(({ m, icon: Icon, label }) => {
                         const active = paymentMethod === m;
