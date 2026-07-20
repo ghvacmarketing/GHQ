@@ -12043,7 +12043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .leftJoin(crmUsers, eq(customerFiles.uploadedBy, crmUsers.id))
         .where(sql`${customerFiles.contentType} LIKE 'image/%'`)
         .orderBy(desc(customerFiles.createdAt))
-        .limit(120);
+        .limit(500);
       res.json(rows);
     } catch (error) {
       console.error("Error fetching photo feed:", error);

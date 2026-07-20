@@ -1,13 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format } from "date-fns";
-import { User, ImageIcon, Download, Trash2 } from "lucide-react";
+import { format, isAfter, isBefore, startOfDay, subDays } from "date-fns";
+import { User, ImageIcon, Download, Trash2, LayoutGrid, List, ZoomIn, ZoomOut, X } from "lucide-react";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -25,6 +28,17 @@ type FeedPhoto = {
   customerName: string | null;
   uploadedByName: string | null;
 };
+
+// Static class maps so Tailwind's JIT sees every variant
+const GRID_CLASSES: Record<number, string> = {
+  0: "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3",
+  1: "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
+  2: "grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8",
+};
+const SMALLEST = 2;
+const LARGEST = 0;
+
+type DatePreset = "all" | "today" | "7d" | "30d" | "custom";
 
 // Fetch as a blob so the browser saves the file instead of navigating to it;
 // falls back to opening in a new tab if the image host blocks the fetch.
@@ -53,6 +67,15 @@ export default function CrmPhotoGallery() {
   const [lightbox, setLightbox] = useState<FeedPhoto | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<FeedPhoto | null>(null);
 
+  // View controls
+  const [view, setView] = useState<"grid" | "list">("grid");
+  const [size, setSize] = useState(1); // 0 = large … 2 = small
+  const [customerFilter, setCustomerFilter] = useState("all");
+  const [userFilter, setUserFilter] = useState("all");
+  const [datePreset, setDatePreset] = useState<DatePreset>("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
   const deletePhoto = useMutation({
     mutationFn: async (p: FeedPhoto) => {
       if (!p.customerId) throw new Error("This photo isn't linked to a customer and can't be deleted here.");
@@ -78,6 +101,57 @@ export default function CrmPhotoGallery() {
     enabled: !!currentUser,
   });
 
+  // Filter options derived from the loaded feed
+  const customerOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of photos ?? []) {
+      if (p.customerId && p.customerName) map.set(p.customerId, p.customerName);
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [photos]);
+
+  const userOptions = useMemo(() => {
+    const names = new Set<string>();
+    for (const p of photos ?? []) {
+      if (p.uploadedByName) names.add(p.uploadedByName);
+    }
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [photos]);
+
+  const filtered = useMemo(() => {
+    let list = photos ?? [];
+    if (customerFilter !== "all") list = list.filter((p) => p.customerId === customerFilter);
+    if (userFilter !== "all") list = list.filter((p) => p.uploadedByName === userFilter);
+
+    let from: Date | null = null;
+    let to: Date | null = null;
+    const today = startOfDay(new Date());
+    if (datePreset === "today") from = today;
+    else if (datePreset === "7d") from = subDays(today, 7);
+    else if (datePreset === "30d") from = subDays(today, 30);
+    else if (datePreset === "custom") {
+      if (dateFrom) from = startOfDay(new Date(`${dateFrom}T00:00:00`));
+      if (dateTo) to = startOfDay(new Date(`${dateTo}T00:00:00`));
+    }
+    if (from) list = list.filter((p) => p.createdAt && !isBefore(new Date(p.createdAt), from!));
+    if (to) list = list.filter((p) => p.createdAt && !isAfter(new Date(p.createdAt), new Date(to!.getTime() + 24 * 60 * 60 * 1000 - 1)));
+
+    return list;
+  }, [photos, customerFilter, userFilter, datePreset, dateFrom, dateTo]);
+
+  const filtersActive =
+    customerFilter !== "all" || userFilter !== "all" || datePreset !== "all";
+
+  const clearFilters = () => {
+    setCustomerFilter("all");
+    setUserFilter("all");
+    setDatePreset("all");
+    setDateFrom("");
+    setDateTo("");
+  };
+
   useEffect(() => {
     if (!authLoading && !currentUser) navigate("/crm/login");
   }, [authLoading, currentUser, navigate]);
@@ -92,9 +166,30 @@ export default function CrmPhotoGallery() {
 
   if (authLoading || !currentUser) return null;
 
+  const photoActions = (p: FeedPhoto) => (
+    <>
+      <button
+        onClick={(e) => { e.stopPropagation(); downloadPhoto(p); }}
+        className="rounded-md bg-black/55 p-1.5 text-white hover:bg-black/80"
+        title="Download"
+        data-testid={`download-photo-${p.id}`}
+      >
+        <Download className="h-3.5 w-3.5" />
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); setConfirmDelete(p); }}
+        className="rounded-md bg-black/55 p-1.5 text-white hover:bg-red-600"
+        title="Delete"
+        data-testid={`delete-photo-${p.id}`}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </>
+  );
+
   return (
     <CrmLayout currentUser={currentUser}>
-      <div className="space-y-5">
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">
@@ -110,21 +205,185 @@ export default function CrmPhotoGallery() {
           </span>
         </div>
 
+        {/* Toolbar: filters on the left, size + view controls on the right */}
+        <div className="flex flex-wrap items-center gap-2" data-testid="gallery-toolbar">
+          <Select value={customerFilter} onValueChange={setCustomerFilter}>
+            <SelectTrigger className="h-9 w-[170px] bg-white text-sm" data-testid="filter-customer">
+              <SelectValue placeholder="Customer" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All customers</SelectItem>
+              {customerOptions.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={userFilter} onValueChange={setUserFilter}>
+            <SelectTrigger className="h-9 w-[150px] bg-white text-sm" data-testid="filter-user">
+              <SelectValue placeholder="Taken by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All users</SelectItem>
+              {userOptions.map((name) => (
+                <SelectItem key={name} value={name}>{name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={datePreset} onValueChange={(v) => setDatePreset(v as DatePreset)}>
+            <SelectTrigger className="h-9 w-[140px] bg-white text-sm" data-testid="filter-date">
+              <SelectValue placeholder="Date" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any date</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+              <SelectItem value="30d">Last 30 days</SelectItem>
+              <SelectItem value="custom">Custom range…</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {datePreset === "custom" && (
+            <div className="flex items-center gap-1.5" data-testid="filter-date-range">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="h-9 rounded-md border border-input bg-white px-2 text-sm"
+                aria-label="From date"
+              />
+              <span className="text-xs text-muted-foreground">to</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="h-9 rounded-md border border-input bg-white px-2 text-sm"
+                aria-label="To date"
+              />
+            </div>
+          )}
+
+          {filtersActive && (
+            <button
+              onClick={clearFilters}
+              className="flex h-9 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground hover:text-foreground"
+              data-testid="clear-filters"
+            >
+              <X className="h-3.5 w-3.5" /> Clear
+            </button>
+          )}
+
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-xs text-muted-foreground" data-testid="photo-count">
+              {filtersActive && photos ? `${filtered.length} of ${photos.length}` : `${filtered.length}`} photos
+            </span>
+
+            {view === "grid" && (
+              <div className="flex items-center rounded-md border border-input bg-white">
+                <button
+                  onClick={() => setSize((s) => Math.min(SMALLEST, s + 1))}
+                  disabled={size === SMALLEST}
+                  className="flex h-9 w-9 items-center justify-center text-slate-600 hover:text-foreground disabled:opacity-35"
+                  title="Smaller thumbnails"
+                  data-testid="size-smaller"
+                >
+                  <ZoomOut className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setSize((s) => Math.max(LARGEST, s - 1))}
+                  disabled={size === LARGEST}
+                  className="flex h-9 w-9 items-center justify-center border-l border-input text-slate-600 hover:text-foreground disabled:opacity-35"
+                  title="Larger thumbnails"
+                  data-testid="size-larger"
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center rounded-md border border-input bg-white">
+              <button
+                onClick={() => setView("grid")}
+                className={`flex h-9 w-9 items-center justify-center ${view === "grid" ? "bg-[#711419] text-white" : "text-slate-600 hover:text-foreground"} rounded-l-md`}
+                title="Grid view"
+                data-testid="view-grid"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setView("list")}
+                className={`flex h-9 w-9 items-center justify-center border-l border-input ${view === "list" ? "bg-[#711419] text-white" : "text-slate-600 hover:text-foreground"} rounded-r-md`}
+                title="List view"
+                data-testid="view-list"
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
         {isLoading ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className={GRID_CLASSES[1]}>
             {[...Array(10)].map((_, i) => (
               <Skeleton key={i} className="aspect-square rounded-xl" />
             ))}
           </div>
-        ) : !photos || photos.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-20 text-center">
             <ImageIcon className="mb-3 h-12 w-12 text-slate-300" />
-            <p className="text-sm font-medium text-slate-600">No photos yet</p>
-            <p className="text-xs text-slate-400">Photos taken in the field will appear here in real time.</p>
+            <p className="text-sm font-medium text-slate-600">
+              {filtersActive ? "No photos match these filters" : "No photos yet"}
+            </p>
+            <p className="text-xs text-slate-400">
+              {filtersActive
+                ? "Try widening the date range or clearing a filter."
+                : "Photos taken in the field will appear here in real time."}
+            </p>
+          </div>
+        ) : view === "list" ? (
+          <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-sm" data-testid="photo-feed-list">
+            {filtered.map((p) => (
+              <div key={p.id} className="flex items-center gap-3 p-2.5" data-testid={`feed-row-${p.id}`}>
+                <button onClick={() => setLightbox(p)} className="shrink-0 overflow-hidden rounded-lg">
+                  <img src={p.url} alt={p.name} loading="lazy" className="h-14 w-14 object-cover" />
+                </button>
+                <div className="min-w-0 flex-1">
+                  <button
+                    onClick={() => setLightbox(p)}
+                    className="block max-w-full truncate text-left text-sm font-semibold text-foreground hover:underline"
+                    title={p.name}
+                  >
+                    {p.name}
+                  </button>
+                  <p className="flex flex-wrap items-center gap-x-1.5 truncate text-xs text-muted-foreground">
+                    {p.customerName && (
+                      <>
+                        <Link href={`/crm/customers/${p.customerId}`} className="text-[#711419] hover:underline">
+                          {p.customerName}
+                        </Link>
+                        <span>·</span>
+                      </>
+                    )}
+                    <span className="inline-flex items-center gap-1">
+                      <User className="h-3 w-3" />
+                      {p.uploadedByName || "Unknown"}
+                    </span>
+                    {p.createdAt && (
+                      <>
+                        <span>·</span>
+                        <span>{format(new Date(p.createdAt), "EEE, MMM d · h:mm a")}</span>
+                      </>
+                    )}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-1">{photoActions(p)}</div>
+              </div>
+            ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5" data-testid="photo-feed">
-            {photos.map((p) => (
+          <div className={GRID_CLASSES[size]} data-testid="photo-feed">
+            {filtered.map((p) => (
               <div key={p.id} className="group relative overflow-hidden rounded-xl border border-border bg-card shadow-sm" data-testid={`feed-photo-${p.id}`}>
                 <button onClick={() => setLightbox(p)} className="block w-full overflow-hidden">
                   <img
@@ -135,36 +394,23 @@ export default function CrmPhotoGallery() {
                   />
                 </button>
                 <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); downloadPhoto(p); }}
-                    className="rounded-md bg-black/55 p-1.5 text-white hover:bg-black/80"
-                    title="Download"
-                    data-testid={`download-photo-${p.id}`}
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setConfirmDelete(p); }}
-                    className="rounded-md bg-black/55 p-1.5 text-white hover:bg-red-600"
-                    title="Delete"
-                    data-testid={`delete-photo-${p.id}`}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  {photoActions(p)}
                 </div>
-                <div className="space-y-0.5 p-2.5">
-                  <p className="truncate text-xs font-semibold text-foreground" title={p.name}>{p.name}</p>
-                  {p.customerName && (
-                    <Link href={`/crm/customers/${p.customerId}`} className="block truncate text-xs text-[#711419] hover:underline">
-                      {p.customerName}
-                    </Link>
-                  )}
-                  <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground">
-                    <User className="h-3 w-3 shrink-0" />
-                    {p.uploadedByName || "Unknown"}
-                    {p.createdAt && <> · {format(new Date(p.createdAt), "MMM d, h:mm a")}</>}
-                  </p>
-                </div>
+                {size !== SMALLEST && (
+                  <div className="space-y-0.5 p-2.5">
+                    <p className="truncate text-xs font-semibold text-foreground" title={p.name}>{p.name}</p>
+                    {p.customerName && (
+                      <Link href={`/crm/customers/${p.customerId}`} className="block truncate text-xs text-[#711419] hover:underline">
+                        {p.customerName}
+                      </Link>
+                    )}
+                    <p className="flex items-center gap-1 truncate text-[11px] text-muted-foreground">
+                      <User className="h-3 w-3 shrink-0" />
+                      {p.uploadedByName || "Unknown"}
+                      {p.createdAt && <> · {format(new Date(p.createdAt), "MMM d, h:mm a")}</>}
+                    </p>
+                  </div>
+                )}
               </div>
             ))}
           </div>
