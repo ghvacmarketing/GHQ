@@ -1462,7 +1462,7 @@ export default function CrmChecklists() {
               <div className="relative min-h-0 flex-1">
               <div
                 ref={viewportRef}
-                className="scrollbar-hide h-full w-full overflow-auto overscroll-contain bg-slate-50"
+                className="h-full w-full overflow-hidden overscroll-contain bg-slate-50"
                 style={{ cursor: panning ? "grabbing" : spaceHeld ? "grab" : undefined }}
                 onPointerDown={onCanvasPointerDown}
                 onPointerMove={onCanvasPointerMove}
