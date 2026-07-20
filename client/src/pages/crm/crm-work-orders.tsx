@@ -2142,6 +2142,26 @@ export default function CrmWorkOrders() {
                               </SelectContent>
                             </Select>
                           )}
+                          {question.questionType === "multi_select" && question.options && (
+                            <div className="space-y-1.5 rounded-md border border-input bg-white p-2.5" data-testid={`multi-${question.id}`}>
+                              {question.options.map((option) => {
+                                const selected = String(checklistAnswers[question.id] ?? "").split(", ").filter(Boolean);
+                                const checked = selected.includes(option);
+                                return (
+                                  <label key={option} className="flex cursor-pointer items-center gap-2 text-sm font-normal">
+                                    <Checkbox
+                                      checked={checked}
+                                      onCheckedChange={(c) => {
+                                        const next = c ? [...selected, option] : selected.filter((o) => o !== option);
+                                        setChecklistAnswers((prev) => ({ ...prev, [question.id]: next.join(", ") }));
+                                      }}
+                                    />
+                                    {option}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       ))
                     )}

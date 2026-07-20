@@ -130,7 +130,7 @@ type CustomersResponse = {
 type ChecklistQuestion = {
   id: string;
   question: string;
-  questionType: "yes_no" | "text" | "number" | "select";
+  questionType: "yes_no" | "text" | "number" | "select" | "multi_select";
   options: string[] | null;
   isRequired: boolean;
 };
@@ -1357,7 +1357,7 @@ export default function CrmWorkOrderDetail() {
                                     {answer !== undefined && answer !== "" ? String(answer) : <span className="text-slate-400 italic font-normal">Not answered</span>}
                                   </span>
                                 )}
-                                {question.questionType === "select" && (
+                                {(question.questionType === "select" || question.questionType === "multi_select") && (
                                   <span className="text-sm text-slate-600">
                                     {answer !== undefined && answer !== "" ? String(answer) : <span className="text-slate-400 italic">Not answered</span>}
                                   </span>

@@ -45,9 +45,13 @@ import {
   Type,
   Hash,
   List,
+  ListChecks,
   Camera,
   GripVertical,
   Unlink,
+  ZoomIn,
+  ZoomOut,
+  Crosshair,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { useToast } from "@/hooks/use-toast";
@@ -80,6 +84,7 @@ const QUESTION_TYPE_LABELS: Record<ChecklistQuestionType, string> = {
   text: "Text",
   number: "Number",
   select: "Select",
+  multi_select: "Multi-select",
 };
 
 const QUESTION_TYPE_ICONS: Record<ChecklistQuestionType, React.ReactNode> = {
@@ -87,6 +92,7 @@ const QUESTION_TYPE_ICONS: Record<ChecklistQuestionType, React.ReactNode> = {
   text: <Type className="h-3 w-3" />,
   number: <Hash className="h-3 w-3" />,
   select: <List className="h-3 w-3" />,
+  multi_select: <ListChecks className="h-3 w-3" />,
 };
 
 const MAROON = "#711419";
@@ -134,6 +140,13 @@ export default function CrmChecklists() {
     helpText: "",
   });
 
+  // Start-flow dialog (type -> subtype -> checklist, asked when starting a flow)
+  const [startOpen, setStartOpen] = useState(false);
+  const [sVT, setSVT] = useState<ChecklistVisitType | "">("");
+  const [sST, setSST] = useState("");
+  const [sPick, setSPick] = useState("__new__");
+  const [sName, setSName] = useState("");
+
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [editingPhoto, setEditingPhoto] = useState<ChecklistPhotoStep | null>(null);
   const [deletingPhoto, setDeletingPhoto] = useState<ChecklistPhotoStep | null>(null);
@@ -142,6 +155,7 @@ export default function CrmChecklists() {
   // Canvas state
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [panning, setPanning] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const [flowPos, setFlowPos] = useState<XY>(DEFAULT_FLOW);
   const [photoPos, setPhotoPos] = useState<Record<string, XY>>({});
   const [localOrder, setLocalOrder] = useState<string[] | null>(null);
@@ -159,6 +173,8 @@ export default function CrmChecklists() {
   const dragRef = useRef<DragState | null>(null);
   const flowPosRef = useRef(flowPos);
   flowPosRef.current = flowPos;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
   const [arrowTick, setArrowTick] = useState(0);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
@@ -229,8 +245,8 @@ export default function CrmChecklists() {
       setChecklistId("");
       return;
     }
-    if (!comboChecklists.some((c) => c.id === checklistId)) {
-      setChecklistId(comboChecklists[0]?.id ?? "");
+    if (!checklistId && comboChecklists.length > 0) {
+      setChecklistId(comboChecklists[0].id);
     }
   }, [visitType, subtype, comboChecklists, checklistId]);
 
@@ -248,6 +264,7 @@ export default function CrmChecklists() {
         const layout = JSON.parse(raw);
         setFlowPos(layout.flow ?? DEFAULT_FLOW);
         setPhotoPos(layout.photos ?? {});
+        setZoom(layout.zoom ?? 1);
         return;
       }
     } catch {}
@@ -259,9 +276,9 @@ export default function CrmChecklists() {
   useEffect(() => {
     if (!checklistId) return;
     try {
-      localStorage.setItem(`checklist-canvas:${checklistId}`, JSON.stringify({ flow: flowPos, photos: photoPos }));
+      localStorage.setItem(`checklist-canvas:${checklistId}`, JSON.stringify({ flow: flowPos, photos: photoPos, zoom }));
     } catch {}
-  }, [flowPos, photoPos, checklistId]);
+  }, [flowPos, photoPos, zoom, checklistId]);
 
   // Give new photo steps a default spot to the right of the flow
   useEffect(() => {
@@ -290,9 +307,10 @@ export default function CrmChecklists() {
     requestAnimationFrame(() => {
       const vp = viewportRef.current;
       if (!vp) return;
+      const z = zoomRef.current;
       vp.scrollTo({
-        left: Math.max(0, flowPosRef.current.x - (vp.clientWidth - FLOW_W) / 2 + 120),
-        top: Math.max(0, flowPosRef.current.y - 70),
+        left: Math.max(0, (flowPosRef.current.x + FLOW_W / 2 + 120) * z - vp.clientWidth / 2),
+        top: Math.max(0, (flowPosRef.current.y - 70) * z),
       });
     });
   }, [checklistId]);
@@ -324,10 +342,11 @@ export default function CrmChecklists() {
     const flowEl = flowBlockRef.current;
     if (!flowEl) return;
     const fRect = flowEl.getBoundingClientRect();
+    const z = zoomRef.current;
     stepGeom.current.clear();
     for (const [id, el] of Array.from(stepRefs.current.entries())) {
       const r = el.getBoundingClientRect();
-      stepGeom.current.set(id, { top: r.top - fRect.top, h: r.height });
+      stepGeom.current.set(id, { top: (r.top - fRect.top) / z, h: r.height / z });
     }
     photoGeom.current.clear();
     for (const [id, el] of Array.from(photoRefs.current.entries())) {
@@ -397,7 +416,7 @@ export default function CrmChecklists() {
         isRequired: stepForm.isRequired,
         helpText: stepForm.helpText || null,
         options:
-          stepForm.questionType === "select" && stepForm.options
+          (stepForm.questionType === "select" || stepForm.questionType === "multi_select") && stepForm.options
             ? stepForm.options.split(",").map((o) => o.trim()).filter(Boolean)
             : null,
         ...(editingStep ? {} : { sortOrder: (serverSteps[serverSteps.length - 1]?.sortOrder ?? 0) + 1 }),
@@ -471,7 +490,35 @@ export default function CrmChecklists() {
   // ----- canvas pointer logic -----
   const worldPoint = (e: { clientX: number; clientY: number }): XY => {
     const r = worldRef.current!.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
+    const z = zoomRef.current;
+    return { x: (e.clientX - r.left) / z, y: (e.clientY - r.top) / z };
+  };
+
+  // Zoom about the viewport center so the content doesn't jump
+  const applyZoom = (next: number) => {
+    next = Math.min(1.5, Math.max(0.4, Math.round(next * 10) / 10));
+    const vp = viewportRef.current;
+    const cur = zoomRef.current;
+    if (!vp || next === cur) return;
+    const cx = vp.scrollLeft + vp.clientWidth / 2;
+    const cy = vp.scrollTop + vp.clientHeight / 2;
+    setZoom(next);
+    requestAnimationFrame(() => {
+      vp.scrollLeft = (cx / cur) * next - vp.clientWidth / 2;
+      vp.scrollTop = (cy / cur) * next - vp.clientHeight / 2;
+    });
+  };
+
+  const centerView = () => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const z = zoomRef.current;
+    const fp = flowPosRef.current;
+    vp.scrollTo({
+      left: Math.max(0, (fp.x + FLOW_W / 2 + 120) * z - vp.clientWidth / 2),
+      top: Math.max(0, (fp.y - 70) * z),
+      behavior: "smooth",
+    });
   };
 
   const stepHandlePoint = (stepId: string): XY => {
@@ -527,7 +574,7 @@ export default function CrmChecklists() {
     e.stopPropagation();
     const el = stepRefs.current.get(q.id);
     const h = el?.offsetHeight ?? 64;
-    const grabY = el ? e.clientY - el.getBoundingClientRect().top : h / 2;
+    const grabY = el ? (e.clientY - el.getBoundingClientRect().top) / zoomRef.current : h / 2;
     dragRef.current = { kind: "step-pending", id: q.id, sx: e.clientX, sy: e.clientY, grabY, h };
   };
 
@@ -647,12 +694,28 @@ export default function CrmChecklists() {
   const upRef = useRef(onNodePointerUp);
   upRef.current = onNodePointerUp;
   useEffect(() => {
-    const move = (e: PointerEvent) => { if (dragRef.current && dragRef.current.kind !== "pan") moveRef.current(e); };
-    const up = () => { if (dragRef.current && dragRef.current.kind !== "pan") upRef.current(); };
+    // Coalesce moves to one state update per frame — dragging stays smooth
+    let raf = 0;
+    let lastEv: PointerEvent | null = null;
+    const move = (e: PointerEvent) => {
+      if (!dragRef.current || dragRef.current.kind === "pan") return;
+      lastEv = e;
+      if (!raf) {
+        raf = requestAnimationFrame(() => {
+          raf = 0;
+          if (lastEv && dragRef.current && dragRef.current.kind !== "pan") moveRef.current(lastEv);
+        });
+      }
+    };
+    const up = () => {
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      if (dragRef.current && dragRef.current.kind !== "pan") upRef.current();
+    };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", up);
     return () => {
+      if (raf) cancelAnimationFrame(raf);
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
@@ -660,28 +723,58 @@ export default function CrmChecklists() {
   }, []);
 
   // ----- arrows -----
+  // Anchor sides adapt to where the target sits relative to the step, so
+  // arrows re-route naturally as cards are dragged around the canvas.
+  type Rect = { x: number; y: number; w: number; h: number };
+  const anchoredPath = (step: Rect, target: Rect) => {
+    const sc = { x: step.x + step.w / 2, y: step.y + step.h / 2 };
+    const tc = { x: target.x + target.w / 2, y: target.y + target.h / 2 };
+    const dx = tc.x - sc.x;
+    const dy = tc.y - sc.y;
+    let a: XY, b: XY, da: XY, db: XY;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      if (dx >= 0) {
+        a = { x: step.x + step.w + 2, y: sc.y };
+        b = { x: target.x - 4, y: tc.y };
+        da = { x: 1, y: 0 }; db = { x: -1, y: 0 };
+      } else {
+        a = { x: step.x - 2, y: sc.y };
+        b = { x: target.x + target.w + 4, y: tc.y };
+        da = { x: -1, y: 0 }; db = { x: 1, y: 0 };
+      }
+    } else if (dy >= 0) {
+      a = { x: sc.x, y: step.y + step.h + 2 };
+      b = { x: tc.x, y: target.y - 4 };
+      da = { x: 0, y: 1 }; db = { x: 0, y: -1 };
+    } else {
+      a = { x: sc.x, y: step.y - 2 };
+      b = { x: tc.x, y: target.y + target.h + 4 };
+      da = { x: 0, y: -1 }; db = { x: 0, y: 1 };
+    }
+    const d = Math.max(36, Math.hypot(b.x - a.x, b.y - a.y) * 0.35);
+    return `M ${a.x} ${a.y} C ${a.x + da.x * d} ${a.y + da.y * d}, ${b.x + db.x * d} ${b.y + db.y * d}, ${b.x} ${b.y}`;
+  };
+
+  const stepRectOf = (stepId: string): Rect | null => {
+    const sg = stepGeom.current.get(stepId);
+    if (!sg) return null;
+    return { x: flowPos.x, y: flowPos.y + sg.top, w: FLOW_W, h: sg.h };
+  };
+
   const arrows = useMemo(() => {
     void arrowTick;
-    const out: Array<{ id: string; from: XY; to: XY }> = [];
+    const out: Array<{ id: string; d: string }> = [];
     for (const ps of photoSteps) {
       if (!ps.linkedQuestionId) continue;
-      const sg = stepGeom.current.get(ps.linkedQuestionId);
+      const sr = stepRectOf(ps.linkedQuestionId);
       const pp = photoPos[ps.id];
       const pg = photoGeom.current.get(ps.id);
-      if (!sg || !pp || !pg) continue;
-      out.push({
-        id: ps.id,
-        from: { x: flowPos.x + FLOW_W + 3, y: flowPos.y + sg.top + sg.h / 2 },
-        to: { x: pp.x - 3, y: pp.y + pg.h / 2 },
-      });
+      if (!sr || !pp || !pg) continue;
+      out.push({ id: ps.id, d: anchoredPath(sr, { x: pp.x, y: pp.y, w: PHOTO_W, h: pg.h }) });
     }
     return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photoSteps, photoPos, flowPos, arrowTick]);
-
-  const curve = (a: XY, b: XY) => {
-    const dx = Math.max(48, Math.abs(b.x - a.x) * 0.45);
-    return `M ${a.x} ${a.y} C ${a.x + dx} ${a.y}, ${b.x - dx} ${b.y}, ${b.x - 6} ${b.y}`;
-  };
 
   const worldSize = useMemo(() => {
     let w = WORLD_W_MIN;
@@ -693,6 +786,58 @@ export default function CrmChecklists() {
     w = Math.max(w, flowPos.x + FLOW_W + 800);
     return { w, h };
   }, [flowPos, photoPos, orderedSteps.length]);
+
+  // ----- start-flow dialog -----
+  const titleCase = (v: string) =>
+    v.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const openStartFlow = () => {
+    setSVT(visitType || "");
+    setSST(subtype || "");
+    setSPick(checklistId || "__new__");
+    setSName("");
+    setStartOpen(true);
+  };
+
+  const sSubtypes = useMemo(
+    () =>
+      workOrderSubtypes
+        .filter((x) => x.visitType === sVT)
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
+    [workOrderSubtypes, sVT],
+  );
+  const sCombo = useMemo(
+    () =>
+      checklists.filter(
+        (c) => ((c as any).visitType || "SERVICE") === sVT && c.serviceType === sST,
+      ),
+    [checklists, sVT, sST],
+  );
+
+  const startFlow = useMutation({
+    mutationFn: async () => {
+      if (sPick === "__new__") {
+        const res = await apiRequest("POST", "/api/crm/checklists", {
+          name: sName.trim() || `${titleCase(sST)} Checklist`,
+          description: null,
+          visitType: sVT,
+          serviceType: sST,
+          isActive: true,
+        });
+        return res.json() as Promise<ServiceCallChecklist>;
+      }
+      return null;
+    },
+    onSuccess: (created) => {
+      invalidate();
+      setVisitType(sVT as ChecklistVisitType);
+      setSubtype(sST);
+      setChecklistId(created ? created.id : sPick);
+      setStartOpen(false);
+      if (created) toast({ title: "Checklist created" });
+    },
+    onError,
+  });
 
   // ----- dialog openers -----
   const openNewChecklist = () => {
@@ -792,7 +937,9 @@ export default function CrmChecklists() {
       {!ghost && (
         <button
           onPointerDown={(e) => startLinkDrag(q.id, e)}
-          className="absolute -right-2 top-1/2 z-20 h-4 w-4 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-white bg-[#711419] shadow transition-transform hover:scale-125"
+          className={`absolute -right-2 top-1/2 z-20 h-4 w-4 -translate-y-1/2 cursor-crosshair rounded-full border-2 border-white bg-[#711419] shadow transition-all hover:scale-125 ${
+            dragLink?.stepId === q.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          }`}
           style={{ touchAction: "none" }}
           title="Drag onto a photo step to require it here"
           data-testid={`step-handle-${q.id}`}
@@ -832,8 +979,8 @@ export default function CrmChecklists() {
   const draggedStep = reorder ? orderedSteps.find((s) => s.id === reorder.id) : null;
 
   return (
-    <CrmLayout currentUser={currentUser}>
-      <div className="flex h-[calc(100vh-4rem)] flex-col lg:h-screen">
+    <CrmLayout currentUser={currentUser} disableScroll flush>
+      <div className="flex min-h-0 flex-1 flex-col">
         {/* Toolbar: the flow selection (type → subtype → checklist) */}
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-5 py-3">
           <Button
@@ -850,33 +997,27 @@ export default function CrmChecklists() {
           <ClipboardList className="h-4 w-4 text-[#711419]" />
           <span className="mr-3 text-sm font-semibold text-slate-900">Checklist Canvas</span>
 
-          <Select value={visitType} onValueChange={(v) => { setVisitType(v as ChecklistVisitType); setSubtype(""); }}>
-            <SelectTrigger className="h-9 w-[150px] text-sm" data-testid="select-visit-type">
-              <SelectValue placeholder="Work order type" />
-            </SelectTrigger>
-            <SelectContent>
-              {checklistVisitTypeEnum.map((type) => (
-                <SelectItem key={type} value={type}>{VISIT_TYPE_LABELS[type]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <ChevronRight className="h-4 w-4 text-slate-300" />
-
-          <Select value={subtype} onValueChange={setSubtype} disabled={!visitType}>
-            <SelectTrigger className="h-9 w-[170px] text-sm" data-testid="select-subtype">
-              <SelectValue placeholder="Subtype" />
-            </SelectTrigger>
-            <SelectContent>
-              {subtypesForVisitType.length > 0 ? (
-                subtypesForVisitType.map((s) => (
-                  <SelectItem key={s.id} value={s.subtype}>{s.subtype}</SelectItem>
-                ))
-              ) : (
-                <SelectItem value="Other">Other</SelectItem>
-              )}
-            </SelectContent>
-          </Select>
+          {visitType && subtype ? (
+            <button
+              onClick={openStartFlow}
+              className="flex h-9 items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-800 transition-colors hover:border-slate-300"
+              data-testid="button-change-flow"
+            >
+              {VISIT_TYPE_LABELS[visitType as ChecklistVisitType]}
+              <ChevronRight className="h-3.5 w-3.5 text-slate-300" />
+              {subtype}
+              <ChevronDown className="ml-1 h-3.5 w-3.5 text-slate-400" />
+            </button>
+          ) : (
+            <Button
+              size="sm"
+              onClick={openStartFlow}
+              className="h-9 bg-[#711419] hover:bg-[#8a1a1f]"
+              data-testid="button-start-flow"
+            >
+              <Plus className="mr-1.5 h-4 w-4" /> Start flow
+            </Button>
+          )}
 
           {visitType && subtype && (
             <>
@@ -933,13 +1074,17 @@ export default function CrmChecklists() {
               className="flex h-full items-center justify-center bg-slate-50"
               style={{ backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)", backgroundSize: "22px 22px" }}
             >
-              <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-white/70 px-10 py-8 text-center backdrop-blur-sm">
+              <button
+                onClick={openStartFlow}
+                className="rounded-2xl border-2 border-dashed border-slate-300 bg-white/70 px-10 py-8 text-center backdrop-blur-sm transition-colors hover:border-[#711419] hover:bg-white"
+                data-testid="button-start-flow-canvas"
+              >
                 <ClipboardList className="mx-auto mb-3 h-8 w-8 text-slate-400" />
-                <p className="text-sm font-semibold text-slate-700">Start your flow</p>
+                <p className="text-sm font-semibold text-slate-700">Start flow</p>
                 <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-                  Pick a work order type and subtype above to open its checklist canvas.
+                  Click to choose the work order type, subtype, and checklist.
                 </p>
-              </div>
+              </button>
             </div>
           ) : !checklist ? (
             <div
@@ -970,12 +1115,15 @@ export default function CrmChecklists() {
                 onPointerCancel={onCanvasPointerUp}
                 data-testid="checklist-canvas"
               >
+                <div style={{ width: worldSize.w * zoom, height: worldSize.h * zoom }}>
                 <div
                   ref={worldRef}
                   className="relative select-none"
                   style={{
                     width: worldSize.w,
                     height: worldSize.h,
+                    transform: `scale(${zoom})`,
+                    transformOrigin: "0 0",
                     backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
                     backgroundSize: "22px 22px",
                   }}
@@ -983,34 +1131,37 @@ export default function CrmChecklists() {
                   {/* Arrows (step → photo) */}
                   <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full">
                     <defs>
-                      <marker id="arrowhead" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
-                        <path d="M 0 0 L 8 4.5 L 0 9 z" fill={MAROON} />
+                      <marker id="arrowhead" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto">
+                        <path d="M 0 0.5 L 6 3.5 L 0 6.5 z" fill={MAROON} fillOpacity="0.55" />
                       </marker>
-                      <marker id="arrowhead-live" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
-                        <path d="M 0 0 L 8 4.5 L 0 9 z" fill="#b45309" />
+                      <marker id="arrowhead-live" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto">
+                        <path d="M 0 0.5 L 6 3.5 L 0 6.5 z" fill="#b45309" />
                       </marker>
                     </defs>
                     {arrows.map((l) => (
                       <path
                         key={l.id}
-                        d={curve(l.from, l.to)}
+                        d={l.d}
                         fill="none"
                         stroke={MAROON}
-                        strokeWidth={2}
-                        strokeOpacity={0.55}
+                        strokeWidth={1.5}
+                        strokeOpacity={0.4}
                         markerEnd="url(#arrowhead)"
                       />
                     ))}
-                    {dragLink && (
-                      <path
-                        d={curve(dragLink.from, dragLink.to)}
-                        fill="none"
-                        stroke="#b45309"
-                        strokeWidth={2}
-                        strokeDasharray="6 5"
-                        markerEnd="url(#arrowhead-live)"
-                      />
-                    )}
+                    {dragLink && (() => {
+                      const sr = stepRectOf(dragLink.stepId);
+                      return sr ? (
+                        <path
+                          d={anchoredPath(sr, { x: dragLink.to.x, y: dragLink.to.y, w: 0, h: 0 })}
+                          fill="none"
+                          stroke="#b45309"
+                          strokeWidth={1.5}
+                          strokeDasharray="4 4"
+                          markerEnd="url(#arrowhead-live)"
+                        />
+                      ) : null;
+                    })()}
                   </svg>
 
                   {/* Flow block: the checklist steps */}
@@ -1121,6 +1272,48 @@ export default function CrmChecklists() {
                     </button>
                   )}
                 </div>
+                </div>
+              </div>
+
+              {/* Bottom canvas toolbar: zoom + center */}
+              <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center">
+                <div className="pointer-events-auto flex items-center gap-0.5 rounded-full border border-slate-200 bg-white/90 px-1.5 py-1 shadow-lg backdrop-blur">
+                  <button
+                    onClick={() => applyZoom(zoom - 0.1)}
+                    disabled={zoom <= 0.4}
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:opacity-35"
+                    title="Zoom out"
+                    data-testid="canvas-zoom-out"
+                  >
+                    <ZoomOut className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => applyZoom(1)}
+                    className="w-11 rounded-full py-1 text-center text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+                    title="Reset zoom"
+                    data-testid="canvas-zoom-reset"
+                  >
+                    {Math.round(zoom * 100)}%
+                  </button>
+                  <button
+                    onClick={() => applyZoom(zoom + 0.1)}
+                    disabled={zoom >= 1.5}
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:opacity-35"
+                    title="Zoom in"
+                    data-testid="canvas-zoom-in"
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </button>
+                  <div className="mx-1 h-5 w-px bg-slate-200" />
+                  <button
+                    onClick={centerView}
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                    title="Center on the flow"
+                    data-testid="canvas-center"
+                  >
+                    <Crosshair className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               {/* Floating canvas controls */}
@@ -1141,6 +1334,111 @@ export default function CrmChecklists() {
           )}
         </div>
       </div>
+
+      {/* Start flow */}
+      <Dialog open={startOpen} onOpenChange={setStartOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Start flow</DialogTitle>
+            <DialogDescription>Choose what this checklist is for.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Work order type</Label>
+              <Select
+                value={sVT}
+                onValueChange={(v) => {
+                  setSVT(v as ChecklistVisitType);
+                  setSST("");
+                  setSPick("__new__");
+                }}
+              >
+                <SelectTrigger data-testid="start-visit-type">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {checklistVisitTypeEnum.map((type) => (
+                    <SelectItem key={type} value={type}>{VISIT_TYPE_LABELS[type]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Subtype</Label>
+              <Select
+                value={sST}
+                onValueChange={(v) => {
+                  setSST(v);
+                  const existing = checklists.filter(
+                    (c) => ((c as any).visitType || "SERVICE") === sVT && c.serviceType === v,
+                  );
+                  setSPick(existing[0]?.id ?? "__new__");
+                  setSName("");
+                }}
+                disabled={!sVT}
+              >
+                <SelectTrigger data-testid="start-subtype">
+                  <SelectValue placeholder="Select subtype" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sSubtypes.length > 0 ? (
+                    sSubtypes.map((x) => (
+                      <SelectItem key={x.id} value={x.subtype}>{x.subtype}</SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="Other">Other</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            {sVT && sST && (
+              <div className="space-y-2">
+                <Label>Checklist</Label>
+                <Select value={sPick} onValueChange={setSPick}>
+                  <SelectTrigger data-testid="start-checklist">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sCombo.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}{!c.isActive ? " (inactive)" : ""}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="__new__">
+                      <span className="flex items-center gap-1.5 text-[#711419]">
+                        <Plus className="h-3.5 w-3.5" /> New checklist
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {sVT && sST && sPick === "__new__" && (
+              <div className="space-y-2">
+                <Label>Checklist name</Label>
+                <Input
+                  placeholder={`${titleCase(sST)} Checklist`}
+                  value={sName}
+                  onChange={(e) => setSName(e.target.value)}
+                  data-testid="start-checklist-name"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStartOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => startFlow.mutate()}
+              disabled={!sVT || !sST || startFlow.isPending}
+              className="bg-[#711419] hover:bg-[#8a1a1f]"
+              data-testid="start-open-canvas"
+            >
+              {startFlow.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Open canvas
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Create checklist */}
       <Dialog open={showCreateChecklist} onOpenChange={setShowCreateChecklist}>
@@ -1270,7 +1568,7 @@ export default function CrmChecklists() {
                 </SelectContent>
               </Select>
             </div>
-            {stepForm.questionType === "select" && (
+            {(stepForm.questionType === "select" || stepForm.questionType === "multi_select") && (
               <div className="space-y-2">
                 <Label>Options (comma-separated)</Label>
                 <Input

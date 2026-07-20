@@ -100,6 +100,7 @@ const QUESTION_TYPE_LABELS: Record<ChecklistQuestionType, string> = {
   text: "Text",
   number: "Number",
   select: "Select",
+  multi_select: "Multi-select",
 };
 
 const QUESTION_TYPE_ICONS: Record<ChecklistQuestionType, React.ReactNode> = {
@@ -107,6 +108,7 @@ const QUESTION_TYPE_ICONS: Record<ChecklistQuestionType, React.ReactNode> = {
   text: <Type className="h-4 w-4" />,
   number: <Hash className="h-4 w-4" />,
   select: <List className="h-4 w-4" />,
+  multi_select: <List className="h-4 w-4" />,
 };
 
 interface ChecklistsSectionProps {

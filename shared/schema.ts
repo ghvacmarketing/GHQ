@@ -2167,7 +2167,7 @@ export const checklistSubtypesByVisitType: Record<ChecklistVisitType, readonly s
 };
 
 // Question types for checklist questions
-export const checklistQuestionTypeEnum = ["yes_no", "text", "number", "select"] as const;
+export const checklistQuestionTypeEnum = ["yes_no", "text", "number", "select", "multi_select"] as const;
 export type ChecklistQuestionType = typeof checklistQuestionTypeEnum[number];
 
 // Service Call Checklist Templates

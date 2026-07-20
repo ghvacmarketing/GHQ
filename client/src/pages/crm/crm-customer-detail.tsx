@@ -5873,6 +5873,27 @@ export default function CrmCustomerDetail() {
                                   className="bg-white"
                                   data-testid={`checklist-text-${q.id}`}
                                 />
+                              ) : q.questionType === "multi_select" && q.options ? (
+                                <div className="space-y-1.5 rounded-md border border-input bg-white p-2.5" data-testid={`checklist-multi-${q.id}`}>
+                                  {q.options.map((option) => {
+                                    const selected = String(checklistAnswers[q.id] ?? "").split(", ").filter(Boolean);
+                                    const checked = selected.includes(option);
+                                    return (
+                                      <label key={option} className="flex cursor-pointer items-center gap-2 text-sm font-normal">
+                                        <input
+                                          type="checkbox"
+                                          checked={checked}
+                                          onChange={(e) => {
+                                            const next = e.target.checked ? [...selected, option] : selected.filter((o) => o !== option);
+                                            setChecklistAnswers((prev) => ({ ...prev, [q.id]: next.join(", ") }));
+                                          }}
+                                          className="h-4 w-4 accent-[#711419]"
+                                        />
+                                        {option}
+                                      </label>
+                                    );
+                                  })}
+                                </div>
                               ) : q.questionType === "number" ? (
                                 <Input
                                   type="number"
