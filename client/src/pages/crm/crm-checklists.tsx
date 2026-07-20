@@ -1117,7 +1117,7 @@ export default function CrmChecklists() {
           <ClipboardList className="h-4 w-4 text-[#711419]" />
           <span className="mr-3 text-sm font-semibold text-slate-900">Checklist Canvas</span>
 
-          {visitType && subtype ? (
+          {visitType && subtype && (
             <button
               onClick={openStartFlow}
               className="flex h-9 items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-800 transition-colors hover:border-slate-300"
@@ -1128,15 +1128,6 @@ export default function CrmChecklists() {
               {subtype}
               <ChevronDown className="ml-1 h-3.5 w-3.5 text-slate-400" />
             </button>
-          ) : (
-            <Button
-              size="sm"
-              onClick={openStartFlow}
-              className="h-9 bg-[#711419] hover:bg-[#8a1a1f]"
-              data-testid="button-start-flow"
-            >
-              <Plus className="mr-1.5 h-4 w-4" /> Start flow
-            </Button>
           )}
 
           {visitType && subtype && (
