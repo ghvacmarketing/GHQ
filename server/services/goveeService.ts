@@ -19,7 +19,6 @@ import {
   type ParsedSensorState,
   type RiskLevel,
 } from "@shared/govee";
-import { isAppActive } from "../activity-tracker";
 
 interface GoveeDevice {
   sku: string;
@@ -326,7 +325,9 @@ export function startGoveeBackgroundSync(intervalMinutes = 5): void {
 
   goveeInterval = setInterval(
     async () => {
-      if (!isAppActive()) return;
+      // Environmental monitoring must run around the clock — do NOT gate on
+      // isAppActive(). Alerts (crawlspace moisture, freeze risk) need to fire
+      // when nobody has the CRM open. That's the whole point of remote monitoring.
       try {
         if (goveeService.isConfigured()) await goveeService.pollAll();
       } catch (e) {

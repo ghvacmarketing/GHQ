@@ -94,6 +94,12 @@ services:
       - key: TRELLO_SECRET
         sync: false
 
+      # ── Govee environmental sensors (temp/humidity remote monitoring) ──
+      # Server polls openapi.api.govee.com with this key. Without it, prod
+      # never pulls sensor data. Set the value in the Render dashboard.
+      - key: GOVEE_API_KEY
+        sync: false
+
       # NOTE: add any remaining vars from .env you actually use (Bouncie,
       # Govee, weather, etc.) via the Render dashboard the same way.
       #
