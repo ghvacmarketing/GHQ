@@ -108,7 +108,7 @@ const DRAG_THRESHOLD = 5;
 type XY = { x: number; y: number };
 
 type DragState =
-  | { kind: "pan"; sx: number; sy: number; sl: number; st: number }
+  | { kind: "pan"; sx: number; sy: number; px: number; py: number }
   | { kind: "flow"; ox: number; oy: number }
   | { kind: "photo-pending"; id: string; sx: number; sy: number; ox: number; oy: number }
   | { kind: "photo"; id: string; ox: number; oy: number }
@@ -163,6 +163,9 @@ export default function CrmChecklists() {
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [panning, setPanning] = useState(false);
   const [zoom, setZoom] = useState(1);
+  // The world is moved with a CSS transform (translate + scale) rather than
+  // native scrolling — a true canvas that never clips or clamps a scroll axis.
+  const [pan, setPan] = useState<XY>({ x: 0, y: 0 });
   const [flowPos, setFlowPos] = useState<XY>(DEFAULT_FLOW);
   const [photoPos, setPhotoPos] = useState<Record<string, XY>>({});
   const [localOrder, setLocalOrder] = useState<string[] | null>(null);
@@ -193,6 +196,8 @@ export default function CrmChecklists() {
   flowPosRef.current = flowPos;
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
+  const panRef = useRef(pan);
+  panRef.current = pan;
   const [arrowTick, setArrowTick] = useState(0);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
@@ -350,18 +355,21 @@ export default function CrmChecklists() {
     });
   }, [photoSteps]);
 
+  // Pan so a world point sits at a given fraction of the viewport
+  const panToWorld = (wx: number, wy: number, fracX = 0.5, fracY = 0.5) => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const z = zoomRef.current;
+    setPan({ x: vp.clientWidth * fracX - wx * z, y: vp.clientHeight * fracY - wy * z });
+  };
+
   // Center the viewport on the flow when a checklist opens
   useEffect(() => {
     if (!checklistId) return;
     requestAnimationFrame(() => {
-      const vp = viewportRef.current;
-      if (!vp) return;
-      const z = zoomRef.current;
-      vp.scrollTo({
-        left: Math.max(0, (flowPosRef.current.x + FLOW_W / 2 + 120) * z - vp.clientWidth / 2),
-        top: Math.max(0, (flowPosRef.current.y - 70) * z),
-      });
+      panToWorld(flowPosRef.current.x + FLOW_W / 2, flowPosRef.current.y + 60, 0.5, 0.16);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checklistId]);
 
   // Space bar = pan mode
@@ -593,25 +601,17 @@ export default function CrmChecklists() {
     const vp = viewportRef.current;
     const cur = zoomRef.current;
     if (!vp || next === cur) return;
-    const cx = vp.scrollLeft + vp.clientWidth / 2;
-    const cy = vp.scrollTop + vp.clientHeight / 2;
+    const cx = vp.clientWidth / 2;
+    const cy = vp.clientHeight / 2;
+    // World point currently under the viewport center
+    const wx = (cx - panRef.current.x) / cur;
+    const wy = (cy - panRef.current.y) / cur;
     setZoom(next);
-    requestAnimationFrame(() => {
-      vp.scrollLeft = (cx / cur) * next - vp.clientWidth / 2;
-      vp.scrollTop = (cy / cur) * next - vp.clientHeight / 2;
-    });
+    setPan({ x: cx - wx * next, y: cy - wy * next });
   };
 
   const centerView = () => {
-    const vp = viewportRef.current;
-    if (!vp) return;
-    const z = zoomRef.current;
-    const fp = flowPosRef.current;
-    vp.scrollTo({
-      left: Math.max(0, (fp.x + FLOW_W / 2 + 120) * z - vp.clientWidth / 2),
-      top: Math.max(0, (fp.y - 70) * z),
-      behavior: "smooth",
-    });
+    panToWorld(flowPosRef.current.x + FLOW_W / 2, flowPosRef.current.y + 60, 0.5, 0.16);
   };
 
   const stepHandlePoint = (stepId: string): XY => {
@@ -624,7 +624,7 @@ export default function CrmChecklists() {
     const bg = e.target === worldRef.current || e.target === viewportRef.current;
     if (!spaceHeld && !bg) return;
     const vp = viewportRef.current!;
-    dragRef.current = { kind: "pan", sx: e.clientX, sy: e.clientY, sl: vp.scrollLeft, st: vp.scrollTop };
+    dragRef.current = { kind: "pan", sx: e.clientX, sy: e.clientY, px: panRef.current.x, py: panRef.current.y };
     vp.setPointerCapture(e.pointerId);
     setPanning(true);
   };
@@ -632,9 +632,7 @@ export default function CrmChecklists() {
   const onCanvasPointerMove = (e: React.PointerEvent) => {
     const st = dragRef.current;
     if (st?.kind !== "pan") return;
-    const vp = viewportRef.current!;
-    vp.scrollLeft = st.sl - (e.clientX - st.sx);
-    vp.scrollTop = st.st - (e.clientY - st.sy);
+    setPan({ x: st.px + (e.clientX - st.sx), y: st.py + (e.clientY - st.sy) });
   };
 
   const onCanvasPointerUp = () => {
@@ -681,29 +679,17 @@ export default function CrmChecklists() {
   };
 
   const scrollToStep = (id: string) => {
-    const vp = viewportRef.current;
     const sr = stepRectOf(id);
-    if (!vp || !sr) return;
-    const z = zoomRef.current;
-    vp.scrollTo({
-      left: Math.max(0, (sr.x + sr.w / 2) * z - vp.clientWidth / 2),
-      top: Math.max(0, (sr.y + sr.h / 2) * z - vp.clientHeight / 2),
-      behavior: "smooth",
-    });
+    if (!sr) return;
+    panToWorld(sr.x + sr.w / 2, sr.y + sr.h / 2, 0.5, 0.5);
     setFlashStepId(id);
     window.setTimeout(() => setFlashStepId((cur) => (cur === id ? null : cur)), 1400);
   };
 
   const scrollToSection = (name: string) => {
-    const vp = viewportRef.current;
     const sg = sectionGeom.current.get(name);
-    if (!vp || !sg) return;
-    const z = zoomRef.current;
-    vp.scrollTo({
-      left: Math.max(0, (flowPos.x + FLOW_W / 2) * z - vp.clientWidth / 2),
-      top: Math.max(0, (flowPos.y + sg.top) * z - 120),
-      behavior: "smooth",
-    });
+    if (!sg) return;
+    panToWorld(flowPos.x + FLOW_W / 2, flowPos.y + sg.top + sg.h / 2, 0.5, 0.2);
   };
 
   const startPanelDrag = (q: ChecklistQuestion, e: React.PointerEvent) => {
@@ -1498,7 +1484,7 @@ export default function CrmChecklists() {
               <div className="relative min-h-0 flex-1">
               <div
                 ref={viewportRef}
-                className="h-full w-full overflow-hidden overscroll-contain bg-slate-50"
+                className="relative h-full w-full overflow-hidden overscroll-contain bg-slate-50"
                 style={{ cursor: panning ? "grabbing" : spaceHeld ? "grab" : undefined }}
                 onPointerDown={onCanvasPointerDown}
                 onPointerMove={onCanvasPointerMove}
@@ -1506,15 +1492,15 @@ export default function CrmChecklists() {
                 onPointerCancel={onCanvasPointerUp}
                 data-testid="checklist-canvas"
               >
-                <div className="mx-auto" style={{ width: worldSize.w * zoom, height: worldSize.h * zoom }}>
                 <div
                   ref={worldRef}
-                  className="relative select-none"
+                  className="absolute left-0 top-0 select-none"
                   style={{
                     width: worldSize.w,
                     height: worldSize.h,
-                    transform: `scale(${zoom})`,
+                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                     transformOrigin: "0 0",
+                    transition: panning ? "none" : "transform 0.18s ease-out",
                     backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
                     backgroundSize: "22px 22px",
                   }}
@@ -1662,7 +1648,6 @@ export default function CrmChecklists() {
                       <Camera className="h-3.5 w-3.5" /> Add photo step
                     </button>
                   )}
-                </div>
                 </div>
               </div>
 
