@@ -101,7 +101,7 @@ const QUESTION_TYPE_ICONS: Record<ChecklistQuestionType, React.ReactNode> = {
 const MAROON = "#711419";
 const FLOW_W = 280;
 const PHOTO_W = 220;
-const WORLD_W_MIN = 3200;
+const WORLD_W_MIN = 6000;
 const DEFAULT_FLOW: XY = { x: WORLD_W_MIN / 2 - FLOW_W / 2 - 160, y: 120 };
 const DRAG_THRESHOLD = 5;
 
@@ -988,12 +988,12 @@ export default function CrmChecklists() {
 
   const worldSize = useMemo(() => {
     let w = WORLD_W_MIN;
-    let h = Math.max(1600, flowPos.y + orderedSteps.length * 150 + 600);
+    let h = Math.max(4000, flowPos.y + orderedSteps.length * 150 + 1000);
     for (const pos of Object.values(photoPos)) {
-      w = Math.max(w, pos.x + PHOTO_W + 400);
-      h = Math.max(h, pos.y + 400);
+      w = Math.max(w, pos.x + PHOTO_W + 600);
+      h = Math.max(h, pos.y + 600);
     }
-    w = Math.max(w, flowPos.x + FLOW_W + 800);
+    w = Math.max(w, flowPos.x + FLOW_W + 1200);
     return { w, h };
   }, [flowPos, photoPos, orderedSteps.length]);
 
