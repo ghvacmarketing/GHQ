@@ -1428,6 +1428,8 @@ export const crmWorkOrders = pgTable("crm_work_orders", {
   priority: text("priority").$type<"low" | "normal" | "high">().default("normal"),
   dispatchQueueStage: text("dispatch_queue_stage").$type<DispatchQueueStage>(),
   checklist: json("checklist").$type<{ item: string; completed: boolean }[]>(),
+  // Template the tech fills in the field; null = dispatcher toggled it off
+  assignedChecklistId: varchar("assigned_checklist_id"),
   partsUsed: json("parts_used").$type<{ partId: string; name: string; qty: number; price: number }[]>(),
   techNotes: text("tech_notes"),
   completionSummary: text("completion_summary"),

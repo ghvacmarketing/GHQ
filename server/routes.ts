@@ -12782,6 +12782,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workOrderNumber = existingWorkOrders.length + 1;
       }
 
+      // Tech checklist defaults ON: unless the request explicitly set or
+      // cleared assignedChecklistId, assign the first active checklist that
+      // matches this visit type + subtype.
+      let assignedChecklistId: string | null = (result.data as any).assignedChecklistId ?? null;
+      if (!("assignedChecklistId" in req.body)) {
+        const matches = await checklistsForSubtype(
+          (result.data.visitType as string) || "SERVICE",
+          result.data.workSubtype as string,
+        );
+        assignedChecklistId = matches[0]?.id ?? null;
+      }
+
       const workOrder = await storage.createWorkOrder({
         ...result.data,
         customerId,
@@ -12792,6 +12804,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         title: typeof title === 'string' ? title.trim() : title,
         description: typeof description === 'string' ? description.trim() : description,
         workOrderNumber,
+        assignedChecklistId,
       });
 
       await logCrmAudit(
@@ -21177,6 +21190,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SERVICE CALL CHECKLISTS API
   // ============================================
 
+  // Older checklists were keyed by the fixed service-call enum; newer ones
+  // (canvas builder) use the work-order subtype string directly. Match both.
+  const LEGACY_SUBTYPE_TO_SERVICE_TYPE: Record<string, string> = {
+    "No Heat": "NO_HEAT",
+    "No Cool": "NO_AC",
+    "Water Leak": "WATER_LEAK",
+    "Strange Noise": "STRANGE_NOISE",
+    "Thermostat Issue": "THERMOSTAT_ISSUE",
+    "Thermostat": "THERMOSTAT_ISSUE",
+    "Noise": "STRANGE_NOISE",
+    "AC Repair": "NO_AC",
+    "A\\C Repair": "NO_AC",
+    "Heating Repair": "NO_HEAT",
+    "Furnace Repair": "NO_HEAT",
+    "Heat Pump Repair": "NO_HEAT",
+    "Ductless Repair": "NO_AC",
+    "Mini Split Repair": "NO_AC",
+  };
+  const checklistsForSubtype = async (visitType: string, subtype: string) => {
+    const keys = Array.from(new Set([subtype, LEGACY_SUBTYPE_TO_SERVICE_TYPE[subtype] || "OTHER"]));
+    return db.select().from(serviceCallChecklists)
+      .where(and(
+        eq(serviceCallChecklists.isActive, true),
+        eq(serviceCallChecklists.visitType, visitType as any),
+        inArray(serviceCallChecklists.serviceType, keys as any),
+      ))
+      .orderBy(asc(serviceCallChecklists.name));
+  };
+
+  // GET /api/crm/checklists/for-subtype - All active checklists for a work
+  // order type + subtype (dispatcher picks one when creating a work order)
+  app.get("/api/crm/checklists/for-subtype", requireCrmAuth, async (req, res) => {
+    try {
+      const visitType = String(req.query.visitType || "SERVICE");
+      const subtype = String(req.query.subtype || "");
+      if (!subtype) return res.status(400).json({ message: "subtype is required" });
+
+      const matches = await checklistsForSubtype(visitType, subtype);
+      const ids = matches.map((m) => m.id);
+      let questions: (typeof checklistQuestions.$inferSelect)[] = [];
+      let photoSteps: (typeof checklistPhotoSteps.$inferSelect)[] = [];
+      if (ids.length > 0) {
+        [questions, photoSteps] = await Promise.all([
+          db.select().from(checklistQuestions).where(inArray(checklistQuestions.checklistId, ids)).orderBy(asc(checklistQuestions.sortOrder)),
+          db.select().from(checklistPhotoSteps).where(inArray(checklistPhotoSteps.checklistId, ids)).orderBy(asc(checklistPhotoSteps.sortOrder)),
+        ]);
+      }
+      res.json(matches.map((m) => ({
+        ...m,
+        questions: questions.filter((q) => q.checklistId === m.id),
+        photoSteps: photoSteps.filter((ps) => ps.checklistId === m.id),
+      })));
+    } catch (error) {
+      console.error("Error fetching checklists for subtype:", error);
+      res.status(500).json({ message: "Failed to fetch checklists" });
+    }
+  });
+
+  // GET /api/crm/checklists/by-id/:id - One checklist template with its
+  // questions and photo steps (the mobile app loads the assigned checklist)
+  app.get("/api/crm/checklists/by-id/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const [checklist] = await db.select().from(serviceCallChecklists).where(eq(serviceCallChecklists.id, req.params.id)).limit(1);
+      if (!checklist) return res.status(404).json({ message: "Checklist not found" });
+      const [questions, photoSteps] = await Promise.all([
+        db.select().from(checklistQuestions).where(eq(checklistQuestions.checklistId, checklist.id)).orderBy(asc(checklistQuestions.sortOrder)),
+        db.select().from(checklistPhotoSteps).where(eq(checklistPhotoSteps.checklistId, checklist.id)).orderBy(asc(checklistPhotoSteps.sortOrder)),
+      ]);
+      res.json({ ...checklist, questions, photoSteps });
+    } catch (error) {
+      console.error("Error fetching checklist by id:", error);
+      res.status(500).json({ message: "Failed to fetch checklist" });
+    }
+  });
+
   // GET /api/crm/checklists - List all checklist templates with their questions
   app.get("/api/crm/checklists", requireCrmAuth, async (req, res) => {
     try {
@@ -28108,6 +28196,10 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         description,
         visitType: visitType as any,
         workSubtype: serviceType === "consultation" ? "Comfort Consultation" : "Service Call",
+        assignedChecklistId: (await checklistsForSubtype(
+          String(visitType || "SERVICE"),
+          serviceType === "consultation" ? "Comfort Consultation" : "Service Call",
+        ))[0]?.id ?? null,
         status: "scheduled",
         priority: "normal",
         dispatchQueueStage: "NeedsScheduling",

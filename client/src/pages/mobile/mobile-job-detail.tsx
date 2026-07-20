@@ -14,6 +14,7 @@ import {
   Car,
   Wrench,
   ClipboardCheck,
+  Camera,
   ChevronDown,
   ChevronUp,
   Check,
@@ -79,6 +80,21 @@ type ChecklistQuestion = {
   questionType: "yes_no" | "text" | "number" | "select" | "multi_select";
   options: string[] | null;
   isRequired: boolean;
+  helpText?: string | null;
+};
+
+type AssignedChecklistTemplate = {
+  id: string;
+  name: string;
+  description: string | null;
+  questions: ChecklistQuestion[];
+  photoSteps?: Array<{
+    id: string;
+    label: string;
+    instructions: string | null;
+    isRequired: boolean;
+    linkedQuestionId: string | null;
+  }>;
 };
 
 type ChecklistResponseData = {
@@ -629,17 +645,208 @@ function OverviewTab({
   );
 }
 
-function WorkTab({ 
-  workOrder, 
-  checklistResponse 
-}: { 
+// Tech-facing checklist: filled in the field, submitted once complete
+function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail; template: AssignedChecklistTemplate }) {
+  const { toast } = useToast();
+  const [answers, setAnswers] = useState<Record<string, string | number>>({});
+
+  const answeredCount = template.questions.filter((q) => {
+    const a = answers[q.id];
+    return a !== undefined && a !== "";
+  }).length;
+  const missingRequired = template.questions.filter(
+    (q) => q.isRequired && (answers[q.id] === undefined || answers[q.id] === ""),
+  ).length;
+
+  const submit = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/crm/work-orders/${workOrder.id}/checklist-response`, {
+        checklistId: template.id,
+        answers,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders", workOrder.id, "checklist-response"] });
+      toast({ title: "Checklist submitted" });
+    },
+    onError: (e: any) => {
+      toast({
+        title: "Couldn't submit checklist",
+        description: e?.message || "Answer all required questions first.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const setAnswer = (id: string, value: string | number) =>
+    setAnswers((prev) => ({ ...prev, [id]: value }));
+
+  return (
+    <div className="space-y-4">
+      <Card className="border-amber-200 bg-amber-50/30" data-testid="card-checklist-fill">
+        <CardHeader className="pb-3 border-b border-amber-200 bg-amber-50/50">
+          <CardTitle className="flex items-center justify-between gap-2 text-base font-semibold">
+            <span className="flex items-center gap-2">
+              <Clipboard className="h-4 w-4 text-amber-600" />
+              {template.name}
+            </span>
+            <span className="text-xs font-semibold text-amber-700">{answeredCount}/{template.questions.length}</span>
+          </CardTitle>
+          {template.description && <p className="text-sm text-amber-700 mt-1">{template.description}</p>}
+        </CardHeader>
+        <CardContent className="pt-4 space-y-3">
+          {template.questions.map((q) => {
+            const value = answers[q.id];
+            return (
+              <div key={q.id} className="rounded-xl border border-amber-200 bg-white p-3.5" data-testid={`fill-question-${q.id}`}>
+                <p className="text-sm font-medium text-slate-800">
+                  {q.question}
+                  {q.isRequired && <span className="ml-1 text-red-500">*</span>}
+                </p>
+                {q.helpText && <p className="mt-0.5 text-xs text-slate-500">{q.helpText}</p>}
+                <div className="mt-2.5">
+                  {q.questionType === "yes_no" && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {["yes", "no"].map((opt) => (
+                        <button
+                          key={opt}
+                          onClick={() => setAnswer(q.id, opt)}
+                          className={`rounded-xl border py-2.5 text-sm font-semibold capitalize transition-colors ${
+                            value === opt
+                              ? opt === "yes"
+                                ? "border-green-500 bg-green-50 text-green-700"
+                                : "border-red-400 bg-red-50 text-red-600"
+                              : "border-slate-200 text-slate-500"
+                          }`}
+                          data-testid={`fill-${q.id}-${opt}`}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {q.questionType === "text" && (
+                    <Textarea
+                      value={(value as string) ?? ""}
+                      onChange={(e) => setAnswer(q.id, e.target.value)}
+                      rows={2}
+                      placeholder="Type your answer..."
+                      className="bg-white"
+                    />
+                  )}
+                  {q.questionType === "number" && (
+                    <Input
+                      type="number"
+                      inputMode="decimal"
+                      value={(value as string | number) ?? ""}
+                      onChange={(e) => setAnswer(q.id, e.target.value === "" ? "" : Number(e.target.value))}
+                      placeholder="Enter a number..."
+                      className="bg-white"
+                    />
+                  )}
+                  {q.questionType === "select" && q.options && (
+                    <div className="flex flex-wrap gap-2">
+                      {q.options.map((opt) => (
+                        <button
+                          key={opt}
+                          onClick={() => setAnswer(q.id, opt)}
+                          className={`rounded-full border px-3.5 py-2 text-sm font-medium transition-colors ${
+                            value === opt ? "border-[#711419] bg-[#711419]/5 text-[#711419]" : "border-slate-200 text-slate-500"
+                          }`}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {q.questionType === "multi_select" && q.options && (
+                    <div className="flex flex-wrap gap-2">
+                      {q.options.map((opt) => {
+                        const selected = String(value ?? "").split(", ").filter(Boolean);
+                        const checked = selected.includes(opt);
+                        return (
+                          <button
+                            key={opt}
+                            onClick={() => {
+                              const next = checked ? selected.filter((o) => o !== opt) : [...selected, opt];
+                              setAnswer(q.id, next.join(", "));
+                            }}
+                            className={`rounded-full border px-3.5 py-2 text-sm font-medium transition-colors ${
+                              checked ? "border-[#711419] bg-[#711419]/5 text-[#711419]" : "border-slate-200 text-slate-500"
+                            }`}
+                          >
+                            {checked ? "\u2713 " : ""}{opt}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {(template.photoSteps?.length ?? 0) > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-white p-3.5" data-testid="fill-photo-steps">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                <Camera className="h-4 w-4 text-[#711419]" /> Required photos
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500">Take these in the Photos tab as you work.</p>
+              <div className="mt-2 space-y-1.5">
+                {template.photoSteps!.map((ps) => {
+                  const stepNo = ps.linkedQuestionId
+                    ? template.questions.findIndex((q) => q.id === ps.linkedQuestionId) + 1
+                    : 0;
+                  return (
+                    <div key={ps.id} className="flex items-start gap-2 text-sm text-slate-700">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#711419]" />
+                      <span>
+                        {ps.label}
+                        {stepNo > 0 && <span className="text-xs text-slate-400"> - step {stepNo}</span>}
+                        {ps.instructions && <span className="block text-xs text-slate-500">{ps.instructions}</span>}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <Button
+            onClick={() => submit.mutate()}
+            disabled={submit.isPending || missingRequired > 0}
+            className="h-12 w-full rounded-xl bg-[#711419] text-base font-semibold hover:bg-[#8a1a1f]"
+            data-testid="button-submit-checklist"
+          >
+            {submit.isPending
+              ? "Submitting..."
+              : missingRequired > 0
+                ? `${missingRequired} required ${missingRequired === 1 ? "answer" : "answers"} left`
+                : "Submit checklist"}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function WorkTab({
+  workOrder,
+  checklistResponse,
+  assignedChecklist,
+}: {
   workOrder: WorkOrderDetail;
   checklistResponse: ChecklistResponseData | null | undefined;
+  assignedChecklist: AssignedChecklistTemplate | null;
 }) {
   const [checklistAnswersOpen, setChecklistAnswersOpen] = useState(true);
   const { toast } = useToast();
 
   if (!checklistResponse || !checklistResponse.checklist) {
+    if (assignedChecklist && assignedChecklist.questions.length > 0) {
+      return <ChecklistFillCard workOrder={workOrder} template={assignedChecklist} />;
+    }
     return (
       <div className="space-y-4">
         <Card>
@@ -3807,6 +4014,18 @@ export default function MobileJobDetail() {
     enabled: !!params.id,
   });
 
+  // The checklist dispatch assigned to this job — the tech fills it in the
+  // field. Only needed until a response exists.
+  const { data: assignedChecklist } = useQuery<AssignedChecklistTemplate | null>({
+    queryKey: ["/api/crm/checklists/by-id", workOrder?.assignedChecklistId],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/checklists/by-id/${workOrder!.assignedChecklistId}`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!workOrder?.assignedChecklistId,
+  });
+
   const { data: renewalInfo, refetch: refetchRenewalInfo } = useQuery<RenewalInfo>({
     queryKey: ["/api/mobile/work-orders", params.id, "renewal-info"],
     queryFn: async () => {
@@ -4296,7 +4515,7 @@ export default function MobileJobDetail() {
             style={{ visibility: activeTab === "overview" ? "hidden" : "visible" }}
           >
             <div className={activeTab === "work" ? "block" : "hidden"}>
-              <WorkTab workOrder={workOrder} checklistResponse={checklistResponse} />
+              <WorkTab workOrder={workOrder} checklistResponse={checklistResponse} assignedChecklist={assignedChecklist ?? null} />
             </div>
             <div className={activeTab === "quote" ? "block" : "hidden"}>
               <QuoteTab workOrder={workOrder} />

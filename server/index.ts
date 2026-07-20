@@ -230,6 +230,7 @@ async function runChecklistPhotoStepsMigration() {
         created_at timestamp DEFAULT now()
       )
     `);
+    await db.execute(sql`ALTER TABLE crm_work_orders ADD COLUMN IF NOT EXISTS assigned_checklist_id varchar`);
   } catch (err) {
     console.error("Checklist photo steps migration error (non-fatal):", err);
   }

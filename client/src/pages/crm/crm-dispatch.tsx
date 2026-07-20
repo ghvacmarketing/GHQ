@@ -2432,6 +2432,8 @@ export default function CrmDispatch() {
   const [showChecklist, setShowChecklist] = useState(true);
   const [checklistLoading, setChecklistLoading] = useState(false);
   const [checklistId, setChecklistId] = useState<string | null>(null);
+  const [availableChecklists, setAvailableChecklists] = useState<Array<{ id: string; name: string; questions: ChecklistQuestion[] }>>([]);
+  const [checklistEnabled, setChecklistEnabled] = useState(true);
   
   // Track source quote ID when creating follow-up work order from quote acceptance
   const [sourceQuoteId, setSourceQuoteId] = useState<string | null>(null);
@@ -2808,6 +2810,8 @@ export default function CrmDispatch() {
     setChecklistAnswers({});
     setShowChecklist(true);
     setChecklistId(null);
+    setAvailableChecklists([]);
+    setChecklistEnabled(true);
     // Reset source quote ID
     setSourceQuoteId(null);
     setImmediateAction("create_now");
@@ -2863,39 +2867,31 @@ export default function CrmDispatch() {
     }
   }, []);
 
-  // Fetch checklist questions when SERVICE is selected and workSubtype changes
+  // Fetch every checklist available for the chosen type + subtype so the
+  // dispatcher can pick one (and toggle whether the tech gets it at all)
   useEffect(() => {
     if (!createDialogOpen) return;
-    if (visitType !== "SERVICE") {
+    if (!workSubtype) {
+      setAvailableChecklists([]);
       setChecklistQuestions([]);
       setChecklistAnswers({});
       setChecklistId(null);
       return;
     }
 
-    const serviceType = WORK_SUBTYPE_TO_SERVICE_TYPE[workSubtype] || "OTHER";
-
     setChecklistLoading(true);
-    fetch(`/api/crm/checklists/${serviceType}`, { credentials: "include" })
-      .then(res => {
-        if (!res.ok) {
-          setChecklistQuestions([]);
-          setChecklistId(null);
-          return null;
-        }
-        return res.json();
-      })
-      .then(data => {
-        if (data && data.questions) {
-          setChecklistQuestions(data.questions);
-          setChecklistId(data.id);
-          setChecklistAnswers({});
-        } else {
-          setChecklistQuestions([]);
-          setChecklistId(null);
-        }
+    fetch(`/api/crm/checklists/for-subtype?visitType=${encodeURIComponent(visitType)}&subtype=${encodeURIComponent(workSubtype)}`, { credentials: "include" })
+      .then(res => (res.ok ? res.json() : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : [];
+        setAvailableChecklists(list);
+        setChecklistQuestions(list[0]?.questions ?? []);
+        setChecklistId(list[0]?.id ?? null);
+        setChecklistAnswers({});
+        setChecklistEnabled(true);
       })
       .catch(() => {
+        setAvailableChecklists([]);
         setChecklistQuestions([]);
         setChecklistId(null);
       })
@@ -2924,19 +2920,9 @@ export default function CrmDispatch() {
     return "--- Service Call Checklist ---\n" + summaryParts.join("\n") + "\n---\n\n";
   };
 
-  // Check if all required checklist questions are answered
-  const areRequiredQuestionsAnswered = (): boolean => {
-    if (visitType !== "SERVICE" || checklistQuestions.length === 0) return true;
-    
-    const requiredQuestions = checklistQuestions.filter(q => q.isRequired);
-    for (const q of requiredQuestions) {
-      const answer = checklistAnswers[q.id];
-      if (answer === undefined || answer === "" || answer === null) {
-        return false;
-      }
-    }
-    return true;
-  };
+  // Dispatcher pre-fill is optional — required answers are enforced when the
+  // tech submits the checklist response in the field.
+  const areRequiredQuestionsAnswered = (): boolean => true;
 
   // Try AI summarization, fall back to local summary
   const generateChecklistSummary = async (): Promise<string> => {
@@ -3025,6 +3011,7 @@ export default function CrmDispatch() {
         status: "scheduled",
         immediateAction,
         dueDate: dueDate ? dueDate.toISOString() : null,
+        assignedChecklistId: checklistEnabled && checklistId ? checklistId : null,
       });
       const workOrder = await res.json();
 
@@ -5304,8 +5291,8 @@ export default function CrmDispatch() {
               </Select>
             </div>
 
-            {/* Service Call Checklist Section */}
-            {visitType === "SERVICE" && (checklistLoading || checklistQuestions.length > 0) && (
+            {/* Checklist Section */}
+            {(checklistLoading || availableChecklists.length > 0) && (
               <Collapsible open={showChecklist} onOpenChange={setShowChecklist} className="space-y-2">
                 <CollapsibleTrigger asChild>
                   <Button
@@ -5333,6 +5320,44 @@ export default function CrmDispatch() {
                   </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="bg-amber-50/50 border border-amber-200 rounded-lg p-4 space-y-4">
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-white px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-amber-900">Tech checklist</p>
+                      <p className="text-xs text-amber-600">
+                        {checklistEnabled ? "The tech fills this out in the field" : "The tech won't get a checklist for this job"}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={checklistEnabled}
+                      onCheckedChange={setChecklistEnabled}
+                      data-testid="switch-tech-checklist"
+                    />
+                  </div>
+                  {availableChecklists.length > 1 && (
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-medium text-amber-900">Which checklist?</Label>
+                      <Select
+                        value={checklistId ?? ""}
+                        onValueChange={(id) => {
+                          setChecklistId(id);
+                          const picked = availableChecklists.find(c => c.id === id);
+                          setChecklistQuestions(picked?.questions ?? []);
+                          setChecklistAnswers({});
+                        }}
+                      >
+                        <SelectTrigger className="bg-white" data-testid="select-wo-checklist">
+                          <SelectValue placeholder="Choose a checklist..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableChecklists.map(c => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name} ({c.questions.length} {c.questions.length === 1 ? "question" : "questions"})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   {checklistLoading ? (
                     <div className="space-y-3">
                       <Skeleton className="h-6 w-3/4" />
