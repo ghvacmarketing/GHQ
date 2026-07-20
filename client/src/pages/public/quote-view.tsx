@@ -80,6 +80,15 @@ function formatCurrency(value: string | number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num);
 }
 
+// Estimated monthly payment with approved financing. Divisor of 67 mirrors the
+// proposal builder / preview so the customer sees the same figure everywhere.
+const FINANCING_DIVISOR = 67;
+function monthlyFinancing(value: string | number): number {
+  const num = typeof value === "string" ? parseFloat(value.replace(/[^0-9.-]/g, "")) : value;
+  if (isNaN(num) || num <= 0) return 0;
+  return Math.round(num / FINANCING_DIVISOR);
+}
+
 function formatDate(dateString: string | Date | null | undefined): string {
   if (!dateString) return "N/A";
   const date = new Date(dateString);
@@ -726,7 +735,14 @@ export default function PublicQuoteView() {
                             </div>
                             <span className="font-semibold text-slate-900 text-base sm:text-lg">{option.tag}</span>
                           </div>
-                          <span className="text-lg sm:text-xl font-bold" style={{ color: BRAND_COLOR }}>{formatCurrency(option.total)}</span>
+                          <div className="text-right">
+                            <div className="text-lg sm:text-xl font-bold" style={{ color: BRAND_COLOR }}>{formatCurrency(option.total)}</div>
+                            {monthlyFinancing(option.total) > 0 && (
+                              <div className="text-xs font-medium text-slate-500" data-testid={`option-monthly-${option.tag.toLowerCase().replace(/\s+/g, "-")}`}>
+                                or {formatCurrency(monthlyFinancing(option.total))}/mo financing
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="p-3 sm:p-4">
                           {/* Show AI-generated category title if available */}
@@ -877,6 +893,12 @@ export default function PublicQuoteView() {
                     <span>Total</span>
                     <span data-testid="text-quote-total">{formatCurrency(quoteData.total)}</span>
                   </div>
+                  {isInstallQuote && monthlyFinancing(quoteData.total) > 0 && (
+                    <div className="flex justify-between items-baseline text-sm font-medium text-slate-600 border-t border-slate-200 pt-2">
+                      <span>Or with approved financing</span>
+                      <span data-testid="text-quote-monthly">{formatCurrency(monthlyFinancing(quoteData.total))}/mo</span>
+                    </div>
+                  )}
                 </div>
               </>
             )}
