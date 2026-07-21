@@ -253,6 +253,66 @@ async function runChecklistPhotoStepsMigration() {
   }
 }
 
+async function runGmailMigration() {
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS gmail_address text`);
+    await db.execute(sql`ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS gmail_refresh_token_enc text`);
+    await db.execute(sql`ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS gmail_connected_at timestamp`);
+    await db.execute(sql`ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS gmail_history_id text`);
+    await db.execute(sql`ALTER TABLE crm_users ADD COLUMN IF NOT EXISTS gmail_sync_enabled boolean NOT NULL DEFAULT true`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS crm_email_threads (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id varchar NOT NULL REFERENCES crm_users(id) ON DELETE CASCADE,
+        gmail_thread_id text NOT NULL,
+        subject text,
+        snippet text,
+        participants json DEFAULT '[]'::json,
+        last_message_at timestamp,
+        is_unread boolean NOT NULL DEFAULT false,
+        in_inbox boolean NOT NULL DEFAULT true,
+        is_sent boolean NOT NULL DEFAULT false,
+        customer_id varchar REFERENCES crm_customers(id) ON DELETE SET NULL,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS crm_email_threads_user_thread_idx ON crm_email_threads(user_id, gmail_thread_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS crm_email_threads_user_last_idx ON crm_email_threads(user_id, last_message_at)`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS crm_email_messages (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        thread_id varchar NOT NULL REFERENCES crm_email_threads(id) ON DELETE CASCADE,
+        user_id varchar NOT NULL REFERENCES crm_users(id) ON DELETE CASCADE,
+        gmail_message_id text NOT NULL,
+        gmail_thread_id text NOT NULL,
+        direction text NOT NULL,
+        from_email text,
+        from_name text,
+        to_emails json DEFAULT '[]'::json,
+        cc_emails json DEFAULT '[]'::json,
+        bcc_emails json DEFAULT '[]'::json,
+        subject text,
+        snippet text,
+        body_html text,
+        body_text text,
+        has_attachments boolean NOT NULL DEFAULT false,
+        attachments json DEFAULT '[]'::json,
+        is_unread boolean NOT NULL DEFAULT false,
+        message_id_header text,
+        sent_at timestamp,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS crm_email_messages_gmail_idx ON crm_email_messages(user_id, gmail_message_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS crm_email_messages_thread_idx ON crm_email_messages(thread_id)`);
+  } catch (err) {
+    console.error("Gmail migration error (non-fatal):", err);
+  }
+}
+
 async function runSalesbookMigrations() {
   try {
     const { db } = await import("./db");
@@ -542,6 +602,7 @@ async function runWaterHeaterSeeds() {
   await runTaggedCommentMigrations();
   await runInstallPlannerMigrations();
   await runChecklistPhotoStepsMigration();
+  await runGmailMigration();
   await runSalesbookMigrations();
   await runProposalTemplateMigrations();
   await runAgreementVisitFrequencyMigration();
@@ -610,6 +671,11 @@ async function runWaterHeaterSeeds() {
 
     // Start Govee sensor polling (humidity/temperature) every minute
     startGoveeBackgroundSync(1);
+
+    // Gmail (Workspace) two-way inbox sync for connected CRM users
+    import("./services/gmailService")
+      .then(({ startGmailBackgroundSync }) => startGmailBackgroundSync(3))
+      .catch((e) => console.error("Gmail sync start failed:", e));
 
     // Textline message sync every 30s — keeps inbound AND outbound SMS
     // flowing into the CRM even when the webhook misses

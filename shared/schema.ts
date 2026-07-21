@@ -842,6 +842,13 @@ export const crmUsers = pgTable("crm_users", {
   // Dispatch-board membership override. null = role default (tech/supervisor
   // on, everyone else off); true/false forces membership either way.
   onDispatchBoard: boolean("on_dispatch_board"),
+  // Gmail (Google Workspace) connection for sending/reading email in the CRM.
+  // Refresh token is AES-256-GCM encrypted at rest.
+  gmailAddress: text("gmail_address"),
+  gmailRefreshTokenEnc: text("gmail_refresh_token_enc"),
+  gmailConnectedAt: timestamp("gmail_connected_at"),
+  gmailHistoryId: text("gmail_history_id"), // last synced Gmail historyId
+  gmailSyncEnabled: boolean("gmail_sync_enabled").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -2998,6 +3005,65 @@ export type InsertCrmMessagingMessage = z.infer<typeof insertCrmMessagingMessage
 export type CrmMessagingMessage = typeof crmMessagingMessages.$inferSelect;
 export type InsertCrmMessagingConversationTag = z.infer<typeof insertCrmMessagingConversationTagSchema>;
 export type CrmMessagingConversationTag = typeof crmMessagingConversationTags.$inferSelect;
+
+// =============================================
+// CRM EMAIL (Gmail / Google Workspace two-way inbox)
+// =============================================
+// One row per Gmail thread, scoped to the connected user's mailbox.
+export const crmEmailThreads = pgTable("crm_email_threads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  gmailThreadId: text("gmail_thread_id").notNull(),
+  subject: text("subject"),
+  snippet: text("snippet"),
+  // Distinct participant emails on the thread (for display + customer matching)
+  participants: json("participants").$type<string[]>().default([]),
+  lastMessageAt: timestamp("last_message_at"),
+  isUnread: boolean("is_unread").notNull().default(false),
+  inInbox: boolean("in_inbox").notNull().default(true),
+  isSent: boolean("is_sent").notNull().default(false),
+  customerId: varchar("customer_id").references(() => crmCustomers.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  userThreadIdx: uniqueIndex("crm_email_threads_user_thread_idx").on(table.userId, table.gmailThreadId),
+  userLastMsgIdx: index("crm_email_threads_user_last_idx").on(table.userId, table.lastMessageAt),
+}));
+
+// One row per Gmail message within a thread.
+export const crmEmailMessages = pgTable("crm_email_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  threadId: varchar("thread_id").notNull().references(() => crmEmailThreads.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => crmUsers.id, { onDelete: "cascade" }),
+  gmailMessageId: text("gmail_message_id").notNull(),
+  gmailThreadId: text("gmail_thread_id").notNull(),
+  direction: text("direction").$type<"inbound" | "outbound">().notNull(),
+  fromEmail: text("from_email"),
+  fromName: text("from_name"),
+  toEmails: json("to_emails").$type<string[]>().default([]),
+  ccEmails: json("cc_emails").$type<string[]>().default([]),
+  bccEmails: json("bcc_emails").$type<string[]>().default([]),
+  subject: text("subject"),
+  snippet: text("snippet"),
+  bodyHtml: text("body_html"),
+  bodyText: text("body_text"),
+  hasAttachments: boolean("has_attachments").notNull().default(false),
+  attachments: json("attachments").$type<{ filename: string; mimeType: string; size: number; attachmentId: string }[]>().default([]),
+  isUnread: boolean("is_unread").notNull().default(false),
+  messageIdHeader: text("message_id_header"), // RFC822 Message-ID, for threading replies
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  msgUniqueIdx: uniqueIndex("crm_email_messages_gmail_idx").on(table.userId, table.gmailMessageId),
+  threadIdx: index("crm_email_messages_thread_idx").on(table.threadId),
+}));
+
+export const insertCrmEmailThreadSchema = createInsertSchema(crmEmailThreads).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCrmEmailMessageSchema = createInsertSchema(crmEmailMessages).omit({ id: true, createdAt: true });
+export type CrmEmailThread = typeof crmEmailThreads.$inferSelect;
+export type CrmEmailMessage = typeof crmEmailMessages.$inferSelect;
+export type InsertCrmEmailThread = z.infer<typeof insertCrmEmailThreadSchema>;
+export type InsertCrmEmailMessage = z.infer<typeof insertCrmEmailMessageSchema>;
 
 // Time Entry Source Types
 export type TimeEntrySource = "mobile" | "manual" | "system";

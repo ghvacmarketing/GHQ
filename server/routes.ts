@@ -85,6 +85,15 @@ import { setupEmployeeAuth, requirePortalAuth, requireAdmin, requireEmployee, ha
 import { recordUserActivity } from "./activity-tracker";
 import { requireCrmAuth, getCurrentCrmUser, getCrmUserByEmail, createCrmSession, destroyCrmSession, comparePasswords as compareCrmPasswords, verifyGatePassword, ensureTechniciansExist, CRM_SESSION_COOKIE, isSalesOrAbove, requireCrmAdmin, requireCrmOwner, requireCrmSalesOrAbove, requireCrmTechOrAbove, logCrmAudit, hashPassword as hashCrmPassword, isSupervisor } from "./crm-auth";
 import { startGoogleOAuth, handleGoogleOAuthCallback, isGoogleOAuthConfigured } from "./crm-google-auth";
+import { startGmailConnect, handleGmailConnectCallback } from "./crm-gmail-auth";
+import {
+  isGmailOAuthConfigured,
+  sendEmail as gmailSendEmail,
+  syncUser as gmailSyncUser,
+  markThreadRead as gmailMarkThreadRead,
+  disconnectGmail,
+} from "./services/gmailService";
+import { crmEmailThreads, crmEmailMessages } from "@shared/schema";
 import cookieParser from "cookie-parser";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerEsignRoutes } from "./esign-routes";
@@ -5410,6 +5419,193 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/crm/auth/google/status - Whether the Google sign-in button should appear
   app.get("/api/crm/auth/google/status", (_req, res) => {
     res.json({ enabled: isGoogleOAuthConfigured() });
+  });
+
+  // ── Gmail (Workspace) connect + Mail inbox ─────────────────────────────────
+  // GET /api/crm/gmail/connect - start the per-user Gmail consent (offline)
+  app.get("/api/crm/gmail/connect", (req, res) => {
+    void startGmailConnect(req, res);
+  });
+  // GET /api/crm/gmail/callback - store the refresh token on the user
+  app.get("/api/crm/gmail/callback", (req, res) => {
+    void handleGmailConnectCallback(req, res);
+  });
+
+  // GET /api/crm/gmail/status - is Gmail configured + is THIS user connected
+  app.get("/api/crm/gmail/status", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      res.json({
+        configured: isGmailOAuthConfigured(),
+        connected: !!user?.gmailRefreshTokenEnc,
+        gmailAddress: user?.gmailAddress || null,
+        syncEnabled: user?.gmailSyncEnabled ?? true,
+        connectedAt: user?.gmailConnectedAt || null,
+      });
+    } catch (e) {
+      res.status(500).json({ message: "Failed to load Gmail status" });
+    }
+  });
+
+  // POST /api/crm/gmail/disconnect
+  app.post("/api/crm/gmail/disconnect", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (user) await disconnectGmail(user.id);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ message: "Failed to disconnect" });
+    }
+  });
+
+  // GET /api/crm/mail/threads?folder=inbox|sent|unread&search=...
+  app.get("/api/crm/mail/threads", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!user.gmailRefreshTokenEnc) return res.json({ connected: false, threads: [] });
+
+      const folder = String(req.query.folder || "inbox");
+      const search = String(req.query.search || "").trim().toLowerCase();
+
+      const conds = [eq(crmEmailThreads.userId, user.id)] as any[];
+      if (folder === "inbox") conds.push(eq(crmEmailThreads.inInbox, true));
+      else if (folder === "sent") conds.push(eq(crmEmailThreads.isSent, true));
+      else if (folder === "unread") conds.push(eq(crmEmailThreads.isUnread, true));
+
+      let rows = await db
+        .select()
+        .from(crmEmailThreads)
+        .where(and(...conds))
+        .orderBy(desc(crmEmailThreads.lastMessageAt))
+        .limit(200);
+
+      if (search) {
+        rows = rows.filter(
+          (t) =>
+            (t.subject || "").toLowerCase().includes(search) ||
+            (t.snippet || "").toLowerCase().includes(search) ||
+            (t.participants || []).some((p) => p.toLowerCase().includes(search)),
+        );
+      }
+
+      res.json({ connected: true, threads: rows });
+    } catch (e) {
+      console.error("mail/threads", e);
+      res.status(500).json({ message: "Failed to load mail" });
+    }
+  });
+
+  // GET /api/crm/mail/threads/:id - messages within a thread (marks read)
+  app.get("/api/crm/mail/threads/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const [thread] = await db
+        .select()
+        .from(crmEmailThreads)
+        .where(and(eq(crmEmailThreads.id, req.params.id), eq(crmEmailThreads.userId, user.id)))
+        .limit(1);
+      if (!thread) return res.status(404).json({ message: "Thread not found" });
+
+      const messages = await db
+        .select()
+        .from(crmEmailMessages)
+        .where(eq(crmEmailMessages.threadId, thread.id))
+        .orderBy(asc(crmEmailMessages.sentAt));
+
+      if (thread.isUnread) gmailMarkThreadRead(user, thread.id).catch((e) => console.error("mark read", e));
+
+      let customer = null;
+      if (thread.customerId) {
+        const [c] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, thread.customerId));
+        customer = c || null;
+      }
+      res.json({ thread, messages, customer });
+    } catch (e) {
+      console.error("mail/thread detail", e);
+      res.status(500).json({ message: "Failed to load thread" });
+    }
+  });
+
+  // POST /api/crm/mail/send - compose new OR reply (pass threadId to reply)
+  app.post("/api/crm/mail/send", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!user.gmailRefreshTokenEnc) return res.status(400).json({ message: "Gmail not connected" });
+
+      const { to, cc, bcc, subject, html, threadRowId } = req.body as {
+        to?: string[]; cc?: string[]; bcc?: string[]; subject?: string; html?: string; threadRowId?: string;
+      };
+      const toList = (Array.isArray(to) ? to : []).map((s) => String(s).trim()).filter(Boolean);
+      if (toList.length === 0) return res.status(400).json({ message: "At least one recipient is required" });
+      if (!html || !html.trim()) return res.status(400).json({ message: "Message body is required" });
+
+      // Reply threading: pull the last message's Gmail thread + Message-ID
+      let gmailThreadId: string | null = null;
+      let inReplyTo: string | null = null;
+      let references: string | null = null;
+      if (threadRowId) {
+        const [t] = await db.select().from(crmEmailThreads).where(and(eq(crmEmailThreads.id, threadRowId), eq(crmEmailThreads.userId, user.id)));
+        if (t) {
+          gmailThreadId = t.gmailThreadId;
+          const [lastMsg] = await db
+            .select()
+            .from(crmEmailMessages)
+            .where(eq(crmEmailMessages.threadId, t.id))
+            .orderBy(desc(crmEmailMessages.sentAt))
+            .limit(1);
+          inReplyTo = lastMsg?.messageIdHeader || null;
+          references = lastMsg?.messageIdHeader || null;
+        }
+      }
+
+      const result = await gmailSendEmail(user, {
+        to: toList,
+        cc: (cc || []).map((s) => String(s).trim()).filter(Boolean),
+        bcc: (bcc || []).map((s) => String(s).trim()).filter(Boolean),
+        subject: subject || "(no subject)",
+        html,
+        gmailThreadId,
+        inReplyTo,
+        references,
+      });
+      res.json({ ok: true, gmailThreadId: result.gmailThreadId });
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (msg === "gmail_revoked") return res.status(401).json({ message: "Gmail access was revoked — please reconnect." });
+      console.error("mail/send", e);
+      res.status(500).json({ message: "Failed to send email" });
+    }
+  });
+
+  // POST /api/crm/mail/threads/:id/read - mark a thread read
+  app.post("/api/crm/mail/threads/:id/read", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      await gmailMarkThreadRead(user, req.params.id);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ message: "Failed to mark read" });
+    }
+  });
+
+  // POST /api/crm/mail/sync - pull latest from Gmail on demand
+  app.post("/api/crm/mail/sync", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!user.gmailRefreshTokenEnc) return res.json({ connected: false });
+      const result = await gmailSyncUser(user);
+      res.json({ ok: true, ...result });
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (msg === "gmail_revoked") return res.status(401).json({ message: "Gmail access was revoked — please reconnect." });
+      console.error("mail/sync", e);
+      res.status(500).json({ message: "Failed to sync" });
+    }
   });
 
   // POST /api/crm/auth/logout - Destroy session
