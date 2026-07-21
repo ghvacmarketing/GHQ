@@ -130,6 +130,18 @@ export default function CrmMail() {
     if (!authLoading && !currentUser) navigate("/crm/login");
   }, [authLoading, currentUser, navigate]);
 
+  // Pull from Gmail once when the page opens while connected. The page otherwise
+  // only reads the local DB, and the server's background sync fails silently to
+  // the logs — so without this a broken sync just looks like an empty inbox.
+  const [didInitialSync, setDidInitialSync] = useState(false);
+  useEffect(() => {
+    if (connected && !didInitialSync) {
+      setDidInitialSync(true);
+      syncMutation.mutate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected, didInitialSync]);
+
   // Show a toast after returning from the OAuth connect flow
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -150,9 +162,14 @@ export default function CrmMail() {
       const res = await apiRequest("POST", "/api/crm/mail/sync");
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: { threads?: number; connected?: boolean } | undefined) => {
       setSyncError(null);
       queryClient.invalidateQueries({ queryKey: ["/api/crm/mail/threads"] });
+      const n = data?.threads ?? 0;
+      toast({
+        title: n > 0 ? `Synced ${n} conversation${n === 1 ? "" : "s"}` : "Up to date",
+        description: n > 0 ? undefined : "Gmail returned no new inbox/sent messages from the last 90 days.",
+      });
     },
     onError: (e: any) => {
       const msg = e?.message || "Sync failed";
@@ -361,6 +378,19 @@ export default function CrmMail() {
                 <p className="mt-1 text-xs text-slate-400">
                   {search ? "No messages match your search." : "New messages will appear here after a sync."}
                 </p>
+                {!search && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-4 rounded-lg"
+                    onClick={() => syncMutation.mutate()}
+                    disabled={syncMutation.isPending}
+                    data-testid="button-sync-empty"
+                  >
+                    <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${syncMutation.isPending ? "animate-spin" : ""}`} />
+                    {syncMutation.isPending ? "Syncing…" : "Sync now"}
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="p-2">
