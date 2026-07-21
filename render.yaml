@@ -80,6 +80,18 @@ services:
       - key: GOOGLE_OAUTH_REDIRECT_URI # https://<your-render-domain>/api/crm/auth/google/callback
         sync: false
 
+      # ── Gmail (CRM Mail — two-way inbox) ─────────────────────────────
+      # Reuses GOOGLE_CLIENT_ID/SECRET above. The Gmail connect flow uses a
+      # SEPARATE callback — register this exact URI in the Google Cloud OAuth
+      # client, enable the Gmail API, and add the gmail.modify scope on the
+      # consent screen, or sync will 403.
+      - key: GMAIL_OAUTH_REDIRECT_URI # https://<your-render-domain>/api/crm/gmail/callback
+        sync: false
+      # Optional: dedicated AES key for encrypting stored refresh tokens.
+      # Falls back to SESSION_SECRET when unset.
+      - key: GMAIL_TOKEN_KEY
+        sync: false
+
       # ── QuickBooks ───────────────────────────────────────────────────
       - key: QUICKBOOKS_CLIENT_ID
         sync: false

@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import {
-  Mail, Search, RefreshCw, PenSquare, Loader2, Inbox, Send, Circle, Paperclip, X, CornerUpLeft, Link2,
+  Mail, Search, RefreshCw, PenSquare, Loader2, Inbox, Send, Paperclip, X,
+  CornerUpLeft, Link2, ArrowLeft, AlertTriangle,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 
@@ -57,6 +58,20 @@ function fmtWhen(iso: string | null): string {
   return format(d, "MMM d, yyyy");
 }
 
+// Display name for a thread row: prefer the participant's name-ish local part.
+function primaryName(t: Thread): string {
+  const p = (t.participants && t.participants[0]) || "";
+  if (!p) return "(no recipient)";
+  return p;
+}
+
+function initials(str: string): string {
+  const s = (str || "").replace(/@.*/, "").replace(/[._-]+/g, " ").trim();
+  if (!s) return "?";
+  const parts = s.split(/\s+/);
+  return (parts[0][0] + (parts[1]?.[0] || "")).toUpperCase();
+}
+
 export default function CrmMail() {
   usePageTitle("Mail");
   const [, navigate] = useLocation();
@@ -68,6 +83,7 @@ export default function CrmMail() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [replyHtml, setReplyHtml] = useState("");
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -105,6 +121,11 @@ export default function CrmMail() {
     enabled: !!selectedId,
   });
 
+  const unreadCount = useMemo(
+    () => threads.reduce((n, t) => n + (t.isUnread ? 1 : 0), 0),
+    [threads],
+  );
+
   useEffect(() => {
     if (!authLoading && !currentUser) navigate("/crm/login");
   }, [authLoading, currentUser, navigate]);
@@ -125,11 +146,19 @@ export default function CrmMail() {
   }, []);
 
   const syncMutation = useMutation({
-    mutationFn: async () => apiRequest("POST", "/api/crm/mail/sync"),
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/crm/mail/sync");
+      return res.json();
+    },
     onSuccess: () => {
+      setSyncError(null);
       queryClient.invalidateQueries({ queryKey: ["/api/crm/mail/threads"] });
     },
-    onError: (e: any) => toast({ variant: "destructive", title: "Sync failed", description: e?.message }),
+    onError: (e: any) => {
+      const msg = e?.message || "Sync failed";
+      setSyncError(msg);
+      toast({ variant: "destructive", title: "Sync failed", description: msg });
+    },
   });
 
   const sendMutation = useMutation({
@@ -180,8 +209,10 @@ export default function CrmMail() {
   if (status && !status.configured) {
     return (
       <CrmLayout currentUser={currentUser}>
-        <div className="mx-auto max-w-lg py-20 text-center">
-          <Mail className="mx-auto mb-4 h-12 w-12 text-slate-300" />
+        <div className="mx-auto max-w-lg py-24 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
+            <Mail className="h-7 w-7 text-slate-400" />
+          </div>
           <h1 className="text-xl font-semibold text-slate-900">Email isn't set up yet</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             An admin needs to enable the Gmail integration (Google Workspace) before you can send and receive email in the CRM.
@@ -194,17 +225,17 @@ export default function CrmMail() {
   if (status && !connected) {
     return (
       <CrmLayout currentUser={currentUser}>
-        <div className="mx-auto max-w-lg py-20 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#711419]/10">
-            <Mail className="h-7 w-7 text-[#711419]" />
+        <div className="mx-auto max-w-lg py-24 text-center">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#711419]/10">
+            <Mail className="h-8 w-8 text-[#711419]" />
           </div>
-          <h1 className="text-xl font-semibold text-slate-900">Connect your Workspace Gmail</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Send and receive email from your own <strong>@giesbrecht</strong> address, right inside the CRM. Messages
-            land in your normal Gmail Sent folder and replies come back to your inbox.
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Connect your Workspace Gmail</h1>
+          <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
+            Send and receive email from your own address, right inside the CRM. Messages land in your normal
+            Gmail Sent folder and replies come back to your inbox.
           </p>
           <Button
-            className="mt-6 bg-[#711419] hover:bg-[#8a1a1f]"
+            className="mt-6 h-11 rounded-xl bg-[#711419] px-6 hover:bg-[#8a1a1f]"
             onClick={() => { window.location.href = "/api/crm/gmail/connect"; }}
             data-testid="button-connect-gmail"
           >
@@ -216,194 +247,277 @@ export default function CrmMail() {
     );
   }
 
-  const FOLDERS: { key: Folder; label: string; icon: React.ReactNode }[] = [
-    { key: "inbox", label: "Inbox", icon: <Inbox className="h-4 w-4" /> },
-    { key: "unread", label: "Unread", icon: <Circle className="h-4 w-4" /> },
+  const FOLDERS: { key: Folder; label: string; icon: React.ReactNode; badge?: number }[] = [
+    { key: "inbox", label: "Inbox", icon: <Inbox className="h-4 w-4" />, badge: unreadCount || undefined },
+    { key: "unread", label: "Unread", icon: <Mail className="h-4 w-4" /> },
     { key: "sent", label: "Sent", icon: <Send className="h-4 w-4" /> },
   ];
 
   return (
     <CrmLayout currentUser={currentUser} flush disableScroll hideGlobalSearch>
-      <div className="flex h-full min-h-0">
+      <div className="flex h-full min-h-0 bg-slate-50">
         {/* Left: folders + thread list */}
-        <div className="flex w-full max-w-sm shrink-0 flex-col border-r border-slate-200 bg-white lg:w-[380px]">
-          <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
-            <div className="flex items-center gap-2">
-              <Mail className="h-5 w-5 text-[#711419]" />
-              <span className="font-semibold text-slate-900">Mail</span>
-              <span className="text-xs text-slate-400">{status?.gmailAddress}</span>
+        <div
+          className={`${selectedId ? "hidden lg:flex" : "flex"} w-full shrink-0 flex-col border-r border-slate-200/80 bg-white lg:w-[400px]`}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-4">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#711419]/10">
+                <Mail className="h-[18px] w-[18px] text-[#711419]" />
+              </div>
+              <div className="min-w-0 leading-tight">
+                <div className="font-semibold text-slate-900">Mail</div>
+                <div className="truncate text-[11px] text-slate-400">{status?.gmailAddress}</div>
+              </div>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={() => syncMutation.mutate()}
-                className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
                 title="Refresh"
                 data-testid="button-sync-mail"
               >
-                <RefreshCw className={`h-4 w-4 ${syncMutation.isPending ? "animate-spin" : ""}`} />
+                <RefreshCw className={`h-[18px] w-[18px] ${syncMutation.isPending ? "animate-spin" : ""}`} />
               </button>
-              <Button size="sm" className="h-8 bg-[#711419] hover:bg-[#8a1a1f]" onClick={() => setComposeOpen(true)} data-testid="button-compose">
-                <PenSquare className="mr-1.5 h-3.5 w-3.5" /> Compose
+              <Button
+                size="sm"
+                className="h-9 rounded-xl bg-[#711419] px-3.5 shadow-sm hover:bg-[#8a1a1f]"
+                onClick={() => setComposeOpen(true)}
+                data-testid="button-compose"
+              >
+                <PenSquare className="mr-1.5 h-4 w-4" /> Compose
               </Button>
             </div>
           </div>
 
-          <div className="flex items-center gap-1 border-b border-slate-100 px-3 py-2">
-            {FOLDERS.map((f) => (
-              <button
-                key={f.key}
-                onClick={() => { setFolder(f.key); setSelectedId(null); }}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors ${
-                  folder === f.key ? "bg-[#711419]/10 text-[#711419]" : "text-slate-500 hover:bg-slate-50"
-                }`}
-                data-testid={`folder-${f.key}`}
-              >
-                {f.icon}
-                {f.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="border-b border-slate-100 px-3 py-2">
+          {/* Search */}
+          <div className="px-4 pb-3">
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput.trim())}
                 onBlur={() => setSearch(searchInput.trim())}
                 placeholder="Search mail…"
-                className="h-9 bg-slate-50 pl-8 text-sm"
+                className="h-10 rounded-xl border-slate-200 bg-slate-50 pl-9 text-sm focus-visible:bg-white"
                 data-testid="input-mail-search"
               />
             </div>
           </div>
 
+          {/* Folder tabs */}
+          <div className="flex items-center gap-1 border-b border-slate-100 px-3 pb-2">
+            {FOLDERS.map((f) => (
+              <button
+                key={f.key}
+                onClick={() => { setFolder(f.key); setSelectedId(null); }}
+                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-medium transition-colors ${
+                  folder === f.key ? "bg-[#711419]/10 text-[#711419]" : "text-slate-500 hover:bg-slate-100"
+                }`}
+                data-testid={`folder-${f.key}`}
+              >
+                {f.icon}
+                {f.label}
+                {f.badge ? (
+                  <span className="ml-0.5 rounded-full bg-[#711419] px-1.5 text-[10px] font-semibold text-white">
+                    {f.badge}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+
+          {/* Sync error banner */}
+          {syncError && (
+            <div className="flex items-start gap-2 border-b border-amber-100 bg-amber-50 px-4 py-2.5 text-xs text-amber-800">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <span className="break-words">{syncError}</span>
+                <button
+                  onClick={() => { window.location.href = "/api/crm/gmail/connect"; }}
+                  className="ml-1 font-semibold underline hover:no-underline"
+                >
+                  Reconnect
+                </button>
+              </div>
+              <button onClick={() => setSyncError(null)} className="text-amber-500 hover:text-amber-700">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Thread list */}
           <div className="min-h-0 flex-1 overflow-y-auto">
             {threadsLoading ? (
-              <div className="space-y-2 p-3">
-                {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
+              <div className="space-y-1 p-2">
+                {[...Array(7)].map((_, i) => <Skeleton key={i} className="h-[68px] w-full rounded-xl" />)}
               </div>
             ) : threads.length === 0 ? (
-              <div className="px-4 py-16 text-center text-sm text-muted-foreground">
-                <Inbox className="mx-auto mb-2 h-8 w-8 text-slate-300" />
-                Nothing here yet.
+              <div className="px-6 py-20 text-center">
+                <Inbox className="mx-auto mb-3 h-9 w-9 text-slate-300" />
+                <p className="text-sm font-medium text-slate-500">Nothing here yet</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  {search ? "No messages match your search." : "New messages will appear here after a sync."}
+                </p>
               </div>
             ) : (
-              threads.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => openThread(t.id)}
-                  className={`block w-full border-b border-slate-100 px-4 py-3 text-left transition-colors ${
-                    selectedId === t.id ? "bg-[#711419]/5" : "hover:bg-slate-50"
-                  }`}
-                  data-testid={`thread-${t.id}`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className={`truncate text-sm ${t.isUnread ? "font-bold text-slate-900" : "font-medium text-slate-700"}`}>
-                      {(t.participants && t.participants[0]) || "(no recipient)"}
-                    </span>
-                    <span className="shrink-0 text-xs text-slate-400">{fmtWhen(t.lastMessageAt)}</span>
-                  </div>
-                  <div className={`truncate text-sm ${t.isUnread ? "font-semibold text-slate-800" : "text-slate-600"}`}>
-                    {t.subject || "(no subject)"}
-                  </div>
-                  <div className="mt-0.5 flex items-center gap-1.5">
-                    {t.isUnread && <span className="h-2 w-2 shrink-0 rounded-full bg-[#711419]" />}
-                    <span className="truncate text-xs text-slate-400">{t.snippet}</span>
-                  </div>
-                </button>
-              ))
+              <div className="p-2">
+                {threads.map((t) => {
+                  const name = primaryName(t);
+                  const active = selectedId === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => openThread(t.id)}
+                      className={`group mb-0.5 flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
+                        active ? "bg-[#711419]/[0.07]" : "hover:bg-slate-100"
+                      }`}
+                      data-testid={`thread-${t.id}`}
+                    >
+                      <div
+                        className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
+                          t.isUnread ? "bg-[#711419] text-white" : "bg-slate-200 text-slate-600"
+                        }`}
+                      >
+                        {initials(name)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className={`truncate text-sm ${t.isUnread ? "font-semibold text-slate-900" : "font-medium text-slate-700"}`}>
+                            {name}
+                          </span>
+                          <span className="shrink-0 text-[11px] text-slate-400">{fmtWhen(t.lastMessageAt)}</span>
+                        </div>
+                        <div className={`truncate text-[13px] ${t.isUnread ? "font-medium text-slate-800" : "text-slate-600"}`}>
+                          {t.subject || "(no subject)"}
+                        </div>
+                        <div className="truncate text-xs text-slate-400">{t.snippet}</div>
+                      </div>
+                      {t.isUnread && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[#711419]" />}
+                    </button>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>
 
         {/* Right: thread detail */}
-        <div className="hidden min-h-0 flex-1 flex-col bg-slate-50 lg:flex">
+        <div className={`${selectedId ? "flex" : "hidden lg:flex"} min-h-0 flex-1 flex-col bg-slate-50`}>
           {!selectedId ? (
             <div className="flex h-full items-center justify-center text-center text-muted-foreground">
               <div>
-                <Mail className="mx-auto mb-3 h-10 w-10 text-slate-300" />
-                <p className="text-sm">Select a conversation to read it.</p>
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
+                  <Mail className="h-8 w-8 text-slate-300" />
+                </div>
+                <p className="text-sm font-medium text-slate-500">Select a conversation to read it</p>
               </div>
             </div>
           ) : detailLoading || !threadDetail ? (
             <div className="space-y-3 p-6">
               <Skeleton className="h-8 w-2/3" />
-              <Skeleton className="h-40 w-full" />
+              <Skeleton className="h-40 w-full rounded-xl" />
             </div>
           ) : (
             <>
-              <div className="border-b border-slate-200 bg-white px-6 py-4">
-                <h2 className="text-lg font-semibold text-slate-900">{threadDetail.thread.subject || "(no subject)"}</h2>
-                {threadDetail.customer && (
-                  <button
-                    onClick={() => navigate(`/crm/customers/${threadDetail.customer.id}`)}
-                    className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-[#711419] hover:underline"
-                  >
-                    <Link2 className="h-3 w-3" /> {threadDetail.customer.name}
-                  </button>
-                )}
+              {/* Thread header */}
+              <div className="flex items-start gap-3 border-b border-slate-200/80 bg-white px-4 py-3.5 lg:px-6">
+                <button
+                  onClick={() => setSelectedId(null)}
+                  className="mt-0.5 rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 lg:hidden"
+                  aria-label="Back"
+                  data-testid="button-back"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </button>
+                <div className="min-w-0 flex-1">
+                  <h2 className="truncate text-lg font-semibold text-slate-900">{threadDetail.thread.subject || "(no subject)"}</h2>
+                  {threadDetail.customer && (
+                    <button
+                      onClick={() => navigate(`/crm/customers/${threadDetail.customer.id}`)}
+                      className="mt-0.5 inline-flex items-center gap-1 rounded-md bg-[#711419]/10 px-2 py-0.5 text-xs font-medium text-[#711419] hover:bg-[#711419]/15"
+                    >
+                      <Link2 className="h-3 w-3" /> {threadDetail.customer.name}
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-                <div className="mx-auto max-w-3xl space-y-4">
-                  {threadDetail.messages.map((m) => (
-                    <div key={m.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" data-testid={`message-${m.id}`}>
-                      <div className={`flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5 ${m.direction === "outbound" ? "bg-[#711419]/5" : "bg-slate-50"}`}>
-                        <div className="min-w-0">
-                          <span className="text-sm font-semibold text-slate-800">{m.fromName || m.fromEmail}</span>
-                          <span className="ml-1.5 text-xs text-slate-400">{m.fromEmail}</span>
-                          <div className="truncate text-xs text-slate-400">to {(m.toEmails || []).join(", ")}</div>
-                        </div>
-                        <span className="shrink-0 text-xs text-slate-400">{m.sentAt ? format(new Date(m.sentAt), "MMM d, yyyy h:mm a") : ""}</span>
-                      </div>
-                      <div className="px-4 py-3">
-                        {m.bodyHtml ? (
-                          <div className="email-body overflow-x-auto text-sm text-slate-700 [&_a]:text-[#711419] [&_img]:max-w-full" dangerouslySetInnerHTML={{ __html: sanitizeHtml(m.bodyHtml) }} />
-                        ) : (
-                          <p className="whitespace-pre-wrap text-sm text-slate-700">{m.bodyText || m.snippet}</p>
-                        )}
-                        {m.hasAttachments && (m.attachments?.length ?? 0) > 0 && (
-                          <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                            {m.attachments!.map((a, i) => (
-                              <span key={i} className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">
-                                <Paperclip className="h-3 w-3" /> {a.filename}
-                              </span>
-                            ))}
+              {/* Messages */}
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 lg:px-6">
+                <div className="mx-auto max-w-3xl space-y-3">
+                  {threadDetail.messages.map((m) => {
+                    const outbound = m.direction === "outbound";
+                    return (
+                      <div key={m.id} className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm" data-testid={`message-${m.id}`}>
+                        <div className="flex items-start gap-3 border-b border-slate-100 px-4 py-3">
+                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${outbound ? "bg-[#711419] text-white" : "bg-slate-200 text-slate-600"}`}>
+                            {initials(m.fromName || m.fromEmail || "?")}
                           </div>
-                        )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-baseline gap-x-1.5">
+                              <span className="text-sm font-semibold text-slate-800">{m.fromName || m.fromEmail}</span>
+                              {m.fromName && <span className="text-xs text-slate-400">{m.fromEmail}</span>}
+                            </div>
+                            <div className="truncate text-xs text-slate-400">to {(m.toEmails || []).join(", ")}</div>
+                          </div>
+                          <span className="shrink-0 pt-0.5 text-xs text-slate-400">{m.sentAt ? format(new Date(m.sentAt), "MMM d, h:mm a") : ""}</span>
+                        </div>
+                        <div className="px-4 py-4">
+                          {m.bodyHtml ? (
+                            <div className="email-body overflow-x-auto text-sm leading-relaxed text-slate-700 [&_a]:text-[#711419] [&_a]:underline [&_img]:max-w-full" dangerouslySetInnerHTML={{ __html: sanitizeHtml(m.bodyHtml) }} />
+                          ) : (
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{m.bodyText || m.snippet}</p>
+                          )}
+                          {m.hasAttachments && (m.attachments?.length ?? 0) > 0 && (
+                            <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                              {m.attachments!.map((a, i) => (
+                                <span key={i} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs text-slate-600">
+                                  <Paperclip className="h-3.5 w-3.5 text-slate-400" /> {a.filename}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
               {/* Reply box */}
-              <div className="border-t border-slate-200 bg-white px-6 py-3">
+              <div className="border-t border-slate-200/80 bg-white px-4 py-3 lg:px-6">
                 <div className="mx-auto max-w-3xl">
-                  <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
-                    <CornerUpLeft className="h-3.5 w-3.5" /> Reply
-                  </div>
-                  <Textarea
-                    value={replyHtml}
-                    onChange={(e) => setReplyHtml(e.target.value)}
-                    placeholder="Write your reply…"
-                    rows={3}
-                    className="mt-1.5 resize-none bg-white"
-                    data-testid="input-reply"
-                  />
-                  <div className="mt-2 flex justify-end">
-                    <Button
-                      size="sm"
-                      className="bg-[#711419] hover:bg-[#8a1a1f]"
-                      disabled={!replyHtml.trim() || sendMutation.isPending}
-                      onClick={handleReply}
-                      data-testid="button-send-reply"
-                    >
-                      {sendMutation.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Send className="mr-1.5 h-3.5 w-3.5" />}
-                      Send
-                    </Button>
+                  <div className="rounded-2xl border border-slate-200 bg-white shadow-sm focus-within:border-[#711419]/40 focus-within:ring-2 focus-within:ring-[#711419]/10">
+                    <div className="flex items-center gap-1.5 px-3 pt-2 text-xs font-medium text-slate-400">
+                      <CornerUpLeft className="h-3.5 w-3.5" /> Reply
+                    </div>
+                    <Textarea
+                      value={replyHtml}
+                      onChange={(e) => setReplyHtml(e.target.value)}
+                      onKeyDown={(e) => {
+                        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); handleReply(); }
+                      }}
+                      placeholder="Write your reply…"
+                      rows={2}
+                      className="resize-none border-0 bg-transparent px-3 py-1.5 text-sm shadow-none focus-visible:ring-0"
+                      data-testid="input-reply"
+                    />
+                    <div className="flex items-center justify-between px-3 pb-2.5">
+                      <span className="hidden text-[11px] text-slate-400 sm:inline">⌘ + Return to send</span>
+                      <Button
+                        size="sm"
+                        className="h-8 rounded-lg bg-[#711419] hover:bg-[#8a1a1f]"
+                        disabled={!replyHtml.trim() || sendMutation.isPending}
+                        onClick={handleReply}
+                        data-testid="button-send-reply"
+                      >
+                        {sendMutation.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Send className="mr-1.5 h-3.5 w-3.5" />}
+                        Send
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -433,12 +547,16 @@ function ComposeDialog({
   const { toast } = useToast();
   const [to, setTo] = useState("");
   const [cc, setCc] = useState("");
+  const [bcc, setBcc] = useState("");
   const [showCc, setShowCc] = useState(false);
+  const [showBcc, setShowBcc] = useState(false);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
 
   useEffect(() => {
-    if (open) { setTo(""); setCc(""); setShowCc(false); setSubject(""); setBody(""); }
+    if (open) {
+      setTo(""); setCc(""); setBcc(""); setShowCc(false); setShowBcc(false); setSubject(""); setBody("");
+    }
   }, [open]);
 
   const splitEmails = (s: string) => s.split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
@@ -447,41 +565,63 @@ function ComposeDialog({
     const toList = splitEmails(to);
     if (toList.length === 0) { toast({ variant: "destructive", title: "Add a recipient" }); return; }
     if (!body.trim()) { toast({ variant: "destructive", title: "Write a message" }); return; }
-    onSend({ to: toList, cc: splitEmails(cc), subject: subject.trim() || "(no subject)", html: body.replace(/\n/g, "<br>") });
+    onSend({
+      to: toList,
+      cc: splitEmails(cc),
+      bcc: splitEmails(bcc),
+      subject: subject.trim() || "(no subject)",
+      html: body.replace(/\n/g, "<br>"),
+    });
   };
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <PenSquare className="h-4 w-4 text-[#711419]" /> New email
+      <DialogContent className="max-w-2xl gap-0 overflow-hidden p-0">
+        <DialogHeader className="border-b border-slate-100 px-5 py-4">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <PenSquare className="h-4 w-4 text-[#711419]" /> New message
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
+        <div className="divide-y divide-slate-100">
+          <div className="flex items-center gap-2 px-5 py-2.5">
             <label className="w-12 shrink-0 text-sm text-slate-500">To</label>
-            <Input value={to} onChange={(e) => setTo(e.target.value)} placeholder="name@example.com" className="flex-1" data-testid="compose-to" />
-            {!showCc && (
-              <button onClick={() => setShowCc(true)} className="shrink-0 text-xs font-medium text-slate-500 hover:text-slate-800">Cc</button>
-            )}
+            <Input value={to} onChange={(e) => setTo(e.target.value)} placeholder="name@example.com" className="flex-1 border-0 px-0 shadow-none focus-visible:ring-0" data-testid="compose-to" />
+            <div className="flex shrink-0 gap-2 text-xs font-medium text-slate-400">
+              {!showCc && <button onClick={() => setShowCc(true)} className="hover:text-slate-700">Cc</button>}
+              {!showBcc && <button onClick={() => setShowBcc(true)} className="hover:text-slate-700">Bcc</button>}
+            </div>
           </div>
           {showCc && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-5 py-2.5">
               <label className="w-12 shrink-0 text-sm text-slate-500">Cc</label>
-              <Input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="cc@example.com" className="flex-1" data-testid="compose-cc" />
+              <Input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="cc@example.com" className="flex-1 border-0 px-0 shadow-none focus-visible:ring-0" data-testid="compose-cc" />
               <button onClick={() => { setShowCc(false); setCc(""); }} className="shrink-0 text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
             </div>
           )}
-          <div className="flex items-center gap-2">
+          {showBcc && (
+            <div className="flex items-center gap-2 px-5 py-2.5">
+              <label className="w-12 shrink-0 text-sm text-slate-500">Bcc</label>
+              <Input value={bcc} onChange={(e) => setBcc(e.target.value)} placeholder="bcc@example.com" className="flex-1 border-0 px-0 shadow-none focus-visible:ring-0" data-testid="compose-bcc" />
+              <button onClick={() => { setShowBcc(false); setBcc(""); }} className="shrink-0 text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
+            </div>
+          )}
+          <div className="flex items-center gap-2 px-5 py-2.5">
             <label className="w-12 shrink-0 text-sm text-slate-500">Subject</label>
-            <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" className="flex-1" data-testid="compose-subject" />
+            <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" className="flex-1 border-0 px-0 shadow-none focus-visible:ring-0" data-testid="compose-subject" />
           </div>
-          <Textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write your message…" rows={12} className="resize-none" data-testid="compose-body" />
+          <Textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); submit(); } }}
+            placeholder="Write your message…"
+            rows={12}
+            className="resize-none rounded-none border-0 px-5 py-3 text-sm shadow-none focus-visible:ring-0"
+            data-testid="compose-body"
+          />
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button className="bg-[#711419] hover:bg-[#8a1a1f]" disabled={sending} onClick={submit} data-testid="compose-send">
+        <DialogFooter className="border-t border-slate-100 px-5 py-3.5">
+          <Button variant="outline" className="rounded-lg" onClick={onClose}>Cancel</Button>
+          <Button className="rounded-lg bg-[#711419] hover:bg-[#8a1a1f]" disabled={sending} onClick={submit} data-testid="compose-send">
             {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
             Send
           </Button>

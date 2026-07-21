@@ -5604,7 +5604,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const msg = (e as Error).message;
       if (msg === "gmail_revoked") return res.status(401).json({ message: "Gmail access was revoked — please reconnect." });
       console.error("mail/sync", e);
-      res.status(500).json({ message: "Failed to sync" });
+      // Surface the real Gmail API error (e.g. 403 "insufficient scopes" or
+      // "Gmail API has not been used in project …") so the failure is actionable
+      // instead of a generic "Failed to sync".
+      res.status(500).json({ message: `Sync failed: ${msg}` });
     }
   });
 
