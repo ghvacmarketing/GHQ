@@ -6,7 +6,7 @@ import { db } from "./db";
 import { crmUsers } from "@shared/schema";
 import { getCurrentCrmUser } from "./crm-auth";
 import { encryptToken } from "./services/tokenCrypto";
-import { GMAIL_SCOPES, isGmailOAuthConfigured } from "./services/gmailService";
+import { GMAIL_SCOPES, isGmailOAuthConfigured, gmailClientId, gmailClientSecret } from "./services/gmailService";
 
 const STATE_COOKIE = "crm_gmail_oauth_state";
 const STATE_TTL_MS = 10 * 60 * 1000;
@@ -25,7 +25,7 @@ function getRedirectUri(req: Request): string {
 }
 
 function client(req: Request): OAuth2Client {
-  return new OAuth2Client(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, getRedirectUri(req));
+  return new OAuth2Client(gmailClientId(), gmailClientSecret(), getRedirectUri(req));
 }
 
 export async function startGmailConnect(req: Request, res: Response): Promise<void> {
@@ -81,7 +81,7 @@ export async function handleGmailConnectCallback(req: Request, res: Response): P
     let gmailAddress = user.email;
     try {
       if (tokens.id_token) {
-        const ticket = await c.verifyIdToken({ idToken: tokens.id_token, audience: process.env.GOOGLE_CLIENT_ID });
+        const ticket = await c.verifyIdToken({ idToken: tokens.id_token, audience: gmailClientId() });
         const email = ticket.getPayload()?.email;
         if (email) gmailAddress = email.trim().toLowerCase();
       }

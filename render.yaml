@@ -81,10 +81,17 @@ services:
         sync: false
 
       # ── Gmail (CRM Mail — two-way inbox) ─────────────────────────────
-      # Reuses GOOGLE_CLIENT_ID/SECRET above. The Gmail connect flow uses a
-      # SEPARATE callback — register this exact URI in the Google Cloud OAuth
-      # client, enable the Gmail API, and add the gmail.modify scope on the
-      # consent screen, or sync will 403.
+      # Uses its OWN OAuth client so Mail can be an "Internal" Workspace app
+      # WITHOUT affecting Google CRM login (which stays on GOOGLE_CLIENT_ID and
+      # can keep serving personal @gmail.com logins). If GMAIL_CLIENT_ID is
+      # unset, Gmail falls back to GOOGLE_CLIENT_ID/SECRET.
+      # In the Workspace-owned Cloud project: enable the Gmail API, set the
+      # consent screen to Internal, add the gmail.modify scope, and register
+      # the redirect URI below on the client.
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
       - key: GMAIL_OAUTH_REDIRECT_URI # https://<your-render-domain>/api/crm/gmail/callback
         sync: false
       # Optional: dedicated AES key for encrypting stored refresh tokens.

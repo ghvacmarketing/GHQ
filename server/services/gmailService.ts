@@ -17,12 +17,21 @@ export const GMAIL_SCOPES = [
   "https://www.googleapis.com/auth/userinfo.email",
 ];
 
+// Gmail can use its OWN OAuth client (a Workspace "Internal" one) so it doesn't
+// disturb the CRM Google-login client. Falls back to the login client if unset.
+export function gmailClientId(): string | undefined {
+  return process.env.GMAIL_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+}
+export function gmailClientSecret(): string | undefined {
+  return process.env.GMAIL_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET;
+}
+
 export function isGmailOAuthConfigured(): boolean {
-  return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+  return Boolean(gmailClientId() && gmailClientSecret());
 }
 
 function oauthClient(): OAuth2Client {
-  return new OAuth2Client(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
+  return new OAuth2Client(gmailClientId(), gmailClientSecret());
 }
 
 // ── base64url helpers ────────────────────────────────────────────────────────
