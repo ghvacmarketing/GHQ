@@ -17,6 +17,7 @@ import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezon
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { WheelTimePicker } from "@/components/mobile/wheel-time-picker";
+import { DraggableSheet } from "@/components/mobile/draggable-sheet";
 import type { CrmWorkOrder, CrmCustomer, CrmUser, CrmProperty } from "@shared/schema";
 
 interface WorkOrderWithDetails extends CrmWorkOrder {
@@ -623,17 +624,17 @@ export default function MobileJob() {
                 const techJobs = workOrders
                   .filter((wo) => wo.assignedTechId === tech.id && wo.scheduledStart && isToday(toLocalTime(wo.scheduledStart)))
                   .sort((x, y) => new Date(x.scheduledStart!).getTime() - new Date(y.scheduledStart!).getTime());
-                const selected = selectedTechId === tech.id;
+                const hasJobs = techJobs.length > 0;
                 return (
                   <button
                     key={tech.id}
-                    onClick={() => setSelectedTechId(selected ? null : tech.id)}
-                    className={`flex flex-col items-center gap-1.5 rounded-2xl border bg-white px-2 py-4 shadow-sm transition-all active:scale-[0.98] ${
-                      selected ? "border-[#711419] ring-1 ring-[#711419]/30" : "border-slate-200"
+                    onClick={() => { if (hasJobs) setSelectedTechId(tech.id); }}
+                    className={`flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-2 py-4 shadow-sm transition-all ${
+                      hasJobs ? "active:scale-[0.98]" : "opacity-60"
                     }`}
                     data-testid={`jobs-tech-${tech.id}`}
                   >
-                    <span className={`flex h-11 w-11 items-center justify-center rounded-full ${selected ? "bg-[#711419] text-white" : "bg-[#711419]/10 text-[#711419]"}`}>
+                    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#711419]/10 text-[#711419]">
                       <HardHat className="h-5 w-5" />
                     </span>
                     <span className="max-w-full truncate text-sm font-semibold text-slate-800">{tech.name}</span>
@@ -642,41 +643,46 @@ export default function MobileJob() {
                 );
               })}
             </div>
-
-            {selectedTechId && (() => {
-              const tech = boardTechs.find((t) => t.id === selectedTechId);
-              const techJobs = workOrders
-                .filter((wo) => wo.assignedTechId === selectedTechId && wo.scheduledStart && isToday(toLocalTime(wo.scheduledStart)))
-                .sort((x, y) => new Date(x.scheduledStart!).getTime() - new Date(y.scheduledStart!).getTime());
-              return (
-                <div className="space-y-2" data-testid="jobs-tech-day">
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">{tech?.name}'s day</h4>
-                  {techJobs.length === 0 ? (
-                    <p className="rounded-2xl bg-white px-4 py-4 text-center text-xs text-slate-400 shadow-sm">No jobs scheduled today.</p>
-                  ) : (
-                    techJobs.map((job) => (
-                      <button
-                        key={job.id}
-                        onClick={() => navigate(`/mobile/job/${job.id}`)}
-                        className="flex w-full items-center gap-2 rounded-2xl border border-slate-100 bg-white px-3 py-2.5 text-left shadow-sm transition-all active:scale-[0.99]"
-                        data-testid={`jobs-roster-job-${job.id}`}
-                      >
-                        <span className="text-xs font-semibold tabular-nums text-slate-500">
-                          {job.scheduledStart ? format(toLocalTime(job.scheduledStart), "h:mm a") : "—"}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">
-                          {job.customer?.name || job.title || "Job"}
-                        </span>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
-                      </button>
-                    ))
-                  )}
-                </div>
-              );
-            })()}
           </div>
         )}
       </div>
+
+      {/* Tech day bottom sheet — opens when tapping a tech that has jobs today */}
+      {(() => {
+        const tech = boardTechs.find((t) => t.id === selectedTechId);
+        const techJobs = selectedTechId
+          ? workOrders
+              .filter((wo) => wo.assignedTechId === selectedTechId && wo.scheduledStart && isToday(toLocalTime(wo.scheduledStart)))
+              .sort((x, y) => new Date(x.scheduledStart!).getTime() - new Date(y.scheduledStart!).getTime())
+          : [];
+        return (
+          <DraggableSheet
+            open={!!selectedTechId}
+            onOpenChange={(o) => { if (!o) setSelectedTechId(null); }}
+            title={tech ? `${tech.name}'s day` : "Tech's day"}
+            testid="jobs-tech-sheet"
+          >
+            <div className="space-y-2 pb-2">
+              {techJobs.map((job) => (
+                <button
+                  key={job.id}
+                  onClick={() => { setSelectedTechId(null); navigate(`/mobile/job/${job.id}`); }}
+                  className="flex w-full items-center gap-2 rounded-2xl border border-slate-100 bg-white px-3 py-3 text-left shadow-sm transition-all active:scale-[0.99]"
+                  data-testid={`jobs-roster-job-${job.id}`}
+                >
+                  <span className="text-xs font-semibold tabular-nums text-slate-500">
+                    {job.scheduledStart ? format(toLocalTime(job.scheduledStart), "h:mm a") : "—"}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">
+                    {job.customer?.name || job.title || "Job"}
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                </button>
+              ))}
+            </div>
+          </DraggableSheet>
+        );
+      })()}
 
       {/* Create Work Order Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={(open) => { 
