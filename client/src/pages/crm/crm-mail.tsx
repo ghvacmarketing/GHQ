@@ -16,7 +16,7 @@ import {
 import { format } from "date-fns";
 import {
   Mail, Search, PenSquare, Loader2, Inbox, Send, Paperclip, X,
-  CornerUpLeft, Link2, ArrowLeft, AlertTriangle,
+  CornerUpLeft, Link2, ArrowLeft, AlertTriangle, Download,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 
@@ -142,6 +142,7 @@ export default function CrmMail() {
   const selectedIdRef = useRef<string | null>(null);
   selectedIdRef.current = selectedId;
   const [composeOpen, setComposeOpen] = useState(false);
+  const [viewer, setViewer] = useState<{ url: string; name: string; mimeType: string } | null>(null);
   const [replyHtml, setReplyHtml] = useState("");
   const [replyFiles, setReplyFiles] = useState<OutAttachment[]>([]);
   const replyFileInput = useRef<HTMLInputElement | null>(null);
@@ -559,23 +560,24 @@ export default function CrmMail() {
                           )}
                           {m.hasAttachments && (m.attachments?.length ?? 0) > 0 && (
                             <div className="mt-4 border-t border-slate-100 pt-3">
-                              {/* Inline previews for images */}
+                              {/* Inline previews for images — open the in-app viewer */}
                               {m.attachments!.some((a) => a.attachmentId && a.mimeType?.startsWith("image/")) && (
                                 <div className="mb-2 flex flex-wrap gap-2">
                                   {m.attachments!.filter((a) => a.attachmentId && a.mimeType?.startsWith("image/")).map((a, i) => {
                                     const url = `/api/crm/mail/messages/${m.gmailMessageId}/attachments/${a.attachmentId}`;
                                     return (
-                                      <a key={i} href={url} target="_blank" rel="noopener noreferrer" title={a.filename}>
-                                        <img src={url} alt={a.filename} className="max-h-48 rounded-lg border border-slate-200 object-cover" />
-                                      </a>
+                                      <button key={i} onClick={() => setViewer({ url, name: a.filename, mimeType: a.mimeType })} title={a.filename} className="overflow-hidden rounded-lg border border-slate-200">
+                                        <img src={url} alt={a.filename} className="max-h-48 object-cover transition-transform hover:scale-[1.02]" />
+                                      </button>
                                     );
                                   })}
                                 </div>
                               )}
-                              {/* Chips for everything (download links when we have the id) */}
+                              {/* Chips — images/PDFs open the in-app viewer; other files download */}
                               <div className="flex flex-wrap gap-2">
                                 {m.attachments!.map((a, i) => {
                                   const url = a.attachmentId ? `/api/crm/mail/messages/${m.gmailMessageId}/attachments/${a.attachmentId}` : null;
+                                  const viewable = !!a.mimeType && (a.mimeType.startsWith("image/") || a.mimeType === "application/pdf");
                                   const inner = (
                                     <>
                                       <Paperclip className="h-3.5 w-3.5 text-slate-400" />
@@ -583,21 +585,14 @@ export default function CrmMail() {
                                       {a.size ? <span className="text-slate-400">{prettySize(a.size)}</span> : null}
                                     </>
                                   );
-                                  return url ? (
-                                    <a
-                                      key={i}
-                                      href={url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 transition-colors hover:border-[#711419]/40 hover:bg-white"
-                                      data-testid={`attachment-${m.id}-${i}`}
-                                    >
-                                      {inner}
-                                    </a>
+                                  const cls = "inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 transition-colors hover:border-[#711419]/40 hover:bg-white";
+                                  if (!url) {
+                                    return <span key={i} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs text-slate-500">{inner}</span>;
+                                  }
+                                  return viewable ? (
+                                    <button key={i} onClick={() => setViewer({ url, name: a.filename, mimeType: a.mimeType })} className={cls} data-testid={`attachment-${m.id}-${i}`}>{inner}</button>
                                   ) : (
-                                    <span key={i} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs text-slate-500">
-                                      {inner}
-                                    </span>
+                                    <a key={i} href={url} download={a.filename} className={cls} data-testid={`attachment-${m.id}-${i}`}>{inner}</a>
                                   );
                                 })}
                               </div>
@@ -688,6 +683,8 @@ export default function CrmMail() {
         sending={sendMutation.isPending}
         onSend={(payload) => sendMutation.mutate(payload, { onSuccess: () => setComposeOpen(false) })}
       />
+
+      {viewer && <AttachmentViewer item={viewer} onClose={() => setViewer(null)} />}
     </CrmLayout>
   );
 }
@@ -833,5 +830,63 @@ function ComposeDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// In-app popup for viewing an email attachment (image or PDF) without leaving
+// the CRM. Close via the X, clicking the backdrop, or Escape.
+function AttachmentViewer({ item, onClose }: { item: { url: string; name: string; mimeType: string }; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const isImage = item.mimeType?.startsWith("image/");
+  const isPdf = item.mimeType === "application/pdf";
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex flex-col bg-black/90 backdrop-blur-sm"
+      onClick={onClose}
+      data-testid="attachment-viewer"
+    >
+      <div className="flex items-center justify-between px-4 py-3 text-white" onClick={(e) => e.stopPropagation()}>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">{item.name}</span>
+        <div className="flex items-center gap-1">
+          <a
+            href={item.url}
+            download={item.name}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white"
+            title="Download"
+            data-testid="viewer-download"
+          >
+            <Download className="h-5 w-5" />
+          </a>
+          <button
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white"
+            title="Close"
+            data-testid="viewer-close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+      <div className="flex min-h-0 flex-1 items-center justify-center p-4" onClick={(e) => e.stopPropagation()}>
+        {isImage ? (
+          <img src={item.url} alt={item.name} className="max-h-full max-w-full rounded-lg object-contain" />
+        ) : isPdf ? (
+          <iframe src={item.url} title={item.name} className="h-full w-full max-w-4xl rounded-lg bg-white" />
+        ) : (
+          <div className="rounded-xl bg-white p-8 text-center">
+            <p className="text-sm text-slate-600">This file type can't be previewed.</p>
+            <a href={item.url} download={item.name} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[#711419] px-4 py-2 text-sm font-medium text-white">
+              <Download className="h-4 w-4" /> Download
+            </a>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
