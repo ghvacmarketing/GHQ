@@ -529,7 +529,7 @@ export default function CrmMail() {
               {/* Reply box */}
               <div className="shrink-0 border-t border-slate-200/80 bg-white px-4 py-3 lg:px-6">
                 <div className="mx-auto max-w-3xl">
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-colors focus-within:border-[#711419]/40">
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     <div className="flex items-center gap-1.5 px-3 pt-2 text-xs font-medium text-slate-400">
                       <CornerUpLeft className="h-3.5 w-3.5" /> Reply
                     </div>
@@ -541,7 +541,7 @@ export default function CrmMail() {
                       }}
                       placeholder="Write your reply…"
                       rows={2}
-                      className="resize-none border-0 bg-transparent px-3 py-1.5 text-sm shadow-none focus-visible:ring-0"
+                      className="resize-none border-0 bg-transparent px-3 py-1.5 text-sm shadow-none outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                       data-testid="input-reply"
                     />
                     {replyFiles.length > 0 && (
