@@ -17,6 +17,7 @@ import { format } from "date-fns";
 import {
   Mail, Search, PenSquare, Loader2, Inbox, Send, Paperclip, X,
   CornerUpLeft, Link2, ArrowLeft, AlertTriangle, Download,
+  FileText, FileSpreadsheet, FileImage, FileArchive, FileAudio, FileVideo, File as FileIconLucide,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 
@@ -71,6 +72,28 @@ function prettySize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// Pick a file-type icon + color from the mime type / extension so attachments
+// read at a glance (image, spreadsheet, PDF, doc, zip, audio, video…).
+function fileMeta(name: string, mime?: string): { Icon: typeof FileText; color: string; kind: string } {
+  const m = (mime || "").toLowerCase();
+  const ext = (name.split(".").pop() || "").toLowerCase();
+  const has = (arr: string[]) => arr.includes(ext);
+  if (m.startsWith("image/") || has(["png", "jpg", "jpeg", "gif", "webp", "heic", "bmp", "svg"])) return { Icon: FileImage, color: "text-violet-500", kind: "Image" };
+  if (m === "application/pdf" || ext === "pdf") return { Icon: FileText, color: "text-red-500", kind: "PDF" };
+  if (m.includes("spreadsheet") || m.includes("excel") || m === "text/csv" || has(["xls", "xlsx", "csv", "numbers"])) return { Icon: FileSpreadsheet, color: "text-green-600", kind: "Spreadsheet" };
+  if (m.includes("word") || m.includes("officedocument.wordprocessing") || has(["doc", "docx", "rtf", "odt", "pages"])) return { Icon: FileText, color: "text-blue-600", kind: "Document" };
+  if (m.includes("presentation") || m.includes("powerpoint") || has(["ppt", "pptx", "key"])) return { Icon: FileText, color: "text-orange-500", kind: "Slides" };
+  if (m.startsWith("audio/") || has(["mp3", "wav", "m4a", "aac", "ogg"])) return { Icon: FileAudio, color: "text-pink-500", kind: "Audio" };
+  if (m.startsWith("video/") || has(["mp4", "mov", "avi", "mkv", "webm"])) return { Icon: FileVideo, color: "text-indigo-500", kind: "Video" };
+  if (m.includes("zip") || m.includes("compressed") || m.includes("tar") || has(["zip", "rar", "7z", "tar", "gz"])) return { Icon: FileArchive, color: "text-amber-600", kind: "Archive" };
+  if (m.includes("json") || m.includes("xml") || m.startsWith("text/") || has(["txt", "json", "xml", "html", "md"])) return { Icon: FileText, color: "text-slate-500", kind: "Text" };
+  return { Icon: FileIconLucide, color: "text-slate-400", kind: "File" };
+}
+function FileTypeIcon({ name, mime, className }: { name: string; mime?: string; className?: string }) {
+  const { Icon, color } = fileMeta(name, mime);
+  return <Icon className={`${className || "h-3.5 w-3.5"} ${color}`} />;
 }
 
 // Textarea that grows with its content up to maxHeight, then scrolls.
@@ -580,7 +603,7 @@ export default function CrmMail() {
                                   const viewable = !!a.mimeType && (a.mimeType.startsWith("image/") || a.mimeType === "application/pdf");
                                   const inner = (
                                     <>
-                                      <Paperclip className="h-3.5 w-3.5 text-slate-400" />
+                                      <FileTypeIcon name={a.filename} mime={a.mimeType} className="h-4 w-4" />
                                       <span className="max-w-[200px] truncate">{a.filename}</span>
                                       {a.size ? <span className="text-slate-400">{prettySize(a.size)}</span> : null}
                                     </>
@@ -628,7 +651,7 @@ export default function CrmMail() {
                       <div className="flex flex-wrap gap-1.5 px-3 pb-1.5">
                         {replyFiles.map((f, i) => (
                           <span key={i} className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">
-                            <Paperclip className="h-3 w-3" />
+                            <FileTypeIcon name={f.filename} mime={f.mimeType} className="h-3.5 w-3.5" />
                             <span className="max-w-[140px] truncate">{f.filename}</span>
                             <span className="text-slate-400">{prettySize(f.size)}</span>
                             <button onClick={() => setReplyFiles((prev) => prev.filter((_, j) => j !== i))} className="text-slate-400 hover:text-red-600">
@@ -792,7 +815,7 @@ function ComposeDialog({
             <div className="flex flex-wrap gap-1.5 px-5 py-2.5">
               {files.map((f, i) => (
                 <span key={i} className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">
-                  <Paperclip className="h-3 w-3" />
+                  <FileTypeIcon name={f.filename} mime={f.mimeType} className="h-3.5 w-3.5" />
                   <span className="max-w-[160px] truncate">{f.filename}</span>
                   <span className="text-slate-400">{prettySize(f.size)}</span>
                   <button onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))} className="text-slate-400 hover:text-red-600">
@@ -880,8 +903,10 @@ function AttachmentViewer({ item, onClose }: { item: { url: string; name: string
           <iframe src={item.url} title={item.name} className="h-full w-full max-w-4xl rounded-lg bg-white" />
         ) : (
           <div className="rounded-xl bg-white p-8 text-center">
-            <p className="text-sm text-slate-600">This file type can't be previewed.</p>
-            <a href={item.url} download={item.name} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[#711419] px-4 py-2 text-sm font-medium text-white">
+            <FileTypeIcon name={item.name} mime={item.mimeType} className="mx-auto mb-3 h-12 w-12" />
+            <p className="text-sm font-medium text-slate-700">{fileMeta(item.name, item.mimeType).kind}</p>
+            <p className="text-xs text-slate-500">This file type can't be previewed here.</p>
+            <a href={item.url} download={item.name} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#711419] px-4 py-2 text-sm font-medium text-white">
               <Download className="h-4 w-4" /> Download
             </a>
           </div>
