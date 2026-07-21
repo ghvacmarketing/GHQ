@@ -144,10 +144,12 @@ function primaryName(t: Thread): string {
 }
 
 function initials(str: string): string {
-  const s = (str || "").replace(/@.*/, "").replace(/[._-]+/g, " ").trim();
+  // Drop the email domain, then keep only letters/digits so leading symbols
+  // like "(" (e.g. "(no recipient)") or dots never show as a clipped glyph.
+  const s = (str || "").replace(/@.*/, "").replace(/[^A-Za-z0-9]+/g, " ").trim();
   if (!s) return "?";
   const parts = s.split(/\s+/);
-  return (parts[0][0] + (parts[1]?.[0] || "")).toUpperCase();
+  return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase() || "?";
 }
 
 export default function CrmMail() {
@@ -478,7 +480,7 @@ export default function CrmMail() {
                       data-testid={`thread-${t.id}`}
                     >
                       <div
-                        className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
+                        className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold leading-none ${
                           t.isUnread ? "bg-[#711419] text-white" : "bg-slate-200 text-slate-600"
                         }`}
                       >
@@ -554,7 +556,7 @@ export default function CrmMail() {
                     return (
                       <div key={m.id} className="overflow-hidden rounded-lg border border-slate-200/80 bg-white shadow-sm" data-testid={`message-${m.id}`}>
                         <div className="flex items-start gap-3 border-b border-slate-100 px-4 py-3">
-                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${outbound ? "bg-[#711419] text-white" : "bg-slate-200 text-slate-600"}`}>
+                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold leading-none ${outbound ? "bg-[#711419] text-white" : "bg-slate-200 text-slate-600"}`}>
                             {initials(m.fromName || m.fromEmail || "?")}
                           </div>
                           <div className="min-w-0 flex-1">
