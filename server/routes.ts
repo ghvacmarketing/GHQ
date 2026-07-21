@@ -91,6 +91,7 @@ import {
   sendEmail as gmailSendEmail,
   syncUser as gmailSyncUser,
   markThreadRead as gmailMarkThreadRead,
+  getAttachmentBytes as gmailGetAttachmentBytes,
   disconnectGmail,
 } from "./services/gmailService";
 import { crmEmailThreads, crmEmailMessages } from "@shared/schema";
@@ -5613,6 +5614,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // "Gmail API has not been used in project …") so the failure is actionable
       // instead of a generic "Failed to sync".
       res.status(500).json({ message: `Sync failed: ${msg}` });
+    }
+  });
+
+  // GET /api/crm/mail/messages/:messageId/attachments/:attachmentId
+  // Streams an incoming email attachment's bytes (fetched live from Gmail).
+  app.get("/api/crm/mail/messages/:messageId/attachments/:attachmentId", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const { messageId, attachmentId } = req.params;
+
+      // Verify this message belongs to the user + pull filename/mime from the
+      // stored metadata (don't trust the client for those).
+      const [msg] = await db
+        .select()
+        .from(crmEmailMessages)
+        .where(and(eq(crmEmailMessages.userId, user.id), eq(crmEmailMessages.gmailMessageId, messageId)))
+        .limit(1);
+      if (!msg) return res.status(404).json({ message: "Message not found" });
+      const meta = (msg.attachments || []).find((a: any) => a.attachmentId === attachmentId);
+      if (!meta) return res.status(404).json({ message: "Attachment not found" });
+
+      const bytes = await gmailGetAttachmentBytes(user, messageId, attachmentId);
+      const safeName = (meta.filename || "attachment").replace(/["\r\n]/g, "");
+      const isImage = (meta.mimeType || "").startsWith("image/");
+      const isPdf = (meta.mimeType || "") === "application/pdf";
+      res.setHeader("Content-Type", meta.mimeType || "application/octet-stream");
+      // Images/PDFs open inline (view), everything else downloads.
+      res.setHeader("Content-Disposition", `${isImage || isPdf ? "inline" : "attachment"}; filename="${safeName}"`);
+      res.setHeader("Cache-Control", "private, max-age=3600");
+      res.send(bytes);
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (msg === "gmail_revoked") return res.status(401).json({ message: "Gmail access was revoked — please reconnect." });
+      console.error("mail attachment", e);
+      res.status(500).json({ message: "Failed to load attachment" });
     }
   });
 

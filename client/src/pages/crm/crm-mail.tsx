@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -33,6 +33,7 @@ type Thread = {
 };
 type EmailMessage = {
   id: string;
+  gmailMessageId: string;
   direction: "inbound" | "outbound";
   fromEmail: string | null;
   fromName: string | null;
@@ -43,7 +44,7 @@ type EmailMessage = {
   bodyHtml: string | null;
   bodyText: string | null;
   hasAttachments: boolean;
-  attachments: { filename: string; mimeType: string; size: number }[] | null;
+  attachments: { filename: string; mimeType: string; size: number; attachmentId?: string }[] | null;
   sentAt: string | null;
 };
 
@@ -70,6 +71,40 @@ function prettySize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// Textarea that grows with its content up to maxHeight, then scrolls.
+function AutoTextarea({
+  value, onChange, onKeyDown, placeholder, className, testid, minHeight = 44, maxHeight = 220,
+}: {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  placeholder?: string;
+  className?: string;
+  testid?: string;
+  minHeight?: number;
+  maxHeight?: number;
+}) {
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(Math.max(el.scrollHeight, minHeight), maxHeight)}px`;
+  }, [value, minHeight, maxHeight]);
+  return (
+    <Textarea
+      ref={ref}
+      value={value}
+      onChange={onChange}
+      onKeyDown={onKeyDown}
+      placeholder={placeholder}
+      style={{ maxHeight }}
+      className={className}
+      data-testid={testid}
+    />
+  );
 }
 
 function fmtWhen(iso: string | null): string {
@@ -104,6 +139,8 @@ export default function CrmMail() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedIdRef = useRef<string | null>(null);
+  selectedIdRef.current = selectedId;
   const [composeOpen, setComposeOpen] = useState(false);
   const [replyHtml, setReplyHtml] = useState("");
   const [replyFiles, setReplyFiles] = useState<OutAttachment[]>([]);
@@ -168,9 +205,9 @@ export default function CrmMail() {
     if (!authLoading && !currentUser) navigate("/crm/login");
   }, [authLoading, currentUser, navigate]);
 
-  // Auto-sync: pull from Gmail every 10s while the page is open and connected.
-  // The page otherwise only reads the local DB. Runs silently — errors surface
-  // in the persistent banner instead of a toast so a 10s cadence isn't spammy.
+  // Near-real-time: pull from Gmail every 4s while the page is visible, and
+  // immediately whenever the tab regains focus/visibility. The page otherwise
+  // reads the local DB. Runs silently — errors surface in the banner.
   useEffect(() => {
     if (!connected) return;
     let cancelled = false;
@@ -184,6 +221,7 @@ export default function CrmMail() {
         if (cancelled) return;
         setSyncError(null);
         queryClient.invalidateQueries({ queryKey: ["/api/crm/mail/threads"] });
+        if (selectedIdRef.current) queryClient.invalidateQueries({ queryKey: ["/api/crm/mail/threads", selectedIdRef.current] });
       } catch (e: any) {
         if (!cancelled) setSyncError(e?.message || "Sync failed");
       } finally {
@@ -191,8 +229,17 @@ export default function CrmMail() {
       }
     };
     doSync(); // immediate first pull
-    const id = setInterval(doSync, 10000);
-    return () => { cancelled = true; clearInterval(id); };
+    const id = setInterval(doSync, 4000);
+    // Sync the instant the tab comes back so returning users see new mail now
+    const onVisible = () => { if (!document.hidden) doSync(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
   }, [connected]);
 
   // Show a toast after returning from the OAuth connect flow
@@ -511,12 +558,49 @@ export default function CrmMail() {
                             <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{m.bodyText || m.snippet}</p>
                           )}
                           {m.hasAttachments && (m.attachments?.length ?? 0) > 0 && (
-                            <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                              {m.attachments!.map((a, i) => (
-                                <span key={i} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs text-slate-600">
-                                  <Paperclip className="h-3.5 w-3.5 text-slate-400" /> {a.filename}
-                                </span>
-                              ))}
+                            <div className="mt-4 border-t border-slate-100 pt-3">
+                              {/* Inline previews for images */}
+                              {m.attachments!.some((a) => a.attachmentId && a.mimeType?.startsWith("image/")) && (
+                                <div className="mb-2 flex flex-wrap gap-2">
+                                  {m.attachments!.filter((a) => a.attachmentId && a.mimeType?.startsWith("image/")).map((a, i) => {
+                                    const url = `/api/crm/mail/messages/${m.gmailMessageId}/attachments/${a.attachmentId}`;
+                                    return (
+                                      <a key={i} href={url} target="_blank" rel="noopener noreferrer" title={a.filename}>
+                                        <img src={url} alt={a.filename} className="max-h-48 rounded-lg border border-slate-200 object-cover" />
+                                      </a>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                              {/* Chips for everything (download links when we have the id) */}
+                              <div className="flex flex-wrap gap-2">
+                                {m.attachments!.map((a, i) => {
+                                  const url = a.attachmentId ? `/api/crm/mail/messages/${m.gmailMessageId}/attachments/${a.attachmentId}` : null;
+                                  const inner = (
+                                    <>
+                                      <Paperclip className="h-3.5 w-3.5 text-slate-400" />
+                                      <span className="max-w-[200px] truncate">{a.filename}</span>
+                                      {a.size ? <span className="text-slate-400">{prettySize(a.size)}</span> : null}
+                                    </>
+                                  );
+                                  return url ? (
+                                    <a
+                                      key={i}
+                                      href={url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 transition-colors hover:border-[#711419]/40 hover:bg-white"
+                                      data-testid={`attachment-${m.id}-${i}`}
+                                    >
+                                      {inner}
+                                    </a>
+                                  ) : (
+                                    <span key={i} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs text-slate-500">
+                                      {inner}
+                                    </span>
+                                  );
+                                })}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -533,16 +617,17 @@ export default function CrmMail() {
                     <div className="flex items-center gap-1.5 px-3 pt-2 text-xs font-medium text-slate-400">
                       <CornerUpLeft className="h-3.5 w-3.5" /> Reply
                     </div>
-                    <Textarea
+                    <AutoTextarea
                       value={replyHtml}
                       onChange={(e) => setReplyHtml(e.target.value)}
                       onKeyDown={(e) => {
                         if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); handleReply(); }
                       }}
                       placeholder="Write your reply…"
-                      rows={2}
-                      className="resize-none border-0 bg-transparent px-3 py-1.5 text-sm shadow-none outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-                      data-testid="input-reply"
+                      minHeight={48}
+                      maxHeight={220}
+                      className="resize-none overflow-y-auto border-0 bg-transparent px-3 py-1.5 text-sm shadow-none outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                      testid="input-reply"
                     />
                     {replyFiles.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 px-3 pb-1.5">
@@ -696,14 +781,15 @@ function ComposeDialog({
             <label className="w-12 shrink-0 text-sm text-slate-500">Subject</label>
             <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" className="flex-1 border-0 px-0 shadow-none focus-visible:ring-0" data-testid="compose-subject" />
           </div>
-          <Textarea
+          <AutoTextarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
             onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); submit(); } }}
             placeholder="Write your message…"
-            rows={12}
-            className="resize-none rounded-none border-0 px-5 py-3 text-sm shadow-none focus-visible:ring-0"
-            data-testid="compose-body"
+            minHeight={220}
+            maxHeight={420}
+            className="resize-none overflow-y-auto rounded-none border-0 px-5 py-3 text-sm shadow-none focus-visible:ring-0"
+            testid="compose-body"
           />
           {files.length > 0 && (
             <div className="flex flex-wrap gap-1.5 px-5 py-2.5">

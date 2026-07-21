@@ -339,6 +339,13 @@ export async function sendEmail(user: CrmUser, o: SendOpts): Promise<{ gmailThre
   return { gmailThreadId: sent.threadId };
 }
 
+// ── attachment download ──────────────────────────────────────────────────────
+export async function getAttachmentBytes(user: CrmUser, gmailMessageId: string, attachmentId: string): Promise<Buffer> {
+  const json = await gmailFetch(user, `/messages/${gmailMessageId}/attachments/${attachmentId}`);
+  if (!json?.data) throw new Error("attachment has no data");
+  return b64urlDecode(json.data);
+}
+
 // ── mark read ────────────────────────────────────────────────────────────────
 export async function markThreadRead(user: CrmUser, threadRowId: string): Promise<void> {
   const msgs = await db
