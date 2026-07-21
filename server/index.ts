@@ -135,6 +135,11 @@ app.use((req, res, next) => {
     express.raw({ type: 'application/json' })(req, res, next);
     return;
   }
+  if (req.path === '/api/crm/mail/send') {
+    // Email attachments (base64) can be large — allow up to ~30MB here
+    express.json({ limit: '30mb' })(req, res, next);
+    return;
+  }
   express.json({ limit: '1mb' })(req, res, next);
 });
 app.use(express.urlencoded({ extended: false }));

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -49,6 +49,29 @@ type EmailMessage = {
 
 type Folder = "inbox" | "unread" | "sent";
 
+type OutAttachment = { filename: string; mimeType: string; contentBase64: string; size: number };
+const MAX_ATTACH_TOTAL = 20 * 1024 * 1024; // 20MB combined
+
+async function fileToAttachment(file: File): Promise<OutAttachment> {
+  const dataUrl: string = await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+  return {
+    filename: file.name,
+    mimeType: file.type || "application/octet-stream",
+    contentBase64: (dataUrl.split(",")[1] || ""),
+    size: file.size,
+  };
+}
+function prettySize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function fmtWhen(iso: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -83,7 +106,22 @@ export default function CrmMail() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const [replyHtml, setReplyHtml] = useState("");
+  const [replyFiles, setReplyFiles] = useState<OutAttachment[]>([]);
+  const replyFileInput = useRef<HTMLInputElement | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
+
+  const addReplyFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const added = await Promise.all(Array.from(files).map(fileToAttachment));
+    setReplyFiles((prev) => {
+      const next = [...prev, ...added];
+      if (next.reduce((s, a) => s + a.size, 0) > MAX_ATTACH_TOTAL) {
+        toast({ variant: "destructive", title: "Attachments too large", description: "Keep the total under 20 MB." });
+        return prev;
+      }
+      return next;
+    });
+  };
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -172,7 +210,7 @@ export default function CrmMail() {
   }, []);
 
   const sendMutation = useMutation({
-    mutationFn: async (payload: { to: string[]; cc?: string[]; bcc?: string[]; subject: string; html: string; threadRowId?: string }) =>
+    mutationFn: async (payload: { to: string[]; cc?: string[]; bcc?: string[]; subject: string; html: string; threadRowId?: string; attachments?: OutAttachment[] }) =>
       apiRequest("POST", "/api/crm/mail/send", payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/mail/threads"] });
@@ -185,6 +223,7 @@ export default function CrmMail() {
   const openThread = (id: string) => {
     setSelectedId(id);
     setReplyHtml("");
+    setReplyFiles([]);
     // Optimistically clear unread in the list
     queryClient.setQueryData<{ connected: boolean; threads: Thread[] }>(
       ["/api/crm/mail/threads", { folder, search }],
@@ -193,7 +232,7 @@ export default function CrmMail() {
   };
 
   const handleReply = () => {
-    if (!threadDetail || !replyHtml.trim()) return;
+    if (!threadDetail || (!replyHtml.trim() && replyFiles.length === 0)) return;
     const msgs = threadDetail.messages;
     const last = msgs[msgs.length - 1];
     const me = (status?.gmailAddress || "").toLowerCase();
@@ -202,8 +241,8 @@ export default function CrmMail() {
     if (to.length === 0 && last.fromEmail) to.push(last.fromEmail);
     const subject = (threadDetail.thread.subject || "").replace(/^(re:\s*)+/i, "");
     sendMutation.mutate(
-      { to, subject: `Re: ${subject}`, html: replyHtml.replace(/\n/g, "<br>"), threadRowId: threadDetail.thread.id },
-      { onSuccess: () => setReplyHtml("") },
+      { to, subject: `Re: ${subject}`, html: (replyHtml.trim() ? replyHtml : "").replace(/\n/g, "<br>"), threadRowId: threadDetail.thread.id, attachments: replyFiles },
+      { onSuccess: () => { setReplyHtml(""); setReplyFiles([]); } },
     );
   };
 
@@ -488,9 +527,9 @@ export default function CrmMail() {
               </div>
 
               {/* Reply box */}
-              <div className="border-t border-slate-200/80 bg-white px-4 py-3 lg:px-6">
+              <div className="shrink-0 border-t border-slate-200/80 bg-white px-4 py-3 lg:px-6">
                 <div className="mx-auto max-w-3xl">
-                  <div className="rounded-2xl border border-slate-200 bg-white shadow-sm focus-within:border-[#711419]/40 focus-within:ring-2 focus-within:ring-[#711419]/10">
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-colors focus-within:border-[#711419]/40">
                     <div className="flex items-center gap-1.5 px-3 pt-2 text-xs font-medium text-slate-400">
                       <CornerUpLeft className="h-3.5 w-3.5" /> Reply
                     </div>
@@ -505,12 +544,44 @@ export default function CrmMail() {
                       className="resize-none border-0 bg-transparent px-3 py-1.5 text-sm shadow-none focus-visible:ring-0"
                       data-testid="input-reply"
                     />
+                    {replyFiles.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 px-3 pb-1.5">
+                        {replyFiles.map((f, i) => (
+                          <span key={i} className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">
+                            <Paperclip className="h-3 w-3" />
+                            <span className="max-w-[140px] truncate">{f.filename}</span>
+                            <span className="text-slate-400">{prettySize(f.size)}</span>
+                            <button onClick={() => setReplyFiles((prev) => prev.filter((_, j) => j !== i))} className="text-slate-400 hover:text-red-600">
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <div className="flex items-center justify-between px-3 pb-2.5">
-                      <span className="hidden text-[11px] text-slate-400 sm:inline">⌘ + Return to send</span>
+                      <div className="flex items-center gap-2">
+                        <input
+                          ref={replyFileInput}
+                          type="file"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => { addReplyFiles(e.target.files); e.target.value = ""; }}
+                          data-testid="reply-file-input"
+                        />
+                        <button
+                          onClick={() => replyFileInput.current?.click()}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                          title="Attach files"
+                          data-testid="reply-attach"
+                        >
+                          <Paperclip className="h-4 w-4" />
+                        </button>
+                        <span className="hidden text-[11px] text-slate-400 sm:inline">⌘ + Return to send</span>
+                      </div>
                       <Button
                         size="sm"
                         className="h-8 rounded-lg bg-[#711419] hover:bg-[#8a1a1f]"
-                        disabled={!replyHtml.trim() || sendMutation.isPending}
+                        disabled={(!replyHtml.trim() && replyFiles.length === 0) || sendMutation.isPending}
                         onClick={handleReply}
                         data-testid="button-send-reply"
                       >
@@ -542,7 +613,7 @@ function ComposeDialog({
   open: boolean;
   onClose: () => void;
   sending: boolean;
-  onSend: (p: { to: string[]; cc?: string[]; bcc?: string[]; subject: string; html: string }) => void;
+  onSend: (p: { to: string[]; cc?: string[]; bcc?: string[]; subject: string; html: string; attachments?: OutAttachment[] }) => void;
 }) {
   const { toast } = useToast();
   const [to, setTo] = useState("");
@@ -552,25 +623,41 @@ function ComposeDialog({
   const [showBcc, setShowBcc] = useState(false);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [files, setFiles] = useState<OutAttachment[]>([]);
+  const fileInput = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (open) {
-      setTo(""); setCc(""); setBcc(""); setShowCc(false); setShowBcc(false); setSubject(""); setBody("");
+      setTo(""); setCc(""); setBcc(""); setShowCc(false); setShowBcc(false); setSubject(""); setBody(""); setFiles([]);
     }
   }, [open]);
+
+  const addFiles = async (list: FileList | null) => {
+    if (!list || list.length === 0) return;
+    const added = await Promise.all(Array.from(list).map(fileToAttachment));
+    setFiles((prev) => {
+      const next = [...prev, ...added];
+      if (next.reduce((s, a) => s + a.size, 0) > MAX_ATTACH_TOTAL) {
+        toast({ variant: "destructive", title: "Attachments too large", description: "Keep the total under 20 MB." });
+        return prev;
+      }
+      return next;
+    });
+  };
 
   const splitEmails = (s: string) => s.split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
 
   const submit = () => {
     const toList = splitEmails(to);
     if (toList.length === 0) { toast({ variant: "destructive", title: "Add a recipient" }); return; }
-    if (!body.trim()) { toast({ variant: "destructive", title: "Write a message" }); return; }
+    if (!body.trim() && files.length === 0) { toast({ variant: "destructive", title: "Write a message" }); return; }
     onSend({
       to: toList,
       cc: splitEmails(cc),
       bcc: splitEmails(bcc),
       subject: subject.trim() || "(no subject)",
       html: body.replace(/\n/g, "<br>"),
+      attachments: files,
     });
   };
 
@@ -618,13 +705,45 @@ function ComposeDialog({
             className="resize-none rounded-none border-0 px-5 py-3 text-sm shadow-none focus-visible:ring-0"
             data-testid="compose-body"
           />
+          {files.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 px-5 py-2.5">
+              {files.map((f, i) => (
+                <span key={i} className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">
+                  <Paperclip className="h-3 w-3" />
+                  <span className="max-w-[160px] truncate">{f.filename}</span>
+                  <span className="text-slate-400">{prettySize(f.size)}</span>
+                  <button onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))} className="text-slate-400 hover:text-red-600">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
-        <DialogFooter className="border-t border-slate-100 px-5 py-3.5">
-          <Button variant="outline" className="rounded-lg" onClick={onClose}>Cancel</Button>
-          <Button className="rounded-lg bg-[#711419] hover:bg-[#8a1a1f]" disabled={sending} onClick={submit} data-testid="compose-send">
-            {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-            Send
-          </Button>
+        <DialogFooter className="flex items-center border-t border-slate-100 px-5 py-3.5 sm:justify-between">
+          <input
+            ref={fileInput}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }}
+            data-testid="compose-file-input"
+          />
+          <button
+            onClick={() => fileInput.current?.click()}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+            title="Attach files"
+            data-testid="compose-attach"
+          >
+            <Paperclip className="h-4 w-4" />
+          </button>
+          <div className="flex gap-2">
+            <Button variant="outline" className="rounded-lg" onClick={onClose}>Cancel</Button>
+            <Button className="rounded-lg bg-[#711419] hover:bg-[#8a1a1f]" disabled={sending} onClick={submit} data-testid="compose-send">
+              {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+              Send
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

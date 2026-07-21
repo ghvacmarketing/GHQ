@@ -1,4 +1,5 @@
 import { OAuth2Client } from "google-auth-library";
+import { randomBytes } from "crypto";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "../db";
 import {
@@ -261,6 +262,11 @@ export async function syncThread(user: CrmUser, gmailThreadId: string): Promise<
 }
 
 // ── send ─────────────────────────────────────────────────────────────────────
+export interface OutgoingAttachment {
+  filename: string;
+  mimeType: string;
+  contentBase64: string; // raw base64 (no data: prefix)
+}
 interface SendOpts {
   to: string[];
   cc?: string[];
@@ -270,22 +276,52 @@ interface SendOpts {
   gmailThreadId?: string | null; // reply within this thread
   inReplyTo?: string | null; // Message-ID header of the message being replied to
   references?: string | null;
+  attachments?: OutgoingAttachment[];
 }
 function buildMime(from: string, o: SendOpts): string {
-  const lines: string[] = [];
-  lines.push(`From: ${from}`);
-  lines.push(`To: ${o.to.join(", ")}`);
-  if (o.cc?.length) lines.push(`Cc: ${o.cc.join(", ")}`);
-  if (o.bcc?.length) lines.push(`Bcc: ${o.bcc.join(", ")}`);
-  lines.push(`Subject: ${o.subject}`);
-  if (o.inReplyTo) lines.push(`In-Reply-To: ${o.inReplyTo}`);
-  if (o.references) lines.push(`References: ${o.references}`);
-  lines.push("MIME-Version: 1.0");
-  lines.push('Content-Type: text/html; charset="UTF-8"');
-  lines.push("Content-Transfer-Encoding: 7bit");
-  lines.push("");
-  lines.push(o.html);
-  return lines.join("\r\n");
+  const headers: string[] = [
+    `From: ${from}`,
+    `To: ${o.to.join(", ")}`,
+    ...(o.cc?.length ? [`Cc: ${o.cc.join(", ")}`] : []),
+    ...(o.bcc?.length ? [`Bcc: ${o.bcc.join(", ")}`] : []),
+    `Subject: ${o.subject}`,
+    ...(o.inReplyTo ? [`In-Reply-To: ${o.inReplyTo}`] : []),
+    ...(o.references ? [`References: ${o.references}`] : []),
+    "MIME-Version: 1.0",
+  ];
+
+  const atts = (o.attachments || []).filter((a) => a && a.contentBase64);
+  if (atts.length === 0) {
+    return [
+      ...headers,
+      'Content-Type: text/html; charset="UTF-8"',
+      "Content-Transfer-Encoding: 7bit",
+      "",
+      o.html,
+    ].join("\r\n");
+  }
+
+  // multipart/mixed: HTML body first, then each file as a base64 attachment
+  const boundary = `ghq_${randomBytes(12).toString("hex")}`;
+  const parts: string[] = [];
+  parts.push(`--${boundary}`);
+  parts.push('Content-Type: text/html; charset="UTF-8"');
+  parts.push("Content-Transfer-Encoding: 7bit");
+  parts.push("");
+  parts.push(o.html);
+  for (const a of atts) {
+    const name = a.filename.replace(/["\r\n]/g, "");
+    const b64 = a.contentBase64.replace(/^data:[^;]+;base64,/, "").replace(/[\r\n]/g, "");
+    parts.push(`--${boundary}`);
+    parts.push(`Content-Type: ${a.mimeType || "application/octet-stream"}; name="${name}"`);
+    parts.push("Content-Transfer-Encoding: base64");
+    parts.push(`Content-Disposition: attachment; filename="${name}"`);
+    parts.push("");
+    parts.push(b64.replace(/(.{76})/g, "$1\r\n")); // wrap per RFC 2045
+  }
+  parts.push(`--${boundary}--`);
+
+  return [...headers, `Content-Type: multipart/mixed; boundary="${boundary}"`, "", ...parts].join("\r\n");
 }
 
 export async function sendEmail(user: CrmUser, o: SendOpts): Promise<{ gmailThreadId: string }> {

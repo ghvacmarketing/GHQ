@@ -5535,9 +5535,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) return res.status(401).json({ message: "Unauthorized" });
       if (!user.gmailRefreshTokenEnc) return res.status(400).json({ message: "Gmail not connected" });
 
-      const { to, cc, bcc, subject, html, threadRowId } = req.body as {
+      const { to, cc, bcc, subject, html, threadRowId, attachments } = req.body as {
         to?: string[]; cc?: string[]; bcc?: string[]; subject?: string; html?: string; threadRowId?: string;
+        attachments?: { filename: string; mimeType: string; contentBase64: string }[];
       };
+      const atts = (Array.isArray(attachments) ? attachments : [])
+        .filter((a) => a && typeof a.contentBase64 === "string" && a.filename)
+        .map((a) => ({ filename: String(a.filename), mimeType: String(a.mimeType || "application/octet-stream"), contentBase64: a.contentBase64 }));
       const toList = (Array.isArray(to) ? to : []).map((s) => String(s).trim()).filter(Boolean);
       if (toList.length === 0) return res.status(400).json({ message: "At least one recipient is required" });
       if (!html || !html.trim()) return res.status(400).json({ message: "Message body is required" });
@@ -5570,6 +5574,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         gmailThreadId,
         inReplyTo,
         references,
+        attachments: atts,
       });
       res.json({ ok: true, gmailThreadId: result.gmailThreadId });
     } catch (e) {
