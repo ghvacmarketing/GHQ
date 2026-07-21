@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import {
-  Mail, Search, PenSquare, Loader2, Inbox, Send, Paperclip, X,
+  Mail, Search, PenSquare, Loader2, Inbox, Send, Paperclip, X, Plus,
   CornerUpLeft, Link2, ArrowLeft, AlertTriangle, Download,
   FileText, FileSpreadsheet, FileImage, FileArchive, FileAudio, FileVideo, File as FileIconLucide,
 } from "lucide-react";
@@ -382,22 +382,19 @@ export default function CrmMail() {
         >
           {/* Header */}
           <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-4">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#711419]/10">
-                <Mail className="h-[18px] w-[18px] text-[#711419]" />
-              </div>
-              <div className="min-w-0 leading-tight">
-                <div className="font-semibold text-slate-900">Mail</div>
-                <div className="truncate text-[11px] text-slate-400">{status?.gmailAddress}</div>
-              </div>
+            <div className="min-w-0 leading-tight">
+              <div className="font-display text-lg font-semibold text-slate-900">Mail</div>
+              <div className="truncate text-[11px] text-slate-400">{status?.gmailAddress}</div>
             </div>
             <Button
               size="sm"
-              className="h-9 rounded-xl bg-[#711419] px-3.5 shadow-sm hover:bg-[#8a1a1f]"
+              variant="ghost"
+              className="h-8 w-8 p-0 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
               onClick={() => setComposeOpen(true)}
+              title="New message"
               data-testid="button-compose"
             >
-              <PenSquare className="mr-1.5 h-4 w-4" /> Compose
+              <Plus className="h-4 w-4" />
             </Button>
           </div>
 
@@ -411,32 +408,29 @@ export default function CrmMail() {
                 onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput.trim())}
                 onBlur={() => setSearch(searchInput.trim())}
                 placeholder="Search mail…"
-                className="h-10 rounded-xl border-slate-200 bg-slate-50 pl-9 text-sm focus-visible:bg-white"
+                className="h-9 rounded-lg border-slate-200 bg-slate-50 pl-9 text-sm focus-visible:bg-white"
                 data-testid="input-mail-search"
               />
             </div>
           </div>
 
-          {/* Folder tabs */}
-          <div className="flex items-center gap-1 border-b border-slate-100 px-3 pb-2">
-            {FOLDERS.map((f) => (
-              <button
-                key={f.key}
-                onClick={() => { setFolder(f.key); setSelectedId(null); }}
-                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-medium transition-colors ${
-                  folder === f.key ? "bg-[#711419]/10 text-[#711419]" : "text-slate-500 hover:bg-slate-100"
-                }`}
-                data-testid={`folder-${f.key}`}
-              >
-                {f.icon}
-                {f.label}
-                {f.badge ? (
-                  <span className="ml-0.5 rounded-full bg-[#711419] px-1.5 text-[10px] font-semibold text-white">
-                    {f.badge}
-                  </span>
-                ) : null}
-              </button>
-            ))}
+          {/* Folder tabs — segmented control (matches Messaging) */}
+          <div className="px-4 pb-2">
+            <div className="flex items-center gap-0.5 rounded-md bg-slate-100 p-0.5">
+              {FOLDERS.map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => { setFolder(f.key); setSelectedId(null); }}
+                  className={`flex-1 rounded-sm px-2 py-1 text-xs font-medium transition-colors ${
+                    folder === f.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                  }`}
+                  data-testid={`folder-${f.key}`}
+                >
+                  {f.label}
+                  {f.badge ? <span className="ml-1 text-[#711419]">{f.badge}</span> : null}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Sync error banner */}
@@ -481,7 +475,7 @@ export default function CrmMail() {
                     <button
                       key={t.id}
                       onClick={() => openThread(t.id)}
-                      className={`group mb-0.5 flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
+                      className={`group mb-0.5 flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
                         active ? "bg-[#711419]/[0.07]" : "hover:bg-slate-100"
                       }`}
                       data-testid={`thread-${t.id}`}
@@ -561,7 +555,7 @@ export default function CrmMail() {
                   {threadDetail.messages.map((m) => {
                     const outbound = m.direction === "outbound";
                     return (
-                      <div key={m.id} className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm" data-testid={`message-${m.id}`}>
+                      <div key={m.id} className="overflow-hidden rounded-lg border border-slate-200/80 bg-white shadow-sm" data-testid={`message-${m.id}`}>
                         <div className="flex items-start gap-3 border-b border-slate-100 px-4 py-3">
                           <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${outbound ? "bg-[#711419] text-white" : "bg-slate-200 text-slate-600"}`}>
                             {initials(m.fromName || m.fromEmail || "?")}
@@ -631,7 +625,7 @@ export default function CrmMail() {
               {/* Reply box */}
               <div className="shrink-0 border-t border-slate-200/80 bg-white px-4 py-3 lg:px-6">
                 <div className="mx-auto max-w-3xl">
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
                     <div className="flex items-center gap-1.5 px-3 pt-2 text-xs font-medium text-slate-400">
                       <CornerUpLeft className="h-3.5 w-3.5" /> Reply
                     </div>

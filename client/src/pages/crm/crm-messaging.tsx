@@ -489,9 +489,6 @@ export default function CrmMessaging() {
         <div className="p-3 border-b border-border space-y-3">
           <div className="flex items-center justify-between">
             <h1 className="text-lg font-display font-semibold text-foreground flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <MessageSquare className="h-4 w-4" />
-              </span>
               Inbox
               {totalUnread > 0 && (
                 <Badge variant="default" className="ml-0.5">
@@ -606,39 +603,44 @@ export default function CrmMessaging() {
                     }}
                     data-testid={`conversation-item-${conv.id}`}
                   >
-                    <div className="min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <span
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[13px] font-semibold text-primary">
+                        {getInitials(name)}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span
+                            className={cn(
+                              "flex min-w-0 items-center gap-1.5 truncate text-sm text-foreground",
+                              hasUnread ? "font-semibold" : "font-medium"
+                            )}
+                          >
+                            {hasUnread && (
+                              <span
+                                className="h-2 w-2 shrink-0 rounded-full bg-primary"
+                                data-testid={`badge-unread-count-${conv.id}`}
+                              />
+                            )}
+                            <span className="truncate">{name}</span>
+                          </span>
+                          <span
+                            className={cn(
+                              "text-xs shrink-0",
+                              hasUnread ? "text-primary font-medium" : "text-muted-foreground"
+                            )}
+                          >
+                            {formatMessageTime(conv.lastMessageAt)}
+                          </span>
+                        </div>
+                        <p
                           className={cn(
-                            "flex min-w-0 items-center gap-1.5 truncate text-sm text-foreground",
-                            hasUnread ? "font-semibold" : "font-medium"
+                            "text-xs truncate mt-0.5",
+                            hasUnread ? "text-foreground/80 font-medium" : "text-muted-foreground"
                           )}
                         >
-                          {hasUnread && (
-                            <span
-                              className="h-2 w-2 shrink-0 rounded-full bg-primary"
-                              data-testid={`badge-unread-count-${conv.id}`}
-                            />
-                          )}
-                          <span className="truncate">{name}</span>
-                        </span>
-                        <span
-                          className={cn(
-                            "text-xs shrink-0",
-                            hasUnread ? "text-primary font-medium" : "text-muted-foreground"
-                          )}
-                        >
-                          {formatMessageTime(conv.lastMessageAt)}
-                        </span>
+                          {preview}
+                        </p>
                       </div>
-                      <p
-                        className={cn(
-                          "text-xs truncate mt-0.5",
-                          hasUnread ? "text-foreground/80 font-medium" : "text-muted-foreground"
-                        )}
-                      >
-                        {preview}
-                      </p>
                     </div>
                   </button>
                 );
