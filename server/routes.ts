@@ -5653,6 +5653,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/mail/recipients?q= - autocomplete recipients from CRM
+  // customers + people you've recently corresponded with (Gmail/Outlook-style).
+  app.get("/api/crm/mail/recipients", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const q = String(req.query.q || "").trim();
+      if (q.length < 1) return res.json({ results: [] });
+      const like = `%${q}%`;
+
+      const custs = await db
+        .select({ id: crmCustomers.id, name: crmCustomers.name, email: crmCustomers.email })
+        .from(crmCustomers)
+        .where(or(ilike(crmCustomers.name, like), ilike(crmCustomers.email, like)))
+        .limit(8);
+
+      const contactRows = await db
+        .select({ email: crmEmailMessages.fromEmail, name: crmEmailMessages.fromName })
+        .from(crmEmailMessages)
+        .where(and(eq(crmEmailMessages.userId, user.id), isNotNull(crmEmailMessages.fromEmail), ilike(crmEmailMessages.fromEmail, like)))
+        .orderBy(desc(crmEmailMessages.sentAt))
+        .limit(25);
+
+      const results: Array<{ type: string; customerId?: string; name: string | null; email: string | null }> = [];
+      const seen = new Set<string>();
+      for (const c of custs) {
+        const key = (c.email || `cust:${c.id}`).toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        results.push({ type: "customer", customerId: c.id, name: c.name, email: c.email || null });
+      }
+      for (const r of contactRows) {
+        if (!r.email) continue;
+        const key = r.email.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        results.push({ type: "contact", name: r.name || null, email: r.email });
+        if (results.length >= 12) break;
+      }
+      res.json({ results: results.slice(0, 12) });
+    } catch (e) {
+      console.error("mail/recipients", e);
+      res.status(500).json({ message: "Failed to search recipients" });
+    }
+  });
+
+  // POST /api/crm/mail/save-customer-email - store an email on a customer record
+  app.post("/api/crm/mail/save-customer-email", requireCrmAuth, async (req, res) => {
+    try {
+      const { customerId, email } = req.body as { customerId?: string; email?: string };
+      if (!customerId || !email || !String(email).includes("@")) {
+        return res.status(400).json({ message: "customerId and a valid email are required" });
+      }
+      await db.update(crmCustomers).set({ email: String(email).trim() }).where(eq(crmCustomers.id, customerId));
+      res.json({ ok: true });
+    } catch (e) {
+      console.error("mail/save-customer-email", e);
+      res.status(500).json({ message: "Failed to save email" });
+    }
+  });
+
   // POST /api/crm/auth/logout - Destroy session
   app.post("/api/crm/auth/logout", async (req, res) => {
     try {

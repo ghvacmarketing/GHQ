@@ -712,6 +712,114 @@ export default function CrmMail() {
   );
 }
 
+type Recipient = { email: string; name?: string | null; customerId?: string; saveToCustomer?: boolean };
+type RecipientResult = { type: "customer" | "contact"; customerId?: string; name: string | null; email: string | null };
+
+// Gmail/Outlook-style recipient field: chips + live autocomplete over CRM
+// customers and people you've corresponded with. Picking a customer with no
+// email on file prompts to enter one (and optionally save it to their profile).
+function RecipientField({ recipients, onChange, testid }: { recipients: Recipient[]; onChange: (r: Recipient[]) => void; testid?: string }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<RecipientResult[]>([]);
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState<{ id: string; name: string | null } | null>(null);
+  const [pendingEmail, setPendingEmail] = useState("");
+  const [saveToProfile, setSaveToProfile] = useState(true);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 1) { setResults([]); setOpen(false); return; }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/crm/mail/recipients?q=${encodeURIComponent(q)}`, { credentials: "include" });
+        const data = await res.json();
+        if (!cancelled) { setResults(data.results || []); setOpen(true); }
+      } catch { /* ignore */ }
+    }, 160);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [query]);
+
+  const add = (r: Recipient) => {
+    if (!recipients.some((x) => x.email.toLowerCase() === r.email.toLowerCase())) onChange([...recipients, r]);
+    setQuery(""); setResults([]); setOpen(false); setPending(null); setPendingEmail("");
+  };
+  const commitTyped = () => {
+    const v = query.trim().replace(/[,;]$/, "");
+    if (v.includes("@")) add({ email: v });
+  };
+  const confirmPending = () => {
+    if (!pending || !pendingEmail.includes("@")) return;
+    add({ email: pendingEmail.trim(), name: pending.name, customerId: pending.id, saveToCustomer: saveToProfile });
+  };
+
+  return (
+    <div className="relative">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {recipients.map((r, i) => (
+          <span key={i} className="inline-flex items-center gap-1 rounded-full bg-[#711419]/[0.08] py-1 pl-2.5 pr-1.5 text-xs font-medium text-[#711419]" title={r.email}>
+            {r.name || r.email}
+            <button onClick={() => onChange(recipients.filter((_, j) => j !== i))} className="text-[#711419]/60 hover:text-[#711419]"><X className="h-3 w-3" /></button>
+          </span>
+        ))}
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if ((e.key === "Enter" || e.key === "," || e.key === ";") && query.trim().includes("@")) { e.preventDefault(); commitTyped(); }
+            else if (e.key === "Backspace" && !query && recipients.length) onChange(recipients.slice(0, -1));
+          }}
+          onBlur={() => { setTimeout(() => setOpen(false), 160); commitTyped(); }}
+          onFocus={() => { if (results.length) setOpen(true); }}
+          placeholder={recipients.length ? "" : "Type a name, customer, or email…"}
+          className="min-w-[180px] flex-1 border-0 bg-transparent py-1 text-sm outline-none placeholder:text-slate-400"
+          data-testid={testid}
+        />
+      </div>
+
+      {open && results.length > 0 && !pending && (
+        <div className="absolute inset-x-0 top-full z-30 mt-1.5 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+          {results.map((r, i) => (
+            <button key={i} onMouseDown={(e) => { e.preventDefault(); r.email ? add({ email: r.email, name: r.name, customerId: r.type === "customer" ? r.customerId : undefined }) : (r.customerId && (setPending({ id: r.customerId, name: r.name }), setPendingEmail(""), setSaveToProfile(true))); }} className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-50" data-testid={`recipient-option-${i}`}>
+              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${r.type === "customer" ? "bg-[#711419]/10 text-[#711419]" : "bg-slate-200 text-slate-600"}`}>
+                {initials(r.name || r.email || "?")}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-slate-800">{r.name || r.email}</span>
+                <span className="block truncate text-xs text-slate-400">{r.email || "No email on file — tap to add one"}</span>
+              </span>
+              {r.type === "customer" && <span className="shrink-0 rounded-full bg-[#711419]/10 px-2 py-0.5 text-[10px] font-semibold text-[#711419]">Customer</span>}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {pending && (
+        <div className="absolute inset-x-0 top-full z-30 mt-1.5 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+          <p className="mb-2 text-xs text-slate-500">No email on file for <span className="font-semibold text-slate-700">{pending.name}</span>. Enter one:</p>
+          <input
+            autoFocus
+            value={pendingEmail}
+            onChange={(e) => setPendingEmail(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && pendingEmail.includes("@")) confirmPending(); }}
+            placeholder="customer@example.com"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#711419]/40"
+            data-testid="recipient-new-email"
+          />
+          <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-slate-600">
+            <input type="checkbox" checked={saveToProfile} onChange={(e) => setSaveToProfile(e.target.checked)} className="h-3.5 w-3.5 accent-[#711419]" />
+            Save this email to {pending.name}'s profile
+          </label>
+          <div className="mt-2.5 flex justify-end gap-2">
+            <button onClick={() => setPending(null)} className="rounded-lg px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-100">Cancel</button>
+            <button onClick={confirmPending} disabled={!pendingEmail.includes("@")} className="rounded-lg bg-[#711419] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40" data-testid="recipient-add-email">Add</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ComposeDialog({
   open, onClose, onSend, sending,
 }: {
@@ -721,9 +829,9 @@ function ComposeDialog({
   onSend: (p: { to: string[]; cc?: string[]; bcc?: string[]; subject: string; html: string; attachments?: OutAttachment[] }) => void;
 }) {
   const { toast } = useToast();
-  const [to, setTo] = useState("");
-  const [cc, setCc] = useState("");
-  const [bcc, setBcc] = useState("");
+  const [toR, setToR] = useState<Recipient[]>([]);
+  const [ccR, setCcR] = useState<Recipient[]>([]);
+  const [bccR, setBccR] = useState<Recipient[]>([]);
   const [showCc, setShowCc] = useState(false);
   const [showBcc, setShowBcc] = useState(false);
   const [subject, setSubject] = useState("");
@@ -733,7 +841,7 @@ function ComposeDialog({
 
   useEffect(() => {
     if (open) {
-      setTo(""); setCc(""); setBcc(""); setShowCc(false); setShowBcc(false); setSubject(""); setBody(""); setFiles([]);
+      setToR([]); setCcR([]); setBccR([]); setShowCc(false); setShowBcc(false); setSubject(""); setBody(""); setFiles([]);
     }
   }, [open]);
 
@@ -750,16 +858,18 @@ function ComposeDialog({
     });
   };
 
-  const splitEmails = (s: string) => s.split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
-
-  const submit = () => {
-    const toList = splitEmails(to);
-    if (toList.length === 0) { toast({ variant: "destructive", title: "Add a recipient" }); return; }
+  const submit = async () => {
+    const to = toR.map((r) => r.email);
+    if (to.length === 0) { toast({ variant: "destructive", title: "Add a recipient" }); return; }
     if (!body.trim() && files.length === 0) { toast({ variant: "destructive", title: "Write a message" }); return; }
+    // Save any new customer emails to their profiles first (best-effort)
+    for (const r of [...toR, ...ccR, ...bccR].filter((x) => x.saveToCustomer && x.customerId)) {
+      try { await apiRequest("POST", "/api/crm/mail/save-customer-email", { customerId: r.customerId, email: r.email }); } catch { /* non-fatal */ }
+    }
     onSend({
-      to: toList,
-      cc: splitEmails(cc),
-      bcc: splitEmails(bcc),
+      to,
+      cc: ccR.map((r) => r.email),
+      bcc: bccR.map((r) => r.email),
       subject: subject.trim() || "(no subject)",
       html: body.replace(/\n/g, "<br>"),
       attachments: files,
@@ -768,38 +878,39 @@ function ComposeDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl gap-0 overflow-hidden p-0">
-        <DialogHeader className="border-b border-slate-100 px-5 py-4">
-          <DialogTitle className="flex items-center gap-2 text-base">
-            <PenSquare className="h-4 w-4 text-[#711419]" /> New message
+      <DialogContent className="max-w-2xl gap-0 overflow-hidden rounded-2xl p-0">
+        <DialogHeader className="border-b border-slate-100 bg-slate-50/60 px-5 py-3.5">
+          <DialogTitle className="flex items-center gap-2 text-[15px] font-semibold text-slate-900">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#711419]/10"><PenSquare className="h-4 w-4 text-[#711419]" /></span>
+            New message
           </DialogTitle>
         </DialogHeader>
         <div className="divide-y divide-slate-100">
-          <div className="flex items-center gap-2 px-5 py-2.5">
-            <label className="w-12 shrink-0 text-sm text-slate-500">To</label>
-            <Input value={to} onChange={(e) => setTo(e.target.value)} placeholder="name@example.com" className="flex-1 border-0 px-0 shadow-none focus-visible:ring-0" data-testid="compose-to" />
-            <div className="flex shrink-0 gap-2 text-xs font-medium text-slate-400">
+          <div className="flex items-start gap-3 px-5 py-2.5">
+            <label className="w-12 shrink-0 pt-1.5 text-sm text-slate-500">To</label>
+            <div className="min-w-0 flex-1"><RecipientField recipients={toR} onChange={setToR} testid="compose-to" /></div>
+            <div className="flex shrink-0 gap-2 pt-1.5 text-xs font-medium text-slate-400">
               {!showCc && <button onClick={() => setShowCc(true)} className="hover:text-slate-700">Cc</button>}
               {!showBcc && <button onClick={() => setShowBcc(true)} className="hover:text-slate-700">Bcc</button>}
             </div>
           </div>
           {showCc && (
-            <div className="flex items-center gap-2 px-5 py-2.5">
-              <label className="w-12 shrink-0 text-sm text-slate-500">Cc</label>
-              <Input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="cc@example.com" className="flex-1 border-0 px-0 shadow-none focus-visible:ring-0" data-testid="compose-cc" />
-              <button onClick={() => { setShowCc(false); setCc(""); }} className="shrink-0 text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
+            <div className="flex items-start gap-3 px-5 py-2.5">
+              <label className="w-12 shrink-0 pt-1.5 text-sm text-slate-500">Cc</label>
+              <div className="min-w-0 flex-1"><RecipientField recipients={ccR} onChange={setCcR} testid="compose-cc" /></div>
+              <button onClick={() => { setShowCc(false); setCcR([]); }} className="shrink-0 pt-1.5 text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
             </div>
           )}
           {showBcc && (
-            <div className="flex items-center gap-2 px-5 py-2.5">
-              <label className="w-12 shrink-0 text-sm text-slate-500">Bcc</label>
-              <Input value={bcc} onChange={(e) => setBcc(e.target.value)} placeholder="bcc@example.com" className="flex-1 border-0 px-0 shadow-none focus-visible:ring-0" data-testid="compose-bcc" />
-              <button onClick={() => { setShowBcc(false); setBcc(""); }} className="shrink-0 text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
+            <div className="flex items-start gap-3 px-5 py-2.5">
+              <label className="w-12 shrink-0 pt-1.5 text-sm text-slate-500">Bcc</label>
+              <div className="min-w-0 flex-1"><RecipientField recipients={bccR} onChange={setBccR} testid="compose-bcc" /></div>
+              <button onClick={() => { setShowBcc(false); setBccR([]); }} className="shrink-0 pt-1.5 text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
             </div>
           )}
-          <div className="flex items-center gap-2 px-5 py-2.5">
+          <div className="flex items-center gap-3 px-5 py-2.5">
             <label className="w-12 shrink-0 text-sm text-slate-500">Subject</label>
-            <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" className="flex-1 border-0 px-0 shadow-none focus-visible:ring-0" data-testid="compose-subject" />
+            <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" className="flex-1 border-0 px-0 text-sm shadow-none focus-visible:ring-0" data-testid="compose-subject" />
           </div>
           <AutoTextarea
             value={body}
@@ -808,14 +919,14 @@ function ComposeDialog({
             placeholder="Write your message…"
             minHeight={220}
             maxHeight={420}
-            className="resize-none overflow-y-auto rounded-none border-0 px-5 py-3 text-sm shadow-none focus-visible:ring-0"
+            className="resize-none overflow-y-auto rounded-none border-0 px-5 py-3 text-sm leading-relaxed shadow-none focus-visible:ring-0"
             testid="compose-body"
           />
           {files.length > 0 && (
             <div className="flex flex-wrap gap-1.5 px-5 py-2.5">
               {files.map((f, i) => (
-                <span key={i} className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">
-                  <FileTypeIcon name={f.filename} mime={f.mimeType} className="h-3.5 w-3.5" />
+                <span key={i} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600">
+                  <FileTypeIcon name={f.filename} mime={f.mimeType} className="h-4 w-4" />
                   <span className="max-w-[160px] truncate">{f.filename}</span>
                   <span className="text-slate-400">{prettySize(f.size)}</span>
                   <button onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))} className="text-slate-400 hover:text-red-600">
@@ -826,26 +937,14 @@ function ComposeDialog({
             </div>
           )}
         </div>
-        <DialogFooter className="flex items-center border-t border-slate-100 px-5 py-3.5 sm:justify-between">
-          <input
-            ref={fileInput}
-            type="file"
-            multiple
-            className="hidden"
-            onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }}
-            data-testid="compose-file-input"
-          />
-          <button
-            onClick={() => fileInput.current?.click()}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-            title="Attach files"
-            data-testid="compose-attach"
-          >
+        <DialogFooter className="flex items-center border-t border-slate-100 bg-slate-50/60 px-5 py-3 sm:justify-between">
+          <input ref={fileInput} type="file" multiple className="hidden" onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} data-testid="compose-file-input" />
+          <button onClick={() => fileInput.current?.click()} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200/60 hover:text-slate-800" title="Attach files" data-testid="compose-attach">
             <Paperclip className="h-4 w-4" />
           </button>
           <div className="flex gap-2">
-            <Button variant="outline" className="rounded-lg" onClick={onClose}>Cancel</Button>
-            <Button className="rounded-lg bg-[#711419] hover:bg-[#8a1a1f]" disabled={sending} onClick={submit} data-testid="compose-send">
+            <Button variant="ghost" className="rounded-lg text-slate-600" onClick={onClose}>Discard</Button>
+            <Button className="rounded-lg bg-[#711419] px-5 hover:bg-[#8a1a1f]" disabled={sending} onClick={submit} data-testid="compose-send">
               {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
               Send
             </Button>
