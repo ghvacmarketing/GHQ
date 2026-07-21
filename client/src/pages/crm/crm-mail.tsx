@@ -10,12 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { sanitizeHtml } from "@/lib/sanitize-html";
-import {
-  Sheet, SheetContent, SheetHeader, SheetTitle,
-} from "@/components/ui/sheet";
 import { format } from "date-fns";
 import {
-  Mail, Search, PenSquare, Loader2, Inbox, Send, Paperclip, X, Plus,
+  Mail, Search, Loader2, Inbox, Send, Paperclip, X, Plus, Trash2,
   CornerUpLeft, Link2, ArrowLeft, AlertTriangle, Download,
   FileText, FileSpreadsheet, FileImage, FileArchive, FileAudio, FileVideo, File as FileIconLucide,
 } from "lucide-react";
@@ -870,89 +867,91 @@ function ComposeDialog({
     });
   };
 
+  if (!open) return null;
+
+  // Gmail-style floating compose docked bottom-right — NO backdrop, so the rest
+  // of the mail section stays interactive while you write.
   return (
-    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-lg [&>button]:hidden">
-        <SheetHeader className="shrink-0 space-y-0 border-b border-slate-100 bg-slate-50/60 px-5 py-3.5 text-left">
-          <div className="flex items-center justify-between">
-            <SheetTitle className="flex items-center gap-2 text-[15px] font-semibold text-slate-900">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#711419]/10"><PenSquare className="h-4 w-4 text-[#711419]" /></span>
-              New message
-            </SheetTitle>
-            <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200/60 hover:text-slate-800" title="Close" data-testid="compose-close">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </SheetHeader>
+    <div
+      className="fixed bottom-0 right-3 z-40 flex max-h-[86vh] w-[min(96vw,520px)] flex-col overflow-hidden rounded-t-xl border border-slate-200 bg-white shadow-2xl"
+      data-testid="compose-panel"
+    >
+      <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-800 px-4 py-2.5 text-white">
+        <span className="text-sm font-semibold">New message</span>
+        <button onClick={onClose} className="flex h-7 w-7 items-center justify-center rounded text-white/80 hover:bg-white/10 hover:text-white" title="Close" data-testid="compose-close">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
 
-        <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto">
-          <div className="flex items-start gap-3 px-5 py-2.5">
-            <label className="w-12 shrink-0 pt-1.5 text-sm text-slate-500">To</label>
-            <div className="min-w-0 flex-1"><RecipientField recipients={toR} onChange={setToR} testid="compose-to" /></div>
-            <div className="flex shrink-0 gap-2 pt-1.5 text-xs font-medium text-slate-400">
-              {!showCc && <button onClick={() => setShowCc(true)} className="hover:text-slate-700">Cc</button>}
-              {!showBcc && <button onClick={() => setShowBcc(true)} className="hover:text-slate-700">Bcc</button>}
-            </div>
+      <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto">
+        <div className="flex items-start gap-3 px-4 py-2.5">
+          <label className="w-12 shrink-0 pt-1.5 text-sm text-slate-500">To</label>
+          <div className="min-w-0 flex-1"><RecipientField recipients={toR} onChange={setToR} testid="compose-to" /></div>
+          <div className="flex shrink-0 gap-2 pt-1.5 text-xs font-medium text-slate-400">
+            {!showCc && <button onClick={() => setShowCc(true)} className="hover:text-slate-700">Cc</button>}
+            {!showBcc && <button onClick={() => setShowBcc(true)} className="hover:text-slate-700">Bcc</button>}
           </div>
-          {showCc && (
-            <div className="flex items-start gap-3 px-5 py-2.5">
-              <label className="w-12 shrink-0 pt-1.5 text-sm text-slate-500">Cc</label>
-              <div className="min-w-0 flex-1"><RecipientField recipients={ccR} onChange={setCcR} testid="compose-cc" /></div>
-              <button onClick={() => { setShowCc(false); setCcR([]); }} className="shrink-0 pt-1.5 text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
-            </div>
-          )}
-          {showBcc && (
-            <div className="flex items-start gap-3 px-5 py-2.5">
-              <label className="w-12 shrink-0 pt-1.5 text-sm text-slate-500">Bcc</label>
-              <div className="min-w-0 flex-1"><RecipientField recipients={bccR} onChange={setBccR} testid="compose-bcc" /></div>
-              <button onClick={() => { setShowBcc(false); setBccR([]); }} className="shrink-0 pt-1.5 text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
-            </div>
-          )}
-          <div className="flex items-center gap-3 px-5 py-2.5">
-            <label className="w-12 shrink-0 text-sm text-slate-500">Subject</label>
-            <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" className="flex-1 border-0 px-0 text-sm shadow-none focus-visible:ring-0" data-testid="compose-subject" />
-          </div>
-          <AutoTextarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); submit(); } }}
-            placeholder="Write your message…"
-            minHeight={280}
-            maxHeight={640}
-            className="resize-none overflow-y-auto rounded-none border-0 px-5 py-3 text-sm leading-relaxed shadow-none focus-visible:ring-0"
-            testid="compose-body"
-          />
-          {files.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 px-5 py-2.5">
-              {files.map((f, i) => (
-                <span key={i} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600">
-                  <FileTypeIcon name={f.filename} mime={f.mimeType} className="h-4 w-4" />
-                  <span className="max-w-[160px] truncate">{f.filename}</span>
-                  <span className="text-slate-400">{prettySize(f.size)}</span>
-                  <button onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))} className="text-slate-400 hover:text-red-600">
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
         </div>
+        {showCc && (
+          <div className="flex items-start gap-3 px-4 py-2.5">
+            <label className="w-12 shrink-0 pt-1.5 text-sm text-slate-500">Cc</label>
+            <div className="min-w-0 flex-1"><RecipientField recipients={ccR} onChange={setCcR} testid="compose-cc" /></div>
+            <button onClick={() => { setShowCc(false); setCcR([]); }} className="shrink-0 pt-1.5 text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
+          </div>
+        )}
+        {showBcc && (
+          <div className="flex items-start gap-3 px-4 py-2.5">
+            <label className="w-12 shrink-0 pt-1.5 text-sm text-slate-500">Bcc</label>
+            <div className="min-w-0 flex-1"><RecipientField recipients={bccR} onChange={setBccR} testid="compose-bcc" /></div>
+            <button onClick={() => { setShowBcc(false); setBccR([]); }} className="shrink-0 pt-1.5 text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
+          </div>
+        )}
+        <div className="flex items-center gap-3 px-4 py-2.5">
+          <label className="w-12 shrink-0 text-sm text-slate-500">Subject</label>
+          <Input value={subject} onChange={(e) => setSubject(e.target.value)} className="flex-1 border-0 px-0 text-sm shadow-none focus-visible:ring-0" data-testid="compose-subject" />
+        </div>
+        <AutoTextarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); submit(); } }}
+          placeholder="Write your message…"
+          minHeight={220}
+          maxHeight={520}
+          className="resize-none overflow-y-auto rounded-none border-0 px-4 py-3 text-sm leading-relaxed shadow-none focus-visible:ring-0"
+          testid="compose-body"
+        />
+        {files.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-4 py-2.5">
+            {files.map((f, i) => (
+              <span key={i} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600">
+                <FileTypeIcon name={f.filename} mime={f.mimeType} className="h-4 w-4" />
+                <span className="max-w-[160px] truncate">{f.filename}</span>
+                <span className="text-slate-400">{prettySize(f.size)}</span>
+                <button onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))} className="text-slate-400 hover:text-red-600">
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
 
-        <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50/60 px-5 py-3">
+      <div className="flex shrink-0 items-center justify-between border-t border-slate-100 px-4 py-2.5">
+        <div className="flex items-center gap-1">
           <input ref={fileInput} type="file" multiple className="hidden" onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} data-testid="compose-file-input" />
-          <button onClick={() => fileInput.current?.click()} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200/60 hover:text-slate-800" title="Attach files" data-testid="compose-attach">
+          <button onClick={() => fileInput.current?.click()} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800" title="Attach files" data-testid="compose-attach">
             <Paperclip className="h-4 w-4" />
           </button>
-          <div className="flex gap-2">
-            <Button variant="ghost" className="rounded-lg text-slate-600" onClick={onClose}>Discard</Button>
-            <Button className="rounded-lg bg-[#711419] px-5 hover:bg-[#8a1a1f]" disabled={sending} onClick={submit} data-testid="compose-send">
-              {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-              Send
-            </Button>
-          </div>
+          <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-red-600" title="Discard" data-testid="compose-discard">
+            <Trash2 className="h-4 w-4" />
+          </button>
         </div>
-      </SheetContent>
-    </Sheet>
+        <Button className="rounded-lg bg-[#711419] px-5 hover:bg-[#8a1a1f]" disabled={sending} onClick={submit} data-testid="compose-send">
+          {sending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+          Send
+        </Button>
+      </div>
+    </div>
   );
 }
 
