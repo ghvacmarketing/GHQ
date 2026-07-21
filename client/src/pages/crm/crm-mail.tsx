@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import {
-  Mail, Search, RefreshCw, PenSquare, Loader2, Inbox, Send, Paperclip, X,
+  Mail, Search, PenSquare, Loader2, Inbox, Send, Paperclip, X,
   CornerUpLeft, Link2, ArrowLeft, AlertTriangle,
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
@@ -130,17 +130,32 @@ export default function CrmMail() {
     if (!authLoading && !currentUser) navigate("/crm/login");
   }, [authLoading, currentUser, navigate]);
 
-  // Pull from Gmail once when the page opens while connected. The page otherwise
-  // only reads the local DB, and the server's background sync fails silently to
-  // the logs — so without this a broken sync just looks like an empty inbox.
-  const [didInitialSync, setDidInitialSync] = useState(false);
+  // Auto-sync: pull from Gmail every 10s while the page is open and connected.
+  // The page otherwise only reads the local DB. Runs silently — errors surface
+  // in the persistent banner instead of a toast so a 10s cadence isn't spammy.
   useEffect(() => {
-    if (connected && !didInitialSync) {
-      setDidInitialSync(true);
-      syncMutation.mutate();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connected, didInitialSync]);
+    if (!connected) return;
+    let cancelled = false;
+    let inFlight = false;
+    const doSync = async () => {
+      if (inFlight || document.hidden) return; // skip while a sync is running or tab is hidden
+      inFlight = true;
+      try {
+        const res = await apiRequest("POST", "/api/crm/mail/sync");
+        await res.json();
+        if (cancelled) return;
+        setSyncError(null);
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/mail/threads"] });
+      } catch (e: any) {
+        if (!cancelled) setSyncError(e?.message || "Sync failed");
+      } finally {
+        inFlight = false;
+      }
+    };
+    doSync(); // immediate first pull
+    const id = setInterval(doSync, 10000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [connected]);
 
   // Show a toast after returning from the OAuth connect flow
   useEffect(() => {
@@ -149,34 +164,12 @@ export default function CrmMail() {
       toast({ title: "Gmail connected", description: "Your inbox will sync in a moment." });
       window.history.replaceState({}, "", window.location.pathname);
       queryClient.invalidateQueries({ queryKey: ["/api/crm/gmail/status"] });
-      syncMutation.mutate();
     } else if (params.get("error")) {
       toast({ variant: "destructive", title: "Couldn't connect Gmail", description: params.get("error") || "" });
       window.history.replaceState({}, "", window.location.pathname);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const syncMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/crm/mail/sync");
-      return res.json();
-    },
-    onSuccess: (data: { threads?: number; connected?: boolean } | undefined) => {
-      setSyncError(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/mail/threads"] });
-      const n = data?.threads ?? 0;
-      toast({
-        title: n > 0 ? `Synced ${n} conversation${n === 1 ? "" : "s"}` : "Up to date",
-        description: n > 0 ? undefined : "Gmail returned no new inbox/sent messages from the last 90 days.",
-      });
-    },
-    onError: (e: any) => {
-      const msg = e?.message || "Sync failed";
-      setSyncError(msg);
-      toast({ variant: "destructive", title: "Sync failed", description: msg });
-    },
-  });
 
   const sendMutation = useMutation({
     mutationFn: async (payload: { to: string[]; cc?: string[]; bcc?: string[]; subject: string; html: string; threadRowId?: string }) =>
@@ -288,24 +281,14 @@ export default function CrmMail() {
                 <div className="truncate text-[11px] text-slate-400">{status?.gmailAddress}</div>
               </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => syncMutation.mutate()}
-                className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                title="Refresh"
-                data-testid="button-sync-mail"
-              >
-                <RefreshCw className={`h-[18px] w-[18px] ${syncMutation.isPending ? "animate-spin" : ""}`} />
-              </button>
-              <Button
-                size="sm"
-                className="h-9 rounded-xl bg-[#711419] px-3.5 shadow-sm hover:bg-[#8a1a1f]"
-                onClick={() => setComposeOpen(true)}
-                data-testid="button-compose"
-              >
-                <PenSquare className="mr-1.5 h-4 w-4" /> Compose
-              </Button>
-            </div>
+            <Button
+              size="sm"
+              className="h-9 rounded-xl bg-[#711419] px-3.5 shadow-sm hover:bg-[#8a1a1f]"
+              onClick={() => setComposeOpen(true)}
+              data-testid="button-compose"
+            >
+              <PenSquare className="mr-1.5 h-4 w-4" /> Compose
+            </Button>
           </div>
 
           {/* Search */}
@@ -376,21 +359,8 @@ export default function CrmMail() {
                 <Inbox className="mx-auto mb-3 h-9 w-9 text-slate-300" />
                 <p className="text-sm font-medium text-slate-500">Nothing here yet</p>
                 <p className="mt-1 text-xs text-slate-400">
-                  {search ? "No messages match your search." : "New messages will appear here after a sync."}
+                  {search ? "No messages match your search." : "New messages will appear here automatically."}
                 </p>
-                {!search && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-4 rounded-lg"
-                    onClick={() => syncMutation.mutate()}
-                    disabled={syncMutation.isPending}
-                    data-testid="button-sync-empty"
-                  >
-                    <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${syncMutation.isPending ? "animate-spin" : ""}`} />
-                    {syncMutation.isPending ? "Syncing…" : "Sync now"}
-                  </Button>
-                )}
               </div>
             ) : (
               <div className="p-2">
