@@ -605,7 +605,7 @@ export default function CrmMessaging() {
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[13px] font-semibold text-primary">
-                        {getInitials(name)}
+                        {/[a-zA-Z]/.test(name) ? getInitials(name) : (name.replace(/\D/g, "").slice(0, 2) || "#")}
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
