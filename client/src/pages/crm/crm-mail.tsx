@@ -11,8 +11,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet, SheetContent, SheetHeader, SheetTitle,
+} from "@/components/ui/sheet";
 import { format } from "date-fns";
 import {
   Mail, Search, PenSquare, Loader2, Inbox, Send, Paperclip, X, Plus,
@@ -871,15 +871,21 @@ function ComposeDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl gap-0 overflow-hidden rounded-2xl p-0">
-        <DialogHeader className="border-b border-slate-100 bg-slate-50/60 px-5 py-3.5">
-          <DialogTitle className="flex items-center gap-2 text-[15px] font-semibold text-slate-900">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#711419]/10"><PenSquare className="h-4 w-4 text-[#711419]" /></span>
-            New message
-          </DialogTitle>
-        </DialogHeader>
-        <div className="divide-y divide-slate-100">
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-lg [&>button]:hidden">
+        <SheetHeader className="shrink-0 space-y-0 border-b border-slate-100 bg-slate-50/60 px-5 py-3.5 text-left">
+          <div className="flex items-center justify-between">
+            <SheetTitle className="flex items-center gap-2 text-[15px] font-semibold text-slate-900">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#711419]/10"><PenSquare className="h-4 w-4 text-[#711419]" /></span>
+              New message
+            </SheetTitle>
+            <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200/60 hover:text-slate-800" title="Close" data-testid="compose-close">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </SheetHeader>
+
+        <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto">
           <div className="flex items-start gap-3 px-5 py-2.5">
             <label className="w-12 shrink-0 pt-1.5 text-sm text-slate-500">To</label>
             <div className="min-w-0 flex-1"><RecipientField recipients={toR} onChange={setToR} testid="compose-to" /></div>
@@ -911,8 +917,8 @@ function ComposeDialog({
             onChange={(e) => setBody(e.target.value)}
             onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); submit(); } }}
             placeholder="Write your message…"
-            minHeight={220}
-            maxHeight={420}
+            minHeight={280}
+            maxHeight={640}
             className="resize-none overflow-y-auto rounded-none border-0 px-5 py-3 text-sm leading-relaxed shadow-none focus-visible:ring-0"
             testid="compose-body"
           />
@@ -931,7 +937,8 @@ function ComposeDialog({
             </div>
           )}
         </div>
-        <DialogFooter className="flex items-center border-t border-slate-100 bg-slate-50/60 px-5 py-3 sm:justify-between">
+
+        <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50/60 px-5 py-3">
           <input ref={fileInput} type="file" multiple className="hidden" onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} data-testid="compose-file-input" />
           <button onClick={() => fileInput.current?.click()} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-200/60 hover:text-slate-800" title="Attach files" data-testid="compose-attach">
             <Paperclip className="h-4 w-4" />
@@ -943,9 +950,9 @@ function ComposeDialog({
               Send
             </Button>
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
