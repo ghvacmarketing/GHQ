@@ -621,8 +621,8 @@ export default function CrmChecklists() {
   };
 
   const onCanvasPointerDown = (e: React.PointerEvent) => {
-    const bg = e.target === worldRef.current || e.target === viewportRef.current;
-    if (!spaceHeld && !bg) return;
+    // Panning is Space-only — dragging empty background does nothing.
+    if (!spaceHeld) return;
     const vp = viewportRef.current!;
     dragRef.current = { kind: "pan", sx: e.clientX, sy: e.clientY, px: panRef.current.x, py: panRef.current.y };
     vp.setPointerCapture(e.pointerId);
