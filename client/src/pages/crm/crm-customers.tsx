@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { EmptyState } from "@/components/crm/ui-kit";
+import { QuickAddCustomerDialog } from "@/components/crm/quick-add-customer-dialog";
 import { format } from "date-fns";
 import type { CrmUser, CrmCustomer, CrmProject } from "@shared/schema";
 
@@ -87,6 +88,7 @@ export default function CrmCustomers() {
   }, []);
 
   const [searchInput, setSearchInput] = useState(initialSearch);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [customerType, setCustomerType] = useState("all");
   const [statusTab, setStatusTab] = useState("all");
   const [hasAgreement, setHasAgreement] = useState(false);
@@ -439,14 +441,18 @@ export default function CrmCustomers() {
           </div>
 
           <div className="shrink-0">
-            <Link href="/crm/accounts/new">
-              <Button size="sm" data-testid="button-create-customer">
-                <Plus className="h-4 w-4 mr-1" />
-                New Customer
-              </Button>
-            </Link>
+            <Button size="sm" onClick={() => setQuickAddOpen(true)} data-testid="button-create-customer">
+              <Plus className="h-4 w-4 mr-1" />
+              New Customer
+            </Button>
           </div>
         </div>
+
+        <QuickAddCustomerDialog
+          open={quickAddOpen}
+          onOpenChange={setQuickAddOpen}
+          onCreated={(customer) => navigate(`/crm/customers/${customer.id}`)}
+        />
 
         {/* Tabs styled like projects page - underline style */}
         <div className="flex overflow-x-auto overflow-y-hidden border-b border-slate-200 scrollbar-hide">

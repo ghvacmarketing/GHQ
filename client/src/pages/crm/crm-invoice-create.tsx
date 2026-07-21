@@ -54,6 +54,7 @@ import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { QuickAddCustomerDialog } from "@/components/crm/quick-add-customer-dialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import RichTextEditor from "@/components/rich-text-editor";
@@ -151,6 +152,7 @@ export default function CrmInvoiceCreate() {
   const [newWOCustomerSearch, setNewWOCustomerSearch] = useState("");
   const [newWOCustomerSearchOpen, setNewWOCustomerSearchOpen] = useState(false);
   const [newWOSelectedCustomer, setNewWOSelectedCustomer] = useState<CrmCustomer | null>(null);
+  const [woQuickAddOpen, setWoQuickAddOpen] = useState(false);
   const [newWOTitle, setNewWOTitle] = useState("");
   const [newWODescription, setNewWODescription] = useState("");
   const [newWOVisitType, setNewWOVisitType] = useState<"SERVICE" | "INSTALL" | "MAINTENANCE" | "SALES">("SERVICE");
@@ -1520,13 +1522,22 @@ export default function CrmInvoiceCreate() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[400px] p-0" align="start">
-                  <div className="p-2">
+                  <div className="flex items-center gap-2 p-2">
                     <Input
                       placeholder="Search customers..."
                       value={newWOCustomerSearch}
                       onChange={(e) => setNewWOCustomerSearch(e.target.value)}
                       data-testid="input-wo-customer-search"
                     />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 whitespace-nowrap"
+                      onClick={() => { setNewWOCustomerSearchOpen(false); setWoQuickAddOpen(true); }}
+                      data-testid="button-wo-new-customer"
+                    >
+                      <Plus className="mr-1 h-4 w-4" /> New
+                    </Button>
                   </div>
                   <div className="max-h-60 overflow-y-auto">
                     {isSearchingCustomers ? (
@@ -1569,6 +1580,14 @@ export default function CrmInvoiceCreate() {
                   </div>
                 </PopoverContent>
               </Popover>
+              <QuickAddCustomerDialog
+                open={woQuickAddOpen}
+                onOpenChange={setWoQuickAddOpen}
+                onCreated={(customer) => {
+                  setNewWOSelectedCustomer(customer as unknown as CrmCustomer);
+                  setNewWOSelectedPropertyId("");
+                }}
+              />
             </div>
 
             {newWOSelectedCustomer && (
