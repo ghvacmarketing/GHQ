@@ -91,6 +91,8 @@ import {
   sendEmail as gmailSendEmail,
   syncUser as gmailSyncUser,
   markThreadRead as gmailMarkThreadRead,
+  archiveThread as gmailArchiveThread,
+  trashThread as gmailTrashThread,
   getAttachmentBytes as gmailGetAttachmentBytes,
   disconnectGmail,
 } from "./services/gmailService";
@@ -5595,6 +5597,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ ok: true });
     } catch (e) {
       res.status(500).json({ message: "Failed to mark read" });
+    }
+  });
+
+  // POST /api/crm/mail/threads/:id/archive - remove the thread from the inbox
+  app.post("/api/crm/mail/threads/:id/archive", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!user.gmailRefreshTokenEnc) return res.status(400).json({ message: "Gmail not connected" });
+      await gmailArchiveThread(user, req.params.id);
+      res.json({ ok: true });
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (msg === "gmail_revoked") return res.status(401).json({ message: "Gmail access was revoked — please reconnect." });
+      console.error("mail/archive", e);
+      res.status(500).json({ message: `Failed to archive: ${msg}` });
+    }
+  });
+
+  // DELETE /api/crm/mail/threads/:id - move the thread to Gmail Trash
+  app.delete("/api/crm/mail/threads/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      if (!user.gmailRefreshTokenEnc) return res.status(400).json({ message: "Gmail not connected" });
+      await gmailTrashThread(user, req.params.id);
+      res.json({ ok: true });
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (msg === "gmail_revoked") return res.status(401).json({ message: "Gmail access was revoked — please reconnect." });
+      console.error("mail/trash", e);
+      res.status(500).json({ message: `Failed to delete: ${msg}` });
     }
   });
 

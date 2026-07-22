@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { format } from "date-fns";
 import {
-  Mail, Search, Loader2, Inbox, Send, Paperclip, X, Plus, Trash2,
+  Mail, Search, Loader2, Inbox, Send, Paperclip, X, Plus, Trash2, Archive,
   CornerUpLeft, Link2, ArrowLeft, AlertTriangle, Download,
   FileText, FileSpreadsheet, FileImage, FileArchive, FileAudio, FileVideo, File as FileIconLucide,
 } from "lucide-react";
@@ -290,6 +290,26 @@ export default function CrmMail() {
     onError: (e: any) => toast({ variant: "destructive", title: "Send failed", description: e?.message }),
   });
 
+  const archiveMutation = useMutation({
+    mutationFn: async (threadRowId: string) => apiRequest("POST", `/api/crm/mail/threads/${threadRowId}/archive`),
+    onSuccess: () => {
+      setSelectedId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/mail/threads"] });
+      toast({ title: "Archived" });
+    },
+    onError: (e: any) => toast({ variant: "destructive", title: "Archive failed", description: e?.message }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (threadRowId: string) => apiRequest("DELETE", `/api/crm/mail/threads/${threadRowId}`),
+    onSuccess: () => {
+      setSelectedId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/mail/threads"] });
+      toast({ title: "Moved to Trash" });
+    },
+    onError: (e: any) => toast({ variant: "destructive", title: "Delete failed", description: e?.message }),
+  });
+
   const openThread = (id: string) => {
     setSelectedId(id);
     setReplyHtml("");
@@ -545,6 +565,30 @@ export default function CrmMail() {
                       <Link2 className="h-3 w-3" /> {threadDetail.customer.name}
                     </button>
                   )}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    onClick={() => archiveMutation.mutate(threadDetail.thread.id)}
+                    disabled={archiveMutation.isPending || deleteMutation.isPending}
+                    className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+                    title="Archive"
+                    aria-label="Archive"
+                    data-testid="button-archive"
+                  >
+                    <Archive className="h-[18px] w-[18px]" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm("Move this conversation to Trash?")) deleteMutation.mutate(threadDetail.thread.id);
+                    }}
+                    disabled={archiveMutation.isPending || deleteMutation.isPending}
+                    className="rounded-lg p-2 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                    title="Delete"
+                    aria-label="Delete"
+                    data-testid="button-delete"
+                  >
+                    <Trash2 className="h-[18px] w-[18px]" />
+                  </button>
                 </div>
               </div>
 

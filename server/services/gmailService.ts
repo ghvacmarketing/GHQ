@@ -95,9 +95,18 @@ function parseAddressList(raw: string): { name: string; email: string }[] {
   return raw
     .split(",")
     .map((part) => {
-      const m = part.match(/^\s*(?:"?([^"<]*?)"?\s*)?<?([^<>\s]+@[^<>\s]+)>?\s*$/);
-      if (!m) return null;
-      return { name: (m[1] || "").trim(), email: m[2].trim().toLowerCase() };
+      const trimmed = part.trim();
+      if (!trimmed) return null;
+      // "Jane Doe <jane@x.com>" → name + address inside angle brackets.
+      const angle = trimmed.match(/^(.*?)<([^<>\s]+@[^<>\s]+)>\s*$/);
+      if (angle) {
+        const name = angle[1].trim().replace(/^"|"$/g, "").trim();
+        return { name, email: angle[2].trim().toLowerCase() };
+      }
+      // Bare address with no display name: "jane@x.com".
+      const bare = trimmed.match(/^([^<>\s]+@[^<>\s]+)$/);
+      if (bare) return { name: "", email: bare[1].toLowerCase() };
+      return null;
     })
     .filter((x): x is { name: string; email: string } => !!x && !!x.email);
 }
@@ -228,7 +237,15 @@ export async function syncThread(user: CrmUser, gmailThreadId: string): Promise<
       })
       .onConflictDoUpdate({
         target: [crmEmailMessages.userId, crmEmailMessages.gmailMessageId],
-        set: { isUnread },
+        // Refresh addresses too so rows synced before the parser fix self-heal.
+        set: {
+          isUnread,
+          fromEmail: from.email || null,
+          fromName: from.name || null,
+          toEmails: to.map((x) => x.email),
+          ccEmails: cc.map((x) => x.email),
+          bccEmails: bcc.map((x) => x.email),
+        },
       });
   }
 
@@ -364,6 +381,32 @@ export async function markThreadRead(user: CrmUser, threadRowId: string): Promis
   }
   await db.update(crmEmailMessages).set({ isUnread: false }).where(eq(crmEmailMessages.threadId, threadRowId));
   await db.update(crmEmailThreads).set({ isUnread: false }).where(eq(crmEmailThreads.id, threadRowId));
+}
+
+// Archive: remove the thread from the Gmail inbox (keeps it in All Mail).
+export async function archiveThread(user: CrmUser, threadRowId: string): Promise<void> {
+  const [thread] = await db
+    .select()
+    .from(crmEmailThreads)
+    .where(and(eq(crmEmailThreads.id, threadRowId), eq(crmEmailThreads.userId, user.id)));
+  if (!thread) throw new Error("thread_not_found");
+  await gmailFetch(user, `/threads/${thread.gmailThreadId}/modify`, {
+    method: "POST",
+    body: JSON.stringify({ removeLabelIds: ["INBOX"] }),
+  });
+  await db.update(crmEmailThreads).set({ inInbox: false, updatedAt: new Date() }).where(eq(crmEmailThreads.id, threadRowId));
+}
+
+// Delete: move the whole thread to Gmail Trash and drop it from the CRM.
+export async function trashThread(user: CrmUser, threadRowId: string): Promise<void> {
+  const [thread] = await db
+    .select()
+    .from(crmEmailThreads)
+    .where(and(eq(crmEmailThreads.id, threadRowId), eq(crmEmailThreads.userId, user.id)));
+  if (!thread) throw new Error("thread_not_found");
+  await gmailFetch(user, `/threads/${thread.gmailThreadId}/trash`, { method: "POST" });
+  // Cascade delete removes the messages via the FK relation.
+  await db.delete(crmEmailThreads).where(eq(crmEmailThreads.id, threadRowId));
 }
 
 // ── background sync ──────────────────────────────────────────────────────────
