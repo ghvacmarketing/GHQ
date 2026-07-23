@@ -477,6 +477,27 @@ input.rounded-full:focus {
   border-color: transparent !important;
 }
 
+/* Dark editor inputs (email template builder panels) */
+.dark-input {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f1f5f9;
+}
+.dark-input::placeholder {
+  color: rgba(241, 245, 249, 0.35);
+}
+.dark-input:focus,
+.dark-input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  background: rgba(255, 255, 255, 0.09);
+}
+select.dark-input option {
+  background: #1e293b;
+  color: #f1f5f9;
+}
+
 /* Minimal grey scrollbar — thin rounded thumb, invisible track */
 .scrollbar-minimal {
   scrollbar-width: thin;

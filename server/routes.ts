@@ -762,6 +762,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerReportingRoutes(app);
   const { registerPinCommentRoutes } = await import("./pin-comments-routes");
   registerPinCommentRoutes(app);
+  const { registerMarketingRoutes } = await import("./marketing-routes");
+  registerMarketingRoutes(app);
 
   // Register customer-portal account routes (password login, signup, profile)
   registerPortalAccountRoutes(app);

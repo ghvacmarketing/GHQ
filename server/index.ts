@@ -372,6 +372,44 @@ async function runDocsAndAccountingMigrations() {
     `);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS pin_comments_path_idx ON pin_comments(path)`);
     await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS mkt_templates (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        name text NOT NULL,
+        subject text,
+        design jsonb NOT NULL DEFAULT '{}'::jsonb,
+        html text,
+        created_by varchar,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS mkt_audiences (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        name text NOT NULL,
+        filters jsonb NOT NULL DEFAULT '[]'::jsonb,
+        created_by varchar,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS mkt_campaigns (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        name text NOT NULL,
+        template_id varchar,
+        audience_id varchar,
+        subject text,
+        status text NOT NULL DEFAULT 'draft',
+        scheduled_at timestamp,
+        sent_at timestamp,
+        recipient_count integer DEFAULT 0,
+        sent_count integer DEFAULT 0,
+        failed_count integer DEFAULT 0,
+        created_by varchar,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS report_saved (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
         name text NOT NULL,

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { MarketingChrome, MARKETING_TABS } from "@/components/marketing-shell";
+import { TemplatesTab, AudiencesTab, CampaignsTab } from "@/pages/marketing-tools";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -67,7 +68,17 @@ export default function MarketingApp() {
 
   return (
     <MarketingChrome currentUser={currentUser ?? undefined}>
-      {tab === "dashboard" || !known ? <MarketingDashboard /> : <PlaceholderTab tabKey={tab} />}
+      {tab === "templates" ? (
+        <TemplatesTab />
+      ) : tab === "audiences" ? (
+        <AudiencesTab />
+      ) : tab === "campaigns" ? (
+        <CampaignsTab />
+      ) : tab === "dashboard" || !known ? (
+        <MarketingDashboard />
+      ) : (
+        <PlaceholderTab tabKey={tab} />
+      )}
     </MarketingChrome>
   );
 }
