@@ -758,6 +758,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register Documents (company Drive) + Accounting app routes
   const { registerDocsAndAccountingRoutes } = await import("./docs-accounting-routes");
   registerDocsAndAccountingRoutes(app);
+  const { registerReportingRoutes } = await import("./reporting/routes");
+  registerReportingRoutes(app);
 
   // Register customer-portal account routes (password login, signup, profile)
   registerPortalAccountRoutes(app);

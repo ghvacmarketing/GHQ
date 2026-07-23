@@ -3,7 +3,7 @@ import { AppLoader } from "@/components/app-loader";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Monitor, Smartphone, FolderOpen, Calculator, Megaphone, Wrench, Loader2, ArrowUpRight,
+  Monitor, Smartphone, FolderOpen, Calculator, Megaphone, Wrench, Loader2, ArrowUpRight, BarChart3,
 } from "lucide-react";
 import { crmFetch } from "@/lib/crmAuth";
 import type { CrmUser } from "@shared/schema";
@@ -51,6 +51,14 @@ const APPS: AppTile[] = [
     description: "P&L, expenses & receivables",
     href: "/accounting",
     icon: <Calculator className="h-6 w-6" strokeWidth={1.75} />,
+    roles: ["owner", "admin", "supervisor"],
+  },
+  {
+    key: "reports",
+    label: "Reports",
+    description: "Company reporting & custom builder",
+    href: "/reports",
+    icon: <BarChart3 className="h-6 w-6" strokeWidth={1.75} />,
     roles: ["owner", "admin", "supervisor"],
   },
   {

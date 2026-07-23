@@ -99,6 +99,7 @@ const CrmMessaging = lazy(() => import("@/pages/crm/crm-messaging"));
 const CrmMail = lazy(() => import("@/pages/crm/crm-mail"));
 const DocumentsApp = lazy(() => import("@/pages/documents-app"));
 const AccountingApp = lazy(() => import("@/pages/accounting-app"));
+const ReportsApp = lazy(() => import("@/pages/reports-app"));
 const CrmNotifications = lazy(() => import("@/pages/crm/crm-notifications"));
 const CrmMyTasks = lazy(() => import("@/pages/crm/crm-my-tasks"));
 const CrmTaskBoard = lazy(() => import("@/pages/crm/crm-task-board"));
@@ -379,6 +380,7 @@ function Router() {
       <Route path="/crm/mail">{() => <ProtectedCrmWrapper><CrmMail /></ProtectedCrmWrapper>}</Route>
       <Route path="/documents" component={DocumentsApp} />
       <Route path="/accounting" component={AccountingApp} />
+      <Route path="/reports" component={ReportsApp} />
       <Route path="/marketing/automations/messages">{() => <ProtectedCrmWrapper><CrmAutomatedMessages /></ProtectedCrmWrapper>}</Route>
       <Route path="/marketing/automations/new">{() => <ProtectedCrmWrapper><CrmMarketingBuilder /></ProtectedCrmWrapper>}</Route>
       <Route path="/marketing/automations/edit/:id">{() => <ProtectedCrmWrapper><CrmMarketingBuilder /></ProtectedCrmWrapper>}</Route>

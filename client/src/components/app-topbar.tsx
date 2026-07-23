@@ -1,6 +1,6 @@
 import { useLocation } from "wouter";
 import {
-  Grip, Monitor, Smartphone, FolderOpen, Calculator, Megaphone, LayoutDashboard,
+  Grip, Monitor, Smartphone, FolderOpen, Calculator, Megaphone, LayoutDashboard, BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,6 +39,11 @@ export function AppTopBar({ currentUser, center }: { currentUser?: CrmUser | nul
           {["owner", "admin", "supervisor"].includes(role) && (
             <DropdownMenuItem onClick={() => navigate("/accounting")} data-testid="app-switch-accounting">
               <Calculator className="mr-2 h-4 w-4 text-slate-500" /> Accounting
+            </DropdownMenuItem>
+          )}
+          {["owner", "admin", "supervisor"].includes(role) && (
+            <DropdownMenuItem onClick={() => navigate("/reports")} data-testid="app-switch-reports">
+              <BarChart3 className="mr-2 h-4 w-4 text-slate-500" /> Reports
             </DropdownMenuItem>
           )}
           {["owner", "admin", "supervisor", "sales"].includes(role) && (

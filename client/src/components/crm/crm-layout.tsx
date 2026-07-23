@@ -528,6 +528,11 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
                   <AppAcctIcon className="mr-2 h-4 w-4 text-slate-500" /> Accounting
                 </DropdownMenuItem>
               )}
+              {["owner", "admin", "supervisor"].includes(currentUser?.role || "") && (
+                <DropdownMenuItem onClick={() => navigate("/reports")} data-testid="app-switch-reports">
+                  <BarChart3 className="mr-2 h-4 w-4 text-slate-500" /> Reports
+                </DropdownMenuItem>
+              )}
               {["owner", "admin", "supervisor", "sales"].includes(currentUser?.role || "") && (
                 <DropdownMenuItem onClick={() => navigate("/marketing")} data-testid="app-switch-marketing">
                   <AppMktIcon className="mr-2 h-4 w-4 text-slate-500" /> Marketing

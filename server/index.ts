@@ -353,6 +353,19 @@ async function runDocsAndAccountingMigrations() {
     await db.execute(sql`CREATE INDEX IF NOT EXISTS doc_files_folder_idx ON doc_files(folder_id)`);
     await db.execute(sql`ALTER TABLE doc_folders ADD COLUMN IF NOT EXISTS category text`);
     await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS report_saved (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        name text NOT NULL,
+        spec jsonb NOT NULL,
+        created_by varchar,
+        shared boolean NOT NULL DEFAULT false,
+        pinned boolean NOT NULL DEFAULT false,
+        schedule_email text,
+        schedule_frequency text,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS acct_accounts (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
         code text,
