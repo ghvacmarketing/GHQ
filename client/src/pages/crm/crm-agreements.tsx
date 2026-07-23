@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -149,6 +149,11 @@ export default function CrmAgreements() {
   const [activeTab, setActiveTab] = useState("all");
   const [page, setPage] = useState(1);
   const [selectedAgreement, setSelectedAgreement] = useState<CrmAgreement | null>(null);
+  // Keeps the detail dialog populated while its close animation plays —
+  // without this the content unmounts instantly and an empty sliver animates out.
+  const lastAgreementRef = useRef<CrmAgreement | null>(null);
+  if (selectedAgreement) lastAgreementRef.current = selectedAgreement;
+  const shownAgreement = selectedAgreement ?? lastAgreementRef.current;
   // Editable copy of an agreement (opens the edit dialog when non-null)
   const [editForm, setEditForm] = useState<null | {
     id: string; agreementPlan: string; price: string; numberOfSystems: number;
@@ -1242,21 +1247,21 @@ export default function CrmAgreements() {
           <DialogHeader>
             <DialogTitle>Agreement Details</DialogTitle>
             <DialogDescription>
-              {selectedAgreement?.agreementNumber}
+              {shownAgreement?.agreementNumber}
             </DialogDescription>
           </DialogHeader>
-          {selectedAgreement && (
+          {shownAgreement && (
             <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label className="text-slate-500 text-xs">Customer</Label>
-                      <p className="font-medium">{formatCustomerName(selectedAgreement.customerName)}</p>
+                      <p className="font-medium">{formatCustomerName(shownAgreement.customerName)}</p>
                     </div>
                     <div>
                       <Label className="text-slate-500 text-xs">Status</Label>
                       <div>
-                        <StatusDot pill={`border ${statusColors[selectedAgreement.status] || statusColors.active}`}>
-                          {statusLabels[selectedAgreement.status] || selectedAgreement.status}
+                        <StatusDot pill={`border ${statusColors[shownAgreement.status] || statusColors.active}`}>
+                          {statusLabels[shownAgreement.status] || shownAgreement.status}
                         </StatusDot>
                       </div>
                     </div>
@@ -1264,97 +1269,97 @@ export default function CrmAgreements() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label className="text-slate-500 text-xs">Agreement Plan</Label>
-                      <p className="font-medium">{selectedAgreement.agreementPlan}</p>
+                      <p className="font-medium">{shownAgreement.agreementPlan}</p>
                     </div>
                     <div>
                       <Label className="text-slate-500 text-xs">Address</Label>
-                      <p className="font-medium">{selectedAgreement.address || "—"}</p>
+                      <p className="font-medium">{shownAgreement.address || "—"}</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label className="text-slate-500 text-xs">Contract Date</Label>
-                      <p className="font-medium">{formatDate(selectedAgreement.contractDate)}</p>
+                      <p className="font-medium">{formatDate(shownAgreement.contractDate)}</p>
                     </div>
                     <div>
                       <Label className="text-slate-500 text-xs">Price</Label>
-                      <p className="font-medium">${selectedAgreement.price || "229.00"}</p>
+                      <p className="font-medium">${shownAgreement.price || "229.00"}</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label className="text-slate-500 text-xs">Billing Type</Label>
                       <p className="font-medium">
-                        {selectedAgreement.billingPreference === "pay_on_visit" ? "Pay Per Visit" : "Auto Invoice"}
+                        {shownAgreement.billingPreference === "pay_on_visit" ? "Pay Per Visit" : "Auto Invoice"}
                       </p>
                     </div>
                     <div>
                       <Label className="text-slate-500 text-xs">Region</Label>
                       <p className="font-medium">
-                        {selectedAgreement.regionId ? getSelectedRegion(selectedAgreement.regionId)?.name || "—" : "—"}
+                        {shownAgreement.regionId ? getSelectedRegion(shownAgreement.regionId)?.name || "—" : "—"}
                       </p>
-                      {selectedAgreement.regionId && getSelectedRegion(selectedAgreement.regionId) && (
+                      {shownAgreement.regionId && getSelectedRegion(shownAgreement.regionId) && (
                         <p className="text-xs text-slate-500">
-                          Reminders on the {getSelectedRegion(selectedAgreement.regionId)?.reminderDayOfMonth}{getSelectedRegion(selectedAgreement.regionId)?.reminderDayOfMonth === 1 ? 'st' : getSelectedRegion(selectedAgreement.regionId)?.reminderDayOfMonth === 2 ? 'nd' : getSelectedRegion(selectedAgreement.regionId)?.reminderDayOfMonth === 3 ? 'rd' : 'th'}
+                          Reminders on the {getSelectedRegion(shownAgreement.regionId)?.reminderDayOfMonth}{getSelectedRegion(shownAgreement.regionId)?.reminderDayOfMonth === 1 ? 'st' : getSelectedRegion(shownAgreement.regionId)?.reminderDayOfMonth === 2 ? 'nd' : getSelectedRegion(shownAgreement.regionId)?.reminderDayOfMonth === 3 ? 'rd' : 'th'}
                         </p>
                       )}
                     </div>
                     <div>
                       <Label className="text-slate-500 text-xs">First Appointment</Label>
-                      <p className="font-medium">{formatDate(selectedAgreement.appointmentDate)}</p>
+                      <p className="font-medium">{formatDate(shownAgreement.appointmentDate)}</p>
                     </div>
                   </div>
-                  {selectedAgreement.appointmentDate && (
+                  {shownAgreement.appointmentDate && (
                     <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
                       <p className="text-sm text-blue-700">
-                        <strong>Visit Schedule:</strong> First visit: {getVisitSummary(selectedAgreement.appointmentDate)?.firstVisit}, Second visit: {getVisitSummary(selectedAgreement.appointmentDate)?.secondVisit}
+                        <strong>Visit Schedule:</strong> First visit: {getVisitSummary(shownAgreement.appointmentDate)?.firstVisit}, Second visit: {getVisitSummary(shownAgreement.appointmentDate)?.secondVisit}
                       </p>
                     </div>
                   )}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label className="text-slate-500 text-xs">Next Service Date</Label>
-                      <p className="font-medium">{formatDate(selectedAgreement.nextServiceDate)}</p>
+                      <p className="font-medium">{formatDate(shownAgreement.nextServiceDate)}</p>
                     </div>
                     <div>
                       <Label className="text-slate-500 text-xs">Next Invoice Date</Label>
-                      <p className="font-medium">{formatDate(selectedAgreement.nextInvoiceDate)}</p>
+                      <p className="font-medium">{formatDate(shownAgreement.nextInvoiceDate)}</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label className="text-slate-500 text-xs">Start Date</Label>
-                      <p className="font-medium">{formatDate(selectedAgreement.startDate)}</p>
+                      <p className="font-medium">{formatDate(shownAgreement.startDate)}</p>
                     </div>
                     <div>
                       <Label className="text-slate-500 text-xs">End Date</Label>
-                      <p className="font-medium">{formatDate(selectedAgreement.endDate)}</p>
+                      <p className="font-medium">{formatDate(shownAgreement.endDate)}</p>
                     </div>
                   </div>
-                  {selectedAgreement.notes && (
+                  {shownAgreement.notes && (
                     <div>
                       <Label className="text-slate-500 text-xs">Notes</Label>
-                      <p className="text-sm">{selectedAgreement.notes}</p>
+                      <p className="text-sm">{shownAgreement.notes}</p>
                     </div>
                   )}
-                  {selectedAgreement.details && (
+                  {shownAgreement.details && (
                     <div>
                       <Label className="text-slate-500 text-xs">Agreement details (printed on document)</Label>
-                      <p className="whitespace-pre-wrap text-sm">{selectedAgreement.details}</p>
+                      <p className="whitespace-pre-wrap text-sm">{shownAgreement.details}</p>
                     </div>
                   )}
                   <div className="flex justify-end gap-2 pt-4 border-t">
                     {canSendInvoice &&
-                      selectedAgreement.billingPreference !== "pay_on_visit" &&
-                      ((selectedAgreement.status === "pending" && !shouldHideFirstInvoiceButton) || selectedAgreement.status === "active") && (
+                      shownAgreement.billingPreference !== "pay_on_visit" &&
+                      ((shownAgreement.status === "pending" && !shouldHideFirstInvoiceButton) || shownAgreement.status === "active") && (
                       <Button
                         size="sm"
                         onClick={() => {
-                          const msg = selectedAgreement.status === "pending"
-                            ? `Create and send first invoice to ${selectedAgreement.customerName} for $${selectedAgreement.price || "0"}?`
-                            : `Send a renewal invoice to ${selectedAgreement.customerName} for $${selectedAgreement.price || "0"}?`;
+                          const msg = shownAgreement.status === "pending"
+                            ? `Create and send first invoice to ${shownAgreement.customerName} for $${shownAgreement.price || "0"}?`
+                            : `Send a renewal invoice to ${shownAgreement.customerName} for $${shownAgreement.price || "0"}?`;
                           if (confirm(msg)) {
-                            sendInvoiceMutation.mutate(selectedAgreement.id);
+                            sendInvoiceMutation.mutate(shownAgreement.id);
                           }
                         }}
                         disabled={sendInvoiceMutation.isPending}
@@ -1362,7 +1367,7 @@ export default function CrmAgreements() {
                         className="bg-[#711419] hover:bg-[#8a1a1f]"
                       >
                         <FileCheck className="h-4 w-4 mr-1" />
-                        {sendInvoiceMutation.isPending ? "Sending..." : selectedAgreement.status === "pending" ? "Send First Invoice" : "Send Invoice"}
+                        {sendInvoiceMutation.isPending ? "Sending..." : shownAgreement.status === "pending" ? "Send First Invoice" : "Send Invoice"}
                       </Button>
                     )}
                     <DropdownMenu>
@@ -1373,7 +1378,7 @@ export default function CrmAgreements() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
-                          onClick={() => navigate(`/crm/agreements/${selectedAgreement.id}/print`)}
+                          onClick={() => navigate(`/crm/agreements/${shownAgreement.id}/print`)}
                           data-testid="button-print-agreement"
                         >
                           <Printer className="mr-2 h-4 w-4" /> Print
@@ -1381,19 +1386,19 @@ export default function CrmAgreements() {
                         <DropdownMenuItem
                           onClick={() =>
                             setEditForm({
-                              id: selectedAgreement.id,
-                              agreementPlan: selectedAgreement.agreementPlan || "",
-                              price: String(selectedAgreement.price ?? ""),
-                              numberOfSystems: selectedAgreement.numberOfSystems ?? 1,
-                              visitsPerPeriod: selectedAgreement.visitsPerPeriod ?? 2,
-                              startDate: selectedAgreement.startDate || "",
-                              endDate: selectedAgreement.endDate || "",
-                              contractDate: selectedAgreement.contractDate || "",
-                              autoRenew: !!selectedAgreement.autoRenew,
-                              billingPreference: selectedAgreement.billingPreference || "auto_invoice",
-                              status: selectedAgreement.status || "active",
-                              notes: selectedAgreement.notes || "",
-                              details: selectedAgreement.details || "",
+                              id: shownAgreement.id,
+                              agreementPlan: shownAgreement.agreementPlan || "",
+                              price: String(shownAgreement.price ?? ""),
+                              numberOfSystems: shownAgreement.numberOfSystems ?? 1,
+                              visitsPerPeriod: shownAgreement.visitsPerPeriod ?? 2,
+                              startDate: shownAgreement.startDate || "",
+                              endDate: shownAgreement.endDate || "",
+                              contractDate: shownAgreement.contractDate || "",
+                              autoRenew: !!shownAgreement.autoRenew,
+                              billingPreference: shownAgreement.billingPreference || "auto_invoice",
+                              status: shownAgreement.status || "active",
+                              notes: shownAgreement.notes || "",
+                              details: shownAgreement.details || "",
                             })
                           }
                           data-testid="button-edit-agreement"
@@ -1405,7 +1410,7 @@ export default function CrmAgreements() {
                           className="text-red-600 focus:text-red-600"
                           onClick={() => {
                             if (confirm("Are you sure you want to delete this agreement?")) {
-                              deleteAgreementMutation.mutate(selectedAgreement.id);
+                              deleteAgreementMutation.mutate(shownAgreement.id);
                             }
                           }}
                           disabled={deleteAgreementMutation.isPending}

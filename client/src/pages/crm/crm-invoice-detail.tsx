@@ -459,194 +459,263 @@ export default function CrmInvoiceDetail() {
     if (!invoice) return;
 
     try {
+      // Industrial-professional invoice: flat surfaces, hairline rules,
+      // letter-spaced caps labels, tabular figures — matches the app's style.
       const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 15;
-      const contentWidth = pageWidth - (margin * 2);
-      let y = margin;
+      const W = doc.internal.pageSize.getWidth();
+      const H = doc.internal.pageSize.getHeight();
+      const M = 18;
+      const CW = W - M * 2;
 
-      const brandColor: [number, number, number] = [113, 20, 25];
-      const textColor: [number, number, number] = [30, 41, 59];
-      const mutedColor: [number, number, number] = [100, 116, 139];
-      const lightBg: [number, number, number] = [248, 250, 252];
+      const INK: [number, number, number] = [15, 23, 42];
+      const SLATE: [number, number, number] = [100, 116, 139];
+      const FAINT: [number, number, number] = [148, 163, 184];
+      const HAIR: [number, number, number] = [217, 223, 231];
+      const MAROON: [number, number, number] = [113, 20, 25];
+      const GREEN: [number, number, number] = [21, 128, 61];
 
-      const addPageHeader = () => {
-        doc.setFillColor(...brandColor);
-        doc.roundedRect(margin, y, contentWidth, 28, 3, 3, 'F');
-        
-        doc.setFontSize(20);
+      const hairline = (yy: number, x1 = M, x2 = W - M) => {
+        doc.setDrawColor(...HAIR);
+        doc.setLineWidth(0.2);
+        doc.line(x1, yy, x2, yy);
+      };
+      const label = (text: string, x: number, yy: number, opts: { align?: "left" | "right" | "center" } = {}) => {
+        doc.setFontSize(6.5);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(255, 255, 255);
-        doc.text("Giesbrecht HVAC", margin + 8, y + 12);
-        
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(220, 220, 220);
-        doc.text("PO Box 917, Wrens, GA 30833", margin + 8, y + 20);
-
-        doc.setFontSize(9);
-        doc.text("(706) 826-0644", pageWidth - margin - 8, y + 10, { align: 'right' });
-        doc.text("chandler@ghvacinc.com", pageWidth - margin - 8, y + 15, { align: 'right' });
-        doc.text("www.ghvacinc.com", pageWidth - margin - 8, y + 20, { align: 'right' });
+        doc.setTextColor(...FAINT);
+        doc.text(text.toUpperCase(), x, yy, { charSpace: 0.7, ...opts });
       };
 
-      const checkPageBreak = (neededSpace: number) => {
-        if (y + neededSpace > pageHeight - 35) {
+      const totalNum = parseFloat(invoice.total || "0");
+      const balanceNum = parseFloat(invoice.balanceDue || "0");
+      const amountPaid = totalNum - balanceNum;
+      const isPaid = balanceNum <= 0 && totalNum > 0;
+
+      // Column geometry for the items table
+      const colAmountR = W - M;
+      const colUnitR = W - M - 30;
+      const colQtyC = W - M - 56;
+      const descW = CW - 68;
+
+      const topBar = () => {
+        doc.setFillColor(...MAROON);
+        doc.rect(0, 0, W, 2.5, "F");
+      };
+
+      const tableHeader = (yy: number): number => {
+        label("Description", M, yy);
+        label("Qty", colQtyC, yy, { align: "center" });
+        label("Unit", colUnitR, yy, { align: "right" });
+        label("Amount", colAmountR, yy, { align: "right" });
+        doc.setDrawColor(...INK);
+        doc.setLineWidth(0.5);
+        doc.line(M, yy + 2.5, W - M, yy + 2.5);
+        return yy + 8;
+      };
+
+      const continuationHeader = (): number => {
+        topBar();
+        const yy = 14;
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...INK);
+        doc.text("GIESBRECHT HVAC", M, yy, { charSpace: 0.5 });
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...SLATE);
+        doc.text(`INVOICE ${invoice.invoiceNumber || ""} — CONTINUED`, W - M, yy, { align: "right", charSpace: 0.5 });
+        hairline(yy + 4);
+        return yy + 12;
+      };
+
+      // ── Page 1 letterhead ──
+      topBar();
+      let y = 17;
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...INK);
+      doc.text("GIESBRECHT", M, y, { charSpace: 1.2 });
+      doc.setFontSize(7.5);
+      doc.setTextColor(...SLATE);
+      doc.text("HEATING & AIR", M, y + 5.5, { charSpace: 1.6 });
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...SLATE);
+      doc.text("PO Box 917, Wrens, GA 30833", W - M, y - 3, { align: "right" });
+      doc.text("(706) 826-0644  ·  chandler@ghvacinc.com", W - M, y + 1.5, { align: "right" });
+      doc.text("www.ghvac.app", W - M, y + 6, { align: "right" });
+
+      hairline(y + 11);
+      y += 24;
+
+      // ── Document title + meta ──
+      doc.setFontSize(21);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...INK);
+      doc.text("INVOICE", M, y, { charSpace: 2.2 });
+
+      const metaLabelX = W - M - 42;
+      const metaRow = (lab: string, val: string, yy: number) => {
+        label(lab, metaLabelX, yy);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...INK);
+        doc.text(val, W - M, yy, { align: "right" });
+      };
+      metaRow("Invoice", invoice.invoiceNumber || "", y - 10);
+      metaRow("Date", formatDate(invoice.createdAt), y - 4.5);
+      metaRow("Due", invoice.dueDate ? formatDate(invoice.dueDate) : "Upon receipt", y + 1);
+
+      y += 14;
+
+      // ── Billed to + balance at a glance ──
+      label("Billed To", M, y);
+      let by = y + 6;
+      doc.setFontSize(10.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...INK);
+      doc.text(invoice.customer?.name || "Customer", M, by);
+      by += 5;
+      doc.setFontSize(8.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...SLATE);
+      if (invoice.customer?.fullAddress) {
+        const addr = doc.splitTextToSize(String(invoice.customer.fullAddress), CW * 0.5);
+        addr.forEach((line: string) => { doc.text(line, M, by); by += 4.2; });
+      }
+      if (invoice.customer?.phone) { doc.text(String(invoice.customer.phone), M, by); by += 4.2; }
+      if (invoice.customer?.email) { doc.text(String(invoice.customer.email), M, by); by += 4.2; }
+
+      label(isPaid ? "Status" : "Balance Due", W - M, y, { align: "right" });
+      if (isPaid) {
+        doc.setFontSize(15);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...GREEN);
+        doc.text("PAID IN FULL", W - M, y + 8, { align: "right", charSpace: 0.8 });
+      } else {
+        doc.setFontSize(17);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...MAROON);
+        doc.text(formatCurrency(invoice.balanceDue), W - M, y + 8.5, { align: "right" });
+        if (invoice.dueDate) {
+          doc.setFontSize(7.5);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(...SLATE);
+          doc.text(`due ${formatDate(invoice.dueDate)}`, W - M, y + 13, { align: "right" });
+        }
+      }
+
+      y = Math.max(by, y + 18) + 8;
+
+      // ── Items ──
+      y = tableHeader(y);
+      const ensureSpace = (needed: number, repeatTable: boolean) => {
+        if (y + needed > H - 30) {
           doc.addPage();
-          y = margin;
-          addPageHeader();
-          y += 35;
+          y = continuationHeader();
+          if (repeatTable) y = tableHeader(y);
         }
       };
 
-      addPageHeader();
-      y += 35;
+      (invoice.lineItems || []).forEach((item) => {
+        doc.setFontSize(9);
+        const descLines = doc.splitTextToSize(item.description || "", descW);
+        const rowH = Math.max(7, descLines.length * 4 + 3.5);
+        ensureSpace(rowH + 2, true);
 
-      doc.setFontSize(24);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...brandColor);
-      doc.text("INVOICE", pageWidth - margin, y, { align: 'right' });
-      y += 12;
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...INK);
+        let ty = y + 4.5;
+        descLines.forEach((line: string) => { doc.text(line, M, ty); ty += 4; });
 
-      doc.setFillColor(...lightBg);
-      doc.roundedRect(pageWidth - margin - 70, y - 5, 70, 28, 2, 2, 'F');
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...mutedColor);
-      doc.text("Invoice #:", pageWidth - margin - 65, y + 3);
-      doc.text("Date:", pageWidth - margin - 65, y + 10);
-      doc.text("Due Date:", pageWidth - margin - 65, y + 17);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...textColor);
-      doc.text(invoice.invoiceNumber || "", pageWidth - margin - 5, y + 3, { align: 'right' });
-      doc.text(formatDate(invoice.createdAt), pageWidth - margin - 5, y + 10, { align: 'right' });
-      doc.text(invoice.dueDate ? formatDate(invoice.dueDate) : "Upon Receipt", pageWidth - margin - 5, y + 17, { align: 'right' });
+        doc.setTextColor(...SLATE);
+        doc.text(String(item.quantity || 1), colQtyC, y + 4.5, { align: "center" });
+        doc.text(formatCurrency(item.unitPrice), colUnitR, y + 4.5, { align: "right" });
+        doc.setTextColor(...INK);
+        doc.setFont("helvetica", "bold");
+        doc.text(formatCurrency(item.lineTotal), colAmountR, y + 4.5, { align: "right" });
 
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...textColor);
-      doc.text("Bill To:", margin, y);
-      y += 5;
-      doc.setFont("helvetica", "normal");
-      doc.text(invoice.customer?.name || "Customer", margin, y + 5);
-      if (invoice.customer?.phone) {
-        doc.text(String(invoice.customer.phone), margin, y + 10);
+        y += rowH;
+        hairline(y);
+      });
+
+      // ── Totals block (right-aligned column) ──
+      y += 8;
+      ensureSpace(46, false);
+      const tX = W - M - 74;
+      const totalsRow = (lab: string, val: string, opts: { bold?: boolean; muted?: boolean } = {}) => {
+        doc.setFontSize(opts.bold ? 10.5 : 9);
+        doc.setFont("helvetica", opts.bold ? "bold" : "normal");
+        doc.setTextColor(...(opts.muted ? SLATE : INK));
+        doc.text(lab, tX, y);
+        doc.text(val, W - M, y, { align: "right" });
+        y += 6;
+      };
+      totalsRow("Subtotal", formatCurrency(invoice.subtotal), { muted: true });
+      if (amountPaid > 0) totalsRow("Amount paid", formatCurrency(amountPaid), { muted: true });
+      doc.setDrawColor(...INK);
+      doc.setLineWidth(0.5);
+      doc.line(tX, y - 3, W - M, y - 3);
+      y += 1.5;
+      totalsRow("Total", formatCurrency(invoice.total), { bold: true });
+
+      y += 1;
+      if (isPaid) {
+        // Outlined stamp — quiet confirmation, no shouting
+        const stampW = 46;
+        doc.setDrawColor(...GREEN);
+        doc.setLineWidth(0.6);
+        doc.rect(W - M - stampW, y - 2, stampW, 9);
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...GREEN);
+        doc.text("PAID IN FULL", W - M - stampW / 2, y + 3.5, { align: "center", charSpace: 1 });
+        y += 13;
+      } else {
+        // Flat maroon band carries the number that matters
+        doc.setFillColor(...MAROON);
+        doc.rect(tX - 4, y - 2, W - M - tX + 4, 11, "F");
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.text("BALANCE DUE", tX, y + 4.5, { charSpace: 0.8 });
+        doc.setFontSize(11.5);
+        doc.text(formatCurrency(invoice.balanceDue), W - M - 3, y + 4.8, { align: "right" });
+        y += 17;
       }
-      if (invoice.customer?.email) {
-        doc.text(String(invoice.customer.email), margin, y + 15);
-      }
-      if (invoice.customer?.fullAddress) {
-        doc.text(invoice.customer.fullAddress, margin, y + 20);
-      }
-      y += 40;
 
-      const col1Width = contentWidth * 0.55;
-      const col2Width = contentWidth * 0.15;
-      const col3Width = contentWidth * 0.15;
-      const col4Width = contentWidth * 0.15;
-
-      doc.setFillColor(...brandColor);
-      doc.rect(margin, y, contentWidth, 10, 'F');
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(255, 255, 255);
-      doc.text("Description", margin + 3, y + 7);
-      doc.text("Qty", margin + col1Width + col2Width / 2, y + 7, { align: 'center' });
-      doc.text("Unit Price", margin + col1Width + col2Width + col3Width / 2, y + 7, { align: 'center' });
-      doc.text("Amount", margin + contentWidth - 3, y + 7, { align: 'right' });
-      y += 10;
-
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...textColor);
-      let rowIndex = 0;
-      
-      if (invoice.lineItems && invoice.lineItems.length > 0) {
-        invoice.lineItems.forEach((item) => {
-          const descLines = doc.splitTextToSize(item.description || "", col1Width - 6);
-          const rowHeight = Math.max(8, descLines.length * 4 + 4);
-          
-          checkPageBreak(rowHeight + 2);
-          if (rowIndex % 2 === 0) {
-            doc.setFillColor(...lightBg);
-            doc.rect(margin, y, contentWidth, rowHeight, 'F');
-          }
-          
-          doc.setFontSize(9);
-          let textY = y + 5;
-          descLines.forEach((line: string) => {
-            doc.text(line, margin + 3, textY);
-            textY += 4;
-          });
-          
-          doc.text(String(item.quantity || 1), margin + col1Width + col2Width / 2, y + 5, { align: 'center' });
-          doc.text(formatCurrency(item.unitPrice), margin + col1Width + col2Width + col3Width / 2, y + 5, { align: 'center' });
-          doc.text(formatCurrency(item.lineTotal), margin + contentWidth - 3, y + 5, { align: 'right' });
-          
-          y += rowHeight;
-          rowIndex++;
+      // ── Notes ──
+      if (invoice.notes && String(invoice.notes).trim()) {
+        ensureSpace(24, false);
+        label("Notes", M, y);
+        y += 5;
+        doc.setFontSize(8.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...SLATE);
+        const noteLines = doc.splitTextToSize(String(invoice.notes).trim(), CW * 0.7);
+        noteLines.forEach((line: string) => {
+          ensureSpace(5, false);
+          doc.text(line, M, y);
+          y += 4.2;
         });
       }
 
-      doc.setDrawColor(...brandColor);
-      doc.setLineWidth(0.5);
-      doc.line(margin, y, margin + contentWidth, y);
-      y += 8;
-
-      const totalsX = margin + contentWidth - 80;
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.text("Subtotal:", totalsX, y);
-      doc.text(formatCurrency(invoice.subtotal), margin + contentWidth - 3, y, { align: 'right' });
-      y += 6;
-
-      checkPageBreak(15);
-      doc.setFillColor(...brandColor);
-      doc.rect(totalsX - 5, y - 3, 85, 12, 'F');
-      doc.setFontSize(11);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(255, 255, 255);
-      doc.text("TOTAL:", totalsX, y + 5);
-      doc.text(formatCurrency(invoice.total), margin + contentWidth - 3, y + 5, { align: 'right' });
-      y += 18;
-      doc.setTextColor(...textColor);
-
-      const amountPaid = parseFloat(invoice.total || "0") - parseFloat(invoice.balanceDue || "0");
-      if (amountPaid > 0) {
-        doc.setFontSize(10);
+      // ── Footer on every page ──
+      const pages = doc.getNumberOfPages();
+      for (let p = 1; p <= pages; p++) {
+        doc.setPage(p);
+        hairline(H - 18);
+        doc.setFontSize(7);
         doc.setFont("helvetica", "normal");
-        doc.text("Amount Paid:", totalsX, y);
-        doc.text(formatCurrency(amountPaid), margin + contentWidth - 3, y, { align: 'right' });
-        y += 8;
+        doc.setTextColor(...SLATE);
+        doc.text("Giesbrecht Heating & Air  ·  (706) 826-0644  ·  www.ghvac.app", M, H - 13);
+        doc.setTextColor(...FAINT);
+        doc.text("Payment is due upon receipt unless otherwise specified. Thank you for your business.", M, H - 9);
+        doc.setTextColor(...SLATE);
+        doc.text(`Page ${p} of ${pages}`, W - M, H - 13, { align: "right" });
       }
 
-      const balanceDue = parseFloat(invoice.balanceDue || "0");
-      if (balanceDue > 0) {
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(220, 38, 38);
-        doc.text("Balance Due:", totalsX, y);
-        doc.text(formatCurrency(invoice.balanceDue), margin + contentWidth - 3, y, { align: 'right' });
-        y += 10;
-      } else {
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(22, 163, 74);
-        doc.text("PAID IN FULL", margin + contentWidth - 3, y, { align: 'right' });
-        y += 10;
-      }
-
-      const footerY = pageHeight - 20;
-      doc.setDrawColor(...brandColor);
-      doc.setLineWidth(0.5);
-      doc.line(margin, footerY - 5, pageWidth - margin, footerY - 5);
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "italic");
-      doc.setTextColor(...mutedColor);
-      doc.text("Thank you for your business!", pageWidth / 2, footerY, { align: 'center' });
-      doc.text("Payment is due upon receipt unless otherwise specified.", pageWidth / 2, footerY + 5, { align: 'center' });
-
-      const customerName = (invoice.customer?.name || "Customer").replace(/[^a-zA-Z0-9]/g, '_');
+      const customerName = (invoice.customer?.name || "Customer").replace(/[^a-zA-Z0-9]/g, "_");
       const fileName = `Invoice_${invoice.invoiceNumber}_${customerName}.pdf`;
       doc.save(fileName);
 
