@@ -116,11 +116,23 @@ export default function CrmAnalytics() {
       <div className="w-full space-y-5 pb-10">
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 shrink-0">
             <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Environment Monitoring</h1>
             <p className="mt-0.5 text-sm text-muted-foreground">Live humidity &amp; temperature from your Govee sensors.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="mx-auto">
+            <IndustrialTabs
+              testidPrefix="env-view"
+              activeKey={view}
+              onSelect={(k) => setView(k as typeof view)}
+              tabs={[
+                { key: "overview", label: "Overview" },
+                { key: "list", label: "List" },
+                { key: "card", label: "Card" },
+              ]}
+            />
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
             <span
               className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
               style={{ backgroundColor: `${status.color}15`, color: status.color }}
@@ -132,20 +144,6 @@ export default function CrmAnalytics() {
               Sync now
             </Button>
           </div>
-        </div>
-
-        {/* Overview | List | Card */}
-        <div className="flex justify-center">
-          <IndustrialTabs
-            testidPrefix="env-view"
-            activeKey={view}
-            onSelect={(k) => setView(k as typeof view)}
-            tabs={[
-              { key: "overview", label: "Overview" },
-              { key: "list", label: "List" },
-              { key: "card", label: "Card" },
-            ]}
-          />
         </div>
 
         {devicesData && !devicesData.configured && (

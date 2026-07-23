@@ -12459,7 +12459,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(customerFiles)
         .leftJoin(crmCustomers, eq(customerFiles.customerId, crmCustomers.id))
         .leftJoin(crmUsers, eq(customerFiles.uploadedBy, crmUsers.id))
-        .where(sql`${customerFiles.contentType} LIKE 'image/%'`)
+        // All file types — the Media page filters photos vs documents client-side
         .orderBy(desc(customerFiles.createdAt))
         .limit(500);
       res.json(rows);

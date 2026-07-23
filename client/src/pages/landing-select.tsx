@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { AppLoader } from "@/components/app-loader";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -85,9 +86,7 @@ export default function LandingSelect() {
 
   if (!ready || !isAuthenticated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f4f5f6]">
-        <Loader2 className="h-7 w-7 animate-spin text-[#711419]" />
-      </div>
+      <AppLoader />
     );
   }
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSmoothLoading } from "@/hooks/use-smooth-loading";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, startOfMonth, endOfMonth, subMonths, startOfQuarter, startOfYear } from "date-fns";
@@ -157,7 +158,8 @@ export default function AccountingApp() {
   const mtdRevenue = Number(summary?.revenueByMonth.find((r) => r.month === thisMonthKey)?.total ?? 0);
   const mtdExpenses = Number(summary?.expensesByMonth.find((r) => r.month === thisMonthKey)?.total ?? 0);
 
-  if (authLoading || !currentUser) {
+  const loaderHold = useSmoothLoading(authLoading, 0, 600);
+  if (loaderHold || !currentUser) {
     return (
       <AppLoader />
     );

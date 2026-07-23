@@ -204,28 +204,26 @@ export default function CrmEsign() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="w-full space-y-6">
-        <PageHeader
-          title="Signatures"
-          description="Upload a PDF, place fields, and send it for e-signature."
-          actions={
-            <Button onClick={() => setDialogOpen(true)} data-testid="button-new-document">
-              <Plus className="mr-2 h-4 w-4" /> New Document
-            </Button>
-          }
-        />
-
-        {/* Overview | List | Card */}
-        <div className="flex justify-center">
-          <IndustrialTabs
-            testidPrefix="esign-view"
-            activeKey={view}
-            onSelect={(k) => setView(k as typeof view)}
-            tabs={[
-              { key: "overview", label: "Overview" },
-              { key: "list", label: "List" },
-              { key: "card", label: "Card" },
-            ]}
-          />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-0 shrink-0">
+            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Signatures</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">Upload a PDF, place fields, and send it for e-signature.</p>
+          </div>
+          <div className="mx-auto">
+            <IndustrialTabs
+              testidPrefix="esign-view"
+              activeKey={view}
+              onSelect={(k) => setView(k as typeof view)}
+              tabs={[
+                { key: "overview", label: "Overview" },
+                { key: "list", label: "List" },
+                { key: "card", label: "Card" },
+              ]}
+            />
+          </div>
+          <Button onClick={() => setDialogOpen(true)} className="shrink-0" data-testid="button-new-document">
+            <Plus className="mr-2 h-4 w-4" /> New Document
+          </Button>
         </div>
 
         {/* Overview — section analytics */}

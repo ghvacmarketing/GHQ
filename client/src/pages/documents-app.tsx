@@ -315,7 +315,8 @@ export default function DocumentsApp() {
     }
   };
 
-  if (authLoading || !currentUser) {
+  const loaderHold = useSmoothLoading(authLoading, 0, 600);
+  if (loaderHold || !currentUser) {
     return (
       <AppLoader />
     );

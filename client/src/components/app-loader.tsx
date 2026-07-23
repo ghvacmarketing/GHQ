@@ -1,10 +1,14 @@
-/** Minimal app-switch loader: a blank canvas with the same thin maroon sweep
- *  bar the CRM uses for route transitions — no centered spinner. */
+import ghqLogo from "@assets/redlogo.webp";
+
+/** Between-app loader: the GHQ mark gently pulsing inside a spinning maroon
+ *  arc. Pages hold it on screen for a minimum beat (see useSmoothLoading with
+ *  appearAfterMs=0) so it reads as a deliberate transition, never a flash. */
 export function AppLoader() {
   return (
-    <div className="min-h-screen bg-[#f5f5f7]">
-      <div className="route-loader fixed inset-x-0 top-0 z-[100] h-0.5 overflow-hidden" data-testid="app-loader">
-        <div className="route-loader-bar h-full w-2/5 bg-[#711419]" />
+    <div className="flex min-h-screen items-center justify-center bg-[#f5f5f7]" data-testid="app-loader">
+      <div className="relative flex h-20 w-20 items-center justify-center">
+        <div className="absolute inset-0 animate-spin rounded-full border-2 border-slate-200 border-t-[#711419]" />
+        <img src={ghqLogo} alt="GHQ" className="app-loader-logo h-10 w-10 rounded-lg object-contain" />
       </div>
     </div>
   );

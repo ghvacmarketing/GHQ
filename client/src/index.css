@@ -218,6 +218,15 @@
   to { transform: translateX(360%); }
 }
 
+/* Between-app loader: GHQ mark breathing inside the spinning arc */
+.app-loader-logo {
+  animation: appLogoPulse 1.2s ease-in-out infinite;
+}
+@keyframes appLogoPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.08); opacity: 0.85; }
+}
+
 /* Subtle settle-in when a CRM section mounts */
 .crm-page-enter {
   animation: crmPageEnter 0.22s ease-out;

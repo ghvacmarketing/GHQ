@@ -3,11 +3,17 @@ import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSmoothLoading } from "@/hooks/use-smooth-loading";
 import { format, isAfter, isBefore, startOfDay, subDays } from "date-fns";
-import { User, ImageIcon, Download, Trash2, LayoutGrid, List, ZoomIn, ZoomOut, X, Check, Loader2 } from "lucide-react";
+import { User, ImageIcon, Download, Trash2, ZoomIn, ZoomOut, X, Check, Loader2, Filter, Upload, Search, FileText } from "lucide-react";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { IndustrialTabs } from "@/components/crm/industrial-tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -61,8 +67,10 @@ async function downloadPhoto(p: FeedPhoto) {
   }
 }
 
+const isImageFile = (p: FeedPhoto) => (p.contentType || "").startsWith("image/");
+
 export default function CrmPhotoGallery() {
-  usePageTitle("Photo Gallery");
+  usePageTitle("Media");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [lightbox, setLightbox] = useState<FeedPhoto | null>(null);
@@ -83,6 +91,14 @@ export default function CrmPhotoGallery() {
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [typeTab, setTypeTab] = useState<"all" | "photos" | "documents" | "checklist" | "recent">("all");
+  const [searchQ, setSearchQ] = useState("");
+
+  // Upload — pick a customer, then attach files to them
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [upCustomer, setUpCustomer] = useState<{ id: string; name: string } | null>(null);
+  const [upSearch, setUpSearch] = useState("");
+  const [upUploading, setUpUploading] = useState(false);
 
   const deletePhoto = useMutation({
     mutationFn: async (p: FeedPhoto) => {
@@ -97,6 +113,43 @@ export default function CrmPhotoGallery() {
     },
     onError: (e: any) => toast({ title: e?.message || "Couldn't delete the photo", variant: "destructive" }),
   });
+
+  const { data: upResults = [] } = useQuery<Array<{ id: string; name: string }>>({
+    queryKey: ["/api/crm/customers", "media-upload", upSearch],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/customers?search=${encodeURIComponent(upSearch.trim())}&limit=8`, { credentials: "include" });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.customers || []).map((c: any) => ({ id: c.id, name: c.name }));
+    },
+    enabled: uploadOpen && upSearch.trim().length >= 2,
+  });
+
+  const handleMediaUpload = async (list: FileList | null) => {
+    if (!list || list.length === 0 || !upCustomer) return;
+    setUpUploading(true);
+    try {
+      for (const file of Array.from(list)) {
+        const presignRes = await apiRequest("POST", "/api/uploads/request-url", {
+          name: file.name, size: file.size, contentType: file.type,
+        });
+        const { uploadURL, objectPath } = await presignRes.json();
+        await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+        const fileUrl = objectPath.startsWith("/objects") ? objectPath : `/objects/${objectPath}`;
+        await apiRequest("POST", `/api/crm/customers/${upCustomer.id}/files`, {
+          name: file.name, url: fileUrl, objectPath, contentType: file.type || "application/octet-stream", size: file.size,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/photos/feed"] });
+      toast({ title: `${list.length} file${list.length > 1 ? "s" : ""} uploaded to ${upCustomer.name}` });
+      setUploadOpen(false);
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Upload failed", variant: "destructive" });
+    } finally {
+      setUpUploading(false);
+    }
+  };
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -147,8 +200,26 @@ export default function CrmPhotoGallery() {
     if (from) list = list.filter((p) => p.createdAt && !isBefore(new Date(p.createdAt), from!));
     if (to) list = list.filter((p) => p.createdAt && !isAfter(new Date(p.createdAt), new Date(to!.getTime() + 24 * 60 * 60 * 1000 - 1)));
 
+    const isImg = (p: FeedPhoto) => (p.contentType || "").startsWith("image/");
+    if (typeTab === "photos") list = list.filter(isImg);
+    else if (typeTab === "documents") list = list.filter((p) => !isImg(p));
+    else if (typeTab === "checklist") list = list.filter((p) => isImg(p) && (/checklist/i.test(p.name) || /^WO-/.test(p.name)));
+    else if (typeTab === "recent") {
+      const cutoff = subDays(startOfDay(new Date()), 7);
+      list = list.filter((p) => p.createdAt && !isBefore(new Date(p.createdAt), cutoff));
+    }
+
+    const q = searchQ.trim().toLowerCase();
+    if (q) {
+      list = list.filter((p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.customerName || "").toLowerCase().includes(q) ||
+        (p.uploadedByName || "").toLowerCase().includes(q),
+      );
+    }
+
     return list;
-  }, [photos, customerFilter, userFilter, datePreset, dateFrom, dateTo]);
+  }, [photos, customerFilter, userFilter, datePreset, dateFrom, dateTo, typeTab, searchQ]);
 
   const filtersActive =
     customerFilter !== "all" || userFilter !== "all" || datePreset !== "all";
@@ -247,93 +318,64 @@ export default function CrmPhotoGallery() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">
-              Photo Gallery
-            </h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Every job-site photo as it comes in — refreshes automatically.
-            </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex min-w-0 shrink-0 items-center gap-3">
+            <div>
+              <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Media</h1>
+              <p className="mt-0.5 text-sm text-muted-foreground">Photos and files from the field — refreshes automatically.</p>
+            </div>
+            <span className="flex items-center gap-1.5 rounded-[4px] bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm" data-testid="media-live">
+              <span className="h-2 w-2 animate-pulse rounded-[2px] bg-green-500" />
+              Live
+            </span>
           </div>
-          <span className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
-            <span className="h-2 w-2 animate-pulse rounded-[2px] bg-green-500" />
-            Live
-          </span>
+          <div className="relative mx-auto w-full max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
+              placeholder="Search media…"
+              className="h-9 rounded-full border-transparent bg-white pl-9 text-sm shadow-sm"
+              data-testid="media-search"
+            />
+          </div>
+          <Button
+            size="sm"
+            className="ml-auto h-9 shrink-0 bg-[#711419] hover:bg-[#8a1a1f]"
+            onClick={() => { setUpCustomer(null); setUpSearch(""); setUploadOpen(true); }}
+            data-testid="media-upload"
+          >
+            <Upload className="mr-1.5 h-4 w-4" /> Upload
+          </Button>
         </div>
 
-        {/* Toolbar: filters on the left, size + view controls on the right */}
+        {/* Row 2: type + view tabs on the left, filters condensed into one icon on the right */}
         <div className="flex flex-wrap items-center gap-2" data-testid="gallery-toolbar">
-          <Select value={customerFilter} onValueChange={setCustomerFilter}>
-            <SelectTrigger className="h-9 w-[170px] bg-white text-sm" data-testid="filter-customer">
-              <SelectValue placeholder="Customer" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All customers</SelectItem>
-              {customerOptions.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={userFilter} onValueChange={setUserFilter}>
-            <SelectTrigger className="h-9 w-[150px] bg-white text-sm" data-testid="filter-user">
-              <SelectValue placeholder="Taken by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All users</SelectItem>
-              {userOptions.map((name) => (
-                <SelectItem key={name} value={name}>{name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={datePreset} onValueChange={(v) => setDatePreset(v as DatePreset)}>
-            <SelectTrigger className="h-9 w-[140px] bg-white text-sm" data-testid="filter-date">
-              <SelectValue placeholder="Date" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Any date</SelectItem>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="7d">Last 7 days</SelectItem>
-              <SelectItem value="30d">Last 30 days</SelectItem>
-              <SelectItem value="custom">Custom range…</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {datePreset === "custom" && (
-            <div className="flex items-center gap-1.5" data-testid="filter-date-range">
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="h-9 rounded-md border border-input bg-white px-2 text-sm"
-                aria-label="From date"
-              />
-              <span className="text-xs text-muted-foreground">to</span>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="h-9 rounded-md border border-input bg-white px-2 text-sm"
-                aria-label="To date"
-              />
-            </div>
-          )}
-
-          {filtersActive && (
-            <button
-              onClick={clearFilters}
-              className="flex h-9 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground hover:text-foreground"
-              data-testid="clear-filters"
-            >
-              <X className="h-3.5 w-3.5" /> Clear
-            </button>
-          )}
+          <IndustrialTabs
+            testidPrefix="media-type"
+            activeKey={typeTab}
+            onSelect={(k) => setTypeTab(k as typeof typeTab)}
+            tabs={[
+              { key: "all", label: "All" },
+              { key: "photos", label: "Photos" },
+              { key: "documents", label: "Documents" },
+              { key: "checklist", label: "Checklist Photos" },
+              { key: "recent", label: "Recent" },
+            ]}
+          />
+          <IndustrialTabs
+            testidPrefix="media-view"
+            activeKey={view}
+            onSelect={(k) => setView(k as typeof view)}
+            tabs={[
+              { key: "grid", label: "Grid" },
+              { key: "list", label: "List" },
+            ]}
+          />
 
           <div className="ml-auto flex items-center gap-2">
             <span className="text-xs text-muted-foreground" data-testid="photo-count">
-              {filtersActive && photos ? `${filtered.length} of ${photos.length}` : `${filtered.length}`} photos
+              {filtersActive && photos ? `${filtered.length} of ${photos.length}` : `${filtered.length}`} items
             </span>
 
             {view === "grid" && (
@@ -359,24 +401,85 @@ export default function CrmPhotoGallery() {
               </div>
             )}
 
-            <div className="flex items-center rounded-md border border-input bg-white">
-              <button
-                onClick={() => setView("grid")}
-                className={`flex h-9 w-9 items-center justify-center ${view === "grid" ? "bg-[#711419] text-white" : "text-slate-600 hover:text-foreground"} rounded-l-md`}
-                title="Grid view"
-                data-testid="view-grid"
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setView("list")}
-                className={`flex h-9 w-9 items-center justify-center border-l border-input ${view === "list" ? "bg-[#711419] text-white" : "text-slate-600 hover:text-foreground"} rounded-r-md`}
-                title="List view"
-                data-testid="view-list"
-              >
-                <List className="h-4 w-4" />
-              </button>
-            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className={`relative flex h-9 w-9 items-center justify-center rounded-md border ${
+                    filtersActive ? "border-[#711419] text-[#711419]" : "border-input bg-white text-slate-600 hover:text-foreground"
+                  }`}
+                  title="Filters"
+                  data-testid="media-filters"
+                >
+                  <Filter className="h-4 w-4" />
+                  {filtersActive && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-[2px] bg-[#711419]" />}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72 space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Filters</p>
+                <Select value={customerFilter} onValueChange={setCustomerFilter}>
+                  <SelectTrigger className="h-9 w-full bg-white text-sm" data-testid="filter-customer">
+                    <SelectValue placeholder="Customer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All customers</SelectItem>
+                    {customerOptions.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={userFilter} onValueChange={setUserFilter}>
+                  <SelectTrigger className="h-9 w-full bg-white text-sm" data-testid="filter-user">
+                    <SelectValue placeholder="Taken by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All users</SelectItem>
+                    {userOptions.map((name) => (
+                      <SelectItem key={name} value={name}>{name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={datePreset} onValueChange={(v) => setDatePreset(v as DatePreset)}>
+                  <SelectTrigger className="h-9 w-full bg-white text-sm" data-testid="filter-date">
+                    <SelectValue placeholder="Date" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Any date</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="7d">Last 7 days</SelectItem>
+                    <SelectItem value="30d">Last 30 days</SelectItem>
+                    <SelectItem value="custom">Custom range…</SelectItem>
+                  </SelectContent>
+                </Select>
+                {datePreset === "custom" && (
+                  <div className="flex items-center gap-1.5" data-testid="filter-date-range">
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      className="h-9 w-full rounded-md border border-input bg-white px-2 text-sm"
+                      aria-label="From date"
+                    />
+                    <span className="text-xs text-muted-foreground">to</span>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      className="h-9 w-full rounded-md border border-input bg-white px-2 text-sm"
+                      aria-label="To date"
+                    />
+                  </div>
+                )}
+                {filtersActive && (
+                  <button
+                    onClick={clearFilters}
+                    className="flex h-8 w-full items-center justify-center gap-1 rounded-md border border-slate-200 text-xs font-medium text-muted-foreground hover:text-foreground"
+                    data-testid="clear-filters"
+                  >
+                    <X className="h-3.5 w-3.5" /> Clear all filters
+                  </button>
+                )}
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
@@ -437,12 +540,21 @@ export default function CrmPhotoGallery() {
                 >
                   <Check className="h-3.5 w-3.5" />
                 </button>
-                <button onClick={() => (selectionActive ? toggleSelect(p.id) : setLightbox(p))} className="shrink-0 overflow-hidden rounded-lg">
-                  <img src={p.url} alt={p.name} loading="lazy" className="h-14 w-14 object-cover" />
+                <button
+                  onClick={() => (selectionActive ? toggleSelect(p.id) : isImageFile(p) ? setLightbox(p) : downloadPhoto(p))}
+                  className="shrink-0 overflow-hidden rounded-lg"
+                >
+                  {isImageFile(p) ? (
+                    <img src={p.url} alt={p.name} loading="lazy" className="h-14 w-14 object-cover" />
+                  ) : (
+                    <span className="flex h-14 w-14 items-center justify-center bg-slate-100">
+                      <FileText className="h-6 w-6 text-slate-400" />
+                    </span>
+                  )}
                 </button>
                 <div className="min-w-0 flex-1">
                   <button
-                    onClick={() => (selectionActive ? toggleSelect(p.id) : setLightbox(p))}
+                    onClick={() => (selectionActive ? toggleSelect(p.id) : isImageFile(p) ? setLightbox(p) : downloadPhoto(p))}
                     className="block max-w-full truncate text-left text-sm font-semibold text-foreground hover:underline"
                     title={p.name}
                   >
@@ -481,13 +593,25 @@ export default function CrmPhotoGallery() {
                 className={`group relative overflow-hidden rounded-lg border bg-card shadow-sm ${selected.has(p.id) ? "border-[#711419] ring-2 ring-[#711419]" : "border-border"}`}
                 data-testid={`feed-photo-${p.id}`}
               >
-                <button onClick={() => (selectionActive ? toggleSelect(p.id) : setLightbox(p))} className="block w-full overflow-hidden">
-                  <img
-                    src={p.url}
-                    alt={p.name}
-                    loading="lazy"
-                    className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-105"
-                  />
+                <button
+                  onClick={() => (selectionActive ? toggleSelect(p.id) : isImageFile(p) ? setLightbox(p) : downloadPhoto(p))}
+                  className="block w-full overflow-hidden"
+                >
+                  {isImageFile(p) ? (
+                    <img
+                      src={p.url}
+                      alt={p.name}
+                      loading="lazy"
+                      className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 bg-slate-50">
+                      <FileText className="h-10 w-10 text-slate-400" strokeWidth={1.5} />
+                      <span className="rounded-[3px] bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-500">
+                        {(p.name.split(".").pop() || "file").slice(0, 5)}
+                      </span>
+                    </div>
+                  )}
                 </button>
                 <button
                   onClick={() => toggleSelect(p.id)}
@@ -527,6 +651,57 @@ export default function CrmPhotoGallery() {
           </div>
         )}
       </div>
+
+      {/* Upload — pick a customer, then files */}
+      <Dialog open={uploadOpen} onOpenChange={(o) => !upUploading && setUploadOpen(o)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Upload media</DialogTitle></DialogHeader>
+          {upCustomer ? (
+            <div className="flex items-center justify-between rounded-[4px] border border-[#711419]/25 bg-[#711419]/[0.05] px-3 py-2">
+              <span className="text-sm font-medium text-slate-900">{upCustomer.name}</span>
+              <button onClick={() => setUpCustomer(null)} className="text-xs font-medium text-[#711419] hover:underline">Change</button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Input
+                autoFocus
+                value={upSearch}
+                onChange={(e) => setUpSearch(e.target.value)}
+                placeholder="Search customers…"
+                data-testid="upload-customer-search"
+              />
+              {upSearch.trim().length >= 2 && (
+                <div className="max-h-56 overflow-y-auto rounded-[4px] border border-slate-200">
+                  {upResults.length === 0 ? (
+                    <p className="px-3 py-4 text-center text-sm text-slate-400">No customers found.</p>
+                  ) : (
+                    upResults.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => setUpCustomer(c)}
+                        className="block w-full border-b border-slate-100 px-3 py-2 text-left text-sm last:border-0 hover:bg-slate-50"
+                        data-testid={`upload-customer-${c.id}`}
+                      >
+                        {c.name}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadOpen(false)} disabled={upUploading}>Cancel</Button>
+            <label className={upCustomer && !upUploading ? "" : "pointer-events-none opacity-50"}>
+              <input type="file" multiple className="hidden" onChange={(e) => handleMediaUpload(e.target.files)} data-testid="upload-files-input" />
+              <span className="inline-flex h-9 cursor-pointer items-center rounded-md bg-[#711419] px-4 text-sm font-medium text-white hover:bg-[#8a1a1f]">
+                {upUploading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Upload className="mr-1.5 h-4 w-4" />}
+                Choose files
+              </span>
+            </label>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Lightbox */}
       {lightbox && (

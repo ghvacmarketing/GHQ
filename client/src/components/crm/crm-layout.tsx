@@ -109,7 +109,7 @@ const navSections: NavSection[] = [
       { label: "Agreements", href: "/crm/agreements", icon: FileCheck },
       { label: "Quotes", href: "/crm/quotes", icon: FileText },
       { label: "Invoices", href: "/crm/invoices", icon: Receipt },
-      { label: "Photo Gallery", href: "/crm/photos", icon: Camera },
+      { label: "Media", href: "/crm/photos", icon: Camera },
     ],
   },
   {

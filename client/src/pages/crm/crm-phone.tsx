@@ -2950,7 +2950,10 @@ function CrmPhoneContent() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900" data-testid="crm-phone-page-title">Phone</h1>
+        <div>
+          <h1 className="font-display text-xl font-semibold tracking-tight text-foreground" data-testid="crm-phone-page-title">Phone</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">Call logs, voicemails, screening and the weather that drives them.</p>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -3024,7 +3027,7 @@ export default function CrmPhonePage() {
     <CrmLayout currentUser={currentUser} flush disableScroll>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <CommsSwitcher active="phone" />
-        <div className="px-4 pb-4 pt-1 lg:px-5 lg:pb-5">
+        <div className="px-4 pb-4 pt-0 lg:px-5 lg:pb-5">
           <CrmPhoneContent />
         </div>
       </div>
