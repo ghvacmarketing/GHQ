@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import pLimit from "p-limit";
-import { and, eq, gte, inArray } from "drizzle-orm";
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   goveeSensors,
@@ -153,10 +153,43 @@ class GoveeService {
     return { created, total: devices.length };
   }
 
+  // Budget guard: Govee's Platform API allows 10,000 requests/day. At 1-min
+  // polling, 6 state reads/min = 8,640/day — running device DISCOVERY on every
+  // poll too (+1,440/day) would blow the cap and kill polling until the daily
+  // reset. So discovery runs on every 10th poll only, and overlapping polls
+  // (interval + manual sync + initial run) are coalesced.
+  private pollInFlight = false;
+  private pollCount = 0;
+  private lastPurgeAt = 0;
+
   /** Poll every active sensor: store a reading, update cache, evaluate alerts. */
   async pollAll(): Promise<void> {
     if (!this.isConfigured()) return;
-    await this.syncDevices().catch((e) => console.error("[Govee] device sync error:", e));
+    if (this.pollInFlight) return;
+    this.pollInFlight = true;
+    try {
+      await this.pollAllInner();
+    } finally {
+      this.pollInFlight = false;
+    }
+  }
+
+  private async pollAllInner(): Promise<void> {
+    if (this.pollCount++ % 10 === 0) {
+      await this.syncDevices().catch((e) => console.error("[Govee] device sync error:", e));
+    }
+
+    // Once a day, trim raw readings older than 90 days (1-min cadence adds
+    // ~8.6k rows/day; the sensors page only charts recent history anyway).
+    if (Date.now() - this.lastPurgeAt > 24 * 60 * 60 * 1000) {
+      this.lastPurgeAt = Date.now();
+      db.execute(sql`DELETE FROM govee_sensor_readings WHERE recorded_at < now() - interval '90 days'`)
+        .then((r: any) => {
+          const n = Number(r?.rowCount ?? 0);
+          if (n > 0) console.log(`[Govee] Purged ${n} readings older than 90 days`);
+        })
+        .catch((e) => console.error("[Govee] readings purge failed:", e));
+    }
 
     const sensors = await db.select().from(goveeSensors).where(eq(goveeSensors.isActive, true));
     const limit = pLimit(2); // respect Govee rate limits
