@@ -12450,6 +12450,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/mobile/photos/feed - recent company-wide photo strip for the
+  // mobile app (tech-accessible; the /api/crm/photos/feed above is admin-only)
+  app.get("/api/mobile/photos/feed", requireCrmTechOrAbove, async (_req, res) => {
+    try {
+      const rows = await db.select({
+        id: customerFiles.id,
+        name: customerFiles.name,
+        url: customerFiles.url,
+        createdAt: customerFiles.createdAt,
+        customerId: customerFiles.customerId,
+        customerName: crmCustomers.name,
+        uploadedByName: crmUsers.name,
+      })
+        .from(customerFiles)
+        .leftJoin(crmCustomers, eq(customerFiles.customerId, crmCustomers.id))
+        .leftJoin(crmUsers, eq(customerFiles.uploadedBy, crmUsers.id))
+        .where(sql`${customerFiles.contentType} LIKE 'image/%'`)
+        .orderBy(desc(customerFiles.createdAt))
+        .limit(30);
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching mobile photo feed:", error);
+      res.status(500).json({ message: "Failed to load photo feed" });
+    }
+  });
+
   app.post("/api/crm/customers/:id/files", requireCrmAuth, async (req, res) => {
     try {
       const { name, url, objectPath, contentType, size } = req.body;

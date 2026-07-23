@@ -76,7 +76,7 @@ export default function CrmPhotoGallery() {
 
   // View controls
   const [view, setView] = useState<"grid" | "list">("grid");
-  const [size, setSize] = useState(1); // 0 = large … 2 = small
+  const [size, setSize] = useState(SMALLEST); // 0 = large … 2 = small (default: smallest)
   const [customerFilter, setCustomerFilter] = useState("all");
   const [userFilter, setUserFilter] = useState("all");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");

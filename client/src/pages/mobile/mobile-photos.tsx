@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Camera, Download, ImageIcon, ImagePlus, Loader2, MapPin, Search, Trash2, X } from "lucide-react";
@@ -18,14 +19,16 @@ type WorkOrderWithDetails = CrmWorkOrder & { customer?: CrmCustomer | null };
 
 export default function MobilePhotos() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   // A customer chosen via search (any customer, not just today's jobs). When
   // set, it overrides the job-based target.
   const [pickedCustomer, setPickedCustomer] = useState<{ id: string; name: string; phone?: string | null } | null>(null);
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchActive, setSearchActive] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -80,15 +83,38 @@ export default function MobilePhotos() {
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: searchOpen && customerSearch.trim().length >= 2,
+    enabled: searchActive && customerSearch.trim().length >= 2,
   });
 
   const chooseCustomer = (c: { id: string; name: string; phone?: string | null }) => {
     setPickedCustomer({ id: c.id, name: c.name, phone: c.phone ?? null });
     setSelectedJobId(null);
-    setSearchOpen(false);
+    setSearchActive(false);
     setCustomerSearch("");
+    searchInputRef.current?.blur();
   };
+  const cancelSearch = () => {
+    setSearchActive(false);
+    setCustomerSearch("");
+    searchInputRef.current?.blur();
+  };
+
+  // Recent company-wide photos for the horizontal gallery strip. Tapping one
+  // jumps to the customer it's attached to.
+  type FeedPhoto = {
+    id: string; url: string; name: string; createdAt: string | null;
+    customerId: string | null; customerName: string | null; uploadedByName: string | null;
+  };
+  const { data: recentPhotos = [] } = useQuery<FeedPhoto[]>({
+    queryKey: ["/api/mobile/photos/feed"],
+    queryFn: async () => {
+      const res = await fetch("/api/mobile/photos/feed", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!currentUser,
+    refetchInterval: 30 * 1000,
+  });
   const chooseJob = (jobId: string) => {
     setSelectedJobId(jobId);
     setPickedCustomer(null);
@@ -345,6 +371,77 @@ export default function MobilePhotos() {
           <p className="text-sm text-slate-500">Attach photos to any customer — search or pick a job.</p>
         </div>
 
+        {/* iOS-style search: minimal pill; Cancel slides in on focus and the
+            results panel eases in below while the page content steps aside */}
+        <div className="flex items-center">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              ref={searchInputRef}
+              value={customerSearch}
+              onChange={(e) => setCustomerSearch(e.target.value)}
+              onFocus={() => setSearchActive(true)}
+              placeholder="Search customers"
+              className="h-10 w-full rounded-full bg-slate-100 pl-9 pr-9 text-[16px] text-slate-900 outline-none transition-colors placeholder:text-slate-400 focus:bg-slate-200/60"
+              data-testid="input-customer-search"
+            />
+            {customerSearch && (
+              <button
+                onClick={() => { setCustomerSearch(""); searchInputRef.current?.focus(); }}
+                className="absolute right-2.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-slate-300 text-white"
+                aria-label="Clear search"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+          <button
+            onClick={cancelSearch}
+            className={`overflow-hidden whitespace-nowrap text-[15px] font-medium text-[#711419] transition-all duration-300 ease-out ${
+              searchActive ? "ml-3 max-w-[72px] opacity-100" : "ml-0 max-w-0 opacity-0"
+            }`}
+            data-testid="button-cancel-search"
+          >
+            Cancel
+          </button>
+        </div>
+
+        {/* Search results (only while searching) */}
+        {searchActive && (
+          <div className="animate-in fade-in slide-in-from-top-2 duration-300" data-testid="customer-search-results">
+            {customerSearch.trim().length < 2 ? (
+              <p className="py-8 text-center text-sm text-slate-400">Search any customer by name or phone.</p>
+            ) : searching ? (
+              <div className="flex items-center justify-center py-8 text-slate-400">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+            ) : searchResults.length === 0 ? (
+              <p className="py-8 text-center text-sm text-slate-400">No customers match &ldquo;{customerSearch.trim()}&rdquo;.</p>
+            ) : (
+              <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+                {searchResults.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => chooseCustomer(c)}
+                    className="flex w-full items-center gap-3 border-b border-slate-50 px-4 py-3 text-left last:border-0 active:bg-slate-50"
+                    data-testid={`search-customer-${c.id}`}
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#711419]/10 text-[13px] font-semibold text-[#711419]">
+                      {(c.name || "?").trim().charAt(0).toUpperCase()}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium text-slate-900">{c.name}</span>
+                      {c.phone && <span className="block truncate text-xs text-slate-500">{c.phone}</span>}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className={searchActive ? "hidden" : "contents"}>
+
         {/* Active target: the customer photos will be saved to */}
         {activeCustomer ? (
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#711419]/25 bg-[#711419]/[0.06] px-4 py-3" data-testid="photo-target">
@@ -354,23 +451,14 @@ export default function MobilePhotos() {
               {activeCustomer.phone && <p className="truncate text-xs text-slate-500">{activeCustomer.phone}</p>}
             </div>
             <button
-              onClick={() => { setCustomerSearch(""); setSearchOpen(true); }}
+              onClick={() => { setCustomerSearch(""); setSearchActive(true); setTimeout(() => searchInputRef.current?.focus(), 0); }}
               className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 active:scale-95"
               data-testid="button-change-customer"
             >
               Change
             </button>
           </div>
-        ) : (
-          <button
-            onClick={() => { setCustomerSearch(""); setSearchOpen(true); }}
-            className="flex w-full items-center gap-2 rounded-2xl border border-dashed border-slate-300 px-4 py-3.5 text-slate-500 active:scale-[0.99]"
-            data-testid="button-search-customer"
-          >
-            <Search className="h-5 w-5" />
-            Search a customer to attach photos
-          </button>
-        )}
+        ) : null}
 
         {/* Today's jobs — quick shortcuts */}
         {jobsLoading ? (
@@ -439,6 +527,35 @@ export default function MobilePhotos() {
           </>
         )}
 
+        {/* Recent photos across the company — tap to open who it's linked to */}
+        {recentPhotos.length > 0 && (
+          <div data-testid="recent-photos">
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Recent — all customers</p>
+            <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1">
+              {recentPhotos.map((rp) => (
+                <button
+                  key={rp.id}
+                  onClick={() => rp.customerId && navigate(`/mobile/customers/${rp.customerId}`)}
+                  className="w-32 shrink-0 snap-start text-left transition-transform active:scale-95"
+                  data-testid={`recent-photo-${rp.id}`}
+                >
+                  <img
+                    src={rp.url}
+                    alt={rp.name}
+                    loading="lazy"
+                    className="aspect-square w-32 rounded-2xl border border-slate-100 object-cover shadow-sm"
+                  />
+                  <p className="mt-1.5 truncate text-[12px] font-semibold text-slate-800">{rp.customerName || "No customer"}</p>
+                  <p className="truncate text-[11px] text-slate-400">
+                    {rp.uploadedByName || "Unknown"}
+                    {rp.createdAt ? ` · ${format(new Date(rp.createdAt), "MMM d")}` : ""}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Photo grid */}
         {customerId && (
           filesLoading ? (
@@ -485,6 +602,8 @@ export default function MobilePhotos() {
             </div>
           )
         )}
+
+        </div>
       </div>
 
       {/* iOS-style long-press preview: always mounted so the CSS transitions
@@ -624,65 +743,6 @@ export default function MobilePhotos() {
             >
               <span className="h-[58px] w-[58px] rounded-full bg-white" />
             </button>
-          </div>
-        </div>
-      )}
-      {/* Customer search overlay — attach photos to ANY customer */}
-      {searchOpen && (
-        <div className="fixed inset-0 z-[65] flex flex-col bg-white" data-testid="customer-search-overlay">
-          <div
-            className="flex items-center gap-2 border-b border-slate-100 p-3"
-            style={{ paddingTop: "calc(12px + env(safe-area-inset-top))" }}
-          >
-            <button
-              onClick={() => { setSearchOpen(false); setCustomerSearch(""); }}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 active:bg-slate-100"
-              aria-label="Close search"
-              data-testid="button-close-search"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                autoFocus
-                value={customerSearch}
-                onChange={(e) => setCustomerSearch(e.target.value)}
-                placeholder="Search customers by name or phone…"
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-[16px] outline-none focus:border-[#711419]/40"
-                data-testid="input-customer-search"
-              />
-            </div>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {customerSearch.trim().length < 2 ? (
-              <p className="px-4 py-10 text-center text-sm text-slate-400">Type at least 2 characters to search.</p>
-            ) : searching ? (
-              <div className="flex items-center justify-center py-10 text-slate-400">
-                <Loader2 className="h-5 w-5 animate-spin" />
-              </div>
-            ) : searchResults.length === 0 ? (
-              <p className="px-4 py-10 text-center text-sm text-slate-400">No customers match &ldquo;{customerSearch.trim()}&rdquo;.</p>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {searchResults.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => chooseCustomer(c)}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50"
-                    data-testid={`search-customer-${c.id}`}
-                  >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#711419]/10 text-[13px] font-semibold text-[#711419]">
-                      {(c.name || "?").trim().charAt(0).toUpperCase()}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium text-slate-900">{c.name}</span>
-                      {c.phone && <span className="block truncate text-xs text-slate-500">{c.phone}</span>}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       )}
