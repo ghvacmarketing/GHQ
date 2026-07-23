@@ -195,7 +195,7 @@ export function FilterBar({
             value={search ?? ""}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={placeholder}
-            className="pl-9"
+            className="h-9 rounded-full border-transparent bg-white pl-9 text-sm shadow-sm"
           />
         </div>
       )}

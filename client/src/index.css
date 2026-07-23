@@ -469,6 +469,14 @@ gmp-place-autocomplete::part(input)::placeholder {
   scrollbar-width: none;
 }
 
+/* House search pills: no focus ring/outline — the subtle bg shift is enough */
+input.rounded-full:focus-visible,
+input.rounded-full:focus {
+  outline: none !important;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05) !important;
+  border-color: transparent !important;
+}
+
 /* Minimal grey scrollbar — thin rounded thumb, invisible track */
 .scrollbar-minimal {
   scrollbar-width: thin;

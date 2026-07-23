@@ -483,7 +483,7 @@ export default function CrmAgreementCreate() {
                                 placeholder="Search customers by name, phone, or address..."
                                 value={customerSearch}
                                 onChange={(e) => setCustomerSearch(e.target.value)}
-                                className="pl-9 h-9"
+                                className="h-9 rounded-full border-transparent bg-white pl-9 text-sm shadow-sm"
                                 data-testid="input-customer-search"
                               />
                               {customersFetching && (

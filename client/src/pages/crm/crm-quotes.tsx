@@ -568,13 +568,13 @@ export default function CrmQuotes() {
             <p className="mt-0.5 text-sm text-muted-foreground">Create, send, and track customer quotes</p>
           </div>
 
-          <div className="relative w-full lg:flex-1 lg:max-w-sm lg:mx-auto">
+          <div className="relative w-full lg:flex-1 lg:max-w-md lg:mx-auto">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search quotes…"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-9 h-9"
+              className="h-9 rounded-full border-transparent bg-white pl-9 text-sm shadow-sm"
               data-testid="input-search"
             />
           </div>

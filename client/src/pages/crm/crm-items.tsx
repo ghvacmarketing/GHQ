@@ -378,7 +378,7 @@ export default function CrmItems() {
               placeholder="Search by name or description..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-10 h-10 text-sm bg-white border-slate-300 focus:border-[#711419] focus:ring-[#711419] rounded-lg"
+              className="h-9 rounded-full border-transparent bg-white pl-9 text-sm shadow-sm"
               data-testid="input-search"
             />
           </div>
