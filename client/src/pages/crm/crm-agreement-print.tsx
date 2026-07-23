@@ -110,7 +110,7 @@ export default function CrmAgreementPrint() {
             <p className="mt-1 text-[13px] text-slate-500">{agreement.agreementPlan}</p>
           </div>
           <div className="text-right text-[12px] text-slate-600">
-            <p><span className="font-semibold text-slate-900">Agreement №</span> {agreement.agreementNumber}</p>
+            <p><span className="font-semibold text-slate-900">Agreement</span> {agreement.agreementNumber}</p>
             <p><span className="font-semibold text-slate-900">Date</span> {fmtDate(agreement.contractDate || agreement.createdAt)}</p>
           </div>
         </div>
