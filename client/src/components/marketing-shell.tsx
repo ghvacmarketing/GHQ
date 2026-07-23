@@ -1,6 +1,6 @@
 import { useLocation } from "wouter";
 import {
-  ArrowLeft, Megaphone, LayoutDashboard, Send, Users, FileText, Zap,
+  LayoutDashboard, Send, Users, FileText, Zap,
   Compass, Blocks, BarChart3, Settings,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -50,23 +50,11 @@ export function MarketingChrome({
   const active = activeTabKey(location);
 
   return (
-    <div className="flex h-screen flex-col bg-[#f4f5f6]">
-      <header className="flex shrink-0 items-center gap-3 border-b border-black/[0.06] bg-white/85 px-4 py-2.5 backdrop-blur">
-        <button
-          onClick={() => navigate("/")}
-          className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-          title="Back to apps"
-          data-testid="button-back-apps"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <Megaphone className="h-5 w-5 text-[#711419]" strokeWidth={1.75} />
-        <span className="font-display text-[15px] font-semibold text-slate-900">Marketing</span>
-      </header>
-      <div className="flex min-h-0 flex-1">
-        {/* Sidebar — shared CRM-style dark collapsible panel */}
+    <div className="flex h-screen bg-[#f4f5f6]">
+        {/* Sidebar — shared CRM-style dark collapsible panel with branded header */}
         <AppSidebar
           appKey="mkt"
+          header={{ title: "Marketing", subtitle: "Command Center", onHome: () => navigate("/") }}
           activeKey={active}
           onSelect={(k) => {
             const t = MARKETING_TABS.find((x) => x.key === k);
@@ -91,7 +79,6 @@ export function MarketingChrome({
           </div>
           <div className="mx-auto w-full max-w-6xl">{children}</div>
         </main>
-      </div>
     </div>
   );
 }
