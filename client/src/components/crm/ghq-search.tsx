@@ -213,6 +213,12 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
         relatedTopics: data.relatedTopics,
       }]);
     },
+    onError: (e: any) => {
+      setConversationMessages(prev => [...prev, {
+        role: "assistant",
+        content: e?.message || "Something went wrong reaching the AI. Try again in a moment.",
+      }]);
+    },
   });
 
   const flatResults = useCallback(() => {

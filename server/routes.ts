@@ -2195,19 +2195,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Quick health probe for the AI stack — tells you exactly what's missing
+  app.get("/api/crm/ai/status", requireCrmAuth, async (_req, res) => {
+    const replitKey = !!process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+    const openaiKey = !!process.env.OPENAI_API_KEY;
+    res.json({
+      configured: replitKey || openaiKey,
+      source: replitKey ? "replit-proxy" : openaiKey ? "openai" : null,
+    });
+  });
+
   app.post("/api/crm/help", requireCrmAuth, async (req, res) => {
     try {
       const { question, conversationHistory } = req.body;
       if (!question || typeof question !== "string") {
         return res.status(400).json({ message: "Question is required" });
       }
-      
+      if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY && !process.env.OPENAI_API_KEY) {
+        return res.status(503).json({
+          message: "AI isn't configured on this server — add OPENAI_API_KEY in the Render environment and redeploy.",
+        });
+      }
+
       const { askCrmHelp } = await import("./services/crmHelpAI");
       const result = await askCrmHelp(question, Array.isArray(conversationHistory) ? conversationHistory : undefined);
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error in CRM help:", error);
-      res.status(500).json({ message: "Error processing help request" });
+      const detail = error?.message || error?.error?.message || "";
+      res.status(500).json({ message: `AI request failed${detail ? `: ${detail}` : ""}` });
     }
   });
 
