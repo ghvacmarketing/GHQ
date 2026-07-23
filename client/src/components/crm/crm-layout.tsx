@@ -655,7 +655,7 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
               topNavCollapsed ? "lg:pt-0" : "lg:pt-14"
             )}
           >
-            <div className={cn("flex-1 min-h-0 flex flex-col", !flush && "px-4 py-4 lg:px-5 lg:py-5")}>{children}</div>
+            <div className={cn("crm-page-enter flex-1 min-h-0 flex flex-col", !flush && "px-4 py-4 lg:px-5 lg:py-5")}>{children}</div>
           </div>
         ) : (
           <div
@@ -665,7 +665,7 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
               topNavCollapsed ? "lg:pt-0" : "lg:pt-14"
             )}
           >
-            <div className={cn("overflow-x-hidden", !flush && "px-4 py-4 lg:px-5 lg:py-5")}>{children}</div>
+            <div className={cn("crm-page-enter overflow-x-hidden", !flush && "px-4 py-4 lg:px-5 lg:py-5")}>{children}</div>
           </div>
         )}
       </main>

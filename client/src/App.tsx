@@ -222,13 +222,15 @@ function GlobalLoader() {
   );
 }
 
-// CRM inter-page loading placeholder. Kept intentionally quiet: a subtle,
-// fading spinner on the app background (no full-screen "Loading…" banner) so
-// navigating between pages feels like a smooth transition, not a page reload.
-// No visible loader when switching between CRM pages — chunks are cached after
-// first load, so a fallback just flashes. Render nothing for a seamless switch.
+// CRM inter-page loader: a thin maroon bar sweeping along the very top.
+// It fades in after ~80ms (see .route-loader), so cached-chunk switches that
+// suspend for a frame show nothing — only real loads get the subtle bar.
 function CrmLoader() {
-  return null;
+  return (
+    <div className="route-loader fixed inset-x-0 top-0 z-[100] h-0.5 overflow-hidden" data-testid="route-loader">
+      <div className="route-loader-bar h-full w-2/5 bg-[#711419]" />
+    </div>
+  );
 }
 
 // Wrapper for lazy-loaded CRM pages
