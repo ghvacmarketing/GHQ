@@ -7,6 +7,7 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { useSmoothLoading } from "@/hooks/use-smooth-loading";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { IndustrialTabs } from "@/components/crm/industrial-tabs";
+import { DatePickerField } from "@/components/crm/date-picker";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -159,14 +160,12 @@ export default function CrmTasksSimple() {
             </PopoverTrigger>
             <PopoverContent align="end" className="w-64 space-y-2.5">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Edit task</p>
-              <input
-                type="date"
-                defaultValue={t.dueAt ? format(new Date(t.dueAt), "yyyy-MM-dd") : ""}
-                onChange={(e) =>
-                  updateTask.mutate({ id: t.id, dueAt: e.target.value ? new Date(`${e.target.value}T09:00:00`).toISOString() : null })
+              <DatePickerField
+                value={t.dueAt ? format(new Date(t.dueAt), "yyyy-MM-dd") : ""}
+                onChange={(v) =>
+                  updateTask.mutate({ id: t.id, dueAt: v ? new Date(`${v}T09:00:00`).toISOString() : null })
                 }
-                className="h-9 w-full rounded-md border border-input bg-white px-2 text-sm"
-                aria-label="Due date"
+                placeholder="Due date"
               />
               <Select
                 value={t.assignedToUserId || ""}
@@ -227,13 +226,12 @@ export default function CrmTasksSimple() {
             className="h-8 flex-1 border-0 px-0 text-sm shadow-none focus-visible:ring-0"
             data-testid="task-add-input"
           />
-          <input
-            type="date"
+          <DatePickerField
             value={newDue}
-            onChange={(e) => setNewDue(e.target.value)}
-            className="h-8 shrink-0 rounded-md border border-input bg-white px-2 text-xs text-slate-600"
-            aria-label="Due date"
-            data-testid="task-add-due"
+            onChange={setNewDue}
+            placeholder="Due"
+            className="h-8 w-36 shrink-0 text-xs"
+            testid="task-add-due"
           />
           <Select value={newAssignee || currentUser.id} onValueChange={setNewAssignee}>
             <SelectTrigger className="h-8 w-32 shrink-0 text-xs" data-testid="task-add-assignee"><SelectValue /></SelectTrigger>

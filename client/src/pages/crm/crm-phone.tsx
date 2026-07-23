@@ -40,9 +40,11 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { GripVertical, Phone, Calendar, CalendarDays, Play, Pause, RefreshCw, ChevronDown, ChevronRight, Plus, Search, Edit2, Trash2, X, Check, Cloud, Sun, CloudRain, CloudSnow, Wind, AlertTriangle, BarChart3, ClipboardList, Send, MessageSquare } from "lucide-react";
+import { GripVertical, Phone, Calendar, CalendarDays, Filter, Play, Pause, RefreshCw, ChevronDown, ChevronRight, Plus, Search, Edit2, Trash2, X, Check, Cloud, Sun, CloudRain, CloudSnow, Wind, AlertTriangle, BarChart3, ClipboardList, Send, MessageSquare } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { DatePickerField } from "@/components/crm/date-picker";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CommentComposer } from "@/components/crm/comment-composer";
 import { CommentThread } from "@/components/crm/comment-thread";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
@@ -886,7 +888,7 @@ interface DateCardProps {
   hideHeader?: boolean;
 }
 
-function DateCard({ date, count, isExpanded, onToggle, highlightedLogId, entryRefs, cardRef, hideHeader = false }: DateCardProps) {
+function DateCard({ date, count, isExpanded, onToggle, highlightedLogId, entryRefs, cardRef, hideHeader = false, logFilter }: DateCardProps & { logFilter?: { tag: string; billableOnly: boolean } }) {
   const { toast } = useToast();
   const [editingLog, setEditingLog] = useState<CallLog | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -911,7 +913,11 @@ function DateCard({ date, count, isExpanded, onToggle, highlightedLogId, entryRe
   });
 
   const formattedDate = format(parseISO(date), "EEE, MMM d, yyyy");
-  const logs = dayData?.logs || [];
+  const logs = (dayData?.logs || []).filter((l) => {
+    if (logFilter?.billableOnly && !l.billable) return false;
+    if (logFilter?.tag && !(l.tag || "").toLowerCase().includes(logFilter.tag.toLowerCase())) return false;
+    return true;
+  });
 
   const handleEdit = (log: CallLog) => {
     setEditingLog(log);
@@ -1202,6 +1208,8 @@ function DailyCallLog() {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [highlightedLogId, setHighlightedLogId] = useState<string | null>(null);
   const [selectedPastDate, setSelectedPastDate] = useState<string | null>(null);
+  const [filterTag, setFilterTag] = useState("");
+  const [filterBillable, setFilterBillable] = useState(false);
   const [pendingScrollTarget, setPendingScrollTarget] = useState<{ date: string; logId: string } | null>(null);
   const entryRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -1359,9 +1367,9 @@ function DailyCallLog() {
   });
 
   return (
-    <div className="space-y-2">
-      <div className="relative">
-        <div className="relative">
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="relative mx-auto w-full max-w-xl">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             ref={searchInputRef}
@@ -1372,7 +1380,7 @@ function DailyCallLog() {
               setShowSearchResults(true);
             }}
             onFocus={() => setShowSearchResults(true)}
-            className="pl-9"
+            className="h-9 rounded-full border-transparent bg-white pl-9 text-sm shadow-sm"
             data-testid="crm-phone-input-search-calls"
           />
           {searchQuery && (
@@ -1388,10 +1396,9 @@ function DailyCallLog() {
               <X className="h-4 w-4" />
             </Button>
           )}
-        </div>
 
-        {showSearchResults && searchQuery.length >= 2 && (
-          <Card className="absolute z-20 w-full mt-1 max-h-64 overflow-auto">
+          {showSearchResults && searchQuery.length >= 2 && (
+          <Card className="absolute z-20 w-full mt-1 max-h-64 overflow-auto rounded-[4px]">
             <CardContent className="p-2">
               {isSearching ? (
                 <div className="text-center text-sm text-muted-foreground py-4">Searching...</div>
@@ -1424,7 +1431,69 @@ function DailyCallLog() {
               )}
             </CardContent>
           </Card>
-        )}
+          )}
+        </div>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-md border ${
+                filterTag || filterBillable || selectedPastDate
+                  ? "border-[#711419] text-[#711419]"
+                  : "border-input bg-white text-slate-600 hover:text-foreground"
+              }`}
+              title="Filters"
+              data-testid="call-log-filters"
+            >
+              <Filter className="h-4 w-4" />
+              {(filterTag || filterBillable || selectedPastDate) && (
+                <span className="absolute -right-1 -top-1 h-2 w-2 rounded-[2px] bg-[#711419]" />
+              )}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-72 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Filters</p>
+            <div>
+              <p className="mb-1 text-xs font-medium text-slate-500">Day</p>
+              <DatePickerField
+                value={selectedPastDate || todayDate}
+                max={todayDate}
+                clearable={false}
+                onChange={(v) => setSelectedPastDate(!v || v === todayDate ? null : v)}
+                testid="call-log-filter-day"
+              />
+              <p className="mt-1 text-[11px] text-slate-400">Pick any day — today shows by default.</p>
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium text-slate-500">Tag contains</p>
+              <Input
+                value={filterTag}
+                onChange={(e) => setFilterTag(e.target.value)}
+                placeholder="e.g. estimate, service"
+                className="h-9"
+                data-testid="call-log-filter-tag"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={filterBillable}
+                onChange={(e) => setFilterBillable(e.target.checked)}
+                className="h-4 w-4 accent-[#711419]"
+              />
+              Billable calls only
+            </label>
+            {(filterTag || filterBillable || selectedPastDate) && (
+              <button
+                onClick={() => { setFilterTag(""); setFilterBillable(false); setSelectedPastDate(null); }}
+                className="flex h-8 w-full items-center justify-center gap-1 rounded-md border border-slate-200 text-xs font-medium text-muted-foreground hover:text-foreground"
+                data-testid="call-log-clear-filters"
+              >
+                <X className="h-3.5 w-3.5" /> Clear all filters
+              </button>
+            )}
+          </PopoverContent>
+        </Popover>
       </div>
 
       {isDaysLoading ? (
@@ -1450,21 +1519,11 @@ function DailyCallLog() {
             const todayData = days.find(d => d.date === todayDate);
             if (todayData) {
               return (
-                <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-background shadow-sm" data-testid="crm-phone-today-card">
+                <Card className="rounded-[4px] border-slate-300/70 shadow-none" data-testid="crm-phone-today-card">
                   <CardHeader className="pb-2 pt-3 px-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Calendar className="h-4 w-4 text-primary" />
-                        </div>
-                        <div>
-                          <CardTitle className="text-base font-semibold">Today</CardTitle>
-                          <p className="text-xs text-muted-foreground">{formatLocal(new Date(), "EEEE, MMMM d")}</p>
-                        </div>
-                      </div>
-                      <Badge className="bg-primary/10 text-primary border-primary/20 text-sm">
-                        {todayData.count} {todayData.count === 1 ? "call" : "calls"}
-                      </Badge>
+                    <div>
+                      <CardTitle className="text-base font-semibold">Today</CardTitle>
+                      <p className="text-xs text-muted-foreground">{formatLocal(new Date(), "EEEE, MMMM d")}</p>
                     </div>
                   </CardHeader>
                   <CardContent className="px-4 pb-3">
@@ -1477,6 +1536,7 @@ function DailyCallLog() {
                       entryRefs={entryRefs}
                       cardRef={(el) => { cardRefs.current[todayDate] = el; }}
                       hideHeader={true}
+                      logFilter={{ tag: filterTag, billableOnly: filterBillable }}
                     />
                   </CardContent>
                 </Card>
@@ -1510,52 +1570,23 @@ function DailyCallLog() {
             
             return (
               <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Select 
-                    value={selectedPastDate || "none"} 
-                    onValueChange={(val) => setSelectedPastDate(val === "none" ? null : val)}
-                  >
-                    <SelectTrigger className="w-full" data-testid="crm-phone-select-past-date">
-                      <SelectValue placeholder="View previous days..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Select a previous day...</SelectItem>
-                      {pastDays.map((day) => (
-                        <SelectItem key={day.date} value={day.date}>
-                          <div className="flex items-center justify-between w-full gap-4">
-                            <span>{format(parseISO(day.date), "EEE, MMM d, yyyy")}</span>
-                            <Badge variant="secondary" className="text-xs">{day.count}</Badge>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {activePastDate && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setSelectedPastDate(null);
-                        setPendingScrollTarget(null);
-                      }}
-                      className="flex-shrink-0"
-                      data-testid="crm-phone-button-clear-selection"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-
                 {activePastDate && (
-                  <Card className="bg-muted/20" data-testid={`crm-phone-past-day-card-${activePastDate}`}>
+                  <Card className="rounded-[4px] border-slate-300/70 shadow-none" data-testid={`crm-phone-past-day-card-${activePastDate}`}>
                     <CardHeader className="pb-2 pt-3 px-4">
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-medium">
+                        <CardTitle className="text-sm font-semibold">
                           {format(parseISO(activePastDate), "EEEE, MMMM d, yyyy")}
                         </CardTitle>
-                        <Badge variant="outline" className="text-xs">
-                          {days.find(d => d.date === activePastDate)?.count || 0} calls
-                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => { setSelectedPastDate(null); setPendingScrollTarget(null); }}
+                          data-testid="crm-phone-button-clear-selection"
+                          aria-label="Back to today"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
                     </CardHeader>
                     <CardContent className="px-4 pb-3">
@@ -1564,6 +1595,7 @@ function DailyCallLog() {
                         count={days.find(d => d.date === activePastDate)?.count || 0}
                         isExpanded={true}
                         onToggle={() => {}}
+                        logFilter={{ tag: filterTag, billableOnly: filterBillable }}
                         highlightedLogId={highlightedLogId}
                         entryRefs={entryRefs}
                         cardRef={(el) => { cardRefs.current[activePastDate] = el; }}

@@ -44,6 +44,9 @@ function pinViewportPos(pin: Pin): { x: number; y: number } | null {
         return { x: r.left + pin.x_pct * r.width, y: r.top + pin.y_pct * r.height };
       }
     }
+    // Anchored pin whose anchor isn't mounted (e.g. a different subtab is
+    // open) — hide it rather than falling back to page coordinates.
+    return null;
   }
   if (pin.abs_x || pin.abs_y) {
     return { x: pin.abs_x - window.scrollX, y: pin.abs_y - window.scrollY };

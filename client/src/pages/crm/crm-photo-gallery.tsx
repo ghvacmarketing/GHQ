@@ -10,6 +10,7 @@ import { CrmLayout } from "@/components/crm/crm-layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { IndustrialTabs } from "@/components/crm/industrial-tabs";
+import { DatePickerField } from "@/components/crm/date-picker";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
@@ -451,22 +452,9 @@ export default function CrmPhotoGallery() {
                   </SelectContent>
                 </Select>
                 {datePreset === "custom" && (
-                  <div className="flex items-center gap-1.5" data-testid="filter-date-range">
-                    <input
-                      type="date"
-                      value={dateFrom}
-                      onChange={(e) => setDateFrom(e.target.value)}
-                      className="h-9 w-full rounded-md border border-input bg-white px-2 text-sm"
-                      aria-label="From date"
-                    />
-                    <span className="text-xs text-muted-foreground">to</span>
-                    <input
-                      type="date"
-                      value={dateTo}
-                      onChange={(e) => setDateTo(e.target.value)}
-                      className="h-9 w-full rounded-md border border-input bg-white px-2 text-sm"
-                      aria-label="To date"
-                    />
+                  <div className="space-y-1.5" data-testid="filter-date-range">
+                    <DatePickerField value={dateFrom} onChange={setDateFrom} placeholder="From" />
+                    <DatePickerField value={dateTo} onChange={setDateTo} placeholder="To" />
                   </div>
                 )}
                 {filtersActive && (
