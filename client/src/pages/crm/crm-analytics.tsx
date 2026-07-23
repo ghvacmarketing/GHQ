@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { IndustrialTabs } from "@/components/crm/industrial-tabs";
 import type { CrmUser } from "@shared/schema";
 import {
   SensorCard, SensorTrendChart, RiskBadge, AlertsList, SensorMappingDialog,
@@ -47,6 +49,7 @@ const SEGMENTS = [
 export default function CrmAnalytics() {
   const { toast } = useToast();
   const [detail, setDetail] = useState<SensorView | null>(null);
+  const [view, setView] = useState<"overview" | "list" | "card">("overview");
   const [mapping, setMapping] = useState<SensorView | null>(null);
 
   const { data: currentUser } = useQuery<CrmUser>({ queryKey: ["/api/crm/auth/me"] });
@@ -131,6 +134,20 @@ export default function CrmAnalytics() {
           </div>
         </div>
 
+        {/* Overview | List | Card */}
+        <div className="flex justify-center">
+          <IndustrialTabs
+            testidPrefix="env-view"
+            activeKey={view}
+            onSelect={(k) => setView(k as typeof view)}
+            tabs={[
+              { key: "overview", label: "Overview" },
+              { key: "list", label: "List" },
+              { key: "card", label: "Card" },
+            ]}
+          />
+        </div>
+
         {devicesData && !devicesData.configured && (
           <Card className="border-amber-200 bg-amber-50">
             <CardContent className="p-4 text-sm text-amber-800">
@@ -140,7 +157,7 @@ export default function CrmAnalytics() {
         )}
 
         {/* System-health hero */}
-        {summary && summary.total > 0 && (
+        {view === "overview" && summary && summary.total > 0 && (
           <Card className="overflow-hidden rounded-lg">
             <CardContent className="p-5">
               <div className="flex items-end justify-between gap-3">
@@ -178,7 +195,7 @@ export default function CrmAnalytics() {
         )}
 
         {/* Open alerts — prominent when present */}
-        {alerts.length > 0 && (
+        {view === "overview" && alerts.length > 0 && (
           <Card className="rounded-lg border-red-200">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base text-red-700">
@@ -191,8 +208,35 @@ export default function CrmAnalytics() {
           </Card>
         )}
 
-        {/* Sensors — the main event */}
-        {sensorsLoading ? (
+        {/* Manage devices */}
+        {view === "overview" && sensors.length > 0 && (
+          <Card className="rounded-lg">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Settings2 className="h-4 w-4 text-muted-foreground" /> Manage devices
+                {unmappedDevices.length > 0 && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                    {unmappedDevices.length} unmapped
+                  </span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {sensors.map((s) => (
+                <div key={s.id} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm">
+                  <span className="truncate">
+                    {s.label || s.deviceName}
+                    {!s.customerId && <span className="ml-1 text-[10px] font-medium text-amber-600">unmapped</span>}
+                  </span>
+                  <Button size="sm" variant="ghost" className="h-7 shrink-0 text-xs" onClick={() => setMapping(s)}>Map</Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Sensors — the data (list or card view) */}
+        {view !== "overview" && (sensorsLoading ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {[0, 1].map((i) => <div key={i} className="h-64 animate-pulse rounded-lg bg-muted" />)}
           </div>
@@ -255,43 +299,44 @@ export default function CrmAnalytics() {
                       {g.sensors.length} sensor{g.sensors.length > 1 ? "s" : ""}
                     </span>
                   </div>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {g.sensors.map((s) => (
-                      <SensorCard key={s.id} sensor={s} onClick={() => setDetail(s)} />
-                    ))}
-                  </div>
+                  {view === "card" ? (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                      {g.sensors.map((s) => (
+                        <SensorCard key={s.id} sensor={s} onClick={() => setDetail(s)} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+                      {g.sensors.map((s) => (
+                        <button
+                          key={s.id}
+                          onClick={() => setDetail(s)}
+                          className="flex w-full items-center gap-3 border-b border-slate-100 px-3 py-2.5 text-left last:border-0 hover:bg-slate-50"
+                          data-testid={`sensor-row-${s.id}`}
+                        >
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                            {s.label || s.deviceName || "Unnamed sensor"}
+                          </span>
+                          <span className="w-16 shrink-0 text-right text-sm tabular-nums text-slate-600">
+                            {s.humidity != null ? `${Math.round(s.humidity)}%` : "—"}
+                          </span>
+                          <span className="w-16 shrink-0 text-right text-sm tabular-nums text-slate-600">
+                            {s.temperatureF != null ? `${Math.round(s.temperatureF)}°F` : "—"}
+                          </span>
+                          <span className="hidden w-28 shrink-0 text-right text-xs text-slate-400 sm:block">
+                            {s.lastReadingAt ? format(new Date(s.lastReadingAt), "MMM d, h:mm a") : "—"}
+                          </span>
+                          <RiskBadge risk={s.risk} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
 
-            {/* Manage devices */}
-            {sensors.length > 0 && (
-              <Card className="rounded-lg">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-sm">
-                    <Settings2 className="h-4 w-4 text-muted-foreground" /> Manage devices
-                    {unmappedDevices.length > 0 && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-                        {unmappedDevices.length} unmapped
-                      </span>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {sensors.map((s) => (
-                    <div key={s.id} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm">
-                      <span className="truncate">
-                        {s.label || s.deviceName}
-                        {!s.customerId && <span className="ml-1 text-[10px] font-medium text-amber-600">unmapped</span>}
-                      </span>
-                      <Button size="sm" variant="ghost" className="h-7 shrink-0 text-xs" onClick={() => setMapping(s)}>Map</Button>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
           </div>
-        )}
+        ))}
       </div>
 
       {/* Sensor detail dialog */}

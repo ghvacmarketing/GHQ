@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useUpload } from "@/hooks/use-upload";
+import { IndustrialTabs } from "@/components/crm/industrial-tabs";
 import {
   PenLine, Plus, FileText, Loader2, Trash2, Upload, CheckCircle2, Send,
   Download, Clock, Users, DollarSign,
@@ -69,6 +70,7 @@ export default function CrmEsign() {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<"overview" | "list" | "card">("overview");
 
   const { uploadFile, isUploading } = useUpload();
 
@@ -158,6 +160,30 @@ export default function CrmEsign() {
     };
   }, [docs]);
 
+  const overviewStats = useMemo(() => {
+    const completedDocs = docs.filter((d) => d.status === "completed" && d.sentAt && d.completedAt);
+    const avgTurnaroundHrs = completedDocs.length
+      ? completedDocs.reduce((sum, d) => sum + (new Date(d.completedAt!).getTime() - new Date(d.sentAt!).getTime()), 0) / completedDocs.length / 36e5
+      : null;
+    const sentOrDone = docs.filter((d) => d.status === "sent" || d.status === "completed").length;
+    const completionRate = sentOrDone > 0 ? Math.round((stats.completed / sentOrDone) * 100) : null;
+    const depositsCollected = docs.reduce((sum, d) => sum + (d.depositPaidAt ? (d.depositAmountCents || 0) : 0), 0) / 100;
+    const months: { key: string; label: string; count: number }[] = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const dte = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({ key: `${dte.getFullYear()}-${dte.getMonth()}`, label: format(dte, "MMM"), count: 0 });
+    }
+    for (const d of docs) {
+      if (!d.createdAt) continue;
+      const c = new Date(d.createdAt);
+      const key = `${c.getFullYear()}-${c.getMonth()}`;
+      const m = months.find((x) => x.key === key);
+      if (m) m.count++;
+    }
+    return { avgTurnaroundHrs, completionRate, depositsCollected, months };
+  }, [docs, stats.completed]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return docs;
@@ -188,15 +214,77 @@ export default function CrmEsign() {
           }
         />
 
-        {/* Stat cards */}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {statCards.map((s) => (
-            <StatCard key={s.label} label={s.label} value={s.value} icon={s.icon} />
-          ))}
+        {/* Overview | List | Card */}
+        <div className="flex justify-center">
+          <IndustrialTabs
+            testidPrefix="esign-view"
+            activeKey={view}
+            onSelect={(k) => setView(k as typeof view)}
+            tabs={[
+              { key: "overview", label: "Overview" },
+              { key: "list", label: "List" },
+              { key: "card", label: "Card" },
+            ]}
+          />
         </div>
 
+        {/* Overview — section analytics */}
+        {view === "overview" && (
+          <>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {statCards.map((s) => (
+                <StatCard key={s.label} label={s.label} value={s.value} icon={s.icon} />
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+              <div className="rounded-[4px] border border-slate-300/70 bg-white p-4">
+                <p className="text-xs font-medium text-slate-500">Completion rate</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900" data-testid="esign-completion-rate">
+                  {overviewStats.completionRate != null ? `${overviewStats.completionRate}%` : "—"}
+                </p>
+                <p className="mt-0.5 text-[11px] text-slate-400">of sent documents get signed</p>
+              </div>
+              <div className="rounded-[4px] border border-slate-300/70 bg-white p-4">
+                <p className="text-xs font-medium text-slate-500">Avg. time to sign</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900" data-testid="esign-turnaround">
+                  {overviewStats.avgTurnaroundHrs == null
+                    ? "—"
+                    : overviewStats.avgTurnaroundHrs < 48
+                      ? `${Math.round(overviewStats.avgTurnaroundHrs)}h`
+                      : `${(overviewStats.avgTurnaroundHrs / 24).toFixed(1)}d`}
+                </p>
+                <p className="mt-0.5 text-[11px] text-slate-400">from send to final signature</p>
+              </div>
+              <div className="col-span-2 rounded-[4px] border border-slate-300/70 bg-white p-4 lg:col-span-1">
+                <p className="text-xs font-medium text-slate-500">Deposits collected</p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-900" data-testid="esign-deposits">
+                  {overviewStats.depositsCollected > 0
+                    ? overviewStats.depositsCollected.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })
+                    : "—"}
+                </p>
+                <p className="mt-0.5 text-[11px] text-slate-400">paid after signing</p>
+              </div>
+            </div>
+            <div className="rounded-[4px] border border-slate-300/70 bg-white p-4">
+              <p className="mb-3 text-xs font-medium text-slate-500">Documents created — last 6 months</p>
+              <div className="flex items-end gap-2" style={{ height: 80 }}>
+                {(() => {
+                  const max = Math.max(1, ...overviewStats.months.map((m) => m.count));
+                  return overviewStats.months.map((m) => (
+                    <div key={m.key} className="flex flex-1 flex-col items-center justify-end gap-1">
+                      <span className="text-xs font-semibold tabular-nums text-slate-700">{m.count || ""}</span>
+                      <div className="w-full rounded-[2px] bg-[#711419]" style={{ height: Math.max(3, (m.count / max) * 52), opacity: m.count ? 1 : 0.15 }} />
+                      <span className="text-[10px] font-medium text-slate-400">{m.label}</span>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          </>
+        )}
+
         {/* Search */}
-        {docs.length > 0 && (
+        {view !== "overview" && docs.length > 0 && (
           <FilterBar
             search={search}
             onSearchChange={setSearch}
@@ -205,8 +293,8 @@ export default function CrmEsign() {
           />
         )}
 
-        {/* List */}
-        {isLoading ? (
+        {/* Data — list or card view */}
+        {view === "overview" ? null : isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => <Skeleton key={i} className="h-[72px] w-full rounded-lg" />)}
           </div>
@@ -227,6 +315,37 @@ export default function CrmEsign() {
           <SectionCard noBodyPadding>
             <EmptyState icon={FileText} title="No matches" message={`No documents match "${search}".`} />
           </SectionCard>
+        ) : view === "card" ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((doc) => {
+              const pct = doc.recipientCount > 0 ? Math.round((doc.signedCount / doc.recipientCount) * 100) : 0;
+              return (
+                <button
+                  key={doc.id}
+                  onClick={() => navigate(`/crm/esign/${doc.id}`)}
+                  className="group flex flex-col rounded-[4px] border border-slate-300/70 bg-white p-4 text-left transition-colors hover:border-slate-900"
+                  data-testid={`doc-card-${doc.id}`}
+                >
+                  <div className="flex w-full items-start justify-between gap-2">
+                    <FileText className="h-5 w-5 text-[#711419]" strokeWidth={1.75} />
+                    <StatusDot pill={STATUS_STYLES[doc.status] || STATUS_STYLES.draft}>
+                      {STATUS_LABELS[doc.status] || doc.status}
+                    </StatusDot>
+                  </div>
+                  <p className="mt-3 line-clamp-2 text-sm font-semibold text-slate-900">{doc.title}</p>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    {doc.recipientCount > 0 ? `${doc.signedCount}/${doc.recipientCount} signed` : "No recipients"}
+                    {doc.createdAt ? ` · ${format(new Date(doc.createdAt), "MMM d, yyyy")}` : ""}
+                  </p>
+                  {doc.recipientCount > 0 && (
+                    <div className="mt-3 h-1.5 w-full overflow-hidden rounded-[2px] bg-slate-100">
+                      <div className="h-full bg-[#711419]" style={{ width: `${pct}%` }} />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         ) : (
           <SectionCard title="Documents" description={`${filtered.length} of ${docs.length}`} noBodyPadding>
             <ul className="divide-y divide-border">
