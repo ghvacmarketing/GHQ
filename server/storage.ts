@@ -260,7 +260,7 @@ export interface IStorage {
   createMessagingConversation(conversation: InsertCrmMessagingConversation): Promise<CrmMessagingConversation>;
   updateMessagingConversation(id: string, updates: Partial<InsertCrmMessagingConversation>): Promise<CrmMessagingConversation | undefined>;
   getMessagesForConversation(conversationId: string): Promise<(CrmMessagingMessage & { authorName?: string | null })[]>;
-  createMessage(message: InsertCrmMessagingMessage): Promise<CrmMessagingMessage>;
+  createMessage(message: InsertCrmMessagingMessage, opts?: { skipConversationBump?: boolean }): Promise<CrmMessagingMessage>;
   updateMessage(id: string, updates: Partial<InsertCrmMessagingMessage>): Promise<CrmMessagingMessage | undefined>;
   getConversationTags(conversationId: string): Promise<CrmMessagingConversationTag[]>;
   addConversationTag(conversationId: string, tag: string): Promise<CrmMessagingConversationTag>;
@@ -2101,9 +2101,13 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async createMessage(message: InsertCrmMessagingMessage): Promise<CrmMessagingMessage> {
+  async createMessage(message: InsertCrmMessagingMessage, opts?: { skipConversationBump?: boolean }): Promise<CrmMessagingMessage> {
     const [created] = await db.insert(crmMessagingMessages).values(message as any).returning();
-    
+
+    // Backfilled history (e.g. Textline catch-up) must not re-order the inbox
+    // or re-mark conversations unread — only genuinely new messages do that.
+    if (opts?.skipConversationBump) return created;
+
     if (message.direction === 'outbound') {
       await db.update(crmMessagingConversations)
         .set({ 

@@ -137,6 +137,13 @@ export function NotificationsDrawerContent({ onClose }: NotificationsDrawerConte
       markAsReadMutation.mutate(notification.id);
     }
     
+    if (notification.entityType === "pin_comment" && notification.entityId) {
+      fetch(`/api/crm/pins/${notification.entityId}`, { credentials: "include" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((pin) => { if (pin?.path) window.location.href = `${pin.path}?pin=${notification.entityId}`; })
+        .catch(() => {});
+      return;
+    }
     if (notification.entityType === "tagged_comment" && notification.entityId) {
       try {
         const res = await fetch(`/api/crm/tagged-comments/lookup/${notification.entityId}`, { credentials: "include" });

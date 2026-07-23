@@ -353,6 +353,25 @@ async function runDocsAndAccountingMigrations() {
     await db.execute(sql`CREATE INDEX IF NOT EXISTS doc_files_folder_idx ON doc_files(folder_id)`);
     await db.execute(sql`ALTER TABLE doc_folders ADD COLUMN IF NOT EXISTS category text`);
     await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS pin_comments (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        path text NOT NULL,
+        anchor_testid text,
+        anchor_index integer DEFAULT 0,
+        x_pct double precision DEFAULT 0,
+        y_pct double precision DEFAULT 0,
+        abs_x double precision DEFAULT 0,
+        abs_y double precision DEFAULT 0,
+        body text NOT NULL,
+        mentions jsonb DEFAULT '[]'::jsonb,
+        created_by varchar,
+        resolved boolean NOT NULL DEFAULT false,
+        resolved_at timestamp,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS pin_comments_path_idx ON pin_comments(path)`);
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS report_saved (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
         name text NOT NULL,

@@ -760,6 +760,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerDocsAndAccountingRoutes(app);
   const { registerReportingRoutes } = await import("./reporting/routes");
   registerReportingRoutes(app);
+  const { registerPinCommentRoutes } = await import("./pin-comments-routes");
+  registerPinCommentRoutes(app);
 
   // Register customer-portal account routes (password login, signup, profile)
   registerPortalAccountRoutes(app);
@@ -23037,34 +23039,48 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
       }
 
       if (textlineMessages.length > 0) {
-        // Get existing message external IDs to avoid duplicates
+        // Dedupe on external id AND on content+timestamp (older rows predate
+        // external ids, and a Textline API change made ids unreliable — the
+        // second layer stops the same history re-inserting on every open).
         const existingMessages = await storage.getMessagesForConversation(id);
         const existingExternalIds = new Set(existingMessages.map(m => m.externalMessageId).filter(Boolean));
+        const contentKey = (body: string | null | undefined, dir: string | null | undefined, at: Date | string | null | undefined) => {
+          const t = at ? Math.floor(new Date(at).getTime() / 60000) : 0; // minute precision
+          return `${dir || ""}|${t}|${(body || "").trim().slice(0, 120)}`;
+        };
+        const existingContentKeys = new Set(
+          existingMessages.map(m => contentKey(m.body, m.direction, m.sentAt || m.createdAt)),
+        );
+        // Anything at/before the conversation's current lastMessageAt is
+        // history — insert silently so the inbox doesn't reorder or re-unread.
+        const baseline = conversation.lastMessageAt ? new Date(conversation.lastMessageAt).getTime() : 0;
 
         for (const tm of textlineMessages) {
-          // Skip empty "ghost" posts (no text and no attachments) so they
-          // don't create blank message bubbles.
           const tmHasContent = !!(tm.body && String(tm.body).trim()) || (Array.isArray(tm.attachments) && tm.attachments.length > 0);
-          if (!existingExternalIds.has(tm.uuid) && tmHasContent) {
-            try {
-              await storage.createMessage({
-                conversationId: id,
-                body: tm.body,
-                direction: tm.direction as any,
-                channel: "sms" as any,
-                status: "delivered" as any,
-                externalMessageId: tm.uuid,
-                // Preserve the real message time so ordering + display are
-                // correct (otherwise createdAt defaults to the sync time).
-                createdAt: tm.created_at ? new Date(tm.created_at) : undefined,
-                sentAt: tm.created_at ? new Date(tm.created_at) : undefined,
-                deliveredAt: tm.delivered_at ? new Date(tm.delivered_at) : undefined,
-                readAt: tm.read_at ? new Date(tm.read_at) : undefined,
-                attachments: tm.attachments?.map(a => ({ url: a.url, filename: a.filename, contentType: a.content_type })) as any,
-              });
-            } catch (e) {
-              console.error("[Textline] Error caching message:", e);
-            }
+          if (!tmHasContent) continue;
+          if (!tm.uuid) continue; // no reliable identity — never re-insert these
+          if (existingExternalIds.has(tm.uuid)) continue;
+          if (existingContentKeys.has(contentKey(tm.body, tm.direction, tm.created_at))) continue;
+          const tmAt = tm.created_at ? new Date(tm.created_at).getTime() : 0;
+          const isGenuinelyNew = tmAt > baseline;
+          try {
+            await storage.createMessage({
+              conversationId: id,
+              body: tm.body,
+              direction: tm.direction as any,
+              channel: "sms" as any,
+              status: "delivered" as any,
+              externalMessageId: tm.uuid,
+              // Preserve the real message time so ordering + display are
+              // correct (otherwise createdAt defaults to the sync time).
+              createdAt: tm.created_at ? new Date(tm.created_at) : undefined,
+              sentAt: tm.created_at ? new Date(tm.created_at) : undefined,
+              deliveredAt: tm.delivered_at ? new Date(tm.delivered_at) : undefined,
+              readAt: tm.read_at ? new Date(tm.read_at) : undefined,
+              attachments: tm.attachments?.map(a => ({ url: a.url, filename: a.filename, contentType: a.content_type })) as any,
+            }, { skipConversationBump: !isGenuinelyNew });
+          } catch (e) {
+            console.error("[Textline] Error caching message:", e);
           }
         }
       }

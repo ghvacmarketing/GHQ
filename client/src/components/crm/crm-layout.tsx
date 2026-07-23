@@ -60,10 +60,10 @@ import {
 } from "lucide-react";
 import type { CrmUser } from "@shared/schema";
 import ghqLogo from "@assets/redlogo.webp";
-import GhqSearch, { openGlobalAI, openGlobalComment } from "./ghq-search";
+import GhqSearch, { openGlobalAI } from "./ghq-search";
 import { TopNavSearch } from "./topnav-search";
 import NotificationsDrawerContent from "./notifications-drawer";
-import TaggedCommentsDisplay from "./tagged-comments-display";
+import { PinCommentsLayer, enterPinMode } from "./pin-comments";
 
 interface CrmLayoutProps {
   children: React.ReactNode;
@@ -549,7 +549,7 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
           <Button variant="ghost" size="icon" onClick={openGlobalAI} title="Ask AI" data-testid="button-topnav-ai">
             <Sparkles className="h-5 w-5 text-slate-600" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={openGlobalComment} title="Leave a comment" data-testid="button-topnav-comment">
+          <Button variant="ghost" size="icon" onClick={enterPinMode} title="Comment mode — drop a pin anywhere" data-testid="button-topnav-comment">
             <MessageSquarePlus className="h-5 w-5 text-slate-600" />
           </Button>
           <Button
@@ -672,7 +672,7 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
         )}
       </main>
       <GhqSearch showFab={!hideGlobalSearch} />
-      <TaggedCommentsDisplay />
+      <PinCommentsLayer currentUser={currentUser} />
       <Sheet open={notificationsOpen} onOpenChange={setNotificationsOpen}>
         <SheetContent side="right" className="w-full sm:w-96 p-0">
           <NotificationsDrawerContent onClose={() => setNotificationsOpen(false)} />

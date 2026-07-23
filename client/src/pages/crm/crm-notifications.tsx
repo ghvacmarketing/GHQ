@@ -396,6 +396,13 @@ function NotificationRow({
 }) {
   const handleClick = async () => {
     if (!n.isRead) onMarkRead();
+    if (n.entityType === "pin_comment" && n.entityId) {
+      fetch(`/api/crm/pins/${n.entityId}`, { credentials: "include" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((pin) => { if (pin?.path) onNavigate(`${pin.path}?pin=${n.entityId}`); })
+        .catch(() => {});
+      return;
+    }
     if (n.entityType === "tagged_comment" && n.entityId) {
       try {
         const res = await fetch(`/api/crm/tagged-comments/lookup/${n.entityId}`, { credentials: "include" });

@@ -1,0 +1,371 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { MapPin, X, Check, Trash2, Loader2 } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { CrmUser } from "@shared/schema";
+
+/** Enter comment mode from anywhere (the top-bar comment button calls this). */
+export const enterPinMode = () => window.dispatchEvent(new Event("ghq-pin-mode"));
+
+type Pin = {
+  id: string;
+  path: string;
+  anchor_testid: string | null;
+  anchor_index: number;
+  x_pct: number;
+  y_pct: number;
+  abs_x: number;
+  abs_y: number;
+  body: string;
+  mentions: string[];
+  created_by: string | null;
+  createdByName: string | null;
+  resolved: boolean;
+  created_at: string;
+};
+
+/** Resolve a pin to viewport coordinates: prefer its data-testid anchor with
+ *  fractional offsets (pixel-accurate across screens); fall back to absolute
+ *  document coordinates. Returns null when the anchor isn't on screen yet. */
+function pinViewportPos(pin: Pin): { x: number; y: number } | null {
+  if (pin.anchor_testid) {
+    const matches = document.querySelectorAll(`[data-testid="${CSS.escape(pin.anchor_testid)}"]`);
+    const el = matches[pin.anchor_index] || matches[0];
+    if (el) {
+      const r = (el as HTMLElement).getBoundingClientRect();
+      if (r.width > 0 || r.height > 0) {
+        return { x: r.left + pin.x_pct * r.width, y: r.top + pin.y_pct * r.height };
+      }
+    }
+  }
+  if (pin.abs_x || pin.abs_y) {
+    return { x: pin.abs_x - window.scrollX, y: pin.abs_y - window.scrollY };
+  }
+  return null;
+}
+
+export function PinCommentsLayer({ currentUser }: { currentUser: CrmUser }) {
+  const [location] = useLocation();
+  const path = location.split("?")[0];
+  const { toast } = useToast();
+
+  const [mode, setMode] = useState(false);
+  const [openPinId, setOpenPinId] = useState<string | null>(null);
+  const [composer, setComposer] = useState<null | {
+    x: number; y: number;
+    anchorTestId: string | null; anchorIndex: number;
+    xPct: number; yPct: number; absX: number; absY: number;
+  }>(null);
+  const [body, setBody] = useState("");
+  const [tagSearch, setTagSearch] = useState("");
+  const [tagged, setTagged] = useState<string[]>([]);
+  const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
+  const [pulseId, setPulseId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const on = () => { setMode(true); setComposer(null); };
+    window.addEventListener("ghq-pin-mode", on);
+    return () => window.removeEventListener("ghq-pin-mode", on);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setMode(false); setComposer(null); setOpenPinId(null); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  const { data: pins = [] } = useQuery<Pin[]>({
+    queryKey: ["/api/crm/pins", path],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/pins?path=${encodeURIComponent(path)}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    refetchInterval: 45_000,
+  });
+
+  const { data: users = [] } = useQuery<CrmUser[]>({
+    queryKey: ["/api/crm/users"],
+    enabled: !!composer,
+  });
+
+  // ── Keep pins glued to their anchors while anything scrolls or resizes ──
+  const rafRef = useRef(0);
+  const recompute = useCallback(() => {
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      const next: Record<string, { x: number; y: number }> = {};
+      for (const p of pins) {
+        const pos = pinViewportPos(p);
+        if (pos) next[p.id] = pos;
+      }
+      setPositions(next);
+    });
+  }, [pins]);
+
+  useEffect(() => {
+    recompute();
+    // A couple of delayed passes so late-rendering content (queries) settles
+    const t1 = setTimeout(recompute, 400);
+    const t2 = setTimeout(recompute, 1200);
+    window.addEventListener("resize", recompute);
+    document.addEventListener("scroll", recompute, { capture: true, passive: true });
+    return () => {
+      clearTimeout(t1); clearTimeout(t2);
+      window.removeEventListener("resize", recompute);
+      document.removeEventListener("scroll", recompute, { capture: true } as any);
+    };
+  }, [recompute]);
+
+  // ── Deep link: ?pin=<id> scrolls to the anchor and pulses the pin ──
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("pin");
+    if (!id || pins.length === 0) return;
+    const pin = pins.find((p) => p.id === id);
+    if (!pin) return;
+    const matches = pin.anchor_testid ? document.querySelectorAll(`[data-testid="${CSS.escape(pin.anchor_testid)}"]`) : null;
+    const el = matches ? ((matches[pin.anchor_index] || matches[0]) as HTMLElement | undefined) : undefined;
+    if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+    setPulseId(id);
+    setOpenPinId(id);
+    const t = setTimeout(() => setPulseId(null), 3500);
+    return () => clearTimeout(t);
+  }, [pins]);
+
+  // ── Drop a pin ──
+  const handleModeClick = (e: React.MouseEvent) => {
+    const x = e.clientX;
+    const y = e.clientY;
+    // Look through the overlay to what's underneath
+    const stack = document.elementsFromPoint(x, y);
+    let anchor: HTMLElement | null = null;
+    for (const el of stack) {
+      if ((el as HTMLElement).dataset?.pinOverlay) continue;
+      anchor = (el as HTMLElement).closest?.("[data-testid]") as HTMLElement | null;
+      if (anchor) break;
+    }
+    let anchorTestId: string | null = null;
+    let anchorIndex = 0;
+    let xPct = 0;
+    let yPct = 0;
+    if (anchor) {
+      anchorTestId = anchor.getAttribute("data-testid");
+      const matches = Array.from(document.querySelectorAll(`[data-testid="${CSS.escape(anchorTestId!)}"]`));
+      anchorIndex = Math.max(0, matches.indexOf(anchor));
+      const r = anchor.getBoundingClientRect();
+      xPct = r.width > 0 ? (x - r.left) / r.width : 0;
+      yPct = r.height > 0 ? (y - r.top) / r.height : 0;
+    }
+    setMode(false);
+    setBody("");
+    setTagged([]);
+    setTagSearch("");
+    setComposer({
+      x, y, anchorTestId, anchorIndex, xPct, yPct,
+      absX: x + window.scrollX, absY: y + window.scrollY,
+    });
+  };
+
+  const createPin = useMutation({
+    mutationFn: async () => {
+      if (!composer) return;
+      return apiRequest("POST", "/api/crm/pins", {
+        path,
+        anchorTestId: composer.anchorTestId,
+        anchorIndex: composer.anchorIndex,
+        xPct: composer.xPct,
+        yPct: composer.yPct,
+        absX: composer.absX,
+        absY: composer.absY,
+        body: body.trim(),
+        mentions: tagged,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/pins", path] });
+      setComposer(null);
+      toast({ title: "Comment pinned", description: tagged.length ? "Tagged people were notified." : undefined });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't pin the comment", variant: "destructive" }),
+  });
+
+  const resolvePin = useMutation({
+    mutationFn: async (id: string) => apiRequest("PATCH", `/api/crm/pins/${id}`, { resolved: true }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/pins", path] });
+      setOpenPinId(null);
+    },
+  });
+  const deletePin = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/crm/pins/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/pins", path] });
+      setOpenPinId(null);
+    },
+  });
+
+  const filteredUsers = useMemo(() => {
+    const q = tagSearch.trim().toLowerCase();
+    const list = users.filter((u) => u.id !== currentUser.id);
+    return q ? list.filter((u) => u.name.toLowerCase().includes(q)) : list;
+  }, [users, tagSearch, currentUser.id]);
+
+  const openPin = pins.find((p) => p.id === openPinId) || null;
+  const openPos = openPin ? positions[openPin.id] : null;
+
+  const popoverStyle = (x: number, y: number): React.CSSProperties => ({
+    left: Math.min(Math.max(x, 12), window.innerWidth - 332),
+    top: Math.min(Math.max(y + 14, 12), window.innerHeight - 280),
+  });
+
+  return (
+    <>
+      {/* Comment-mode overlay */}
+      {mode && (
+        <div
+          data-pin-overlay="1"
+          onClick={handleModeClick}
+          className="fixed inset-0 z-[95] cursor-crosshair"
+          data-testid="pin-mode-overlay"
+        >
+          <div className="pointer-events-none fixed inset-x-0 top-3 z-[96] flex justify-center">
+            <span className="rounded-[4px] bg-slate-900 px-3 py-1.5 text-xs font-medium text-white shadow-lg">
+              Click anywhere to drop a comment pin — Esc to cancel
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Pins */}
+      {pins.map((p) => {
+        const pos = positions[p.id];
+        if (!pos) return null;
+        if (pos.y < -20 || pos.y > window.innerHeight + 20) return null;
+        return (
+          <button
+            key={p.id}
+            onClick={() => setOpenPinId(openPinId === p.id ? null : p.id)}
+            className={`fixed z-[85] -translate-x-1/2 -translate-y-full transition-transform hover:scale-110 ${
+              pulseId === p.id ? "animate-bounce" : ""
+            }`}
+            style={{ left: pos.x, top: pos.y }}
+            title={`${p.createdByName || "Someone"}: ${p.body.slice(0, 60)}`}
+            data-testid={`pin-${p.id}`}
+          >
+            <MapPin className="h-6 w-6 fill-[#711419] text-white drop-shadow-md" strokeWidth={1.5} />
+          </button>
+        );
+      })}
+
+      {/* Open pin card */}
+      {openPin && openPos && (
+        <div
+          className="fixed z-[96] w-80 rounded-[4px] border border-slate-300/70 bg-white p-3.5 shadow-xl"
+          style={popoverStyle(openPos.x, openPos.y)}
+          data-testid="pin-card"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-900">{openPin.createdByName || "Someone"}</p>
+              <p className="text-[11px] text-slate-400">{format(new Date(openPin.created_at), "MMM d, h:mm a")}</p>
+            </div>
+            <button onClick={() => setOpenPinId(null)} className="rounded p-1 text-slate-400 hover:bg-slate-100" aria-label="Close">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{openPin.body}</p>
+          {openPin.mentions?.length > 0 && (
+            <p className="mt-2 text-[11px] text-slate-400">
+              Tagged: {openPin.mentions.map((id) => users.find((u) => u.id === id)?.name || "user").join(", ")}
+            </p>
+          )}
+          <div className="mt-3 flex items-center justify-end gap-1.5 border-t border-slate-100 pt-2.5">
+            {(openPin.created_by === currentUser.id || ["owner", "admin"].includes(currentUser.role)) && (
+              <button
+                onClick={() => deletePin.mutate(openPin.id)}
+                className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                title="Delete"
+                data-testid="pin-delete"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+            <Button size="sm" variant="outline" className="h-8" onClick={() => resolvePin.mutate(openPin.id)} data-testid="pin-resolve">
+              <Check className="mr-1 h-3.5 w-3.5" /> Resolve
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Composer */}
+      {composer && (
+        <>
+          <MapPin
+            className="pointer-events-none fixed z-[96] h-6 w-6 -translate-x-1/2 -translate-y-full fill-[#711419] text-white drop-shadow-md"
+            style={{ left: composer.x, top: composer.y }}
+            strokeWidth={1.5}
+          />
+          <div
+            className="fixed z-[96] w-80 rounded-[4px] border border-slate-300/70 bg-white p-3.5 shadow-xl"
+            style={popoverStyle(composer.x, composer.y)}
+            data-testid="pin-composer"
+          >
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">New comment</p>
+            <Textarea
+              autoFocus
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="Leave a comment at this spot…"
+              className="mt-2 min-h-[72px] resize-none text-sm"
+              data-testid="pin-body"
+            />
+            <div className="mt-2.5">
+              <Input
+                value={tagSearch}
+                onChange={(e) => setTagSearch(e.target.value)}
+                placeholder="Tag people…"
+                className="h-8 text-xs"
+                data-testid="pin-tag-search"
+              />
+              <div className="mt-1.5 max-h-28 space-y-0.5 overflow-y-auto">
+                {filteredUsers.map((u) => (
+                  <label key={u.id} className="flex items-center gap-2 rounded px-1.5 py-1 text-sm text-slate-700 hover:bg-slate-50">
+                    <Checkbox
+                      checked={tagged.includes(u.id)}
+                      onCheckedChange={(on) =>
+                        setTagged((prev) => (on ? [...prev, u.id] : prev.filter((id) => id !== u.id)))
+                      }
+                    />
+                    {u.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-2.5">
+              <Button size="sm" variant="outline" className="h-8" onClick={() => setComposer(null)}>Cancel</Button>
+              <Button
+                size="sm"
+                className="h-8 bg-[#711419] hover:bg-[#8a1a1f]"
+                disabled={!body.trim() || createPin.isPending}
+                onClick={() => createPin.mutate()}
+                data-testid="pin-post"
+              >
+                {createPin.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <MapPin className="mr-1 h-3.5 w-3.5" />}
+                Pin comment
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
