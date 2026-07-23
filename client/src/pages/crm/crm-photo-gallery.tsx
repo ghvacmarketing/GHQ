@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, isAfter, isBefore, startOfDay, subDays } from "date-fns";
-import { User, ImageIcon, Download, Trash2, LayoutGrid, List, ZoomIn, ZoomOut, X, CheckSquare, Check, Loader2 } from "lucide-react";
+import { User, ImageIcon, Download, Trash2, LayoutGrid, List, ZoomIn, ZoomOut, X, Check, Loader2 } from "lucide-react";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -67,8 +67,9 @@ export default function CrmPhotoGallery() {
   const [lightbox, setLightbox] = useState<FeedPhoto | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<FeedPhoto | null>(null);
 
-  // Multi-select
-  const [selectMode, setSelectMode] = useState(false);
+  // Multi-select: hover any photo to reveal its select circle; having at
+  // least one selection is what shows the bulk-action bar (Google Photos
+  // style — no separate mode toggle).
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDownloading, setBulkDownloading] = useState(false);
@@ -169,7 +170,7 @@ export default function CrmPhotoGallery() {
     });
   const selectAllFiltered = () => setSelected(new Set(filtered.map((p) => p.id)));
   const clearSelection = () => setSelected(new Set());
-  const exitSelect = () => { setSelectMode(false); setSelected(new Set()); };
+  const selectionActive = selected.size > 0;
 
   const bulkDownload = async () => {
     setBulkDownloading(true);
@@ -200,7 +201,7 @@ export default function CrmPhotoGallery() {
     onSuccess: ({ ok, fail }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/photos/feed"] });
       setConfirmBulkDelete(false);
-      exitSelect();
+      clearSelection();
       toast({ title: `${ok} photo${ok !== 1 ? "s" : ""} deleted${fail ? `, ${fail} failed` : ""}` });
     },
     onError: (e: any) => toast({ title: e?.message || "Bulk delete failed", variant: "destructive" }),
@@ -356,14 +357,6 @@ export default function CrmPhotoGallery() {
               </div>
             )}
 
-            <button
-              onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
-              className={`flex h-9 items-center gap-1.5 rounded-md border px-2.5 text-sm font-medium transition-colors ${selectMode ? "border-[#711419] bg-[#711419] text-white" : "border-input bg-white text-slate-600 hover:text-foreground"}`}
-              data-testid="toggle-select-mode"
-            >
-              <CheckSquare className="h-4 w-4" /> {selectMode ? "Cancel" : "Select"}
-            </button>
-
             <div className="flex items-center rounded-md border border-input bg-white">
               <button
                 onClick={() => setView("grid")}
@@ -385,13 +378,13 @@ export default function CrmPhotoGallery() {
           </div>
         </div>
 
-        {selectMode && (
+        {selectionActive && (
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#711419]/25 bg-[#711419]/[0.06] px-3 py-2" data-testid="selection-bar">
+            <button onClick={clearSelection} className="rounded-md p-1 text-slate-500 hover:bg-white hover:text-slate-800" title="Clear selection" data-testid="selection-clear-x">
+              <X className="h-4 w-4" />
+            </button>
             <span className="text-sm font-semibold text-slate-800">{selected.size} selected</span>
             <button onClick={selectAllFiltered} className="text-xs font-medium text-[#711419] hover:underline">Select all ({filtered.length})</button>
-            {selected.size > 0 && (
-              <button onClick={clearSelection} className="text-xs font-medium text-slate-500 hover:text-slate-800">Clear</button>
-            )}
             <div className="ml-auto flex items-center gap-2">
               <Button size="sm" variant="outline" disabled={selected.size === 0 || bulkDownloading} onClick={bulkDownload} data-testid="bulk-download">
                 {bulkDownloading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}
@@ -430,22 +423,24 @@ export default function CrmPhotoGallery() {
                 className={`group flex items-center gap-3 p-2.5 ${selected.has(p.id) ? "bg-[#711419]/[0.06]" : ""}`}
                 data-testid={`feed-row-${p.id}`}
               >
-                {selectMode && (
-                  <button
-                    onClick={() => toggleSelect(p.id)}
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 ${selected.has(p.id) ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300 text-transparent"}`}
-                    aria-label="Select photo"
-                    data-testid={`select-row-${p.id}`}
-                  >
-                    <Check className="h-3.5 w-3.5" />
-                  </button>
-                )}
-                <button onClick={() => (selectMode ? toggleSelect(p.id) : setLightbox(p))} className="shrink-0 overflow-hidden rounded-lg">
+                <button
+                  onClick={() => toggleSelect(p.id)}
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition-opacity ${
+                    selected.has(p.id)
+                      ? "border-[#711419] bg-[#711419] text-white opacity-100"
+                      : `border-slate-300 text-transparent hover:text-slate-300 ${selectionActive ? "opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"}`
+                  }`}
+                  aria-label="Select photo"
+                  data-testid={`select-row-${p.id}`}
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </button>
+                <button onClick={() => (selectionActive ? toggleSelect(p.id) : setLightbox(p))} className="shrink-0 overflow-hidden rounded-lg">
                   <img src={p.url} alt={p.name} loading="lazy" className="h-14 w-14 object-cover" />
                 </button>
                 <div className="min-w-0 flex-1">
                   <button
-                    onClick={() => (selectMode ? toggleSelect(p.id) : setLightbox(p))}
+                    onClick={() => (selectionActive ? toggleSelect(p.id) : setLightbox(p))}
                     className="block max-w-full truncate text-left text-sm font-semibold text-foreground hover:underline"
                     title={p.name}
                   >
@@ -472,7 +467,7 @@ export default function CrmPhotoGallery() {
                     )}
                   </p>
                 </div>
-                {!selectMode && <div className="flex shrink-0 gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">{photoActions(p)}</div>}
+                {!selectionActive && <div className="flex shrink-0 gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">{photoActions(p)}</div>}
               </div>
             ))}
           </div>
@@ -484,7 +479,7 @@ export default function CrmPhotoGallery() {
                 className={`group relative overflow-hidden rounded-xl border bg-card shadow-sm ${selected.has(p.id) ? "border-[#711419] ring-2 ring-[#711419]" : "border-border"}`}
                 data-testid={`feed-photo-${p.id}`}
               >
-                <button onClick={() => (selectMode ? toggleSelect(p.id) : setLightbox(p))} className="block w-full overflow-hidden">
+                <button onClick={() => (selectionActive ? toggleSelect(p.id) : setLightbox(p))} className="block w-full overflow-hidden">
                   <img
                     src={p.url}
                     alt={p.name}
@@ -492,16 +487,19 @@ export default function CrmPhotoGallery() {
                     className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-105"
                   />
                 </button>
-                {selectMode ? (
-                  <button
-                    onClick={() => toggleSelect(p.id)}
-                    className={`absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 shadow ${selected.has(p.id) ? "border-white bg-[#711419] text-white" : "border-white bg-black/35 text-transparent"}`}
-                    aria-label="Select photo"
-                    data-testid={`select-photo-${p.id}`}
-                  >
-                    <Check className="h-3.5 w-3.5" />
-                  </button>
-                ) : (
+                <button
+                  onClick={() => toggleSelect(p.id)}
+                  className={`absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 shadow transition-opacity ${
+                    selected.has(p.id)
+                      ? "border-white bg-[#711419] text-white opacity-100"
+                      : `border-white bg-black/35 text-white/70 hover:text-white ${selectionActive ? "opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"}`
+                  }`}
+                  aria-label="Select photo"
+                  data-testid={`select-photo-${p.id}`}
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </button>
+                {!selectionActive && (
                   <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
                     {photoActions(p)}
                   </div>
