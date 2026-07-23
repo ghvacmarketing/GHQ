@@ -613,69 +613,11 @@ export default function DocumentsApp() {
   );
 
   return (
-    <div className="flex h-screen flex-col bg-[#f5f5f7]">
-      {/* Top bar */}
-      <header className="flex shrink-0 items-center gap-3 border-b border-black/[0.06] bg-white/80 px-4 py-2.5 backdrop-blur">
-        <button
-          onClick={() => navigate("/")}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-          title="Back to apps"
-          data-testid="button-back-apps"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-gradient-to-br from-sky-500 to-blue-700">
-          <FolderOpen className="h-4 w-4 text-white" />
-        </span>
-        <span className="font-display text-[15px] font-semibold text-slate-900">Documents</span>
-
-        <div className="relative mx-auto w-full max-w-md">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <Input
-            value={searchInput}
-            onChange={(e) => { setSearchInput(e.target.value); if (!e.target.value.trim()) setSearch(""); }}
-            onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput)}
-            placeholder="Search files…"
-            className="h-9 rounded-full border-transparent bg-slate-100 pl-9 text-sm focus-visible:bg-white"
-            data-testid="input-doc-search"
-          />
-          {search && (
-            <button
-              onClick={() => { setSearch(""); setSearchInput(""); }}
-              className="absolute right-2.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-slate-300 text-white"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </div>
-
-        <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => uploadFiles(e.target.files)} data-testid="input-doc-upload" />
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-9 rounded-lg"
-          onClick={() => { setNewFolderName(""); setNewFolderOpen(true); }}
-          disabled={!canUpload}
-          data-testid="button-new-folder"
-        >
-          <FolderPlus className="mr-1.5 h-4 w-4" /> Folder
-        </Button>
-        <Button
-          size="sm"
-          className="h-9 rounded-lg bg-[#711419] hover:bg-[#8a1a1f]"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading || !canUpload}
-          data-testid="button-upload"
-        >
-          {uploading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Upload className="mr-1.5 h-4 w-4" />}
-          Upload
-        </Button>
-      </header>
-
-      <div className="flex min-h-0 flex-1">
+    <div className="flex h-screen bg-[#f5f5f7]">
         {/* Sidebar — shared CRM-style dark collapsible panel */}
         <AppSidebar
           appKey="docs"
+          header={{ title: "Documents", subtitle: "Command Center", onHome: () => navigate("/") }}
           activeKey={searching ? "" : tab}
           onSelect={(k) => switchTab(k as TabKey)}
           groups={[
@@ -739,6 +681,52 @@ export default function DocumentsApp() {
           onDrop={(e) => { e.preventDefault(); setDragOver(false); if (canUpload && e.dataTransfer.types.includes("Files")) uploadFiles(e.dataTransfer.files); }}
           data-testid="docs-main"
         >
+          {/* Toolbar — search + folder/upload (was the old top bar) */}
+          <div className="mb-3 flex items-center gap-2">
+            <div className="relative w-full max-w-md">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                value={searchInput}
+                onChange={(e) => { setSearchInput(e.target.value); if (!e.target.value.trim()) setSearch(""); }}
+                onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput)}
+                placeholder="Search files…"
+                className="h-9 rounded-full border-transparent bg-white pl-9 text-sm shadow-sm focus-visible:bg-white"
+                data-testid="input-doc-search"
+              />
+              {search && (
+                <button
+                  onClick={() => { setSearch(""); setSearchInput(""); }}
+                  className="absolute right-2.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-slate-300 text-white"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+            <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => uploadFiles(e.target.files)} data-testid="input-doc-upload" />
+            <div className="ml-auto flex shrink-0 gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9 rounded-lg"
+                onClick={() => { setNewFolderName(""); setNewFolderOpen(true); }}
+                disabled={!canUpload}
+                data-testid="button-new-folder"
+              >
+                <FolderPlus className="mr-1.5 h-4 w-4" /> Folder
+              </Button>
+              <Button
+                size="sm"
+                className="h-9 rounded-lg bg-[#711419] hover:bg-[#8a1a1f]"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading || !canUpload}
+                data-testid="button-upload"
+              >
+                {uploading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Upload className="mr-1.5 h-4 w-4" />}
+                Upload
+              </Button>
+            </div>
+          </div>
+
           {/* Mobile tab strip */}
           <div className="-mx-1 mb-3 flex gap-1 overflow-x-auto px-1 pb-1 sm:hidden">
             {(["drive", "library", ...CATEGORY_KEYS, "archived", "settings"] as TabKey[]).map((t) => (
@@ -756,7 +744,6 @@ export default function DocumentsApp() {
 
           {tab === "settings" ? <DocsSettings viewMode={viewMode} setMode={setMode} /> : contentArea}
         </main>
-      </div>
 
       {/* Preview */}
       {preview && (

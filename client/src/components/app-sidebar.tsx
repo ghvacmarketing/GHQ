@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PanelLeftClose, PanelLeftOpen, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import ghqLogo from "@assets/redlogo.webp";
 
 export type AppSidebarItem = { key: string; label: string; icon: LucideIcon };
 export type AppSidebarGroup = { label?: string; items: AppSidebarItem[] };
@@ -15,12 +16,17 @@ export function AppSidebar({
   groups,
   activeKey,
   onSelect,
+  header,
 }: {
   /** localStorage namespace for the collapsed state, e.g. "docs" */
   appKey: string;
   groups: AppSidebarGroup[];
   activeKey: string;
   onSelect: (key: string) => void;
+  /** CRM-style branded header (logo + title/subtitle). Expanded logo click
+   *  goes home; collapsed logo click expands — same as the CRM sidebar.
+   *  When present, the collapse toggle lives in the header, not the footer. */
+  header?: { title: string; subtitle?: string; onHome?: () => void };
 }) {
   const [collapsed, setCollapsed] = useState(
     () => typeof window !== "undefined" && localStorage.getItem(`${appKey}_sidebar_collapsed`) === "1",
@@ -34,6 +40,36 @@ export function AppSidebar({
 
   const interior = (isCollapsed: boolean) => (
     <div className="flex h-full flex-col">
+      {header && (
+        <div className={cn("flex items-center gap-2.5 overflow-hidden border-b border-slate-700/50", isCollapsed ? "justify-center p-2" : "p-4")}>
+          <button
+            onClick={isCollapsed ? toggle : header.onHome}
+            title={isCollapsed ? "Expand sidebar" : "All apps"}
+            className="shrink-0 rounded-lg transition-opacity hover:opacity-80"
+            data-testid={`${appKey}-sidebar-logo`}
+          >
+            <img src={ghqLogo} alt="GHQ" className="h-9 w-9 rounded-lg object-contain brightness-0 invert" />
+          </button>
+          {!isCollapsed && (
+            <>
+              <div className="min-w-0 flex-1 overflow-hidden leading-tight">
+                <h1 className="truncate whitespace-nowrap text-lg font-bold text-white" data-testid={`${appKey}-sidebar-title`}>{header.title}</h1>
+                {header.subtitle && (
+                  <p className="truncate whitespace-nowrap text-[10px] font-medium uppercase tracking-wider text-slate-400">{header.subtitle}</p>
+                )}
+              </div>
+              <button
+                onClick={toggle}
+                title="Collapse sidebar"
+                className="shrink-0 rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
+                data-testid={`${appKey}-sidebar-toggle`}
+              >
+                <PanelLeftClose className="h-4 w-4" />
+              </button>
+            </>
+          )}
+        </div>
+      )}
       <nav className="scrollbar-hide flex-1 overflow-y-auto py-3" style={{ width: isCollapsed ? 64 : 224 }}>
         <div className={cn(isCollapsed ? "space-y-2 px-2" : "space-y-4 px-3")}>
           {groups.map((g, gi) => (
@@ -74,6 +110,7 @@ export function AppSidebar({
           ))}
         </div>
       </nav>
+      {!header && (
       <div className={cn("border-t border-slate-700/50", isCollapsed ? "p-2" : "p-2.5")}>
         <button
           onClick={toggle}
@@ -88,6 +125,7 @@ export function AppSidebar({
           {!isCollapsed && <span className="text-[13px] font-medium">Collapse</span>}
         </button>
       </div>
+      )}
     </div>
   );
 

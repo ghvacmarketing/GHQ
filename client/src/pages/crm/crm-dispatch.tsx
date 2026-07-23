@@ -1834,6 +1834,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
             </div>
           </div>
 
+          <div className="relative">
           {technicians.map((tech) => {
             const techWorkOrders = getWorkOrdersForTech(tech.id);
             return (
@@ -1902,15 +1903,25 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
               </DroppableScheduleRow>
             );
           })}
-
-          {/* Current-time line — sits under the sticky tech column (z-10) and header (z-20) */}
+          {/* Current-time marker — dashed, spans exactly the technician rows,
+              stamped with the current clock time. Sits under the sticky tech
+              column (z-10) and header (z-20). */}
           {nowPct !== null && (
             <div
-              className="pointer-events-none absolute inset-y-0 z-[6] w-[2px] -translate-x-1/2 bg-[#711419]"
+              className="pointer-events-none absolute inset-y-0 z-[6] -translate-x-1/2"
               style={{ left: `calc(176px + (100% - 176px) * ${nowPct})` }}
               data-testid="dispatch-now-line"
-            />
+            >
+              <div
+                className="absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2"
+                style={{ backgroundImage: "repeating-linear-gradient(to bottom, #711419 0 5px, transparent 5px 10px)" }}
+              />
+              <span className="absolute left-1/2 top-1 -translate-x-1/2 whitespace-nowrap rounded-[3px] bg-[#711419] px-1.5 py-0.5 text-[9px] font-semibold leading-none tabular-nums text-white">
+                {formatLocal(nowTick, "h:mm a")}
+              </span>
+            </div>
           )}
+          </div>
 
           {/* Empty-day hint — subtle, only when nothing is scheduled */}
           {workOrders.length === 0 && (
@@ -4478,10 +4489,10 @@ export default function CrmDispatch() {
           onDragCancel={handleDragCleanup}
           modifiers={combinedModifiers}
         >
-          <div ref={dispatchBoardRef} className={cn("flex flex-col flex-1 min-h-0 gap-2", viewMode === "day" ? "overflow-y-auto overflow-x-hidden" : "overflow-hidden")}>
+          <div ref={dispatchBoardRef} className={cn("scrollbar-minimal flex flex-col flex-1 min-h-0 gap-2", viewMode === "day" ? "overflow-y-auto overflow-x-hidden" : "overflow-hidden")}>
             {/* Technician schedule. Day view sizes to content so the grid ends at the
                 last tech row (no blank stretch); other views fill + scroll internally. */}
-            <div className={cn("overflow-x-hidden", viewMode === "day" ? "flex-shrink-0" : "flex-1 min-h-[280px] overflow-y-auto")}>
+            <div className={cn("scrollbar-minimal overflow-x-hidden", viewMode === "day" ? "flex-shrink-0" : "flex-1 min-h-[280px] overflow-y-auto")}>
               {viewMode === "trucks" ? (
                 <TrucksMapView technicians={technicians} />
               ) : viewMode === "day" ? (
@@ -4550,7 +4561,7 @@ export default function CrmDispatch() {
             
             {/* Unassigned Queue — sits directly below the grid (day view), hidden in trucks */}
             {viewMode !== "trucks" && (
-            <div className={cn("flex-shrink-0 overflow-x-hidden", viewMode === "day" ? "" : "max-h-[220px] overflow-y-auto")}>
+            <div className={cn("scrollbar-minimal flex-shrink-0 overflow-x-hidden", viewMode === "day" ? "" : "max-h-[220px] overflow-y-auto")}>
               <UnassignedQueueSection
                 workOrders={unassignedWorkOrders}
                 onWorkOrderClick={handleWorkOrderClick}

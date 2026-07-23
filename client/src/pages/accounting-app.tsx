@@ -185,35 +185,17 @@ export default function AccountingApp() {
     .filter((g) => g.list.length > 0);
 
   return (
-    <div className="flex h-screen flex-col bg-[#f5f5f7]">
-      {/* Top bar */}
-      <header className="flex shrink-0 items-center gap-3 border-b border-black/[0.06] bg-white/80 px-4 py-2.5 backdrop-blur">
-        <button
-          onClick={() => navigate("/")}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-          title="Back to apps"
-          data-testid="button-back-apps"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-gradient-to-br from-emerald-500 to-green-700">
-          <Calculator className="h-4 w-4 text-white" />
-        </span>
-        <span className="font-display text-[15px] font-semibold text-slate-900">Accounting</span>
-        <div className="ml-auto">
-          <Button size="sm" variant="outline" className="h-9 rounded-lg" onClick={() => navigate("/crm/invoices")} data-testid="link-invoices">
-            Invoices <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </header>
-
-      <div className="flex min-h-0 flex-1">
+    <div className="flex h-screen bg-[#f5f5f7]">
         {/* Sidebar — shared CRM-style dark collapsible panel */}
         <AppSidebar
           appKey="acct"
+          header={{ title: "Accounting", subtitle: "Command Center", onHome: () => navigate("/") }}
           activeKey={tab}
-          onSelect={(k) => setTab(k as Tab)}
-          groups={[{ items: NAV }]}
+          onSelect={(k) => {
+            if (k === "invoices") { navigate("/crm/invoices"); return; }
+            setTab(k as Tab);
+          }}
+          groups={[{ items: NAV }, { items: [{ key: "invoices", label: "Invoices", icon: ExternalLink }] }]}
         />
 
         {/* Main */}
@@ -434,7 +416,6 @@ export default function AccountingApp() {
             </div>
           )}
         </main>
-      </div>
 
       {/* Expense dialog */}
       <Dialog open={!!expenseForm} onOpenChange={(o) => !o && setExpenseForm(null)}>
