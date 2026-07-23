@@ -175,6 +175,7 @@ export async function syncThread(user: CrmUser, gmailThreadId: string): Promise<
 
   const myEmail = (user.gmailAddress || user.email || "").toLowerCase();
   const participantSet = new Set<string>();
+  const nameByEmail = new Map<string, string>(); // best display name seen per email
   let subject = "";
   let lastMs = 0;
   let anyUnread = false;
@@ -207,8 +208,12 @@ export async function syncThread(user: CrmUser, gmailThreadId: string): Promise<
     if (isUnread) anyUnread = true;
     if (labels.includes("INBOX")) anyInbox = true;
     if (isSent) anySent = true;
-    [from.email, ...to.map((x) => x.email), ...cc.map((x) => x.email)].forEach((e) => {
-      if (e && e !== myEmail) participantSet.add(e);
+    [from, ...to, ...cc].forEach((a) => {
+      if (a.email && a.email !== myEmail) {
+        participantSet.add(a.email);
+        // Prefer a real display name; don't overwrite one we already have.
+        if (a.name && !nameByEmail.has(a.email)) nameByEmail.set(a.email, a.name);
+      }
     });
     const { html, text, attachments } = extractBody(m.payload);
 
@@ -260,12 +265,14 @@ export async function syncThread(user: CrmUser, gmailThreadId: string): Promise<
     customerId = cust?.id ?? null;
   }
 
+  const participantList = Array.from(participantSet);
   await db
     .update(crmEmailThreads)
     .set({
       subject: subject || null,
       snippet: messages[messages.length - 1]?.snippet || null,
-      participants: Array.from(participantSet),
+      participants: participantList,
+      participantNames: participantList.map((e) => nameByEmail.get(e) ?? null),
       lastMessageAt: lastMs ? new Date(lastMs) : null,
       isUnread: anyUnread,
       inInbox: anyInbox,

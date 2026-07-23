@@ -284,6 +284,7 @@ async function runGmailMigration() {
         updated_at timestamp DEFAULT now()
       )
     `);
+    await db.execute(sql`ALTER TABLE crm_email_threads ADD COLUMN IF NOT EXISTS participant_names json DEFAULT '[]'::json`);
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS crm_email_threads_user_thread_idx ON crm_email_threads(user_id, gmail_thread_id)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS crm_email_threads_user_last_idx ON crm_email_threads(user_id, last_message_at)`);
     await db.execute(sql`

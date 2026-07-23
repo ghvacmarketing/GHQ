@@ -3018,6 +3018,8 @@ export const crmEmailThreads = pgTable("crm_email_threads", {
   snippet: text("snippet"),
   // Distinct participant emails on the thread (for display + customer matching)
   participants: json("participants").$type<string[]>().default([]),
+  // Display names aligned index-wise with `participants` (null when unknown)
+  participantNames: json("participant_names").$type<(string | null)[]>().default([]),
   lastMessageAt: timestamp("last_message_at"),
   isUnread: boolean("is_unread").notNull().default(false),
   inInbox: boolean("in_inbox").notNull().default(true),

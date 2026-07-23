@@ -25,10 +25,20 @@ type Thread = {
   subject: string | null;
   snippet: string | null;
   participants: string[] | null;
+  participantNames: (string | null)[] | null;
   lastMessageAt: string | null;
   isUnread: boolean;
   customerId: string | null;
 };
+
+// A friendlier fallback name from an email when no display name exists:
+// "grainger@e.grainger.com" -> "Grainger". Keeps a full unknown address as-is.
+function nameFromEmail(email: string): string {
+  const local = email.split("@")[0] || email;
+  const cleaned = local.replace(/[._-]+/g, " ").trim();
+  if (!cleaned) return email;
+  return cleaned.replace(/\b\w/g, (c) => c.toUpperCase());
+}
 type EmailMessage = {
   id: string;
   gmailMessageId: string;
@@ -136,11 +146,14 @@ function fmtWhen(iso: string | null): string {
   return format(d, "MMM d, yyyy");
 }
 
-// Display name for a thread row: prefer the participant's name-ish local part.
+// Display name for a thread row: the real sender name if Gmail gave us one,
+// otherwise a friendly name derived from the email address.
 function primaryName(t: Thread): string {
-  const p = (t.participants && t.participants[0]) || "";
-  if (!p) return "(no recipient)";
-  return p;
+  const email = (t.participants && t.participants[0]) || "";
+  const name = (t.participantNames && t.participantNames[0]) || "";
+  if (name) return name;
+  if (email) return nameFromEmail(email);
+  return "(no recipient)";
 }
 
 function initials(str: string): string {
@@ -165,6 +178,7 @@ export default function CrmMail() {
   selectedIdRef.current = selectedId;
   const [composeOpen, setComposeOpen] = useState(false);
   const [viewer, setViewer] = useState<{ url: string; name: string; mimeType: string } | null>(null);
+  const [showEmailFor, setShowEmailFor] = useState<string | null>(null); // message id whose raw emails are revealed
   const [replyHtml, setReplyHtml] = useState("");
   const [replyFiles, setReplyFiles] = useState<OutAttachment[]>([]);
   const replyFileInput = useRef<HTMLInputElement | null>(null);
@@ -599,19 +613,34 @@ export default function CrmMail() {
                     const outbound = m.direction === "outbound";
                     return (
                       <div key={m.id} className="overflow-hidden rounded-lg border border-slate-200/80 bg-white shadow-sm" data-testid={`message-${m.id}`}>
-                        <div className="flex items-start gap-3 border-b border-slate-100 px-4 py-3">
-                          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold leading-none ${outbound ? "bg-[#711419] text-white" : "bg-slate-200 text-slate-600"}`}>
-                            {initials(m.fromName || m.fromEmail || "?")}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-baseline gap-x-1.5">
-                              <span className="text-sm font-semibold text-slate-800">{m.fromName || m.fromEmail}</span>
-                              {m.fromName && <span className="text-xs text-slate-400">{m.fromEmail}</span>}
-                            </div>
-                            <div className="truncate text-xs text-slate-400">to {(m.toEmails || []).join(", ")}</div>
-                          </div>
-                          <span className="shrink-0 pt-0.5 text-xs text-slate-400">{m.sentAt ? format(new Date(m.sentAt), "MMM d, h:mm a") : ""}</span>
-                        </div>
+                        {(() => {
+                          const fromDisplay = m.fromName || (m.fromEmail ? nameFromEmail(m.fromEmail) : "Unknown");
+                          const revealed = showEmailFor === m.id;
+                          const toList = m.toEmails || [];
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setShowEmailFor((cur) => (cur === m.id ? null : m.id))}
+                              className="flex w-full items-start gap-3 border-b border-slate-100 px-4 py-3 text-left transition-colors hover:bg-slate-50/60"
+                              title={revealed ? "Hide addresses" : "Show email addresses"}
+                              data-testid={`message-header-${m.id}`}
+                            >
+                              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold leading-none ${outbound ? "bg-[#711419] text-white" : "bg-slate-200 text-slate-600"}`}>
+                                {initials(m.fromName || m.fromEmail || "?")}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-baseline gap-x-1.5">
+                                  <span className="text-sm font-semibold text-slate-800">{fromDisplay}</span>
+                                  {revealed && m.fromEmail && <span className="text-xs text-slate-400">&lt;{m.fromEmail}&gt;</span>}
+                                </div>
+                                <div className="truncate text-xs text-slate-400">
+                                  to {revealed ? (toList.length ? toList.join(", ") : "—") : toList.map((e) => nameFromEmail(e)).join(", ") || "—"}
+                                </div>
+                              </div>
+                              <span className="shrink-0 pt-0.5 text-xs text-slate-400">{m.sentAt ? format(new Date(m.sentAt), "MMM d, h:mm a") : ""}</span>
+                            </button>
+                          );
+                        })()}
                         <div className="px-4 py-4">
                           {m.bodyHtml ? (
                             <div className="email-body overflow-x-auto text-sm leading-relaxed text-slate-700 [&_a]:text-[#711419] [&_a]:underline [&_img]:max-w-full" dangerouslySetInnerHTML={{ __html: sanitizeHtml(m.bodyHtml) }} />
