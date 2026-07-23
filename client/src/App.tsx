@@ -250,9 +250,8 @@ function ProtectedCrmWrapper({ children }: { children: ReactNode }) {
 // Mobile-specific loading placeholder
 function MobileLoader() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50" data-testid="mobile-loader">
-      <Loader2 className="h-8 w-8 animate-spin text-[#711419] mb-4" />
-      <p className="text-slate-500">Loading...</p>
+    <div className="min-h-screen flex items-center justify-center bg-slate-50" data-testid="mobile-loader">
+      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
     </div>
   );
 }

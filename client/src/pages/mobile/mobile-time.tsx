@@ -107,7 +107,7 @@ export default function MobileTime() {
           <CardContent>
             {loadingCurrent ? (
               <div className="flex justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-[#711419]" />
+                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
               </div>
             ) : (
               <div className="text-center space-y-4">
@@ -177,7 +177,7 @@ export default function MobileTime() {
           <CardContent>
             {loadingHistory ? (
               <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
               </div>
             ) : !history || history.length === 0 ? (
               <div className="text-center py-8 text-slate-500">

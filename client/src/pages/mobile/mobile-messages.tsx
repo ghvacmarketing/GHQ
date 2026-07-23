@@ -153,7 +153,7 @@ export default function MobileMessages() {
           <ScrollArea className="flex-1">
             {loadingContacts ? (
               <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
               </div>
             ) : contacts && contacts.length > 0 ? (
               <div className="divide-y">
@@ -236,7 +236,7 @@ export default function MobileMessages() {
           <ScrollArea className="flex-1 p-4">
             {loadingDetail ? (
               <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
               </div>
             ) : conversationDetail?.messages && conversationDetail.messages.length > 0 ? (
               <div className="space-y-3">
@@ -350,7 +350,7 @@ export default function MobileMessages() {
         <ScrollArea className="flex-1">
           {loadingConversations ? (
             <div className="flex justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
             </div>
           ) : conversations && conversations.length > 0 ? (
             <div className="divide-y">

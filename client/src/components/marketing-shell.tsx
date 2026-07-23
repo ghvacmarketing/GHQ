@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { AppSidebar } from "@/components/app-sidebar";
+import { AppTopBar } from "@/components/app-topbar";
 import type { CrmUser } from "@shared/schema";
 
 /** "/marketing/..." renders the standalone Marketing app chrome; the legacy
@@ -50,7 +51,9 @@ export function MarketingChrome({
   const active = activeTabKey(location);
 
   return (
-    <div className="flex h-screen bg-[#f4f5f6]">
+    <div className="flex h-screen flex-col bg-[#f4f5f6]">
+      <AppTopBar currentUser={currentUser ?? null} />
+      <div className="flex min-h-0 flex-1">
         {/* Sidebar — shared CRM-style dark collapsible panel with branded header */}
         <AppSidebar
           appKey="mkt"
@@ -79,6 +82,7 @@ export function MarketingChrome({
           </div>
           <div className="mx-auto w-full max-w-6xl">{children}</div>
         </main>
+      </div>
     </div>
   );
 }

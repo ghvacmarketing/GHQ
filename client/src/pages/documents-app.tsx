@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { AppSidebar } from "@/components/app-sidebar";
+import { AppTopBar } from "@/components/app-topbar";
+import { AppLoader } from "@/components/app-loader";
 import { useToast } from "@/hooks/use-toast";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Button } from "@/components/ui/button";
@@ -313,9 +315,7 @@ export default function DocumentsApp() {
 
   if (authLoading || !currentUser) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f5f5f7]">
-        <Loader2 className="h-7 w-7 animate-spin text-[#711419]" />
-      </div>
+      <AppLoader />
     );
   }
 
@@ -613,7 +613,9 @@ export default function DocumentsApp() {
   );
 
   return (
-    <div className="flex h-screen bg-[#f5f5f7]">
+    <div className="flex h-screen flex-col bg-[#f5f5f7]">
+      <AppTopBar currentUser={currentUser} />
+      <div className="flex min-h-0 flex-1">
         {/* Sidebar — shared CRM-style dark collapsible panel */}
         <AppSidebar
           appKey="docs"
@@ -744,6 +746,7 @@ export default function DocumentsApp() {
 
           {tab === "settings" ? <DocsSettings viewMode={viewMode} setMode={setMode} /> : contentArea}
         </main>
+      </div>
 
       {/* Preview */}
       {preview && (

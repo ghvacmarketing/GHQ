@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { AppSidebar } from "@/components/app-sidebar";
+import { AppTopBar } from "@/components/app-topbar";
+import { AppLoader } from "@/components/app-loader";
 import { useToast } from "@/hooks/use-toast";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Button } from "@/components/ui/button";
@@ -157,9 +159,7 @@ export default function AccountingApp() {
 
   if (authLoading || !currentUser) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f5f5f7]">
-        <Loader2 className="h-7 w-7 animate-spin text-[#711419]" />
-      </div>
+      <AppLoader />
     );
   }
 
@@ -185,7 +185,9 @@ export default function AccountingApp() {
     .filter((g) => g.list.length > 0);
 
   return (
-    <div className="flex h-screen bg-[#f5f5f7]">
+    <div className="flex h-screen flex-col bg-[#f5f5f7]">
+      <AppTopBar currentUser={currentUser} />
+      <div className="flex min-h-0 flex-1">
         {/* Sidebar — shared CRM-style dark collapsible panel */}
         <AppSidebar
           appKey="acct"
@@ -416,6 +418,7 @@ export default function AccountingApp() {
             </div>
           )}
         </main>
+      </div>
 
       {/* Expense dialog */}
       <Dialog open={!!expenseForm} onOpenChange={(o) => !o && setExpenseForm(null)}>

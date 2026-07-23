@@ -1940,7 +1940,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
                 style={{ left: `calc(176px + (100% - 176px) * ${nowPct})` }}
                 data-testid="dispatch-now-time"
               >
-                {formatLocal(nowTick, "h:mm a")}
+                {formatLocal(nowTick, "h:mm")}
               </button>
             </>
           )}

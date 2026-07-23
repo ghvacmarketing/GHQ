@@ -45,7 +45,7 @@ export default function MobileProfile() {
       <div className="p-4 pt-16 space-y-4" data-testid="mobile-profile">
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-8 w-8 animate-spin text-[#711419]" />
+            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
           </div>
         ) : currentUser ? (
           <>

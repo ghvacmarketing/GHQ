@@ -985,7 +985,7 @@ export default function MobileInvoiceDetail() {
                     <img src={qrDataUrl} alt="Payment QR code" className="h-64 w-64" data-testid="payment-qr" />
                   ) : (
                     <div className="flex h-64 w-64 items-center justify-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-[#711419]" />
                     </div>
                   )}
                 </div>
