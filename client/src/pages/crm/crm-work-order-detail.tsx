@@ -1030,7 +1030,7 @@ export default function CrmWorkOrderDetail() {
         </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-6">
+          <TabsList className="mb-4">
             <TabsTrigger
               value="details"
               data-testid="tab-details"

@@ -2307,7 +2307,7 @@ function CustomerTabbedView({
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" data-testid="customer-tabs">
-      <TabsList className="mb-6" data-testid="tabs-list">
+      <TabsList className="mb-4" data-testid="tabs-list">
         <TabsTrigger 
           value="overview"
           data-testid="tab-overview"

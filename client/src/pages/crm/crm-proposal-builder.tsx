@@ -3498,7 +3498,7 @@ export default function CrmProposalBuilder() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-          <TabsList className="mb-6" data-testid="tabs-view-switcher">
+          <TabsList className="mb-4" data-testid="tabs-view-switcher">
             <TabsTrigger 
               value="preset" 
               data-testid="tab-preset-packages"

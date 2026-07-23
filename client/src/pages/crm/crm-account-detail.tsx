@@ -572,7 +572,7 @@ export default function CrmAccountDetail() {
         </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="mb-6">
+          <TabsList className="mb-4">
             {account.accountType === "PROPERTY_MANAGER" && (
               <TabsTrigger value="overview" data-testid="tab-overview">
                 <LayoutDashboard className="h-4 w-4 mr-2" />

@@ -185,9 +185,7 @@ export default function AccountingApp() {
     .filter((g) => g.list.length > 0);
 
   return (
-    <div className="flex h-screen flex-col bg-[#f5f5f7]">
-      <AppTopBar currentUser={currentUser} />
-      <div className="flex min-h-0 flex-1">
+    <div className="flex h-screen bg-[#f5f5f7]">
         {/* Sidebar — shared CRM-style dark collapsible panel */}
         <AppSidebar
           appKey="acct"
@@ -200,6 +198,8 @@ export default function AccountingApp() {
           groups={[{ items: NAV }, { items: [{ key: "invoices", label: "Invoices", icon: ExternalLink }] }]}
         />
 
+      <div className="flex min-h-0 flex-1 flex-col">
+      <AppTopBar currentUser={currentUser} />
         {/* Main */}
         <main className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">
           {/* Mobile tabs */}

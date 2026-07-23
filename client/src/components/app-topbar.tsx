@@ -10,8 +10,9 @@ import {
 import type { CrmUser } from "@shared/schema";
 
 /** CRM-style top utility bar for the app shells: Apps switcher on the left,
- *  the signed-in user's name on the right. */
-export function AppTopBar({ currentUser }: { currentUser?: CrmUser | null }) {
+ *  an optional centered slot (e.g. Documents' file search), and the
+ *  signed-in user's name on the right. */
+export function AppTopBar({ currentUser, center }: { currentUser?: CrmUser | null; center?: React.ReactNode }) {
   const [, navigate] = useLocation();
   const role = currentUser?.role || "";
 
@@ -52,7 +53,9 @@ export function AppTopBar({ currentUser }: { currentUser?: CrmUser | null }) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <div className="ml-auto flex items-center border-l border-border pl-3">
+      {center && <div className="min-w-0 flex-1">{center}</div>}
+
+      <div className={`${center ? "" : "ml-auto "}flex items-center border-l border-border pl-3`}>
         <span className="text-sm font-medium text-slate-600">{currentUser?.name || "User"}</span>
       </div>
     </div>

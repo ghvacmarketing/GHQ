@@ -2954,7 +2954,7 @@ function CrmPhoneContent() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-6">
+        <TabsList className="mb-4">
           <TabsTrigger value="call-logs" data-testid="crm-phone-tab-call-logs">
             <Calendar className="h-3.5 w-3.5 mr-1.5" />
             Call Logs
@@ -3024,7 +3024,7 @@ export default function CrmPhonePage() {
     <CrmLayout currentUser={currentUser} flush disableScroll>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <CommsSwitcher active="phone" />
-        <div className="px-4 pb-4 pt-2 lg:px-5 lg:pb-5">
+        <div className="px-4 pb-4 pt-1 lg:px-5 lg:pb-5">
           <CrmPhoneContent />
         </div>
       </div>

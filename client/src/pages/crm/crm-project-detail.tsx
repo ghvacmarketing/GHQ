@@ -1362,7 +1362,7 @@ export default function CrmProjectDetail() {
         </Dialog>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6">
+          <TabsList className="mb-4">
             <TabsTrigger 
               value="overview"
               data-testid="tab-overview"

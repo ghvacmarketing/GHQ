@@ -51,9 +51,7 @@ export function MarketingChrome({
   const active = activeTabKey(location);
 
   return (
-    <div className="flex h-screen flex-col bg-[#f4f5f6]">
-      <AppTopBar currentUser={currentUser ?? null} />
-      <div className="flex min-h-0 flex-1">
+    <div className="flex h-screen bg-[#f4f5f6]">
         {/* Sidebar — shared CRM-style dark collapsible panel with branded header */}
         <AppSidebar
           appKey="mkt"
@@ -65,6 +63,8 @@ export function MarketingChrome({
           }}
           groups={[{ items: MARKETING_TABS.map((t) => ({ key: t.key, label: t.label, icon: t.icon })) }]}
         />
+      <div className="flex min-h-0 flex-1 flex-col">
+      <AppTopBar currentUser={currentUser ?? null} />
         <main className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">
           {/* Mobile tab strip */}
           <div className="-mx-1 mb-4 flex gap-1 overflow-x-auto px-1 pb-1 sm:hidden">

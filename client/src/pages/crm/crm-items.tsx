@@ -399,20 +399,19 @@ export default function CrmItems() {
         />
 
         <Tabs value={activeCategory} onValueChange={setActiveCategory} className="w-full">
-          <TabsList className="w-full h-auto flex flex-wrap justify-start gap-1 bg-transparent p-0">
+          <TabsList className="mb-1 h-auto flex-wrap overflow-visible">
             {categoryTabs.map((tab) => {
               const count = tab.key !== "all" ? categoryCounts[tab.key] || 0 : items.length;
               return (
                 <TabsTrigger
                   key={tab.key}
                   value={tab.key}
-                  className="px-3 py-2 text-sm font-medium border-b-2 border-transparent rounded-none data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-slate-900 hover:border-slate-300"
                   data-testid={`tab-category-${tab.key}`}
                 >
                   {tab.label}
                   {count > 0 && (
-                    <span className={`ml-1.5 px-1.5 py-0.5 text-xs rounded ${
-                      activeCategory === tab.key ? "bg-[#711419] text-white" : "bg-slate-200 text-slate-600"
+                    <span className={`ml-1.5 text-xs tabular-nums ${
+                      activeCategory === tab.key ? "text-white/60" : "text-slate-400"
                     }`}>
                       {count}
                     </span>

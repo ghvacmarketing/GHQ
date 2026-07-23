@@ -22175,8 +22175,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const OpenAI = (await import("openai")).default;
         const openai = new OpenAI({
-          apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-          baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+          apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+          baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || undefined,
         });
         
         const serviceTypeDisplay = serviceType?.replace(/_/g, " ").toLowerCase() || "service call";

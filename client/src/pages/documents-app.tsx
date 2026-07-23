@@ -615,9 +615,7 @@ export default function DocumentsApp() {
   );
 
   return (
-    <div className="flex h-screen flex-col bg-[#f5f5f7]">
-      <AppTopBar currentUser={currentUser} />
-      <div className="flex min-h-0 flex-1">
+    <div className="flex h-screen bg-[#f5f5f7]">
         {/* Sidebar — shared CRM-style dark collapsible panel */}
         <AppSidebar
           appKey="docs"
@@ -644,6 +642,32 @@ export default function DocumentsApp() {
           ]}
         />
 
+      <div className="flex min-h-0 flex-1 flex-col">
+      <AppTopBar
+        currentUser={currentUser}
+        center={
+          <div className="relative mx-auto w-full max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              value={searchInput}
+              onChange={(e) => { setSearchInput(e.target.value); if (!e.target.value.trim()) setSearch(""); }}
+              onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput)}
+              placeholder="Search files…"
+              className="h-9 rounded-full border-transparent bg-slate-100 pl-9 text-sm focus-visible:bg-white"
+              data-testid="input-doc-search"
+            />
+            {search && (
+              <button
+                onClick={() => { setSearch(""); setSearchInput(""); }}
+                className="absolute right-2.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-slate-300 text-white"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        }
+      />
+      <div className="flex min-h-0 flex-1">
         {/* Library folder tree */}
         {tab === "library" && !searching && (
           <div className="hidden w-60 shrink-0 overflow-y-auto border-r border-black/[0.06] bg-white/40 p-2 md:block" data-testid="library-tree">
@@ -685,27 +709,8 @@ export default function DocumentsApp() {
           onDrop={(e) => { e.preventDefault(); setDragOver(false); if (canUpload && e.dataTransfer.types.includes("Files")) uploadFiles(e.dataTransfer.files); }}
           data-testid="docs-main"
         >
-          {/* Toolbar — search + folder/upload (was the old top bar) */}
+          {/* Toolbar — folder/upload actions (search lives in the top bar) */}
           <div className="mb-3 flex items-center gap-2">
-            <div className="relative w-full max-w-md">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                value={searchInput}
-                onChange={(e) => { setSearchInput(e.target.value); if (!e.target.value.trim()) setSearch(""); }}
-                onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput)}
-                placeholder="Search files…"
-                className="h-9 rounded-full border-transparent bg-white pl-9 text-sm shadow-sm focus-visible:bg-white"
-                data-testid="input-doc-search"
-              />
-              {search && (
-                <button
-                  onClick={() => { setSearch(""); setSearchInput(""); }}
-                  className="absolute right-2.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-slate-300 text-white"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
             <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => uploadFiles(e.target.files)} data-testid="input-doc-upload" />
             <div className="ml-auto flex shrink-0 gap-2">
               <Button
@@ -748,6 +753,7 @@ export default function DocumentsApp() {
 
           {tab === "settings" ? <DocsSettings viewMode={viewMode} setMode={setMode} /> : contentArea}
         </main>
+      </div>
       </div>
 
       {/* Preview */}

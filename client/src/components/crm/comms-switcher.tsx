@@ -21,32 +21,31 @@ export function CommsSwitcher({ active }: { active: CommsTab }) {
     if (href) localStorage.setItem("crmCommsLastTab", href);
   }, [active]);
 
+  // Same pill segmented control as the dispatch board's Day/Week/Month switch
   const control = (
-    <div className="flex items-center">
-      <div className="flex w-fit overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
-        {ITEMS.map((it, i) => {
-          const Icon = it.icon;
-          const isActive = active === it.key;
-          return (
-            <button
-              key={it.key}
-              onClick={() => !isActive && navigate(it.href)}
-              className={`flex h-8 items-center gap-1.5 px-3 text-[13px] font-medium transition-colors ${
-                i > 0 ? "border-l border-slate-300/70" : ""
-              } ${isActive ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}
-              data-testid={`comms-tab-${it.key}`}
-            >
-              <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
-              {it.label}
-            </button>
-          );
-        })}
-      </div>
+    <div className="inline-flex items-center gap-1 rounded-lg bg-slate-100 p-1">
+      {ITEMS.map((it) => {
+        const Icon = it.icon;
+        const isActive = active === it.key;
+        return (
+          <button
+            key={it.key}
+            onClick={() => !isActive && navigate(it.href)}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-all ${
+              isActive ? "bg-white text-[#711419] shadow-sm" : "text-slate-500 hover:text-slate-700"
+            }`}
+            data-testid={`comms-tab-${it.key}`}
+          >
+            <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
+            {it.label}
+          </button>
+        );
+      })}
     </div>
   );
 
   return (
-    <div className="flex shrink-0 items-center justify-center px-4 pb-1 pt-2.5">
+    <div className="flex shrink-0 items-center justify-center px-4 pb-3 pt-4">
       {control}
     </div>
   );

@@ -2702,7 +2702,7 @@ export default function CrmProspectFunnel() {
 
                 <ScrollArea className="flex-1 px-4 py-3">
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="mb-6">
+                    <TabsList className="mb-4">
                       <TabsTrigger value="details">Details</TabsTrigger>
                       <TabsTrigger value="followups">
                         <Calendar className="h-3 w-3 mr-1" />
