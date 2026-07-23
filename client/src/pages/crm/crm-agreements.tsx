@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useSmoothLoading } from "@/hooks/use-smooth-loading";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -215,7 +216,7 @@ export default function CrmAgreements() {
     setPage(1);
   }, [debouncedSearch, activeTab]);
 
-  const { data: agreementsData, isLoading: agreementsLoading } = useQuery<AgreementsResponse>({
+  const { data: agreementsData, isLoading: agreementsLoadingRaw } = useQuery<AgreementsResponse>({
     queryKey: ["/api/crm/agreements", page, debouncedSearch, activeTab],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -234,6 +235,7 @@ export default function CrmAgreements() {
     },
     enabled: !!currentUser,
   });
+  const agreementsLoading = useSmoothLoading(agreementsLoadingRaw);
 
   const { data: regions = [] } = useQuery<MaintenanceRegion[]>({
     queryKey: ["/api/crm/maintenance-regions"],
@@ -718,6 +720,7 @@ export default function CrmAgreements() {
         <div className="flex items-center justify-between gap-2">
           <IndustrialTabs
             testidPrefix="tab"
+            className="flex-wrap overflow-visible"
             activeKey={activeTab}
             onSelect={(k) => setActiveTab(k as typeof activeTab)}
             tabs={tabFilters.map((tab) => {

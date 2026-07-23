@@ -2307,82 +2307,72 @@ function CustomerTabbedView({
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" data-testid="customer-tabs">
-      <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap" data-testid="tabs-list">
+      <TabsList className="mb-6" data-testid="tabs-list">
         <TabsTrigger 
-          value="overview" 
-          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          value="overview"
           data-testid="tab-overview"
         >
           <LayoutGrid className="h-4 w-4 mr-2" />
           Overview
         </TabsTrigger>
         <TabsTrigger 
-          value="locations" 
-          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          value="locations"
           data-testid="tab-locations"
         >
           <MapPin className="h-4 w-4 mr-2" />
           Locations
         </TabsTrigger>
         <TabsTrigger 
-          value="work-orders" 
-          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          value="work-orders"
           data-testid="tab-work-orders"
         >
           <Wrench className="h-4 w-4 mr-2" />
           Work Orders
         </TabsTrigger>
         <TabsTrigger 
-          value="projects" 
-          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          value="projects"
           data-testid="tab-projects"
         >
           <Briefcase className="h-4 w-4 mr-2" />
           Projects
         </TabsTrigger>
         <TabsTrigger 
-          value="quotes" 
-          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          value="quotes"
           data-testid="tab-quotes"
         >
           <FileText className="h-4 w-4 mr-2" />
           Quotes
         </TabsTrigger>
         <TabsTrigger 
-          value="invoices" 
-          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          value="invoices"
           data-testid="tab-invoices"
         >
           <Receipt className="h-4 w-4 mr-2" />
           Invoices & Payments
         </TabsTrigger>
         <TabsTrigger 
-          value="files" 
-          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          value="files"
           data-testid="tab-files"
         >
           <FileText className="h-4 w-4 mr-2" />
           Files / Photos
         </TabsTrigger>
         <TabsTrigger 
-          value="tasks" 
-          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          value="tasks"
           data-testid="tab-tasks"
         >
           <ClipboardList className="h-4 w-4 mr-2" />
           Tasks
         </TabsTrigger>
         <TabsTrigger 
-          value="agreements" 
-          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          value="agreements"
           data-testid="tab-agreements"
         >
           <FileText className="h-4 w-4 mr-2" />
           Agreements
         </TabsTrigger>
         <TabsTrigger 
-          value="timeline" 
-          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+          value="timeline"
           data-testid="tab-timeline"
         >
           <History className="h-4 w-4 mr-2" />
@@ -2390,7 +2380,6 @@ function CustomerTabbedView({
         </TabsTrigger>
         <TabsTrigger
           value="settings"
-          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
           data-testid="tab-settings"
         >
           <ClipboardList className="h-4 w-4 mr-2" />
@@ -2398,7 +2387,6 @@ function CustomerTabbedView({
         </TabsTrigger>
         <TabsTrigger
           value="portal"
-          className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
           data-testid="tab-portal"
         >
           <Key className="h-4 w-4 mr-2" />
@@ -2408,7 +2396,6 @@ function CustomerTabbedView({
         {customer?.parentCustomerId && (
           <TabsTrigger
             value="sub-account"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
             data-testid="tab-sub-account"
           >
             <GitBranch className="h-4 w-4 mr-2" />
@@ -2419,7 +2406,6 @@ function CustomerTabbedView({
         {subAccounts.length > 0 && (
           <TabsTrigger
             value="sub-accounts"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
             data-testid="tab-sub-accounts"
           >
             <Users className="h-4 w-4 mr-2" />

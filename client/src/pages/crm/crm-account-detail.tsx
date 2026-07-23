@@ -572,26 +572,26 @@ export default function CrmAccountDetail() {
         </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap">
+          <TabsList className="mb-6">
             {account.accountType === "PROPERTY_MANAGER" && (
-              <TabsTrigger value="overview" data-testid="tab-overview" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
+              <TabsTrigger value="overview" data-testid="tab-overview">
                 <LayoutDashboard className="h-4 w-4 mr-2" />
                 Overview
               </TabsTrigger>
             )}
-            <TabsTrigger value="locations" data-testid="tab-locations" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
+            <TabsTrigger value="locations" data-testid="tab-locations">
               <MapPin className="h-4 w-4 mr-2" />
               Locations {displaySites.length}
             </TabsTrigger>
-            <TabsTrigger value="contacts" data-testid="tab-contacts" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
+            <TabsTrigger value="contacts" data-testid="tab-contacts">
               <User className="h-4 w-4 mr-2" />
               Contacts {contacts.length}
             </TabsTrigger>
-            <TabsTrigger value="jobs" data-testid="tab-jobs" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
+            <TabsTrigger value="jobs" data-testid="tab-jobs">
               <Briefcase className="h-4 w-4 mr-2" />
               Projects {jobs.length}
             </TabsTrigger>
-            <TabsTrigger value="profile" data-testid="tab-profile" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
+            <TabsTrigger value="profile" data-testid="tab-profile">
               <FileText className="h-4 w-4 mr-2" />
               Profile
             </TabsTrigger>

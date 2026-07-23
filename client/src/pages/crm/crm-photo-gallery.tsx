@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useSmoothLoading } from "@/hooks/use-smooth-loading";
 import { format, isAfter, isBefore, startOfDay, subDays } from "date-fns";
 import { User, ImageIcon, Download, Trash2, LayoutGrid, List, ZoomIn, ZoomOut, X, Check, Loader2 } from "lucide-react";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -102,11 +103,12 @@ export default function CrmPhotoGallery() {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
-  const { data: photos, isLoading } = useQuery<FeedPhoto[]>({
+  const { data: photos, isLoading: isLoadingRaw } = useQuery<FeedPhoto[]>({
     queryKey: ["/api/crm/photos/feed"],
     refetchInterval: 10 * 1000, // near real-time monitoring
     enabled: !!currentUser,
   });
+  const isLoading = useSmoothLoading(isLoadingRaw);
 
   // Filter options derived from the loaded feed
   const customerOptions = useMemo(() => {

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, useSearch, Link } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSmoothLoading } from "@/hooks/use-smooth-loading";
 import { getQueryFn, queryClient as globalQueryClient } from "@/lib/queryClient";
 
 // Debug logging for cache hits
@@ -175,7 +176,7 @@ export default function CrmCustomers() {
     logCache('========================================');
   }, [queryParams]);
 
-  const { data: customersData, isLoading: customersLoading } = useQuery<CustomersResponse>({
+  const { data: customersData, isLoading: customersLoadingRaw } = useQuery<CustomersResponse>({
     queryKey: ["/api/crm/customers/merged", queryParams],
     queryFn: async () => {
       logCache('queryFn EXECUTING - fetching from network!');
@@ -190,6 +191,7 @@ export default function CrmCustomers() {
     enabled: !!currentUser,
     staleTime: 2 * 60 * 1000,
   });
+  const customersLoading = useSmoothLoading(customersLoadingRaw);
 
   const { data: statsData } = useQuery<{ prospects: number; customers: number; total: number; withAgreements: number }>({
     queryKey: ["/api/crm/customers/stats", debouncedSearch],

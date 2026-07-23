@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useSmoothLoading } from "@/hooks/use-smooth-loading";
 import { format } from "date-fns";
 import {
   FolderOpen, Folder, FolderPlus, Upload, Search, Star, Trash2, ChevronRight,
@@ -188,7 +189,7 @@ export default function DocumentsApp() {
       : starOnly && tab === "drive"
         ? "/api/docs/files?view=starred"
         : `/api/docs/files?view=folder${folderId ? `&folderId=${folderId}` : ""}`;
-  const { data: files = [], isLoading: filesLoading } = useQuery<DocFile[]>({
+  const { data: files = [], isLoading: filesLoadingRaw } = useQuery<DocFile[]>({
     queryKey: ["/api/docs/files", filesUrl],
     queryFn: async () => {
       const res = await fetch(filesUrl, { credentials: "include" });
@@ -197,6 +198,7 @@ export default function DocumentsApp() {
     },
     enabled: !!currentUser && (tab !== "settings") && rootReady,
   });
+  const filesLoading = useSmoothLoading(filesLoadingRaw);
 
   const foldersByParent = useMemo(() => {
     const map = new Map<string | null, DocFolder[]>();

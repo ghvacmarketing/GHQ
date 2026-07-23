@@ -3,6 +3,7 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSmoothLoading } from "@/hooks/use-smooth-loading";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 
 // Debug logging for cache hits
@@ -682,7 +683,7 @@ export default function CrmWorkOrders() {
     logCache('========================================');
   }, [queryParams]);
 
-  const { data: workOrdersData, isLoading: workOrdersLoading, refetch } = useQuery<EnrichedWorkOrder[]>({
+  const { data: workOrdersData, isLoading: workOrdersLoadingRaw, refetch } = useQuery<EnrichedWorkOrder[]>({
     queryKey: ["/api/crm/work-orders/list", queryParams],
     queryFn: async () => {
       logCache('queryFn EXECUTING - fetching from network!');
@@ -697,6 +698,7 @@ export default function CrmWorkOrders() {
     refetchInterval: 60000, // Refresh every 60 seconds to catch sync updates
     refetchIntervalInBackground: true, // Keep syncing even when tab is not focused
   });
+  const workOrdersLoading = useSmoothLoading(workOrdersLoadingRaw);
 
   const filteredWorkOrders = useMemo(() => {
     let orders = workOrdersData || [];

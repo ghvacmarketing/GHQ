@@ -1362,59 +1362,51 @@ export default function CrmProjectDetail() {
         </Dialog>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap">
+          <TabsList className="mb-6">
             <TabsTrigger 
-              value="overview" 
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+              value="overview"
               data-testid="tab-overview"
             >
               Overview
             </TabsTrigger>
             <TabsTrigger 
-              value="work-orders" 
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+              value="work-orders"
               data-testid="tab-work-orders"
             >
               Work Orders {workOrderCount}
             </TabsTrigger>
             <TabsTrigger 
-              value="quotes" 
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+              value="quotes"
               data-testid="tab-quotes"
             >
               Quotes {quotes?.length || 0}
             </TabsTrigger>
             <TabsTrigger 
-              value="invoices" 
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+              value="invoices"
               data-testid="tab-invoices"
             >
               Invoices {invoices?.length || 0}
             </TabsTrigger>
             <TabsTrigger 
-              value="timeline" 
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+              value="timeline"
               data-testid="tab-timeline"
             >
               Timeline
             </TabsTrigger>
             <TabsTrigger 
-              value="job-costing" 
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+              value="job-costing"
               data-testid="tab-job-costing"
             >
               Job Costing
             </TabsTrigger>
             <TabsTrigger 
-              value="comments" 
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+              value="comments"
               data-testid="tab-comments"
             >
               Comments
             </TabsTrigger>
             <TabsTrigger 
-              value="tasks" 
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-2"
+              value="tasks"
               data-testid="tab-tasks"
             >
               Tasks

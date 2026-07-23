@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSmoothLoading } from "@/hooks/use-smooth-loading";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -191,7 +192,7 @@ export default function CrmQuotes() {
     setPage(1);
   }, [debouncedSearch, activeTab, quoteTypeFilter]);
 
-  const { data: quotesData, isLoading: quotesLoading } = useQuery<QuotesResponse>({
+  const { data: quotesData, isLoading: quotesLoadingRaw } = useQuery<QuotesResponse>({
     queryKey: ["/api/crm/quotes", page, quoteTypeFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -209,6 +210,7 @@ export default function CrmQuotes() {
     enabled: !!currentUser,
     staleTime: 2 * 60 * 1000,
   });
+  const quotesLoading = useSmoothLoading(quotesLoadingRaw);
 
   // Customer search query
   const { data: customerSearchResults = [], isLoading: isSearchingCustomers } = useQuery<CrmCustomer[]>({

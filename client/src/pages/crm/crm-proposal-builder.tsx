@@ -3498,10 +3498,9 @@ export default function CrmProposalBuilder() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-          <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap" data-testid="tabs-view-switcher">
+          <TabsList className="mb-6" data-testid="tabs-view-switcher">
             <TabsTrigger 
               value="preset" 
-              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" 
               data-testid="tab-preset-packages"
             >
               <Package className="h-5 w-5 sm:mr-2" />
@@ -3509,7 +3508,6 @@ export default function CrmProposalBuilder() {
             </TabsTrigger>
             <TabsTrigger 
               value="custom" 
-              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" 
               data-testid="tab-build-your-own"
             >
               <Wrench className="h-5 w-5 sm:mr-2" />
@@ -3517,7 +3515,6 @@ export default function CrmProposalBuilder() {
             </TabsTrigger>
             <TabsTrigger 
               value="crawlspace" 
-              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" 
               data-testid="tab-crawlspace"
             >
               <Droplets className="h-5 w-5 sm:mr-2" />

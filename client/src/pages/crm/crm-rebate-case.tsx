@@ -218,7 +218,7 @@ export default function CrmRebateCase() {
       <Tabs defaultValue="program_overview">
         {/* Scrollable tab bar — never wraps, scrolls horizontally on small screens */}
         <div className="overflow-x-auto overflow-y-hidden border-b border-slate-200 -mx-4 sm:mx-0 px-4 sm:px-0">
-          <TabsList className="min-w-max w-auto flex justify-start rounded-none bg-transparent h-auto p-0">
+          <TabsList className="min-w-max">
             {[
               { value: "program_overview",       label: "Program Overview",        icon: Star },
               { value: "rebate_request",          label: "Rebate Request",          icon: FileText },
@@ -236,7 +236,6 @@ export default function CrmRebateCase() {
                 <TabsTrigger
                   key={value}
                   value={value}
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:bg-transparent data-[state=active]:shadow-none px-2.5 sm:px-3.5 md:px-4 py-2 text-xs sm:text-sm whitespace-nowrap flex items-center gap-1.5"
                 >
                   {isComplete ? (
                     <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 flex-shrink-0" />

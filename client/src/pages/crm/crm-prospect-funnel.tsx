@@ -2702,21 +2702,21 @@ export default function CrmProspectFunnel() {
 
                 <ScrollArea className="flex-1 px-4 py-3">
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap">
-                      <TabsTrigger value="details" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">Details</TabsTrigger>
-                      <TabsTrigger value="followups" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
+                    <TabsList className="mb-6">
+                      <TabsTrigger value="details">Details</TabsTrigger>
+                      <TabsTrigger value="followups">
                         <Calendar className="h-3 w-3 mr-1" />
                         Follow-ups {getLeadFollowUps(expandedLead.customerId).length}
                       </TabsTrigger>
-                      <TabsTrigger value="notes" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
+                      <TabsTrigger value="notes">
                         <StickyNote className="h-3 w-3 mr-1" />
                         Notes
                       </TabsTrigger>
-                      <TabsTrigger value="quotes" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
+                      <TabsTrigger value="quotes">
                         <FileText className="h-3 w-3 mr-1" />
                         Quotes {leadQuotes.length}
                       </TabsTrigger>
-                      <TabsTrigger value="comments" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
+                      <TabsTrigger value="comments">
                         <MessageSquare className="h-3 w-3 mr-1" />
                         Comments
                       </TabsTrigger>

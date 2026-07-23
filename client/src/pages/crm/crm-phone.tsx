@@ -2954,24 +2954,24 @@ function CrmPhoneContent() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap">
-          <TabsTrigger value="call-logs" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" data-testid="crm-phone-tab-call-logs">
+        <TabsList className="mb-6">
+          <TabsTrigger value="call-logs" data-testid="crm-phone-tab-call-logs">
             <Calendar className="h-3.5 w-3.5 mr-1.5" />
             Call Logs
           </TabsTrigger>
-          <TabsTrigger value="voicemails" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" data-testid="crm-phone-tab-voicemails">
+          <TabsTrigger value="voicemails" data-testid="crm-phone-tab-voicemails">
             <Phone className="h-3.5 w-3.5 mr-1.5" />
             Voicemails
           </TabsTrigger>
-          <TabsTrigger value="screening" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" data-testid="crm-phone-tab-screening">
+          <TabsTrigger value="screening" data-testid="crm-phone-tab-screening">
             <ClipboardList className="h-3.5 w-3.5 mr-1.5" />
             Screening
           </TabsTrigger>
-          <TabsTrigger value="calendar" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" data-testid="crm-phone-tab-calendar">
+          <TabsTrigger value="calendar" data-testid="crm-phone-tab-calendar">
             <CalendarDays className="h-3.5 w-3.5 mr-1.5" />
             Calendar
           </TabsTrigger>
-          <TabsTrigger value="weather" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" data-testid="crm-phone-tab-weather">
+          <TabsTrigger value="weather" data-testid="crm-phone-tab-weather">
             <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
             Weather
           </TabsTrigger>

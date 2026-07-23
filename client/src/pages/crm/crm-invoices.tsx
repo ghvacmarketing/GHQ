@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useSmoothLoading } from "@/hooks/use-smooth-loading";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 
 // Debug logging for cache hits
@@ -186,7 +187,7 @@ export default function CrmInvoices() {
     logCache('========================================');
   }, [queryParams]);
 
-  const { data: invoicesResponse, isLoading: invoicesLoading } = useQuery<{ invoices: InvoiceWithRelations[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>({
+  const { data: invoicesResponse, isLoading: invoicesLoadingRaw } = useQuery<{ invoices: InvoiceWithRelations[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>({
     queryKey: ["/api/crm/invoices", queryParams],
     queryFn: async () => {
       logCache('queryFn EXECUTING - fetching from network!');
@@ -201,6 +202,7 @@ export default function CrmInvoices() {
     enabled: !!currentUser,
     staleTime: 2 * 60 * 1000,
   });
+  const invoicesLoading = useSmoothLoading(invoicesLoadingRaw);
 
   const invoicesData = invoicesResponse?.invoices;
 

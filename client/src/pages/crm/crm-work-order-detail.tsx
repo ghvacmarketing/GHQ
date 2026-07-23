@@ -1030,11 +1030,10 @@ export default function CrmWorkOrderDetail() {
         </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap">
+          <TabsList className="mb-6">
             <TabsTrigger
               value="details"
               data-testid="tab-details"
-              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
             >
               <ClipboardList className="h-4 w-4 md:mr-2" />
               <span className="hidden md:inline">Details</span>
@@ -1042,7 +1041,6 @@ export default function CrmWorkOrderDetail() {
             <TabsTrigger
               value="quotes"
               data-testid="tab-quotes"
-              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
             >
               <FileText className="h-4 w-4 md:mr-2" />
               <span className="hidden md:inline">Quotes</span>
@@ -1050,7 +1048,6 @@ export default function CrmWorkOrderDetail() {
             <TabsTrigger
               value="invoices"
               data-testid="tab-invoices"
-              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
             >
               <DollarSign className="h-4 w-4 md:mr-2" />
               <span className="hidden md:inline">Invoices</span>
@@ -1058,7 +1055,6 @@ export default function CrmWorkOrderDetail() {
             <TabsTrigger
               value="edit"
               data-testid="tab-edit"
-              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
             >
               <Pencil className="h-4 w-4 md:mr-2" />
               <span className="hidden md:inline">Edit</span>
@@ -1066,7 +1062,6 @@ export default function CrmWorkOrderDetail() {
             <TabsTrigger
               value="timeline"
               data-testid="tab-timeline"
-              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
             >
               <Clock className="h-4 w-4 md:mr-2" />
               <span className="hidden md:inline">Timeline</span>
@@ -1074,7 +1069,6 @@ export default function CrmWorkOrderDetail() {
             <TabsTrigger
               value="comments"
               data-testid="tab-comments"
-              className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none"
             >
               <MessageSquare className="h-4 w-4 md:mr-2" />
               <span className="hidden md:inline">Comments</span>
