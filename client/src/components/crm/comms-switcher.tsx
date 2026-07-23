@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { Phone, MessageSquare, Mail } from "lucide-react";
 
@@ -20,6 +21,12 @@ export function CommsSwitcher({
   variant?: "flush" | "inline";
 }) {
   const [, navigate] = useLocation();
+
+  // Remember the last-used Comms tab so the sidebar "Comms" item returns here.
+  useEffect(() => {
+    const href = ITEMS.find((i) => i.key === active)?.href;
+    if (href) localStorage.setItem("crmCommsLastTab", href);
+  }, [active]);
 
   const control = (
     <div className="flex items-center">

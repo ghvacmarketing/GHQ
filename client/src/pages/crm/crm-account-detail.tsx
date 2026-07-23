@@ -581,15 +581,15 @@ export default function CrmAccountDetail() {
             )}
             <TabsTrigger value="locations" data-testid="tab-locations" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
               <MapPin className="h-4 w-4 mr-2" />
-              Locations ({displaySites.length})
+              Locations {displaySites.length}
             </TabsTrigger>
             <TabsTrigger value="contacts" data-testid="tab-contacts" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
               <User className="h-4 w-4 mr-2" />
-              Contacts ({contacts.length})
+              Contacts {contacts.length}
             </TabsTrigger>
             <TabsTrigger value="jobs" data-testid="tab-jobs" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
               <Briefcase className="h-4 w-4 mr-2" />
-              Projects ({jobs.length})
+              Projects {jobs.length}
             </TabsTrigger>
             <TabsTrigger value="profile" data-testid="tab-profile" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
               <FileText className="h-4 w-4 mr-2" />

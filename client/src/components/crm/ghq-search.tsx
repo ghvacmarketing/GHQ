@@ -383,7 +383,7 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
                   <span className="text-xs font-semibold uppercase tracking-wider">
                     {config.label}
                   </span>
-                  <span className="text-xs opacity-70">({categoryData.total})</span>
+                  <span className="text-xs opacity-70">{categoryData.total}</span>
                 </div>
                 {categoryData.hasMore && (
                   <button

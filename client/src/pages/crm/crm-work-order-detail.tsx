@@ -1314,7 +1314,7 @@ export default function CrmWorkOrderDetail() {
                         className="w-full flex items-center justify-between p-3 text-sm font-medium text-amber-700 hover:bg-amber-100 rounded-lg border border-amber-200 bg-white"
                         data-testid="button-toggle-checklist-answers"
                       >
-                        <span>View All Answers ({checklistResponse.checklist.questions.length})</span>
+                        <span>View All Answers {checklistResponse.checklist.questions.length}</span>
                         {checklistAnswersOpen ? (
                           <ChevronUp className="h-4 w-4" />
                         ) : (
@@ -1480,7 +1480,7 @@ export default function CrmWorkOrderDetail() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2 text-base font-semibold">
                     <FileText className="h-4 w-4 text-[#711419]" />
-                    Quotes ({quotes?.length || 0})
+                    Quotes {quotes?.length || 0}
                   </CardTitle>
                   <Button
                     size="sm"
@@ -1638,7 +1638,7 @@ export default function CrmWorkOrderDetail() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2 text-base font-semibold">
                     <DollarSign className="h-4 w-4 text-[#711419]" />
-                    Invoices ({invoices?.length || 0})
+                    Invoices {invoices?.length || 0}
                   </CardTitle>
                   <Button
                     size="sm"

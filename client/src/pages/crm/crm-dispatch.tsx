@@ -1994,7 +1994,7 @@ function UnassignedQueueSection({
     >
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-800">
-          Unassigned Queue ({workOrders.length})
+          Unassigned Queue {workOrders.length}
           {isOver && <span className="ml-2 text-sm text-amber-600 font-normal">Drop here to unassign</span>}
         </h2>
       </div>

@@ -95,7 +95,7 @@ const navSections: NavSection[] = [
       { label: "Dispatch Board", href: "/crm/dispatch", icon: CalendarClock },
       {
         label: "Comms",
-        href: "/crm/messaging",
+        href: "/crm/phone",
         icon: Headset,
         activePaths: ["/crm/phone", "/crm/messaging", "/crm/mail"],
       },
@@ -348,6 +348,13 @@ function SidebarContent({
                           itemWithBadge = { ...item, badgeCount: unreadData.unreadCount };
                         } else if (item.label === "Notifications" && notificationCount?.count && notificationCount.count > 0) {
                           itemWithBadge = { ...item, badgeCount: notificationCount.count };
+                        }
+                        if (item.label === "Comms") {
+                          // Reopen Comms on whichever tab was used last (default: Phone)
+                          const last = localStorage.getItem("crmCommsLastTab");
+                          if (last && (item.activePaths ?? []).some((p) => last.startsWith(p))) {
+                            itemWithBadge = { ...itemWithBadge, href: last };
+                          }
                         }
                         return (
                           <NavItemComponent

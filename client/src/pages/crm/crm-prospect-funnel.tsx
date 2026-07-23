@@ -1852,7 +1852,7 @@ export default function CrmProspectFunnel() {
                       tempDriverCounts.temp.map((t) => (
                         <div key={t.numericValue} className="flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
                           <span className="font-semibold">T{t.numericValue}</span>
-                          <span className="text-blue-500">({t.count})</span>
+                          <span className="text-blue-500">{t.count}</span>
                         </div>
                       ))
                     ) : (
@@ -1868,7 +1868,7 @@ export default function CrmProspectFunnel() {
                       tempDriverCounts.driver.map((d) => (
                         <div key={d.label} className="flex items-center gap-1 text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded">
                           <span className="font-semibold">{d.label.split('-')[0].trim()}</span>
-                          <span className="text-purple-500">({d.count})</span>
+                          <span className="text-purple-500">{d.count}</span>
                         </div>
                       ))
                     ) : (
@@ -2744,7 +2744,7 @@ export default function CrmProspectFunnel() {
                       <TabsTrigger value="details" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">Details</TabsTrigger>
                       <TabsTrigger value="followups" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
                         <Calendar className="h-3 w-3 mr-1" />
-                        Follow-ups ({getLeadFollowUps(expandedLead.customerId).length})
+                        Follow-ups {getLeadFollowUps(expandedLead.customerId).length}
                       </TabsTrigger>
                       <TabsTrigger value="notes" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
                         <StickyNote className="h-3 w-3 mr-1" />
@@ -2752,7 +2752,7 @@ export default function CrmProspectFunnel() {
                       </TabsTrigger>
                       <TabsTrigger value="quotes" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
                         <FileText className="h-3 w-3 mr-1" />
-                        Quotes ({leadQuotes.length})
+                        Quotes {leadQuotes.length}
                       </TabsTrigger>
                       <TabsTrigger value="comments" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none">
                         <MessageSquare className="h-3 w-3 mr-1" />

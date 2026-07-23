@@ -69,7 +69,7 @@ function TemplateSection({
       <div className="mb-3 flex items-center justify-between border-b pb-2">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <Icon className="h-4 w-4 text-[#711419]" /> {title}
-          <span className="text-xs font-normal text-muted-foreground">({data?.templates.length ?? 0})</span>
+          <span className="text-xs font-normal text-muted-foreground">{data?.templates.length ?? 0}</span>
         </h2>
         <Button size="sm" variant={dirty ? "default" : "ghost"} disabled={!dirty || save.isPending} onClick={() => save.mutate()}>
           {save.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}

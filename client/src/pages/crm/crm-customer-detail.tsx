@@ -853,7 +853,7 @@ function CustomerFilesTab({ customerId }: { customerId: string }) {
                 <div>
                   <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-1.5">
                     <ImageIcon className="h-4 w-4" />
-                    Photos ({images.length})
+                    Photos {images.length}
                   </h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                     {images.map(file => (
@@ -901,7 +901,7 @@ function CustomerFilesTab({ customerId }: { customerId: string }) {
                 <div>
                   <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-1.5">
                     <FileText className="h-4 w-4" />
-                    Documents ({docs.length})
+                    Documents {docs.length}
                   </h3>
                   <div className="space-y-2">
                     {docs.map(file => (
@@ -1524,7 +1524,7 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-[#711419]" />
-            Maintenance Agreements ({agreements.length})
+            Maintenance Agreements {agreements.length}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -2423,7 +2423,7 @@ function CustomerTabbedView({
             data-testid="tab-sub-accounts"
           >
             <Users className="h-4 w-4 mr-2" />
-            Sub-Accounts ({subAccounts.length})
+            Sub-Accounts {subAccounts.length}
           </TabsTrigger>
         )}
       </TabsList>
@@ -2634,7 +2634,7 @@ function CustomerTabbedView({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <History className="h-5 w-5 text-slate-500" />
-                Recent Service History ({completedJobs.length})
+                Recent Service History {completedJobs.length}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -2763,7 +2763,7 @@ function CustomerTabbedView({
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Droplets className="h-5 w-5 text-[#711419]" />
-                Environment Monitoring ({customerSensors.length})
+                Environment Monitoring {customerSensors.length}
               </CardTitle>
               <Button
                 variant="ghost"
@@ -2823,7 +2823,7 @@ function CustomerTabbedView({
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <MapPin className="h-5 w-5 text-[#711419]" />
-              Locations/Properties ({customerProperties?.length || 0})
+              Locations/Properties {customerProperties?.length || 0}
             </CardTitle>
             <Button 
               size="sm"
@@ -2894,7 +2894,7 @@ function CustomerTabbedView({
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <CalendarPlus className="h-5 w-5 text-green-500" />
-              Upcoming Work Orders ({upcomingWorkOrders.length})
+              Upcoming Work Orders {upcomingWorkOrders.length}
             </CardTitle>
             <Button 
               size="sm" 
@@ -2953,7 +2953,7 @@ function CustomerTabbedView({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-green-500" />
-              Completed Work Orders ({completedWorkOrders.length})
+              Completed Work Orders {completedWorkOrders.length}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -2991,7 +2991,7 @@ function CustomerTabbedView({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <History className="h-5 w-5 text-slate-500" />
-                Service History - FieldEdge ({historicalWorkOrders.length})
+                Service History - FieldEdge {historicalWorkOrders.length}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -3036,7 +3036,7 @@ function CustomerTabbedView({
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Briefcase className="h-5 w-5 text-blue-500" />
-              Active Projects ({crmProjects?.filter(p => p.status !== "archived" && p.status !== "completed").length || 0})
+              Active Projects {crmProjects?.filter(p => p.status !== "archived" && p.status !== "completed").length || 0}
             </CardTitle>
             <Button 
               size="sm" 
@@ -3100,7 +3100,7 @@ function CustomerTabbedView({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-green-500" />
-              Completed Projects ({crmProjects?.filter(p => p.status === "completed").length || 0})
+              Completed Projects {crmProjects?.filter(p => p.status === "completed").length || 0}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -3135,7 +3135,7 @@ function CustomerTabbedView({
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-[#711419]" />
-              Quotes ({crmQuotes?.length || 0})
+              Quotes {crmQuotes?.length || 0}
             </CardTitle>
             <Link href={`/crm/quotes/new?customerId=${customer.id}`}>
               <Button 
@@ -3231,7 +3231,7 @@ function CustomerTabbedView({
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-[#711419]" />
-              Invoices ({crmInvoices?.length || 0})
+              Invoices {crmInvoices?.length || 0}
             </CardTitle>
             <Link href={`/crm/invoices/new?customerId=${customer.id}`}>
               <Button size="sm" className="bg-[#711419] hover:bg-[#5a1014] text-white">
@@ -3484,7 +3484,7 @@ function CustomerTabbedView({
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-[#711419]" />
-                Sub-Accounts ({subAccounts.length})
+                Sub-Accounts {subAccounts.length}
               </CardTitle>
               <button
                 onClick={() => navigate(`/crm/accounts/new?parentId=${customer.id}`)}

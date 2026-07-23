@@ -47,6 +47,7 @@ import {
   FileCheck,
   ChevronLeft,
   ChevronRight,
+  MoreVertical,
   Plus,
   ArrowUpDown,
   ArrowUp,
@@ -835,7 +836,7 @@ export default function CrmAgreements() {
                       {getSortIcon("status")}
                     </div>
                   </TableHead>
-                  <TableHead className="font-semibold">Actions</TableHead>
+                  <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -879,7 +880,7 @@ export default function CrmAgreements() {
                   filteredAndSortedAgreements.map((agreement) => (
                     <TableRow
                       key={agreement.id}
-                      className="hover:bg-slate-50 cursor-pointer"
+                      className="group hover:bg-slate-50 cursor-pointer"
                       onClick={() => setSelectedAgreement(agreement)}
                       data-testid={`row-agreement-${agreement.id}`}
                     >
@@ -902,23 +903,7 @@ export default function CrmAgreements() {
                         })()}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (confirm("Are you sure you want to delete this agreement?")) {
-                                deleteAgreementMutation.mutate(agreement.id);
-                              }
-                            }}
-                            disabled={deleteAgreementMutation.isPending}
-                            data-testid={`button-delete-${agreement.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <ChevronRight className="ml-auto h-4 w-4 text-slate-300 opacity-0 transition-opacity group-hover:opacity-100" />
                       </TableCell>
                     </TableRow>
                   ))
@@ -1376,46 +1361,13 @@ export default function CrmAgreements() {
                     </div>
                   )}
                   <div className="flex justify-end gap-2 pt-4 border-t">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/crm/agreements/${selectedAgreement.id}/print`)}
-                      data-testid="button-print-agreement"
-                    >
-                      <Printer className="h-4 w-4 mr-1" /> Print
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        setEditForm({
-                          id: selectedAgreement.id,
-                          agreementPlan: selectedAgreement.agreementPlan || "",
-                          price: String(selectedAgreement.price ?? ""),
-                          numberOfSystems: selectedAgreement.numberOfSystems ?? 1,
-                          visitsPerPeriod: selectedAgreement.visitsPerPeriod ?? 2,
-                          startDate: selectedAgreement.startDate || "",
-                          endDate: selectedAgreement.endDate || "",
-                          contractDate: selectedAgreement.contractDate || "",
-                          autoRenew: !!selectedAgreement.autoRenew,
-                          billingPreference: selectedAgreement.billingPreference || "auto_invoice",
-                          status: selectedAgreement.status || "active",
-                          notes: selectedAgreement.notes || "",
-                          details: selectedAgreement.details || "",
-                        })
-                      }
-                      data-testid="button-edit-agreement"
-                    >
-                      <Edit className="h-4 w-4 mr-1" /> Edit
-                    </Button>
-                    {canSendInvoice && 
-                      selectedAgreement.billingPreference !== "pay_on_visit" && 
+                    {canSendInvoice &&
+                      selectedAgreement.billingPreference !== "pay_on_visit" &&
                       ((selectedAgreement.status === "pending" && !shouldHideFirstInvoiceButton) || selectedAgreement.status === "active") && (
                       <Button
-                        variant="outline"
                         size="sm"
                         onClick={() => {
-                          const msg = selectedAgreement.status === "pending" 
+                          const msg = selectedAgreement.status === "pending"
                             ? `Create and send first invoice to ${selectedAgreement.customerName} for $${selectedAgreement.price || "0"}?`
                             : `Send a renewal invoice to ${selectedAgreement.customerName} for $${selectedAgreement.price || "0"}?`;
                           if (confirm(msg)) {
@@ -1424,26 +1376,62 @@ export default function CrmAgreements() {
                         }}
                         disabled={sendInvoiceMutation.isPending}
                         data-testid="button-send-invoice"
-                        className="text-[#711419] border-[#711419] hover:bg-[#711419]/10"
+                        className="bg-[#711419] hover:bg-[#8a1a1f]"
                       >
                         <FileCheck className="h-4 w-4 mr-1" />
                         {sendInvoiceMutation.isPending ? "Sending..." : selectedAgreement.status === "pending" ? "Send First Invoice" : "Send Invoice"}
                       </Button>
                     )}
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => {
-                        if (confirm("Are you sure you want to delete this agreement?")) {
-                          deleteAgreementMutation.mutate(selectedAgreement.id);
-                        }
-                      }}
-                      disabled={deleteAgreementMutation.isPending}
-                      data-testid="button-delete-agreement"
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="w-9 p-0" data-testid="button-agreement-actions">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => navigate(`/crm/agreements/${selectedAgreement.id}/print`)}
+                          data-testid="button-print-agreement"
+                        >
+                          <Printer className="mr-2 h-4 w-4" /> Print
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            setEditForm({
+                              id: selectedAgreement.id,
+                              agreementPlan: selectedAgreement.agreementPlan || "",
+                              price: String(selectedAgreement.price ?? ""),
+                              numberOfSystems: selectedAgreement.numberOfSystems ?? 1,
+                              visitsPerPeriod: selectedAgreement.visitsPerPeriod ?? 2,
+                              startDate: selectedAgreement.startDate || "",
+                              endDate: selectedAgreement.endDate || "",
+                              contractDate: selectedAgreement.contractDate || "",
+                              autoRenew: !!selectedAgreement.autoRenew,
+                              billingPreference: selectedAgreement.billingPreference || "auto_invoice",
+                              status: selectedAgreement.status || "active",
+                              notes: selectedAgreement.notes || "",
+                              details: selectedAgreement.details || "",
+                            })
+                          }
+                          data-testid="button-edit-agreement"
+                        >
+                          <Edit className="mr-2 h-4 w-4" /> Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-red-600 focus:text-red-600"
+                          onClick={() => {
+                            if (confirm("Are you sure you want to delete this agreement?")) {
+                              deleteAgreementMutation.mutate(selectedAgreement.id);
+                            }
+                          }}
+                          disabled={deleteAgreementMutation.isPending}
+                          data-testid="button-delete-agreement"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
             </div>
           )}

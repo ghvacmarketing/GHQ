@@ -203,7 +203,7 @@ export default function CrmNotifications() {
             <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-amber-500" />
               All Tagged Notes
-              <span className="text-xs font-normal text-slate-400">({taggedHistory.length})</span>
+              <span className="text-xs font-normal text-slate-400">{taggedHistory.length}</span>
             </h2>
             {taggedHistory.length === 0 ? (
               <div className="text-center py-10 border border-slate-200 rounded-lg">
@@ -225,7 +225,7 @@ export default function CrmNotifications() {
             <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-amber-500" />
               Tagged Notes
-              <span className="text-xs font-normal text-slate-400">({taggedHistory.length})</span>
+              <span className="text-xs font-normal text-slate-400">{taggedHistory.length}</span>
             </h2>
             <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 overflow-hidden">
               {taggedHistory.map((item) => (

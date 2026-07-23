@@ -384,7 +384,7 @@ export default function CrmPhotoGallery() {
               <X className="h-4 w-4" />
             </button>
             <span className="text-sm font-semibold text-slate-800">{selected.size} selected</span>
-            <button onClick={selectAllFiltered} className="text-xs font-medium text-[#711419] hover:underline">Select all ({filtered.length})</button>
+            <button onClick={selectAllFiltered} className="text-xs font-medium text-[#711419] hover:underline">Select all {filtered.length}</button>
             <div className="ml-auto flex items-center gap-2">
               <Button size="sm" variant="outline" disabled={selected.size === 0 || bulkDownloading} onClick={bulkDownload} data-testid="bulk-download">
                 {bulkDownloading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}

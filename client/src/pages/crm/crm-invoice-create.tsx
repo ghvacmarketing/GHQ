@@ -1347,7 +1347,7 @@ export default function CrmInvoiceCreate() {
                       <Card>
                         <CardHeader className="py-3">
                           <CardTitle className="text-sm font-medium">
-                            Line Items ({formData.lineItems.length})
+                            Line Items {formData.lineItems.length}
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="py-3">

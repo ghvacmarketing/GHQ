@@ -465,7 +465,7 @@ export default function CrmCustomers() {
             }`}
             data-testid="tab-status-all"
           >
-            All ({total.toLocaleString()})
+            All {total.toLocaleString()}
           </button>
           <button
             onClick={() => { setStatusTab("prospects"); setCustomerType("all"); setHasAgreement(false); setSourceFilter("all"); setAccountRole("all"); }}

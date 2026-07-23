@@ -182,7 +182,7 @@ export default function CrmAnalytics() {
           <Card className="rounded-lg border-red-200">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base text-red-700">
-                <AlertTriangle className="h-4 w-4" /> Open alerts ({alerts.length})
+                <AlertTriangle className="h-4 w-4" /> Open alerts {alerts.length}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -220,7 +220,7 @@ export default function CrmAnalytics() {
                     <div className="mb-2 flex items-center gap-2">
                       <Cpu className="h-4 w-4 text-amber-500" />
                       <h2 className="text-sm font-semibold text-foreground">Unassigned sensors</h2>
-                      <span className="text-xs text-muted-foreground">({g.sensors.length})</span>
+                      <span className="text-xs text-muted-foreground">{g.sensors.length}</span>
                     </div>
                     <Card className="rounded-lg border-dashed">
                       <CardContent className="p-3">
