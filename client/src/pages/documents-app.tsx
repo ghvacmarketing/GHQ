@@ -100,6 +100,31 @@ export default function DocumentsApp() {
   const [newFolderName, setNewFolderName] = useState("");
   const [dragOver, setDragOver] = useState(false);
 
+  // Personal order of the big category tiles on the Drive root (drag to arrange)
+  const [catOrder, setCatOrder] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("docsDriveCatOrder") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [dragCat, setDragCat] = useState<string | null>(null);
+  const orderedCategories = useMemo(() => {
+    const known = DOC_CATEGORIES.map((c) => c.key) as string[];
+    const kept = catOrder.filter((k) => known.includes(k));
+    return [...kept, ...known.filter((k) => !kept.includes(k))].map(
+      (k) => DOC_CATEGORIES.find((c) => c.key === k)!,
+    );
+  }, [catOrder]);
+  const moveCatBefore = (dragKey: string, overKey: string) => {
+    if (dragKey === overKey) return;
+    const keys = orderedCategories.map((c) => c.key as string);
+    const next = keys.filter((k) => k !== dragKey);
+    next.splice(next.indexOf(overKey), 0, dragKey);
+    setCatOrder(next);
+    localStorage.setItem("docsDriveCatOrder", JSON.stringify(next));
+  };
+
   const setMode = (m: ViewMode) => { setViewMode(m); localStorage.setItem("docsViewMode", m); };
   const switchTab = (t: TabKey) => {
     setTab(t); setBrowseId(null); setStarOnly(false); setSearch(""); setSearchInput("");
@@ -271,6 +296,7 @@ export default function DocumentsApp() {
   const isImage = (f: DocFile) => (f.contentType || "").startsWith("image/");
   const isPdf = (f: DocFile) => f.contentType === "application/pdf";
   const canUpload = isBrowse && !searching && !starOnly && rootReady;
+  const showCatTiles = tab === "drive" && !folderId && !searching && !starOnly;
 
   const openFolder = (id: string | null) => { setBrowseId(id); setStarOnly(false); };
 
@@ -399,8 +425,44 @@ export default function DocumentsApp() {
         <p className="mb-3 text-sm text-slate-500">Archived files can be restored or deleted forever.</p>
       )}
 
+      {/* Drive root: big category tiles, drag to arrange a personal layout */}
+      {showCatTiles && (
+        <div className="mb-5">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+            Categories — drag to arrange
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {orderedCategories.map((c) => {
+              const Icon = CATEGORY_ICONS[c.key];
+              return (
+                <div
+                  key={c.key}
+                  draggable
+                  onDragStart={(e) => { e.stopPropagation(); setDragCat(c.key); e.dataTransfer.effectAllowed = "move"; }}
+                  onDragEnd={() => setDragCat(null)}
+                  onDragOver={(e) => {
+                    if (!dragCat) return;
+                    e.preventDefault(); e.stopPropagation();
+                    moveCatBefore(dragCat, c.key);
+                  }}
+                  onClick={() => switchTab(c.key)}
+                  className={`group flex cursor-pointer flex-col rounded-[4px] border bg-white p-4 transition-all ${
+                    dragCat === c.key ? "opacity-40 border-slate-900" : "border-slate-300/70 hover:border-slate-900"
+                  }`}
+                  data-testid={`drive-cat-${c.key}`}
+                >
+                  <Icon className="h-7 w-7 text-[#711419]" strokeWidth={1.5} />
+                  <p className="mt-3 truncate text-sm font-semibold text-slate-900">{c.label}</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Category folder</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Empty state */}
-      {!filesLoading && files.length === 0 && childFolders.length === 0 ? (
+      {!filesLoading && files.length === 0 && childFolders.length === 0 && !showCatTiles ? (
         <div className="flex flex-col items-center justify-center rounded-[4px] border border-dashed border-slate-300 py-20 text-center">
           <Grid3X3 className="mb-3 h-10 w-10 text-slate-300" />
           <p className="text-sm font-medium text-slate-600">
@@ -416,7 +478,7 @@ export default function DocumentsApp() {
         ) : (
           <div className="space-y-1.5">{[...Array(8)].map((_, i) => <Skeleton key={i} className="h-10 rounded-[4px]" />)}</div>
         )
-      ) : viewMode === "card" ? (
+      ) : childFolders.length === 0 && files.length === 0 ? null : viewMode === "card" ? (
         <>
           {childFolders.length > 0 && (
             <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -632,9 +694,9 @@ export default function DocumentsApp() {
         {/* Main */}
         <main
           className={`min-h-0 flex-1 overflow-y-auto p-4 ${dragOver ? "bg-sky-50" : ""}`}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragOver={(e) => { e.preventDefault(); if (e.dataTransfer.types.includes("Files")) setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => { e.preventDefault(); setDragOver(false); if (canUpload) uploadFiles(e.dataTransfer.files); }}
+          onDrop={(e) => { e.preventDefault(); setDragOver(false); if (canUpload && e.dataTransfer.types.includes("Files")) uploadFiles(e.dataTransfer.files); }}
           data-testid="docs-main"
         >
           {/* Mobile tab strip */}
