@@ -410,6 +410,19 @@ async function runDocsAndAccountingMigrations() {
       )
     `);
     await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS mkt_lead_sources (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        name text NOT NULL,
+        monthly_cost_cents integer NOT NULL DEFAULT 0,
+        notes text,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS mkt_lead_sources_lower_name_idx ON mkt_lead_sources ((lower(name)))
+    `);
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS report_saved (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
         name text NOT NULL,

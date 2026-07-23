@@ -443,7 +443,7 @@ export default function CrmMail() {
                 onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput.trim())}
                 onBlur={() => setSearch(searchInput.trim())}
                 placeholder="Search mail…"
-                className="h-9 rounded-lg border-slate-200 bg-slate-50 pl-9 text-sm focus-visible:bg-white"
+                className="h-9 bg-white pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
                 data-testid="input-mail-search"
               />
             </div>

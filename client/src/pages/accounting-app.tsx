@@ -364,7 +364,7 @@ export default function AccountingApp() {
               <div className="flex items-center gap-2">
                 <div className="relative flex-1 sm:max-w-xs">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <Input value={expSearch} onChange={(e) => setExpSearch(e.target.value)} placeholder="Search vendor or memo…" className="h-9 rounded-lg bg-white pl-9 text-sm" data-testid="input-expense-search" />
+                  <Input value={expSearch} onChange={(e) => setExpSearch(e.target.value)} placeholder="Search vendor or memo…" className="h-9 bg-white pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none" data-testid="input-expense-search" />
                 </div>
                 <Button size="sm" className="ml-auto h-9 rounded-lg bg-[#711419] hover:bg-[#8a1a1f]" onClick={() => setExpenseForm({ ...EMPTY_EXPENSE })} data-testid="button-add-expense">
                   <Plus className="mr-1.5 h-4 w-4" /> Expense

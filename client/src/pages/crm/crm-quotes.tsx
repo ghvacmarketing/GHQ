@@ -574,7 +574,7 @@ export default function CrmQuotes() {
               placeholder="Search quotes…"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="h-9 rounded-full border-transparent bg-white pl-9 text-sm shadow-sm"
+              className="h-9 bg-white pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
               data-testid="input-search"
             />
           </div>

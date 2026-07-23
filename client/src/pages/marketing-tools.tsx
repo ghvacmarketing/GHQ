@@ -493,7 +493,7 @@ function ColorInput({ value, onChange }: { value: string; onChange: (v: string) 
 // ════════════════════════ AUDIENCES ════════════════════════
 
 const AUDIENCE_FIELDS = [
-  { key: "customerType", label: "Customer type", kind: "select", options: ["Residential", "Commercial", "Property Manager"] },
+  { key: "customerType", label: "Customer type", kind: "select", options: ["residential", "commercial", "property_manager"] },
   { key: "customerStatus", label: "Status", kind: "select", options: ["customer", "prospect"] },
   { key: "leadSource", label: "Lead source contains", kind: "text" },
   { key: "city", label: "City contains", kind: "text" },
@@ -546,7 +546,7 @@ export function AudiencesTab() {
             <FilterIcon className="h-3.5 w-3.5" /> Build a segment
           </p>
           <button
-            onClick={() => setFilters((p) => [...p, { field: "customerType", op: "eq", value: "Residential" }])}
+            onClick={() => setFilters((p) => [...p, { field: "customerType", op: "eq", value: "residential" }])}
             className="flex items-center gap-1 text-xs font-medium text-[#711419] hover:underline"
             data-testid="audience-add-filter"
           >
@@ -783,6 +783,248 @@ export function CampaignsTab() {
             <Button className="bg-[#711419] hover:bg-[#8a1a1f]" disabled={sendCampaign.isPending} onClick={() => confirmSend && sendCampaign.mutate(confirmSend.id)} data-testid="campaign-confirm-send">
               {sendCampaign.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}
               Send campaign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ════════════════════════ LEAD SOURCES ════════════════════════
+
+type LeadSourceRow = {
+  source: string;
+  leads: number;
+  leads30: number;
+  won: number;
+  lastLeadAt: string | null;
+  revenue: number;
+  revenue90: number;
+  configId: string | null;
+  monthlyCostCents: number;
+  notes: string;
+};
+
+const usd = (n: number) =>
+  n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+
+export function LeadSourcesTab() {
+  const { toast } = useToast();
+  const { data: rows = [], isLoading } = useQuery<LeadSourceRow[]>({
+    queryKey: ["/api/marketing/lead-sources"],
+  });
+
+  // One dialog covers both flows: editing an existing source's cost/notes and
+  // pre-registering a source that hasn't produced a lead yet.
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingExisting, setEditingExisting] = useState(false);
+  const [formName, setFormName] = useState("");
+  const [formCost, setFormCost] = useState("");
+  const [formNotes, setFormNotes] = useState("");
+
+  const save = useMutation({
+    mutationFn: async () =>
+      apiRequest("POST", "/api/marketing/lead-sources", {
+        name: formName,
+        monthlyCostCents: Math.round((parseFloat(formCost) || 0) * 100),
+        notes: formNotes,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/marketing/lead-sources"] });
+      setDialogOpen(false);
+      toast({ title: "Lead source saved" });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't save", variant: "destructive" }),
+  });
+
+  const openEdit = (r: LeadSourceRow) => {
+    setEditingExisting(true);
+    setFormName(r.source);
+    setFormCost(r.monthlyCostCents ? String(r.monthlyCostCents / 100) : "");
+    setFormNotes(r.notes || "");
+    setDialogOpen(true);
+  };
+  const openAdd = () => {
+    setEditingExisting(false);
+    setFormName("");
+    setFormCost("");
+    setFormNotes("");
+    setDialogOpen(true);
+  };
+
+  const attributed = rows.filter((r) => r.source !== "(unattributed)");
+  const unattributed = rows.find((r) => r.source === "(unattributed)");
+  const totalLeads30 = attributed.reduce((s, r) => s + r.leads30, 0);
+  const totalRevenue = attributed.reduce((s, r) => s + r.revenue, 0);
+  const totalCostMo = attributed.reduce((s, r) => s + r.monthlyCostCents, 0) / 100;
+
+  const kpis = [
+    { label: "Sources tracked", value: String(attributed.length) },
+    { label: "New leads (30d)", value: String(totalLeads30) },
+    { label: "Attributed revenue", value: usd(totalRevenue) },
+    { label: "Monthly spend", value: usd(totalCostMo) },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-xl font-semibold tracking-tight text-slate-900">Lead Sources</h1>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Where customers come from and what each channel is worth. Sources appear automatically from the
+            Lead Source field on CRM customers.
+          </p>
+        </div>
+        <Button className="bg-[#711419] hover:bg-[#8a1a1f]" onClick={openAdd} data-testid="lead-source-add">
+          <Plus className="mr-1.5 h-4 w-4" /> Track a source
+        </Button>
+      </div>
+
+      {/* KPI strip */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {kpis.map((k) => (
+          <div key={k.label} className="rounded-[4px] border border-slate-300/70 bg-white px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{k.label}</p>
+            <p className="mt-1 text-xl font-semibold tabular-nums text-slate-900">
+              {isLoading ? "—" : k.value}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* Source table */}
+      <div className="overflow-x-auto rounded-[4px] border border-slate-300/70 bg-white">
+        <table className="w-full min-w-[760px] text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <th className="px-4 py-2.5">Source</th>
+              <th className="px-3 py-2.5 text-right">Leads</th>
+              <th className="px-3 py-2.5 text-right">New (30d)</th>
+              <th className="px-3 py-2.5 text-right">Customers</th>
+              <th className="px-3 py-2.5 text-right">Win rate</th>
+              <th className="px-3 py-2.5 text-right">Revenue</th>
+              <th className="px-3 py-2.5 text-right">Last 90d</th>
+              <th className="px-3 py-2.5 text-right">Cost / mo</th>
+              <th className="w-10 px-2 py-2.5" />
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              [0, 1, 2, 3].map((i) => (
+                <tr key={i} className="border-b border-slate-100 last:border-0">
+                  <td className="px-4 py-3" colSpan={9}><Skeleton className="h-4 w-full" /></td>
+                </tr>
+              ))
+            ) : attributed.length === 0 ? (
+              <tr>
+                <td className="px-4 py-10 text-center text-sm text-slate-400" colSpan={9}>
+                  No lead sources yet — set the Lead Source field on customers in the CRM and they'll show up here.
+                </td>
+              </tr>
+            ) : (
+              attributed.map((r) => {
+                const winRate = r.leads > 0 ? Math.round((r.won / r.leads) * 100) : 0;
+                return (
+                  <tr
+                    key={r.source}
+                    className="group cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                    onClick={() => openEdit(r)}
+                    data-testid={`lead-source-row-${r.source}`}
+                  >
+                    <td className="px-4 py-2.5">
+                      <p className="font-semibold text-slate-900">{r.source}</p>
+                      {r.notes && <p className="mt-0.5 line-clamp-1 text-[11px] text-slate-400">{r.notes}</p>}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">{r.leads}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">{r.leads30}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">{r.won}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">{winRate}%</td>
+                    <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-900">{usd(r.revenue)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{usd(r.revenue90)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">
+                      {r.monthlyCostCents > 0 ? usd(r.monthlyCostCents / 100) : <span className="text-slate-300">—</span>}
+                    </td>
+                    <td className="px-2 py-2.5 text-right">
+                      <ChevronDown className="h-4 w-4 -rotate-90 text-slate-300 opacity-0 transition-opacity group-hover:opacity-100" />
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+            {!isLoading && unattributed && unattributed.leads > 0 && (
+              <tr className="border-t border-slate-200 bg-slate-50/60">
+                <td className="px-4 py-2.5">
+                  <p className="font-medium text-slate-500">Unattributed</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Customers without a lead source set</p>
+                </td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{unattributed.leads}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{unattributed.leads30}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{unattributed.won}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">—</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{usd(unattributed.revenue)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{usd(unattributed.revenue90)}</td>
+                <td className="px-3 py-2.5 text-right text-slate-300">—</td>
+                <td />
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Add / edit dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingExisting ? formName : "Track a lead source"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {!editingExisting && (
+              <div>
+                <p className="mb-1 text-xs font-medium text-slate-500">Source name</p>
+                <Input
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  placeholder="e.g. Google Ads, Referral, Yard sign"
+                  className="h-9"
+                  data-testid="lead-source-name"
+                />
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Match the spelling used in the customer Lead Source field so stats line up.
+                </p>
+              </div>
+            )}
+            <div>
+              <p className="mb-1 text-xs font-medium text-slate-500">Monthly cost ($)</p>
+              <Input
+                value={formCost}
+                onChange={(e) => setFormCost(e.target.value.replace(/[^0-9.]/g, ""))}
+                placeholder="0"
+                inputMode="decimal"
+                className="h-9"
+                data-testid="lead-source-cost"
+              />
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium text-slate-500">Notes</p>
+              <Textarea
+                value={formNotes}
+                onChange={(e) => setFormNotes(e.target.value)}
+                placeholder="Campaign details, account, rep contact…"
+                rows={3}
+                data-testid="lead-source-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-[#711419] hover:bg-[#8a1a1f]"
+              disabled={!formName.trim() || save.isPending}
+              onClick={() => save.mutate()}
+              data-testid="lead-source-save"
+            >
+              <Save className="mr-1.5 h-4 w-4" /> Save
             </Button>
           </DialogFooter>
         </DialogContent>

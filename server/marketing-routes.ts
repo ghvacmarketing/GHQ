@@ -96,7 +96,7 @@ function audienceWhere(filters: AudienceFilter[]): any {
     const v = String(f.value ?? "");
     switch (f.field) {
       case "customerType":
-        conds.push(f.op === "neq" ? sql`COALESCE(c.customer_type,'Residential') <> ${v}` : sql`COALESCE(c.customer_type,'Residential') = ${v}`);
+        conds.push(f.op === "neq" ? sql`COALESCE(c.customer_type,'residential') <> ${v}` : sql`COALESCE(c.customer_type,'residential') = ${v}`);
         break;
       case "customerStatus":
         conds.push(f.op === "neq" ? sql`COALESCE(c.customer_status,'customer') <> ${v}` : sql`COALESCE(c.customer_status,'customer') = ${v}`);
@@ -105,7 +105,7 @@ function audienceWhere(filters: AudienceFilter[]): any {
         conds.push(sql`COALESCE(c.lead_source,'') ILIKE ${"%" + v + "%"}`);
         break;
       case "city":
-        conds.push(sql`COALESCE(c.city,'') ILIKE ${"%" + v + "%"}`);
+        conds.push(sql`COALESCE(c.full_address,'') ILIKE ${"%" + v + "%"}`);
         break;
       case "hasAgreement":
         conds.push(v === "yes"
@@ -338,5 +338,96 @@ export function registerMarketingRoutes(app: Express): void {
       if (error) return res.status(500).json({ message: `Resend error: ${(error as any)?.message || "unknown"}` });
       res.json({ ok: true });
     } catch (e) { console.error("mkt test send", e); res.status(500).json({ message: "Failed to send test" }); }
+  });
+
+  // ── Lead sources: live CRM attribution + configurable cost/notes ──
+  // Sources appear automatically from crm_customers.lead_source; a config row
+  // (mkt_lead_sources) only exists once the user sets a cost or notes on one.
+  app.get("/api/marketing/lead-sources", requireCrmAuth, async (_req, res) => {
+    try {
+      const statsR: any = await db.execute(sql`
+        SELECT
+          COALESCE(NULLIF(TRIM(c.lead_source), ''), '(unattributed)') AS source,
+          COUNT(*)::int AS leads,
+          COUNT(*) FILTER (WHERE c.created_at >= now() - interval '30 days')::int AS leads30,
+          COUNT(*) FILTER (WHERE COALESCE(c.customer_status, 'customer') = 'customer')::int AS won,
+          MAX(c.created_at) AS "lastLeadAt"
+        FROM crm_customers c
+        GROUP BY 1`);
+      const revR: any = await db.execute(sql`
+        SELECT
+          COALESCE(NULLIF(TRIM(c.lead_source), ''), '(unattributed)') AS source,
+          COALESCE(SUM(i.amount_paid::numeric), 0)::float AS revenue,
+          COALESCE(SUM(i.amount_paid::numeric) FILTER (WHERE i.created_at >= now() - interval '90 days'), 0)::float AS revenue90
+        FROM crm_invoices i
+        JOIN crm_customers c ON c.id = i.customer_id
+        WHERE i.voided_at IS NULL
+        GROUP BY 1`);
+      const cfgR: any = await db.execute(sql`SELECT * FROM mkt_lead_sources ORDER BY name`);
+
+      const revBy = new Map<string, any>((revR.rows || []).map((r: any) => [String(r.source).toLowerCase(), r]));
+      const cfgBy = new Map<string, any>((cfgR.rows || []).map((r: any) => [String(r.name).toLowerCase(), r]));
+      const seen = new Set<string>();
+      const merged = (statsR.rows || []).map((s: any) => {
+        const key = String(s.source).toLowerCase();
+        seen.add(key);
+        const rev = revBy.get(key);
+        const cfg = cfgBy.get(key);
+        return {
+          source: s.source,
+          leads: s.leads,
+          leads30: s.leads30,
+          won: s.won,
+          lastLeadAt: s.lastLeadAt,
+          revenue: rev?.revenue || 0,
+          revenue90: rev?.revenue90 || 0,
+          configId: cfg?.id || null,
+          monthlyCostCents: cfg?.monthly_cost_cents ?? 0,
+          notes: cfg?.notes || "",
+        };
+      });
+      // Configured sources that have no CRM leads yet still show up
+      for (const cfg of cfgR.rows || []) {
+        if (seen.has(String(cfg.name).toLowerCase())) continue;
+        merged.push({
+          source: cfg.name, leads: 0, leads30: 0, won: 0, lastLeadAt: null,
+          revenue: 0, revenue90: 0, configId: cfg.id,
+          monthlyCostCents: cfg.monthly_cost_cents ?? 0, notes: cfg.notes || "",
+        });
+      }
+      merged.sort((a: any, b: any) => {
+        if (a.source === "(unattributed)") return 1;
+        if (b.source === "(unattributed)") return -1;
+        return b.revenue - a.revenue || b.leads - a.leads;
+      });
+      res.json(merged);
+    } catch (e) { console.error("mkt lead sources", e); res.status(500).json({ message: "Failed to load lead sources" }); }
+  });
+
+  // Create or update a source's config (upsert by name, case-insensitive)
+  app.post("/api/marketing/lead-sources", requireCrmAuth, async (req, res) => {
+    try {
+      const { name, monthlyCostCents, notes } = req.body || {};
+      const clean = String(name || "").trim();
+      if (!clean) return res.status(400).json({ message: "name is required" });
+      if (clean.toLowerCase() === "(unattributed)") return res.status(400).json({ message: "Unattributed can't be configured" });
+      const cost = Math.max(0, Math.round(Number(monthlyCostCents) || 0));
+      const r: any = await db.execute(sql`
+        INSERT INTO mkt_lead_sources (name, monthly_cost_cents, notes)
+        VALUES (${clean}, ${cost}, ${String(notes || "")})
+        ON CONFLICT ((lower(name))) DO UPDATE
+          SET monthly_cost_cents = EXCLUDED.monthly_cost_cents,
+              notes = EXCLUDED.notes,
+              updated_at = now()
+        RETURNING *`);
+      res.json(r.rows?.[0]);
+    } catch (e) { console.error("mkt lead source save", e); res.status(500).json({ message: "Failed to save lead source" }); }
+  });
+
+  app.delete("/api/marketing/lead-sources/:id", requireCrmAuth, async (req, res) => {
+    try {
+      await db.execute(sql`DELETE FROM mkt_lead_sources WHERE id = ${req.params.id}`);
+      res.json({ ok: true });
+    } catch (e) { console.error("mkt lead source delete", e); res.status(500).json({ message: "Failed to delete" }); }
   });
 }

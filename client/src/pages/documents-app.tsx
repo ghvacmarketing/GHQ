@@ -654,7 +654,7 @@ export default function DocumentsApp() {
               onChange={(e) => { setSearchInput(e.target.value); if (!e.target.value.trim()) setSearch(""); }}
               onKeyDown={(e) => e.key === "Enter" && setSearch(searchInput)}
               placeholder="Search files…"
-              className="h-9 rounded-full border-transparent bg-slate-100 pl-9 text-sm focus-visible:bg-white"
+              className="h-9 bg-white pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
               data-testid="input-doc-search"
             />
             {search && (

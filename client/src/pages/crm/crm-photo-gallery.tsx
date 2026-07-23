@@ -69,6 +69,9 @@ async function downloadPhoto(p: FeedPhoto) {
 }
 
 const isImageFile = (p: FeedPhoto) => (p.contentType || "").startsWith("image/");
+const isPdfFile = (p: FeedPhoto) =>
+  (p.contentType || "") === "application/pdf" || /\.pdf$/i.test(p.name || "");
+const isViewableFile = (p: FeedPhoto) => isImageFile(p) || isPdfFile(p);
 
 export default function CrmPhotoGallery() {
   usePageTitle("Media");
@@ -336,7 +339,7 @@ export default function CrmPhotoGallery() {
               value={searchQ}
               onChange={(e) => setSearchQ(e.target.value)}
               placeholder="Search media…"
-              className="h-9 rounded-full border-transparent bg-white pl-9 text-sm shadow-sm"
+              className="h-9 bg-white pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
               data-testid="media-search"
             />
           </div>
@@ -529,7 +532,7 @@ export default function CrmPhotoGallery() {
                   <Check className="h-3.5 w-3.5" />
                 </button>
                 <button
-                  onClick={() => (selectionActive ? toggleSelect(p.id) : isImageFile(p) ? setLightbox(p) : downloadPhoto(p))}
+                  onClick={() => (selectionActive ? toggleSelect(p.id) : isViewableFile(p) ? setLightbox(p) : downloadPhoto(p))}
                   className="shrink-0 overflow-hidden rounded-lg"
                 >
                   {isImageFile(p) ? (
@@ -542,7 +545,7 @@ export default function CrmPhotoGallery() {
                 </button>
                 <div className="min-w-0 flex-1">
                   <button
-                    onClick={() => (selectionActive ? toggleSelect(p.id) : isImageFile(p) ? setLightbox(p) : downloadPhoto(p))}
+                    onClick={() => (selectionActive ? toggleSelect(p.id) : isViewableFile(p) ? setLightbox(p) : downloadPhoto(p))}
                     className="block max-w-full truncate text-left text-sm font-semibold text-foreground hover:underline"
                     title={p.name}
                   >
@@ -582,7 +585,7 @@ export default function CrmPhotoGallery() {
                 data-testid={`feed-photo-${p.id}`}
               >
                 <button
-                  onClick={() => (selectionActive ? toggleSelect(p.id) : isImageFile(p) ? setLightbox(p) : downloadPhoto(p))}
+                  onClick={() => (selectionActive ? toggleSelect(p.id) : isViewableFile(p) ? setLightbox(p) : downloadPhoto(p))}
                   className="block w-full overflow-hidden"
                 >
                   {isImageFile(p) ? (
@@ -698,7 +701,18 @@ export default function CrmPhotoGallery() {
           onClick={() => setLightbox(null)}
           data-testid="gallery-lightbox"
         >
-          <img src={lightbox.url} alt={lightbox.name} className="max-h-[80vh] max-w-full rounded-lg object-contain" />
+          {isPdfFile(lightbox) ? (
+            <div className="h-[80vh] w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
+              <iframe
+                src={lightbox.url}
+                title={lightbox.name}
+                className="h-full w-full rounded-lg border-0 bg-white"
+                data-testid="lightbox-pdf-frame"
+              />
+            </div>
+          ) : (
+            <img src={lightbox.url} alt={lightbox.name} className="max-h-[80vh] max-w-full rounded-lg object-contain" />
+          )}
           <div className="mt-3 text-center text-sm text-white/80">
             <p className="font-semibold text-white">{lightbox.name}</p>
             <p>

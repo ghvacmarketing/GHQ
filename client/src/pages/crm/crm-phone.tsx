@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useSearch, useLocation } from "wouter";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -1368,8 +1369,8 @@ function DailyCallLog() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <div className="relative mx-auto w-full max-w-xl">
+      <PhoneToolbarPortal>
+        <div className="relative w-full max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             ref={searchInputRef}
@@ -1380,7 +1381,7 @@ function DailyCallLog() {
               setShowSearchResults(true);
             }}
             onFocus={() => setShowSearchResults(true)}
-            className="h-9 rounded-full border-transparent bg-white pl-9 text-sm shadow-sm"
+            className="h-9 bg-white pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
             data-testid="crm-phone-input-search-calls"
           />
           {searchQuery && (
@@ -1494,7 +1495,7 @@ function DailyCallLog() {
             )}
           </PopoverContent>
         </Popover>
-      </div>
+      </PhoneToolbarPortal>
 
       {isDaysLoading ? (
         <div className="text-center text-muted-foreground py-8">Loading call logs...</div>
@@ -2975,6 +2976,17 @@ function WeatherWidget() {
   );
 }
 
+/** Renders the call-log search + filter controls into the tabs row so the
+ *  content sits one row higher; falls back inline if the slot isn't mounted. */
+function PhoneToolbarPortal({ children }: { children: ReactNode }) {
+  const [node, setNode] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setNode(document.getElementById("phone-toolbar-slot"));
+  }, []);
+  if (node) return createPortal(children, node);
+  return <div className="flex items-center justify-end gap-2">{children}</div>;
+}
+
 function CrmPhoneContent() {
   const [activeTab, setActiveTab] = useState("call-logs");
 
@@ -2988,7 +3000,8 @@ function CrmPhoneContent() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-4">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+        <TabsList>
           <TabsTrigger value="call-logs" data-testid="crm-phone-tab-call-logs">
             <Calendar className="h-3.5 w-3.5 mr-1.5" />
             Call Logs
@@ -3010,6 +3023,8 @@ function CrmPhoneContent() {
             Weather
           </TabsTrigger>
         </TabsList>
+        <div id="phone-toolbar-slot" className="flex min-w-0 flex-1 items-center justify-end gap-2" />
+        </div>
 
         <TabsContent value="voicemails" className="mt-0">
           <VoicemailsKanban />

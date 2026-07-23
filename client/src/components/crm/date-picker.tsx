@@ -51,7 +51,7 @@ export function DatePickerField({
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-auto p-2">
+      <PopoverContent align="start" className="z-[110] w-auto p-2">
         <Calendar
           mode="single"
           selected={date}
