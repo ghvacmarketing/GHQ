@@ -46,7 +46,7 @@ export function CommsSwitcher({ active }: { active: CommsTab }) {
   );
 
   return (
-    <div className="flex shrink-0 items-center justify-center border-b border-slate-200/80 bg-white/85 px-4 py-2">
+    <div className="flex shrink-0 items-center justify-center px-4 pb-1 pt-2.5">
       {control}
     </div>
   );

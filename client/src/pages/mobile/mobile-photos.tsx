@@ -335,7 +335,7 @@ export default function MobilePhotos() {
 
   return (
     <MobileShell>
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-5">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">Photos</h2>
           <p className="text-sm text-slate-500">Search any customer to add photos, or browse recent shots.</p>
@@ -493,7 +493,7 @@ export default function MobilePhotos() {
         {recentCustomers.length > 0 && (
           <div className="pt-1" data-testid="recent-customers">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Customers</p>
-            <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2">
+            <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 scroll-pl-4">
               {recentCustomers.map((c) => (
                 <button
                   key={c.id}
@@ -520,7 +520,7 @@ export default function MobilePhotos() {
         {recentPhotos.length > 0 && (
           <div className="pt-1" data-testid="recent-photos">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Recent — all customers</p>
-            <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2">
+            <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 scroll-pl-4">
               {recentPhotos.map((rp) => (
                 <button
                   key={rp.id}

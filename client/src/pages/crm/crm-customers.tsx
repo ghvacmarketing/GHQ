@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { StatusDot } from "@/components/ui/status-dot";
+import { IndustrialTabs } from "@/components/crm/industrial-tabs";
 import {
   Table,
   TableBody,
@@ -454,111 +455,64 @@ export default function CrmCustomers() {
           onCreated={(customer) => navigate(`/crm/customers/${customer.id}`)}
         />
 
-        {/* Tabs styled like projects page - underline style */}
-        <div className="flex overflow-x-auto overflow-y-hidden border-b border-slate-200 scrollbar-hide">
-          <button
-            onClick={() => { setStatusTab("all"); setCustomerType("all"); setHasAgreement(false); setSourceFilter("all"); setAccountRole("all"); }}
-            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              statusTab === "all" && customerType === "all" && !hasAgreement && sourceFilter === "all" && accountRole === "all"
-                ? "border-[#711419] text-[#711419]"
-                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-            }`}
-            data-testid="tab-status-all"
-          >
-            All {total.toLocaleString()}
-          </button>
-          <button
-            onClick={() => { setStatusTab("prospects"); setCustomerType("all"); setHasAgreement(false); setSourceFilter("all"); setAccountRole("all"); }}
-            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              statusTab === "prospects" && !hasAgreement && sourceFilter === "all" && accountRole === "all"
-                ? "border-[#711419] text-[#711419]"
-                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-            }`}
-            data-testid="tab-status-prospects"
-          >
-            Leads ({statsData?.prospects?.toLocaleString() || 0})
-          </button>
-          <button
-            onClick={() => { setStatusTab("customers"); setCustomerType("all"); setHasAgreement(false); setSourceFilter("all"); setAccountRole("all"); }}
-            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              statusTab === "customers" && !hasAgreement && sourceFilter === "all" && accountRole === "all"
-                ? "border-[#711419] text-[#711419]"
-                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-            }`}
-            data-testid="tab-status-customers"
-          >
-            Customers ({statsData?.customers?.toLocaleString() || 0})
-          </button>
-          <div className="border-l border-slate-200 mx-2" />
-          <button
-            onClick={() => { setCustomerType("Residential"); setStatusTab("all"); setHasAgreement(false); setSourceFilter("all"); setAccountRole("all"); }}
-            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              customerType === "Residential" && !hasAgreement && sourceFilter === "all" && accountRole === "all"
-                ? "border-[#711419] text-[#711419]"
-                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-            }`}
-            data-testid="tab-type-residential"
-          >
-            Residential
-          </button>
-          <button
-            onClick={() => { setCustomerType("Commercial"); setStatusTab("all"); setHasAgreement(false); setSourceFilter("all"); setAccountRole("all"); }}
-            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              customerType === "Commercial" && !hasAgreement && sourceFilter === "all" && accountRole === "all"
-                ? "border-[#711419] text-[#711419]"
-                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-            }`}
-            data-testid="tab-type-commercial"
-          >
-            Commercial
-          </button>
-          <button
-            onClick={() => { setCustomerType("Property Manager"); setStatusTab("all"); setHasAgreement(false); setSourceFilter("all"); setAccountRole("all"); }}
-            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              customerType === "Property Manager" && !hasAgreement && sourceFilter === "all" && accountRole === "all"
-                ? "border-[#711419] text-[#711419]"
-                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-            }`}
-            data-testid="tab-type-property-manager"
-          >
-            Property Manager
-          </button>
-          <div className="border-l border-slate-200 mx-2" />
-          <button
-            onClick={() => { setHasAgreement(true); setCustomerType("all"); setStatusTab("all"); setSourceFilter("all"); setAccountRole("all"); }}
-            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              hasAgreement && accountRole === "all"
-                ? "border-[#711419] text-[#711419]"
-                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-            }`}
-            data-testid="tab-has-agreements"
-          >
-            Agreements ({statsData?.withAgreements?.toLocaleString() || 0})
-          </button>
-          <div className="border-l border-slate-200 mx-2" />
-          <button
-            onClick={() => { setAccountRole("parent"); setCustomerType("all"); setStatusTab("all"); setHasAgreement(false); setSourceFilter("all"); }}
-            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              accountRole === "parent"
-                ? "border-[#711419] text-[#711419]"
-                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-            }`}
-            data-testid="tab-role-parent"
-          >
-            Parent Accounts
-          </button>
-          <button
-            onClick={() => { setAccountRole("sub"); setCustomerType("all"); setStatusTab("all"); setHasAgreement(false); setSourceFilter("all"); }}
-            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-              accountRole === "sub"
-                ? "border-[#711419] text-[#711419]"
-                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-            }`}
-            data-testid="tab-role-sub"
-          >
-            Sub Accounts
-          </button>
-        </div>
+        {/* Industrial segmented tabs — the experimental house tab structure */}
+        {(() => {
+          const activeTabKey =
+            sourceFilter !== "all" ? "" :
+            accountRole === "parent" ? "parent" :
+            accountRole === "sub" ? "sub" :
+            hasAgreement ? "agreements" :
+            customerType === "Residential" ? "residential" :
+            customerType === "Commercial" ? "commercial" :
+            customerType === "Property Manager" ? "pm" :
+            statusTab === "prospects" ? "prospects" :
+            statusTab === "customers" ? "customers" : "all";
+          const selectTab = (key: string) => {
+            setStatusTab("all"); setCustomerType("all"); setHasAgreement(false); setSourceFilter("all"); setAccountRole("all");
+            if (key === "prospects") setStatusTab("prospects");
+            else if (key === "customers") setStatusTab("customers");
+            else if (key === "residential") setCustomerType("Residential");
+            else if (key === "commercial") setCustomerType("Commercial");
+            else if (key === "pm") setCustomerType("Property Manager");
+            else if (key === "agreements") setHasAgreement(true);
+            else if (key === "parent") setAccountRole("parent");
+            else if (key === "sub") setAccountRole("sub");
+          };
+          return (
+            <div className="flex flex-wrap items-center gap-2">
+              <IndustrialTabs
+                testidPrefix="tab-status"
+                activeKey={activeTabKey}
+                onSelect={selectTab}
+                tabs={[
+                  { key: "all", label: "All", count: total.toLocaleString() },
+                  { key: "prospects", label: "Leads", count: statsData?.prospects?.toLocaleString() || 0 },
+                  { key: "customers", label: "Customers", count: statsData?.customers?.toLocaleString() || 0 },
+                ]}
+              />
+              <IndustrialTabs
+                testidPrefix="tab-type"
+                activeKey={activeTabKey}
+                onSelect={selectTab}
+                tabs={[
+                  { key: "residential", label: "Residential" },
+                  { key: "commercial", label: "Commercial" },
+                  { key: "pm", label: "Property Manager" },
+                ]}
+              />
+              <IndustrialTabs
+                testidPrefix="tab-extra"
+                activeKey={activeTabKey}
+                onSelect={selectTab}
+                tabs={[
+                  { key: "agreements", label: "Agreements", count: statsData?.withAgreements?.toLocaleString() || 0 },
+                  { key: "parent", label: "Parent Accounts" },
+                  { key: "sub", label: "Sub Accounts" },
+                ]}
+              />
+            </div>
+          );
+        })()}
 
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
