@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth, subMonths, startOfQuarter, startOfYear } from "date-fns";
 import {
   Calculator, ArrowLeft, LayoutDashboard, Receipt, ListTree, Plus, Search,
   Pencil, Trash2, Loader2, ExternalLink, TrendingUp, TrendingDown, Wallet, AlertCircle,
+  BarChart3, Printer,
 } from "lucide-react";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -34,7 +35,7 @@ function money(v: unknown): string {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: n % 1 ? 2 : 0 });
 }
 
-type Tab = "dashboard" | "expenses" | "accounts";
+type Tab = "dashboard" | "reports" | "expenses" | "accounts";
 
 type Summary = {
   revenueByMonth: { month: string; total: string }[];
@@ -173,6 +174,7 @@ export default function AccountingApp() {
 
   const NAV: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
+    { key: "reports", label: "Reports", icon: <BarChart3 className="h-4 w-4" /> },
     { key: "expenses", label: "Expenses", icon: <Receipt className="h-4 w-4" /> },
     { key: "accounts", label: "Chart of Accounts", icon: <ListTree className="h-4 w-4" /> },
   ];
@@ -338,6 +340,8 @@ export default function AccountingApp() {
               </div>
             )
           )}
+
+          {tab === "reports" && <ReportsTab />}
 
           {tab === "expenses" && (
             <div className="space-y-3">
@@ -561,6 +565,286 @@ export default function AccountingApp() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+
+// ── Reports (QB-style) ───────────────────────────────────────────────────────
+
+type ReportData = {
+  from: string;
+  to: string;
+  pnl: {
+    revenue: number;
+    paymentCount: number;
+    expensesByAccount: { id: string | null; code: string; name: string; total: string; cnt: number }[];
+    totalExpenses: number;
+    netIncome: number;
+  };
+  revenueByMonth: { month: string; total: string }[];
+  expensesByMonth: { month: string; total: string }[];
+  expenseDetail: { id: string; expenseDate: string; vendor: string; memo: string | null; amount: string; accountName: string }[];
+  topCustomers: { name: string; total: string; invoices: number }[];
+  arDetail: { id: string; invoiceNumber: string | null; customerName: string; total: string; balanceDue: string; dueDate: string | null; status: string; bucket: string }[];
+};
+
+const REPORTS = [
+  { key: "pnl", label: "Profit & Loss" },
+  { key: "revenue", label: "Revenue" },
+  { key: "expenses", label: "Expenses" },
+  { key: "ar", label: "A/R Aging" },
+  { key: "customers", label: "Top Customers" },
+] as const;
+
+const PERIODS = [
+  { key: "this-month", label: "This month" },
+  { key: "last-month", label: "Last month" },
+  { key: "this-quarter", label: "This quarter" },
+  { key: "ytd", label: "Year to date" },
+  { key: "last-12", label: "Last 12 months" },
+] as const;
+
+function monthLabel(m: string): string {
+  const [y, mo] = m.split("-").map(Number);
+  return format(new Date(y, mo - 1, 1), "MMM yyyy");
+}
+
+function ReportsTab() {
+  const [report, setReport] = useState<(typeof REPORTS)[number]["key"]>("pnl");
+  const [period, setPeriod] = useState<(typeof PERIODS)[number]["key"]>("this-month");
+
+  const range = useMemo(() => {
+    const now = new Date();
+    const f = (d: Date) => format(d, "yyyy-MM-dd");
+    switch (period) {
+      case "last-month": {
+        const s = startOfMonth(subMonths(now, 1));
+        return { from: f(s), to: f(endOfMonth(s)) };
+      }
+      case "this-quarter": return { from: f(startOfQuarter(now)), to: f(now) };
+      case "ytd": return { from: f(startOfYear(now)), to: f(now) };
+      case "last-12": return { from: f(startOfMonth(subMonths(now, 11))), to: f(now) };
+      default: return { from: f(startOfMonth(now)), to: f(now) };
+    }
+  }, [period]);
+
+  const { data, isLoading } = useQuery<ReportData>({
+    queryKey: ["/api/accounting/reports", range.from, range.to],
+    queryFn: async () => {
+      const res = await fetch(`/api/accounting/reports?from=${range.from}&to=${range.to}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load report");
+      return res.json();
+    },
+  });
+
+  const periodLabel = `${format(new Date(range.from + "T00:00:00"), "MMM d, yyyy")} – ${format(new Date(range.to + "T00:00:00"), "MMM d, yyyy")}`;
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-4" data-testid="acct-reports">
+      {/* Controls */}
+      <div className="flex flex-wrap items-center gap-2 print:hidden">
+        <Select value={report} onValueChange={(v) => setReport(v as typeof report)}>
+          <SelectTrigger className="w-44" data-testid="select-report"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {REPORTS.map((r) => <SelectItem key={r.key} value={r.key}>{r.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={period} onValueChange={(v) => setPeriod(v as typeof period)}>
+          <SelectTrigger className="w-40" data-testid="select-report-period"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {PERIODS.map((p) => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Button size="sm" variant="outline" className="ml-auto h-9" onClick={() => window.print()} data-testid="button-print-report">
+          <Printer className="mr-1.5 h-4 w-4" /> Print
+        </Button>
+      </div>
+
+      {/* Report document */}
+      <div className="rounded-[4px] border border-slate-300/70 bg-white p-5">
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Giesbrecht HVAC</p>
+        <h1 className="mt-0.5 font-display text-xl font-semibold tracking-tight text-slate-900">
+          {REPORTS.find((r) => r.key === report)?.label}
+        </h1>
+        <p className="mt-0.5 text-sm text-slate-500">{periodLabel}</p>
+
+        {isLoading || !data ? (
+          <div className="mt-5 space-y-2">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-8 rounded-[4px]" />)}</div>
+        ) : report === "pnl" ? (
+          <div className="mt-5">
+            <ReportSectionHeader label="Income" />
+            <ReportRow label={`Payments collected (${data.pnl.paymentCount})`} value={money(data.pnl.revenue)} />
+            <ReportRow label="Total income" value={money(data.pnl.revenue)} bold topBorder />
+            <ReportSectionHeader label="Expenses" className="mt-5" />
+            {data.pnl.expensesByAccount.length === 0 && <p className="py-2 text-sm text-slate-400">No expenses recorded in this period.</p>}
+            {data.pnl.expensesByAccount.map((a) => (
+              <ReportRow key={a.id ?? "none"} label={`${a.code ? `${a.code} · ` : ""}${a.name}`} value={money(a.total)} />
+            ))}
+            <ReportRow label="Total expenses" value={money(data.pnl.totalExpenses)} bold topBorder />
+            <div className={`mt-5 flex items-center justify-between rounded-[4px] border px-3 py-2.5 ${data.pnl.netIncome >= 0 ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}`}>
+              <span className="text-sm font-semibold text-slate-900">Net income</span>
+              <span className={`text-base font-bold tabular-nums ${data.pnl.netIncome >= 0 ? "text-green-700" : "text-red-700"}`} data-testid="report-net-income">
+                {money(data.pnl.netIncome)}
+              </span>
+            </div>
+          </div>
+        ) : report === "revenue" ? (
+          <div className="mt-5">
+            {data.revenueByMonth.length === 0 ? (
+              <p className="py-4 text-sm text-slate-400">No payments collected in this period.</p>
+            ) : (
+              <>
+                {(() => {
+                  const max = Math.max(1, ...data.revenueByMonth.map((r) => Number(r.total)));
+                  return data.revenueByMonth.map((r) => (
+                    <div key={r.month} className="flex items-center gap-3 border-b border-slate-100 py-2 last:border-0">
+                      <span className="w-20 shrink-0 text-sm text-slate-600">{monthLabel(r.month)}</span>
+                      <div className="h-3.5 flex-1 rounded-[2px] bg-slate-100">
+                        <div className="h-full rounded-[2px] bg-[#711419]" style={{ width: `${(Number(r.total) / max) * 100}%` }} />
+                      </div>
+                      <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-slate-900">{money(r.total)}</span>
+                    </div>
+                  ));
+                })()}
+                <ReportRow label="Total collected" value={money(data.pnl.revenue)} bold topBorder />
+              </>
+            )}
+          </div>
+        ) : report === "expenses" ? (
+          <div className="mt-5 space-y-6">
+            <div>
+              <ReportSectionHeader label="By account" />
+              {data.pnl.expensesByAccount.map((a) => (
+                <div key={a.id ?? "none"} className="flex items-center gap-3 border-b border-slate-100 py-2 last:border-0">
+                  <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{a.name}</span>
+                  <span className="shrink-0 text-xs text-slate-400">{a.cnt}×</span>
+                  <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-slate-900">{money(a.total)}</span>
+                  <span className="w-12 shrink-0 text-right text-xs tabular-nums text-slate-400">
+                    {data.pnl.totalExpenses > 0 ? Math.round((Number(a.total) / data.pnl.totalExpenses) * 100) : 0}%
+                  </span>
+                </div>
+              ))}
+              <ReportRow label="Total expenses" value={money(data.pnl.totalExpenses)} bold topBorder />
+            </div>
+            <div>
+              <ReportSectionHeader label="Detail" />
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-left text-[11px] uppercase tracking-wide text-slate-400">
+                      <th className="py-1.5 pr-3 font-semibold">Date</th>
+                      <th className="py-1.5 pr-3 font-semibold">Vendor</th>
+                      <th className="py-1.5 pr-3 font-semibold">Account</th>
+                      <th className="py-1.5 text-right font-semibold">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.expenseDetail.map((e) => (
+                      <tr key={e.id} className="border-b border-slate-100 last:border-0">
+                        <td className="py-1.5 pr-3 whitespace-nowrap text-slate-500">{format(new Date(e.expenseDate + "T00:00:00"), "MMM d")}</td>
+                        <td className="py-1.5 pr-3 text-slate-800">{e.vendor}</td>
+                        <td className="py-1.5 pr-3 text-slate-500">{e.accountName}</td>
+                        <td className="py-1.5 text-right font-medium tabular-nums text-slate-900">{money(e.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : report === "ar" ? (
+          <div className="mt-5">
+            {(() => {
+              const buckets = ["current", "1-30", "31-60", "60+"] as const;
+              const sums = buckets.map((b) => data.arDetail.filter((r) => r.bucket === b).reduce((s, r) => s + Number(r.balanceDue), 0));
+              return (
+                <div className="mb-4 grid grid-cols-4 gap-2">
+                  {buckets.map((b, i) => (
+                    <div key={b} className="rounded-[4px] border border-slate-300/70 p-2.5 text-center">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{b === "current" ? "Current" : `${b} days`}</p>
+                      <p className={`mt-0.5 text-sm font-bold tabular-nums ${i >= 2 && sums[i] > 0 ? "text-red-600" : "text-slate-900"}`}>{money(sums[i])}</p>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+            {data.arDetail.length === 0 ? (
+              <p className="py-4 text-sm text-slate-400">Nothing outstanding — all invoices are paid.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-left text-[11px] uppercase tracking-wide text-slate-400">
+                      <th className="py-1.5 pr-3 font-semibold">Invoice</th>
+                      <th className="py-1.5 pr-3 font-semibold">Customer</th>
+                      <th className="py-1.5 pr-3 font-semibold">Due</th>
+                      <th className="py-1.5 pr-3 font-semibold">Age</th>
+                      <th className="py-1.5 text-right font-semibold">Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.arDetail.map((r) => (
+                      <tr key={r.id} className="border-b border-slate-100 last:border-0">
+                        <td className="py-1.5 pr-3 whitespace-nowrap text-slate-500">{r.invoiceNumber || "—"}</td>
+                        <td className="py-1.5 pr-3 text-slate-800">{r.customerName}</td>
+                        <td className="py-1.5 pr-3 whitespace-nowrap text-slate-500">{r.dueDate ? format(new Date(r.dueDate), "MMM d, yyyy") : "—"}</td>
+                        <td className="py-1.5 pr-3">
+                          <span className={`rounded-[3px] px-1.5 py-0.5 text-[10px] font-semibold uppercase ${r.bucket === "current" ? "bg-slate-100 text-slate-500" : r.bucket === "1-30" ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"}`}>
+                            {r.bucket === "current" ? "Current" : `${r.bucket}d`}
+                          </span>
+                        </td>
+                        <td className="py-1.5 text-right font-medium tabular-nums text-slate-900">{money(r.balanceDue)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <ReportRow label="Total outstanding" value={money(data.arDetail.reduce((s, r) => s + Number(r.balanceDue), 0))} bold topBorder />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="mt-5">
+            {data.topCustomers.length === 0 ? (
+              <p className="py-4 text-sm text-slate-400">No payments collected in this period.</p>
+            ) : (
+              (() => {
+                const max = Math.max(1, ...data.topCustomers.map((c) => Number(c.total)));
+                return data.topCustomers.map((c, i) => (
+                  <div key={c.name} className="relative mb-1.5 overflow-hidden rounded-[4px] border border-slate-200 px-3 py-2">
+                    <div className="absolute inset-y-0 left-0 bg-slate-100" style={{ width: `${(Number(c.total) / max) * 100}%` }} />
+                    <div className="relative flex items-center gap-2">
+                      <span className={`w-5 shrink-0 text-center text-xs font-bold tabular-nums ${i === 0 ? "text-[#711419]" : "text-slate-400"}`}>{i + 1}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">{c.name}</span>
+                      <span className="shrink-0 text-xs text-slate-400">{c.invoices} invoice{c.invoices === 1 ? "" : "s"}</span>
+                      <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">{money(c.total)}</span>
+                    </div>
+                  </div>
+                ));
+              })()
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ReportSectionHeader({ label, className = "" }: { label: string; className?: string }) {
+  return (
+    <p className={`border-b border-slate-200 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400 ${className}`}>
+      {label}
+    </p>
+  );
+}
+
+function ReportRow({ label, value, bold = false, topBorder = false }: {
+  label: string; value: string; bold?: boolean; topBorder?: boolean;
+}) {
+  return (
+    <div className={`flex items-center justify-between py-2 ${topBorder ? "mt-1 border-t border-slate-300" : "border-b border-slate-100 last:border-0"}`}>
+      <span className={`text-sm ${bold ? "font-semibold text-slate-900" : "text-slate-700"}`}>{label}</span>
+      <span className={`tabular-nums text-sm ${bold ? "font-bold" : "font-medium"} text-slate-900`}>{value}</span>
     </div>
   );
 }

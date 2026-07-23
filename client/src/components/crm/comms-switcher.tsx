@@ -11,15 +11,8 @@ const ITEMS = [
 export type CommsTab = typeof ITEMS[number]["key"];
 
 /** Segmented switcher for the Comms console — Phone, Messages, and Mail stay
- *  separate pages; this strip makes them feel like one console. */
-export function CommsSwitcher({
-  active,
-  variant = "flush",
-}: {
-  active: CommsTab;
-  /** "flush" = full-width bar for edge-to-edge pages; "inline" = plain row inside padded pages. */
-  variant?: "flush" | "inline";
-}) {
+ *  separate pages; this identical strip on each makes them feel like one console. */
+export function CommsSwitcher({ active }: { active: CommsTab }) {
   const [, navigate] = useLocation();
 
   // Remember the last-used Comms tab so the sidebar "Comms" item returns here.
@@ -52,7 +45,6 @@ export function CommsSwitcher({
     </div>
   );
 
-  if (variant === "inline") return <div className="mb-3 flex justify-center">{control}</div>;
   return (
     <div className="flex shrink-0 items-center justify-center border-b border-slate-200/80 bg-white/85 px-4 py-2">
       {control}

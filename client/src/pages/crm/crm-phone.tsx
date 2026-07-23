@@ -401,16 +401,24 @@ function CallLogEntry({ log, isHighlighted, entryRef, onEdit, onDelete }: CallLo
   const relativeTime = formatDistanceToNow(createdAt, { addSuffix: true });
   const exactTime = format(createdAt, "MMM d, yyyy 'at' h:mm a");
 
+  // The day endpoint preloads tasks + comment counts; only fetch per-log when
+  // they're missing (e.g. search results) so a day doesn't fan out N+1 requests.
+  const preloadedTasks = (log as CallLog & { tasks?: CallLogTask[] }).tasks;
+  const preloadedCommentCount = (log as CallLog & { commentCount?: number }).commentCount;
+
   const { data: tasks = [], isLoading: tasksLoading } = useQuery<CallLogTask[]>({
     queryKey: [`/api/call-logs/${log.id}/tasks`],
     enabled: isExpanded,
+    initialData: preloadedTasks,
+    staleTime: 15_000,
   });
 
   const { data: comments = [] } = useQuery<{ id: string }[]>({
     queryKey: ["/api/crm/comments", "call_log", log.id],
+    enabled: preloadedCommentCount === undefined,
   });
 
-  const commentCount = comments.length;
+  const commentCount = preloadedCommentCount ?? comments.length;
 
   const createTaskMutation = useMutation({
     mutationFn: async (description: string) => {
@@ -3013,9 +3021,13 @@ export default function CrmPhonePage() {
   }
 
   return (
-    <CrmLayout currentUser={currentUser}>
-      <CommsSwitcher active="phone" variant="inline" />
-      <CrmPhoneContent />
+    <CrmLayout currentUser={currentUser} flush disableScroll>
+      <div className="flex h-full min-h-0 flex-col">
+        <CommsSwitcher active="phone" />
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-5 lg:py-5">
+          <CrmPhoneContent />
+        </div>
+      </div>
     </CrmLayout>
   );
 }

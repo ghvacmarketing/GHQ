@@ -258,6 +258,91 @@ export function registerDocsAndAccountingRoutes(app: Express): void {
     }
   });
 
+  // In-depth reporting (QB-style): everything for the Reports tab in one call.
+  // from/to are YYYY-MM-DD; defaults to the current month.
+  app.get("/api/accounting/reports", requireCrmAdmin, async (req: Request, res: Response) => {
+    try {
+      const now = new Date();
+      const defFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+      const from = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.from)) ? String(req.query.from) : defFrom;
+      const to = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.to)) ? String(req.query.to) : now.toISOString().slice(0, 10);
+
+      const revRow: any = await db.execute(sql`
+        SELECT COALESCE(SUM(amount), 0)::numeric AS total, COUNT(*)::int AS cnt
+        FROM crm_payments
+        WHERE status = 'completed' AND created_at >= ${from}::date AND created_at < ${to}::date + interval '1 day'`);
+
+      const revMonths: any = await db.execute(sql`
+        SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month, SUM(amount)::numeric AS total
+        FROM crm_payments
+        WHERE status = 'completed' AND created_at >= ${from}::date AND created_at < ${to}::date + interval '1 day'
+        GROUP BY 1 ORDER BY 1`);
+
+      const expByAccount: any = await db.execute(sql`
+        SELECT a.id, COALESCE(a.code, '') AS code, COALESCE(a.name, 'Uncategorized') AS name,
+               SUM(e.amount)::numeric AS total, COUNT(*)::int AS cnt
+        FROM acct_expenses e LEFT JOIN acct_accounts a ON a.id = e.account_id
+        WHERE e.expense_date >= ${from}::date AND e.expense_date <= ${to}::date
+        GROUP BY a.id, a.code, a.name ORDER BY SUM(e.amount) DESC`);
+
+      const expMonths: any = await db.execute(sql`
+        SELECT to_char(date_trunc('month', expense_date), 'YYYY-MM') AS month, SUM(amount)::numeric AS total
+        FROM acct_expenses
+        WHERE expense_date >= ${from}::date AND expense_date <= ${to}::date
+        GROUP BY 1 ORDER BY 1`);
+
+      const expenseDetail: any = await db.execute(sql`
+        SELECT e.id, e.expense_date AS "expenseDate", e.vendor, e.memo, e.amount::numeric AS amount,
+               COALESCE(a.name, 'Uncategorized') AS "accountName"
+        FROM acct_expenses e LEFT JOIN acct_accounts a ON a.id = e.account_id
+        WHERE e.expense_date >= ${from}::date AND e.expense_date <= ${to}::date
+        ORDER BY e.expense_date DESC LIMIT 200`);
+
+      const topCustomers: any = await db.execute(sql`
+        SELECT COALESCE(c.name, 'Unknown') AS name, SUM(p.amount)::numeric AS total, COUNT(DISTINCT p.invoice_id)::int AS invoices
+        FROM crm_payments p
+        JOIN crm_invoices i ON i.id = p.invoice_id
+        LEFT JOIN crm_customers c ON c.id = i.customer_id
+        WHERE p.status = 'completed' AND p.created_at >= ${from}::date AND p.created_at < ${to}::date + interval '1 day'
+        GROUP BY c.name ORDER BY SUM(p.amount) DESC LIMIT 10`);
+
+      const arDetail: any = await db.execute(sql`
+        SELECT i.id, i.invoice_number AS "invoiceNumber", COALESCE(c.name, 'Unknown') AS "customerName",
+               i.total::numeric AS total, i.balance_due::numeric AS "balanceDue", i.due_date AS "dueDate", i.status,
+               CASE
+                 WHEN i.due_date IS NULL OR i.due_date > now() THEN 'current'
+                 WHEN i.due_date > now() - interval '30 days' THEN '1-30'
+                 WHEN i.due_date > now() - interval '60 days' THEN '31-60'
+                 ELSE '60+'
+               END AS bucket
+        FROM crm_invoices i LEFT JOIN crm_customers c ON c.id = i.customer_id
+        WHERE i.status NOT IN ('draft', 'void', 'paid') AND i.balance_due > 0
+        ORDER BY i.due_date NULLS LAST LIMIT 200`);
+
+      const revenue = parseFloat(revRow.rows?.[0]?.total ?? "0");
+      const totalExpenses = (expByAccount.rows ?? []).reduce((s: number, r: any) => s + parseFloat(r.total || "0"), 0);
+      res.json({
+        from,
+        to,
+        pnl: {
+          revenue,
+          paymentCount: Number(revRow.rows?.[0]?.cnt) || 0,
+          expensesByAccount: expByAccount.rows ?? [],
+          totalExpenses,
+          netIncome: revenue - totalExpenses,
+        },
+        revenueByMonth: revMonths.rows ?? [],
+        expensesByMonth: expMonths.rows ?? [],
+        expenseDetail: expenseDetail.rows ?? [],
+        topCustomers: topCustomers.rows ?? [],
+        arDetail: arDetail.rows ?? [],
+      });
+    } catch (e) {
+      console.error("accounting/reports", e);
+      res.status(500).json({ message: "Failed to build report" });
+    }
+  });
+
   app.get("/api/accounting/accounts", requireCrmAdmin, async (_req: Request, res: Response) => {
     try {
       const accounts = await db.select().from(acctAccounts).orderBy(acctAccounts.sortOrder, acctAccounts.code);

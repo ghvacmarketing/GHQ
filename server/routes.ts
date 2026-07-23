@@ -1277,7 +1277,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid date format. Use YYYY-MM-DD" });
       }
       const logs = await storage.getCallLogsByDay(date);
-      res.json({ date, logs });
+      // Preload comment counts in one query so each row doesn't fetch its own
+      let withCounts: any[] = logs;
+      if (logs.length > 0) {
+        try {
+          const counts = await db
+            .select({ entityId: crmComments.entityId, cnt: sql<number>`COUNT(*)::int` })
+            .from(crmComments)
+            .where(and(eq(crmComments.entityType, "call_log"), inArray(crmComments.entityId, logs.map((l) => l.id))))
+            .groupBy(crmComments.entityId);
+          const byId = new Map(counts.map((c) => [c.entityId, Number(c.cnt) || 0]));
+          withCounts = logs.map((l) => ({ ...l, commentCount: byId.get(l.id) ?? 0 }));
+        } catch (e) {
+          console.error("call-log comment counts (non-fatal):", e);
+        }
+      }
+      res.json({ date, logs: withCounts });
     } catch (error) {
       console.error("Error fetching call logs for day:", error);
       res.status(500).json({ message: "Error fetching call logs for day" });

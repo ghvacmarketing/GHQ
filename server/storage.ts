@@ -158,7 +158,7 @@ export interface IStorage {
   // Call Log operations
   getCallLogDays(): Promise<{ id: string; date: string; count: number }[]>;
   getOrCreateCallLogDay(date: string): Promise<CallLogDay>;
-  getCallLogsByDay(date: string): Promise<CallLog[]>;
+  getCallLogsByDay(date: string): Promise<(CallLog & { tasks: CallLogTask[] })[]>;
   createCallLog(data: InsertCallLog): Promise<CallLog>;
   updateCallLog(id: string, data: Partial<InsertCallLog>): Promise<CallLog | undefined>;
   deleteCallLog(id: string): Promise<boolean>;
@@ -1341,13 +1341,17 @@ export class DatabaseStorage implements IStorage {
 
   // Call Log operations
   async getCallLogDays(): Promise<{ id: string; date: string; count: number }[]> {
-    const days = await db.select().from(callLogDays).orderBy(desc(callLogDays.date));
-    const result = [];
-    for (const day of days) {
-      const logs = await db.select().from(callLogs).where(eq(callLogs.dayId, day.id));
-      result.push({ id: day.id, date: day.date, count: logs.length });
-    }
-    return result;
+    const rows = await db
+      .select({
+        id: callLogDays.id,
+        date: callLogDays.date,
+        count: sql<number>`COUNT(${callLogs.id})::int`,
+      })
+      .from(callLogDays)
+      .leftJoin(callLogs, eq(callLogs.dayId, callLogDays.id))
+      .groupBy(callLogDays.id, callLogDays.date)
+      .orderBy(desc(callLogDays.date));
+    return rows.map((r) => ({ id: r.id, date: r.date, count: Number(r.count) || 0 }));
   }
 
   async getOrCreateCallLogDay(date: string): Promise<CallLogDay> {
@@ -1358,11 +1362,25 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getCallLogsByDay(date: string): Promise<CallLog[]> {
+  async getCallLogsByDay(date: string): Promise<(CallLog & { tasks: CallLogTask[] })[]> {
     const [day] = await db.select().from(callLogDays).where(eq(callLogDays.date, date));
     if (!day) return [];
-    
-    return await db.select().from(callLogs).where(eq(callLogs.dayId, day.id)).orderBy(desc(callLogs.createdAt));
+
+    const logs = await db.select().from(callLogs).where(eq(callLogs.dayId, day.id)).orderBy(desc(callLogs.createdAt));
+    if (logs.length === 0) return [];
+    // Preload every log's tasks in one query so the client doesn't fan out N+1 requests
+    const taskRows = await db
+      .select()
+      .from(callLogTasks)
+      .where(inArray(callLogTasks.callLogId, logs.map((l) => l.id)))
+      .orderBy(asc(callLogTasks.createdAt));
+    const byLog = new Map<string, CallLogTask[]>();
+    for (const t of taskRows) {
+      const list = byLog.get(t.callLogId) ?? [];
+      list.push(t);
+      byLog.set(t.callLogId, list);
+    }
+    return logs.map((l) => ({ ...l, tasks: byLog.get(l.id) ?? [] }));
   }
 
   async createCallLog(data: InsertCallLog): Promise<CallLog> {

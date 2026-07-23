@@ -545,7 +545,7 @@ export default function CrmMessaging() {
           </div>
         </div>
 
-        <ScrollArea className="flex-1">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {loadingConversations ? (
             <div className="p-3 space-y-2">
               {[1, 2, 3, 4, 5].map((i) => (
@@ -655,7 +655,7 @@ export default function CrmMessaging() {
               })}
             </div>
           )}
-        </ScrollArea>
+        </div>
       </div>
 
       {/* ───────────── Thread ───────────── */}
@@ -744,7 +744,7 @@ export default function CrmMessaging() {
               </div>
             </div>
 
-            <ScrollArea className="flex-1 px-4 py-4 lg:px-6">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-6">
               <div className="space-y-1">
                 {conversationDetail?.messages?.map((msg, idx) => {
                   const prev = conversationDetail.messages[idx - 1];
@@ -823,7 +823,7 @@ export default function CrmMessaging() {
                 })}
                 <div ref={messagesEndRef} />
               </div>
-            </ScrollArea>
+            </div>
 
             <div className="p-3 border-t border-border bg-card">
               {/* Staged image preview */}

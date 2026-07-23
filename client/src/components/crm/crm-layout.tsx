@@ -456,24 +456,50 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
     staleTime: 25000,
   });
 
+  // One shared motion spec for the whole chrome: sidebar width, top-bar
+  // position, content margin/padding all move together on the same curve,
+  // and the sidebar's two interiors crossfade while the width eases.
+  const CHROME_MOTION = "duration-[400ms] ease-[cubic-bezier(0.32,0.72,0,1)]";
+
   return (
     <div className="h-screen overflow-hidden bg-background flex">
       <aside
         className={cn(
-          "hidden lg:flex flex-shrink-0 fixed inset-y-0 left-0 z-40 transition-[width] duration-[600ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+          "hidden lg:block flex-shrink-0 fixed inset-y-0 left-0 z-40 overflow-hidden transition-[width]",
+          CHROME_MOTION,
           sidebarCollapsed ? "w-[64px]" : "w-56"
         )}
       >
-        <SidebarContent
-          currentUser={currentUser}
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
-        />
+        <div
+          className={cn(
+            "absolute inset-y-0 left-0 flex w-56 transition-opacity duration-300",
+            sidebarCollapsed ? "pointer-events-none opacity-0" : "opacity-100"
+          )}
+        >
+          <SidebarContent
+            currentUser={currentUser}
+            collapsed={false}
+            onToggleCollapse={() => setSidebarCollapsed(true)}
+          />
+        </div>
+        <div
+          className={cn(
+            "absolute inset-y-0 left-0 flex w-[64px] transition-opacity duration-300",
+            sidebarCollapsed ? "opacity-100" : "pointer-events-none opacity-0"
+          )}
+        >
+          <SidebarContent
+            currentUser={currentUser}
+            collapsed
+            onToggleCollapse={() => setSidebarCollapsed(false)}
+          />
+        </div>
       </aside>
 
       <div
         className={cn(
-          "hidden lg:flex fixed top-0 right-0 z-40 bg-background border-b h-14 items-center gap-4 px-5 transition-[left,transform] duration-[600ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+          "hidden lg:flex fixed top-0 right-0 z-40 bg-background border-b h-14 items-center gap-4 px-5 transition-[left,transform]",
+          CHROME_MOTION,
           sidebarCollapsed ? "left-[64px]" : "left-56",
           topNavCollapsed && "-translate-y-full"
         )}
@@ -556,7 +582,7 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
         onClick={() => setTopNavCollapsed(false)}
         title="Show top bar"
         className={cn(
-          "hidden lg:flex fixed top-0 left-1/2 z-40 h-6 items-center gap-1 rounded-b-md border border-t-0 border-border bg-background px-3 text-xs font-medium text-muted-foreground shadow-sm transition-all duration-[600ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-foreground",
+          "hidden lg:flex fixed top-0 left-1/2 z-40 h-6 items-center gap-1 rounded-b-md border border-t-0 border-border bg-background px-3 text-xs font-medium text-muted-foreground shadow-sm transition-all duration-[400ms] ease-[cubic-bezier(0.32,0.72,0,1)] hover:text-foreground",
           topNavCollapsed ? "-translate-x-1/2 translate-y-0 opacity-100" : "-translate-x-1/2 -translate-y-full opacity-0 pointer-events-none"
         )}
         data-testid="button-expand-topnav"
@@ -614,16 +640,29 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
 
       <main
         className={cn(
-          "flex-1 overflow-x-hidden transition-[margin] duration-[600ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
+          "flex-1 overflow-x-hidden transition-[margin]",
+          CHROME_MOTION,
           sidebarCollapsed ? "lg:ml-[64px]" : "lg:ml-56"
         )}
       >
         {disableScroll ? (
-          <div className={cn("h-screen overflow-hidden flex flex-col bg-background pt-16", topNavCollapsed ? "lg:pt-0" : "lg:pt-14")}>
+          <div
+            className={cn(
+              "h-screen overflow-hidden flex flex-col bg-background pt-16 transition-[padding]",
+              CHROME_MOTION,
+              topNavCollapsed ? "lg:pt-0" : "lg:pt-14"
+            )}
+          >
             <div className={cn("flex-1 min-h-0 flex flex-col", !flush && "px-4 py-4 lg:px-5 lg:py-5")}>{children}</div>
           </div>
         ) : (
-          <div className={cn("h-screen overflow-y-auto overflow-x-hidden bg-background pt-16", topNavCollapsed ? "lg:pt-0" : "lg:pt-14")}>
+          <div
+            className={cn(
+              "h-screen overflow-y-auto overflow-x-hidden bg-background pt-16 transition-[padding]",
+              CHROME_MOTION,
+              topNavCollapsed ? "lg:pt-0" : "lg:pt-14"
+            )}
+          >
             <div className={cn("overflow-x-hidden", !flush && "px-4 py-4 lg:px-5 lg:py-5")}>{children}</div>
           </div>
         )}
