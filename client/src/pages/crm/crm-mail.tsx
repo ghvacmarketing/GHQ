@@ -364,7 +364,7 @@ export default function CrmMail() {
     return (
       <CrmLayout currentUser={currentUser}>
         <div className="mx-auto max-w-lg py-24 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-slate-100">
             <Mail className="h-7 w-7 text-slate-400" />
           </div>
           <h1 className="text-xl font-semibold text-slate-900">Email isn't set up yet</h1>
@@ -380,7 +380,7 @@ export default function CrmMail() {
     return (
       <CrmLayout currentUser={currentUser}>
         <div className="mx-auto max-w-lg py-24 text-center">
-          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#711419]/10">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-lg bg-[#711419]/10">
             <Mail className="h-8 w-8 text-[#711419]" />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Connect your Workspace Gmail</h1>
@@ -389,7 +389,7 @@ export default function CrmMail() {
             Gmail Sent folder and replies come back to your inbox.
           </p>
           <Button
-            className="mt-6 h-11 rounded-xl bg-[#711419] px-6 hover:bg-[#8a1a1f]"
+            className="mt-6 h-11 rounded-lg bg-[#711419] px-6 hover:bg-[#8a1a1f]"
             onClick={() => { window.location.href = "/api/crm/gmail/connect"; }}
             data-testid="button-connect-gmail"
           >
@@ -490,7 +490,7 @@ export default function CrmMail() {
           <div className="min-h-0 flex-1 overflow-y-auto">
             {threadsLoading ? (
               <div className="space-y-1 p-2">
-                {[...Array(7)].map((_, i) => <Skeleton key={i} className="h-[68px] w-full rounded-xl" />)}
+                {[...Array(7)].map((_, i) => <Skeleton key={i} className="h-[68px] w-full rounded-lg" />)}
               </div>
             ) : threads.length === 0 ? (
               <div className="px-6 py-20 text-center">
@@ -547,7 +547,7 @@ export default function CrmMail() {
           {!selectedId ? (
             <div className="flex h-full items-center justify-center text-center text-muted-foreground">
               <div>
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-slate-100">
                   <Mail className="h-8 w-8 text-slate-300" />
                 </div>
                 <p className="text-sm font-medium text-slate-500">Select a conversation to read it</p>
@@ -556,7 +556,7 @@ export default function CrmMail() {
           ) : detailLoading || !threadDetail ? (
             <div className="space-y-3 p-6">
               <Skeleton className="h-8 w-2/3" />
-              <Skeleton className="h-40 w-full rounded-xl" />
+              <Skeleton className="h-40 w-full rounded-lg" />
             </div>
           ) : (
             <>
@@ -845,7 +845,7 @@ function RecipientField({ recipients, onChange, testid }: { recipients: Recipien
       </div>
 
       {open && results.length > 0 && !pending && (
-        <div className="absolute inset-x-0 top-full z-30 mt-1.5 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+        <div className="absolute inset-x-0 top-full z-30 mt-1.5 max-h-72 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-xl">
           {results.map((r, i) => (
             <button key={i} onMouseDown={(e) => { e.preventDefault(); r.email ? add({ email: r.email, name: r.name, customerId: r.type === "customer" ? r.customerId : undefined }) : (r.customerId && (setPending({ id: r.customerId, name: r.name }), setPendingEmail(""), setSaveToProfile(true))); }} className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-50" data-testid={`recipient-option-${i}`}>
               <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${r.type === "customer" ? "bg-[#711419]/10 text-[#711419]" : "bg-slate-200 text-slate-600"}`}>
@@ -862,7 +862,7 @@ function RecipientField({ recipients, onChange, testid }: { recipients: Recipien
       )}
 
       {pending && (
-        <div className="absolute inset-x-0 top-full z-30 mt-1.5 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+        <div className="absolute inset-x-0 top-full z-30 mt-1.5 rounded-lg border border-slate-200 bg-white p-3 shadow-xl">
           <p className="mb-2 text-xs text-slate-500">No email on file for <span className="font-semibold text-slate-700">{pending.name}</span>. Enter one:</p>
           <input
             autoFocus
@@ -1077,7 +1077,7 @@ function AttachmentViewer({ item, onClose }: { item: { url: string; name: string
         ) : isPdf ? (
           <iframe src={item.url} title={item.name} className="h-full w-full max-w-4xl rounded-lg bg-white" />
         ) : (
-          <div className="rounded-xl bg-white p-8 text-center">
+          <div className="rounded-lg bg-white p-8 text-center">
             <FileTypeIcon name={item.name} mime={item.mimeType} className="mx-auto mb-3 h-12 w-12" />
             <p className="text-sm font-medium text-slate-700">{fileMeta(item.name, item.mimeType).kind}</p>
             <p className="text-xs text-slate-500">This file type can't be previewed here.</p>

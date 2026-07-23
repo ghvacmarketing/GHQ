@@ -436,7 +436,7 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
     if (conversationMessages.length === 0 && !helpMutation.isPending) {
       return (
         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-          <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <Sparkles className="h-6 w-6" />
           </span>
           <p className="text-sm">Ask a question about the CRM</p>
@@ -451,7 +451,7 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
           if (msg.role === "user") {
             return (
               <div key={i} className="flex justify-end">
-                <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-sm px-4 py-2 max-w-[85%] text-sm">
+                <div className="bg-primary text-primary-foreground rounded-lg rounded-tr-sm px-4 py-2 max-w-[85%] text-sm">
                   {msg.content}
                 </div>
               </div>
@@ -463,7 +463,7 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
                 <Sparkles className="h-4 w-4 text-white" />
               </div>
               <div className="flex-1 space-y-2">
-                <div className="bg-muted rounded-2xl rounded-tl-sm p-4 text-foreground text-sm leading-relaxed whitespace-pre-wrap">
+                <div className="bg-muted rounded-lg rounded-tl-sm p-4 text-foreground text-sm leading-relaxed whitespace-pre-wrap">
                   {msg.content}
                 </div>
                 {msg.relatedTopics && msg.relatedTopics.length > 0 && (
@@ -494,7 +494,7 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-primary to-[#e8704f] flex items-center justify-center">
               <Sparkles className="h-4 w-4 text-white" />
             </div>
-            <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
+            <div className="bg-muted rounded-lg rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
@@ -726,7 +726,7 @@ function TaggedCommentComposer({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden"
+        className="bg-white rounded-lg shadow-2xl w-full max-w-md mx-4 overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-4 border-b">

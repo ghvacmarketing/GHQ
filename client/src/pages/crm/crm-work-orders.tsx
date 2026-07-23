@@ -1206,10 +1206,10 @@ export default function CrmWorkOrders() {
       <div className="min-h-screen bg-slate-50 p-4 md:p-6">
         <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
           <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-12 w-full rounded-xl" />
+          <Skeleton className="h-12 w-full rounded-lg" />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-48 w-full rounded-xl" />
+              <Skeleton key={i} className="h-48 w-full rounded-lg" />
             ))}
           </div>
         </div>
@@ -1290,7 +1290,7 @@ export default function CrmWorkOrders() {
         {workOrdersLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-48 w-full rounded-xl" />
+              <Skeleton key={i} className="h-48 w-full rounded-lg" />
             ))}
           </div>
         ) : filteredWorkOrders.length === 0 ? (

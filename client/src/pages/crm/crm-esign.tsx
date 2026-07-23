@@ -176,7 +176,7 @@ export default function CrmEsign() {
         {/* List */}
         {isLoading ? (
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-[72px] w-full rounded-xl" />)}
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-[72px] w-full rounded-lg" />)}
           </div>
         ) : docs.length === 0 ? (
           <SectionCard noBodyPadding>

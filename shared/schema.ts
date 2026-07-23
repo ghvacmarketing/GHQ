@@ -2005,6 +2005,8 @@ export const crmAgreements = pgTable("crm_agreements", {
   status: text("status").$type<CrmAgreementStatus>().notNull().default("active"),
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes"),
+  // Client-facing terms/details — printed on the formal agreement document
+  details: text("details"),
   startDate: date("start_date"),
   endDate: date("end_date"),
   contractDate: date("contract_date"),

@@ -4302,7 +4302,7 @@ export default function CrmProposalBuilder() {
 
                     {/* Pricing Summary and Add Button */}
                     {(selectedCrawlspaceServices.length > 0 || selectedDoorOption) && (
-                      <div className="mt-6 p-4 border-2 border-orange-200 dark:border-orange-800 rounded-xl bg-gradient-to-r from-orange-50 to-white dark:from-orange-950 dark:to-gray-900">
+                      <div className="mt-6 p-4 border-2 border-orange-200 dark:border-orange-800 rounded-lg bg-gradient-to-r from-orange-50 to-white dark:from-orange-950 dark:to-gray-900">
                         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                           <div>
                             <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -4876,7 +4876,7 @@ export default function CrmProposalBuilder() {
               const basePrice = selectedPricing.totalPrice;
               
               return (
-              <div className="mt-6 p-4 border-2 border-teal-200 dark:border-teal-800 rounded-xl bg-gradient-to-r from-teal-50 to-white dark:from-teal-950 dark:to-gray-900">
+              <div className="mt-6 p-4 border-2 border-teal-200 dark:border-teal-800 rounded-lg bg-gradient-to-r from-teal-50 to-white dark:from-teal-950 dark:to-gray-900">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                   <div>
                     <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -5043,7 +5043,7 @@ export default function CrmProposalBuilder() {
 
       <Dialog open={quoteDialogOpen} onOpenChange={setQuoteDialogOpen}>
         <DialogContent className="sm:max-w-3xl h-[90vh] max-h-[90vh] p-0 overflow-hidden flex flex-col">
-          <div className="bg-gray-50 dark:bg-gray-900 border-b mx-4 mt-4 rounded-xl px-5 py-4 sm:px-6 sm:py-5">
+          <div className="bg-gray-50 dark:bg-gray-900 border-b mx-4 mt-4 rounded-lg px-5 py-4 sm:px-6 sm:py-5">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <img
@@ -5121,7 +5121,7 @@ export default function CrmProposalBuilder() {
                     const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
                     const itemPrice = finalPrice * item.quantity;
                     return (
-                      <div key={item.id} className={`rounded-xl border-2 ${item.eliteData ? 'border-amber-300 dark:border-amber-700' : 'border-teal-200 dark:border-teal-800'} bg-gradient-to-br from-teal-50 to-white dark:from-teal-950 dark:to-gray-900 overflow-hidden shadow-sm`}>
+                      <div key={item.id} className={`rounded-lg border-2 ${item.eliteData ? 'border-amber-300 dark:border-amber-700' : 'border-teal-200 dark:border-teal-800'} bg-gradient-to-br from-teal-50 to-white dark:from-teal-950 dark:to-gray-900 overflow-hidden shadow-sm`}>
                         <div className={`${item.eliteData ? 'bg-gradient-to-r from-amber-500 to-amber-600' : 'bg-teal-500'} text-white px-4 py-2 flex items-center justify-between`}>
                           <div className="flex items-center gap-2">
                             {item.eliteData ? <Crown className="h-4 w-4" /> : <Package className="h-4 w-4" />}
@@ -5201,7 +5201,7 @@ export default function CrmProposalBuilder() {
                       item.thermostat ? { label: 'Thermostat', brand: item.thermostat.brand, name: item.thermostat.unitName, image: item.thermostat.imageUrl } : null,
                     ].filter((c): c is NonNullable<typeof c> => c !== null);
                     return (
-                      <div key={item.id} className="rounded-xl border-2 border-green-200 dark:border-green-800 bg-gradient-to-br from-green-50 to-white dark:from-green-950 dark:to-gray-900 overflow-hidden shadow-sm">
+                      <div key={item.id} className="rounded-lg border-2 border-green-200 dark:border-green-800 bg-gradient-to-br from-green-50 to-white dark:from-green-950 dark:to-gray-900 overflow-hidden shadow-sm">
                         <div className="bg-green-500 text-white px-4 py-2 flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Wrench className="h-4 w-4" />
@@ -5239,7 +5239,7 @@ export default function CrmProposalBuilder() {
                   } else if (isCrawlspaceServicesItem(item)) {
                     const itemPrice = item.totalPrice * item.quantity;
                     return (
-                      <div key={item.id} className="rounded-xl border-2 border-orange-200 dark:border-orange-800 bg-gradient-to-br from-orange-50 to-white dark:from-orange-950 dark:to-gray-900 overflow-hidden shadow-sm">
+                      <div key={item.id} className="rounded-lg border-2 border-orange-200 dark:border-orange-800 bg-gradient-to-br from-orange-50 to-white dark:from-orange-950 dark:to-gray-900 overflow-hidden shadow-sm">
                         <div className="bg-orange-500 text-white px-4 py-2 flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Wrench className="h-4 w-4" />
@@ -5317,7 +5317,7 @@ export default function CrmProposalBuilder() {
                       { label: 'Thermostat', name: item.thermostatName || item.thermostatModel, image: item.thermostatImageUrl },
                     ].filter(c => c.name);
                     return (
-                      <div key={item.id} className={`rounded-xl border-2 bg-gradient-to-br overflow-hidden shadow-sm ${item.eliteData ? 'border-amber-300 dark:border-amber-700' : ''} ${levelColors[item.packageLevel] || levelColors.Budget}`}>
+                      <div key={item.id} className={`rounded-lg border-2 bg-gradient-to-br overflow-hidden shadow-sm ${item.eliteData ? 'border-amber-300 dark:border-amber-700' : ''} ${levelColors[item.packageLevel] || levelColors.Budget}`}>
                         <div className={`${item.eliteData ? 'bg-gradient-to-r from-amber-500 to-amber-600' : (headerColors[item.packageLevel] || headerColors.Budget)} text-white px-4 py-2 flex items-center justify-between`}>
                           <div className="flex items-center gap-2">
                             {item.eliteData ? <Crown className="h-4 w-4" /> : <Award className="h-4 w-4" />}
@@ -5620,14 +5620,14 @@ export default function CrmProposalBuilder() {
               <Button
                 variant="outline"
                 onClick={() => setQuoteDialogOpen(false)}
-                className="flex-1 h-11 rounded-xl border-slate-200 text-slate-700 hover:bg-slate-50"
+                className="flex-1 h-11 rounded-lg border-slate-200 text-slate-700 hover:bg-slate-50"
               >
                 Close
               </Button>
               <Button
                 onClick={handleSaveToCrm}
                 disabled={cart.length === 0 || !selectedCustomer || saveToCrmMutation.isPending}
-                className="flex-1 h-11 rounded-xl bg-[#711419] hover:bg-[#5a1014] text-white"
+                className="flex-1 h-11 rounded-lg bg-[#711419] hover:bg-[#5a1014] text-white"
                 data-testid="button-save-to-crm"
               >
                 {saveToCrmMutation.isPending ? (

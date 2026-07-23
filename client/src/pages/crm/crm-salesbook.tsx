@@ -137,7 +137,7 @@ export default function CrmSalesbook() {
     <CrmLayout currentUser={currentUser}>
       <div
         ref={viewerRef}
-        className="flex flex-col overflow-hidden rounded-xl border border-border bg-card"
+        className="flex flex-col overflow-hidden rounded-lg border border-border bg-card"
         style={{ height: isFullscreen ? "100vh" : "calc(100vh - 96px)" }}
       >
         {/* Toolbar */}

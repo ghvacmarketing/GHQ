@@ -141,7 +141,7 @@ export default function CrmAnalytics() {
 
         {/* System-health hero */}
         {summary && summary.total > 0 && (
-          <Card className="overflow-hidden rounded-2xl">
+          <Card className="overflow-hidden rounded-lg">
             <CardContent className="p-5">
               <div className="flex items-end justify-between gap-3">
                 <div>
@@ -179,7 +179,7 @@ export default function CrmAnalytics() {
 
         {/* Open alerts — prominent when present */}
         {alerts.length > 0 && (
-          <Card className="rounded-2xl border-red-200">
+          <Card className="rounded-lg border-red-200">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base text-red-700">
                 <AlertTriangle className="h-4 w-4" /> Open alerts ({alerts.length})
@@ -194,12 +194,12 @@ export default function CrmAnalytics() {
         {/* Sensors — the main event */}
         {sensorsLoading ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {[0, 1].map((i) => <div key={i} className="h-64 animate-pulse rounded-2xl bg-muted" />)}
+            {[0, 1].map((i) => <div key={i} className="h-64 animate-pulse rounded-lg bg-muted" />)}
           </div>
         ) : sensors.length === 0 ? (
-          <Card className="rounded-2xl border-dashed">
+          <Card className="rounded-lg border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-              <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#711419]/10">
+              <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-[#711419]/10">
                 <Thermometer className="h-7 w-7 text-[#711419]" />
               </span>
               <h3 className="text-lg font-semibold text-foreground">No sensors yet</h3>
@@ -222,10 +222,10 @@ export default function CrmAnalytics() {
                       <h2 className="text-sm font-semibold text-foreground">Unassigned sensors</h2>
                       <span className="text-xs text-muted-foreground">({g.sensors.length})</span>
                     </div>
-                    <Card className="rounded-2xl border-dashed">
+                    <Card className="rounded-lg border-dashed">
                       <CardContent className="p-3">
                         <p className="mb-2 px-1 text-xs text-muted-foreground">Map these to a property to start tracking them.</p>
-                        <div className="overflow-hidden rounded-xl border border-border divide-y divide-border">
+                        <div className="overflow-hidden rounded-lg border border-border divide-y divide-border">
                           {g.sensors.map((s) => (
                             <div key={s.id} className="flex items-center justify-between gap-2 px-3 py-2.5">
                               <div className="min-w-0">
@@ -266,7 +266,7 @@ export default function CrmAnalytics() {
 
             {/* Manage devices */}
             {sensors.length > 0 && (
-              <Card className="rounded-2xl">
+              <Card className="rounded-lg">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2 text-sm">
                     <Settings2 className="h-4 w-4 text-muted-foreground" /> Manage devices
@@ -306,7 +306,7 @@ export default function CrmAnalytics() {
                 </DialogTitle>
               </DialogHeader>
               <div className="mb-2 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-[#711419]/5 p-4">
+                <div className="rounded-lg bg-[#711419]/5 p-4">
                   <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#711419]">
                     <Droplets className="h-4 w-4" /> Humidity
                   </div>
@@ -314,7 +314,7 @@ export default function CrmAnalytics() {
                     {detail.humidity != null ? `${Math.round(detail.humidity)}%` : "—"}
                   </p>
                 </div>
-                <div className="rounded-2xl bg-slate-50 p-4">
+                <div className="rounded-lg bg-slate-50 p-4">
                   <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     <Thermometer className="h-4 w-4" /> Temperature
                   </div>

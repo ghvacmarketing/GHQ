@@ -629,7 +629,7 @@ export default function MobileJob() {
                   <button
                     key={tech.id}
                     onClick={() => { if (hasJobs) setSelectedTechId(tech.id); }}
-                    className={`flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-2 py-4 shadow-sm transition-all ${
+                    className={`flex flex-col items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-4 shadow-sm transition-all ${
                       hasJobs ? "active:scale-[0.98]" : "opacity-60"
                     }`}
                     data-testid={`jobs-tech-${tech.id}`}
@@ -667,7 +667,7 @@ export default function MobileJob() {
                 <button
                   key={job.id}
                   onClick={() => { setSelectedTechId(null); navigate(`/mobile/job/${job.id}`); }}
-                  className="flex w-full items-center gap-2 rounded-2xl border border-slate-100 bg-white px-3 py-3 text-left shadow-sm transition-all active:scale-[0.99]"
+                  className="flex w-full items-center gap-2 rounded-lg border border-slate-100 bg-white px-3 py-3 text-left shadow-sm transition-all active:scale-[0.99]"
                   data-testid={`jobs-roster-job-${job.id}`}
                 >
                   <span className="text-xs font-semibold tabular-nums text-slate-500">

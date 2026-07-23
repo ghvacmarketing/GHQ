@@ -514,7 +514,7 @@ export default function CrmProposalPreview() {
                 const finalPrice = item.eliteData ? item.eliteData.finalTotal : basePrice;
                 const itemPrice = finalPrice * item.quantity;
                 return (
-                  <div key={item.id} className={`rounded-xl border overflow-hidden ${item.eliteData ? "border-amber-200 dark:border-amber-800" : "border-border"} bg-card`}>
+                  <div key={item.id} className={`rounded-lg border overflow-hidden ${item.eliteData ? "border-amber-200 dark:border-amber-800" : "border-border"} bg-card`}>
                     <div className={`${item.eliteData ? "bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-200" : "bg-muted/50 text-foreground"} px-4 py-2 flex items-center justify-between border-b`}>
                       <div className="flex items-center gap-2">
                         {item.eliteData ? <Crown className="h-4 w-4" /> : <Package className="h-4 w-4" />}
@@ -568,7 +568,7 @@ export default function CrmProposalPreview() {
                   item.thermostat ? { label: "Thermostat", name: item.thermostat.unitName, image: item.thermostat.imageUrl } : null,
                 ].filter((c): c is NonNullable<typeof c> => c !== null);
                 return (
-                  <div key={item.id} className="rounded-xl border border-border overflow-hidden bg-card">
+                  <div key={item.id} className="rounded-lg border border-border overflow-hidden bg-card">
                     <div className="bg-muted/50 text-foreground px-4 py-2 flex items-center justify-between border-b">
                       <div className="flex items-center gap-2">
                         <Wrench className="h-4 w-4" />
@@ -605,7 +605,7 @@ export default function CrmProposalPreview() {
               if (isCrawlspaceServicesItem(item)) {
                 const itemPrice = item.totalPrice * item.quantity;
                 return (
-                  <div key={item.id} className="rounded-xl border border-border overflow-hidden bg-card">
+                  <div key={item.id} className="rounded-lg border border-border overflow-hidden bg-card">
                     <div className="bg-muted/50 text-foreground px-4 py-2 flex items-center justify-between border-b">
                       <div className="flex items-center gap-2">
                         <Wrench className="h-4 w-4" />
@@ -675,7 +675,7 @@ export default function CrmProposalPreview() {
                 { label: "Thermostat", name: hvac.thermostatName || hvac.thermostatModel, image: hvac.thermostatImageUrl },
               ].filter(c => c.name);
               return (
-                <div key={hvac.id} className={`rounded-xl border overflow-hidden bg-card ${hvac.eliteData ? "border-amber-200 dark:border-amber-800" : "border-border"}`}>
+                <div key={hvac.id} className={`rounded-lg border overflow-hidden bg-card ${hvac.eliteData ? "border-amber-200 dark:border-amber-800" : "border-border"}`}>
                   <div className={`${hvac.eliteData ? "bg-amber-500 text-white" : (headerColors[hvac.packageLevel] || headerColors.Budget)} px-4 py-2 flex items-center justify-between border-b`}>
                     <div className="flex items-center gap-2">
                       {hvac.eliteData ? <Crown className="h-4 w-4" /> : <Award className="h-4 w-4" />}

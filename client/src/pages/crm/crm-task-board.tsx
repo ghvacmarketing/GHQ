@@ -293,7 +293,7 @@ function DroppableColumn({
     <div
       ref={setNodeRef}
       className={`
-        flex flex-col bg-white border border-slate-200 rounded-xl min-w-0 shadow-sm h-full
+        flex flex-col bg-white border border-slate-200 rounded-lg min-w-0 shadow-sm h-full
         ${isOver ? "ring-2 ring-[#711419]/40 ring-offset-1 bg-red-50/20" : ""}
       `}
     >
@@ -733,7 +733,7 @@ export default function CrmTaskBoard() {
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           <Skeleton className="h-12 w-64" />
-          <Skeleton className="h-64 rounded-xl" />
+          <Skeleton className="h-64 rounded-lg" />
         </div>
       </div>
     );

@@ -111,6 +111,7 @@ export default function CrmAgreementCreate() {
   const [autoRenew, setAutoRenew] = useState(true);
   const [billingPreference, setBillingPreference] = useState<"auto_invoice" | "pay_on_visit">("auto_invoice");
   const [notes, setNotes] = useState("");
+  const [details, setDetails] = useState("");
   const [price, setPrice] = useState("229.00");
   const [frequency, setFrequency] = useState<"weekly" | "monthly" | "annual">("annual");
   // Visit cadence is separate from billing frequency so a monthly-billed Care plan
@@ -305,6 +306,7 @@ export default function CrmAgreementCreate() {
         numberOfSystems,
         autoRenew: billingPreference === "auto_invoice" ? autoRenew : false,
         notes,
+        details,
         status: "pending" as const,
         frequency,
         visitFrequency,
@@ -378,7 +380,7 @@ export default function CrmAgreementCreate() {
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           <Skeleton className="h-12 w-64" />
-          <Skeleton className="h-96 w-full rounded-xl" />
+          <Skeleton className="h-96 w-full rounded-lg" />
         </div>
       </div>
     );
@@ -778,6 +780,17 @@ export default function CrmAgreementCreate() {
                         data-testid="textarea-notes"
                       />
                     </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="agr-details" className="text-sm font-medium">Agreement details (printed on the client document)</Label>
+                        <Textarea
+                          id="agr-details"
+                          value={details}
+                          onChange={(e) => setDetails(e.target.value)}
+                          placeholder="What this agreement covers, inclusions, special terms… Blank lines start new paragraphs on the printed document."
+                          rows={4}
+                          data-testid="textarea-agreement-details"
+                        />
+                      </div>
                   </div>
                 </CardContent>
               </Card>

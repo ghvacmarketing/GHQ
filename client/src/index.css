@@ -24,10 +24,10 @@
   --accent-foreground: #0f172a;
   --destructive: #b91c1c;
   --destructive-foreground: #ffffff;
-  --border: #e2e8f0;               /* slate-200 hairline */
+  --border: #d9dfe7;               /* slate-250 hairline — crisper card edges */
   --input: #e2e8f0;
   --ring: #711419;                 /* focus ring = brand */
-  --radius: 0.5rem;                /* 8px — sharper, premium-crisp corners */
+  --radius: 0.25rem;               /* 4px — flat, industrial-professional corners */
 
   /* ── Charts (kept) ────────────────────────────────────── */
   --chart-1: hsl(203.8863, 88.2845%, 53.1373%);

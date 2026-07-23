@@ -175,7 +175,7 @@ export function MessagingCustomerPanel({
   if (!data?.inCrm || !data.customer) {
     return (
       <div className="flex h-full flex-col items-center justify-center px-6 py-12 text-center">
-        <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+        <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-lg bg-muted text-muted-foreground">
           <User className="h-7 w-7" />
         </span>
         <h3 className="text-sm font-semibold text-foreground">Not in the CRM yet</h3>

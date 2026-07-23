@@ -228,7 +228,7 @@ export default function PublicSign() {
     const dep = data.deposit;
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-muted/30">
-        <div className="text-center max-w-md bg-white rounded-xl shadow-sm border p-10">
+        <div className="text-center max-w-md bg-white rounded-lg shadow-sm border p-10">
           <CheckCircle2 className="mx-auto h-14 w-14 text-green-600" />
           <h1 className="mt-4 text-xl font-semibold">Thank you, {data.recipient.name}!</h1>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -236,7 +236,7 @@ export default function PublicSign() {
           </p>
 
           {dep?.enabled && (
-            <div className="mt-6 rounded-xl border bg-muted/30 p-5">
+            <div className="mt-6 rounded-lg border bg-muted/30 p-5">
               {depositPaid ? (
                 <div className="flex items-center justify-center gap-2 text-green-700">
                   <CheckCircle2 className="h-5 w-5" />

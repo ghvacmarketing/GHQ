@@ -136,7 +136,7 @@ export function SensorCard({ sensor, onClick }: { sensor: SensorView; onClick?: 
     <Card
       onClick={onClick}
       className={cn(
-        "cursor-pointer transition-all hover:shadow-md hover:border-[#711419]/20 rounded-xl overflow-hidden",
+        "cursor-pointer transition-all hover:shadow-md hover:border-[#711419]/20 rounded-lg overflow-hidden",
         sensor.risk === "critical" && "border-red-300",
       )}
       data-testid={`sensor-card-${sensor.id}`}
@@ -172,7 +172,7 @@ export function SensorCard({ sensor, onClick }: { sensor: SensorView; onClick?: 
         {/* Big readings */}
         <div className="grid grid-cols-2 gap-2.5">
           {/* Humidity — the hero reading */}
-          <div className="rounded-xl p-3" style={{ backgroundColor: `${meta.color}12` }}>
+          <div className="rounded-lg p-3" style={{ backgroundColor: `${meta.color}12` }}>
             <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide" style={{ color: meta.color }}>
               <Droplets className="h-3.5 w-3.5" /> Humidity
             </div>
@@ -184,7 +184,7 @@ export function SensorCard({ sensor, onClick }: { sensor: SensorView; onClick?: 
             </div>
           </div>
           {/* Temperature */}
-          <div className="rounded-xl bg-slate-50 p-3">
+          <div className="rounded-lg bg-slate-50 p-3">
             <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
               <Thermometer className="h-3.5 w-3.5" /> Temp
             </div>
@@ -356,7 +356,7 @@ export function AlertsList({
       {alerts.map((a) => {
         const meta = RISK_META[a.severity];
         return (
-          <div key={a.id} className="flex items-start gap-3 p-3 rounded-xl border bg-white" data-testid={`alert-${a.id}`}>
+          <div key={a.id} className="flex items-start gap-3 p-3 rounded-lg border bg-white" data-testid={`alert-${a.id}`}>
             <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: `${meta.color}1a` }}>
               <Bell className="h-4 w-4" style={{ color: meta.color }} />
             </span>

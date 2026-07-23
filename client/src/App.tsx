@@ -54,6 +54,7 @@ const CrmQuotes = lazy(() => import("@/pages/crm/crm-quotes"));
 const CrmQuoteCreate = lazy(() => import("@/pages/crm/crm-quote-create"));
 const CrmQuoteDetail = lazy(() => import("@/pages/crm/crm-quote-detail"));
 const CrmAgreements = lazy(() => import("@/pages/crm/crm-agreements"));
+const CrmAgreementPrint = lazy(() => import("@/pages/crm/crm-agreement-print"));
 const CrmAgreementCreate = lazy(() => import("@/pages/crm/crm-agreement-create"));
 const CrmProjects = lazy(() => import("@/pages/crm/crm-projects"));
 const CrmInstallPlanner = lazy(() => import("@/pages/crm/crm-install-planner"));
@@ -206,7 +207,7 @@ function GlobalLoader() {
         <img
           src={redLogoUrl}
           alt="Giesbrecht HVAC"
-          className="relative h-14 w-14 rounded-2xl object-contain animate-[pulse_2.2s_ease-in-out_infinite]"
+          className="relative h-14 w-14 rounded-lg object-contain animate-[pulse_2.2s_ease-in-out_infinite]"
         />
       </div>
       <div className="flex items-center gap-1.5" aria-hidden="true">
@@ -334,6 +335,7 @@ function Router() {
       <Route path="/crm/quotes/new">{() => <ProtectedCrmWrapper><CrmQuoteCreate /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/quotes/:id">{() => <ProtectedCrmWrapper><CrmQuoteDetail /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/quotes">{() => <ProtectedCrmWrapper><CrmQuotes /></ProtectedCrmWrapper>}</Route>
+      <Route path="/crm/agreements/:id/print">{() => <ProtectedCrmWrapper><CrmAgreementPrint /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/agreements/new">{() => <ProtectedCrmWrapper><CrmAgreementCreate /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/agreements">{() => <ProtectedCrmWrapper><CrmAgreements /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/install-planner">{() => <ProtectedCrmWrapper><CrmInstallPlanner /></ProtectedCrmWrapper>}</Route>

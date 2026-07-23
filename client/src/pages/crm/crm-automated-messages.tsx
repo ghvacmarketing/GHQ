@@ -77,13 +77,13 @@ function TemplateSection({
         </Button>
       </div>
       {isLoading ? (
-        <div className="space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-28 rounded-xl" />)}</div>
+        <div className="space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-28 rounded-lg" />)}</div>
       ) : (
         <div className="space-y-3">
           {data?.templates.map((t) => {
             const val = drafts[t.key] ?? t.value;
             return (
-              <Card key={t.key} className="rounded-xl transition-shadow hover:shadow-sm">
+              <Card key={t.key} className="rounded-lg transition-shadow hover:shadow-sm">
                 <CardContent className="p-4">
                   <div className="mb-2 flex items-center gap-2.5">
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#711419]/8">

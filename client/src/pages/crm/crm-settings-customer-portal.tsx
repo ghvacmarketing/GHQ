@@ -68,7 +68,7 @@ export default function CrmSettingsCustomerPortal() {
     return (
       <div className="mx-auto w-full max-w-2xl space-y-6 p-6">
         <Skeleton className="h-7 w-48" />
-        <Skeleton className="h-40 w-full rounded-xl" />
+        <Skeleton className="h-40 w-full rounded-lg" />
       </div>
     );
   }

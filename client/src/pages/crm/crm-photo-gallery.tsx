@@ -379,7 +379,7 @@ export default function CrmPhotoGallery() {
         </div>
 
         {selectionActive && (
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#711419]/25 bg-[#711419]/[0.06] px-3 py-2" data-testid="selection-bar">
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[#711419]/25 bg-[#711419]/[0.06] px-3 py-2" data-testid="selection-bar">
             <button onClick={clearSelection} className="rounded-md p-1 text-slate-500 hover:bg-white hover:text-slate-800" title="Clear selection" data-testid="selection-clear-x">
               <X className="h-4 w-4" />
             </button>
@@ -400,11 +400,11 @@ export default function CrmPhotoGallery() {
         {isLoading ? (
           <div className={GRID_CLASSES[1]}>
             {[...Array(10)].map((_, i) => (
-              <Skeleton key={i} className="aspect-square rounded-xl" />
+              <Skeleton key={i} className="aspect-square rounded-lg" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-20 text-center">
+          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-20 text-center">
             <ImageIcon className="mb-3 h-12 w-12 text-slate-300" />
             <p className="text-sm font-medium text-slate-600">
               {filtersActive ? "No photos match these filters" : "No photos yet"}
@@ -416,7 +416,7 @@ export default function CrmPhotoGallery() {
             </p>
           </div>
         ) : view === "list" ? (
-          <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-sm" data-testid="photo-feed-list">
+          <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-sm" data-testid="photo-feed-list">
             {filtered.map((p) => (
               <div
                 key={p.id}
@@ -476,7 +476,7 @@ export default function CrmPhotoGallery() {
             {filtered.map((p) => (
               <div
                 key={p.id}
-                className={`group relative overflow-hidden rounded-xl border bg-card shadow-sm ${selected.has(p.id) ? "border-[#711419] ring-2 ring-[#711419]" : "border-border"}`}
+                className={`group relative overflow-hidden rounded-lg border bg-card shadow-sm ${selected.has(p.id) ? "border-[#711419] ring-2 ring-[#711419]" : "border-border"}`}
                 data-testid={`feed-photo-${p.id}`}
               >
                 <button onClick={() => (selectionActive ? toggleSelect(p.id) : setLightbox(p))} className="block w-full overflow-hidden">

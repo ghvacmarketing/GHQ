@@ -122,7 +122,7 @@ function RingStat({ pct, center, label, sub, color = "#711419" }: {
   const c = 2 * Math.PI * r;
   const clamped = Math.max(0, Math.min(1, pct));
   return (
-    <div className="flex flex-col items-center rounded-2xl bg-white px-2 py-4 shadow-sm">
+    <div className="flex flex-col items-center rounded-lg bg-white px-2 py-4 shadow-sm">
       <div className="relative h-16 w-16">
         <svg viewBox="0 0 60 60" className="h-16 w-16 -rotate-90">
           <circle cx="30" cy="30" r={r} fill="none" stroke="#e2e8f0" strokeWidth="5" />
@@ -145,7 +145,7 @@ function WeeklyBars({ weeks }: { weeks: WeeklyRevenue[] }) {
   const best = weeks.reduce((b, w) => (w.revenue > (b?.revenue ?? -1) && !w.current ? w : b), null as WeeklyRevenue | null);
   const fmtK = (v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${Math.round(v)}`);
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm" data-testid="perf-weekly">
+    <div className="rounded-lg bg-white p-4 shadow-sm" data-testid="perf-weekly">
       <div className="flex items-center justify-between">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-[#711419]">Revenue by Week</p>
         {best && best.revenue > 0 && (
@@ -183,7 +183,7 @@ function InvoicingBar({ inv }: { inv: InvoicingSummary }) {
   const pct = total > 0 ? Math.round((inv.collected / total) * 100) : 100;
   const fmt = (v: number) => `$${Math.round(v).toLocaleString("en-US")}`;
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm" data-testid="perf-invoicing">
+    <div className="rounded-lg bg-white p-4 shadow-sm" data-testid="perf-invoicing">
       <div className="flex items-center justify-between">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-[#711419]">Invoicing</p>
         <p className="text-xs font-bold text-green-600">{pct}% collected</p>
@@ -800,7 +800,7 @@ export default function MobileAgenda() {
                   <div className="space-y-2">
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Up Next</h3>
                     <div
-                      className="flex flex-col items-center justify-center rounded-2xl bg-white py-8 text-center shadow-sm"
+                      className="flex flex-col items-center justify-center rounded-lg bg-white py-8 text-center shadow-sm"
                       data-testid="agenda-empty"
                     >
                       <ClipboardList className="mb-2 h-8 w-8 text-slate-300" />
@@ -814,7 +814,7 @@ export default function MobileAgenda() {
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Up Next</h3>
                     <div
                       onClick={() => navigateMain(`/mobile/job/${upNext.id}`)}
-                      className="cursor-pointer rounded-3xl bg-gradient-to-b from-[#7d1720] to-[#5e1015] p-4 text-white shadow-[0_12px_32px_rgba(113,20,25,0.35)] transition-transform active:scale-[0.99]"
+                      className="cursor-pointer rounded-lg bg-gradient-to-b from-[#7d1720] to-[#5e1015] p-4 text-white shadow-[0_12px_32px_rgba(113,20,25,0.35)] transition-transform active:scale-[0.99]"
                       data-testid="agenda-up-next"
                     >
                       <div className="flex items-start justify-between">
@@ -842,7 +842,7 @@ export default function MobileAgenda() {
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="flex items-center justify-center gap-1.5 rounded-2xl bg-white py-3 text-sm font-bold text-[#711419] transition-transform active:scale-[0.97]"
+                          className="flex items-center justify-center gap-1.5 rounded-lg bg-white py-3 text-sm font-bold text-[#711419] transition-transform active:scale-[0.97]"
                           data-testid="up-next-navigate"
                         >
                           <Navigation className="h-4 w-4" /> Navigate
@@ -851,13 +851,13 @@ export default function MobileAgenda() {
                           <a
                             href={`tel:${upNext.customer.phone}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="flex items-center justify-center gap-1.5 rounded-2xl border border-white/30 py-3 text-sm font-semibold text-white transition-transform active:scale-[0.97]"
+                            className="flex items-center justify-center gap-1.5 rounded-lg border border-white/30 py-3 text-sm font-semibold text-white transition-transform active:scale-[0.97]"
                             data-testid="up-next-call"
                           >
                             <Phone className="h-4 w-4" /> Call
                           </a>
                         ) : (
-                          <span className="flex items-center justify-center gap-1.5 rounded-2xl border border-white/20 py-3 text-sm font-semibold text-white/40">
+                          <span className="flex items-center justify-center gap-1.5 rounded-lg border border-white/20 py-3 text-sm font-semibold text-white/40">
                             <Phone className="h-4 w-4" /> Call
                           </span>
                         )}
@@ -869,7 +869,7 @@ export default function MobileAgenda() {
                 <div className="space-y-2">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Later Today</h3>
                   {laterToday.length === 0 ? (
-                    <p className="rounded-2xl bg-white px-4 py-5 text-center text-xs text-slate-400 shadow-sm" data-testid="agenda-later-empty">
+                    <p className="rounded-lg bg-white px-4 py-5 text-center text-xs text-slate-400 shadow-sm" data-testid="agenda-later-empty">
                       Nothing else scheduled today.
                     </p>
                   ) : (
@@ -878,7 +878,7 @@ export default function MobileAgenda() {
                         <button
                           key={job.id}
                           onClick={() => navigateMain(`/mobile/job/${job.id}`)}
-                          className="flex w-full items-center gap-3 rounded-2xl bg-white px-4 py-3 text-left shadow-sm transition-transform active:scale-[0.99]"
+                          className="flex w-full items-center gap-3 rounded-lg bg-white px-4 py-3 text-left shadow-sm transition-transform active:scale-[0.99]"
                           data-testid={`agenda-job-${job.id}`}
                         >
                           <div className="w-11 shrink-0 text-center">
@@ -913,7 +913,7 @@ export default function MobileAgenda() {
                         <button
                           key={job.id}
                           onClick={() => navigateMain(`/mobile/job/${job.id}`)}
-                          className="flex w-full items-center gap-3 rounded-2xl bg-white/70 px-4 py-3 text-left shadow-sm transition-transform active:scale-[0.99]"
+                          className="flex w-full items-center gap-3 rounded-lg bg-white/70 px-4 py-3 text-left shadow-sm transition-transform active:scale-[0.99]"
                           data-testid={`agenda-job-${job.id}`}
                         >
                           <div className="w-11 shrink-0 text-center">
@@ -961,7 +961,7 @@ export default function MobileAgenda() {
                   </div>
 
                   {/* Revenue generated */}
-                  <div className="rounded-2xl bg-white p-4 pb-3 shadow-sm" data-testid="perf-revenue">
+                  <div className="rounded-lg bg-white p-4 pb-3 shadow-sm" data-testid="perf-revenue">
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-[#711419]">Revenue Generated</p>
                     {isLoadingPerformance ? (
                       <Skeleton className="mt-3 h-28 w-full" />

@@ -47,8 +47,8 @@ export default function CrmMarketingBuilder() {
 
         {id && isLoading ? (
           <div className="mx-auto max-w-2xl space-y-4">
-            <Skeleton className="h-24 rounded-xl" />
-            <Skeleton className="h-40 rounded-xl" />
+            <Skeleton className="h-24 rounded-lg" />
+            <Skeleton className="h-40 rounded-lg" />
           </div>
         ) : (
           <AutomationForm existing={existing} onDone={back} onCancel={back} />

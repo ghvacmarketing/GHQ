@@ -705,7 +705,7 @@ export default function CrmInvoiceCreate() {
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="max-w-4xl mx-auto space-y-6">
           <Skeleton className="h-12 w-64" />
-          <Skeleton className="h-96 w-full rounded-xl" />
+          <Skeleton className="h-96 w-full rounded-lg" />
         </div>
       </div>
     );

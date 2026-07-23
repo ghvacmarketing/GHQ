@@ -60,6 +60,7 @@ import {
   Wrench,
   FileText,
   Pencil as Edit,
+  Printer,
   RefreshCw,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -146,6 +147,12 @@ export default function CrmAgreements() {
   const [activeTab, setActiveTab] = useState("all");
   const [page, setPage] = useState(1);
   const [selectedAgreement, setSelectedAgreement] = useState<CrmAgreement | null>(null);
+  // Editable copy of an agreement (opens the edit dialog when non-null)
+  const [editForm, setEditForm] = useState<null | {
+    id: string; agreementPlan: string; price: string; numberOfSystems: number;
+    visitsPerPeriod: number; startDate: string; endDate: string; contractDate: string;
+    autoRenew: boolean; billingPreference: string; status: string; notes: string; details: string;
+  }>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
@@ -176,6 +183,7 @@ export default function CrmAgreements() {
     startDate: "",
     endDate: "",
     notes: "",
+    details: "",
     status: "active" as const,
     contractDate: "",
     appointmentDate: "",
@@ -333,6 +341,7 @@ export default function CrmAgreements() {
         startDate: "",
         endDate: "",
         notes: "",
+        details: "",
         status: "active",
         contractDate: "",
         appointmentDate: "",
@@ -344,6 +353,27 @@ export default function CrmAgreements() {
     onError: () => {
       toast({ title: "Failed to create agreement", variant: "destructive" });
     },
+  });
+
+  const updateAgreementMutation = useMutation({
+    mutationFn: async () => {
+      if (!editForm) return;
+      const { id, ...body } = editForm;
+      const res = await apiRequest("PATCH", `/api/crm/agreements/${id}`, {
+        ...body,
+        price: body.price || undefined,
+        numberOfSystems: Number(body.numberOfSystems) || 1,
+        visitsPerPeriod: Number(body.visitsPerPeriod) || 1,
+      });
+      return res.json();
+    },
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/agreements"] });
+      setEditForm(null);
+      if (updated) setSelectedAgreement(updated);
+      toast({ title: "Agreement updated" });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Failed to update agreement", variant: "destructive" }),
   });
 
   const deleteAgreementMutation = useMutation({
@@ -550,8 +580,8 @@ export default function CrmAgreements() {
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           <Skeleton className="h-12 w-64" />
-          <Skeleton className="h-16 w-full rounded-xl" />
-          <Skeleton className="h-96 w-full rounded-xl" />
+          <Skeleton className="h-16 w-full rounded-lg" />
+          <Skeleton className="h-96 w-full rounded-lg" />
         </div>
       </div>
     );
@@ -1098,6 +1128,17 @@ export default function CrmAgreements() {
                   data-testid="input-notes"
                 />
               </div>
+              <div className="grid gap-2">
+                <Label htmlFor="agr-details">Agreement details (printed on the client document)</Label>
+                <Textarea
+                  id="agr-details"
+                  value={createForm.details}
+                  onChange={(e) => setCreateForm({ ...createForm, details: e.target.value })}
+                  placeholder="What this agreement covers, inclusions, special terms… Blank lines start new paragraphs on the printed document."
+                  rows={4}
+                  data-testid="textarea-agreement-details"
+                />
+              </div>
             </div>
             <DialogFooter>
               <Button
@@ -1118,6 +1159,106 @@ export default function CrmAgreements() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit agreement */}
+      <Dialog open={!!editForm} onOpenChange={(o) => !o && setEditForm(null)}>
+        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Agreement</DialogTitle>
+            <DialogDescription>Changes apply to billing, scheduling, and the printed document.</DialogDescription>
+          </DialogHeader>
+          {editForm && (
+            <div className="grid gap-4 py-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label>Plan name</Label>
+                  <Input value={editForm.agreementPlan} onChange={(e) => setEditForm({ ...editForm, agreementPlan: e.target.value })} data-testid="edit-plan" />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>Price</Label>
+                  <Input type="number" min="0" step="0.01" value={editForm.price} onChange={(e) => setEditForm({ ...editForm, price: e.target.value })} data-testid="edit-price" />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="grid gap-1.5">
+                  <Label>Systems</Label>
+                  <Input type="number" min="1" value={editForm.numberOfSystems} onChange={(e) => setEditForm({ ...editForm, numberOfSystems: Number(e.target.value) || 1 })} data-testid="edit-systems" />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>Visits / yr</Label>
+                  <Input type="number" min="1" value={editForm.visitsPerPeriod} onChange={(e) => setEditForm({ ...editForm, visitsPerPeriod: Number(e.target.value) || 1 })} data-testid="edit-visits" />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>Status</Label>
+                  <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
+                    <SelectTrigger data-testid="edit-status"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {["pending", "active", "grace_period", "expired", "cancelled"].map((st) => (
+                        <SelectItem key={st} value={st} className="capitalize">{st.replace("_", " ")}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="grid gap-1.5">
+                  <Label>Contract date</Label>
+                  <Input type="date" value={editForm.contractDate} onChange={(e) => setEditForm({ ...editForm, contractDate: e.target.value })} data-testid="edit-contract-date" />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>Start</Label>
+                  <Input type="date" value={editForm.startDate} onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })} data-testid="edit-start" />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>End</Label>
+                  <Input type="date" value={editForm.endDate} onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })} data-testid="edit-end" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label>Billing</Label>
+                  <Select value={editForm.billingPreference} onValueChange={(v) => setEditForm({ ...editForm, billingPreference: v })}>
+                    <SelectTrigger data-testid="edit-billing"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto_invoice">Auto invoice</SelectItem>
+                      <SelectItem value="pay_on_visit">Pay per visit</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <label className="flex items-end gap-2 pb-2 text-sm">
+                  <input type="checkbox" className="h-4 w-4 accent-[#711419]" checked={editForm.autoRenew} onChange={(e) => setEditForm({ ...editForm, autoRenew: e.target.checked })} data-testid="edit-autorenew" />
+                  Auto-renew
+                </label>
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Notes (internal)</Label>
+                <Textarea rows={2} value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} data-testid="edit-notes" />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Agreement details (printed on the client document)</Label>
+                <Textarea
+                  rows={5}
+                  value={editForm.details}
+                  onChange={(e) => setEditForm({ ...editForm, details: e.target.value })}
+                  placeholder="What this agreement covers, inclusions, special terms… Blank lines start new paragraphs on the printed document."
+                  data-testid="edit-details"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditForm(null)}>Cancel</Button>
+            <Button
+              className="bg-[#711419] hover:bg-[#8a1a1f]"
+              disabled={updateAgreementMutation.isPending}
+              onClick={() => updateAgreementMutation.mutate()}
+              data-testid="save-agreement-edit"
+            >
+              {updateAgreementMutation.isPending ? "Saving…" : "Save changes"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1228,7 +1369,45 @@ export default function CrmAgreements() {
                       <p className="text-sm">{selectedAgreement.notes}</p>
                     </div>
                   )}
+                  {selectedAgreement.details && (
+                    <div>
+                      <Label className="text-slate-500 text-xs">Agreement details (printed on document)</Label>
+                      <p className="whitespace-pre-wrap text-sm">{selectedAgreement.details}</p>
+                    </div>
+                  )}
                   <div className="flex justify-end gap-2 pt-4 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/crm/agreements/${selectedAgreement.id}/print`)}
+                      data-testid="button-print-agreement"
+                    >
+                      <Printer className="h-4 w-4 mr-1" /> Print
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setEditForm({
+                          id: selectedAgreement.id,
+                          agreementPlan: selectedAgreement.agreementPlan || "",
+                          price: String(selectedAgreement.price ?? ""),
+                          numberOfSystems: selectedAgreement.numberOfSystems ?? 1,
+                          visitsPerPeriod: selectedAgreement.visitsPerPeriod ?? 2,
+                          startDate: selectedAgreement.startDate || "",
+                          endDate: selectedAgreement.endDate || "",
+                          contractDate: selectedAgreement.contractDate || "",
+                          autoRenew: !!selectedAgreement.autoRenew,
+                          billingPreference: selectedAgreement.billingPreference || "auto_invoice",
+                          status: selectedAgreement.status || "active",
+                          notes: selectedAgreement.notes || "",
+                          details: selectedAgreement.details || "",
+                        })
+                      }
+                      data-testid="button-edit-agreement"
+                    >
+                      <Edit className="h-4 w-4 mr-1" /> Edit
+                    </Button>
                     {canSendInvoice && 
                       selectedAgreement.billingPreference !== "pay_on_visit" && 
                       ((selectedAgreement.status === "pending" && !shouldHideFirstInvoiceButton) || selectedAgreement.status === "active") && (

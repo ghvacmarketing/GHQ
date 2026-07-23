@@ -1480,7 +1480,7 @@ export default function CrmChecklists() {
             >
               <button
                 onClick={openStartFlow}
-                className="rounded-2xl border-2 border-dashed border-slate-300 bg-white/70 px-10 py-8 text-center backdrop-blur-sm transition-colors hover:border-[#711419] hover:bg-white"
+                className="rounded-lg border-2 border-dashed border-slate-300 bg-white/70 px-10 py-8 text-center backdrop-blur-sm transition-colors hover:border-[#711419] hover:bg-white"
                 data-testid="button-start-flow-canvas"
               >
                 <ClipboardList className="mx-auto mb-3 h-8 w-8 text-slate-400" />
@@ -1497,7 +1497,7 @@ export default function CrmChecklists() {
             >
               <button
                 onClick={openNewChecklist}
-                className="rounded-2xl border-2 border-dashed border-[#711419]/40 bg-white/70 px-10 py-8 text-center backdrop-blur-sm transition-colors hover:border-[#711419] hover:bg-white"
+                className="rounded-lg border-2 border-dashed border-[#711419]/40 bg-white/70 px-10 py-8 text-center backdrop-blur-sm transition-colors hover:border-[#711419] hover:bg-white"
                 data-testid="button-create-first-checklist"
               >
                 <Plus className="mx-auto mb-3 h-8 w-8 text-[#711419]" />

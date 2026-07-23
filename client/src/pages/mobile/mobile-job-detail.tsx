@@ -234,7 +234,7 @@ function OverviewTab({
 
   const nextStatus = getNextStatus(displayStatus as WorkOrderStatus);
 
-  const actionBtn = "flex items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white py-3 text-sm font-semibold text-slate-800 shadow-sm transition-transform active:scale-[0.97]";
+  const actionBtn = "flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white py-3 text-sm font-semibold text-slate-800 shadow-sm transition-transform active:scale-[0.97]";
 
   const [, goNavigate] = useLocation();
   const flowIndex = statusFlow.indexOf(displayStatus as WorkOrderStatus);
@@ -306,7 +306,7 @@ function OverviewTab({
         <button
           onClick={() => handleStatusChange(nextStatus)}
           disabled={updateStatusMutation.isPending}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#711419] py-4 text-base font-bold text-white shadow-[0_8px_24px_rgba(113,20,25,0.35)] transition-transform active:scale-[0.98] disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#711419] py-4 text-base font-bold text-white shadow-[0_8px_24px_rgba(113,20,25,0.35)] transition-transform active:scale-[0.98] disabled:opacity-60"
           data-testid={`button-status-${nextStatus}`}
         >
           {updateStatusMutation.isPending && <Loader2 className="h-5 w-5 animate-spin" />}
@@ -317,14 +317,14 @@ function OverviewTab({
         </button>
       )}
       {displayStatus === "completed" && (
-        <div className="flex items-center justify-center gap-2 rounded-2xl bg-green-50 py-3.5 text-sm font-bold text-green-700" data-testid="job-completed-banner">
+        <div className="flex items-center justify-center gap-2 rounded-lg bg-green-50 py-3.5 text-sm font-bold text-green-700" data-testid="job-completed-banner">
           <CheckCircle2 className="h-5 w-5" /> Job Completed
         </div>
       )}
 
       {/* Waiting toggle */}
       {displayStatus !== "completed" && displayStatus !== "scheduled" && (
-        <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm" data-testid="pending-toggle-section">
+        <div className="rounded-lg border border-slate-100 bg-white p-3.5 shadow-sm" data-testid="pending-toggle-section">
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-2 text-sm font-medium text-slate-700">
               <Clock className="h-4 w-4 text-amber-600" /> Mark as Waiting
@@ -452,7 +452,7 @@ function OverviewTab({
 
       {/* Brief — what dispatch wants you to know */}
       {(workOrder.dispatchNotes || workOrder.description) && (
-        <Card className="rounded-2xl border-slate-100 shadow-sm" data-testid="card-dispatch-notes">
+        <Card className="rounded-lg border-slate-100 shadow-sm" data-testid="card-dispatch-notes">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-[#711419]">Brief</p>
@@ -467,26 +467,26 @@ function OverviewTab({
 
       {/* Section tiles */}
       <div className="grid grid-cols-2 gap-2" data-testid="job-tiles">
-        <button onClick={() => onGoTab("work")} className="rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition-transform active:scale-[0.98]" data-testid="tile-checklist">
+        <button onClick={() => onGoTab("work")} className="rounded-lg border border-slate-100 bg-white p-4 text-left shadow-sm transition-transform active:scale-[0.98]" data-testid="tile-checklist">
           <p className="text-sm font-bold text-slate-900">Checklist</p>
           <p className="mt-0.5 text-xs text-slate-500">Tasks, notes & wrap-up</p>
         </button>
-        <button onClick={() => goNavigate("/mobile/photos")} className="rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition-transform active:scale-[0.98]" data-testid="tile-photos">
+        <button onClick={() => goNavigate("/mobile/photos")} className="rounded-lg border border-slate-100 bg-white p-4 text-left shadow-sm transition-transform active:scale-[0.98]" data-testid="tile-photos">
           <p className="text-sm font-bold text-slate-900">Photos</p>
           <p className="mt-0.5 text-xs text-slate-500">Job-site photos</p>
         </button>
-        <button onClick={() => onGoTab("quote")} className="rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition-transform active:scale-[0.98]" data-testid="tile-quote">
+        <button onClick={() => onGoTab("quote")} className="rounded-lg border border-slate-100 bg-white p-4 text-left shadow-sm transition-transform active:scale-[0.98]" data-testid="tile-quote">
           <p className="text-sm font-bold text-slate-900">Quote</p>
           <p className="mt-0.5 text-xs text-slate-500">Build & present</p>
         </button>
-        <button onClick={() => onGoTab("invoice")} className="rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition-transform active:scale-[0.98]" data-testid="tile-invoice">
+        <button onClick={() => onGoTab("invoice")} className="rounded-lg border border-slate-100 bg-white p-4 text-left shadow-sm transition-transform active:scale-[0.98]" data-testid="tile-invoice">
           <p className="text-sm font-bold text-slate-900">Invoice</p>
           <p className="mt-0.5 text-xs text-slate-500">Collect payment</p>
         </button>
       </div>
 
       {/* Schedule */}
-      <Card className="rounded-2xl border-slate-100 shadow-sm" data-testid="card-schedule">
+      <Card className="rounded-lg border-slate-100 shadow-sm" data-testid="card-schedule">
         <CardContent className="pt-4">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Schedule</p>
           <div className="mt-2 space-y-1.5 text-sm">
@@ -515,7 +515,7 @@ function OverviewTab({
       </Card>
 
       {/* Customer */}
-      <Card className="rounded-2xl border-slate-100 shadow-sm" data-testid="customer-info-card">
+      <Card className="rounded-lg border-slate-100 shadow-sm" data-testid="customer-info-card">
         <CardContent className="pt-4">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Customer</p>
           <div className="mt-2 space-y-2.5">
@@ -720,7 +720,7 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
                 {header && (
                   <p className="pb-1.5 pt-1 text-[11px] font-bold uppercase tracking-wider text-amber-700/80">{header}</p>
                 )}
-              <div className="rounded-xl border border-amber-200 bg-white p-3.5" data-testid={`fill-question-${q.id}`}>
+              <div className="rounded-lg border border-amber-200 bg-white p-3.5" data-testid={`fill-question-${q.id}`}>
                 <p className="text-sm font-medium text-slate-800">
                   {q.question}
                   {q.isRequired && <span className="ml-1 text-red-500">*</span>}
@@ -733,7 +733,7 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
                         <button
                           key={opt}
                           onClick={() => setAnswer(q.id, opt)}
-                          className={`rounded-xl border py-2.5 text-sm font-semibold capitalize transition-colors ${
+                          className={`rounded-lg border py-2.5 text-sm font-semibold capitalize transition-colors ${
                             value === opt
                               ? opt === "yes"
                                 ? "border-green-500 bg-green-50 text-green-700"
@@ -810,7 +810,7 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
           })}
 
           {(template.photoSteps?.length ?? 0) > 0 && (
-            <div className="rounded-xl border border-amber-200 bg-white p-3.5" data-testid="fill-photo-steps">
+            <div className="rounded-lg border border-amber-200 bg-white p-3.5" data-testid="fill-photo-steps">
               <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
                 <Camera className="h-4 w-4 text-[#711419]" /> Required photos
               </p>
@@ -838,7 +838,7 @@ function ChecklistFillCard({ workOrder, template }: { workOrder: WorkOrderDetail
           <Button
             onClick={() => submit.mutate()}
             disabled={submit.isPending || missingRequired > 0}
-            className="h-12 w-full rounded-xl bg-[#711419] text-base font-semibold hover:bg-[#8a1a1f]"
+            className="h-12 w-full rounded-lg bg-[#711419] text-base font-semibold hover:bg-[#8a1a1f]"
             data-testid="button-submit-checklist"
           >
             {submit.isPending

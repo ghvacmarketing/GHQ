@@ -980,7 +980,7 @@ export default function MobileInvoiceDetail() {
                   </p>
                 </div>
 
-                <div className="mx-auto w-fit rounded-2xl border-2 border-slate-200 bg-white p-3">
+                <div className="mx-auto w-fit rounded-lg border-2 border-slate-200 bg-white p-3">
                   {qrDataUrl ? (
                     <img src={qrDataUrl} alt="Payment QR code" className="h-64 w-64" data-testid="payment-qr" />
                   ) : (

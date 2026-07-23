@@ -321,7 +321,7 @@ export default function DocumentsApp() {
           {childFolders.length > 0 && (
             <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {childFolders.map((f) => (
-                <div key={f.id} className="group flex items-center gap-2.5 rounded-xl border border-black/[0.06] bg-white px-3 py-2.5 shadow-sm transition-shadow hover:shadow" data-testid={`folder-${f.id}`}>
+                <div key={f.id} className="group flex items-center gap-2.5 rounded-lg border border-black/[0.06] bg-white px-3 py-2.5 shadow-sm transition-shadow hover:shadow" data-testid={`folder-${f.id}`}>
                   <button onClick={() => setFolderId(f.id)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
                     <Folder className="h-5 w-5 shrink-0 fill-sky-100 text-sky-500" />
                     <span className="truncate text-sm font-medium text-slate-800">{f.name}</span>
@@ -349,10 +349,10 @@ export default function DocumentsApp() {
           {/* Files */}
           {filesLoading ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-40 rounded-xl" />)}
+              {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-40 rounded-lg" />)}
             </div>
           ) : files.length === 0 && childFolders.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 py-20 text-center">
+            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 py-20 text-center">
               <Grid3X3 className="mb-3 h-10 w-10 text-slate-300" />
               <p className="text-sm font-medium text-slate-600">
                 {view === "trash" ? "Trash is empty" : view === "starred" ? "Nothing starred yet" : "This folder is empty"}
@@ -366,7 +366,7 @@ export default function DocumentsApp() {
               {files.map((f) => {
                 const { Icon, color } = fileVisual(f.name, f.contentType);
                 return (
-                  <div key={f.id} className="group overflow-hidden rounded-xl border border-black/[0.06] bg-white shadow-sm transition-shadow hover:shadow-md" data-testid={`file-${f.id}`}>
+                  <div key={f.id} className="group overflow-hidden rounded-lg border border-black/[0.06] bg-white shadow-sm transition-shadow hover:shadow-md" data-testid={`file-${f.id}`}>
                     <button
                       onClick={() => (isImage(f) || isPdf(f) ? setPreview(f) : download(f))}
                       className="flex h-28 w-full items-center justify-center overflow-hidden bg-slate-50"

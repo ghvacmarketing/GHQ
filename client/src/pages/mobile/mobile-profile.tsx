@@ -73,7 +73,7 @@ export default function MobileProfile() {
             {currentUser.role !== "tech" && (
               <button
                 onClick={() => { window.location.href = "/crm"; }}
-                className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-left shadow-sm transition-all active:scale-[0.98]"
+                className="flex w-full items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3.5 text-left shadow-sm transition-all active:scale-[0.98]"
                 data-testid="button-desktop-crm"
               >
                 <Monitor className="h-5 w-5 text-[#711419]" />

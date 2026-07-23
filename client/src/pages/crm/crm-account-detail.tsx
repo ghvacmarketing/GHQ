@@ -474,8 +474,8 @@ export default function CrmAccountDetail() {
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="max-w-6xl mx-auto space-y-6">
           <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-48 rounded-xl" />
-          <Skeleton className="h-64 rounded-xl" />
+          <Skeleton className="h-48 rounded-lg" />
+          <Skeleton className="h-64 rounded-lg" />
         </div>
       </div>
     );

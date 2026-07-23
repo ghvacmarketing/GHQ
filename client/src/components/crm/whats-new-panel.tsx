@@ -44,7 +44,7 @@ export function WhatsNewPanel() {
         {/* Screenshot / preview — hover to magnify, next arrow sits to its right */}
         <div className="flex w-full max-w-2xl items-center gap-3">
           <div
-            className="group relative min-w-0 flex-1 overflow-hidden rounded-2xl border border-white/10 bg-black/30 shadow-2xl"
+            className="group relative min-w-0 flex-1 overflow-hidden rounded-lg border border-white/10 bg-black/30 shadow-2xl"
             onMouseEnter={() => f.image && imgOk && setZoomed(true)}
             onMouseLeave={() => setZoomed(false)}
           >
@@ -118,7 +118,7 @@ export function WhatsNewPanel() {
             src={f.image}
             alt={f.title}
             className={cn(
-              "max-h-[92vh] max-w-[92vw] rounded-xl border border-white/10 object-contain shadow-2xl transition-transform duration-500 ease-out",
+              "max-h-[92vh] max-w-[92vw] rounded-lg border border-white/10 object-contain shadow-2xl transition-transform duration-500 ease-out",
               zoomed ? "scale-100" : "scale-95"
             )}
           />

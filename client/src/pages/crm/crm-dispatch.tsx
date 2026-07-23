@@ -762,7 +762,7 @@ function TrucksMapView({ technicians }: TrucksMapViewProps) {
       <CardHeader className="pb-3 border-b bg-gradient-to-r from-[#711419]/[0.05] to-transparent">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#711419]/10 ring-1 ring-[#711419]/10">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#711419]/10 ring-1 ring-[#711419]/10">
               <Truck className="h-5 w-5 text-[#711419]" />
             </div>
             <div>
@@ -811,7 +811,7 @@ function TrucksMapView({ technicians }: TrucksMapViewProps) {
               <div className="p-2.5 space-y-2">
                 {vehicles.length === 0 ? (
                   <div className="text-center py-10 text-sm text-slate-500">
-                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100">
+                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100">
                       <Truck className="h-6 w-6 text-slate-300" />
                     </div>
                     No vehicles configured
@@ -831,7 +831,7 @@ function TrucksMapView({ technicians }: TrucksMapViewProps) {
                         key={vehicle.id}
                         onClick={() => handleVehicleClick(vehicle.id)}
                         className={cn(
-                          "group p-3 rounded-xl border bg-white cursor-pointer transition-all hover:shadow-md hover:border-[#711419]/20",
+                          "group p-3 rounded-lg border bg-white cursor-pointer transition-all hover:shadow-md hover:border-[#711419]/20",
                           isSelected && "ring-2 ring-[#711419] border-transparent shadow-md"
                         )}
                       >
@@ -4154,7 +4154,7 @@ export default function CrmDispatch() {
             <Skeleton className="h-10 w-32" />
             <Skeleton className="h-10 w-32" />
           </div>
-          <Skeleton className="h-96 rounded-xl" />
+          <Skeleton className="h-96 rounded-lg" />
         </div>
       </div>
     );

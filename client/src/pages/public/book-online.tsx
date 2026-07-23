@@ -385,7 +385,7 @@ export default function BookOnline() {
               {getProblemOptions().map((problem) => (
                 <div
                   key={problem}
-                  className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-all hover:bg-gray-50 ${
+                  className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-gray-50 ${
                     data.problems.includes(problem) ? "border-[#722F37] bg-red-50" : "border-gray-200"
                   }`}
                   onClick={() => {
@@ -414,7 +414,7 @@ export default function BookOnline() {
               {getSystemTypes().map((type) => (
                 <div
                   key={type}
-                  className={`flex items-center gap-3 p-4 border-2 rounded-xl cursor-pointer transition-all hover:bg-gray-50 ${
+                  className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all hover:bg-gray-50 ${
                     data.systemType === type ? "border-[#722F37] bg-red-50" : "border-gray-200"
                   }`}
                   onClick={() => setData({ ...data, systemType: type })}
@@ -444,7 +444,7 @@ export default function BookOnline() {
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <button
-                className={`p-6 border-2 rounded-xl text-center transition-all hover:bg-gray-50 ${
+                className={`p-6 border-2 rounded-lg text-center transition-all hover:bg-gray-50 ${
                   data.projectType === "replacement" 
                     ? "border-[#722F37] bg-red-50" 
                     : "border-gray-200"
@@ -455,7 +455,7 @@ export default function BookOnline() {
                 <p className="text-gray-500 text-sm mt-1">Replace an existing system</p>
               </button>
               <button
-                className={`p-6 border-2 rounded-xl text-center transition-all hover:bg-gray-50 ${
+                className={`p-6 border-2 rounded-lg text-center transition-all hover:bg-gray-50 ${
                   data.projectType === "installation" 
                     ? "border-[#722F37] bg-red-50" 
                     : "border-gray-200"
@@ -480,7 +480,7 @@ export default function BookOnline() {
               {TIMELINE_OPTIONS.map((option) => (
                 <button
                   key={option.value}
-                  className={`p-5 border-2 rounded-xl text-center transition-all hover:bg-gray-50 ${
+                  className={`p-5 border-2 rounded-lg text-center transition-all hover:bg-gray-50 ${
                     data.timeline === option.value 
                       ? "border-[#722F37] bg-red-50" 
                       : "border-gray-200"
@@ -516,7 +516,7 @@ export default function BookOnline() {
                 {dates.map((date) => (
                   <button
                     key={date.toISOString()}
-                    className={`flex-shrink-0 flex flex-col items-center px-4 py-3 rounded-xl border-2 transition-all ${
+                    className={`flex-shrink-0 flex flex-col items-center px-4 py-3 rounded-lg border-2 transition-all ${
                       data.selectedDate?.toDateString() === date.toDateString()
                         ? "bg-[#722F37] text-white border-[#722F37]"
                         : "border-gray-200 hover:bg-gray-50"
@@ -541,7 +541,7 @@ export default function BookOnline() {
               {TIME_SLOTS.map((slot) => (
                 <button
                   key={slot.value}
-                  className={`p-4 rounded-xl border-2 text-center transition-all ${
+                  className={`p-4 rounded-lg border-2 text-center transition-all ${
                     data.selectedTimeSlot === slot.value
                       ? "bg-[#722F37] text-white border-[#722F37]"
                       : "border-gray-200 hover:bg-gray-50"

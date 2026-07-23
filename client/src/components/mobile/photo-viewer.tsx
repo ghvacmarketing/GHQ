@@ -197,7 +197,7 @@ export function PhotoViewer({
   const toolBtn = (t: Exclude<Tool, null>, Icon: typeof Pen, testid: string) => (
     <button
       onClick={() => setTool(tool === t ? null : t)}
-      className={`flex h-11 w-11 items-center justify-center rounded-2xl transition-all active:scale-90 ${
+      className={`flex h-11 w-11 items-center justify-center rounded-lg transition-all active:scale-90 ${
         tool === t ? "bg-white text-slate-900" : "bg-white/15 text-white"
       }`}
       data-testid={testid}
@@ -246,7 +246,7 @@ export function PhotoViewer({
             <button
               onClick={undo}
               disabled={!dirty}
-              className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 text-white transition-all active:scale-90 disabled:opacity-30"
+              className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/15 text-white transition-all active:scale-90 disabled:opacity-30"
               data-testid="tool-undo"
             >
               <Undo2 className="h-5 w-5" />
@@ -268,7 +268,7 @@ export function PhotoViewer({
             <button
               onClick={save}
               disabled={!dirty || saving || !customerId}
-              className="ml-2 flex h-11 items-center gap-1.5 rounded-2xl bg-[#711419] px-4 text-sm font-bold text-white transition-all active:scale-95 disabled:opacity-40"
+              className="ml-2 flex h-11 items-center gap-1.5 rounded-lg bg-[#711419] px-4 text-sm font-bold text-white transition-all active:scale-95 disabled:opacity-40"
               data-testid="button-save-annotation"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}

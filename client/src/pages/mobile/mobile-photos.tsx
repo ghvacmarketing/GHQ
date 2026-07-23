@@ -433,7 +433,7 @@ export default function MobilePhotos() {
             ) : searchResults.length === 0 ? (
               <p className="py-8 text-center text-sm text-slate-400">No customers match &ldquo;{customerSearch.trim()}&rdquo;.</p>
             ) : (
-              <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+              <div className="overflow-hidden rounded-lg border border-slate-100 bg-white shadow-sm">
                 {searchResults.map((c) => (
                   <button
                     key={c.id}
@@ -459,7 +459,7 @@ export default function MobilePhotos() {
 
         {/* Active target: the customer photos will be saved to */}
         {activeCustomer ? (
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#711419]/25 bg-[#711419]/[0.06] px-4 py-3" data-testid="photo-target">
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-[#711419]/25 bg-[#711419]/[0.06] px-4 py-3" data-testid="photo-target">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-[#711419]/70">Saving photos to</p>
               <p className="truncate font-semibold text-slate-900">{activeCustomer.name}</p>
@@ -467,7 +467,7 @@ export default function MobilePhotos() {
             </div>
             <button
               onClick={() => { setCustomerSearch(""); setSearchActive(true); setTimeout(() => searchInputRef.current?.focus(), 0); }}
-              className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 active:scale-95"
+              className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 active:scale-95"
               data-testid="button-change-customer"
             >
               Change
@@ -477,7 +477,7 @@ export default function MobilePhotos() {
 
         {/* Today's jobs — quick shortcuts */}
         {jobsLoading ? (
-          <Skeleton className="h-14 rounded-2xl" />
+          <Skeleton className="h-14 rounded-lg" />
         ) : jobs.length > 0 ? (
           <div>
             <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Today's jobs</p>
@@ -488,7 +488,7 @@ export default function MobilePhotos() {
                   <button
                     key={job.id}
                     onClick={() => chooseJob(job.id)}
-                    className={`shrink-0 rounded-2xl border px-3.5 py-2 text-left transition-all active:scale-95 ${
+                    className={`shrink-0 rounded-lg border px-3.5 py-2 text-left transition-all active:scale-95 ${
                       active ? "border-[#711419] bg-[#711419] text-white shadow-md" : "border-slate-200 bg-white text-slate-700"
                     }`}
                     data-testid={`photo-job-${job.id}`}
@@ -523,7 +523,7 @@ export default function MobilePhotos() {
               <button
                 onClick={openCamera}
                 disabled={uploading}
-                className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#711419] py-3.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-60"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#711419] py-3.5 font-semibold text-white shadow-md transition-transform active:scale-[0.98] disabled:opacity-60"
                 data-testid="button-take-photo"
               >
                 <Camera className="h-5 w-5" />
@@ -532,7 +532,7 @@ export default function MobilePhotos() {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 font-semibold text-slate-700 shadow-sm transition-transform active:scale-[0.98] disabled:opacity-60"
+                className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3.5 font-semibold text-slate-700 shadow-sm transition-transform active:scale-[0.98] disabled:opacity-60"
                 data-testid="button-add-from-library"
                 aria-label="Add from library"
               >
@@ -551,7 +551,7 @@ export default function MobilePhotos() {
                 <button
                   key={c.id}
                   onClick={() => navigate(`/mobile/customers/${c.id}`)}
-                  className="w-56 shrink-0 snap-start overflow-hidden rounded-2xl border border-slate-100 bg-white text-left shadow-sm transition-transform active:scale-[0.98]"
+                  className="w-56 shrink-0 snap-start overflow-hidden rounded-lg border border-slate-100 bg-white text-left shadow-sm transition-transform active:scale-[0.98]"
                   data-testid={`recent-customer-${c.id}`}
                 >
                   <img src={c.latest.url} alt="" loading="lazy" className="h-28 w-full object-cover" />
@@ -585,7 +585,7 @@ export default function MobilePhotos() {
                     src={rp.url}
                     alt={rp.name}
                     loading="lazy"
-                    className="aspect-square w-32 rounded-2xl border border-slate-100 object-cover shadow-sm"
+                    className="aspect-square w-32 rounded-lg border border-slate-100 object-cover shadow-sm"
                   />
                   <p className="mt-2 truncate text-[12px] font-semibold text-slate-800">{rp.customerName || "No customer"}</p>
                   <p className="mt-0.5 truncate text-[11px] text-slate-400">
@@ -602,9 +602,9 @@ export default function MobilePhotos() {
         {customerId && (
           filesLoading ? (
             <div className="grid grid-cols-3 gap-2">
-              <Skeleton className="aspect-square rounded-xl" />
-              <Skeleton className="aspect-square rounded-xl" />
-              <Skeleton className="aspect-square rounded-xl" />
+              <Skeleton className="aspect-square rounded-lg" />
+              <Skeleton className="aspect-square rounded-lg" />
+              <Skeleton className="aspect-square rounded-lg" />
             </div>
           ) : photos.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-10 text-slate-300">
@@ -614,7 +614,7 @@ export default function MobilePhotos() {
           ) : (
             <div className="photo-grid-noselect grid grid-cols-3 gap-2" data-testid="photo-grid">
               {photos.map((p) => (
-                <div key={p.id} className="relative overflow-hidden rounded-xl">
+                <div key={p.id} className="relative overflow-hidden rounded-lg">
                   <button
                     onClick={() => {
                       if (suppressClick.current) { suppressClick.current = false; return; }
@@ -626,7 +626,7 @@ export default function MobilePhotos() {
                     onPointerCancel={cancelPress}
                     onPointerLeave={cancelPress}
                     onContextMenu={(e) => e.preventDefault()}
-                    className={`ios-press-source block w-full select-none overflow-hidden rounded-xl ${pressedId === p.id ? "is-pressed" : ""}`}
+                    className={`ios-press-source block w-full select-none overflow-hidden rounded-lg ${pressedId === p.id ? "is-pressed" : ""}`}
                     style={{ WebkitTouchCallout: "none" }}
                     data-testid={`photo-${p.id}`}
                   >
@@ -635,7 +635,7 @@ export default function MobilePhotos() {
                       alt={p.name}
                       loading="lazy"
                       draggable={false}
-                      className="pointer-events-none aspect-square w-full select-none rounded-xl object-cover"
+                      className="pointer-events-none aspect-square w-full select-none rounded-lg object-cover"
                       style={{ WebkitTouchCallout: "none" }}
                     />
                   </button>
@@ -681,7 +681,7 @@ export default function MobilePhotos() {
       >
         <button
           onClick={() => { if (shownPreview) downloadPhoto(shownPreview); setPreview(null); }}
-          className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-[16px] text-slate-900 active:bg-white/40"
+          className="flex w-full items-center justify-between rounded-lg px-4 py-3 text-[16px] text-slate-900 active:bg-white/40"
           data-testid="action-download"
         >
           Download <Download className="h-5 w-5 text-slate-700" />
@@ -689,7 +689,7 @@ export default function MobilePhotos() {
         <div className="mx-2 h-px bg-slate-900/10" />
         <button
           onClick={() => { if (shownPreview) setConfirmDelete(shownPreview); setPreview(null); }}
-          className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-[16px] text-red-600 active:bg-white/40"
+          className="flex w-full items-center justify-between rounded-lg px-4 py-3 text-[16px] text-red-600 active:bg-white/40"
           data-testid="action-delete"
         >
           Delete <Trash2 className="h-5 w-5" />
@@ -698,7 +698,7 @@ export default function MobilePhotos() {
 
       {/* Delete confirmation (supervisor+) */}
       <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
-        <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-2xl">
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-lg">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this photo?</AlertDialogTitle>
             <AlertDialogDescription>

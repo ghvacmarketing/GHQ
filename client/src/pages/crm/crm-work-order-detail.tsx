@@ -899,12 +899,12 @@ export default function CrmWorkOrderDetail() {
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="max-w-6xl mx-auto space-y-6">
           <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-lg" />
           <Skeleton className="h-12 w-full rounded-lg" />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Skeleton className="h-48 rounded-xl" />
-            <Skeleton className="h-48 rounded-xl" />
-            <Skeleton className="h-48 rounded-xl" />
+            <Skeleton className="h-48 rounded-lg" />
+            <Skeleton className="h-48 rounded-lg" />
+            <Skeleton className="h-48 rounded-lg" />
           </div>
         </div>
       </div>

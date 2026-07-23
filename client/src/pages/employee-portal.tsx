@@ -161,8 +161,8 @@ export default function EmployeePortal() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
         <div className="max-w-4xl mx-auto p-4 space-y-6">
-          <Skeleton className="h-48 w-full rounded-2xl" />
-          <Skeleton className="h-64 w-full rounded-2xl" />
+          <Skeleton className="h-48 w-full rounded-lg" />
+          <Skeleton className="h-64 w-full rounded-lg" />
         </div>
       </div>
     );
@@ -236,7 +236,7 @@ export default function EmployeePortal() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent rounded-2xl p-6 border" data-testid="hero-greeting">
+        <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent rounded-lg p-6 border" data-testid="hero-greeting">
           <div className="flex items-center gap-4">
             <Avatar className="h-16 w-16 border-2 border-white shadow-lg">
               <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-white text-xl font-semibold">
@@ -262,10 +262,10 @@ export default function EmployeePortal() {
           </div>
         </div>
 
-        <Card className="border-0 shadow-md rounded-2xl overflow-hidden" data-testid="card-time-clock">
+        <Card className="border-0 shadow-md rounded-lg overflow-hidden" data-testid="card-time-clock">
           <CardContent className="p-6">
             {timeLoading ? (
-              <Skeleton className="h-20 w-full rounded-xl" />
+              <Skeleton className="h-20 w-full rounded-lg" />
             ) : timeStatus && !timeStatus.linked ? (
               <div className="flex items-center gap-3 text-muted-foreground" data-testid="text-clock-unlinked">
                 <Clock className="h-5 w-5 flex-shrink-0" />
@@ -376,12 +376,12 @@ export default function EmployeePortal() {
           <TabsContent value="overview" className="space-y-4 mt-6">
             {profileLoading ? (
               <div className="space-y-4">
-                <Skeleton className="h-48 w-full rounded-xl" />
-                <Skeleton className="h-32 w-full rounded-xl" />
+                <Skeleton className="h-48 w-full rounded-lg" />
+                <Skeleton className="h-32 w-full rounded-lg" />
               </div>
             ) : profileData ? (
               <>
-                <Card className="border-0 shadow-md rounded-xl overflow-hidden" data-testid="card-profile">
+                <Card className="border-0 shadow-md rounded-lg overflow-hidden" data-testid="card-profile">
                   <CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b flex flex-row items-center justify-between">
                     <div>
                       <CardTitle className="text-lg">Profile Information</CardTitle>
@@ -394,7 +394,7 @@ export default function EmployeePortal() {
                           Edit
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="rounded-2xl">
+                      <DialogContent className="rounded-lg">
                         <DialogHeader>
                           <DialogTitle>Edit Profile</DialogTitle>
                           <DialogDescription>Update your contact information</DialogDescription>
@@ -512,7 +512,7 @@ export default function EmployeePortal() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-0 shadow-md rounded-xl overflow-hidden" data-testid="card-compensation">
+                <Card className="border-0 shadow-md rounded-lg overflow-hidden" data-testid="card-compensation">
                   <CardHeader className="bg-gradient-to-r from-emerald-50 to-white border-b">
                     <CardTitle className="text-lg flex items-center gap-2">
                       <DollarSign className="h-5 w-5 text-emerald-600" />
@@ -523,7 +523,7 @@ export default function EmployeePortal() {
                   <CardContent className="p-6">
                     {profileData.compensation ? (
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="text-center p-6 rounded-xl bg-gradient-to-br from-slate-50 to-white border">
+                        <div className="text-center p-6 rounded-lg bg-gradient-to-br from-slate-50 to-white border">
                           <p className="text-sm text-muted-foreground mb-2">Pay Type</p>
                           <Badge 
                             variant={getPayTypeBadgeVariant(profileData.compensation.payType)} 
@@ -533,7 +533,7 @@ export default function EmployeePortal() {
                             {profileData.compensation.payType}
                           </Badge>
                         </div>
-                        <div className="text-center p-6 rounded-xl bg-gradient-to-br from-emerald-50 to-white border border-emerald-100">
+                        <div className="text-center p-6 rounded-lg bg-gradient-to-br from-emerald-50 to-white border border-emerald-100">
                           <p className="text-sm text-muted-foreground mb-2">Current Rate</p>
                           <p className="font-bold text-2xl text-emerald-600" data-testid="text-rate">
                             {formatCurrency(profileData.compensation.rate)}
@@ -543,7 +543,7 @@ export default function EmployeePortal() {
                             </span>
                           </p>
                         </div>
-                        <div className="text-center p-6 rounded-xl bg-gradient-to-br from-slate-50 to-white border">
+                        <div className="text-center p-6 rounded-lg bg-gradient-to-br from-slate-50 to-white border">
                           <p className="text-sm text-muted-foreground mb-2">Pay Schedule</p>
                           <p className="font-semibold text-lg capitalize" data-testid="text-pay-schedule">
                             {profileData.paySchedule || profileData.compensation.paySchedule}
@@ -565,13 +565,13 @@ export default function EmployeePortal() {
           <TabsContent value="pay-history" className="space-y-4 mt-6">
             {paystubsLoading ? (
               <div className="space-y-4">
-                <Skeleton className="h-28 w-full rounded-xl" />
-                <Skeleton className="h-28 w-full rounded-xl" />
-                <Skeleton className="h-28 w-full rounded-xl" />
+                <Skeleton className="h-28 w-full rounded-lg" />
+                <Skeleton className="h-28 w-full rounded-lg" />
+                <Skeleton className="h-28 w-full rounded-lg" />
               </div>
             ) : paystubs && paystubs.length > 0 ? (
               paystubs.map((paystub) => (
-                <Card key={paystub.id} className="border-0 shadow-md rounded-xl overflow-hidden hover:shadow-lg transition-shadow" data-testid={`card-paystub-${paystub.id}`}>
+                <Card key={paystub.id} className="border-0 shadow-md rounded-lg overflow-hidden hover:shadow-lg transition-shadow" data-testid={`card-paystub-${paystub.id}`}>
                   <CardContent className="p-6">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 flex-1">
@@ -618,7 +618,7 @@ export default function EmployeePortal() {
                 </Card>
               ))
             ) : (
-              <Card className="border-0 shadow-md rounded-xl" data-testid="card-no-paystubs">
+              <Card className="border-0 shadow-md rounded-lg" data-testid="card-no-paystubs">
                 <CardContent className="py-16 text-center">
                   <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
                     <DollarSign className="h-8 w-8 text-slate-400" />
@@ -632,16 +632,16 @@ export default function EmployeePortal() {
           <TabsContent value="documents" className="space-y-4 mt-6">
             {documentsLoading ? (
               <div className="space-y-4">
-                <Skeleton className="h-24 w-full rounded-xl" />
-                <Skeleton className="h-24 w-full rounded-xl" />
+                <Skeleton className="h-24 w-full rounded-lg" />
+                <Skeleton className="h-24 w-full rounded-lg" />
               </div>
             ) : documents && documents.length > 0 ? (
               documents.map((doc) => (
-                <Card key={doc.id} className="border-0 shadow-md rounded-xl overflow-hidden hover:shadow-lg transition-shadow" data-testid={`card-document-${doc.id}`}>
+                <Card key={doc.id} className="border-0 shadow-md rounded-lg overflow-hidden hover:shadow-lg transition-shadow" data-testid={`card-document-${doc.id}`}>
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+                        <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
                           <FileText className="h-6 w-6 text-primary" />
                         </div>
                         <div>
@@ -670,7 +670,7 @@ export default function EmployeePortal() {
                 </Card>
               ))
             ) : (
-              <Card className="border-0 shadow-md rounded-xl" data-testid="card-no-documents">
+              <Card className="border-0 shadow-md rounded-lg" data-testid="card-no-documents">
                 <CardContent className="py-16 text-center">
                   <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
                     <FileText className="h-8 w-8 text-slate-400" />

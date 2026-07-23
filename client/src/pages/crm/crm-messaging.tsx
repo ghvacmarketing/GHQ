@@ -660,7 +660,7 @@ export default function CrmMessaging() {
         {!selectedConversationId ? (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <div className="text-center">
-              <span className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
+              <span className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-lg bg-muted">
                 <MessageSquare className="h-7 w-7 text-muted-foreground/50" />
               </span>
               <p className="font-medium text-foreground">Select a conversation</p>
@@ -777,7 +777,7 @@ export default function CrmMessaging() {
                         {/* Only the text is boxed */}
                         <div
                           className={cn(
-                            "max-w-[75%] rounded-2xl px-3.5 py-2",
+                            "max-w-[75%] rounded-lg px-3.5 py-2",
                             outbound
                               ? "bg-[#c0607a] text-white rounded-br-sm shadow-sm"
                               : "bg-muted text-foreground rounded-bl-sm"

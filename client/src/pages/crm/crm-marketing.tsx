@@ -102,7 +102,7 @@ export default function CrmMarketing() {
             { label: "Triggered", value: automations.reduce((s, a) => s + (a.totalTriggered || 0), 0), icon: Sparkles, color: "#0ea5e9" },
             { label: "Completed", value: automations.reduce((s, a) => s + (a.totalCompleted || 0), 0), icon: Send, color: "#7c3aed" },
           ].map((s) => (
-            <Card key={s.label} className="rounded-xl">
+            <Card key={s.label} className="rounded-lg">
               <CardContent className="flex items-center gap-3 p-4">
                 <span className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ background: `${s.color}15`, color: s.color }}>
                   <s.icon className="h-4 w-4" />
@@ -119,12 +119,12 @@ export default function CrmMarketing() {
         {/* List */}
         {isLoading ? (
           <div className="grid gap-3 md:grid-cols-2">
-            {[0, 1].map((i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
+            {[0, 1].map((i) => <Skeleton key={i} className="h-32 rounded-lg" />)}
           </div>
         ) : automations.length === 0 ? (
-          <Card className="rounded-2xl border-dashed">
+          <Card className="rounded-lg border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-              <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#711419] to-[#a31d24] text-white shadow-lg">
+              <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-gradient-to-br from-[#711419] to-[#a31d24] text-white shadow-lg">
                 <Zap className="h-7 w-7" />
               </span>
               <h3 className="text-lg font-semibold text-foreground">Create your first automation</h3>
@@ -143,7 +143,7 @@ export default function CrmMarketing() {
               const conds = (a.conditions as any[]) || [];
               const tType = (a.trigger as any)?.type;
               return (
-                <Card key={a.id} className="group rounded-2xl transition-shadow hover:shadow-md">
+                <Card key={a.id} className="group rounded-lg transition-shadow hover:shadow-md">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">

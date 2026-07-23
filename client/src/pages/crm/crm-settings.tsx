@@ -102,7 +102,7 @@ export default function CrmSettings() {
         <Skeleton className="h-7 w-40" />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-40 w-full rounded-xl" />
+            <Skeleton key={i} className="h-40 w-full rounded-lg" />
           ))}
         </div>
       </div>
@@ -122,7 +122,7 @@ export default function CrmSettings() {
       <CrmLayout currentUser={currentUser}>
         <div className="flex min-h-[60vh] items-center justify-center">
           <div className="text-center">
-            <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+            <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-muted text-muted-foreground">
               <Shield className="h-6 w-6" />
             </span>
             <p className="text-sm text-muted-foreground">Settings are only available to managers.</p>

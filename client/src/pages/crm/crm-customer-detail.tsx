@@ -1793,7 +1793,7 @@ function PortalAccountCard({ customerId }: { customerId: string }) {
   });
 
   if (isLoading) {
-    return <Skeleton className="h-32 rounded-xl" data-testid="skeleton-portal-card" />;
+    return <Skeleton className="h-32 rounded-lg" data-testid="skeleton-portal-card" />;
   }
   if (!data) return null;
 
@@ -5305,8 +5305,8 @@ export default function CrmCustomerDetail() {
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="max-w-4xl mx-auto space-y-6">
           <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-48 rounded-xl" />
-          <Skeleton className="h-64 rounded-xl" />
+          <Skeleton className="h-48 rounded-lg" />
+          <Skeleton className="h-64 rounded-lg" />
         </div>
       </div>
     );
@@ -6431,7 +6431,7 @@ export default function CrmCustomerDetail() {
         <Dialog open={propertyDialogOpen} onOpenChange={(open) => !open && handleClosePropertyDialog()}>
           <DialogContent className="sm:max-w-[520px] p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
             <div className="p-4 pb-0 shrink-0">
-              <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-5">
+              <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-5">
                 <DialogHeader className="p-0">
                   <DialogTitle className="text-xl font-semibold">{editingProperty ? "Edit Location" : "Add Location"}</DialogTitle>
                   <DialogDescription className="text-slate-500">
@@ -6531,7 +6531,7 @@ export default function CrmCustomerDetail() {
 
               {/* Tenant Contact & Location Details - Only for Property Manager customers */}
               {isPropertyManager && (
-                <div className="bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 rounded-xl p-4 space-y-4 border border-violet-200/60 dark:border-violet-700/40 shadow-sm">
+                <div className="bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 rounded-lg p-4 space-y-4 border border-violet-200/60 dark:border-violet-700/40 shadow-sm">
                   <p className="text-xs font-semibold text-violet-600 uppercase tracking-wider flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-violet-400"></span>
                     Tenant Contact <span className="text-violet-400 font-normal">(optional)</span>
@@ -6663,7 +6663,7 @@ export default function CrmCustomerDetail() {
 
                       {/* Owner Contact - when billing to owner */}
                       {propBilledTo === "owner" && (
-                        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl p-4 space-y-4 border border-emerald-200/60 dark:border-emerald-700/40">
+                        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-lg p-4 space-y-4 border border-emerald-200/60 dark:border-emerald-700/40">
                           <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                             Owner Contact <span className="text-red-500">*</span>

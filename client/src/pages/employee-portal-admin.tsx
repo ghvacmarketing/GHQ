@@ -219,8 +219,8 @@ export default function EmployeePortalAdmin() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
         <div className="max-w-6xl mx-auto p-4 space-y-6">
-          <Skeleton className="h-20 w-full rounded-2xl" />
-          <Skeleton className="h-64 w-full rounded-2xl" />
+          <Skeleton className="h-20 w-full rounded-lg" />
+          <Skeleton className="h-64 w-full rounded-lg" />
         </div>
       </div>
     );
@@ -380,16 +380,16 @@ export default function EmployeePortalAdmin() {
 
             {employeesLoading ? (
               <div className="space-y-4">
-                <Skeleton className="h-24 w-full rounded-xl" />
-                <Skeleton className="h-24 w-full rounded-xl" />
-                <Skeleton className="h-24 w-full rounded-xl" />
+                <Skeleton className="h-24 w-full rounded-lg" />
+                <Skeleton className="h-24 w-full rounded-lg" />
+                <Skeleton className="h-24 w-full rounded-lg" />
               </div>
             ) : employees && employees.length > 0 ? (
               <div className="space-y-4">
                 {employees.filter((emp) => emp?.user?.id).map((emp) => (
                   <Card 
                     key={emp.user.id} 
-                    className="border-0 shadow-md rounded-xl overflow-hidden hover:shadow-lg transition-all"
+                    className="border-0 shadow-md rounded-lg overflow-hidden hover:shadow-lg transition-all"
                     data-testid={`card-employee-${emp.user.id}`}
                   >
                     <CardContent className="p-0">
@@ -475,7 +475,7 @@ export default function EmployeePortalAdmin() {
                           </div>
 
                           {emp.compensation && (
-                            <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-white border border-emerald-100 mb-4">
+                            <div className="p-4 rounded-lg bg-gradient-to-r from-emerald-50 to-white border border-emerald-100 mb-4">
                               <h4 className="text-sm font-semibold text-emerald-700 mb-3 flex items-center gap-2">
                                 <DollarSign className="h-4 w-4" />
                                 Current Compensation
@@ -544,7 +544,7 @@ export default function EmployeePortalAdmin() {
                 ))}
               </div>
             ) : (
-              <Card className="border-0 shadow-md rounded-xl" data-testid="card-no-employees">
+              <Card className="border-0 shadow-md rounded-lg" data-testid="card-no-employees">
                 <CardContent className="py-16 text-center">
                   <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
                     <Users className="h-8 w-8 text-slate-400" />
@@ -566,11 +566,11 @@ export default function EmployeePortalAdmin() {
             </div>
 
             {auditLoading ? (
-              <Skeleton className="h-64 w-full rounded-xl" />
+              <Skeleton className="h-64 w-full rounded-lg" />
             ) : auditLog && auditLog.length > 0 ? (
               <div className="space-y-3">
                 {auditLog.map((entry) => (
-                  <Card key={entry.id} className="border-0 shadow-md rounded-xl overflow-hidden" data-testid={`row-audit-${entry.id}`}>
+                  <Card key={entry.id} className="border-0 shadow-md rounded-lg overflow-hidden" data-testid={`row-audit-${entry.id}`}>
                     <CardContent className="p-4">
                       <div className="flex items-start gap-4">
                         <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
@@ -618,7 +618,7 @@ export default function EmployeePortalAdmin() {
                 ))}
               </div>
             ) : (
-              <Card className="border-0 shadow-md rounded-xl" data-testid="card-no-audit">
+              <Card className="border-0 shadow-md rounded-lg" data-testid="card-no-audit">
                 <CardContent className="py-16 text-center">
                   <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
                     <Clock className="h-8 w-8 text-slate-400" />
@@ -632,7 +632,7 @@ export default function EmployeePortalAdmin() {
       </main>
 
       <Dialog open={addEmployeeOpen} onOpenChange={setAddEmployeeOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg">
           <DialogHeader>
             <DialogTitle className="text-xl">Add New Employee</DialogTitle>
             <DialogDescription>Create a new employee account and profile.</DialogDescription>
@@ -770,7 +770,7 @@ export default function EmployeePortalAdmin() {
       </Dialog>
 
       <Dialog open={compensationDialogOpen} onOpenChange={setCompensationDialogOpen}>
-        <DialogContent className="rounded-2xl">
+        <DialogContent className="rounded-lg">
           <DialogHeader>
             <DialogTitle>Set Compensation</DialogTitle>
             <DialogDescription>
@@ -867,7 +867,7 @@ export default function EmployeePortalAdmin() {
       </Dialog>
 
       <Dialog open={paystubDialogOpen} onOpenChange={setPaystubDialogOpen}>
-        <DialogContent className="rounded-2xl">
+        <DialogContent className="rounded-lg">
           <DialogHeader>
             <DialogTitle>Add Paystub</DialogTitle>
             <DialogDescription>
@@ -980,7 +980,7 @@ export default function EmployeePortalAdmin() {
       </Dialog>
 
       <AlertDialog open={deactivateDialogOpen} onOpenChange={setDeactivateDialogOpen}>
-        <AlertDialogContent className="rounded-2xl">
+        <AlertDialogContent className="rounded-lg">
           <AlertDialogHeader>
             <AlertDialogTitle>Deactivate Employee</AlertDialogTitle>
             <AlertDialogDescription>

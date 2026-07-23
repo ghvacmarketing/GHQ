@@ -54,11 +54,11 @@ export default function CrmRouteGuard({ children }: CrmRouteGuardProps) {
       >
         {/* Unique, minimalist GHQ entry loader: breathing logo + a sweeping bar. */}
         <div className="relative">
-          <span className="absolute inset-0 rounded-2xl bg-[#711419]/10 blur-xl animate-pulse" />
+          <span className="absolute inset-0 rounded-lg bg-[#711419]/10 blur-xl animate-pulse" />
           <img
             src={redLogo}
             alt="GHQ"
-            className="relative h-12 w-12 rounded-xl object-contain animate-[pulse_2.2s_ease-in-out_infinite]"
+            className="relative h-12 w-12 rounded-lg object-contain animate-[pulse_2.2s_ease-in-out_infinite]"
           />
         </div>
         <div className="h-1 w-36 overflow-hidden rounded-full bg-[#711419]/10">
@@ -79,7 +79,7 @@ export default function CrmRouteGuard({ children }: CrmRouteGuardProps) {
   if (currentUser.role === "tech") {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-4" data-testid="crm-access-denied">
-        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md text-center">
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <ShieldX className="h-8 w-8 text-red-600" />
           </div>

@@ -2693,8 +2693,8 @@ export default function CrmQuoteDetail() {
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="w-full space-y-6">
           <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-64 w-full rounded-xl" />
-          <Skeleton className="h-96 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-lg" />
+          <Skeleton className="h-96 w-full rounded-lg" />
         </div>
       </div>
     );

@@ -177,8 +177,8 @@ export default function PublicInvoiceView() {
       <div className="min-h-screen bg-slate-50 py-8 px-4">
         <div className="max-w-2xl mx-auto space-y-6">
           <Skeleton className="h-24 w-48 mx-auto" />
-          <Skeleton className="h-64 w-full rounded-xl" />
-          <Skeleton className="h-48 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-lg" />
+          <Skeleton className="h-48 w-full rounded-lg" />
         </div>
       </div>
     );

@@ -246,7 +246,7 @@ export default function MobileMessages() {
                     className={`flex ${message.direction === "outbound" ? "justify-end" : "justify-start"}`}
                   >
                     <div
-                      className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                      className={`max-w-[80%] rounded-lg px-4 py-2 ${
                         message.direction === "outbound"
                           ? "bg-[#711419] text-white"
                           : "bg-slate-100 text-slate-800"

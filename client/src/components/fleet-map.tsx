@@ -205,7 +205,7 @@ export function FleetMap({ vehicles, selectedVehicleId, onVehicleClick }: FleetM
     return (
       <div className="flex-1 min-h-[400px] flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
         <div className="text-center p-8 max-w-md">
-          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#711419]/10">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-lg bg-[#711419]/10">
             <MapPin className="h-8 w-8 text-[#711419]" strokeWidth={1.75} />
           </div>
           <h3 className="text-lg font-semibold text-slate-800 mb-1.5">No location data yet</h3>
@@ -234,7 +234,7 @@ export function FleetMap({ vehicles, selectedVehicleId, onVehicleClick }: FleetM
 
       {/* Live fleet summary — top left */}
       <div className="absolute top-3 left-3 z-[1000] pointer-events-none">
-        <div className="flex items-center gap-2 rounded-xl bg-white/95 backdrop-blur px-3 py-2 shadow-lg ring-1 ring-black/5">
+        <div className="flex items-center gap-2 rounded-lg bg-white/95 backdrop-blur px-3 py-2 shadow-lg ring-1 ring-black/5">
           <span className="relative flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
@@ -247,7 +247,7 @@ export function FleetMap({ vehicles, selectedVehicleId, onVehicleClick }: FleetM
 
       {/* Legend — bottom left */}
       <div className="absolute bottom-4 left-3 z-[1000] pointer-events-none">
-        <div className="rounded-xl bg-white/95 backdrop-blur px-3 py-2.5 shadow-lg ring-1 ring-black/5 space-y-1.5">
+        <div className="rounded-lg bg-white/95 backdrop-blur px-3 py-2.5 shadow-lg ring-1 ring-black/5 space-y-1.5">
           <div className="flex items-center gap-2">
             <StatusDot color={STATUS.moving} />
             <span className="text-[11px] font-medium text-slate-600">Moving</span>

@@ -78,7 +78,7 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
   if (currentUser && !canAccessMobile) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-4" data-testid="mobile-access-denied">
-        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md text-center">
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <ShieldX className="h-8 w-8 text-red-600" />
           </div>
@@ -209,7 +209,7 @@ function SheetTile({
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center gap-1.5 rounded-2xl bg-slate-100 px-1 py-3 transition-all active:scale-95 active:bg-slate-200"
+      className="flex flex-col items-center gap-1.5 rounded-lg bg-slate-100 px-1 py-3 transition-all active:scale-95 active:bg-slate-200"
       data-testid={testid}
     >
       <Icon className="h-6 w-6 text-[#711419]" />

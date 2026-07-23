@@ -759,7 +759,7 @@ export default function CrmInstallPlanner() {
         {view === "calendar" && (
         <div
           className={cn(
-            "relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card transition-shadow duration-200",
+            "relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card transition-shadow duration-200",
             dragActive && "ring-2 ring-[#711419]/25",
           )}
         >

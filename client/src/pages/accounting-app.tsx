@@ -236,28 +236,28 @@ export default function AccountingApp() {
           {tab === "dashboard" && (
             summaryLoading || !summary ? (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}</div>
-                <Skeleton className="h-64 rounded-xl" />
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)}</div>
+                <Skeleton className="h-64 rounded-lg" />
               </div>
             ) : (
               <div className="space-y-4">
                 {/* KPI cards */}
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                  <div className="rounded-xl border border-black/[0.06] bg-white p-4 shadow-sm">
+                  <div className="rounded-lg border border-black/[0.06] bg-white p-4 shadow-sm">
                     <p className="flex items-center gap-1.5 text-xs font-medium text-slate-500"><TrendingUp className="h-3.5 w-3.5 text-emerald-500" /> Revenue (MTD)</p>
                     <p className="mt-1 text-2xl font-semibold tracking-tight text-slate-900" data-testid="kpi-revenue">{money(mtdRevenue)}</p>
                   </div>
-                  <div className="rounded-xl border border-black/[0.06] bg-white p-4 shadow-sm">
+                  <div className="rounded-lg border border-black/[0.06] bg-white p-4 shadow-sm">
                     <p className="flex items-center gap-1.5 text-xs font-medium text-slate-500"><TrendingDown className="h-3.5 w-3.5 text-red-500" /> Expenses (MTD)</p>
                     <p className="mt-1 text-2xl font-semibold tracking-tight text-slate-900" data-testid="kpi-expenses">{money(mtdExpenses)}</p>
                   </div>
-                  <div className="rounded-xl border border-black/[0.06] bg-white p-4 shadow-sm">
+                  <div className="rounded-lg border border-black/[0.06] bg-white p-4 shadow-sm">
                     <p className="flex items-center gap-1.5 text-xs font-medium text-slate-500"><Wallet className="h-3.5 w-3.5 text-slate-400" /> Net (MTD)</p>
                     <p className={`mt-1 text-2xl font-semibold tracking-tight ${mtdRevenue - mtdExpenses >= 0 ? "text-emerald-600" : "text-red-600"}`} data-testid="kpi-net">
                       {money(mtdRevenue - mtdExpenses)}
                     </p>
                   </div>
-                  <div className="rounded-xl border border-black/[0.06] bg-white p-4 shadow-sm">
+                  <div className="rounded-lg border border-black/[0.06] bg-white p-4 shadow-sm">
                     <p className="text-xs font-medium text-slate-500">Outstanding A/R</p>
                     <p className="mt-1 text-2xl font-semibold tracking-tight text-slate-900" data-testid="kpi-ar">{money(summary.ar.total)}</p>
                     <p className="text-[11px] text-slate-400">{summary.ar.open_count} open invoice{summary.ar.open_count === 1 ? "" : "s"}</p>
@@ -265,7 +265,7 @@ export default function AccountingApp() {
                 </div>
 
                 {/* Revenue vs expenses (6 mo) */}
-                <div className="rounded-xl border border-black/[0.06] bg-white p-4 shadow-sm">
+                <div className="rounded-lg border border-black/[0.06] bg-white p-4 shadow-sm">
                   <p className="mb-3 text-sm font-semibold text-slate-900">Revenue vs expenses — last 6 months</p>
                   {chart.length === 0 ? (
                     <p className="py-8 text-center text-sm text-slate-400">No activity yet.</p>
@@ -290,7 +290,7 @@ export default function AccountingApp() {
 
                 <div className="grid gap-4 lg:grid-cols-2">
                   {/* A/R aging */}
-                  <div className="rounded-xl border border-black/[0.06] bg-white p-4 shadow-sm">
+                  <div className="rounded-lg border border-black/[0.06] bg-white p-4 shadow-sm">
                     <p className="mb-3 text-sm font-semibold text-slate-900">A/R aging</p>
                     {[
                       ["Current", summary.ar.current, "bg-emerald-500"],
@@ -315,7 +315,7 @@ export default function AccountingApp() {
                   </div>
 
                   {/* Recent expenses */}
-                  <div className="rounded-xl border border-black/[0.06] bg-white p-4 shadow-sm">
+                  <div className="rounded-lg border border-black/[0.06] bg-white p-4 shadow-sm">
                     <div className="mb-2 flex items-center justify-between">
                       <p className="text-sm font-semibold text-slate-900">Recent expenses</p>
                       <button onClick={() => setTab("expenses")} className="text-xs font-medium text-[#711419] hover:underline">View all</button>
@@ -351,7 +351,7 @@ export default function AccountingApp() {
                 </Button>
               </div>
 
-              <div className="overflow-hidden rounded-xl border border-black/[0.06] bg-white shadow-sm">
+              <div className="overflow-hidden rounded-lg border border-black/[0.06] bg-white shadow-sm">
                 {expensesLoading ? (
                   <div className="space-y-2 p-4">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
                 ) : expenses.length === 0 ? (
@@ -419,7 +419,7 @@ export default function AccountingApp() {
                 </Button>
               </div>
               {grouped.map((g) => (
-                <div key={g.type} className="overflow-hidden rounded-xl border border-black/[0.06] bg-white shadow-sm">
+                <div key={g.type} className="overflow-hidden rounded-lg border border-black/[0.06] bg-white shadow-sm">
                   <p className="border-b border-slate-100 bg-slate-50 px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">{g.type}</p>
                   {g.list.map((a) => (
                     <div key={a.id} className="flex items-center gap-3 border-b border-slate-50 px-4 py-2.5 text-sm last:border-0" data-testid={`account-${a.id}`}>

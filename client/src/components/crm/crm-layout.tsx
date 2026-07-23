@@ -52,7 +52,7 @@ import {
   Activity,
   Sparkles,
   MessageSquarePlus,
-  LayoutGrid as AppGridIcon,
+  Grip as AppGridIcon,
   Monitor as AppMonitorIcon,
   Smartphone as AppPhoneIcon,
   FolderOpen as AppDocsIcon,
@@ -462,8 +462,9 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
           {/* App switcher — jump between GHQ apps */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" title="Switch app" data-testid="button-app-switcher">
+              <Button variant="ghost" size="sm" className="gap-1.5 px-2.5" title="Switch app" data-testid="button-app-switcher">
                 <AppGridIcon className="h-5 w-5 text-slate-600" />
+                <span className="text-sm font-medium text-slate-600">Apps</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
