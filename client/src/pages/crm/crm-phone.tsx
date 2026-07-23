@@ -2627,8 +2627,9 @@ function WeatherImpactTab() {
 
   return (
     <div className="space-y-4">
+      <WeatherWidget />
       <WeeklyForecast />
-      
+
       <div className="flex items-center justify-between flex-wrap gap-2">
         <Select value={range} onValueChange={setRange}>
           <SelectTrigger className="w-auto h-8 px-3 text-xs border-0 bg-transparent hover:bg-muted/50 focus:ring-0 gap-1" data-testid="crm-phone-select-weather-range">
@@ -2943,9 +2944,7 @@ function CrmPhoneContent() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900" data-testid="crm-phone-page-title">Phone</h1>
       </div>
-      
-      <WeatherWidget />
-      
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 mb-6 flex-wrap">
           <TabsTrigger value="call-logs" className="px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent data-[state=active]:border-[#711419] data-[state=active]:text-[#711419] rounded-none bg-transparent shadow-none" data-testid="crm-phone-tab-call-logs">

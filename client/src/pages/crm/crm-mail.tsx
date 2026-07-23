@@ -536,7 +536,7 @@ export default function CrmMail() {
                         </div>
                         <div className="truncate text-xs text-slate-400">{t.snippet}</div>
                       </div>
-                      {t.isUnread && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[#711419]" />}
+                      {t.isUnread && <span className="mt-2 h-2 w-2 shrink-0 rounded-[2px] bg-[#711419]" />}
                     </button>
                   );
                 })}

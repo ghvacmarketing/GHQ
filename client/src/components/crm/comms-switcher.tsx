@@ -22,8 +22,7 @@ export function CommsSwitcher({
   const [, navigate] = useLocation();
 
   const control = (
-    <div className="flex items-center gap-3">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Comms</span>
+    <div className="flex items-center">
       <div className="flex w-fit overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
         {ITEMS.map((it, i) => {
           const Icon = it.icon;
@@ -46,9 +45,9 @@ export function CommsSwitcher({
     </div>
   );
 
-  if (variant === "inline") return <div className="mb-3">{control}</div>;
+  if (variant === "inline") return <div className="mb-3 flex justify-center">{control}</div>;
   return (
-    <div className="flex shrink-0 items-center border-b border-slate-200/80 bg-white/85 px-4 py-2">
+    <div className="flex shrink-0 items-center justify-center border-b border-slate-200/80 bg-white/85 px-4 py-2">
       {control}
     </div>
   );

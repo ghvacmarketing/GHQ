@@ -255,7 +255,7 @@ export default function CrmPhotoGallery() {
             </p>
           </div>
           <span className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
+            <span className="h-2 w-2 animate-pulse rounded-[2px] bg-green-500" />
             Live
           </span>
         </div>

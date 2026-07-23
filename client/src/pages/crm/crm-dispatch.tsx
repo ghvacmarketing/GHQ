@@ -770,13 +770,13 @@ function TrucksMapView({ technicians }: TrucksMapViewProps) {
               <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
                 {bouncieStatus?.connected ? (
                   <>
-                    <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                    <span className="h-1.5 w-1.5 rounded-[2px] bg-green-500" />
                     Bouncie connected
                     {bouncieStatus.lastSync ? ` · synced ${formatLastUpdate(bouncieStatus.lastSync)}` : ""}
                   </>
                 ) : (
                   <>
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                    <span className="h-1.5 w-1.5 rounded-[2px] bg-amber-500" />
                     Bouncie not connected
                   </>
                 )}
@@ -931,12 +931,12 @@ function TrucksMapView({ technicians }: TrucksMapViewProps) {
                       <div className="flex items-center gap-2">
                         {selectedVehicle.lastSpeed && parseFloat(selectedVehicle.lastSpeed) > 0 ? (
                           <>
-                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                            <div className="w-2 h-2 rounded-[2px] bg-green-500 animate-pulse" />
                             <span className="text-lg font-semibold text-green-600">Running</span>
                           </>
                         ) : (
                           <>
-                            <div className="w-2 h-2 rounded-full bg-slate-400" />
+                            <div className="w-2 h-2 rounded-[2px] bg-slate-400" />
                             <span className="text-lg font-semibold text-slate-600">Parked</span>
                           </>
                         )}
@@ -4338,27 +4338,27 @@ export default function CrmDispatch() {
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Status (Left Stripe)</p>
                     <div className="grid grid-cols-3 gap-x-3 gap-y-2">
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-yellow-400 flex-shrink-0" />
+                        <span className="w-2 h-2 rounded-[2px] bg-yellow-400 flex-shrink-0" />
                         <span className="text-sm text-slate-700">Pending</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />
+                        <span className="w-2 h-2 rounded-[2px] bg-blue-400 flex-shrink-0" />
                         <span className="text-sm text-slate-700">Dispatched</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />
+                        <span className="w-2 h-2 rounded-[2px] bg-blue-400 flex-shrink-0" />
                         <span className="text-sm text-slate-700">Traveling</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
+                        <span className="w-2 h-2 rounded-[2px] bg-green-400 flex-shrink-0" />
                         <span className="text-sm text-slate-700">Working</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0" />
+                        <span className="w-2 h-2 rounded-[2px] bg-gray-400 flex-shrink-0" />
                         <span className="text-sm text-slate-700">Completed</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0" />
+                        <span className="w-2 h-2 rounded-[2px] bg-gray-400 flex-shrink-0" />
                         <span className="text-sm text-slate-700">Cancelled</span>
                       </div>
                     </div>
@@ -4428,9 +4428,9 @@ export default function CrmDispatch() {
                           {workPct > 0 && <div className="bg-green-500" style={{ width: `${workPct}%` }} title={`Work: ${formatMins(work)}`} />}
                         </div>
                         <div className="flex justify-between mt-2 text-xs text-slate-500">
-                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-400" />Idle {idlePct}%</span>
-                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" />Drive {drivePct}%</span>
-                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" />Work {workPct}%</span>
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-[2px] bg-gray-400" />Idle {idlePct}%</span>
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-[2px] bg-blue-500" />Drive {drivePct}%</span>
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-[2px] bg-green-500" />Work {workPct}%</span>
                         </div>
                       </Card>
                     );

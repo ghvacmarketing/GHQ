@@ -57,7 +57,7 @@ export function StatusDot({ pill, color, children, className, ...props }: Status
       )}
       {...props}
     >
-      <span className={cn("h-2 w-2 shrink-0 rounded-full", color || statusDotColor(pill))} />
+      <span className={cn("h-2 w-2 shrink-0 rounded-[2px]", color || statusDotColor(pill))} />
       {children}
     </span>
   );

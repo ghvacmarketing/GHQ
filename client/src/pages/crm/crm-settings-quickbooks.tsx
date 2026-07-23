@@ -796,7 +796,7 @@ export default function CrmSettingsQuickBooks() {
                                   <AccordionTrigger className="hover:no-underline py-3">
                                     <div className="flex items-center justify-between w-full pr-4">
                                       <div className="flex items-center gap-3">
-                                        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                                        <div className="w-2 h-2 rounded-[2px] bg-blue-500"></div>
                                         <span className="font-semibold text-slate-900">{parent.name}</span>
                                         <Badge variant="outline" className="text-xs">
                                           {children.length} sub-account{children.length !== 1 ? 's' : ''}
@@ -815,7 +815,7 @@ export default function CrmSettingsQuickBooks() {
                                     <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100 mb-3"
                                       data-testid={`account-row-${parent.id}`}>
                                       <div className="flex items-center gap-3">
-                                        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                                        <div className="w-2 h-2 rounded-[2px] bg-blue-500"></div>
                                         <span className="font-medium text-slate-700">{parent.name}</span>
                                         <Badge variant="outline" className="text-xs bg-white">Parent Account</Badge>
                                       </div>
@@ -848,7 +848,7 @@ export default function CrmSettingsQuickBooks() {
                                             data-testid={`account-row-${child.id}`}
                                           >
                                             <div className="flex items-center gap-3">
-                                              <div className={`w-1.5 h-1.5 rounded-full ${child.categoryType && child.propertyType ? 'bg-green-500' : 'bg-amber-400'}`}></div>
+                                              <div className={`w-1.5 h-1.5 rounded-[2px] ${child.categoryType && child.propertyType ? 'bg-green-500' : 'bg-amber-400'}`}></div>
                                               <span className="font-medium text-slate-700">
                                                 {child.fullyQualifiedName?.replace(parent.name + ":", "") || child.name}
                                               </span>

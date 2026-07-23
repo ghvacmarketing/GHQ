@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -9,6 +9,7 @@ import {
   FileAudio, FileVideo, File as FileIcon, ArrowLeft, HardDrive, FolderTree,
   BookOpen, Scale, GraduationCap, LayoutTemplate, Users, BadgeDollarSign,
   HardHat, Server, Truck, Handshake, Archive, Settings, LayoutGrid, List,
+  ArrowUpRight,
 } from "lucide-react";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -116,14 +117,38 @@ export default function DocumentsApp() {
       (k) => DOC_CATEGORIES.find((c) => c.key === k)!,
     );
   }, [catOrder]);
+
+  // FLIP: capture tile positions before a reorder, then ease each tile from its
+  // old spot to the new one so the grid visibly makes room while dragging.
+  const tileRefs = useRef(new Map<string, HTMLDivElement>());
+  const prevTileRects = useRef(new Map<string, DOMRect>());
   const moveCatBefore = (dragKey: string, overKey: string) => {
     if (dragKey === overKey) return;
     const keys = orderedCategories.map((c) => c.key as string);
     const next = keys.filter((k) => k !== dragKey);
     next.splice(next.indexOf(overKey), 0, dragKey);
+    if (next.every((k, i) => k === keys[i])) return;
+    tileRefs.current.forEach((el, key) => prevTileRects.current.set(key, el.getBoundingClientRect()));
     setCatOrder(next);
     localStorage.setItem("docsDriveCatOrder", JSON.stringify(next));
   };
+  useLayoutEffect(() => {
+    if (prevTileRects.current.size === 0) return;
+    tileRefs.current.forEach((el, key) => {
+      const prev = prevTileRects.current.get(key);
+      if (!prev) return;
+      const now = el.getBoundingClientRect();
+      const dx = prev.left - now.left;
+      const dy = prev.top - now.top;
+      if (dx || dy) {
+        el.animate(
+          [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }],
+          { duration: 280, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+        );
+      }
+    });
+    prevTileRects.current.clear();
+  }, [orderedCategories]);
 
   const setMode = (m: ViewMode) => { setViewMode(m); localStorage.setItem("docsViewMode", m); };
   const switchTab = (t: TabKey) => {
@@ -434,24 +459,36 @@ export default function DocumentsApp() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {orderedCategories.map((c) => {
               const Icon = CATEGORY_ICONS[c.key];
+              const isDragging = dragCat === c.key;
               return (
                 <div
                   key={c.key}
+                  ref={(el) => {
+                    if (el) tileRefs.current.set(c.key, el);
+                    else tileRefs.current.delete(c.key);
+                  }}
                   draggable
                   onDragStart={(e) => { e.stopPropagation(); setDragCat(c.key); e.dataTransfer.effectAllowed = "move"; }}
                   onDragEnd={() => setDragCat(null)}
                   onDragOver={(e) => {
                     if (!dragCat) return;
                     e.preventDefault(); e.stopPropagation();
+                    e.dataTransfer.dropEffect = "move";
                     moveCatBefore(dragCat, c.key);
                   }}
+                  onDrop={(e) => { if (dragCat) { e.preventDefault(); e.stopPropagation(); setDragCat(null); } }}
                   onClick={() => switchTab(c.key)}
-                  className={`group flex cursor-pointer flex-col rounded-[4px] border bg-white p-4 transition-all ${
-                    dragCat === c.key ? "opacity-40 border-slate-900" : "border-slate-300/70 hover:border-slate-900"
+                  className={`group flex cursor-grab flex-col rounded-[4px] border bg-white p-4 transition-[border-color,box-shadow,opacity,transform] duration-200 active:cursor-grabbing ${
+                    isDragging
+                      ? "scale-[0.98] border-dashed border-slate-400 bg-slate-50 opacity-40"
+                      : "border-slate-300/70 hover:border-slate-900"
                   }`}
                   data-testid={`drive-cat-${c.key}`}
                 >
-                  <Icon className="h-7 w-7 text-[#711419]" strokeWidth={1.5} />
+                  <div className="flex items-start justify-between">
+                    <Icon className="h-7 w-7 text-[#711419]" strokeWidth={1.5} />
+                    <ArrowUpRight className="h-4 w-4 text-slate-300 opacity-0 transition-opacity group-hover:opacity-100" strokeWidth={1.75} />
+                  </div>
                   <p className="mt-3 truncate text-sm font-semibold text-slate-900">{c.label}</p>
                   <p className="mt-0.5 text-[11px] text-slate-400">Category folder</p>
                 </div>

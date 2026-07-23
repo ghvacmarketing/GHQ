@@ -208,7 +208,7 @@ export default function CrmRebateCase() {
           </p>
           <span className="text-slate-200">·</span>
           <div className="flex items-center gap-1.5 text-sm text-slate-500">
-            <div className={`w-2 h-2 rounded-full ${stepsComplete === totalSteps ? "bg-green-500" : "bg-amber-400"}`} />
+            <div className={`w-2 h-2 rounded-[2px] ${stepsComplete === totalSteps ? "bg-green-500" : "bg-amber-400"}`} />
             {stepsComplete} of {totalSteps} complete
           </div>
         </div>
@@ -431,7 +431,7 @@ function FormCard({ title, children }: { title: string; children: React.ReactNod
     <section className="bg-white rounded-lg overflow-hidden shadow-sm border border-slate-200 border-l-4 border-l-[#711419]">
       <header className="bg-gradient-to-r from-[#711419]/5 to-transparent px-4 sm:px-5 py-3 border-b border-slate-200/70">
         <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#711419]" />
+          <span className="inline-block w-1.5 h-1.5 rounded-[2px] bg-[#711419]" />
           {title}
         </h3>
       </header>
@@ -1259,7 +1259,7 @@ function GefaChecklistDialog({ open, onOpenChange, caseId }: { open: boolean; on
           </div>
           {/* Progress */}
           <div className="mt-4 flex items-center gap-3">
-            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className="flex-1 h-1.5 bg-slate-100 rounded-[2px] overflow-hidden">
               <div
                 className="h-full bg-[#711419] transition-all duration-300 rounded-full"
                 style={{ width: `${pct}%` }}
@@ -3004,7 +3004,7 @@ function TasksTab({ caseId, clientName }: { caseId: string; clientName: string }
           <div className="space-y-2">
             {tasks.map(task => (
               <div key={task.id} className="flex items-center gap-3 p-2.5 rounded-md border border-slate-100 text-sm">
-                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${task.status === "completed" ? "bg-green-500" : task.status === "in_progress" ? "bg-blue-500" : "bg-slate-300"}`} />
+                <div className={`w-2 h-2 rounded-[2px] flex-shrink-0 ${task.status === "completed" ? "bg-green-500" : task.status === "in_progress" ? "bg-blue-500" : "bg-slate-300"}`} />
                 <span className="flex-1 text-slate-700">{task.title}</span>
                 {task.dueDate && (
                   <span className="text-xs text-slate-400">{format(new Date(task.dueDate), "MMM d")}</span>

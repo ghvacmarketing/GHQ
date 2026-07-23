@@ -485,45 +485,45 @@ export default function CrmMessaging() {
       {/* ───────────── Conversation list ───────────── */}
       <div
         className={cn(
-          "w-full md:w-72 lg:w-80 xl:w-96 border-r border-border bg-card flex-shrink-0 flex flex-col",
-          showMobileThread ? "hidden md:flex" : "flex"
+          "w-full lg:w-[400px] border-r border-slate-200/80 bg-white flex-shrink-0 flex flex-col",
+          showMobileThread ? "hidden lg:flex" : "flex"
         )}
       >
-        <div className="p-3 border-b border-border space-y-3">
-          <div className="flex items-center justify-between">
-            <h1 className="text-lg font-display font-semibold text-foreground flex items-center gap-2">
-              Inbox
-              {totalUnread > 0 && (
-                <Badge variant="default" className="ml-0.5">
-                  {totalUnread}
-                </Badge>
-              )}
-            </h1>
-            <div className="flex items-center gap-1">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setNewMessageOpen(true)}
-                className="h-8 w-8 p-0"
-                data-testid="button-new-message"
-                title="New message"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
+        {/* Header — mirrors Mail's pane header */}
+        <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-4">
+          <div className="min-w-0 leading-tight">
+            <div className="font-display text-lg font-semibold text-slate-900">Messages</div>
+            <div className="truncate text-[11px] text-slate-400">{currentUser?.name}</div>
           </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setNewMessageOpen(true)}
+            className="h-8 w-8 p-0 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            data-testid="button-new-message"
+            title="New message"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Search */}
+        <div className="px-4 pb-3">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input
               placeholder="Search conversations…"
-              className="pl-8 h-9 text-sm"
+              className="h-9 rounded-lg border-slate-200 bg-slate-50 pl-9 text-sm focus-visible:bg-white"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               data-testid="input-search-conversations"
             />
           </div>
-          {/* Filter tabs */}
-          <div className="flex items-center gap-0.5 rounded-md bg-muted p-0.5">
+        </div>
+
+        {/* Filter tabs — segmented control (matches Mail) */}
+        <div className="px-4 pb-2">
+          <div className="flex items-center gap-0.5 rounded-md bg-slate-100 p-0.5">
             {FILTER_TABS.map((tab) => (
               <button
                 key={tab.value}
@@ -531,14 +531,14 @@ export default function CrmMessaging() {
                 className={cn(
                   "flex-1 rounded-sm px-2 py-1 text-xs font-medium transition-colors",
                   filterTab === tab.value
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-800"
                 )}
                 data-testid={`filter-tab-${tab.value}`}
               >
                 {tab.label}
                 {tab.value === "unread" && totalUnread > 0 && (
-                  <span className="ml-1 text-primary">{totalUnread}</span>
+                  <span className="ml-1 text-[#711419]">{totalUnread}</span>
                 )}
               </button>
             ))}
@@ -625,7 +625,7 @@ export default function CrmMessaging() {
                           >
                             {hasUnread && (
                               <span
-                                className="h-2 w-2 shrink-0 rounded-full bg-primary"
+                                className="h-2 w-2 shrink-0 rounded-[2px] bg-primary"
                                 data-testid={`badge-unread-count-${conv.id}`}
                               />
                             )}
@@ -659,7 +659,7 @@ export default function CrmMessaging() {
       </div>
 
       {/* ───────────── Thread ───────────── */}
-      <div className={cn("flex-1 flex flex-col bg-background min-w-0", !showMobileThread ? "hidden md:flex" : "flex")}>
+      <div className={cn("flex-1 flex flex-col bg-background min-w-0", !showMobileThread ? "hidden lg:flex" : "flex")}>
         {!selectedConversationId ? (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <div className="text-center">
@@ -681,7 +681,7 @@ export default function CrmMessaging() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="md:hidden h-8 w-8 p-0 shrink-0"
+                  className="lg:hidden h-8 w-8 p-0 shrink-0"
                   onClick={() => setShowMobileThread(false)}
                 >
                   <ArrowLeft className="h-4 w-4" />

@@ -574,7 +574,7 @@ function NotesSection({ notes, notesLoading, customerId, onCommentPosted }: Note
             <div className="border-l-2 border-slate-200 pl-4 space-y-4 mt-4">
               {notes.slice(0, 5).map((note) => (
                 <div key={note.id} className="relative" data-testid={`note-overview-${note.id}`}>
-                  <div className="absolute -left-[21px] top-0 w-2.5 h-2.5 bg-blue-500 rounded-full" />
+                  <div className="absolute -left-[21px] top-0 w-2.5 h-2.5 bg-blue-500 rounded-[2px]" />
                   <div className="bg-slate-50 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-medium text-sm text-slate-700">
@@ -1626,9 +1626,9 @@ function AgreementsTabContent({ customerId }: { customerId: string }) {
                     {scheduledCount > 0 && `, ${scheduledCount} scheduled`}
                   </span>
                 </div>
-                <div className="w-full bg-slate-200 rounded-full h-2">
+                <div className="w-full bg-slate-200 rounded-[2px] h-2">
                   <div
-                    className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                    className="bg-green-500 h-2 rounded-[2px] transition-all duration-300"
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>
@@ -6533,7 +6533,7 @@ export default function CrmCustomerDetail() {
               {isPropertyManager && (
                 <div className="bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 rounded-lg p-4 space-y-4 border border-violet-200/60 dark:border-violet-700/40 shadow-sm">
                   <p className="text-xs font-semibold text-violet-600 uppercase tracking-wider flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-violet-400"></span>
+                    <span className="w-2 h-2 rounded-[2px] bg-violet-400"></span>
                     Tenant Contact <span className="text-violet-400 font-normal">(optional)</span>
                   </p>
                   <div className="grid grid-cols-2 gap-3">
@@ -6665,7 +6665,7 @@ export default function CrmCustomerDetail() {
                       {propBilledTo === "owner" && (
                         <div className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-lg p-4 space-y-4 border border-emerald-200/60 dark:border-emerald-700/40">
                           <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                            <span className="w-2 h-2 rounded-[2px] bg-emerald-400"></span>
                             Owner Contact <span className="text-red-500">*</span>
                           </p>
                           <div className="grid grid-cols-2 gap-3">

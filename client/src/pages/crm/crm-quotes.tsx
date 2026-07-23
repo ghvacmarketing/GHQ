@@ -743,7 +743,7 @@ export default function CrmQuotes() {
                         <div className="flex items-center gap-1.5">
                           {quote.customerName || "—"}
                           {quote.status === "accepted" && (
-                            <span className="inline-block w-2 h-2 rounded-full bg-green-500" title="Accepted" />
+                            <span className="inline-block w-2 h-2 rounded-[2px] bg-green-500" title="Accepted" />
                           )}
                         </div>
                       </TableCell>

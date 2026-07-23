@@ -156,7 +156,7 @@ export default function CrmAnalytics() {
               </div>
 
               {/* Segmented health bar */}
-              <div className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-slate-100">
+              <div className="mt-4 flex h-2.5 overflow-hidden rounded-[2px] bg-slate-100">
                 {SEGMENTS.map((seg) => {
                   const v = (summary as any)[seg.key] as number;
                   const pct = summary.total > 0 ? (v / summary.total) * 100 : 0;
