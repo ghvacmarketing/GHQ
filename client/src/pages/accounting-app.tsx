@@ -209,7 +209,7 @@ export default function AccountingApp() {
         {/* Sidebar — shared CRM-style dark collapsible panel */}
         <AppSidebar
           appKey="acct"
-          header={{ title: "Accounting", subtitle: "Command Center", onHome: () => navigate("/") }}
+          header={{ title: "Accounting", subtitle: "Giesbrecht HVAC", onHome: () => navigate("/") }}
           activeKey={tab}
           onSelect={(k) => {
             if (k === "invoices") { navigate("/crm/invoices"); return; }

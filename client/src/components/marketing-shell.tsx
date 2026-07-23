@@ -55,7 +55,7 @@ export function MarketingChrome({
         {/* Sidebar — shared CRM-style dark collapsible panel with branded header */}
         <AppSidebar
           appKey="mkt"
-          header={{ title: "Marketing", subtitle: "Command Center", onHome: () => navigate("/") }}
+          header={{ title: "Marketing", subtitle: "Giesbrecht HVAC", onHome: () => navigate("/") }}
           activeKey={active}
           onSelect={(k) => {
             const t = MARKETING_TABS.find((x) => x.key === k);

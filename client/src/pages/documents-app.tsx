@@ -620,7 +620,7 @@ export default function DocumentsApp() {
         {/* Sidebar — shared CRM-style dark collapsible panel */}
         <AppSidebar
           appKey="docs"
-          header={{ title: "Documents", subtitle: "Command Center", onHome: () => navigate("/") }}
+          header={{ title: "Documents", subtitle: "Giesbrecht HVAC", onHome: () => navigate("/") }}
           activeKey={searching ? "" : tab}
           onSelect={(k) => switchTab(k as TabKey)}
           groups={[

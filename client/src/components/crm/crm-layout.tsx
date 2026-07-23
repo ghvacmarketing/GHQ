@@ -288,8 +288,8 @@ function SidebarContent({
         {!collapsed && (
           <>
             <div className="min-w-0 flex-1 overflow-hidden leading-tight">
-              <h1 className="truncate whitespace-nowrap text-lg font-bold text-white" data-testid="text-sidebar-title">CRM</h1>
-              <p className="truncate whitespace-nowrap text-[10px] font-medium uppercase tracking-wider text-slate-400">Command Center</p>
+              <h1 className="truncate whitespace-nowrap text-lg font-bold text-white" data-testid="text-sidebar-title">GHQ</h1>
+              <p className="truncate whitespace-nowrap text-[10px] font-medium uppercase tracking-wider text-slate-400">Giesbrecht HVAC</p>
             </div>
             {onToggleCollapse && (
               <button
