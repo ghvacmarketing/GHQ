@@ -54,14 +54,6 @@ const APPS: AppTile[] = [
     roles: ["owner", "admin", "supervisor"],
   },
   {
-    key: "reports",
-    label: "Reports",
-    description: "Company reporting & custom builder",
-    href: "/reports",
-    icon: <BarChart3 className="h-6 w-6" strokeWidth={1.75} />,
-    roles: ["owner", "admin", "supervisor"],
-  },
-  {
     key: "marketing",
     label: "Marketing",
     description: "Campaigns & automations",

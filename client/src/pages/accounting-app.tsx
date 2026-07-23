@@ -10,6 +10,11 @@ import {
 } from "lucide-react";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { AppSidebar } from "@/components/app-sidebar";
+import { ReportsWorkspace } from "@/pages/reports-app";
+import {
+  Briefcase, Landmark, Users2, Route, UserRound, Boxes, Wrench,
+  Megaphone as MegaphoneIcon, Truck, ShieldCheck, Sparkles, Hammer, Save as SaveIcon, FileBarChart,
+} from "lucide-react";
 import { AppTopBar } from "@/components/app-topbar";
 import { AppLoader } from "@/components/app-loader";
 import { useToast } from "@/hooks/use-toast";
@@ -39,7 +44,7 @@ function money(v: unknown): string {
   return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: n % 1 ? 2 : 0 });
 }
 
-type Tab = "dashboard" | "reports" | "expenses" | "accounts";
+type Tab = string;
 
 type Summary = {
   revenueByMonth: { month: string; total: string }[];
@@ -51,6 +56,13 @@ type Summary = {
 type ExpenseRow = {
   id: string; expenseDate: string; vendor: string; accountId: string | null; accountName: string | null;
   amount: string; paymentMethod: string | null; memo: string | null;
+};
+
+const REPORT_CATEGORY_ICONS: Record<string, typeof BarChart3> = {
+  executive: Briefcase, financial: Landmark, revenue: TrendingUp, "ar-ap": Receipt,
+  payroll: Users2, "job-costing": Hammer, dispatch: Route, customer: UserRound,
+  inventory: Boxes, equipment: Wrench, marketing: MegaphoneIcon, fleet: Truck,
+  compliance: ShieldCheck, ai: Sparkles,
 };
 
 const EMPTY_EXPENSE = {
@@ -81,6 +93,12 @@ export default function AccountingApp() {
     if (!authLoading && !currentUser) navigate("/crm/login");
   }, [authLoading, currentUser, navigate]);
   const isAllowed = !!currentUser && ["owner", "admin", "supervisor"].includes(currentUser.role);
+
+  const { data: reportCatalog } = useQuery<{ categories: { key: string; label: string }[] }>({
+    queryKey: ["/api/reporting/catalog"],
+    enabled: isAllowed,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const { data: summary, isLoading: summaryLoading } = useQuery<Summary>({
     queryKey: ["/api/accounting/summary"],
@@ -177,7 +195,7 @@ export default function AccountingApp() {
 
   const NAV: { key: Tab; label: string; icon: typeof LayoutDashboard }[] = [
     { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { key: "reports", label: "Reports", icon: BarChart3 },
+    { key: "reports", label: "Statements", icon: FileBarChart },
     { key: "expenses", label: "Expenses", icon: Receipt },
     { key: "accounts", label: "Chart of Accounts", icon: ListTree },
   ];
@@ -197,7 +215,25 @@ export default function AccountingApp() {
             if (k === "invoices") { navigate("/crm/invoices"); return; }
             setTab(k as Tab);
           }}
-          groups={[{ items: NAV }, { items: [{ key: "invoices", label: "Invoices", icon: ExternalLink }] }]}
+          groups={[
+            { items: NAV },
+            {
+              label: "Reports",
+              items: (reportCatalog?.categories ?? []).map((c) => ({
+                key: c.key,
+                label: c.label,
+                icon: REPORT_CATEGORY_ICONS[c.key] || BarChart3,
+              })),
+            },
+            {
+              label: "Build",
+              items: [
+                { key: "builder", label: "Custom Builder", icon: Hammer },
+                { key: "saved", label: "Saved Reports", icon: SaveIcon },
+              ],
+            },
+            { items: [{ key: "invoices", label: "Invoices", icon: ExternalLink }] },
+          ]}
         />
 
       <div className="flex min-h-0 flex-1 flex-col">
@@ -320,6 +356,8 @@ export default function AccountingApp() {
           )}
 
           {tab === "reports" && <ReportsTab />}
+
+          {!["dashboard", "reports", "expenses", "accounts"].includes(tab) && <ReportsWorkspace nav={tab} />}
 
           {tab === "expenses" && (
             <div className="space-y-3">

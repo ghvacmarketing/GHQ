@@ -41,11 +41,6 @@ export function AppTopBar({ currentUser, center }: { currentUser?: CrmUser | nul
               <Calculator className="mr-2 h-4 w-4 text-slate-500" /> Accounting
             </DropdownMenuItem>
           )}
-          {["owner", "admin", "supervisor"].includes(role) && (
-            <DropdownMenuItem onClick={() => navigate("/reports")} data-testid="app-switch-reports">
-              <BarChart3 className="mr-2 h-4 w-4 text-slate-500" /> Reports
-            </DropdownMenuItem>
-          )}
           {["owner", "admin", "supervisor", "sales"].includes(role) && (
             <DropdownMenuItem onClick={() => navigate("/marketing")} data-testid="app-switch-marketing">
               <Megaphone className="mr-2 h-4 w-4 text-slate-500" /> Marketing

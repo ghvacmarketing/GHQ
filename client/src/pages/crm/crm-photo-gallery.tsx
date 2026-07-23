@@ -319,15 +319,15 @@ export default function CrmPhotoGallery() {
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex min-w-0 shrink-0 items-center gap-3">
-            <div>
+          <div className="min-w-0 shrink-0">
+            <div className="flex items-center gap-2.5">
               <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Media</h1>
-              <p className="mt-0.5 text-sm text-muted-foreground">Photos and files from the field — refreshes automatically.</p>
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-500" data-testid="media-live">
+                <span className="h-2 w-2 animate-pulse rounded-[2px] bg-green-500" />
+                Live
+              </span>
             </div>
-            <span className="flex items-center gap-1.5 rounded-[4px] bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm" data-testid="media-live">
-              <span className="h-2 w-2 animate-pulse rounded-[2px] bg-green-500" />
-              Live
-            </span>
+            <p className="mt-0.5 text-sm text-muted-foreground">Photos and files from the field — refreshes automatically.</p>
           </div>
           <div className="relative mx-auto w-full max-w-md">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />

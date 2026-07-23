@@ -364,8 +364,15 @@ export default function CrmItems() {
   return (
     <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
-        <div className="flex justify-center mb-2">
-          <div className="relative w-full max-w-xl">
+        {/* Title · centered search · actions — one row, like the rest of the CRM */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-0 shrink-0">
+            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground" data-testid="text-items-title">Items</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {itemsLoading ? "Loading…" : `${filteredAndSortedItems.length} item${filteredAndSortedItems.length !== 1 ? "s" : ""}`}
+            </p>
+          </div>
+          <div className="relative mx-auto w-full max-w-xl">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Search by name or description..."
@@ -375,28 +382,21 @@ export default function CrmItems() {
               data-testid="input-search"
             />
           </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={resetFilters} className="text-xs text-muted-foreground" data-testid="button-reset-filters">
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Reset
+              </Button>
+            )}
+            {activeCategory !== "discount" && (
+              <Button size="sm" onClick={() => setShowCreateDialog(true)} data-testid="button-add-item">
+                <Plus className="h-4 w-4 mr-1" />
+                Add Item
+              </Button>
+            )}
+          </div>
         </div>
-
-        <PageHeader
-          title={<span data-testid="text-items-title">Items</span>}
-          description={itemsLoading ? "Loading…" : `${filteredAndSortedItems.length} item${filteredAndSortedItems.length !== 1 ? "s" : ""}`}
-          actions={
-            <>
-              {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={resetFilters} className="text-xs text-muted-foreground" data-testid="button-reset-filters">
-                  <RotateCcw className="h-3 w-3 mr-1" />
-                  Reset
-                </Button>
-              )}
-              {activeCategory !== "discount" && (
-                <Button size="sm" onClick={() => setShowCreateDialog(true)} data-testid="button-add-item">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Item
-                </Button>
-              )}
-            </>
-          }
-        />
 
         <Tabs value={activeCategory} onValueChange={setActiveCategory} className="w-full">
           <TabsList className="mb-1 h-auto flex-wrap overflow-visible">

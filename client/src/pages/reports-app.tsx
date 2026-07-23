@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, startOfMonth, endOfMonth, subMonths, startOfQuarter, startOfYear } from "date-fns";
@@ -7,13 +7,8 @@ import {
   UserRound, Boxes, Wrench, Megaphone, Truck, ShieldCheck, Sparkles, Hammer,
   Printer, Download, Save, Play, Trash2, Pin, PinOff, Share2, Plus, X, Loader2,
 } from "lucide-react";
-import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { usePageTitle } from "@/hooks/use-page-title";
-import { useSmoothLoading } from "@/hooks/use-smooth-loading";
-import { AppSidebar } from "@/components/app-sidebar";
-import { AppTopBar } from "@/components/app-topbar";
-import { AppLoader } from "@/components/app-loader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,7 +19,6 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import type { CrmUser } from "@shared/schema";
 
 // ── Types (mirror server/reporting) ─────────────────────────────────────────
 type FieldMeta = { key: string; label: string; type: string; groupable: boolean; agg: string | null };
@@ -97,32 +91,23 @@ function fmtCell(v: unknown, type: string): string {
   return String(v);
 }
 
-export default function ReportsApp() {
-  usePageTitle("Reports");
-  const [, navigate] = useLocation();
+/** The full reporting experience (catalog browser, viewer, builder, saved) —
+ *  hosted inside the Accounting app's sidebar. `nav` is a category key,
+ *  "builder", or "saved". */
+export function ReportsWorkspace({ nav }: { nav: string }) {
   const { toast } = useToast();
-
-  const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
-    queryKey: ["/api/crm/auth/me"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
-  });
-  const loaderHold = useSmoothLoading(authLoading, 0, 600);
-
-  const isAllowed = !!currentUser && ["owner", "admin", "supervisor"].includes(currentUser.role);
 
   const { data: catalog } = useQuery<{ categories: CatalogCategory[]; sources: SourceMeta[] }>({
     queryKey: ["/api/reporting/catalog"],
-    enabled: isAllowed,
     staleTime: 5 * 60 * 1000,
   });
   const { data: saved = [] } = useQuery<SavedReport[]>({
     queryKey: ["/api/reporting/saved"],
-    enabled: isAllowed,
   });
-
-  const [nav, setNav] = useState<string>("executive"); // category key | "builder" | "saved"
   const [active, setActive] = useState<{ title: string; description?: string; spec: ReportSpec; savedId?: string } | null>(null);
   const [period, setPeriod] = useState<(typeof PERIODS)[number]["key"]>("last-12");
+  const [lastNav, setLastNav] = useState(nav);
+  if (nav !== lastNav) { setLastNav(nav); setActive(null); }
 
   // ── Runner (shared by catalog reports, saved reports, and the builder) ──
   const runSpec = useMemo(() => {
@@ -136,7 +121,7 @@ export default function ReportsApp() {
       const res = await apiRequest("POST", "/api/reporting/run", runSpec);
       return res.json();
     },
-    enabled: !!runSpec && isAllowed,
+    enabled: !!runSpec,
   });
 
   const exportCsv = async () => {
@@ -220,17 +205,6 @@ export default function ReportsApp() {
     };
   };
 
-  if (loaderHold || !currentUser) return <AppLoader />;
-  if (!isAllowed) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#f5f5f7] p-6 text-center">
-        <BarChart3 className="mb-3 h-10 w-10 text-slate-300" />
-        <p className="font-medium text-slate-700">Reports are limited to admins.</p>
-        <Button variant="outline" className="mt-4" onClick={() => navigate("/")}>Back to apps</Button>
-      </div>
-    );
-  }
-
   const categories = catalog?.categories ?? [];
   const activeCategory = categories.find((c) => c.key === nav);
   const numericFields = srcMeta?.fields.filter((f) => f.type === "currency" || f.type === "number") ?? [];
@@ -238,29 +212,7 @@ export default function ReportsApp() {
   const groupedChart = result && (active?.spec.groupBy?.length ?? 0) > 0 && result.columns.length >= 2;
 
   return (
-    <div className="flex h-screen bg-[#f5f5f7]">
-      <AppSidebar
-        appKey="reports"
-        header={{ title: "Reports", subtitle: "Command Center", onHome: () => navigate("/") }}
-        activeKey={nav}
-        onSelect={(k) => { setNav(k); setActive(null); }}
-        groups={[
-          {
-            label: "Browse",
-            items: categories.map((c) => ({ key: c.key, label: c.label, icon: CATEGORY_ICONS[c.key] || BarChart3 })),
-          },
-          {
-            label: "Build",
-            items: [
-              { key: "builder", label: "Custom Builder", icon: Hammer },
-              { key: "saved", label: "Saved Reports", icon: Save },
-            ],
-          },
-        ]}
-      />
-      <div className="flex min-h-0 flex-1 flex-col">
-        <AppTopBar currentUser={currentUser} />
-        <main className="scrollbar-minimal min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">
+    <>
           <div className="mx-auto w-full max-w-5xl space-y-4">
             {/* ── Viewer (active report) ── */}
             {active ? (
@@ -595,8 +547,6 @@ export default function ReportsApp() {
               </div>
             )}
           </div>
-        </main>
-      </div>
 
       {/* Save dialog */}
       <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
@@ -646,6 +596,13 @@ export default function ReportsApp() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
+}
+
+/** Standalone /reports now lives inside Accounting — redirect there. */
+export default function ReportsApp() {
+  const [, navigate] = useLocation();
+  useEffect(() => { navigate("/accounting"); }, [navigate]);
+  return null;
 }
