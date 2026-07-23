@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Camera, Download, ImageIcon, ImagePlus, Loader2, MapPin, Trash2, X } from "lucide-react";
+import { Camera, Download, ImageIcon, ImagePlus, Loader2, MapPin, Search, Trash2, X } from "lucide-react";
 import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +21,11 @@ export default function MobilePhotos() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  // A customer chosen via search (any customer, not just today's jobs). When
+  // set, it overrides the job-based target.
+  const [pickedCustomer, setPickedCustomer] = useState<{ id: string; name: string; phone?: string | null } | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState("");
 
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -56,8 +61,38 @@ export default function MobilePhotos() {
     }),
     [workOrders],
   );
-  const selectedJob = jobs.find((j) => j.id === selectedJobId) || jobs[0] || null;
-  const customerId = selectedJob?.customerId || null;
+  // Job target: an explicit chip, else the first job of the day — unless a
+  // customer was searched, in which case we ignore jobs entirely.
+  const jobFromSelection = selectedJobId ? jobs.find((j) => j.id === selectedJobId) : null;
+  const selectedJob = pickedCustomer ? null : (jobFromSelection || jobs[0] || null);
+  const activeCustomer: { id: string; name: string; phone?: string | null } | null = pickedCustomer
+    ? pickedCustomer
+    : selectedJob?.customerId
+      ? { id: selectedJob.customerId, name: selectedJob.customer?.name || selectedJob.title || "Customer", phone: selectedJob.customer?.phone }
+      : null;
+  const customerId = activeCustomer?.id || null;
+
+  // Search ANY customer to attach photos to (mobile-friendly, tech-accessible).
+  const { data: searchResults = [], isFetching: searching } = useQuery<Array<{ id: string; name: string; phone?: string | null }>>({
+    queryKey: ["/api/mobile/customers", customerSearch],
+    queryFn: async () => {
+      const res = await fetch(`/api/mobile/customers?search=${encodeURIComponent(customerSearch.trim())}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: searchOpen && customerSearch.trim().length >= 2,
+  });
+
+  const chooseCustomer = (c: { id: string; name: string; phone?: string | null }) => {
+    setPickedCustomer({ id: c.id, name: c.name, phone: c.phone ?? null });
+    setSelectedJobId(null);
+    setSearchOpen(false);
+    setCustomerSearch("");
+  };
+  const chooseJob = (jobId: string) => {
+    setSelectedJobId(jobId);
+    setPickedCustomer(null);
+  };
 
   const { data: files, isLoading: filesLoading } = useQuery<CustomerFile[]>({
     queryKey: ["/api/crm/customers", customerId, "files"],
@@ -248,7 +283,7 @@ export default function MobilePhotos() {
 
   // Single-file background upload used by the camera (no global blocking)
   const uploadOne = async (file: File) => {
-    if (!customerId || !selectedJob) throw new Error("no job");
+    if (!customerId) throw new Error("no customer");
     const presignRes = await apiRequest("POST", "/api/uploads/request-url", {
       name: file.name,
       size: file.size,
@@ -257,8 +292,9 @@ export default function MobilePhotos() {
     const { uploadURL, objectPath } = await presignRes.json();
     await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
     const fileUrl = objectPath.startsWith("/objects") ? objectPath : `/objects/${objectPath}`;
+    const namePrefix = !pickedCustomer && selectedJob ? `WO-${selectedJob.workOrderNumber ?? ""} ` : "";
     await apiRequest("POST", `/api/crm/customers/${customerId}/files`, {
-      name: `WO-${selectedJob.workOrderNumber ?? ""} ${file.name}`.trim(),
+      name: `${namePrefix}${file.name}`.trim(),
       url: fileUrl,
       objectPath,
       contentType: file.type,
@@ -268,7 +304,7 @@ export default function MobilePhotos() {
   };
 
   const handleUpload = async (list: FileList | File[] | null) => {
-    if (!list || list.length === 0 || !customerId || !selectedJob) return;
+    if (!list || list.length === 0 || !customerId) return;
     setUploading(true);
     try {
       for (const file of Array.from(list)) {
@@ -281,8 +317,9 @@ export default function MobilePhotos() {
         await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
         // objectPath may already carry the /objects prefix (Neon store mode)
         const fileUrl = objectPath.startsWith("/objects") ? objectPath : `/objects/${objectPath}`;
+        const namePrefix = !pickedCustomer && selectedJob ? `WO-${selectedJob.workOrderNumber ?? ""} ` : "";
         await apiRequest("POST", `/api/crm/customers/${customerId}/files`, {
-          name: `WO-${selectedJob.workOrderNumber ?? ""} ${file.name}`.trim(),
+          name: `${namePrefix}${file.name}`.trim(),
           url: fileUrl,
           objectPath,
           contentType: file.type,
@@ -305,44 +342,70 @@ export default function MobilePhotos() {
       <div className="p-4 space-y-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">Photos</h2>
-          <p className="text-sm text-slate-500">Job site photos — saved to the customer's file record.</p>
+          <p className="text-sm text-slate-500">Attach photos to any customer — search or pick a job.</p>
         </div>
 
-        {/* Job picker */}
-        {jobsLoading ? (
-          <Skeleton className="h-16 rounded-2xl" />
-        ) : jobs.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-400">
-            No jobs today — photos attach to a scheduled job's customer.
+        {/* Active target: the customer photos will be saved to */}
+        {activeCustomer ? (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#711419]/25 bg-[#711419]/[0.06] px-4 py-3" data-testid="photo-target">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#711419]/70">Saving photos to</p>
+              <p className="truncate font-semibold text-slate-900">{activeCustomer.name}</p>
+              {activeCustomer.phone && <p className="truncate text-xs text-slate-500">{activeCustomer.phone}</p>}
+            </div>
+            <button
+              onClick={() => { setCustomerSearch(""); setSearchOpen(true); }}
+              className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 active:scale-95"
+              data-testid="button-change-customer"
+            >
+              Change
+            </button>
           </div>
         ) : (
-          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-            {jobs.map((job) => {
-              const active = selectedJob?.id === job.id;
-              return (
-                <button
-                  key={job.id}
-                  onClick={() => setSelectedJobId(job.id)}
-                  className={`shrink-0 rounded-2xl border px-3.5 py-2 text-left transition-all active:scale-95 ${
-                    active ? "border-[#711419] bg-[#711419] text-white shadow-md" : "border-slate-200 bg-white text-slate-700"
-                  }`}
-                  data-testid={`photo-job-${job.id}`}
-                >
-                  <p className="text-xs font-semibold">
-                    {job.scheduledStart ? format(toLocalTime(job.scheduledStart), "h:mm a") : "Unscheduled"}
-                  </p>
-                  <p className={`flex items-center gap-1 text-[11px] ${active ? "text-white/80" : "text-slate-500"}`}>
-                    <MapPin className="h-3 w-3" />
-                    {job.customer?.name || job.title || "Job"}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
+          <button
+            onClick={() => { setCustomerSearch(""); setSearchOpen(true); }}
+            className="flex w-full items-center gap-2 rounded-2xl border border-dashed border-slate-300 px-4 py-3.5 text-slate-500 active:scale-[0.99]"
+            data-testid="button-search-customer"
+          >
+            <Search className="h-5 w-5" />
+            Search a customer to attach photos
+          </button>
         )}
 
+        {/* Today's jobs — quick shortcuts */}
+        {jobsLoading ? (
+          <Skeleton className="h-14 rounded-2xl" />
+        ) : jobs.length > 0 ? (
+          <div>
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Today's jobs</p>
+            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+              {jobs.map((job) => {
+                const active = !pickedCustomer && selectedJob?.id === job.id;
+                return (
+                  <button
+                    key={job.id}
+                    onClick={() => chooseJob(job.id)}
+                    className={`shrink-0 rounded-2xl border px-3.5 py-2 text-left transition-all active:scale-95 ${
+                      active ? "border-[#711419] bg-[#711419] text-white shadow-md" : "border-slate-200 bg-white text-slate-700"
+                    }`}
+                    data-testid={`photo-job-${job.id}`}
+                  >
+                    <p className="text-xs font-semibold">
+                      {job.scheduledStart ? format(toLocalTime(job.scheduledStart), "h:mm a") : "Unscheduled"}
+                    </p>
+                    <p className={`flex items-center gap-1 text-[11px] ${active ? "text-white/80" : "text-slate-500"}`}>
+                      <MapPin className="h-3 w-3" />
+                      {job.customer?.name || job.title || "Job"}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
         {/* Capture / library */}
-        {selectedJob && (
+        {activeCustomer && (
           <>
             <input
               ref={fileInputRef}
@@ -387,7 +450,7 @@ export default function MobilePhotos() {
           ) : photos.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-10 text-slate-300">
               <ImageIcon className="h-10 w-10" />
-              <p className="text-sm text-slate-400">No photos yet for {selectedJob?.customer?.name || "this customer"}.</p>
+              <p className="text-sm text-slate-400">No photos yet for {activeCustomer?.name || "this customer"}.</p>
             </div>
           ) : (
             <div className="photo-grid-noselect grid grid-cols-3 gap-2" data-testid="photo-grid">
@@ -551,7 +614,7 @@ export default function MobilePhotos() {
               </div>
             )}
             <p className="text-xs font-medium text-white/70">
-              Auto-saves to {selectedJob?.customer?.name || "the customer"}
+              Auto-saves to {activeCustomer?.name || "the customer"}
             </p>
             <button
               onClick={capturePhoto}
@@ -564,6 +627,66 @@ export default function MobilePhotos() {
           </div>
         </div>
       )}
+      {/* Customer search overlay — attach photos to ANY customer */}
+      {searchOpen && (
+        <div className="fixed inset-0 z-[65] flex flex-col bg-white" data-testid="customer-search-overlay">
+          <div
+            className="flex items-center gap-2 border-b border-slate-100 p-3"
+            style={{ paddingTop: "calc(12px + env(safe-area-inset-top))" }}
+          >
+            <button
+              onClick={() => { setSearchOpen(false); setCustomerSearch(""); }}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 active:bg-slate-100"
+              aria-label="Close search"
+              data-testid="button-close-search"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                autoFocus
+                value={customerSearch}
+                onChange={(e) => setCustomerSearch(e.target.value)}
+                placeholder="Search customers by name or phone…"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-[16px] outline-none focus:border-[#711419]/40"
+                data-testid="input-customer-search"
+              />
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {customerSearch.trim().length < 2 ? (
+              <p className="px-4 py-10 text-center text-sm text-slate-400">Type at least 2 characters to search.</p>
+            ) : searching ? (
+              <div className="flex items-center justify-center py-10 text-slate-400">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+            ) : searchResults.length === 0 ? (
+              <p className="px-4 py-10 text-center text-sm text-slate-400">No customers match &ldquo;{customerSearch.trim()}&rdquo;.</p>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {searchResults.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => chooseCustomer(c)}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-50"
+                    data-testid={`search-customer-${c.id}`}
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#711419]/10 text-[13px] font-semibold text-[#711419]">
+                      {(c.name || "?").trim().charAt(0).toUpperCase()}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium text-slate-900">{c.name}</span>
+                      {c.phone && <span className="block truncate text-xs text-slate-500">{c.phone}</span>}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </MobileShell>
   );
 }
