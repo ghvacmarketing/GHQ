@@ -43,6 +43,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { GripVertical, Phone, Calendar, CalendarDays, Play, Pause, RefreshCw, ChevronDown, ChevronRight, Plus, Search, Edit2, Trash2, X, Check, Cloud, Sun, CloudRain, CloudSnow, Wind, AlertTriangle, BarChart3, ClipboardList, Send, MessageSquare } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { CommsSwitcher } from "@/components/crm/comms-switcher";
 import { CommentComposer } from "@/components/crm/comment-composer";
 import { CommentThread } from "@/components/crm/comment-thread";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
@@ -3014,6 +3015,7 @@ export default function CrmPhonePage() {
 
   return (
     <CrmLayout currentUser={currentUser}>
+      <CommsSwitcher active="phone" variant="inline" />
       <CrmPhoneContent />
     </CrmLayout>
   );

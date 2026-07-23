@@ -66,6 +66,7 @@ import type {
 } from "@shared/schema";
 import { format, isSameDay } from "date-fns";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { CommsSwitcher } from "@/components/crm/comms-switcher";
 import { MessagingCustomerPanel } from "@/components/crm/messaging-customer-panel";
 import { cn } from "@/lib/utils";
 
@@ -478,7 +479,9 @@ export default function CrmMessaging() {
   ) : null;
 
   const messagingContent = (
-    <div className="h-full flex overflow-hidden bg-muted/30">
+    <div className="flex h-full flex-col overflow-hidden">
+      <CommsSwitcher active="messages" />
+    <div className="min-h-0 flex-1 flex overflow-hidden bg-muted/30">
       {/* ───────────── Conversation list ───────────── */}
       <div
         className={cn(
@@ -897,6 +900,7 @@ export default function CrmMessaging() {
           <div className="h-full w-80 xl:w-96">{contextPanel}</div>
         </div>
       )}
+    </div>
     </div>
   );
 

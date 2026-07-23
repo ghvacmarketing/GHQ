@@ -38,9 +38,7 @@ import {
   Megaphone,
   Package,
   BookOpen,
-  Phone,
-  MessageSquare,
-  Mail,
+  Headset,
   Bell,
   Camera,
   ListTodo,
@@ -80,6 +78,8 @@ type NavItem = {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   badgeCount?: number;
+  /** Extra path prefixes that light this item up (e.g. the Comms console spans phone/messaging/mail). */
+  activePaths?: string[];
 };
 
 type NavSection = {
@@ -93,9 +93,12 @@ const navSections: NavSection[] = [
     items: [
       { label: "Dashboard", href: "/crm/dashboard", icon: LayoutDashboard },
       { label: "Dispatch Board", href: "/crm/dispatch", icon: CalendarClock },
-      { label: "Phone", href: "/crm/phone", icon: Phone },
-      { label: "Messaging", href: "/crm/messaging", icon: MessageSquare },
-      { label: "Mail", href: "/crm/mail", icon: Mail },
+      {
+        label: "Comms",
+        href: "/crm/messaging",
+        icon: Headset,
+        activePaths: ["/crm/phone", "/crm/messaging", "/crm/mail"],
+      },
       { label: "Notifications", href: "/crm/notifications", icon: Bell },
     ],
   },
@@ -203,6 +206,22 @@ function SidebarContent({
     if (el) el.scrollTop = navScrollPos;
   }, []);
 
+  // Collapsed nav sections persist across sessions (click a section title to toggle)
+  const [collapsedSections, setCollapsedSections] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("crmNavCollapsedSections") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const toggleSection = (title: string) => {
+    setCollapsedSections((prev) => {
+      const next = prev.includes(title) ? prev.filter((t) => t !== title) : [...prev, title];
+      localStorage.setItem("crmNavCollapsedSections", JSON.stringify(next));
+      return next;
+    });
+  };
+
   const { data: unreadData } = useQuery<{ unreadCount: number }>({
     queryKey: ["/api/crm/messaging/unread-count"],
     refetchInterval: 30000,
@@ -289,37 +308,63 @@ function SidebarContent({
         onScroll={(e) => { navScrollPos = e.currentTarget.scrollTop; }}
         className={cn("flex-1 overflow-y-auto scrollbar-hide py-4", collapsed ? "px-2" : "px-3")}
       >
-        <div className={collapsed ? "space-y-2" : "space-y-6"}>
-          {navSections.map((section, idx) => (
-            <div key={section.title}>
-              {collapsed ? (
-                idx > 0 ? <div className="mx-2 mb-2 border-t border-slate-700/40" /> : null
-              ) : (
-                <p className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  {section.title}
-                </p>
-              )}
-              <div className="space-y-1">
-                {section.items.map((item) => {
-                  let itemWithBadge = item;
-                  if (item.label === "Messaging" && unreadData?.unreadCount) {
-                    itemWithBadge = { ...item, badgeCount: unreadData.unreadCount };
-                  } else if (item.label === "Notifications" && notificationCount?.count && notificationCount.count > 0) {
-                    itemWithBadge = { ...item, badgeCount: notificationCount.count };
-                  }
-                  return (
-                    <NavItemComponent
-                      key={item.href}
-                      item={itemWithBadge}
-                      isActive={isActive(item.href)}
-                      onClick={onItemClick}
-                      collapsed={collapsed}
+        <div className={collapsed ? "space-y-2" : "space-y-4"}>
+          {navSections.map((section, idx) => {
+            const sectionCollapsed = !collapsed && collapsedSections.includes(section.title);
+            const sectionHasActive = section.items.some(
+              (item) => isActive(item.href) || (item.activePaths ?? []).some((p) => location.startsWith(p)),
+            );
+            return (
+              <div key={section.title}>
+                {collapsed ? (
+                  idx > 0 ? <div className="mx-2 mb-2 border-t border-slate-700/40" /> : null
+                ) : (
+                  <button
+                    onClick={() => toggleSection(section.title)}
+                    className="group mb-1 flex w-full items-center gap-1 rounded px-3 py-1 text-xs font-semibold uppercase tracking-wider text-slate-500 transition-colors hover:text-slate-300"
+                    data-testid={`section-toggle-${section.title.toLowerCase()}`}
+                  >
+                    <span>{section.title}</span>
+                    {sectionCollapsed && sectionHasActive && (
+                      <span className="h-1.5 w-1.5 rounded-[1px] bg-[#e8704f]" />
+                    )}
+                    <ChevronRight
+                      className={cn(
+                        "ml-auto h-3 w-3 text-slate-600 transition-transform duration-200 group-hover:text-slate-400",
+                        !sectionCollapsed && "rotate-90",
+                      )}
                     />
-                  );
-                })}
+                  </button>
+                )}
+                <div
+                  className="grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+                  style={{ gridTemplateRows: sectionCollapsed ? "0fr" : "1fr" }}
+                >
+                  <div className="overflow-hidden">
+                    <div className="space-y-1">
+                      {section.items.map((item) => {
+                        let itemWithBadge = item;
+                        if (item.label === "Comms" && unreadData?.unreadCount) {
+                          itemWithBadge = { ...item, badgeCount: unreadData.unreadCount };
+                        } else if (item.label === "Notifications" && notificationCount?.count && notificationCount.count > 0) {
+                          itemWithBadge = { ...item, badgeCount: notificationCount.count };
+                        }
+                        return (
+                          <NavItemComponent
+                            key={item.href}
+                            item={itemWithBadge}
+                            isActive={isActive(item.href) || (item.activePaths ?? []).some((p) => location.startsWith(p))}
+                            onClick={onItemClick}
+                            collapsed={collapsed}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

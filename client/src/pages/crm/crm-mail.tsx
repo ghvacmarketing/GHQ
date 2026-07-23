@@ -4,6 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { CommsSwitcher } from "@/components/crm/comms-switcher";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -409,7 +410,9 @@ export default function CrmMail() {
 
   return (
     <CrmLayout currentUser={currentUser} flush disableScroll hideGlobalSearch>
-      <div className="flex h-full min-h-0 bg-slate-50">
+      <div className="flex h-full min-h-0 flex-col">
+      <CommsSwitcher active="mail" />
+      <div className="flex min-h-0 flex-1 bg-slate-50">
         {/* Left: folders + thread list */}
         <div
           className={`${selectedId ? "hidden lg:flex" : "flex"} w-full shrink-0 flex-col border-r border-slate-200/80 bg-white lg:w-[400px]`}
@@ -765,6 +768,7 @@ export default function CrmMail() {
             </>
           )}
         </div>
+      </div>
       </div>
 
       <ComposeDialog
