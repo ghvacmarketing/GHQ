@@ -3904,10 +3904,26 @@ export const docFolders = pgTable("doc_folders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   parentId: varchar("parent_id"), // null = root ("Company Drive")
+  category: text("category"), // set = protected root folder backing a Documents category tab
   createdBy: varchar("created_by"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+/** Category tabs in the Documents app; each is backed by a protected root folder. */
+export const DOC_CATEGORIES = [
+  { key: "sops", label: "SOPs" },
+  { key: "policies", label: "Policies" },
+  { key: "training", label: "Training" },
+  { key: "templates", label: "Templates" },
+  { key: "hr", label: "HR Documents" },
+  { key: "sales", label: "Sales Documents" },
+  { key: "safety", label: "Safety" },
+  { key: "system", label: "System Management" },
+  { key: "vendor", label: "Vendor Documents" },
+  { key: "subcontractor", label: "Subcontractor Documents" },
+] as const;
+export type DocCategoryKey = typeof DOC_CATEGORIES[number]["key"];
 
 export const docFiles = pgTable("doc_files", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

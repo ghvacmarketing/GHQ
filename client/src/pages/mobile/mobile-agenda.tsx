@@ -279,7 +279,7 @@ function ProfileHeader({ user }: { user: CrmUser }) {
         >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+            <span className="absolute right-1.5 top-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-[3px] bg-[#711419] px-1 text-[9px] font-semibold leading-none text-white tabular-nums">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}

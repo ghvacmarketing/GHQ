@@ -8,6 +8,7 @@ import {
   acctExpenses,
   crmInvoices,
   crmPayments,
+  DOC_CATEGORIES,
 } from "@shared/schema";
 import { requireCrmAuth, requireCrmAdmin, getCurrentCrmUser } from "./crm-auth";
 
@@ -22,6 +23,48 @@ export function registerDocsAndAccountingRoutes(app: Express): void {
     } catch (e) {
       console.error("docs/folders", e);
       res.status(500).json({ message: "Failed to load folders" });
+    }
+  });
+
+  // Each Documents category tab is backed by a protected root folder; ensure
+  // they all exist and return { categoryKey: folderId }.
+  app.get("/api/docs/category-roots", requireCrmAuth, async (_req: Request, res: Response) => {
+    try {
+      const existing = await db.select().from(docFolders).where(sql`${docFolders.category} IS NOT NULL`);
+      const map: Record<string, string> = {};
+      for (const c of DOC_CATEGORIES) {
+        let folder = existing.find((f) => f.category === c.key);
+        if (!folder) {
+          [folder] = await db.insert(docFolders).values({ name: c.label, category: c.key }).returning();
+        }
+        map[c.key] = folder.id;
+      }
+      res.json(map);
+    } catch (e) {
+      console.error("docs/category-roots", e);
+      res.status(500).json({ message: "Failed to load category folders" });
+    }
+  });
+
+  app.get("/api/docs/stats", requireCrmAuth, async (_req: Request, res: Response) => {
+    try {
+      const [fileRow] = await db
+        .select({
+          files: sql<number>`count(*) filter (where ${docFiles.trashedAt} is null)`,
+          archived: sql<number>`count(*) filter (where ${docFiles.trashedAt} is not null)`,
+          totalSize: sql<number>`coalesce(sum(${docFiles.size}) filter (where ${docFiles.trashedAt} is null), 0)`,
+        })
+        .from(docFiles);
+      const [folderRow] = await db.select({ folders: sql<number>`count(*)` }).from(docFolders);
+      res.json({
+        files: Number(fileRow?.files ?? 0),
+        archived: Number(fileRow?.archived ?? 0),
+        totalSize: Number(fileRow?.totalSize ?? 0),
+        folders: Number(folderRow?.folders ?? 0),
+      });
+    } catch (e) {
+      console.error("docs/stats", e);
+      res.status(500).json({ message: "Failed to load stats" });
     }
   });
 
@@ -43,6 +86,9 @@ export function registerDocsAndAccountingRoutes(app: Express): void {
 
   app.patch("/api/docs/folders/:id", requireCrmAuth, async (req: Request, res: Response) => {
     try {
+      const [existing] = await db.select().from(docFolders).where(eq(docFolders.id, req.params.id));
+      if (!existing) return res.status(404).json({ message: "Folder not found" });
+      if (existing.category) return res.status(400).json({ message: "Category folders can't be renamed or moved" });
       const { name, parentId } = req.body as { name?: string; parentId?: string | null };
       const set: Record<string, unknown> = { updatedAt: new Date() };
       if (name !== undefined) {
@@ -64,6 +110,9 @@ export function registerDocsAndAccountingRoutes(app: Express): void {
 
   app.delete("/api/docs/folders/:id", requireCrmAuth, async (req: Request, res: Response) => {
     try {
+      const [target] = await db.select().from(docFolders).where(eq(docFolders.id, req.params.id));
+      if (!target) return res.status(404).json({ message: "Folder not found" });
+      if (target.category) return res.status(400).json({ message: "Category folders can't be deleted" });
       const [child] = await db.select({ id: docFolders.id }).from(docFolders).where(eq(docFolders.parentId, req.params.id)).limit(1);
       if (child) return res.status(400).json({ message: "Folder has subfolders — move or delete them first" });
       const [file] = await db

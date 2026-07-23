@@ -4,9 +4,11 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   FolderOpen, Folder, FolderPlus, Upload, Search, Star, Trash2, ChevronRight,
-  MoreHorizontal, Download, Pencil, FolderInput, RotateCcw, X, Loader2, Grid3X3,
-  FileText, FileSpreadsheet, FileImage, FileArchive, FileAudio, FileVideo, File as FileIcon,
-  ArrowLeft, HardDrive,
+  ChevronDown, MoreHorizontal, Download, Pencil, FolderInput, RotateCcw, X,
+  Loader2, Grid3X3, FileText, FileSpreadsheet, FileImage, FileArchive,
+  FileAudio, FileVideo, File as FileIcon, ArrowLeft, HardDrive, FolderTree,
+  BookOpen, Scale, GraduationCap, LayoutTemplate, Users, BadgeDollarSign,
+  HardHat, Server, Truck, Handshake, Archive, Settings, LayoutGrid, List,
 } from "lucide-react";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -23,15 +25,15 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import type { CrmUser, DocFolder, DocFile } from "@shared/schema";
-
-const MAROON = "#711419";
+import type { CrmUser, DocFolder, DocFile, DocCategoryKey } from "@shared/schema";
+import { DOC_CATEGORIES } from "@shared/schema";
 
 function prettySize(bytes: number | null): string {
   if (!bytes) return "";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
 function fileVisual(name: string, mime?: string | null): { Icon: typeof FileText; color: string } {
@@ -48,15 +50,44 @@ function fileVisual(name: string, mime?: string | null): { Icon: typeof FileText
   return { Icon: FileIcon, color: "text-slate-400" };
 }
 
-type ViewKey = "drive" | "starred" | "trash";
+const CATEGORY_ICONS: Record<DocCategoryKey, typeof BookOpen> = {
+  sops: BookOpen,
+  policies: Scale,
+  training: GraduationCap,
+  templates: LayoutTemplate,
+  hr: Users,
+  sales: BadgeDollarSign,
+  safety: HardHat,
+  system: Server,
+  vendor: Truck,
+  subcontractor: Handshake,
+};
+
+type TabKey = "drive" | "library" | DocCategoryKey | "archived" | "settings";
+type ViewMode = "card" | "list";
+
+const CATEGORY_KEYS = DOC_CATEGORIES.map((c) => c.key) as string[];
+const isCategoryTab = (t: TabKey): t is DocCategoryKey => CATEGORY_KEYS.includes(t);
+const tabLabel = (t: TabKey): string => {
+  if (t === "drive") return "Drive";
+  if (t === "library") return "Library";
+  if (t === "archived") return "Archived";
+  if (t === "settings") return "Settings";
+  return DOC_CATEGORIES.find((c) => c.key === t)?.label ?? t;
+};
 
 export default function DocumentsApp() {
   usePageTitle("Documents");
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
-  const [view, setView] = useState<ViewKey>("drive");
-  const [folderId, setFolderId] = useState<string | null>(null);
+  const [tab, setTab] = useState<TabKey>("drive");
+  const [browseId, setBrowseId] = useState<string | null>(null); // null = current tab's root
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    (localStorage.getItem("docsViewMode") as ViewMode) || "card",
+  );
+  const [starOnly, setStarOnly] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -68,6 +99,11 @@ export default function DocumentsApp() {
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [dragOver, setDragOver] = useState(false);
+
+  const setMode = (m: ViewMode) => { setViewMode(m); localStorage.setItem("docsViewMode", m); };
+  const switchTab = (t: TabKey) => {
+    setTab(t); setBrowseId(null); setStarOnly(false); setSearch(""); setSearchInput("");
+  };
 
   const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -81,13 +117,24 @@ export default function DocumentsApp() {
     queryKey: ["/api/docs/folders"],
     enabled: !!currentUser,
   });
+  const { data: categoryRoots } = useQuery<Record<string, string>>({
+    queryKey: ["/api/docs/category-roots"],
+    enabled: !!currentUser,
+  });
+
+  const isBrowse = tab === "drive" || tab === "library" || isCategoryTab(tab);
+  const rootId = isCategoryTab(tab) ? categoryRoots?.[tab] ?? null : null;
+  const rootReady = !isCategoryTab(tab) || !!rootId;
+  const folderId = browseId ?? rootId; // effective current folder (null = drive root)
 
   const searching = search.trim().length > 0;
   const filesUrl = searching
     ? `/api/docs/files?view=search&q=${encodeURIComponent(search.trim())}`
-    : view === "drive"
-      ? `/api/docs/files?view=folder${folderId ? `&folderId=${folderId}` : ""}`
-      : `/api/docs/files?view=${view}`;
+    : tab === "archived"
+      ? "/api/docs/files?view=trash"
+      : starOnly && tab === "drive"
+        ? "/api/docs/files?view=starred"
+        : `/api/docs/files?view=folder${folderId ? `&folderId=${folderId}` : ""}`;
   const { data: files = [], isLoading: filesLoading } = useQuery<DocFile[]>({
     queryKey: ["/api/docs/files", filesUrl],
     queryFn: async () => {
@@ -95,23 +142,48 @@ export default function DocumentsApp() {
       if (!res.ok) throw new Error("Failed to load files");
       return res.json();
     },
-    enabled: !!currentUser,
+    enabled: !!currentUser && (tab !== "settings") && rootReady,
   });
 
-  const childFolders = useMemo(
-    () => (searching || view !== "drive" ? [] : folders.filter((f) => (f.parentId || null) === folderId)),
-    [folders, folderId, view, searching],
-  );
+  const foldersByParent = useMemo(() => {
+    const map = new Map<string | null, DocFolder[]>();
+    for (const f of folders) {
+      const key = f.parentId || null;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(f);
+    }
+    return map;
+  }, [folders]);
 
+  const childFolders = useMemo(() => {
+    if (!isBrowse || searching || starOnly) return [];
+    const kids = foldersByParent.get(folderId ?? null) ?? [];
+    // Category roots only surface in Library and their own tabs, not the Drive root
+    if (tab === "drive" && !folderId) return kids.filter((f) => !f.category);
+    return kids;
+  }, [foldersByParent, folderId, tab, isBrowse, searching, starOnly]);
+
+  // Chain from the current folder up to (but excluding) the tab's root folder
   const breadcrumbs = useMemo(() => {
     const chain: DocFolder[] = [];
     let cur = folderId ? folders.find((f) => f.id === folderId) : undefined;
-    while (cur) {
+    while (cur && cur.id !== rootId) {
       chain.unshift(cur);
       cur = cur.parentId ? folders.find((f) => f.id === cur!.parentId) : undefined;
     }
     return chain;
-  }, [folders, folderId]);
+  }, [folders, folderId, rootId]);
+
+  const folderPath = (f: DocFolder): string => {
+    const names: string[] = [f.name];
+    let cur = f.parentId ? folders.find((x) => x.id === f.parentId) : undefined;
+    let guard = 0;
+    while (cur && guard++ < 20) {
+      names.unshift(cur.name);
+      cur = cur.parentId ? folders.find((x) => x.id === cur!.parentId) : undefined;
+    }
+    return names.join(" / ");
+  };
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/docs/files"] });
@@ -196,14 +268,249 @@ export default function DocumentsApp() {
     );
   }
 
-  const NAV: { key: ViewKey; label: string; icon: React.ReactNode }[] = [
-    { key: "drive", label: "Drive", icon: <HardDrive className="h-4 w-4" /> },
-    { key: "starred", label: "Starred", icon: <Star className="h-4 w-4" /> },
-    { key: "trash", label: "Trash", icon: <Trash2 className="h-4 w-4" /> },
-  ];
-
   const isImage = (f: DocFile) => (f.contentType || "").startsWith("image/");
   const isPdf = (f: DocFile) => f.contentType === "application/pdf";
+  const canUpload = isBrowse && !searching && !starOnly && rootReady;
+
+  const openFolder = (id: string | null) => { setBrowseId(id); setStarOnly(false); };
+
+  const fileMenu = (f: DocFile) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="rounded p-1 text-slate-400 opacity-0 hover:bg-slate-100 hover:text-slate-700 group-hover:opacity-100" data-testid={`file-menu-${f.id}`}>
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {tab === "archived" ? (
+          <>
+            <DropdownMenuItem onClick={() => patchFile.mutate({ id: f.id, trashed: false })}>
+              <RotateCcw className="mr-2 h-4 w-4" /> Restore
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => deleteFileForever.mutate(f.id)}>
+              <Trash2 className="mr-2 h-4 w-4" /> Delete forever
+            </DropdownMenuItem>
+          </>
+        ) : (
+          <>
+            <DropdownMenuItem onClick={() => download(f)}>
+              <Download className="mr-2 h-4 w-4" /> Download
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setRenameTarget({ kind: "file", id: f.id, name: f.name })}>
+              <Pencil className="mr-2 h-4 w-4" /> Rename
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => { setMoveTarget(f); setMoveDest(f.folderId || "root"); }}>
+              <FolderInput className="mr-2 h-4 w-4" /> Move
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => patchFile.mutate({ id: f.id, starred: !f.starred })}>
+              <Star className="mr-2 h-4 w-4" /> {f.starred ? "Unstar" : "Star"}
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => patchFile.mutate({ id: f.id, trashed: true })}>
+              <Archive className="mr-2 h-4 w-4" /> Archive
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const folderMenu = (f: DocFolder) =>
+    f.category ? null : (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="rounded p-1 text-slate-400 opacity-0 hover:bg-slate-100 hover:text-slate-700 group-hover:opacity-100" data-testid={`folder-menu-${f.id}`}>
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => setRenameTarget({ kind: "folder", id: f.id, name: f.name })}>
+            <Pencil className="mr-2 h-4 w-4" /> Rename
+          </DropdownMenuItem>
+          <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => deleteFolder.mutate(f.id)}>
+            <Trash2 className="mr-2 h-4 w-4" /> Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+
+  const contentArea = (
+    <>
+      {/* Breadcrumbs + view controls */}
+      {isBrowse && !searching && (
+        <div className="mb-3 flex flex-wrap items-center gap-1 text-sm">
+          {!starOnly && (
+            <>
+              <button
+                onClick={() => openFolder(null)}
+                className={`rounded px-1.5 py-0.5 ${breadcrumbs.length ? "text-slate-500 hover:bg-slate-100" : "font-semibold text-slate-900"}`}
+                data-testid="crumb-root"
+              >
+                {tabLabel(tab)}
+              </button>
+              {breadcrumbs.map((b, i) => (
+                <span key={b.id} className="flex items-center gap-1">
+                  <ChevronRight className="h-3.5 w-3.5 text-slate-300" />
+                  <button
+                    onClick={() => openFolder(b.id)}
+                    className={`rounded px-1.5 py-0.5 ${i === breadcrumbs.length - 1 ? "font-semibold text-slate-900" : "text-slate-500 hover:bg-slate-100"}`}
+                  >
+                    {b.name}
+                  </button>
+                </span>
+              ))}
+            </>
+          )}
+          {starOnly && <span className="px-1.5 font-semibold text-slate-900">Starred — all folders</span>}
+          <div className="ml-auto flex items-center gap-1">
+            {tab === "drive" && (
+              <button
+                onClick={() => setStarOnly((v) => !v)}
+                className={`flex h-7 items-center gap-1 rounded-[4px] border px-2 text-xs font-medium ${
+                  starOnly ? "border-amber-400 bg-amber-50 text-amber-600" : "border-slate-300/70 bg-white text-slate-500 hover:text-slate-800"
+                }`}
+                data-testid="toggle-starred"
+              >
+                <Star className={`h-3.5 w-3.5 ${starOnly ? "fill-amber-400 text-amber-400" : ""}`} /> Starred
+              </button>
+            )}
+            <div className="flex overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+              <button
+                onClick={() => setMode("card")}
+                className={`flex h-7 w-8 items-center justify-center ${viewMode === "card" ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-800"}`}
+                title="Card view"
+                data-testid="view-card"
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => setMode("list")}
+                className={`flex h-7 w-8 items-center justify-center ${viewMode === "list" ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-800"}`}
+                title="List view"
+                data-testid="view-list"
+              >
+                <List className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {searching && <p className="mb-3 text-sm text-slate-500">Results for “{search.trim()}”</p>}
+      {tab === "archived" && !searching && (
+        <p className="mb-3 text-sm text-slate-500">Archived files can be restored or deleted forever.</p>
+      )}
+
+      {/* Empty state */}
+      {!filesLoading && files.length === 0 && childFolders.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-[4px] border border-dashed border-slate-300 py-20 text-center">
+          <Grid3X3 className="mb-3 h-10 w-10 text-slate-300" />
+          <p className="text-sm font-medium text-slate-600">
+            {tab === "archived" ? "Nothing archived" : starOnly ? "Nothing starred yet" : searching ? "No results" : "This folder is empty"}
+          </p>
+          {canUpload && <p className="mt-1 text-xs text-slate-400">Drag files here or use Upload.</p>}
+        </div>
+      ) : filesLoading ? (
+        viewMode === "card" ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-40 rounded-[4px]" />)}
+          </div>
+        ) : (
+          <div className="space-y-1.5">{[...Array(8)].map((_, i) => <Skeleton key={i} className="h-10 rounded-[4px]" />)}</div>
+        )
+      ) : viewMode === "card" ? (
+        <>
+          {childFolders.length > 0 && (
+            <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {childFolders.map((f) => {
+                const CatIcon = f.category ? CATEGORY_ICONS[f.category as DocCategoryKey] : null;
+                return (
+                  <div key={f.id} className="group flex items-center gap-2.5 rounded-[4px] border border-slate-300/70 bg-white px-3 py-2.5 transition-colors hover:border-slate-900" data-testid={`folder-${f.id}`}>
+                    <button onClick={() => openFolder(f.id)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
+                      {CatIcon
+                        ? <CatIcon className="h-5 w-5 shrink-0 text-[#711419]" strokeWidth={1.75} />
+                        : <Folder className="h-5 w-5 shrink-0 fill-sky-100 text-sky-500" />}
+                      <span className="truncate text-sm font-medium text-slate-800">{f.name}</span>
+                    </button>
+                    {folderMenu(f)}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {files.map((f) => {
+              const { Icon, color } = fileVisual(f.name, f.contentType);
+              return (
+                <div key={f.id} className="group overflow-hidden rounded-[4px] border border-slate-300/70 bg-white transition-colors hover:border-slate-900" data-testid={`file-${f.id}`}>
+                  <button
+                    onClick={() => (isImage(f) || isPdf(f) ? setPreview(f) : download(f))}
+                    className="flex h-28 w-full items-center justify-center overflow-hidden bg-slate-50"
+                  >
+                    {isImage(f) ? (
+                      <img src={f.url} alt={f.name} loading="lazy" className="h-full w-full object-cover" />
+                    ) : (
+                      <Icon className={`h-10 w-10 ${color}`} strokeWidth={1.5} />
+                    )}
+                  </button>
+                  <div className="flex items-center gap-1.5 px-2.5 py-2">
+                    <Icon className={`h-4 w-4 shrink-0 ${color}`} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-medium text-slate-800" title={f.name}>{f.name}</p>
+                      <p className="truncate text-[11px] text-slate-400">
+                        {prettySize(f.size)}{f.updatedAt ? ` · ${format(new Date(f.updatedAt), "MMM d")}` : ""}
+                      </p>
+                    </div>
+                    {f.starred && tab !== "archived" && <Star className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" />}
+                    {fileMenu(f)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        /* List view — folders then files as rows */
+        <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+          <div className="grid grid-cols-[1fr_90px_110px_60px] items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            <span>Name</span><span>Size</span><span>Modified</span><span />
+          </div>
+          {childFolders.map((f) => {
+            const CatIcon = f.category ? CATEGORY_ICONS[f.category as DocCategoryKey] : null;
+            return (
+              <div key={f.id} className="group grid grid-cols-[1fr_90px_110px_60px] items-center gap-2 border-b border-slate-100 px-3 py-2 last:border-0 hover:bg-slate-50" data-testid={`folder-row-${f.id}`}>
+                <button onClick={() => openFolder(f.id)} className="flex min-w-0 items-center gap-2.5 text-left">
+                  {CatIcon
+                    ? <CatIcon className="h-4 w-4 shrink-0 text-[#711419]" strokeWidth={1.75} />
+                    : <Folder className="h-4 w-4 shrink-0 fill-sky-100 text-sky-500" />}
+                  <span className="truncate text-sm font-medium text-slate-800">{f.name}</span>
+                </button>
+                <span className="text-xs text-slate-400">—</span>
+                <span className="text-xs text-slate-400">{f.updatedAt ? format(new Date(f.updatedAt), "MMM d, yyyy") : ""}</span>
+                <span className="flex justify-end">{folderMenu(f)}</span>
+              </div>
+            );
+          })}
+          {files.map((f) => {
+            const { Icon, color } = fileVisual(f.name, f.contentType);
+            return (
+              <div key={f.id} className="group grid grid-cols-[1fr_90px_110px_60px] items-center gap-2 border-b border-slate-100 px-3 py-2 last:border-0 hover:bg-slate-50" data-testid={`file-row-${f.id}`}>
+                <button
+                  onClick={() => (isImage(f) || isPdf(f) ? setPreview(f) : download(f))}
+                  className="flex min-w-0 items-center gap-2.5 text-left"
+                >
+                  <Icon className={`h-4 w-4 shrink-0 ${color}`} />
+                  <span className="truncate text-sm text-slate-800" title={f.name}>{f.name}</span>
+                  {f.starred && tab !== "archived" && <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-400" />}
+                </button>
+                <span className="text-xs text-slate-500">{prettySize(f.size) || "—"}</span>
+                <span className="text-xs text-slate-500">{f.updatedAt ? format(new Date(f.updatedAt), "MMM d, yyyy") : ""}</span>
+                <span className="flex justify-end">{fileMenu(f)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
 
   return (
     <div className="flex h-screen flex-col bg-[#f5f5f7]">
@@ -248,7 +555,7 @@ export default function DocumentsApp() {
           variant="outline"
           className="h-9 rounded-lg"
           onClick={() => { setNewFolderName(""); setNewFolderOpen(true); }}
-          disabled={view !== "drive" || searching}
+          disabled={!canUpload}
           data-testid="button-new-folder"
         >
           <FolderPlus className="mr-1.5 h-4 w-4" /> Folder
@@ -257,7 +564,7 @@ export default function DocumentsApp() {
           size="sm"
           className="h-9 rounded-lg bg-[#711419] hover:bg-[#8a1a1f]"
           onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
+          disabled={uploading || !canUpload}
           data-testid="button-upload"
         >
           {uploading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Upload className="mr-1.5 h-4 w-4" />}
@@ -267,168 +574,85 @@ export default function DocumentsApp() {
 
       <div className="flex min-h-0 flex-1">
         {/* Sidebar */}
-        <aside className="hidden w-52 shrink-0 flex-col gap-0.5 border-r border-black/[0.06] bg-white/60 p-3 sm:flex">
-          {NAV.map((n) => (
-            <button
-              key={n.key}
-              onClick={() => { setView(n.key); setFolderId(null); setSearch(""); setSearchInput(""); }}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                view === n.key && !searching ? "bg-[#711419]/10 text-[#711419]" : "text-slate-600 hover:bg-slate-100"
-              }`}
-              data-testid={`docs-nav-${n.key}`}
-            >
-              {n.icon}
-              {n.label}
-            </button>
-          ))}
+        <aside className="hidden w-56 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-black/[0.06] bg-white/60 p-3 sm:flex">
+          <SideItem active={tab === "drive" && !searching} icon={<HardDrive className="h-4 w-4" />} label="Drive" onClick={() => switchTab("drive")} testid="docs-nav-drive" />
+          <SideItem active={tab === "library" && !searching} icon={<FolderTree className="h-4 w-4" />} label="Library" onClick={() => switchTab("library")} testid="docs-nav-library" />
+          <p className="mb-1 mt-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Categories</p>
+          {DOC_CATEGORIES.map((c) => {
+            const Icon = CATEGORY_ICONS[c.key];
+            return (
+              <SideItem
+                key={c.key}
+                active={tab === c.key && !searching}
+                icon={<Icon className="h-4 w-4" strokeWidth={1.75} />}
+                label={c.label}
+                onClick={() => switchTab(c.key)}
+                testid={`docs-nav-${c.key}`}
+              />
+            );
+          })}
+          <div className="my-2 border-t border-slate-200" />
+          <SideItem active={tab === "archived" && !searching} icon={<Archive className="h-4 w-4" />} label="Archived" onClick={() => switchTab("archived")} testid="docs-nav-archived" />
+          <SideItem active={tab === "settings" && !searching} icon={<Settings className="h-4 w-4" />} label="Settings" onClick={() => switchTab("settings")} testid="docs-nav-settings" />
         </aside>
+
+        {/* Library folder tree */}
+        {tab === "library" && !searching && (
+          <div className="hidden w-60 shrink-0 overflow-y-auto border-r border-black/[0.06] bg-white/40 p-2 md:block" data-testid="library-tree">
+            <button
+              onClick={() => openFolder(null)}
+              className={`flex w-full items-center gap-2 rounded-[4px] px-2 py-1.5 text-sm ${
+                folderId === null ? "bg-[#711419]/10 font-semibold text-[#711419]" : "text-slate-700 hover:bg-slate-100"
+              }`}
+              data-testid="tree-root"
+            >
+              <HardDrive className="h-4 w-4 shrink-0 text-slate-400" /> Drive
+            </button>
+            {(foldersByParent.get(null) ?? []).map((f) => (
+              <TreeNode
+                key={f.id}
+                folder={f}
+                depth={0}
+                selectedId={folderId}
+                onSelect={(id) => openFolder(id)}
+                foldersByParent={foldersByParent}
+                expanded={expanded}
+                onToggle={(id) =>
+                  setExpanded((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(id)) next.delete(id); else next.add(id);
+                    return next;
+                  })
+                }
+              />
+            ))}
+          </div>
+        )}
 
         {/* Main */}
         <main
           className={`min-h-0 flex-1 overflow-y-auto p-4 ${dragOver ? "bg-sky-50" : ""}`}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => { e.preventDefault(); setDragOver(false); if (view === "drive" && !searching) uploadFiles(e.dataTransfer.files); }}
+          onDrop={(e) => { e.preventDefault(); setDragOver(false); if (canUpload) uploadFiles(e.dataTransfer.files); }}
           data-testid="docs-main"
         >
-          {/* Breadcrumbs */}
-          {view === "drive" && !searching && (
-            <div className="mb-3 flex flex-wrap items-center gap-1 text-sm">
+          {/* Mobile tab strip */}
+          <div className="-mx-1 mb-3 flex gap-1 overflow-x-auto px-1 pb-1 sm:hidden">
+            {(["drive", "library", ...CATEGORY_KEYS, "archived", "settings"] as TabKey[]).map((t) => (
               <button
-                onClick={() => setFolderId(null)}
-                className={`rounded px-1.5 py-0.5 ${folderId ? "text-slate-500 hover:bg-slate-100" : "font-semibold text-slate-900"}`}
-                data-testid="crumb-root"
+                key={t}
+                onClick={() => switchTab(t)}
+                className={`shrink-0 rounded-[4px] px-3 py-1.5 text-xs font-medium ${
+                  tab === t ? "bg-[#711419] text-white" : "border border-slate-300/70 bg-white text-slate-600"
+                }`}
               >
-                Drive
+                {tabLabel(t)}
               </button>
-              {breadcrumbs.map((b, i) => (
-                <span key={b.id} className="flex items-center gap-1">
-                  <ChevronRight className="h-3.5 w-3.5 text-slate-300" />
-                  <button
-                    onClick={() => setFolderId(b.id)}
-                    className={`rounded px-1.5 py-0.5 ${i === breadcrumbs.length - 1 ? "font-semibold text-slate-900" : "text-slate-500 hover:bg-slate-100"}`}
-                  >
-                    {b.name}
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-          {searching && <p className="mb-3 text-sm text-slate-500">Results for “{search.trim()}”</p>}
-          {view === "trash" && !searching && <p className="mb-3 text-sm text-slate-500">Items in Trash can be restored or deleted forever.</p>}
+            ))}
+          </div>
 
-          {/* Folders */}
-          {childFolders.length > 0 && (
-            <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {childFolders.map((f) => (
-                <div key={f.id} className="group flex items-center gap-2.5 rounded-lg border border-black/[0.06] bg-white px-3 py-2.5 shadow-sm transition-shadow hover:shadow" data-testid={`folder-${f.id}`}>
-                  <button onClick={() => setFolderId(f.id)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
-                    <Folder className="h-5 w-5 shrink-0 fill-sky-100 text-sky-500" />
-                    <span className="truncate text-sm font-medium text-slate-800">{f.name}</span>
-                  </button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="rounded p-1 text-slate-400 opacity-0 hover:bg-slate-100 hover:text-slate-700 group-hover:opacity-100" data-testid={`folder-menu-${f.id}`}>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setRenameTarget({ kind: "folder", id: f.id, name: f.name })}>
-                        <Pencil className="mr-2 h-4 w-4" /> Rename
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => deleteFolder.mutate(f.id)}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Files */}
-          {filesLoading ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-40 rounded-lg" />)}
-            </div>
-          ) : files.length === 0 && childFolders.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 py-20 text-center">
-              <Grid3X3 className="mb-3 h-10 w-10 text-slate-300" />
-              <p className="text-sm font-medium text-slate-600">
-                {view === "trash" ? "Trash is empty" : view === "starred" ? "Nothing starred yet" : "This folder is empty"}
-              </p>
-              {view === "drive" && !searching && (
-                <p className="mt-1 text-xs text-slate-400">Drag files here or use Upload.</p>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-              {files.map((f) => {
-                const { Icon, color } = fileVisual(f.name, f.contentType);
-                return (
-                  <div key={f.id} className="group overflow-hidden rounded-lg border border-black/[0.06] bg-white shadow-sm transition-shadow hover:shadow-md" data-testid={`file-${f.id}`}>
-                    <button
-                      onClick={() => (isImage(f) || isPdf(f) ? setPreview(f) : download(f))}
-                      className="flex h-28 w-full items-center justify-center overflow-hidden bg-slate-50"
-                    >
-                      {isImage(f) ? (
-                        <img src={f.url} alt={f.name} loading="lazy" className="h-full w-full object-cover" />
-                      ) : (
-                        <Icon className={`h-10 w-10 ${color}`} />
-                      )}
-                    </button>
-                    <div className="flex items-center gap-1.5 px-2.5 py-2">
-                      <Icon className={`h-4 w-4 shrink-0 ${color}`} />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[13px] font-medium text-slate-800" title={f.name}>{f.name}</p>
-                        <p className="truncate text-[11px] text-slate-400">
-                          {prettySize(f.size)}{f.updatedAt ? ` · ${format(new Date(f.updatedAt), "MMM d")}` : ""}
-                        </p>
-                      </div>
-                      {f.starred && view !== "trash" && <Star className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" />}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className="rounded p-1 text-slate-400 opacity-0 hover:bg-slate-100 hover:text-slate-700 group-hover:opacity-100" data-testid={`file-menu-${f.id}`}>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {view === "trash" ? (
-                            <>
-                              <DropdownMenuItem onClick={() => patchFile.mutate({ id: f.id, trashed: false })}>
-                                <RotateCcw className="mr-2 h-4 w-4" /> Restore
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => deleteFileForever.mutate(f.id)}>
-                                <Trash2 className="mr-2 h-4 w-4" /> Delete forever
-                              </DropdownMenuItem>
-                            </>
-                          ) : (
-                            <>
-                              <DropdownMenuItem onClick={() => download(f)}>
-                                <Download className="mr-2 h-4 w-4" /> Download
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setRenameTarget({ kind: "file", id: f.id, name: f.name })}>
-                                <Pencil className="mr-2 h-4 w-4" /> Rename
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { setMoveTarget(f); setMoveDest(f.folderId || "root"); }}>
-                                <FolderInput className="mr-2 h-4 w-4" /> Move
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => patchFile.mutate({ id: f.id, starred: !f.starred })}>
-                                <Star className="mr-2 h-4 w-4" /> {f.starred ? "Unstar" : "Star"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => patchFile.mutate({ id: f.id, trashed: true })}>
-                                <Trash2 className="mr-2 h-4 w-4" /> Move to trash
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {tab === "settings" ? <DocsSettings viewMode={viewMode} setMode={setMode} /> : contentArea}
         </main>
       </div>
 
@@ -515,7 +739,7 @@ export default function DocumentsApp() {
             <SelectContent>
               <SelectItem value="root">Drive (top level)</SelectItem>
               {folders.map((f) => (
-                <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                <SelectItem key={f.id} value={f.id}>{folderPath(f)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -537,6 +761,128 @@ export default function DocumentsApp() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function SideItem({
+  active, icon, label, onClick, testid,
+}: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void; testid: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+        active ? "bg-[#711419]/10 text-[#711419]" : "text-slate-600 hover:bg-slate-100"
+      }`}
+      data-testid={testid}
+    >
+      {icon}
+      <span className="truncate">{label}</span>
+    </button>
+  );
+}
+
+function TreeNode({
+  folder, depth, selectedId, onSelect, foldersByParent, expanded, onToggle,
+}: {
+  folder: DocFolder;
+  depth: number;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  foldersByParent: Map<string | null, DocFolder[]>;
+  expanded: Set<string>;
+  onToggle: (id: string) => void;
+}) {
+  const children = foldersByParent.get(folder.id) ?? [];
+  const isOpen = expanded.has(folder.id);
+  const CatIcon = folder.category ? CATEGORY_ICONS[folder.category as DocCategoryKey] : null;
+  return (
+    <div>
+      <div
+        className={`flex items-center rounded-[4px] ${selectedId === folder.id ? "bg-[#711419]/10" : "hover:bg-slate-100"}`}
+        style={{ paddingLeft: depth * 14 }}
+      >
+        <button
+          onClick={() => onToggle(folder.id)}
+          className={`flex h-6 w-5 shrink-0 items-center justify-center text-slate-400 ${children.length === 0 ? "invisible" : ""}`}
+          data-testid={`tree-toggle-${folder.id}`}
+        >
+          {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+        </button>
+        <button
+          onClick={() => onSelect(folder.id)}
+          className={`flex min-w-0 flex-1 items-center gap-1.5 py-1 pr-1.5 text-left text-[13px] ${
+            selectedId === folder.id ? "font-semibold text-[#711419]" : "text-slate-700"
+          }`}
+          data-testid={`tree-node-${folder.id}`}
+        >
+          {CatIcon
+            ? <CatIcon className="h-3.5 w-3.5 shrink-0 text-[#711419]" strokeWidth={1.75} />
+            : <Folder className="h-3.5 w-3.5 shrink-0 fill-sky-100 text-sky-500" />}
+          <span className="truncate">{folder.name}</span>
+        </button>
+      </div>
+      {isOpen && children.map((c) => (
+        <TreeNode
+          key={c.id}
+          folder={c}
+          depth={depth + 1}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          foldersByParent={foldersByParent}
+          expanded={expanded}
+          onToggle={onToggle}
+        />
+      ))}
+    </div>
+  );
+}
+
+function DocsSettings({ viewMode, setMode }: { viewMode: ViewMode; setMode: (m: ViewMode) => void }) {
+  const { data: stats } = useQuery<{ files: number; folders: number; totalSize: number; archived: number }>({
+    queryKey: ["/api/docs/stats"],
+  });
+  const tiles = [
+    { label: "Files", value: stats ? stats.files.toLocaleString() : "—" },
+    { label: "Folders", value: stats ? stats.folders.toLocaleString() : "—" },
+    { label: "Storage used", value: stats ? prettySize(stats.totalSize) || "0 B" : "—" },
+    { label: "Archived", value: stats ? stats.archived.toLocaleString() : "—" },
+  ];
+  return (
+    <div className="mx-auto max-w-2xl space-y-4">
+      <div>
+        <h1 className="font-display text-lg font-semibold tracking-tight text-slate-900">Settings</h1>
+        <p className="mt-0.5 text-sm text-slate-500">Storage overview and preferences for the Documents app.</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {tiles.map((t) => (
+          <div key={t.label} className="rounded-[4px] border border-slate-300/70 bg-white p-4">
+            <p className="text-xs font-medium text-slate-500">{t.label}</p>
+            <p className="mt-1 text-xl font-semibold tracking-tight text-slate-900" data-testid={`docs-stat-${t.label.toLowerCase().replace(/\s+/g, "-")}`}>{t.value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="rounded-[4px] border border-slate-300/70 bg-white p-4">
+        <p className="text-sm font-semibold text-slate-900">Default view</p>
+        <p className="mt-0.5 text-xs text-slate-500">How folder contents are shown in Drive, Library, and category tabs.</p>
+        <Select value={viewMode} onValueChange={(v) => setMode(v as ViewMode)}>
+          <SelectTrigger className="mt-2 w-40" data-testid="select-default-view">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="card">Card view</SelectItem>
+            <SelectItem value="list">List view</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="rounded-[4px] border border-slate-300/70 bg-white p-4">
+        <p className="text-sm font-semibold text-slate-900">Category tabs</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
+          Each category tab (SOPs, Policies, Training, …) is backed by a protected folder — files uploaded in a tab
+          live in its folder, and everything is also reachable from the Library tree. Category folders can't be
+          renamed or deleted.
+        </p>
+      </div>
     </div>
   );
 }

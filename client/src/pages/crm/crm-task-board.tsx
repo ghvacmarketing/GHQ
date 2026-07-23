@@ -300,7 +300,7 @@ function DroppableColumn({
       <div className="flex items-center gap-2 px-3 py-2.5">
         <Icon className="h-3.5 w-3.5 text-slate-400" />
         <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{column.label}</h3>
-        <span className="ml-auto text-[10px] font-semibold text-slate-400 bg-slate-100 rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+        <span className="ml-auto min-w-[18px] rounded-[3px] bg-slate-100 px-1.5 py-0.5 text-center text-[10px] font-semibold tabular-nums text-slate-400">
           {tasks.length}
         </span>
       </div>
@@ -812,7 +812,7 @@ export default function CrmTaskBoard() {
                   <div key={col.id} className="flex items-center justify-center py-1.5 text-slate-600 rounded hover:bg-slate-100 relative" title={`${col.label} (${count})`}>
                     <Icon className="h-4 w-4" />
                     {count > 0 && (
-                      <span className="absolute -top-1 -right-1 text-[10px] bg-slate-200 rounded-full w-4 h-4 flex items-center justify-center">{count}</span>
+                      <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-[3px] bg-slate-200 px-0.5 text-[10px] leading-none tabular-nums">{count}</span>
                     )}
                   </div>
                 );

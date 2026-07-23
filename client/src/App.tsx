@@ -63,6 +63,7 @@ const CrmProjectDetail = lazy(() => import("@/pages/crm/crm-project-detail"));
 const CrmProspectFunnel = lazy(() => import("@/pages/crm/crm-prospect-funnel"));
 const CrmAddProspect = lazy(() => import("@/pages/crm/crm-add-prospect"));
 const CrmMarketing = lazy(() => import("@/pages/crm/crm-marketing"));
+const MarketingApp = lazy(() => import("@/pages/marketing-app"));
 const CrmMarketingBuilder = lazy(() => import("@/pages/crm/crm-marketing-builder"));
 const CrmAutomatedMessages = lazy(() => import("@/pages/crm/crm-automated-messages"));
 const CrmItems = lazy(() => import("@/pages/crm/crm-items"));
@@ -377,10 +378,12 @@ function Router() {
       <Route path="/crm/mail">{() => <ProtectedCrmWrapper><CrmMail /></ProtectedCrmWrapper>}</Route>
       <Route path="/documents" component={DocumentsApp} />
       <Route path="/accounting" component={AccountingApp} />
-      <Route path="/marketing/messages">{() => <ProtectedCrmWrapper><CrmAutomatedMessages /></ProtectedCrmWrapper>}</Route>
-      <Route path="/marketing/new">{() => <ProtectedCrmWrapper><CrmMarketingBuilder /></ProtectedCrmWrapper>}</Route>
-      <Route path="/marketing/edit/:id">{() => <ProtectedCrmWrapper><CrmMarketingBuilder /></ProtectedCrmWrapper>}</Route>
-      <Route path="/marketing">{() => <ProtectedCrmWrapper><CrmMarketing /></ProtectedCrmWrapper>}</Route>
+      <Route path="/marketing/automations/messages">{() => <ProtectedCrmWrapper><CrmAutomatedMessages /></ProtectedCrmWrapper>}</Route>
+      <Route path="/marketing/automations/new">{() => <ProtectedCrmWrapper><CrmMarketingBuilder /></ProtectedCrmWrapper>}</Route>
+      <Route path="/marketing/automations/edit/:id">{() => <ProtectedCrmWrapper><CrmMarketingBuilder /></ProtectedCrmWrapper>}</Route>
+      <Route path="/marketing/automations">{() => <ProtectedCrmWrapper><CrmMarketing /></ProtectedCrmWrapper>}</Route>
+      <Route path="/marketing/:tab">{() => <ProtectedCrmWrapper><MarketingApp /></ProtectedCrmWrapper>}</Route>
+      <Route path="/marketing">{() => <ProtectedCrmWrapper><MarketingApp /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/notifications">{() => <ProtectedCrmWrapper><CrmNotifications /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/salesbook">{() => <ProtectedCrmWrapper><CrmSalesbook /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/tasks/board">{() => <ProtectedCrmWrapper><CrmTaskBoard /></ProtectedCrmWrapper>}</Route>

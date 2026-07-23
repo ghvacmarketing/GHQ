@@ -351,6 +351,7 @@ async function runDocsAndAccountingMigrations() {
       )
     `);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS doc_files_folder_idx ON doc_files(folder_id)`);
+    await db.execute(sql`ALTER TABLE doc_folders ADD COLUMN IF NOT EXISTS category text`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS acct_accounts (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),

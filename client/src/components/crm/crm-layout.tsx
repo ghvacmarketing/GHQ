@@ -19,7 +19,6 @@ import { clearCrmToken } from "@/lib/crmAuth";
 import { useCrmPrefetch } from "@/hooks/use-crm-prefetch";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Badge } from "@/components/ui/badge";
 import {
   Home,
   LayoutDashboard,
@@ -40,7 +39,6 @@ import {
   Package,
   BookOpen,
   Phone,
-  Smartphone,
   MessageSquare,
   Mail,
   Bell,
@@ -48,7 +46,6 @@ import {
   ListTodo,
   Award,
   PenLine,
-  Wrench,
   Activity,
   Sparkles,
   MessageSquarePlus,
@@ -173,15 +170,15 @@ function NavItemComponent({
         <Icon className={cn("h-4 w-4 flex-shrink-0", isActive && "text-[#e8704f]")} />
         {!collapsed && <span className="text-[13px] font-medium">{item.label}</span>}
         {!collapsed && hasBadge ? (
-          <Badge
-            className="ml-auto bg-[#e8704f] text-white text-xs px-1.5 py-0.5 min-w-[20px] text-center border-0"
+          <span
+            className="ml-auto flex min-w-[18px] items-center justify-center rounded-[3px] bg-[#e8704f] px-1 py-0.5 text-[10px] font-semibold leading-none text-white tabular-nums"
             data-testid={`badge-unread-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
           >
             {item.badgeCount! > 99 ? "99+" : item.badgeCount}
-          </Badge>
+          </span>
         ) : null}
         {collapsed && hasBadge ? (
-          <span className="absolute top-1 right-2 h-2 w-2 rounded-full bg-[#e8704f]" />
+          <span className="absolute top-1 right-2 h-1.5 w-1.5 rounded-[1px] bg-[#e8704f]" />
         ) : null}
       </div>
     </Link>
@@ -327,35 +324,6 @@ function SidebarContent({
       </div>
 
       <div className={cn("border-t border-slate-700/50", collapsed ? "p-2" : "p-3")}>
-        {currentUser?.role !== "tech" && (
-          <Link href="/mobile" onClick={onItemClick}>
-            <div
-              title={collapsed ? "Mobile View" : undefined}
-              className={cn(
-                "flex items-center rounded-md cursor-pointer transition-all text-slate-300 hover:bg-slate-800 hover:text-white mb-1.5",
-                collapsed ? "justify-center py-2" : "gap-2.5 px-2.5 py-2"
-              )}
-              data-testid="nav-item-mobile-view"
-            >
-              <Smartphone className="h-4 w-4 shrink-0" />
-              {!collapsed && <span className="text-[13px] font-medium">Mobile View</span>}
-            </div>
-          </Link>
-        )}
-        <Link href="/tools" onClick={onItemClick}>
-          <div
-            title={collapsed ? "GHVAC Tools" : undefined}
-            className={cn(
-              "flex items-center rounded-md cursor-pointer transition-all text-slate-300 hover:bg-slate-800 hover:text-white mb-2",
-              collapsed ? "justify-center py-2" : "gap-2.5 px-2.5 py-2"
-            )}
-            data-testid="nav-item-home"
-          >
-            <Wrench className="h-4 w-4 shrink-0" />
-            {!collapsed && <span className="text-[13px] font-medium">GHVAC Tools</span>}
-          </div>
-        </Link>
-
         {collapsed ? (
           <div className="flex flex-col items-center gap-1.5">
             <div
@@ -511,16 +479,13 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
           >
             <Bell className="h-5 w-5 text-slate-600" />
             {(notificationCount?.count ?? 0) > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full text-white text-[10px] font-bold flex items-center justify-center px-1" style={{ backgroundColor: "#711419" }}>
+              <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-[3px] bg-[#711419] px-1 text-[9px] font-semibold leading-none text-white tabular-nums">
                 {notificationCount!.count > 99 ? "99+" : notificationCount!.count}
               </span>
             )}
           </Button>
-          <div className="ml-1 flex items-center gap-2 border-l border-border pl-3">
+          <div className="ml-1 flex items-center border-l border-border pl-3">
             <span className="text-sm font-medium text-slate-600">{currentUser?.name || "User"}</span>
-            <div className="w-8 h-8 rounded-md bg-[#711419] flex items-center justify-center text-white font-semibold text-xs">
-              {currentUser?.name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "U"}
-            </div>
           </div>
           <Button
             variant="ghost"
@@ -583,7 +548,7 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
             >
               <Bell className="h-5 w-5" />
               {(notificationCount?.count ?? 0) > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full text-white text-[10px] font-bold flex items-center justify-center px-1" style={{ backgroundColor: "#711419" }}>
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-[3px] bg-[#711419] px-1 text-[9px] font-semibold leading-none text-white tabular-nums">
                   {notificationCount!.count > 99 ? "99+" : notificationCount!.count}
                 </span>
               )}
@@ -591,11 +556,6 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
             <span className="text-sm font-medium text-slate-600">
               {currentUser?.name?.split(" ")[0] || "User"}
             </span>
-            <div className="w-8 h-8 rounded-full bg-[#711419] flex items-center justify-center text-white font-semibold text-xs">
-              {currentUser?.name
-                ? currentUser.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
-                : "U"}
-            </div>
           </div>
         </div>
       </div>
