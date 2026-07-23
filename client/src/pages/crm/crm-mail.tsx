@@ -146,14 +146,15 @@ function fmtWhen(iso: string | null): string {
   return format(d, "MMM d, yyyy");
 }
 
-// Display name for a thread row: the real sender name if Gmail gave us one,
-// otherwise a friendly name derived from the email address.
+// Display name for a thread row, Gmail-style: the sender's real display name
+// when we have one; a friendly derivation from the address otherwise; "Me"
+// for self-threads (notes to yourself have no external participant).
 function primaryName(t: Thread): string {
   const email = (t.participants && t.participants[0]) || "";
   const name = (t.participantNames && t.participantNames[0]) || "";
   if (name) return name;
   if (email) return nameFromEmail(email);
-  return "(no recipient)";
+  return "Me";
 }
 
 function initials(str: string): string {

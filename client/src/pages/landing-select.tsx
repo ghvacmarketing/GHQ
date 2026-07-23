@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
-import { Link, useLocation } from "wouter";
+import { useEffect } from "react";
+import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Monitor, Smartphone, Wrench, ChevronRight, Loader2 } from "lucide-react";
+import {
+  Monitor, Smartphone, FolderOpen, Calculator, Megaphone, Wrench, Loader2,
+} from "lucide-react";
 import { crmFetch } from "@/lib/crmAuth";
-import { getQueryFn } from "@/lib/queryClient";
-import type { CrmUser, PortalUser } from "@shared/schema";
+import type { CrmUser } from "@shared/schema";
 import redlogo from "@assets/redlogo.webp";
 
 function firstNameOf(name?: string | null): string {
@@ -12,8 +13,65 @@ function firstNameOf(name?: string | null): string {
   return name.trim().split(/\s+/)[0] || "";
 }
 
+type AppTile = {
+  key: string;
+  label: string;
+  description: string;
+  href: string;
+  icon: React.ReactNode;
+  gradient: string; // squircle background
+  roles?: string[]; // undefined = everyone
+};
+
+const APPS: AppTile[] = [
+  {
+    key: "crm",
+    label: "CRM",
+    description: "Customers, dispatch, quotes & invoices",
+    href: "/crm",
+    icon: <Monitor className="h-7 w-7 text-white" />,
+    gradient: "bg-gradient-to-br from-[#8a1a1f] to-[#5c0f13]",
+  },
+  {
+    key: "field",
+    label: "Field",
+    description: "Tech agenda, jobs & time",
+    href: "/mobile",
+    icon: <Smartphone className="h-7 w-7 text-white" />,
+    gradient: "bg-gradient-to-br from-slate-700 to-slate-900",
+  },
+  {
+    key: "documents",
+    label: "Documents",
+    description: "Company files & folders",
+    href: "/documents",
+    icon: <FolderOpen className="h-7 w-7 text-white" />,
+    gradient: "bg-gradient-to-br from-sky-500 to-blue-700",
+  },
+  {
+    key: "accounting",
+    label: "Accounting",
+    description: "P&L, expenses & receivables",
+    href: "/accounting",
+    icon: <Calculator className="h-7 w-7 text-white" />,
+    gradient: "bg-gradient-to-br from-emerald-500 to-green-700",
+    roles: ["owner", "admin", "supervisor"],
+  },
+  {
+    key: "marketing",
+    label: "Marketing",
+    description: "Campaigns & automations",
+    href: "/crm/marketing",
+    icon: <Megaphone className="h-7 w-7 text-white" />,
+    gradient: "bg-gradient-to-br from-amber-500 to-orange-600",
+    roles: ["owner", "admin", "supervisor", "sales"],
+  },
+];
+
 export default function LandingSelect() {
-  const { data: crmUser, isLoading: isLoadingCrm } = useQuery<CrmUser | null>({
+  const [, navigate] = useLocation();
+
+  const { data: crmUser, isLoading } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: async () => {
       const res = await crmFetch("/api/crm/auth/me");
@@ -24,127 +82,76 @@ export default function LandingSelect() {
     staleTime: 60 * 1000,
   });
 
-  const { data: portalUser, isLoading: isLoadingPortal } = useQuery<PortalUser | null>({
-    queryKey: ["/api/employee-portal/me"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
-    staleTime: 60 * 1000,
-  });
-
-  const [, navigate] = useLocation();
-
-  const ready = !isLoadingCrm && !isLoadingPortal;
+  const ready = !isLoading;
   const isAuthenticated = !!crmUser?.id;
 
-  // Require sign-in before reaching the app selection screen.
   useEffect(() => {
-    if (ready && !isAuthenticated) {
-      navigate("/crm/login");
-    }
+    if (ready && !isAuthenticated) navigate("/crm/login");
   }, [ready, isAuthenticated, navigate]);
 
-  const firstName = firstNameOf(crmUser?.name) || firstNameOf(portalUser?.username);
-  const fullText = `Welcome${firstName ? `, ${firstName}` : ""}`;
-
-  const [stage, setStage] = useState(0); // 0: heading, 1: subheading, 2: cards
-
-  useEffect(() => {
-    if (!ready) return;
-    setStage(0);
-    const t1 = setTimeout(() => setStage(1), 200);
-    const t2 = setTimeout(() => setStage(2), 450);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, [ready, fullText]);
-
-  // While verifying the session (or redirecting an unauthenticated visitor to
-  // login), show a loader instead of the app selection screen.
   if (!ready || !isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#4a0d10] to-slate-900 flex flex-col items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-[#e08a8f] mb-4" />
-        <p className="text-slate-300">Loading...</p>
+      <div className="flex min-h-screen items-center justify-center bg-[#f5f5f7]">
+        <Loader2 className="h-7 w-7 animate-spin text-[#711419]" />
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#4a0d10] to-slate-900 flex flex-col items-center justify-center p-4">
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMyMDIwMjAiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRoLTJ2LTRoMnY0em0wLTZoLTJ2LTRoMnY0em0wLTZoLTJ2LTRoMnY0em0wLTZoLTJWOGgydjh6bTAgMjRoLTJ2LTRoMnY0em0wIDZoLTJ2LTRoMnY0em0tOC0xMmgtMnYtNGgydjR6bTAgNmgtMnYtNGgydjR6bTAtMTJoLTJ2LTRoMnY0em0wLTZoLTJWOGgydjh6bTAgMjRoLTJ2LTRoMnY0em0wIDZoLTJ2LTRoMnY0em0tOC02aC0ydi00aDJ2NHptMC02aC0ydi00aDJ2NHptMC02aC0ydi00aDJ2NHptMC02aC0yVjhoMnY4em0wIDI0aC0ydi00aDJ2NHptMCA2aC0ydi00aDJ2NHoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-20"></div>
+  const role = crmUser?.role || "tech";
+  const visibleApps = APPS.filter((a) => !a.roles || a.roles.includes(role));
+  const firstName = firstNameOf(crmUser?.name);
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
-      <div className="relative z-10 w-full max-w-3xl">
-        <div className="text-center mb-10">
-          <img src={redlogo} alt="GHVAC" className="h-16 mx-auto mb-6" />
-          <h1 className="text-3xl font-bold text-white mb-2 min-h-[2.5rem] animate-in fade-in-0 slide-in-from-bottom-2 duration-500" data-testid="text-welcome">
-            {fullText}
-          </h1>
-          <p
-            className={`text-slate-300 transition-opacity duration-700 ${
-              stage >= 1 ? "opacity-100" : "opacity-0"
-            }`}
-            data-testid="text-subheading"
+  return (
+    <div className="flex min-h-screen flex-col bg-[#f5f5f7]">
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-6 py-14">
+        {/* Header */}
+        <div className="mb-10 text-center">
+          <img src={redlogo} alt="Giesbrecht HVAC" className="mx-auto mb-6 h-12" />
+          <h1
+            className="text-[28px] font-semibold tracking-tight text-slate-900"
+            data-testid="text-welcome"
           >
-            Choose where you'd like to go.
+            {greeting}
+            {firstName ? `, ${firstName}` : ""}
+          </h1>
+          <p className="mt-1 text-[15px] text-slate-500">
+            {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
           </p>
         </div>
 
-        <div
-          className={`grid grid-cols-1 sm:grid-cols-2 gap-5 transition-opacity duration-700 ${
-            stage >= 2 ? "opacity-100" : "opacity-0 pointer-events-none"
-          }`}
-        >
-          <Link href="/crm">
-            <div
-              className="group h-full bg-white/[0.07] hover:bg-white/[0.12] border border-white/10 hover:border-[#711419] rounded-2xl p-8 cursor-pointer transition-all duration-200 flex flex-col items-center text-center"
-              data-testid="card-crm"
+        {/* App grid — iOS home-screen feel */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-testid="app-grid">
+          {visibleApps.map((app, i) => (
+            <button
+              key={app.key}
+              onClick={() => navigate(app.href)}
+              className="group flex flex-col items-center rounded-2xl border border-black/[0.06] bg-white px-4 py-6 text-center shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] active:scale-[0.97] animate-in fade-in slide-in-from-bottom-2"
+              style={{ animationDelay: `${i * 60}ms`, animationFillMode: "backwards", animationDuration: "400ms" }}
+              data-testid={`app-${app.key}`}
             >
-              <div className="w-16 h-16 rounded-2xl bg-[#711419] flex items-center justify-center mb-5 group-hover:scale-105 transition-transform">
-                <Monitor className="h-8 w-8 text-white" />
-              </div>
-              <h2 className="text-xl font-semibold text-white mb-1">Office / CRM</h2>
-              <p className="text-sm text-slate-300">
-                Full desktop workspace — customers, quotes, invoices, dispatch and more.
-              </p>
-              <span className="mt-4 inline-flex items-center text-sm font-medium text-[#e08a8f] group-hover:text-white transition-colors">
-                Enter CRM <ChevronRight className="h-4 w-4 ml-1" />
+              <span
+                className={`mb-3 flex h-[60px] w-[60px] items-center justify-center rounded-[18px] shadow-inner ${app.gradient}`}
+              >
+                {app.icon}
               </span>
-            </div>
-          </Link>
-
-          <Link href="/mobile">
-            <div
-              className="group h-full bg-white/[0.07] hover:bg-white/[0.12] border border-white/10 hover:border-[#711419] rounded-2xl p-8 cursor-pointer transition-all duration-200 flex flex-col items-center text-center"
-              data-testid="card-mobile"
-            >
-              <div className="w-16 h-16 rounded-2xl bg-[#711419] flex items-center justify-center mb-5 group-hover:scale-105 transition-transform">
-                <Smartphone className="h-8 w-8 text-white" />
-              </div>
-              <h2 className="text-xl font-semibold text-white mb-1">Field / Mobile</h2>
-              <p className="text-sm text-slate-300">
-                On-the-go view for technicians — daily agenda, jobs, time tracking.
-              </p>
-              <span className="mt-4 inline-flex items-center text-sm font-medium text-[#e08a8f] group-hover:text-white transition-colors">
-                Open Mobile <ChevronRight className="h-4 w-4 ml-1" />
-              </span>
-            </div>
-          </Link>
+              <span className="text-[15px] font-semibold text-slate-900">{app.label}</span>
+              <span className="mt-0.5 text-[12px] leading-snug text-slate-500">{app.description}</span>
+            </button>
+          ))}
         </div>
 
-        <div
-          className={`text-center mt-8 transition-all duration-700 ${
-            stage >= 2 ? "opacity-100" : "opacity-0 pointer-events-none"
-          }`}
-        >
-          <Link href="/tools">
-            <span
-              className="inline-flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors cursor-pointer"
-              data-testid="link-ghvac-tools"
-            >
-              <Wrench className="h-4 w-4" />
-              Open GHVAC Tools
-            </span>
-          </Link>
+        {/* Footer utilities */}
+        <div className="mt-10 text-center">
+          <button
+            onClick={() => navigate("/tools")}
+            className="inline-flex items-center gap-1.5 text-[13px] font-medium text-slate-400 transition-colors hover:text-slate-700"
+            data-testid="link-ghvac-tools"
+          >
+            <Wrench className="h-3.5 w-3.5" />
+            GHVAC Tools
+          </button>
         </div>
       </div>
     </div>

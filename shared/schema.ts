@@ -3895,6 +3895,71 @@ export type InsertCustomerFile = z.infer<typeof insertCustomerFileSchema>;
 export type CustomerFile = typeof customerFiles.$inferSelect;
 
 // ============================================================================
+// DOCUMENTS APP (company Drive: folders + files on the Neon object store)
+// ============================================================================
+
+export const docFolders = pgTable("doc_folders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  parentId: varchar("parent_id"), // null = root ("Company Drive")
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const docFiles = pgTable("doc_files", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  folderId: varchar("folder_id"), // null = root
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  objectPath: text("object_path"),
+  contentType: text("content_type"),
+  size: integer("size"),
+  starred: boolean("starred").notNull().default(false),
+  trashedAt: timestamp("trashed_at"), // soft delete → Trash view
+  uploadedBy: varchar("uploaded_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type DocFolder = typeof docFolders.$inferSelect;
+export type DocFile = typeof docFiles.$inferSelect;
+
+// ============================================================================
+// ACCOUNTING APP (chart of accounts + expenses; revenue reads crm_invoices)
+// ============================================================================
+
+export const acctAccountTypeEnum = ["income", "expense", "asset", "liability", "equity"] as const;
+export type AcctAccountType = typeof acctAccountTypeEnum[number];
+
+export const acctAccounts = pgTable("acct_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code"),
+  name: text("name").notNull(),
+  type: text("type").$type<AcctAccountType>().notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const acctExpenses = pgTable("acct_expenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  expenseDate: timestamp("expense_date").notNull(),
+  vendor: text("vendor").notNull(),
+  accountId: varchar("account_id"),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  paymentMethod: text("payment_method").$type<"card" | "check" | "cash" | "ach" | "other">().default("card"),
+  memo: text("memo"),
+  receiptUrl: text("receipt_url"),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type AcctAccount = typeof acctAccounts.$inferSelect;
+export type AcctExpense = typeof acctExpenses.$inferSelect;
+
+// ============================================================================
 // Rebate Programs Module (HEAR / HER case management)
 // ============================================================================
 

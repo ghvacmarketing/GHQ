@@ -319,6 +319,91 @@ async function runGmailMigration() {
   }
 }
 
+async function runDocsAndAccountingMigrations() {
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS doc_folders (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        name text NOT NULL,
+        parent_id varchar,
+        created_by varchar,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS doc_files (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        folder_id varchar,
+        name text NOT NULL,
+        url text NOT NULL,
+        object_path text,
+        content_type text,
+        size integer,
+        starred boolean NOT NULL DEFAULT false,
+        trashed_at timestamp,
+        uploaded_by varchar,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS doc_files_folder_idx ON doc_files(folder_id)`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS acct_accounts (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        code text,
+        name text NOT NULL,
+        type text NOT NULL,
+        is_active boolean NOT NULL DEFAULT true,
+        sort_order integer NOT NULL DEFAULT 0,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS acct_expenses (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        expense_date timestamp NOT NULL,
+        vendor text NOT NULL,
+        account_id varchar,
+        amount decimal(10,2) NOT NULL,
+        payment_method text DEFAULT 'card',
+        memo text,
+        receipt_url text,
+        created_by varchar,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+    // Seed a starter HVAC chart of accounts once
+    const existing: any = await db.execute(sql`SELECT COUNT(*)::int AS n FROM acct_accounts`);
+    const n = Number(existing?.rows?.[0]?.n ?? 0);
+    if (n === 0) {
+      await db.execute(sql`
+        INSERT INTO acct_accounts (code, name, type, sort_order) VALUES
+        ('4000','Service Revenue','income',1),
+        ('4100','Installation Revenue','income',2),
+        ('4200','Maintenance Agreements','income',3),
+        ('5000','Equipment & Parts','expense',10),
+        ('5100','Materials & Supplies','expense',11),
+        ('5200','Subcontractors','expense',12),
+        ('6000','Payroll','expense',20),
+        ('6100','Vehicle & Fuel','expense',21),
+        ('6200','Insurance','expense',22),
+        ('6300','Office & Software','expense',23),
+        ('6400','Marketing & Advertising','expense',24),
+        ('6500','Rent & Utilities','expense',25),
+        ('6600','Tools & Equipment','expense',26),
+        ('6900','Other Expenses','expense',29)
+      `);
+      console.log("[Accounting] Seeded starter chart of accounts");
+    }
+  } catch (err) {
+    console.error("Docs/Accounting migration error (non-fatal):", err);
+  }
+}
+
 async function runSalesbookMigrations() {
   try {
     const { db } = await import("./db");
@@ -609,6 +694,7 @@ async function runWaterHeaterSeeds() {
   await runInstallPlannerMigrations();
   await runChecklistPhotoStepsMigration();
   await runGmailMigration();
+  await runDocsAndAccountingMigrations();
   await runSalesbookMigrations();
   await runProposalTemplateMigrations();
   await runAgreementVisitFrequencyMigration();
@@ -680,7 +766,10 @@ async function runWaterHeaterSeeds() {
 
     // Gmail (Workspace) two-way inbox sync for connected CRM users
     import("./services/gmailService")
-      .then(({ startGmailBackgroundSync }) => startGmailBackgroundSync(3))
+      .then(({ startGmailBackgroundSync, backfillThreadNames }) => {
+        startGmailBackgroundSync(3);
+        backfillThreadNames();
+      })
       .catch((e) => console.error("Gmail sync start failed:", e));
 
     // Textline message sync every 30s — keeps inbound AND outbound SMS

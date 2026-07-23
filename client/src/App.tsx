@@ -95,6 +95,8 @@ const CrmBusinessDashboard = lazy(() => import("@/pages/crm/crm-business-dashboa
 const CrmGoalsTracker = lazy(() => import("@/pages/crm/crm-goals-tracker"));
 const CrmMessaging = lazy(() => import("@/pages/crm/crm-messaging"));
 const CrmMail = lazy(() => import("@/pages/crm/crm-mail"));
+const DocumentsApp = lazy(() => import("@/pages/documents-app"));
+const AccountingApp = lazy(() => import("@/pages/accounting-app"));
 const CrmNotifications = lazy(() => import("@/pages/crm/crm-notifications"));
 const CrmMyTasks = lazy(() => import("@/pages/crm/crm-my-tasks"));
 const CrmTaskBoard = lazy(() => import("@/pages/crm/crm-task-board"));
@@ -371,6 +373,8 @@ function Router() {
       <Route path="/crm/reports">{() => <ProtectedCrmWrapper><CrmGoalsTracker /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/messaging">{() => <ProtectedCrmWrapper><CrmMessaging /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/mail">{() => <ProtectedCrmWrapper><CrmMail /></ProtectedCrmWrapper>}</Route>
+      <Route path="/documents" component={DocumentsApp} />
+      <Route path="/accounting" component={AccountingApp} />
       <Route path="/crm/notifications">{() => <ProtectedCrmWrapper><CrmNotifications /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/salesbook">{() => <ProtectedCrmWrapper><CrmSalesbook /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/tasks/board">{() => <ProtectedCrmWrapper><CrmTaskBoard /></ProtectedCrmWrapper>}</Route>

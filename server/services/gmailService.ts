@@ -416,6 +416,40 @@ export async function trashThread(user: CrmUser, threadRowId: string): Promise<v
   await db.delete(crmEmailThreads).where(eq(crmEmailThreads.id, threadRowId));
 }
 
+// ── one-time backfill: derive thread participant display names from stored
+// message From headers (threads synced before participant_names existed show
+// mangled email-derived names in the UI until this runs) ─────────────────────
+export async function backfillThreadNames(): Promise<void> {
+  try {
+    const threads = await db.select().from(crmEmailThreads);
+    let fixed = 0;
+    for (const t of threads) {
+      const participants = (t.participants || []) as string[];
+      if (participants.length === 0) continue;
+      const names = ((t.participantNames || []) as (string | null)[]);
+      const hasAnyName = names.some((n) => n);
+      if (hasAnyName && names.length === participants.length) continue;
+
+      const msgs = await db
+        .select({ fromEmail: crmEmailMessages.fromEmail, fromName: crmEmailMessages.fromName })
+        .from(crmEmailMessages)
+        .where(eq(crmEmailMessages.threadId, t.id));
+      const nameByEmail = new Map<string, string>();
+      for (const m of msgs) {
+        if (m.fromEmail && m.fromName && !nameByEmail.has(m.fromEmail)) nameByEmail.set(m.fromEmail, m.fromName);
+      }
+      if (nameByEmail.size === 0) continue;
+      const newNames = participants.map((e) => nameByEmail.get(e) ?? null);
+      if (!newNames.some((n) => n)) continue;
+      await db.update(crmEmailThreads).set({ participantNames: newNames }).where(eq(crmEmailThreads.id, t.id));
+      fixed++;
+    }
+    if (fixed > 0) console.log(`[Gmail] Backfilled display names on ${fixed} thread(s)`);
+  } catch (e) {
+    console.error("[Gmail] thread-name backfill failed:", (e as Error).message);
+  }
+}
+
 // ── background sync ──────────────────────────────────────────────────────────
 let gmailInterval: NodeJS.Timeout | null = null;
 export function startGmailBackgroundSync(intervalMinutes = 3): void {

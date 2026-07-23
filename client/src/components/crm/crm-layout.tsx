@@ -121,7 +121,6 @@ const navSections: NavSection[] = [
     title: "Other",
     items: [
       { label: "Goals", href: "/crm/reports", icon: BarChart3 },
-      { label: "Marketing", href: "/crm/marketing", icon: Megaphone },
       { label: "Settings", href: "/crm/settings", icon: Settings },
     ],
   },
