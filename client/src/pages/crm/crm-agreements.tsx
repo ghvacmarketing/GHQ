@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { StatusDot } from "@/components/ui/status-dot";
+import { IndustrialTabs } from "@/components/crm/industrial-tabs";
 import {
   Table,
   TableBody,
@@ -709,9 +710,12 @@ export default function CrmAgreements() {
         </div>
 
         {/* Tab Filters with Type dropdown on right */}
-        <div className="flex items-center justify-between border-b border-slate-200">
-          <div className="flex overflow-x-auto overflow-y-hidden">
-            {tabFilters.map((tab) => {
+        <div className="flex items-center justify-between gap-2">
+          <IndustrialTabs
+            testidPrefix="tab"
+            activeKey={activeTab}
+            onSelect={(k) => setActiveTab(k as typeof activeTab)}
+            tabs={tabFilters.map((tab) => {
               const count = tab.key === "all" ? statusCounts.all_active
                 : tab.key === "pending" ? statusCounts.pending
                 : tab.key === "active" ? statusCounts.active
@@ -719,30 +723,9 @@ export default function CrmAgreements() {
                 : tab.key === "grace_period" ? statusCounts.grace_period
                 : tab.key === "expired" ? statusCounts.expired
                 : null;
-
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors ${
-                    activeTab === tab.key
-                      ? "border-[#711419] text-[#711419]"
-                      : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-                  }`}
-                  data-testid={`tab-${tab.key}`}
-                >
-                {tab.label}
-                {count != null && count > 0 && (
-                  <span className={`ml-1.5 px-1.5 py-0.5 text-xs rounded ${
-                    activeTab === tab.key ? "bg-[#711419] text-white" : "bg-slate-200 text-slate-600"
-                  }`}>
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-          </div>
+              return { key: tab.key, label: tab.label, count: count != null && count > 0 ? count : null };
+            })}
+          />
           <div className="shrink-0 pb-1">
             <Select value={agreementTypeFilter} onValueChange={setAgreementTypeFilter}>
               <SelectTrigger className="w-[140px] h-8 text-xs border-0 bg-transparent focus:ring-0 focus:ring-offset-0" data-testid="select-agreement-type-filter">

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { IndustrialTabs } from "@/components/crm/industrial-tabs";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -168,34 +169,22 @@ export default function CrmNotifications() {
           )}
         </div>
 
-        <div className="flex items-center gap-6 border-b border-slate-200 mb-6">
-          {(["unread", "all"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`pb-2.5 text-sm font-medium transition-colors whitespace-nowrap border-b-2 -mb-px ${
-                tab === t
-                  ? "border-slate-900 text-slate-900"
-                  : "border-transparent text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              {t === "unread" ? "Unread" : "All"}
-            </button>
-          ))}
-          <div className="w-px h-5 bg-slate-200 self-center" />
-          {typeFilters.map((tf) => (
-            <button
-              key={tf.key}
-              onClick={() => setTypeFilter(tf.key)}
-              className={`pb-2.5 text-sm font-medium transition-colors whitespace-nowrap border-b-2 -mb-px ${
-                typeFilter === tf.key
-                  ? "border-slate-900 text-slate-900"
-                  : "border-transparent text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              {tf.label}
-            </button>
-          ))}
+        <div className="mb-6 flex flex-wrap items-center gap-2">
+          <IndustrialTabs
+            testidPrefix="tab-read"
+            activeKey={tab}
+            onSelect={(k) => setTab(k as typeof tab)}
+            tabs={[
+              { key: "unread", label: "Unread" },
+              { key: "all", label: "All" },
+            ]}
+          />
+          <IndustrialTabs
+            testidPrefix="tab-type"
+            activeKey={typeFilter}
+            onSelect={(k) => setTypeFilter(k as typeof typeFilter)}
+            tabs={typeFilters.map((tf) => ({ key: tf.key, label: tf.label }))}
+          />
         </div>
 
         {showTaggedNotesView && (

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { IndustrialTabs } from "@/components/crm/industrial-tabs";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -304,28 +305,17 @@ export default function CrmRebatePrograms() {
         </div>
       </div>
 
-      {/* Underline status tabs */}
-      <div className="flex overflow-x-auto overflow-y-hidden border-b border-slate-200">
-        {QUICK_FILTERS.map(tab => {
-          const count = tab.status === "" ? cases.length : cases.filter(c => c.applicationStatus === tab.status).length;
-          return (
-            <button
-              key={tab.status || "all"}
-              onClick={() => setActiveTab(tab.status || "all")}
-              className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-                activeTab === (tab.status || "all")
-                  ? "border-[#711419] text-[#711419]"
-                  : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-              }`}
-            >
-              {tab.label}
-              <span className={`ml-1.5 text-xs ${activeTab === (tab.status || "all") ? "text-[#711419]" : "text-slate-400"}`}>
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      {/* Status tabs */}
+      <IndustrialTabs
+        testidPrefix="tab"
+        activeKey={activeTab}
+        onSelect={setActiveTab}
+        tabs={QUICK_FILTERS.map((tab) => ({
+          key: tab.status || "all",
+          label: tab.label,
+          count: tab.status === "" ? cases.length : cases.filter((c) => c.applicationStatus === tab.status).length,
+        }))}
+      />
 
         {/* Table */}
         <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">

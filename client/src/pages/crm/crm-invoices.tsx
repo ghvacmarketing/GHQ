@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { IndustrialTabs } from "@/components/crm/industrial-tabs";
 import { StatusDot } from "@/components/ui/status-dot";
 import {
   Select,
@@ -656,23 +657,13 @@ export default function CrmInvoices() {
         </div>
 
         {/* Tabs with All Sources filter on the right */}
-        <div className="flex items-center justify-between border-b border-slate-200">
-          <div className="flex overflow-x-auto overflow-y-hidden">
-            {statusTabs.map((tab) => (
-              <button
-                key={tab.value}
-                onClick={() => setStatusFilter(tab.value)}
-                className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-                  statusFilter === tab.value
-                    ? "border-[#711419] text-[#711419]"
-                    : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-                }`}
-                data-testid={`tab-status-${tab.value}`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+        <div className="flex items-center justify-between gap-2">
+          <IndustrialTabs
+            testidPrefix="tab-status"
+            activeKey={statusFilter}
+            onSelect={(k) => setStatusFilter(k as typeof statusFilter)}
+            tabs={statusTabs.map((tab) => ({ key: tab.value, label: tab.label }))}
+          />
           <div className="shrink-0 pb-1">
             <Select value={sourceFilter} onValueChange={setSourceFilter}>
               <SelectTrigger className="w-[140px] h-8 text-xs border-0 bg-transparent focus:ring-0 focus:ring-offset-0" data-testid="select-source-filter">

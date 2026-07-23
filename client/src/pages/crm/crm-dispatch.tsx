@@ -1907,19 +1907,25 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
               stamped with the current clock time. Sits under the sticky tech
               column (z-10) and header (z-20). */}
           {nowPct !== null && (
-            <div
-              className="pointer-events-none absolute inset-y-0 z-[6] -translate-x-1/2"
-              style={{ left: `calc(176px + (100% - 176px) * ${nowPct})` }}
-              data-testid="dispatch-now-line"
-            >
+            <>
               <div
-                className="absolute inset-y-0 left-1/2 w-[2px] -translate-x-1/2"
-                style={{ backgroundImage: "repeating-linear-gradient(to bottom, #711419 0 5px, transparent 5px 10px)" }}
+                className="pointer-events-none absolute inset-y-0 z-[6] w-[2px] -translate-x-1/2"
+                style={{
+                  left: `calc(176px + (100% - 176px) * ${nowPct})`,
+                  backgroundImage: "repeating-linear-gradient(to bottom, #711419 0 5px, transparent 5px 10px)",
+                }}
+                data-testid="dispatch-now-line"
               />
-              <span className="absolute left-1/2 top-1 -translate-x-1/2 whitespace-nowrap rounded-[3px] bg-[#711419] px-1.5 py-0.5 text-[9px] font-semibold leading-none tabular-nums text-white">
+              {/* Time chip sits just above the first technician row's top border
+                  (z-30 so the sticky axis header doesn't swallow it) */}
+              <span
+                className="pointer-events-none absolute top-[-2px] z-30 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-[3px] bg-[#711419] px-1.5 py-0.5 text-[9px] font-semibold leading-none tabular-nums text-white"
+                style={{ left: `calc(176px + (100% - 176px) * ${nowPct})` }}
+                data-testid="dispatch-now-time"
+              >
                 {formatLocal(nowTick, "h:mm a")}
               </span>
-            </div>
+            </>
           )}
           </div>
 

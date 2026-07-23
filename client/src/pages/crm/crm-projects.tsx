@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef, useCallback, type ReactNode } from "react";
+import { IndustrialTabs } from "@/components/crm/industrial-tabs";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -1291,52 +1292,17 @@ export default function CrmProjects() {
           }
         />
 
-        <div className="flex overflow-x-auto overflow-y-hidden border-b border-slate-200">
-          <button
-            onClick={() => setMainViewTab("overview")}
-            className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-2 ${
-              mainViewTab === "overview"
-                ? "border-[#711419] text-[#711419]"
-                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-            }`}
-          >
-            <BarChart3 className="h-4 w-4" />
-            Overview
-          </button>
-          <button
-            onClick={() => setMainViewTab("list")}
-            className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-2 ${
-              mainViewTab === "list"
-                ? "border-[#711419] text-[#711419]"
-                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-            }`}
-          >
-            <List className="h-4 w-4" />
-            List
-          </button>
-          <button
-            onClick={() => setMainViewTab("calendar")}
-            className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-2 ${
-              mainViewTab === "calendar"
-                ? "border-[#711419] text-[#711419]"
-                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-            }`}
-          >
-            <CalendarDays className="h-4 w-4" />
-            Calendar
-          </button>
-          <button
-            onClick={() => setMainViewTab("kanban")}
-            className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px flex items-center gap-2 ${
-              mainViewTab === "kanban"
-                ? "border-[#711419] text-[#711419]"
-                : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-            }`}
-          >
-            <LayoutGrid className="h-4 w-4" />
-            Kanban
-          </button>
-        </div>
+        <IndustrialTabs
+          testidPrefix="tab-view"
+          activeKey={mainViewTab}
+          onSelect={(k) => setMainViewTab(k as typeof mainViewTab)}
+          tabs={[
+            { key: "overview", label: "Overview" },
+            { key: "list", label: "List" },
+            { key: "calendar", label: "Calendar" },
+            { key: "kanban", label: "Kanban" },
+          ]}
+        />
 
         <Tabs value={mainViewTab} onValueChange={(v) => setMainViewTab(v as any)} className="w-full">
           <TabsContent value="overview" className="mt-4">

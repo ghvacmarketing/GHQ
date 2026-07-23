@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { IndustrialTabs } from "@/components/crm/industrial-tabs";
 import { StatusDot } from "@/components/ui/status-dot";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
@@ -1269,23 +1270,15 @@ export default function CrmWorkOrders() {
         </div>
 
         {/* Tabs styled like projects/customers page - underline style */}
-        <div className="flex overflow-x-auto overflow-y-hidden border-b border-slate-200">
-          {(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
-                activeTab === tab
-                  ? "border-[#711419] text-[#711419]"
-                  : "border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
-              }`}
-              data-testid={`tab-${tab}`}
-            >
-              <span className="hidden sm:inline">{filterTabConfig[tab].label}</span>
-              <span className="sm:hidden">{filterTabConfig[tab].shortLabel}</span>
-            </button>
-          ))}
-        </div>
+        <IndustrialTabs
+          testidPrefix="tab"
+          activeKey={activeTab}
+          onSelect={(k) => setActiveTab(k as FilterTab)}
+          tabs={(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => ({
+            key: tab,
+            label: filterTabConfig[tab].label,
+          }))}
+        />
 
         {workOrdersLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
