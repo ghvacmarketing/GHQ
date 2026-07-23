@@ -20,11 +20,12 @@ const PUBLIC_ROUTES = [
   /^\/book-online/,         // /book-online - public booking page
   /^\/book(\/|$)/,          // /book - same public booking page (canonical route)
   /^\/auth-verify/,         // /auth-verify - SMS magic link verification
-  // Sign-in screens are safe without the shared password: each one requires a
-  // real credential, and every data API is enforced server-side regardless.
-  // This lets a fresh install (e.g. the Play Store app) go straight to login.
-  /^\/$/,                   // root landing (redirects to /crm/login when signed out)
-  /^\/crm\/login/,          // CRM sign-in
+  // Customer/employee sign-in screens stay open — each requires its own
+  // credential and every data API is enforced server-side regardless.
+  // NOTE: the CRM entry ("/" and "/crm/login") is intentionally NOT public, so
+  // a brand-new device hits the shared-password gate first. Once passed, the
+  // per-device flag (see checkAuthStatus) skips it on every future visit —
+  // even after a CRM logout or session timeout.
   /^\/login/,               // GHVAC Tools SMS magic-link sign-in
   /^\/employee-portal\/login/, // employee portal sign-in
 ];
@@ -78,10 +79,8 @@ export default function GlobalPasswordGate({ children }: { children: React.React
       setAuthRequired(true);
     }
 
-    // Source of truth: ask the server whether this browser currently holds a
-    // valid credential (global gate session, employee-portal, CRM, or admin).
-    // This avoids trusting a stale localStorage flag once server enforcement is
-    // on (server session is 8h; the localStorage hint is 90d).
+    // An active server credential (a CRM login, or a fresh gate unlock this
+    // session) skips the gate outright.
     try {
       const sessionResponse = await fetch('/api/global/session', { credentials: 'include' });
       if (sessionResponse.ok) {
@@ -90,10 +89,12 @@ export default function GlobalPasswordGate({ children }: { children: React.React
           setIsAuthenticated(true);
           return;
         }
-        // Server says not authed — clear any stale local hint and show the gate.
-        localStorage.removeItem(STORAGE_KEY);
-        setIsAuthenticated(false);
-        return;
+        // No active server session (e.g. logged out or the 8h session timed
+        // out). That is NOT a reason to re-prompt for the shared password: if
+        // this DEVICE already passed the gate, the per-device flag below keeps
+        // it trusted and sends the user straight to login. A brand-new device
+        // has no flag and gets the gate. (Real data stays protected either way —
+        // the server enforces a credential on every API independently.)
       }
     } catch {
       // Endpoint unreachable — fall back to the checks below.
