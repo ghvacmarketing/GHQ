@@ -70,7 +70,7 @@ export default function CrmEsign() {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<"overview" | "list" | "card">("overview");
+  const [view, setView] = useState<"overview" | "list" | "card">("list");
 
   const { uploadFile, isUploading } = useUpload();
 

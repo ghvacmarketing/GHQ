@@ -49,7 +49,7 @@ const SEGMENTS = [
 export default function CrmAnalytics() {
   const { toast } = useToast();
   const [detail, setDetail] = useState<SensorView | null>(null);
-  const [view, setView] = useState<"overview" | "list" | "card">("overview");
+  const [view, setView] = useState<"overview" | "list" | "card">("card");
   const [mapping, setMapping] = useState<SensorView | null>(null);
 
   const { data: currentUser } = useQuery<CrmUser>({ queryKey: ["/api/crm/auth/me"] });

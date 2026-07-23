@@ -275,15 +275,27 @@ export default function CrmRebatePrograms() {
         </div>
       </div>
 
-      {/* Title row */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">Rebate Program Cases</h1>
-          <p className="text-sm text-slate-500">
+      {/* Title row — tabs sit inline, like the rest of the CRM */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0 shrink-0">
+          <h1 className="font-display text-xl font-semibold tracking-tight text-slate-900">Rebate Program Cases</h1>
+          <p className="mt-0.5 text-sm text-slate-500">
             {filtered.length} {filtered.length === 1 ? "case" : "cases"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="mx-auto">
+          <IndustrialTabs
+            testidPrefix="tab"
+            activeKey={activeTab}
+            onSelect={setActiveTab}
+            tabs={QUICK_FILTERS.map((tab) => ({
+              key: tab.status || "all",
+              label: tab.label,
+              count: tab.status === "" ? cases.length : cases.filter((c) => c.applicationStatus === tab.status).length,
+            }))}
+          />
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
           <Select value={filterProgram} onValueChange={setFilterProgram}>
             <SelectTrigger className="w-[130px] h-8 text-xs border-slate-200 focus:ring-0 focus:ring-offset-0">
               <SelectValue placeholder="All Programs" />
@@ -304,18 +316,6 @@ export default function CrmRebatePrograms() {
           </Button>
         </div>
       </div>
-
-      {/* Status tabs */}
-      <IndustrialTabs
-        testidPrefix="tab"
-        activeKey={activeTab}
-        onSelect={setActiveTab}
-        tabs={QUICK_FILTERS.map((tab) => ({
-          key: tab.status || "all",
-          label: tab.label,
-          count: tab.status === "" ? cases.length : cases.filter((c) => c.applicationStatus === tab.status).length,
-        }))}
-      />
 
         {/* Table */}
         <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
