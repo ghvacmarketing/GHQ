@@ -4,7 +4,7 @@ import { queryClient } from "@/lib/queryClient";
 import { Link, useLocation } from "wouter";
 import { format, isToday, formatDistanceToNow } from "date-fns";
 import { getLocalStartOfDay, getLocalEndOfDay, formatLocal, toLocalTime } from "@/lib/timezone";
-import { MapPin, Clock, ClipboardList, WifiOff, CloudOff, LogIn, User, DollarSign, TrendingUp, Wrench, FileText, Users, Target, CheckCircle, XCircle, MessageSquare, Phone, Navigation, ChevronRight, Thermometer, Droplets, Wind, Settings, AlertTriangle, Calendar, Bell, Monitor } from "lucide-react";
+import { MapPin, Clock, ClipboardList, WifiOff, CloudOff, LogIn, User, DollarSign, TrendingUp, TrendingDown, Wrench, FileText, Users, Target, CheckCircle, XCircle, MessageSquare, Phone, Navigation, ChevronRight, Thermometer, Droplets, Wind, Settings, AlertTriangle, Calendar, Bell, Monitor } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,10 +23,12 @@ interface WorkOrderWithDetails extends CrmWorkOrder {
 
 type WeeklyRevenue = { label: string; revenue: number; current: boolean };
 type InvoicingSummary = { collected: number; outstanding: number; openCount: number };
+type LeaderboardRow = { name: string; revenue: number; jobs: number };
 
 interface TechPerformance {
   role: "tech";
   weeklyRevenue?: WeeklyRevenue[];
+  leaderboard?: LeaderboardRow[];
   invoicing?: InvoicingSummary;
   dayOfMonth?: number;
   daysInMonth?: number;
@@ -42,6 +44,7 @@ interface TechPerformance {
 interface SalesPerformance {
   role: "sales";
   weeklyRevenue?: WeeklyRevenue[];
+  leaderboard?: LeaderboardRow[];
   dayOfMonth?: number;
   daysInMonth?: number;
   leadsReceived: number;
@@ -160,7 +163,7 @@ function WeeklyBars({ weeks }: { weeks: WeeklyRevenue[] }) {
             <div key={w.label} className="flex flex-1 flex-col items-center justify-end gap-1">
               <span className="text-xs font-bold text-slate-700">{fmtK(w.revenue)}</span>
               <div
-                className={`w-full rounded-lg ${
+                className={`w-full rounded-[3px] ${
                   w.current
                     ? "bg-[repeating-linear-gradient(45deg,#e9d5c8,#e9d5c8_5px,#f6ede6_5px,#f6ede6_10px)]"
                     : isBest
@@ -188,8 +191,8 @@ function InvoicingBar({ inv }: { inv: InvoicingSummary }) {
         <p className="text-[11px] font-semibold uppercase tracking-wider text-[#711419]">Invoicing</p>
         <p className="text-xs font-bold text-green-600">{pct}% collected</p>
       </div>
-      <div className="mt-2.5 flex h-2.5 overflow-hidden rounded-full bg-slate-100">
-        <span className="rounded-l-full bg-green-600" style={{ width: `${pct}%` }} />
+      <div className="mt-2.5 flex h-2.5 overflow-hidden rounded-[3px] bg-slate-100">
+        <span className="bg-green-600" style={{ width: `${pct}%` }} />
         <span className="bg-amber-500" style={{ width: `${100 - pct}%` }} />
       </div>
       <div className="mt-2 flex items-center justify-between text-xs">
@@ -197,6 +200,89 @@ function InvoicingBar({ inv }: { inv: InvoicingSummary }) {
         <span className="font-semibold text-amber-600">
           {fmt(inv.outstanding)} outstanding{inv.openCount > 0 ? ` · ${inv.openCount} invoice${inv.openCount === 1 ? "" : "s"}` : ""}
         </span>
+      </div>
+    </div>
+  );
+}
+
+function TrendCard({ weeks }: { weeks: WeeklyRevenue[] }) {
+  if (weeks.length < 2) return null;
+  const cur = weeks[weeks.length - 1];
+  const prev = weeks[weeks.length - 2];
+  const delta = prev.revenue > 0 ? ((cur.revenue - prev.revenue) / prev.revenue) * 100 : cur.revenue > 0 ? 100 : 0;
+  const up = delta >= 0;
+  const max = Math.max(1, ...weeks.map((x) => x.revenue));
+  const fmt = (v: number) => `$${Math.round(v).toLocaleString("en-US")}`;
+  return (
+    <div className="rounded-lg bg-white p-4 shadow-sm" data-testid="perf-trend">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#711419]">This Week vs Last</p>
+        <span className={`flex items-center gap-1 rounded-[3px] px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${up ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}>
+          {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+          {Math.abs(Math.round(delta))}%
+        </span>
+      </div>
+      <div className="mt-2 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-2xl font-bold tabular-nums text-slate-900" data-testid="perf-trend-value">{fmt(cur.revenue)}</p>
+          <p className="text-[11px] text-slate-400">this week · {fmt(prev.revenue)} last week</p>
+        </div>
+        <div className="flex shrink-0 items-end gap-1" style={{ height: 36 }}>
+          {weeks.map((w) => (
+            <span
+              key={w.label}
+              className={`w-2 rounded-[2px] ${w.current ? "bg-[#711419]" : "bg-slate-200"}`}
+              style={{ height: Math.max(4, Math.round((w.revenue / max) * 36)) }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LeaderboardCard({ rows, meName }: {
+  rows: { name: string; revenue: number; jobs: number }[];
+  meName?: string;
+}) {
+  if (rows.length === 0) return null;
+  const max = Math.max(1, ...rows.map((r) => r.revenue));
+  const fmtK = (v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${Math.round(v)}`);
+  return (
+    <div className="rounded-lg bg-white p-4 shadow-sm" data-testid="perf-leaderboard">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-[#711419]">Team Leaderboard</p>
+        <p className="text-[11px] text-slate-400">revenue MTD</p>
+      </div>
+      <div className="mt-2.5 space-y-1.5">
+        {rows.map((r, i) => {
+          const isMe = !!meName && r.name === meName;
+          return (
+            <div
+              key={r.name}
+              className={`relative overflow-hidden rounded-[4px] border px-2.5 py-1.5 ${
+                isMe ? "border-[#711419]/30" : "border-slate-200"
+              }`}
+              data-testid={`leaderboard-row-${i}`}
+            >
+              <div
+                className={`absolute inset-y-0 left-0 ${isMe ? "bg-[#711419]/[0.07]" : "bg-slate-100"}`}
+                style={{ width: `${(r.revenue / max) * 100}%` }}
+              />
+              <div className="relative flex items-center gap-2">
+                <span className={`w-5 shrink-0 text-center text-xs font-bold tabular-nums ${i === 0 ? "text-[#711419]" : "text-slate-400"}`}>
+                  {i + 1}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">
+                  {r.name}
+                  {isMe && <span className="text-slate-400"> · you</span>}
+                </span>
+                <span className="shrink-0 text-[11px] text-slate-400">{r.jobs} job{r.jobs === 1 ? "" : "s"}</span>
+                <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">{fmtK(r.revenue)}</span>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -955,7 +1041,7 @@ export default function MobileAgenda() {
                 <div className="space-y-2.5 border-t border-slate-200 pt-4" data-testid="perf-section">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">My Performance</h3>
-                    <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-500 shadow-sm">
+                    <span className="rounded-[3px] bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-500 shadow-sm">
                       {format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), "MMM d")}–{format(new Date(), "d")}
                     </span>
                   </div>
@@ -1005,9 +1091,17 @@ export default function MobileAgenda() {
                   {/* Weekly revenue */}
                   {pd.weeklyRevenue && pd.weeklyRevenue.length > 0 && <WeeklyBars weeks={pd.weeklyRevenue} />}
 
+                  {/* Week-over-week trend */}
+                  {pd.weeklyRevenue && pd.weeklyRevenue.length > 1 && <TrendCard weeks={pd.weeklyRevenue} />}
+
                   {/* Invoicing (techs) */}
                   {isTech && pd.invoicing && (pd.invoicing.collected > 0 || pd.invoicing.outstanding > 0) && (
                     <InvoicingBar inv={pd.invoicing} />
+                  )}
+
+                  {/* Team leaderboard */}
+                  {pd.leaderboard && pd.leaderboard.length > 0 && (
+                    <LeaderboardCard rows={pd.leaderboard} meName={currentUser?.name} />
                   )}
                 </div>
               );

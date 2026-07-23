@@ -22593,6 +22593,30 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           eq(monthlyGoals.month, month)
         ));
 
+      // Month-to-date revenue leaderboard (paid invoices attributed to the assigned tech)
+      let leaderboard: { name: string; revenue: number; jobs: number }[] = [];
+      try {
+        const lbRows = await db.select({
+          name: crmUsers.name,
+          revenue: sql<string>`COALESCE(SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))), 0)`,
+          jobs: sql<number>`COUNT(DISTINCT ${crmInvoices.workOrderId})::int`,
+        })
+          .from(crmInvoices)
+          .innerJoin(crmWorkOrders, eq(crmInvoices.workOrderId, crmWorkOrders.id))
+          .innerJoin(crmUsers, eq(crmWorkOrders.assignedTechId, crmUsers.id))
+          .where(and(
+            eq(crmInvoices.status, "paid"),
+            sql`COALESCE(${crmInvoices.paidAt}, ${crmInvoices.updatedAt}) >= ${startOfMonth}`
+          ))
+          .groupBy(crmUsers.id, crmUsers.name)
+          .orderBy(sql`SUM(CAST(${crmInvoices.total} AS DECIMAL(10,2))) DESC`);
+        leaderboard = lbRows
+          .map((r) => ({ name: r.name, revenue: parseFloat(r.revenue || "0"), jobs: Number(r.jobs) || 0 }))
+          .slice(0, 6);
+      } catch (e) {
+        console.error("my-performance leaderboard error (non-fatal):", e);
+      }
+
       if (user.role === "tech" || user.role === "supervisor") {
         // Tech performance data - invoice-payment-driven attribution
         // Revenue counts as soon as invoice is paid, regardless of work order status
@@ -22726,6 +22750,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           goalTarget: techGoal,
           weeklyRevenue,
           invoicing,
+          leaderboard,
           dayOfMonth,
           daysInMonth,
         });
@@ -22841,6 +22866,7 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
           quoted: sentQuotesTotal,
           goal: individualInstallGoal, // Divided by number of salespeople like tech goal
           weeklyRevenue: weeklyRevenueS,
+          leaderboard,
           dayOfMonth: dayOfMonthS,
           daysInMonth: daysInMonthS,
         });
