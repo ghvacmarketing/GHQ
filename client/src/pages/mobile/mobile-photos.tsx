@@ -438,21 +438,7 @@ export default function MobilePhotos() {
               </button>
             </div>
           </div>
-        ) : (
-          <button
-            onClick={() => { setCustomerSearch(""); setSearchActive(true); setTimeout(() => searchInputRef.current?.focus(), 0); }}
-            className="flex w-full items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-white px-4 py-3.5 text-left active:bg-slate-50"
-            data-testid="photo-target-empty"
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#711419]/10">
-              <Camera className="h-5 w-5 text-[#711419]" />
-            </span>
-            <span className="min-w-0">
-              <span className="block font-semibold text-slate-900">Add photos to a customer</span>
-              <span className="block text-xs text-slate-500">Search any customer, then shoot or upload.</span>
-            </span>
-          </button>
-        )}
+        ) : null}
 
         {/* Capture / library */}
         {activeCustomer && (
