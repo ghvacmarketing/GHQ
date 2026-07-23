@@ -115,6 +115,21 @@ export default function MobilePhotos() {
     enabled: !!currentUser,
     refetchInterval: 30 * 1000,
   });
+
+  // Customers with recent photo activity — bigger rail above the photo strip
+  const recentCustomers = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; count: number; latest: FeedPhoto }>();
+    for (const rp of recentPhotos) {
+      if (!rp.customerId) continue;
+      const cur = map.get(rp.customerId);
+      if (cur) {
+        cur.count++;
+      } else {
+        map.set(rp.customerId, { id: rp.customerId, name: rp.customerName || "Customer", count: 1, latest: rp });
+      }
+    }
+    return Array.from(map.values()).slice(0, 10);
+  }, [recentPhotos]);
   const chooseJob = (jobId: string) => {
     setSelectedJobId(jobId);
     setPickedCustomer(null);
@@ -527,11 +542,38 @@ export default function MobilePhotos() {
           </>
         )}
 
+        {/* Customers with recent photo activity — larger cards, more info */}
+        {recentCustomers.length > 0 && (
+          <div className="pt-1" data-testid="recent-customers">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Customers</p>
+            <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2">
+              {recentCustomers.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => navigate(`/mobile/customers/${c.id}`)}
+                  className="w-56 shrink-0 snap-start overflow-hidden rounded-2xl border border-slate-100 bg-white text-left shadow-sm transition-transform active:scale-[0.98]"
+                  data-testid={`recent-customer-${c.id}`}
+                >
+                  <img src={c.latest.url} alt="" loading="lazy" className="h-28 w-full object-cover" />
+                  <div className="px-3.5 py-2.5">
+                    <p className="truncate text-[14px] font-semibold text-slate-900">{c.name}</p>
+                    <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                      {c.count} recent photo{c.count !== 1 ? "s" : ""}
+                      {c.latest.uploadedByName ? ` · ${c.latest.uploadedByName}` : ""}
+                      {c.latest.createdAt ? ` · ${format(new Date(c.latest.createdAt), "MMM d")}` : ""}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Recent photos across the company — tap to open who it's linked to */}
         {recentPhotos.length > 0 && (
-          <div data-testid="recent-photos">
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Recent — all customers</p>
-            <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1">
+          <div className="pt-1" data-testid="recent-photos">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Recent — all customers</p>
+            <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2">
               {recentPhotos.map((rp) => (
                 <button
                   key={rp.id}
@@ -545,8 +587,8 @@ export default function MobilePhotos() {
                     loading="lazy"
                     className="aspect-square w-32 rounded-2xl border border-slate-100 object-cover shadow-sm"
                   />
-                  <p className="mt-1.5 truncate text-[12px] font-semibold text-slate-800">{rp.customerName || "No customer"}</p>
-                  <p className="truncate text-[11px] text-slate-400">
+                  <p className="mt-2 truncate text-[12px] font-semibold text-slate-800">{rp.customerName || "No customer"}</p>
+                  <p className="mt-0.5 truncate text-[11px] text-slate-400">
                     {rp.uploadedByName || "Unknown"}
                     {rp.createdAt ? ` · ${format(new Date(rp.createdAt), "MMM d")}` : ""}
                   </p>

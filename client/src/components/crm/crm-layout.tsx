@@ -5,6 +5,14 @@ import { cn } from "@/lib/utils";
 // re-mounts per page) so the nav doesn't jump back to the top when you click.
 let navScrollPos = 0;
 import { Link, useLocation } from "wouter";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { clearCrmToken } from "@/lib/crmAuth";
@@ -44,6 +52,12 @@ import {
   Activity,
   Sparkles,
   MessageSquarePlus,
+  LayoutGrid as AppGridIcon,
+  Monitor as AppMonitorIcon,
+  Smartphone as AppPhoneIcon,
+  FolderOpen as AppDocsIcon,
+  Calculator as AppAcctIcon,
+  Megaphone as AppMktIcon,
   PanelLeftClose,
   ChevronUp,
   ChevronDown,
@@ -395,6 +409,7 @@ function SidebarContent({
 }
 
 export function CrmLayout({ children, currentUser, disableScroll = false, hideGlobalSearch = false, flush = false }: CrmLayoutProps) {
+  const [, navigate] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
@@ -443,7 +458,39 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
           topNavCollapsed && "-translate-y-full"
         )}
       >
-        <div className="flex-1" />
+        <div className="flex flex-1 items-center">
+          {/* App switcher — jump between GHQ apps */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" title="Switch app" data-testid="button-app-switcher">
+                <AppGridIcon className="h-5 w-5 text-slate-600" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Apps</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => navigate("/mobile")} data-testid="app-switch-field">
+                <AppPhoneIcon className="mr-2 h-4 w-4 text-slate-500" /> Field
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/documents")} data-testid="app-switch-documents">
+                <AppDocsIcon className="mr-2 h-4 w-4 text-slate-500" /> Documents
+              </DropdownMenuItem>
+              {["owner", "admin", "supervisor"].includes(currentUser?.role || "") && (
+                <DropdownMenuItem onClick={() => navigate("/accounting")} data-testid="app-switch-accounting">
+                  <AppAcctIcon className="mr-2 h-4 w-4 text-slate-500" /> Accounting
+                </DropdownMenuItem>
+              )}
+              {["owner", "admin", "supervisor", "sales"].includes(currentUser?.role || "") && (
+                <DropdownMenuItem onClick={() => navigate("/marketing")} data-testid="app-switch-marketing">
+                  <AppMktIcon className="mr-2 h-4 w-4 text-slate-500" /> Marketing
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate("/")} data-testid="app-switch-home">
+                <AppMonitorIcon className="mr-2 h-4 w-4 text-slate-500" /> All apps
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
         {/* Global customer-related search — inline dropdown of linked records, centered */}
         <TopNavSearch />
 

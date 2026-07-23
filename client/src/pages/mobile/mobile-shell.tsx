@@ -114,23 +114,22 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
       style={{ paddingTop: "env(safe-area-inset-top)" }}
       data-testid="mobile-shell"
     >
-      {/* Content scrolls underneath the floating nav pill */}
+      {/* Content scrolls underneath the bottom tab bar */}
       <main
         className="flex-1 overflow-auto"
-        style={{ paddingBottom: "calc(100px + env(safe-area-inset-bottom))" }}
+        style={{ paddingBottom: "calc(84px + env(safe-area-inset-bottom))" }}
         data-testid="mobile-main"
       >
         {children}
       </main>
 
-      {/* Floating pill nav + detached "+" button */}
-      <div
-        className="absolute left-1/2 z-40 flex -translate-x-1/2 items-center gap-2"
-        style={{ bottom: "calc(4px + env(safe-area-inset-bottom))", maxWidth: "calc(100vw - 12px)" }}
-        data-testid="mobile-nav"
-      >
-        <nav className="rounded-full border border-slate-900/10 bg-white/90 p-1.5 shadow-[0_8px_28px_rgba(0,0,0,0.16)] backdrop-blur-xl">
-          <div className="flex items-center gap-0.5">
+      {/* Flat full-width bottom tab bar (icon + label; active = maroon) */}
+      <div className="absolute inset-x-0 bottom-0 z-40" data-testid="mobile-nav">
+        <nav
+          className="rounded-t-2xl border-t border-slate-200/80 bg-[#f4f4f4]/95 shadow-[0_-6px_24px_rgba(0,0,0,0.07)] backdrop-blur-xl"
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        >
+          <div className="flex items-stretch justify-around px-2 pb-2 pt-2.5">
             {customNav ? customNav.tabs.map((tab) => {
               const active = customNav.activeId === tab.id;
               const Icon = tab.icon;
@@ -139,45 +138,46 @@ export default function MobileShell({ children, customNav }: MobileShellProps) {
                   key={tab.id}
                   onClick={() => customNav.onSelect(tab.id)}
                   data-testid={`nav-tab-${tab.id}`}
-                  className={`flex min-w-[58px] flex-col items-center justify-center gap-0.5 rounded-full px-3 py-1.5 transition-all duration-200 active:scale-95 ${
-                    active ? "bg-[#711419] text-white shadow-md" : "text-slate-500"
-                  }`}
+                  className="flex flex-1 flex-col items-center gap-1 py-0.5 transition-transform active:scale-95"
                 >
-                  <Icon className={`h-5 w-5 ${active ? "stroke-[2.25]" : "text-slate-400"}`} />
-                  <span className={`text-[10px] leading-none ${active ? "font-semibold" : "font-medium"}`}>
+                  <Icon className={`h-6 w-6 ${active ? "stroke-[2] text-[#711419]" : "text-slate-500"}`} strokeWidth={active ? 2 : 1.75} />
+                  <span className={`text-[11px] leading-none ${active ? "font-semibold text-[#711419]" : "font-medium text-slate-500"}`}>
                     {tab.label}
                   </span>
                 </button>
               );
-            }) : navTabs.map((tab) => {
-              const active = isActive(tab.path);
-              const Icon = tab.icon;
-              return (
-                <Link
-                  key={tab.path}
-                  href={tab.path}
-                  data-testid={`nav-tab-${tab.label.toLowerCase()}`}
-                  className={`flex min-w-[58px] flex-col items-center justify-center gap-0.5 rounded-full px-3 py-1.5 transition-all duration-200 active:scale-95 ${
-                    active ? "bg-[#711419] text-white shadow-md" : "text-slate-500"
-                  }`}
+            }) : (
+              <>
+                {navTabs.map((tab) => {
+                  const active = isActive(tab.path);
+                  const Icon = tab.icon;
+                  return (
+                    <Link
+                      key={tab.path}
+                      href={tab.path}
+                      data-testid={`nav-tab-${tab.label.toLowerCase()}`}
+                      className="flex flex-1 flex-col items-center gap-1 py-0.5 transition-transform active:scale-95"
+                    >
+                      <Icon className={`h-6 w-6 ${active ? "text-[#711419]" : "text-slate-500"}`} strokeWidth={active ? 2 : 1.75} />
+                      <span className={`text-[11px] leading-none ${active ? "font-semibold text-[#711419]" : "font-medium text-slate-500"}`}>
+                        {tab.label}
+                      </span>
+                    </Link>
+                  );
+                })}
+                <button
+                  onClick={() => setMoreOpen(true)}
+                  className="flex flex-1 flex-col items-center gap-1 py-0.5 transition-transform active:scale-95"
+                  data-testid="nav-tab-more"
+                  aria-label="More"
                 >
-                  <Icon className={`h-5 w-5 ${active ? "stroke-[2.25]" : "text-slate-400"}`} />
-                  <span className={`text-[10px] leading-none ${active ? "font-semibold" : "font-medium"}`}>
-                    {tab.label}
-                  </span>
-                </Link>
-              );
-            })}
+                  <Plus className="h-6 w-6 text-slate-500" strokeWidth={1.75} />
+                  <span className="text-[11px] font-medium leading-none text-slate-500">More</span>
+                </button>
+              </>
+            )}
           </div>
         </nav>
-        {!customNav && <button
-          onClick={() => setMoreOpen(true)}
-          className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-full bg-[#711419] text-white shadow-[0_8px_28px_rgba(113,20,25,0.45)] transition-transform active:scale-95"
-          data-testid="nav-tab-more"
-          aria-label="More"
-        >
-          <Plus className="h-6 w-6 stroke-[2.5]" />
-        </button>}
       </div>
 
       {/* "+" sheet — extra destinations and supervisor quick actions */}
