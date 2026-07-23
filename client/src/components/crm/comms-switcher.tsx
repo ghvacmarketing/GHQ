@@ -1,9 +1,8 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
-import { Phone, MessageSquare, Mail } from "lucide-react";
+import { MessageSquare, Mail } from "lucide-react";
 
 const ITEMS = [
-  { key: "phone", label: "Phone", icon: Phone, href: "/crm/phone" },
   { key: "messages", label: "Messages", icon: MessageSquare, href: "/crm/messaging" },
   { key: "mail", label: "Mail", icon: Mail, href: "/crm/mail" },
 ] as const;

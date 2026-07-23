@@ -39,6 +39,7 @@ import {
   Package,
   BookOpen,
   Headset,
+  Phone,
   Bell,
   Camera,
   ListTodo,
@@ -93,11 +94,12 @@ const navSections: NavSection[] = [
     items: [
       { label: "Dashboard", href: "/crm/dashboard", icon: LayoutDashboard },
       { label: "Dispatch Board", href: "/crm/dispatch", icon: CalendarClock },
+      { label: "Phone", href: "/crm/phone", icon: Phone },
       {
-        label: "Comms",
-        href: "/crm/phone",
+        label: "Inbox",
+        href: "/crm/messaging",
         icon: Headset,
-        activePaths: ["/crm/phone", "/crm/messaging", "/crm/mail"],
+        activePaths: ["/crm/messaging", "/crm/mail"],
       },
       { label: "Notifications", href: "/crm/notifications", icon: Bell },
     ],
@@ -344,13 +346,13 @@ function SidebarContent({
                     <div className="space-y-1">
                       {section.items.map((item) => {
                         let itemWithBadge = item;
-                        if (item.label === "Comms" && unreadData?.unreadCount) {
+                        if (item.label === "Inbox" && unreadData?.unreadCount) {
                           itemWithBadge = { ...item, badgeCount: unreadData.unreadCount };
                         } else if (item.label === "Notifications" && notificationCount?.count && notificationCount.count > 0) {
                           itemWithBadge = { ...item, badgeCount: notificationCount.count };
                         }
-                        if (item.label === "Comms") {
-                          // Reopen Comms on whichever tab was used last (default: Phone)
+                        if (item.label === "Inbox") {
+                          // Reopen the inbox on whichever tab was used last (default: Messages)
                           const last = localStorage.getItem("crmCommsLastTab");
                           if (last && (item.activePaths ?? []).some((p) => last.startsWith(p))) {
                             itemWithBadge = { ...itemWithBadge, href: last };
