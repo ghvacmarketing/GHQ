@@ -21,7 +21,7 @@ export function MarketingChrome({
   const standalone = location.startsWith("/marketing");
 
   if (!standalone) {
-    return <CrmLayout currentUser={currentUser}>{children}</CrmLayout>;
+    return <CrmLayout currentUser={currentUser as CrmUser}>{children}</CrmLayout>;
   }
 
   return (
