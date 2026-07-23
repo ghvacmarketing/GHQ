@@ -2,8 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Camera, Download, ImageIcon, ImagePlus, Loader2, MapPin, Search, Trash2, X } from "lucide-react";
-import { getLocalStartOfDay, getLocalEndOfDay, toLocalTime } from "@/lib/timezone";
+import { Camera, Download, ImageIcon, ImagePlus, Loader2, Search, Trash2, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,18 +12,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import MobileShell from "./mobile-shell";
 import { PhotoViewer } from "@/components/mobile/photo-viewer";
-import type { CrmUser, CrmWorkOrder, CrmCustomer, CustomerFile } from "@shared/schema";
-
-type WorkOrderWithDetails = CrmWorkOrder & { customer?: CrmCustomer | null };
+import type { CrmUser, CustomerFile } from "@shared/schema";
 
 export default function MobilePhotos() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  // A customer chosen via search (any customer, not just today's jobs). When
-  // set, it overrides the job-based target.
+  // The customer photos get attached to — always chosen via search.
   const [pickedCustomer, setPickedCustomer] = useState<{ id: string; name: string; phone?: string | null } | null>(null);
   const [searchActive, setSearchActive] = useState(false);
   const [customerSearch, setCustomerSearch] = useState("");
@@ -39,40 +34,7 @@ export default function MobilePhotos() {
     },
   });
 
-  const todayStart = getLocalStartOfDay(new Date()).toISOString();
-  const todayEnd = getLocalEndOfDay(new Date()).toISOString();
-  const { data: workOrders, isLoading: jobsLoading } = useQuery<WorkOrderWithDetails[]>({
-    queryKey: ["/api/crm/work-orders", "photos", todayStart],
-    queryFn: async () => {
-      const params = new URLSearchParams({ dateFrom: todayStart, dateTo: todayEnd });
-      if (currentUser && ["tech", "sales"].includes(currentUser.role)) {
-        params.set("techId", currentUser.id);
-      }
-      const res = await fetch(`/api/crm/work-orders?${params}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load jobs");
-      const data = await res.json();
-      return data.workOrders || [];
-    },
-    enabled: !!currentUser,
-  });
-
-  const jobs = useMemo(
-    () => (workOrders || []).filter((wo) => wo.customerId).sort((a, b) => {
-      const at = a.scheduledStart ? new Date(a.scheduledStart).getTime() : Infinity;
-      const bt = b.scheduledStart ? new Date(b.scheduledStart).getTime() : Infinity;
-      return at - bt;
-    }),
-    [workOrders],
-  );
-  // Job target: an explicit chip, else the first job of the day — unless a
-  // customer was searched, in which case we ignore jobs entirely.
-  const jobFromSelection = selectedJobId ? jobs.find((j) => j.id === selectedJobId) : null;
-  const selectedJob = pickedCustomer ? null : (jobFromSelection || jobs[0] || null);
-  const activeCustomer: { id: string; name: string; phone?: string | null } | null = pickedCustomer
-    ? pickedCustomer
-    : selectedJob?.customerId
-      ? { id: selectedJob.customerId, name: selectedJob.customer?.name || selectedJob.title || "Customer", phone: selectedJob.customer?.phone }
-      : null;
+  const activeCustomer = pickedCustomer;
   const customerId = activeCustomer?.id || null;
 
   // Search ANY customer to attach photos to (mobile-friendly, tech-accessible).
@@ -88,7 +50,6 @@ export default function MobilePhotos() {
 
   const chooseCustomer = (c: { id: string; name: string; phone?: string | null }) => {
     setPickedCustomer({ id: c.id, name: c.name, phone: c.phone ?? null });
-    setSelectedJobId(null);
     setSearchActive(false);
     setCustomerSearch("");
     searchInputRef.current?.blur();
@@ -130,10 +91,6 @@ export default function MobilePhotos() {
     }
     return Array.from(map.values()).slice(0, 10);
   }, [recentPhotos]);
-  const chooseJob = (jobId: string) => {
-    setSelectedJobId(jobId);
-    setPickedCustomer(null);
-  };
 
   const { data: files, isLoading: filesLoading } = useQuery<CustomerFile[]>({
     queryKey: ["/api/crm/customers", customerId, "files"],
@@ -333,9 +290,8 @@ export default function MobilePhotos() {
     const { uploadURL, objectPath } = await presignRes.json();
     await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
     const fileUrl = objectPath.startsWith("/objects") ? objectPath : `/objects/${objectPath}`;
-    const namePrefix = !pickedCustomer && selectedJob ? `WO-${selectedJob.workOrderNumber ?? ""} ` : "";
     await apiRequest("POST", `/api/crm/customers/${customerId}/files`, {
-      name: `${namePrefix}${file.name}`.trim(),
+      name: file.name,
       url: fileUrl,
       objectPath,
       contentType: file.type,
@@ -358,9 +314,8 @@ export default function MobilePhotos() {
         await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
         // objectPath may already carry the /objects prefix (Neon store mode)
         const fileUrl = objectPath.startsWith("/objects") ? objectPath : `/objects/${objectPath}`;
-        const namePrefix = !pickedCustomer && selectedJob ? `WO-${selectedJob.workOrderNumber ?? ""} ` : "";
         await apiRequest("POST", `/api/crm/customers/${customerId}/files`, {
-          name: `${namePrefix}${file.name}`.trim(),
+          name: file.name,
           url: fileUrl,
           objectPath,
           contentType: file.type,
@@ -383,7 +338,7 @@ export default function MobilePhotos() {
       <div className="p-4 space-y-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">Photos</h2>
-          <p className="text-sm text-slate-500">Attach photos to any customer — search or pick a job.</p>
+          <p className="text-sm text-slate-500">Search any customer to add photos, or browse recent shots.</p>
         </div>
 
         {/* iOS-style search: minimal pill; Cancel slides in on focus and the
@@ -465,47 +420,39 @@ export default function MobilePhotos() {
               <p className="truncate font-semibold text-slate-900">{activeCustomer.name}</p>
               {activeCustomer.phone && <p className="truncate text-xs text-slate-500">{activeCustomer.phone}</p>}
             </div>
-            <button
-              onClick={() => { setCustomerSearch(""); setSearchActive(true); setTimeout(() => searchInputRef.current?.focus(), 0); }}
-              className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 active:scale-95"
-              data-testid="button-change-customer"
-            >
-              Change
-            </button>
-          </div>
-        ) : null}
-
-        {/* Today's jobs — quick shortcuts */}
-        {jobsLoading ? (
-          <Skeleton className="h-14 rounded-lg" />
-        ) : jobs.length > 0 ? (
-          <div>
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Today's jobs</p>
-            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-              {jobs.map((job) => {
-                const active = !pickedCustomer && selectedJob?.id === job.id;
-                return (
-                  <button
-                    key={job.id}
-                    onClick={() => chooseJob(job.id)}
-                    className={`shrink-0 rounded-lg border px-3.5 py-2 text-left transition-all active:scale-95 ${
-                      active ? "border-[#711419] bg-[#711419] text-white shadow-md" : "border-slate-200 bg-white text-slate-700"
-                    }`}
-                    data-testid={`photo-job-${job.id}`}
-                  >
-                    <p className="text-xs font-semibold">
-                      {job.scheduledStart ? format(toLocalTime(job.scheduledStart), "h:mm a") : "Unscheduled"}
-                    </p>
-                    <p className={`flex items-center gap-1 text-[11px] ${active ? "text-white/80" : "text-slate-500"}`}>
-                      <MapPin className="h-3 w-3" />
-                      {job.customer?.name || job.title || "Job"}
-                    </p>
-                  </button>
-                );
-              })}
+            <div className="flex shrink-0 items-center gap-1.5">
+              <button
+                onClick={() => { setCustomerSearch(""); setSearchActive(true); setTimeout(() => searchInputRef.current?.focus(), 0); }}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 active:scale-95"
+                data-testid="button-change-customer"
+              >
+                Change
+              </button>
+              <button
+                onClick={() => setPickedCustomer(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 active:scale-95"
+                data-testid="button-clear-customer"
+                aria-label="Clear customer"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
           </div>
-        ) : null}
+        ) : (
+          <button
+            onClick={() => { setCustomerSearch(""); setSearchActive(true); setTimeout(() => searchInputRef.current?.focus(), 0); }}
+            className="flex w-full items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-white px-4 py-3.5 text-left active:bg-slate-50"
+            data-testid="photo-target-empty"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#711419]/10">
+              <Camera className="h-5 w-5 text-[#711419]" />
+            </span>
+            <span className="min-w-0">
+              <span className="block font-semibold text-slate-900">Add photos to a customer</span>
+              <span className="block text-xs text-slate-500">Search any customer, then shoot or upload.</span>
+            </span>
+          </button>
+        )}
 
         {/* Capture / library */}
         {activeCustomer && (
