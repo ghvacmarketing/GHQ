@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, isBefore, startOfDay } from "date-fns";
-import { Plus, Check, Trash2, ChevronDown, ChevronRight, CalendarDays, Circle } from "lucide-react";
+import { Plus, Check, Trash2, ChevronDown, ChevronRight, CalendarDays, Circle, MapPin, ExternalLink } from "lucide-react";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useSmoothLoading } from "@/hooks/use-smooth-loading";
@@ -38,7 +39,8 @@ export default function CrmTasksSimple() {
     enabled: !!currentUser,
   });
 
-  const [scope, setScope] = useState<"mine" | "everyone">("mine");
+  const [scope, setScope] = useState<"mine" | "everyone" | "comments">("mine");
+  const [, navigate] = useLocation();
   const [completedOpen, setCompletedOpen] = useState(false);
 
   const { data: tasksData, isLoading: tasksLoadingRaw } = useQuery<{ tasks: (Task & { assignedToUser?: CrmUser | null })[] }>({
@@ -53,6 +55,23 @@ export default function CrmTasksSimple() {
     enabled: !!currentUser,
   });
   const tasksLoading = useSmoothLoading(tasksLoadingRaw);
+
+  type PinRow = {
+    id: string; path: string; body: string; createdByName: string | null; created_at: string; mentions: string[];
+  };
+  const { data: allPins = [] } = useQuery<PinRow[]>({
+    queryKey: ["/api/crm/pins", "all-open"],
+    queryFn: async () => {
+      const res = await fetch("/api/crm/pins", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!currentUser && scope === "comments",
+  });
+  const resolvePin = useMutation({
+    mutationFn: async (id: string) => apiRequest("PATCH", `/api/crm/pins/${id}`, { resolved: true }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/crm/pins"] }),
+  });
 
   const tasks = tasksData?.tasks ?? [];
   const open = useMemo(
@@ -210,12 +229,55 @@ export default function CrmTasksSimple() {
               tabs={[
                 { key: "mine", label: "My Tasks" },
                 { key: "everyone", label: "Everyone" },
+                { key: "comments", label: "Comments", count: scope === "comments" && allPins.length ? allPins.length : null },
               ]}
             />
           </div>
         </div>
 
+        {/* Comments across the CRM — open pin comments, click through to the spot */}
+        {scope === "comments" && (
+          allPins.length === 0 ? (
+            <div className="rounded-[4px] border border-dashed border-slate-300 bg-white py-14 text-center">
+              <MapPin className="mx-auto mb-3 h-8 w-8 text-slate-200" />
+              <p className="text-sm font-medium text-slate-600">No open comments</p>
+              <p className="mt-0.5 text-xs text-slate-400">Pin comments dropped anywhere in the CRM collect here.</p>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white" data-testid="pin-comment-list">
+              {allPins.map((p) => (
+                <div key={p.id} className="group flex items-start gap-3 border-b border-slate-100 px-4 py-3 last:border-0 hover:bg-slate-50" data-testid={`pin-row-${p.id}`}>
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 fill-[#711419] text-white" />
+                  <button onClick={() => navigate(`${p.path}?pin=${p.id}`)} className="min-w-0 flex-1 text-left">
+                    <p className="line-clamp-2 text-sm text-slate-900">{p.body}</p>
+                    <p className="mt-0.5 text-[11px] text-slate-400">
+                      {p.createdByName || "Someone"} · {p.path} · {format(new Date(p.created_at), "MMM d, h:mm a")}
+                    </p>
+                  </button>
+                  <button
+                    onClick={() => navigate(`${p.path}?pin=${p.id}`)}
+                    className="mt-0.5 rounded p-1 text-slate-300 opacity-0 hover:bg-slate-100 hover:text-slate-600 group-hover:opacity-100"
+                    title="Open at the pinned spot"
+                    data-testid={`pin-open-${p.id}`}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => resolvePin.mutate(p.id)}
+                    className="mt-0.5 rounded p-1 text-slate-300 opacity-0 hover:bg-green-50 hover:text-green-700 group-hover:opacity-100"
+                    title="Resolve"
+                    data-testid={`pin-resolve-${p.id}`}
+                  >
+                    <Check className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+
         {/* Quick add */}
+        {scope !== "comments" && (
         <div className="flex items-center gap-2 rounded-[4px] border border-slate-300/70 bg-white px-3 py-2" data-testid="task-add-bar">
           <Plus className="h-4 w-4 shrink-0 text-[#711419]" />
           <Input
@@ -240,9 +302,10 @@ export default function CrmTasksSimple() {
             </SelectContent>
           </Select>
         </div>
+        )}
 
         {/* Open tasks */}
-        {tasksLoading ? (
+        {scope === "comments" ? null : tasksLoading ? (
           <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 rounded-[4px]" />)}</div>
         ) : open.length === 0 ? (
           <div className="rounded-[4px] border border-dashed border-slate-300 bg-white py-14 text-center">
@@ -257,7 +320,7 @@ export default function CrmTasksSimple() {
         )}
 
         {/* Completed */}
-        {done.length > 0 && (
+        {scope !== "comments" && done.length > 0 && (
           <div>
             <button
               onClick={() => setCompletedOpen((v) => !v)}

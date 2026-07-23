@@ -14,8 +14,17 @@ export function registerPinCommentRoutes(app: Express): void {
   app.get("/api/crm/pins", requireCrmAuth, async (req: Request, res: Response) => {
     try {
       const p = String(req.query.path || "");
-      if (!p.startsWith("/")) return res.status(400).json({ message: "path is required" });
       const includeResolved = req.query.all === "1";
+      // No path → every open pin across the CRM (the Tasks "Comments" view)
+      if (!p) {
+        const r: any = await db.execute(sql`
+          SELECT pc.*, u.name AS "createdByName"
+          FROM pin_comments pc LEFT JOIN crm_users u ON u.id = pc.created_by
+          ${includeResolved ? sql`` : sql`WHERE pc.resolved = false`}
+          ORDER BY pc.created_at DESC LIMIT 200`);
+        return res.json(r.rows ?? []);
+      }
+      if (!p.startsWith("/")) return res.status(400).json({ message: "path is required" });
       const r: any = await db.execute(sql`
         SELECT pc.*, u.name AS "createdByName"
         FROM pin_comments pc LEFT JOIN crm_users u ON u.id = pc.created_by

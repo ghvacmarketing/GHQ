@@ -431,7 +431,7 @@ function SidebarContent({
 }
 
 export function CrmLayout({ children, currentUser, disableScroll = false, hideGlobalSearch = false, flush = false }: CrmLayoutProps) {
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
@@ -457,6 +457,20 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
     refetchInterval: 30000,
     staleTime: 25000,
   });
+
+  // Open pins on the current page — badge on the comment button. Same
+  // queryKey as PinCommentsLayer, so no extra network traffic.
+  const pinPath = location.split("?")[0];
+  const { data: pagePins } = useQuery<{ id: string }[]>({
+    queryKey: ["/api/crm/pins", pinPath],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/pins?path=${encodeURIComponent(pinPath)}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    refetchInterval: 45_000,
+  });
+  const pinCount = pagePins?.length ?? 0;
 
   // One shared motion spec for the whole chrome: sidebar width, top-bar
   // position, content margin/padding all move together on the same curve,
@@ -549,8 +563,13 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
           <Button variant="ghost" size="icon" onClick={openGlobalAI} title="Ask AI" data-testid="button-topnav-ai">
             <Sparkles className="h-5 w-5 text-slate-600" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={enterPinMode} title="Comment mode — drop a pin anywhere" data-testid="button-topnav-comment">
+          <Button variant="ghost" size="icon" className="relative" onClick={enterPinMode} title="Comment mode — drop a pin anywhere" data-testid="button-topnav-comment">
             <MessageSquarePlus className="h-5 w-5 text-slate-600" />
+            {pinCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-[3px] bg-[#711419] px-1 text-[9px] font-semibold leading-none text-white tabular-nums" data-testid="pin-count-badge">
+                {pinCount > 99 ? "99+" : pinCount}
+              </span>
+            )}
           </Button>
           <Button
             variant="ghost"
