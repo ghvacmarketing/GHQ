@@ -145,6 +145,53 @@ export function registerEsignRoutes(app: Express): void {
     }
   });
 
+  // Restore a document whose PDF bytes were lost (e.g. files stranded in the
+  // old Replit bucket after the storage migration): re-upload the original
+  // PDF, and if the document was completed, re-flatten it with the stored
+  // field values so the signed copy comes back too.
+  app.post("/api/crm/signature-documents/:id/restore-original", requireCrmAuth, async (req: Request, res: Response) => {
+    try {
+      const { objectPath } = req.body || {};
+      if (!objectPath || !String(objectPath).startsWith("/objects/")) {
+        return res.status(400).json({ message: "objectPath is required" });
+      }
+      const doc = await storage.getSignatureDocument(req.params.id);
+      if (!doc) return res.status(404).json({ message: "Not found" });
+
+      let pageCount = doc.pageCount;
+      try {
+        pageCount = await getPdfPageCount(String(objectPath));
+      } catch (e) {
+        console.error("[esign] restore: could not read PDF:", e);
+        return res.status(400).json({ message: "Could not read the uploaded PDF" });
+      }
+
+      let signedObjectPath = doc.signedObjectPath;
+      if (doc.status === "completed") {
+        const fields = await storage.getSignatureFields(doc.id);
+        const filled = fields.filter((f) => f.value);
+        if (filled.length > 0) {
+          try {
+            signedObjectPath = await flattenSignedPdf(String(objectPath), fields);
+          } catch (e) {
+            console.error("[esign] restore: re-flatten failed:", e);
+            return res.status(500).json({ message: "Re-flattening the signed PDF failed" });
+          }
+        }
+      }
+
+      const updated = await storage.updateSignatureDocument(doc.id, {
+        originalObjectPath: String(objectPath),
+        signedObjectPath,
+        pageCount,
+      } as any);
+      res.json(updated);
+    } catch (err) {
+      console.error("[esign] restore error:", err);
+      res.status(500).json({ message: "Failed to restore document" });
+    }
+  });
+
   // Get a single document with recipients + fields
   app.get("/api/crm/signature-documents/:id", requireCrmAuth, async (req, res) => {
     try {

@@ -23,6 +23,7 @@ import { useUpload } from "@/hooks/use-upload";
 import {
   PenLine, Plus, FileText, Loader2, Trash2, Upload, CheckCircle2, Send,
   Download, Clock, Users, DollarSign,
+  FileUp,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { CrmUser, SignatureDocument } from "@shared/schema";
@@ -101,6 +102,37 @@ export default function CrmEsign() {
     },
     onError: (e: Error) => toast({ title: "Could not delete", description: e.message, variant: "destructive" }),
   });
+
+  // Repair tool: re-upload a document's original PDF (for files stranded in the
+  // old storage) — completed docs get re-flattened with the stored signatures.
+  const restoreInputRef = useRef<HTMLInputElement>(null);
+  const [restoreTargetId, setRestoreTargetId] = useState<string | null>(null);
+  const restoreMutation = useMutation({
+    mutationFn: async ({ id, file }: { id: string; file: File }) => {
+      const uploaded = await uploadFile(file);
+      if (!uploaded) throw new Error("File upload failed");
+      const res = await apiRequest("POST", `/api/crm/signature-documents/${id}/restore-original`, {
+        objectPath: uploaded.objectPath,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/signature-documents"] });
+      toast({ title: "Document restored", description: "The PDF was re-attached and the signed copy rebuilt." });
+    },
+    onError: (e: Error) => toast({ title: "Restore failed", description: e.message, variant: "destructive" }),
+  });
+  const handleRestorePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (restoreInputRef.current) restoreInputRef.current.value = "";
+    if (!f || !restoreTargetId) return;
+    if (f.type !== "application/pdf") {
+      toast({ title: "PDF only", description: "Please choose a PDF file.", variant: "destructive" });
+      return;
+    }
+    restoreMutation.mutate({ id: restoreTargetId, file: f });
+    setRestoreTargetId(null);
+  };
 
   const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -262,6 +294,14 @@ export default function CrmEsign() {
                         </Button>
                       )}
                       <Button
+                        variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-slate-900"
+                        title="Restore PDF — re-upload the original if this document won't load"
+                        onClick={(e) => { e.stopPropagation(); setRestoreTargetId(doc.id); restoreInputRef.current?.click(); }}
+                        data-testid={`button-restore-${doc.id}`}
+                      >
+                        <FileUp className="h-4 w-4" />
+                      </Button>
+                      <Button
                         variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-red-600"
                         onClick={(e) => { e.stopPropagation(); setDeleteId(doc.id); }}
                         data-testid={`button-delete-${doc.id}`}
@@ -276,6 +316,8 @@ export default function CrmEsign() {
           </SectionCard>
         )}
       </div>
+
+      <input ref={restoreInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleRestorePick} data-testid="input-restore-pdf" />
 
       {/* New document dialog */}
       <Dialog open={dialogOpen} onOpenChange={(o) => { if (!busy) setDialogOpen(o); }}>
