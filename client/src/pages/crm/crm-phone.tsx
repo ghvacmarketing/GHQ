@@ -2949,10 +2949,13 @@ function CrmPhoneContent() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0 shrink-0">
           <h1 className="font-display text-xl font-semibold tracking-tight text-foreground" data-testid="crm-phone-page-title">Phone</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">Call logs, voicemails, screening and the weather that drives them.</p>
+        </div>
+        <div className="mx-auto">
+          <CommsSwitcher active="phone" bare />
         </div>
       </div>
 
@@ -3026,8 +3029,7 @@ export default function CrmPhonePage() {
   return (
     <CrmLayout currentUser={currentUser} flush disableScroll>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <CommsSwitcher active="phone" />
-        <div className="px-4 pb-4 pt-0 lg:px-5 lg:pb-5">
+        <div className="px-4 py-4 lg:px-5 lg:py-5">
           <CrmPhoneContent />
         </div>
       </div>

@@ -12,7 +12,7 @@ export type CommsTab = typeof ITEMS[number]["key"];
 
 /** Segmented switcher for the Comms console — Phone, Messages, and Mail stay
  *  separate pages; this identical strip on each makes them feel like one console. */
-export function CommsSwitcher({ active }: { active: CommsTab }) {
+export function CommsSwitcher({ active, bare = false }: { active: CommsTab; bare?: boolean }) {
   const [, navigate] = useLocation();
 
   // Remember the last-used Comms tab so the sidebar "Comms" item returns here.
@@ -44,6 +44,7 @@ export function CommsSwitcher({ active }: { active: CommsTab }) {
     </div>
   );
 
+  if (bare) return control;
   return (
     <div className="flex shrink-0 items-center justify-center px-4 pb-2.5 pt-3">
       {control}
