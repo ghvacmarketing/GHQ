@@ -1,7 +1,7 @@
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
-import { CrmLayout } from "@/components/crm/crm-layout";
+import { MarketingChrome, useMarketingBase } from "@/components/marketing-shell";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
@@ -27,10 +27,11 @@ export default function CrmMarketingBuilder() {
   });
   const existing = id ? automations?.find((a) => a.id === id) ?? null : null;
 
-  const back = () => navigate("/crm/marketing");
+  const base = useMarketingBase();
+  const back = () => navigate(base);
 
   return (
-    <CrmLayout currentUser={currentUser ?? undefined}>
+    <MarketingChrome currentUser={currentUser ?? undefined}>
       <div className="w-full">
         <div className="mb-5 flex items-center gap-3">
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={back}>
@@ -53,6 +54,6 @@ export default function CrmMarketingBuilder() {
           <AutomationForm existing={existing} onDone={back} onCancel={back} />
         )}
       </div>
-    </CrmLayout>
+    </MarketingChrome>
   );
 }

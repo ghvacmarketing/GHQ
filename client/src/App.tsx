@@ -375,6 +375,10 @@ function Router() {
       <Route path="/crm/mail">{() => <ProtectedCrmWrapper><CrmMail /></ProtectedCrmWrapper>}</Route>
       <Route path="/documents" component={DocumentsApp} />
       <Route path="/accounting" component={AccountingApp} />
+      <Route path="/marketing/messages">{() => <ProtectedCrmWrapper><CrmAutomatedMessages /></ProtectedCrmWrapper>}</Route>
+      <Route path="/marketing/new">{() => <ProtectedCrmWrapper><CrmMarketingBuilder /></ProtectedCrmWrapper>}</Route>
+      <Route path="/marketing/edit/:id">{() => <ProtectedCrmWrapper><CrmMarketingBuilder /></ProtectedCrmWrapper>}</Route>
+      <Route path="/marketing">{() => <ProtectedCrmWrapper><CrmMarketing /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/notifications">{() => <ProtectedCrmWrapper><CrmNotifications /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/salesbook">{() => <ProtectedCrmWrapper><CrmSalesbook /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/tasks/board">{() => <ProtectedCrmWrapper><CrmTaskBoard /></ProtectedCrmWrapper>}</Route>

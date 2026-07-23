@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
-import { CrmLayout } from "@/components/crm/crm-layout";
+import { MarketingChrome, useMarketingBase } from "@/components/marketing-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -118,6 +118,7 @@ function TemplateSection({
 export default function CrmAutomatedMessages() {
   usePageTitle("Automated Messages");
   const [, navigate] = useLocation();
+  const base = useMarketingBase();
   const { toast } = useToast();
 
   const { data: currentUser } = useQuery<CrmUser | null>({
@@ -142,10 +143,10 @@ export default function CrmAutomatedMessages() {
   const emailMut = useMutation(makeToggle("/api/admin/settings/automated-email"));
 
   return (
-    <CrmLayout currentUser={currentUser ?? undefined}>
+    <MarketingChrome currentUser={currentUser ?? undefined}>
       <div className="mx-auto w-full max-w-2xl space-y-8 pb-16">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" className="h-8 w-8 shrink-0 p-0" onClick={() => navigate("/crm/marketing")}>
+          <Button variant="ghost" size="sm" className="h-8 w-8 shrink-0 p-0" onClick={() => navigate(base)}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -175,6 +176,6 @@ export default function CrmAutomatedMessages() {
         <TemplateSection title="Text message templates" icon={MessageSquare} endpoint="/api/admin/settings/sms-templates" kind="sms" />
         <TemplateSection title="Email templates" icon={Mail} endpoint="/api/admin/settings/email-templates" kind="email" />
       </div>
-    </CrmLayout>
+    </MarketingChrome>
   );
 }

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
-import { CrmLayout } from "@/components/crm/crm-layout";
+import { MarketingChrome, useMarketingBase } from "@/components/marketing-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -39,6 +39,7 @@ export default function CrmMarketing() {
   usePageTitle("Marketing Automation");
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const base = useMarketingBase();
 
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
@@ -70,20 +71,20 @@ export default function CrmMarketing() {
     },
   });
 
-  const openNew = () => navigate("/crm/marketing/new");
-  const openEdit = (a: AutomationCampaign) => navigate(`/crm/marketing/edit/${a.id}`);
+  const openNew = () => navigate(`${base}/new`);
+  const openEdit = (a: AutomationCampaign) => navigate(`${base}/edit/${a.id}`);
 
   const activeCount = automations.filter((a) => a.isActive).length;
 
   return (
-    <CrmLayout currentUser={currentUser ?? undefined}>
+    <MarketingChrome currentUser={currentUser ?? undefined}>
       <div className="w-full space-y-5 pb-10">
         <PageHeader
           title="Marketing Automation"
           description="Build campaigns that run themselves — trigger, conditions, actions, timing, and safeguards."
           actions={
             <>
-              <Button variant="outline" onClick={() => navigate("/crm/marketing/messages")}>
+              <Button variant="outline" onClick={() => navigate(`${base}/messages`)}>
                 <MessageSquare className="mr-1.5 h-4 w-4" /> Automated messages
               </Button>
               <Button onClick={openNew} className="bg-[#711419] hover:bg-[#5a1014]">
@@ -206,6 +207,6 @@ export default function CrmMarketing() {
         )}
       </div>
 
-    </CrmLayout>
+    </MarketingChrome>
   );
 }

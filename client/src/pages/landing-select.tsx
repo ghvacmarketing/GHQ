@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Monitor, Smartphone, FolderOpen, Calculator, Megaphone, Wrench, Loader2,
+  Monitor, Smartphone, FolderOpen, Calculator, Megaphone, Wrench, Loader2, ArrowUpRight,
 } from "lucide-react";
 import { crmFetch } from "@/lib/crmAuth";
 import type { CrmUser } from "@shared/schema";
@@ -19,7 +19,6 @@ type AppTile = {
   description: string;
   href: string;
   icon: React.ReactNode;
-  gradient: string; // squircle background
   roles?: string[]; // undefined = everyone
 };
 
@@ -29,41 +28,36 @@ const APPS: AppTile[] = [
     label: "CRM",
     description: "Customers, dispatch, quotes & invoices",
     href: "/crm",
-    icon: <Monitor className="h-7 w-7 text-white" />,
-    gradient: "bg-gradient-to-br from-[#8a1a1f] to-[#5c0f13]",
+    icon: <Monitor className="h-6 w-6" strokeWidth={1.75} />,
   },
   {
     key: "field",
     label: "Field",
     description: "Tech agenda, jobs & time",
     href: "/mobile",
-    icon: <Smartphone className="h-7 w-7 text-white" />,
-    gradient: "bg-gradient-to-br from-slate-700 to-slate-900",
+    icon: <Smartphone className="h-6 w-6" strokeWidth={1.75} />,
   },
   {
     key: "documents",
     label: "Documents",
     description: "Company files & folders",
     href: "/documents",
-    icon: <FolderOpen className="h-7 w-7 text-white" />,
-    gradient: "bg-gradient-to-br from-sky-500 to-blue-700",
+    icon: <FolderOpen className="h-6 w-6" strokeWidth={1.75} />,
   },
   {
     key: "accounting",
     label: "Accounting",
     description: "P&L, expenses & receivables",
     href: "/accounting",
-    icon: <Calculator className="h-7 w-7 text-white" />,
-    gradient: "bg-gradient-to-br from-emerald-500 to-green-700",
+    icon: <Calculator className="h-6 w-6" strokeWidth={1.75} />,
     roles: ["owner", "admin", "supervisor"],
   },
   {
     key: "marketing",
     label: "Marketing",
     description: "Campaigns & automations",
-    href: "/crm/marketing",
-    icon: <Megaphone className="h-7 w-7 text-white" />,
-    gradient: "bg-gradient-to-br from-amber-500 to-orange-600",
+    href: "/marketing",
+    icon: <Megaphone className="h-6 w-6" strokeWidth={1.75} />,
     roles: ["owner", "admin", "supervisor", "sales"],
   },
 ];
@@ -91,7 +85,7 @@ export default function LandingSelect() {
 
   if (!ready || !isAuthenticated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f5f5f7]">
+      <div className="flex min-h-screen items-center justify-center bg-[#f4f5f6]">
         <Loader2 className="h-7 w-7 animate-spin text-[#711419]" />
       </div>
     );
@@ -104,52 +98,51 @@ export default function LandingSelect() {
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#f5f5f7]">
-      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-6 py-14">
-        {/* Header */}
-        <div className="mb-10 text-center">
-          <img src={redlogo} alt="Giesbrecht HVAC" className="mx-auto mb-6 h-12" />
-          <h1
-            className="text-[28px] font-semibold tracking-tight text-slate-900"
-            data-testid="text-welcome"
-          >
+    <div className="flex min-h-screen flex-col bg-[#f4f5f6]">
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-6 py-14">
+        {/* Header — left-aligned, utilitarian */}
+        <div className="mb-8">
+          <img src={redlogo} alt="Giesbrecht HVAC" className="mb-8 h-10" />
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+            {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+          </p>
+          <h1 className="mt-1 text-[26px] font-semibold tracking-tight text-slate-900" data-testid="text-welcome">
             {greeting}
             {firstName ? `, ${firstName}` : ""}
           </h1>
-          <p className="mt-1 text-[15px] text-slate-500">
-            {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-          </p>
         </div>
 
-        {/* App grid — iOS home-screen feel */}
+        <div className="mb-4 h-px bg-slate-200" />
+
+        {/* App grid — flat, squared, monochrome with one accent */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-testid="app-grid">
           {visibleApps.map((app, i) => (
             <button
               key={app.key}
               onClick={() => navigate(app.href)}
-              className="group flex flex-col items-center rounded-2xl border border-black/[0.06] bg-white px-4 py-6 text-center shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] active:scale-[0.97] animate-in fade-in slide-in-from-bottom-2"
-              style={{ animationDelay: `${i * 60}ms`, animationFillMode: "backwards", animationDuration: "400ms" }}
+              className="group relative flex flex-col items-start rounded-[4px] border border-slate-300/70 bg-white p-5 text-left transition-colors duration-150 hover:border-slate-900 active:bg-slate-50 animate-in fade-in"
+              style={{ animationDelay: `${i * 50}ms`, animationFillMode: "backwards", animationDuration: "350ms" }}
               data-testid={`app-${app.key}`}
             >
-              <span
-                className={`mb-3 flex h-[60px] w-[60px] items-center justify-center rounded-[18px] shadow-inner ${app.gradient}`}
-              >
-                {app.icon}
-              </span>
-              <span className="text-[15px] font-semibold text-slate-900">{app.label}</span>
+              <span className="text-[#711419]">{app.icon}</span>
+              <span className="mt-5 text-[15px] font-semibold text-slate-900">{app.label}</span>
               <span className="mt-0.5 text-[12px] leading-snug text-slate-500">{app.description}</span>
+              <ArrowUpRight className="absolute right-4 top-4 h-4 w-4 text-slate-300 opacity-0 transition-opacity group-hover:opacity-100" strokeWidth={1.75} />
             </button>
           ))}
         </div>
 
         {/* Footer utilities */}
-        <div className="mt-10 text-center">
+        <div className="mt-8 flex items-center justify-between border-t border-slate-200 pt-4">
+          <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
+            Giesbrecht HVAC
+          </span>
           <button
             onClick={() => navigate("/tools")}
-            className="inline-flex items-center gap-1.5 text-[13px] font-medium text-slate-400 transition-colors hover:text-slate-700"
+            className="inline-flex items-center gap-1.5 text-[13px] font-medium text-slate-400 transition-colors hover:text-slate-800"
             data-testid="link-ghvac-tools"
           >
-            <Wrench className="h-3.5 w-3.5" />
+            <Wrench className="h-3.5 w-3.5" strokeWidth={1.75} />
             GHVAC Tools
           </button>
         </div>
