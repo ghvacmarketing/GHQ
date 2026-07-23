@@ -49,6 +49,7 @@ import {
   Camera,
   GripVertical,
   Unlink,
+  X,
   ZoomIn,
   ZoomOut,
   Crosshair,
@@ -119,6 +120,66 @@ type DragState =
   | { kind: "panel"; id: string }
   | { kind: "link"; stepId: string };
 
+// Chip-style editor for select/multi-select choices: type, press Enter to
+// add; tap the x on a chip to remove. Replaces the comma-separated input.
+function OptionsEditor({ options, onChange }: { options: string[]; onChange: (o: string[]) => void }) {
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const v = draft.trim();
+    if (!v) return;
+    if (!options.some((o) => o.toLowerCase() === v.toLowerCase())) onChange([...options, v]);
+    setDraft("");
+  };
+  return (
+    <div className="rounded-lg border border-input bg-white p-2" data-testid="options-editor">
+      {options.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {options.map((o, i) => (
+            <span
+              key={`${o}-${i}`}
+              className="inline-flex items-center gap-1 rounded-full bg-[#711419]/[0.08] py-1 pl-2.5 pr-1.5 text-xs font-medium text-[#711419]"
+            >
+              {o}
+              <button
+                type="button"
+                onClick={() => onChange(options.filter((_, j) => j !== i))}
+                className="text-[#711419]/60 hover:text-[#711419]"
+                aria-label={`Remove ${o}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-1.5">
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === ",") { e.preventDefault(); add(); }
+            else if (e.key === "Backspace" && !draft && options.length) onChange(options.slice(0, -1));
+          }}
+          onBlur={add}
+          placeholder={options.length ? "Add another option…" : "Type an option, press Enter"}
+          className="h-8 min-w-0 flex-1 border-0 bg-transparent px-1 text-sm outline-none placeholder:text-slate-400"
+          data-testid="input-question-options"
+        />
+        <button
+          type="button"
+          onClick={add}
+          disabled={!draft.trim()}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200 disabled:opacity-40"
+          aria-label="Add option"
+          data-testid="add-option"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function CrmChecklists() {
   usePageTitle("Checklist Canvas");
   const [, navigate] = useLocation();
@@ -142,7 +203,7 @@ export default function CrmChecklists() {
     question: "",
     questionType: "yes_no" as ChecklistQuestionType,
     isRequired: false,
-    options: "",
+    options: [] as string[],
     helpText: "",
     section: "",
   });
@@ -534,8 +595,8 @@ export default function CrmChecklists() {
         helpText: stepForm.helpText || null,
         section: stepForm.section.trim() || null,
         options:
-          (stepForm.questionType === "select" || stepForm.questionType === "multi_select") && stepForm.options
-            ? stepForm.options.split(",").map((o) => o.trim()).filter(Boolean)
+          (stepForm.questionType === "select" || stepForm.questionType === "multi_select") && stepForm.options.length > 0
+            ? stepForm.options
             : null,
         ...(editingStep ? {} : { sortOrder: (serverSteps[serverSteps.length - 1]?.sortOrder ?? 0) + 1 }),
       };
@@ -1152,7 +1213,7 @@ export default function CrmChecklists() {
 
   const openNewStep = (section = "") => {
     setEditingStep(null);
-    setStepForm({ question: "", questionType: "yes_no", isRequired: false, options: "", helpText: "", section });
+    setStepForm({ question: "", questionType: "yes_no", isRequired: false, options: [], helpText: "", section });
     setStepDialogOpen(true);
   };
 
@@ -1162,7 +1223,7 @@ export default function CrmChecklists() {
       question: q.question,
       questionType: q.questionType,
       isRequired: q.isRequired,
-      options: q.options?.join(", ") || "",
+      options: q.options || [],
       helpText: q.helpText || "",
       section: q.section || "",
     });
@@ -1448,8 +1509,11 @@ export default function CrmChecklists() {
             </div>
           ) : (
             <div className="relative flex h-full min-h-0">
-              {layersOpen && (
-                <div className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white" data-testid="layers-panel">
+              <div
+                className={`shrink-0 overflow-hidden bg-white transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${layersOpen ? "w-60 border-r border-slate-200" : "w-0"}`}
+                data-testid="layers-panel"
+              >
+                <div className="flex h-full w-60 flex-col">
                   <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5">
                     <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
                       <Layers className="h-3.5 w-3.5 text-[#711419]" /> Layers
@@ -1561,7 +1625,7 @@ export default function CrmChecklists() {
                     </button>
                   </div>
                 </div>
-              )}
+              </div>
               <div className="relative min-h-0 flex-1">
               <div
                 ref={viewportRef}
@@ -1770,17 +1834,9 @@ export default function CrmChecklists() {
                   </button>
                   <div className="mx-1 h-5 w-px bg-slate-200" />
                   <button
-                    onClick={centerView}
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
-                    title="Center on the flow"
-                    data-testid="canvas-center"
-                  >
-                    <Crosshair className="h-4 w-4" />
-                  </button>
-                  <button
                     onClick={organizeContent}
                     className="flex h-8 w-8 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
-                    title="Organize layout"
+                    title="Organize & center"
                     data-testid="canvas-organize"
                   >
                     <Wand2 className="h-4 w-4" />
@@ -2051,13 +2107,11 @@ export default function CrmChecklists() {
             </div>
             {(stepForm.questionType === "select" || stepForm.questionType === "multi_select") && (
               <div className="space-y-2">
-                <Label>Options (comma-separated)</Label>
-                <Input
-                  placeholder="Option 1, Option 2, Option 3"
-                  value={stepForm.options}
-                  onChange={(e) => setStepForm({ ...stepForm, options: e.target.value })}
-                  data-testid="input-question-options"
-                />
+                <Label>Options</Label>
+                <OptionsEditor options={stepForm.options} onChange={(o) => setStepForm({ ...stepForm, options: o })} />
+                <p className="text-xs text-muted-foreground">
+                  The choices the tech taps{stepForm.questionType === "multi_select" ? " — they can pick several" : ""}.
+                </p>
               </div>
             )}
             <div className="space-y-2">
