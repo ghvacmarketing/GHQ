@@ -472,6 +472,14 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
   });
   const pinCount = pagePins?.length ?? 0;
 
+  // Comment-mode state broadcast by PinCommentsLayer — styles the toolbar icon
+  const [pinModeActive, setPinModeActive] = useState(false);
+  useEffect(() => {
+    const on = (e: Event) => setPinModeActive(!!(e as CustomEvent).detail?.active);
+    window.addEventListener("ghq-pin-mode-state", on);
+    return () => window.removeEventListener("ghq-pin-mode-state", on);
+  }, []);
+
   // One shared motion spec for the whole chrome: sidebar width, top-bar
   // position, content margin/padding all move together on the same curve,
   // and the sidebar's two interiors crossfade while the width eases.
@@ -563,8 +571,15 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
           <Button variant="ghost" size="icon" onClick={openGlobalAI} title="Ask AI" data-testid="button-topnav-ai">
             <Sparkles className="h-5 w-5 text-slate-600" />
           </Button>
-          <Button variant="ghost" size="icon" className="relative" onClick={enterPinMode} title="Comment mode — drop a pin anywhere" data-testid="button-topnav-comment">
-            <MessageSquarePlus className="h-5 w-5 text-slate-600" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`relative ${pinModeActive ? "bg-[#711419] hover:bg-[#8a1a1f]" : ""}`}
+            onClick={enterPinMode}
+            title={pinModeActive ? "Exit comment mode" : "Comment mode — drop a pin anywhere"}
+            data-testid="button-topnav-comment"
+          >
+            <MessageSquarePlus className={`h-5 w-5 ${pinModeActive ? "text-white" : "text-slate-600"}`} />
             {pinCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-[3px] bg-[#711419] px-1 text-[9px] font-semibold leading-none text-white tabular-nums" data-testid="pin-count-badge">
                 {pinCount > 99 ? "99+" : pinCount}

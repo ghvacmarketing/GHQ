@@ -11,7 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { CrmUser } from "@shared/schema";
 
-/** Enter comment mode from anywhere (the top-bar comment button calls this). */
+/** Toggle comment mode (the top-bar comment button calls this — clicking it
+ *  again while active exits). The layer broadcasts "ghq-pin-mode-state" so
+ *  the toolbar icon can reflect the active state. */
 export const enterPinMode = () => window.dispatchEvent(new Event("ghq-pin-mode"));
 
 type Pin = {
@@ -73,10 +75,15 @@ export function PinCommentsLayer({ currentUser }: { currentUser: CrmUser }) {
   const [pulseId, setPulseId] = useState<string | null>(null);
 
   useEffect(() => {
-    const on = () => { setMode(true); setComposer(null); };
+    const on = () => { setMode((v) => !v); setComposer(null); };
     window.addEventListener("ghq-pin-mode", on);
     return () => window.removeEventListener("ghq-pin-mode", on);
   }, []);
+
+  // Let the toolbar icon reflect the mode
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("ghq-pin-mode-state", { detail: { active: mode } }));
+  }, [mode]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -232,7 +239,7 @@ export function PinCommentsLayer({ currentUser }: { currentUser: CrmUser }) {
 
   return (
     <>
-      {/* Comment-mode overlay */}
+      {/* Comment mode — a real mode: tinted canvas, maroon frame, persistent banner */}
       {mode && (
         <div
           data-pin-overlay="1"
@@ -240,10 +247,22 @@ export function PinCommentsLayer({ currentUser }: { currentUser: CrmUser }) {
           className="fixed inset-0 z-[95] cursor-crosshair"
           data-testid="pin-mode-overlay"
         >
-          <div className="pointer-events-none fixed inset-x-0 top-3 z-[96] flex justify-center">
-            <span className="rounded-[4px] bg-slate-900 px-3 py-1.5 text-xs font-medium text-white shadow-lg">
-              Click anywhere to drop a comment pin — Esc to cancel
-            </span>
+          <div className="pointer-events-none absolute inset-0 animate-in fade-in bg-slate-900/[0.05] duration-300" />
+          <div className="pointer-events-none absolute inset-2 animate-in fade-in rounded-lg border-2 border-[#711419]/60 duration-500" />
+          <div className="pointer-events-none absolute inset-x-0 top-4 flex justify-center animate-in fade-in slide-in-from-top-3 duration-300">
+            <div className="pointer-events-auto flex items-center gap-2.5 rounded-[4px] bg-slate-900 py-1.5 pl-3 pr-1.5 text-white shadow-xl" data-testid="pin-mode-banner">
+              <MapPin className="h-4 w-4 fill-[#e8704f] text-slate-900" />
+              <span className="text-xs font-medium">Comment mode — click anywhere to drop a pin</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); setMode(false); }}
+                className="rounded p-1 hover:bg-white/15"
+                title="Exit comment mode"
+                data-testid="pin-mode-exit"
+                aria-label="Exit comment mode"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}
