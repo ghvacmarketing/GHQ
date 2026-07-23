@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, isAfter, isBefore, startOfDay, subDays } from "date-fns";
-import { User, ImageIcon, Download, Trash2, LayoutGrid, List, ZoomIn, ZoomOut, X } from "lucide-react";
+import { User, ImageIcon, Download, Trash2, LayoutGrid, List, ZoomIn, ZoomOut, X, CheckSquare, Check, Loader2 } from "lucide-react";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { CrmLayout } from "@/components/crm/crm-layout";
@@ -66,6 +66,12 @@ export default function CrmPhotoGallery() {
   const { toast } = useToast();
   const [lightbox, setLightbox] = useState<FeedPhoto | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<FeedPhoto | null>(null);
+
+  // Multi-select
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDownloading, setBulkDownloading] = useState(false);
 
   // View controls
   const [view, setView] = useState<"grid" | "list">("grid");
@@ -151,6 +157,54 @@ export default function CrmPhotoGallery() {
     setDateFrom("");
     setDateTo("");
   };
+
+  // ── Multi-select + bulk actions ──
+  const selectedItems = useMemo(() => (photos ?? []).filter((p) => selected.has(p.id)), [photos, selected]);
+  const deletableCount = selectedItems.filter((p) => p.customerId).length;
+  const toggleSelect = (id: string) =>
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  const selectAllFiltered = () => setSelected(new Set(filtered.map((p) => p.id)));
+  const clearSelection = () => setSelected(new Set());
+  const exitSelect = () => { setSelectMode(false); setSelected(new Set()); };
+
+  const bulkDownload = async () => {
+    setBulkDownloading(true);
+    try {
+      for (const p of filtered.filter((x) => selected.has(x.id))) {
+        await downloadPhoto(p);
+        await new Promise((r) => setTimeout(r, 350)); // stagger so the browser doesn't block
+      }
+    } finally {
+      setBulkDownloading(false);
+    }
+  };
+
+  const bulkDelete = useMutation({
+    mutationFn: async () => {
+      const items = selectedItems.filter((p) => p.customerId);
+      let ok = 0, fail = 0;
+      for (const p of items) {
+        try {
+          await apiRequest("DELETE", `/api/crm/customers/${p.customerId}/files/${p.id}`);
+          ok++;
+        } catch {
+          fail++;
+        }
+      }
+      return { ok, fail };
+    },
+    onSuccess: ({ ok, fail }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/photos/feed"] });
+      setConfirmBulkDelete(false);
+      exitSelect();
+      toast({ title: `${ok} photo${ok !== 1 ? "s" : ""} deleted${fail ? `, ${fail} failed` : ""}` });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Bulk delete failed", variant: "destructive" }),
+  });
 
   useEffect(() => {
     if (!authLoading && !currentUser) navigate("/crm/login");
@@ -302,6 +356,14 @@ export default function CrmPhotoGallery() {
               </div>
             )}
 
+            <button
+              onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+              className={`flex h-9 items-center gap-1.5 rounded-md border px-2.5 text-sm font-medium transition-colors ${selectMode ? "border-[#711419] bg-[#711419] text-white" : "border-input bg-white text-slate-600 hover:text-foreground"}`}
+              data-testid="toggle-select-mode"
+            >
+              <CheckSquare className="h-4 w-4" /> {selectMode ? "Cancel" : "Select"}
+            </button>
+
             <div className="flex items-center rounded-md border border-input bg-white">
               <button
                 onClick={() => setView("grid")}
@@ -322,6 +384,25 @@ export default function CrmPhotoGallery() {
             </div>
           </div>
         </div>
+
+        {selectMode && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#711419]/25 bg-[#711419]/[0.06] px-3 py-2" data-testid="selection-bar">
+            <span className="text-sm font-semibold text-slate-800">{selected.size} selected</span>
+            <button onClick={selectAllFiltered} className="text-xs font-medium text-[#711419] hover:underline">Select all ({filtered.length})</button>
+            {selected.size > 0 && (
+              <button onClick={clearSelection} className="text-xs font-medium text-slate-500 hover:text-slate-800">Clear</button>
+            )}
+            <div className="ml-auto flex items-center gap-2">
+              <Button size="sm" variant="outline" disabled={selected.size === 0 || bulkDownloading} onClick={bulkDownload} data-testid="bulk-download">
+                {bulkDownloading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}
+                Download{selected.size ? ` (${selected.size})` : ""}
+              </Button>
+              <Button size="sm" variant="destructive" disabled={deletableCount === 0} onClick={() => setConfirmBulkDelete(true)} data-testid="bulk-delete">
+                <Trash2 className="mr-1.5 h-4 w-4" /> Delete{deletableCount ? ` (${deletableCount})` : ""}
+              </Button>
+            </div>
+          </div>
+        )}
 
         {isLoading ? (
           <div className={GRID_CLASSES[1]}>
@@ -344,13 +425,27 @@ export default function CrmPhotoGallery() {
         ) : view === "list" ? (
           <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-sm" data-testid="photo-feed-list">
             {filtered.map((p) => (
-              <div key={p.id} className="group flex items-center gap-3 p-2.5" data-testid={`feed-row-${p.id}`}>
-                <button onClick={() => setLightbox(p)} className="shrink-0 overflow-hidden rounded-lg">
+              <div
+                key={p.id}
+                className={`group flex items-center gap-3 p-2.5 ${selected.has(p.id) ? "bg-[#711419]/[0.06]" : ""}`}
+                data-testid={`feed-row-${p.id}`}
+              >
+                {selectMode && (
+                  <button
+                    onClick={() => toggleSelect(p.id)}
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 ${selected.has(p.id) ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300 text-transparent"}`}
+                    aria-label="Select photo"
+                    data-testid={`select-row-${p.id}`}
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                <button onClick={() => (selectMode ? toggleSelect(p.id) : setLightbox(p))} className="shrink-0 overflow-hidden rounded-lg">
                   <img src={p.url} alt={p.name} loading="lazy" className="h-14 w-14 object-cover" />
                 </button>
                 <div className="min-w-0 flex-1">
                   <button
-                    onClick={() => setLightbox(p)}
+                    onClick={() => (selectMode ? toggleSelect(p.id) : setLightbox(p))}
                     className="block max-w-full truncate text-left text-sm font-semibold text-foreground hover:underline"
                     title={p.name}
                   >
@@ -377,15 +472,19 @@ export default function CrmPhotoGallery() {
                     )}
                   </p>
                 </div>
-                <div className="flex shrink-0 gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">{photoActions(p)}</div>
+                {!selectMode && <div className="flex shrink-0 gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">{photoActions(p)}</div>}
               </div>
             ))}
           </div>
         ) : (
           <div className={GRID_CLASSES[size]} data-testid="photo-feed">
             {filtered.map((p) => (
-              <div key={p.id} className="group relative overflow-hidden rounded-xl border border-border bg-card shadow-sm" data-testid={`feed-photo-${p.id}`}>
-                <button onClick={() => setLightbox(p)} className="block w-full overflow-hidden">
+              <div
+                key={p.id}
+                className={`group relative overflow-hidden rounded-xl border bg-card shadow-sm ${selected.has(p.id) ? "border-[#711419] ring-2 ring-[#711419]" : "border-border"}`}
+                data-testid={`feed-photo-${p.id}`}
+              >
+                <button onClick={() => (selectMode ? toggleSelect(p.id) : setLightbox(p))} className="block w-full overflow-hidden">
                   <img
                     src={p.url}
                     alt={p.name}
@@ -393,9 +492,20 @@ export default function CrmPhotoGallery() {
                     className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-105"
                   />
                 </button>
-                <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
-                  {photoActions(p)}
-                </div>
+                {selectMode ? (
+                  <button
+                    onClick={() => toggleSelect(p.id)}
+                    className={`absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 shadow ${selected.has(p.id) ? "border-white bg-[#711419] text-white" : "border-white bg-black/35 text-transparent"}`}
+                    aria-label="Select photo"
+                    data-testid={`select-photo-${p.id}`}
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                  </button>
+                ) : (
+                  <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+                    {photoActions(p)}
+                  </div>
+                )}
                 <div className={size === SMALLEST ? "space-y-0.5 p-1.5" : "space-y-0.5 p-2.5"}>
                   <p className={`truncate font-semibold text-foreground ${size === SMALLEST ? "text-[10px]" : "text-xs"}`} title={p.name}>{p.name}</p>
                   {p.customerName && (
@@ -463,6 +573,30 @@ export default function CrmPhotoGallery() {
               data-testid="confirm-delete-photo"
             >
               {deletePhoto.isPending ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk delete confirmation */}
+      <AlertDialog open={confirmBulkDelete} onOpenChange={(o) => !o && setConfirmBulkDelete(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deletableCount} photo{deletableCount !== 1 ? "s" : ""}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deletableCount} selected photo{deletableCount !== 1 ? "s" : ""} will be removed from the customers' files. This can't be undone.
+              {selected.size > deletableCount ? ` (${selected.size - deletableCount} not linked to a customer will be skipped.)` : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              disabled={bulkDelete.isPending || deletableCount === 0}
+              onClick={() => bulkDelete.mutate()}
+              data-testid="confirm-bulk-delete"
+            >
+              {bulkDelete.isPending ? "Deleting…" : `Delete ${deletableCount}`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
