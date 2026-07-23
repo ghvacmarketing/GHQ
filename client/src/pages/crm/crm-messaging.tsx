@@ -479,9 +479,7 @@ export default function CrmMessaging() {
   ) : null;
 
   const messagingContent = (
-    <div className="flex h-full flex-col overflow-hidden">
-      <CommsSwitcher active="messages" />
-    <div className="min-h-0 flex-1 flex overflow-hidden bg-muted/30">
+    <div className="h-full flex overflow-hidden bg-muted/30">
       {/* ───────────── Conversation list ───────────── */}
       <div
         className={cn(
@@ -660,6 +658,7 @@ export default function CrmMessaging() {
 
       {/* ───────────── Thread ───────────── */}
       <div className={cn("flex-1 flex flex-col bg-background min-w-0", !showMobileThread ? "hidden lg:flex" : "flex")}>
+        <CommsSwitcher active="messages" />
         {!selectedConversationId ? (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <div className="text-center">
@@ -900,7 +899,6 @@ export default function CrmMessaging() {
           <div className="h-full w-80 xl:w-96">{contextPanel}</div>
         </div>
       )}
-    </div>
     </div>
   );
 

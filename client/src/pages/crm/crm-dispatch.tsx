@@ -1757,6 +1757,16 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
     const t = setInterval(() => setNowTick(new Date()), 60_000);
     return () => clearInterval(t);
   }, []);
+  // The time chip toggles the line; preference sticks across sessions.
+  const [nowLineOn, setNowLineOn] = useState(
+    () => typeof window === "undefined" || localStorage.getItem("crm_dispatch_nowline") !== "0",
+  );
+  const toggleNowLine = () => {
+    setNowLineOn((v) => {
+      localStorage.setItem("crm_dispatch_nowline", v ? "0" : "1");
+      return !v;
+    });
+  };
   const nowPct = useMemo(() => {
     if (getLocalDateString(nowTick) !== getLocalDateString(selectedDate)) return null;
     const local = toLocalTime(nowTick);
@@ -1908,23 +1918,30 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
               column (z-10) and header (z-20). */}
           {nowPct !== null && (
             <>
-              <div
-                className="pointer-events-none absolute inset-y-0 z-[6] w-[2px] -translate-x-1/2"
-                style={{
-                  left: `calc(176px + (100% - 176px) * ${nowPct})`,
-                  backgroundImage: "repeating-linear-gradient(to bottom, #711419 0 5px, transparent 5px 10px)",
-                }}
-                data-testid="dispatch-now-line"
-              />
+              {nowLineOn && (
+                <div
+                  className="pointer-events-none absolute inset-y-0 z-[6] w-[2px] -translate-x-1/2"
+                  style={{
+                    left: `calc(176px + (100% - 176px) * ${nowPct})`,
+                    backgroundImage: "repeating-linear-gradient(to bottom, #711419 0 5px, transparent 5px 10px)",
+                  }}
+                  data-testid="dispatch-now-line"
+                />
+              )}
               {/* Time chip sits just above the first technician row's top border
-                  (z-30 so the sticky axis header doesn't swallow it) */}
-              <span
-                className="pointer-events-none absolute top-[-2px] z-30 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-[3px] bg-[#711419] px-1.5 py-0.5 text-[9px] font-semibold leading-none tabular-nums text-white"
+                  (z-30 so the sticky axis header doesn't swallow it) and doubles
+                  as the on/off toggle for the line — muted when off. */}
+              <button
+                onClick={toggleNowLine}
+                title={nowLineOn ? "Hide current-time line" : "Show current-time line"}
+                className={`absolute top-[-2px] z-30 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-[3px] px-1.5 py-0.5 text-[9px] font-semibold leading-none tabular-nums transition-colors ${
+                  nowLineOn ? "bg-[#711419] text-white" : "bg-slate-200 text-slate-500 hover:bg-slate-300"
+                }`}
                 style={{ left: `calc(176px + (100% - 176px) * ${nowPct})` }}
                 data-testid="dispatch-now-time"
               >
                 {formatLocal(nowTick, "h:mm a")}
-              </span>
+              </button>
             </>
           )}
           </div>

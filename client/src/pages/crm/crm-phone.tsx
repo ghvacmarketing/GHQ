@@ -3022,9 +3022,9 @@ export default function CrmPhonePage() {
 
   return (
     <CrmLayout currentUser={currentUser} flush disableScroll>
-      <div className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         <CommsSwitcher active="phone" />
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 lg:px-5 lg:py-5">
+        <div className="px-4 pb-4 pt-2 lg:px-5 lg:pb-5">
           <CrmPhoneContent />
         </div>
       </div>

@@ -410,9 +410,7 @@ export default function CrmMail() {
 
   return (
     <CrmLayout currentUser={currentUser} flush disableScroll hideGlobalSearch>
-      <div className="flex h-full min-h-0 flex-col">
-      <CommsSwitcher active="mail" />
-      <div className="flex min-h-0 flex-1 bg-slate-50">
+      <div className="flex h-full min-h-0 bg-slate-50">
         {/* Left: folders + thread list */}
         <div
           className={`${selectedId ? "hidden lg:flex" : "flex"} w-full shrink-0 flex-col border-r border-slate-200/80 bg-white lg:w-[400px]`}
@@ -547,6 +545,7 @@ export default function CrmMail() {
 
         {/* Right: thread detail */}
         <div className={`${selectedId ? "flex" : "hidden lg:flex"} min-h-0 flex-1 flex-col bg-slate-50`}>
+          <CommsSwitcher active="mail" />
           {!selectedId ? (
             <div className="flex h-full items-center justify-center text-center text-muted-foreground">
               <div>
@@ -768,7 +767,6 @@ export default function CrmMail() {
             </>
           )}
         </div>
-      </div>
       </div>
 
       <ComposeDialog
