@@ -52,6 +52,7 @@ import {
   ZoomIn,
   ZoomOut,
   Crosshair,
+  Wand2,
   Layers,
   PanelLeftClose,
   PanelLeftOpen,
@@ -363,14 +364,54 @@ export default function CrmChecklists() {
     setPan({ x: vp.clientWidth * fracX - wx * z, y: vp.clientHeight * fracY - wy * z });
   };
 
-  // Center the viewport on the flow when a checklist opens
+  // Center the viewport on the flow when a checklist opens. The canvas can
+  // mount a few frames AFTER checklistId is set (data still loading), so keep
+  // retrying until the viewport exists and has a real size — otherwise the
+  // pan stays at 0,0 and the flow loads far off-screen.
+  const canvasReady = !!checklist;
   useEffect(() => {
-    if (!checklistId) return;
-    requestAnimationFrame(() => {
-      panToWorld(flowPosRef.current.x + FLOW_W / 2, flowPosRef.current.y + 60, 0.5, 0.16);
-    });
+    if (!checklistId || !canvasReady) return;
+    let tries = 0;
+    let raf = 0;
+    const attempt = () => {
+      const vp = viewportRef.current;
+      if (vp && vp.clientWidth > 0) {
+        panToWorld(flowPosRef.current.x + FLOW_W / 2, flowPosRef.current.y + 60, 0.5, 0.16);
+        return;
+      }
+      if (tries++ < 40) raf = requestAnimationFrame(attempt);
+    };
+    raf = requestAnimationFrame(attempt);
+    return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checklistId]);
+  }, [checklistId, canvasReady]);
+
+  // Scroll / trackpad-pinch zooms about the cursor (Figma-style).
+  const [wheeling, setWheeling] = useState(false);
+  const wheelTimer = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = vp.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      const cur = zoomRef.current;
+      const next = Math.min(1.5, Math.max(0.4, cur * Math.exp(-e.deltaY * 0.0016)));
+      if (next === cur) return;
+      const wx = (cx - panRef.current.x) / cur;
+      const wy = (cy - panRef.current.y) / cur;
+      setWheeling(true);
+      window.clearTimeout(wheelTimer.current);
+      wheelTimer.current = window.setTimeout(() => setWheeling(false), 160);
+      setZoom(next);
+      setPan({ x: cx - wx * next, y: cy - wy * next });
+    };
+    vp.addEventListener("wheel", onWheel, { passive: false });
+    return () => vp.removeEventListener("wheel", onWheel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasReady]);
 
   // Space bar = pan mode
   useEffect(() => {
@@ -612,6 +653,46 @@ export default function CrmChecklists() {
 
   const centerView = () => {
     panToWorld(flowPosRef.current.x + FLOW_W / 2, flowPosRef.current.y + 60, 0.5, 0.16);
+  };
+
+  // One-click tidy: flow at a clean anchor, linked photos aligned beside the
+  // step they belong to (no overlaps), unlinked photos in a second column.
+  const organizeContent = () => {
+    const fp = { x: 480, y: 120 };
+    setFlowPos(fp);
+    const gap = 18;
+    const defaultH = 96;
+    const colX = fp.x + FLOW_W + 170;
+    const placed: Record<string, XY> = {};
+
+    const linked = photoSteps
+      .filter((ps) => ps.linkedQuestionId && stepGeom.current.has(ps.linkedQuestionId))
+      .sort(
+        (a, b) =>
+          stepGeom.current.get(a.linkedQuestionId!)!.top - stepGeom.current.get(b.linkedQuestionId!)!.top,
+      );
+    let nextY = fp.y;
+    for (const ps of linked) {
+      const sg = stepGeom.current.get(ps.linkedQuestionId!)!;
+      const h = photoGeom.current.get(ps.id)?.h ?? defaultH;
+      const y = Math.max(fp.y + sg.top, nextY);
+      placed[ps.id] = { x: colX, y };
+      nextY = y + h + gap;
+    }
+
+    const col2X = colX + PHOTO_W + 40;
+    let y2 = fp.y + 30;
+    for (const ps of photoSteps) {
+      if (placed[ps.id]) continue;
+      const h = photoGeom.current.get(ps.id)?.h ?? defaultH;
+      placed[ps.id] = { x: col2X, y: y2 };
+      y2 += h + gap;
+    }
+
+    setPhotoPos((prev) => ({ ...prev, ...placed }));
+    requestAnimationFrame(() =>
+      panToWorld(fp.x + (FLOW_W + (photoSteps.length ? 170 + PHOTO_W : 0)) / 2, fp.y + 60, 0.5, 0.16),
+    );
   };
 
   const stepHandlePoint = (stepId: string): XY => {
@@ -1366,7 +1447,7 @@ export default function CrmChecklists() {
               </button>
             </div>
           ) : (
-            <div className="flex h-full min-h-0">
+            <div className="relative flex h-full min-h-0">
               {layersOpen && (
                 <div className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white" data-testid="layers-panel">
                   <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5">
@@ -1492,7 +1573,7 @@ export default function CrmChecklists() {
                   backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
                   backgroundSize: `${22 * zoom}px ${22 * zoom}px`,
                   backgroundPosition: `${pan.x}px ${pan.y}px`,
-                  transition: panning ? "none" : "background-position 0.18s ease-out, background-size 0.18s ease-out",
+                  transition: panning || wheeling ? "none" : "background-position 0.18s ease-out, background-size 0.18s ease-out",
                 }}
                 onPointerDown={onCanvasPointerDown}
                 onPointerMove={onCanvasPointerMove}
@@ -1508,7 +1589,7 @@ export default function CrmChecklists() {
                     height: worldSize.h,
                     transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                     transformOrigin: "0 0",
-                    transition: panning ? "none" : "transform 0.18s ease-out",
+                    transition: panning || wheeling ? "none" : "transform 0.18s ease-out",
                   }}
                 >
                   {/* Arrows (step → photo) */}
@@ -1657,6 +1738,7 @@ export default function CrmChecklists() {
                 </div>
               </div>
 
+              </div>
               {/* Bottom canvas toolbar: zoom + center */}
               <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center">
                 <div className="pointer-events-auto flex items-center gap-0.5 rounded-full border border-slate-200 bg-white/90 px-1.5 py-1 shadow-lg backdrop-blur">
@@ -1695,6 +1777,14 @@ export default function CrmChecklists() {
                   >
                     <Crosshair className="h-4 w-4" />
                   </button>
+                  <button
+                    onClick={organizeContent}
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                    title="Organize layout"
+                    data-testid="canvas-organize"
+                  >
+                    <Wand2 className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
 
@@ -1711,9 +1801,6 @@ export default function CrmChecklists() {
                       <PanelLeftOpen className="h-4 w-4" />
                     </button>
                   )}
-                  <span className="pointer-events-auto rounded-full bg-white/85 px-3 py-1.5 text-[11px] font-medium text-slate-500 shadow-sm backdrop-blur">
-                    Hold <kbd className="rounded bg-slate-100 px-1 font-semibold">Space</kbd> + drag to pan · click a card to edit · drag a step's ● onto a photo
-                  </span>
                 </div>
                 <Button
                   size="sm"
@@ -1723,7 +1810,6 @@ export default function CrmChecklists() {
                 >
                   <Camera className="mr-1.5 h-3.5 w-3.5" /> Add photo step
                 </Button>
-              </div>
               </div>
             </div>
           )}
