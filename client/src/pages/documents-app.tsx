@@ -12,6 +12,7 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
+import { AppSidebar } from "@/components/app-sidebar";
 import { useToast } from "@/hooks/use-toast";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Button } from "@/components/ui/button";
@@ -672,28 +673,30 @@ export default function DocumentsApp() {
       </header>
 
       <div className="flex min-h-0 flex-1">
-        {/* Sidebar */}
-        <aside className="hidden w-56 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-black/[0.06] bg-white/60 p-3 sm:flex">
-          <SideItem active={tab === "drive" && !searching} icon={<HardDrive className="h-4 w-4" />} label="Drive" onClick={() => switchTab("drive")} testid="docs-nav-drive" />
-          <SideItem active={tab === "library" && !searching} icon={<FolderTree className="h-4 w-4" />} label="Library" onClick={() => switchTab("library")} testid="docs-nav-library" />
-          <p className="mb-1 mt-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Categories</p>
-          {DOC_CATEGORIES.map((c) => {
-            const Icon = CATEGORY_ICONS[c.key];
-            return (
-              <SideItem
-                key={c.key}
-                active={tab === c.key && !searching}
-                icon={<Icon className="h-4 w-4" strokeWidth={1.75} />}
-                label={c.label}
-                onClick={() => switchTab(c.key)}
-                testid={`docs-nav-${c.key}`}
-              />
-            );
-          })}
-          <div className="my-2 border-t border-slate-200" />
-          <SideItem active={tab === "archived" && !searching} icon={<Archive className="h-4 w-4" />} label="Archived" onClick={() => switchTab("archived")} testid="docs-nav-archived" />
-          <SideItem active={tab === "settings" && !searching} icon={<Settings className="h-4 w-4" />} label="Settings" onClick={() => switchTab("settings")} testid="docs-nav-settings" />
-        </aside>
+        {/* Sidebar — shared CRM-style dark collapsible panel */}
+        <AppSidebar
+          appKey="docs"
+          activeKey={searching ? "" : tab}
+          onSelect={(k) => switchTab(k as TabKey)}
+          groups={[
+            {
+              items: [
+                { key: "drive", label: "Drive", icon: HardDrive },
+                { key: "library", label: "Library", icon: FolderTree },
+              ],
+            },
+            {
+              label: "Categories",
+              items: DOC_CATEGORIES.map((c) => ({ key: c.key, label: c.label, icon: CATEGORY_ICONS[c.key] })),
+            },
+            {
+              items: [
+                { key: "archived", label: "Archived", icon: Archive },
+                { key: "settings", label: "Settings", icon: Settings },
+              ],
+            },
+          ]}
+        />
 
         {/* Library folder tree */}
         {tab === "library" && !searching && (
@@ -864,22 +867,6 @@ export default function DocumentsApp() {
   );
 }
 
-function SideItem({
-  active, icon, label, onClick, testid,
-}: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void; testid: string }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-        active ? "bg-[#711419]/10 text-[#711419]" : "text-slate-600 hover:bg-slate-100"
-      }`}
-      data-testid={testid}
-    >
-      {icon}
-      <span className="truncate">{label}</span>
-    </button>
-  );
-}
 
 function TreeNode({
   folder, depth, selectedId, onSelect, foldersByParent, expanded, onToggle,

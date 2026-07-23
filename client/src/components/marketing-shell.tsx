@@ -4,6 +4,7 @@ import {
   Compass, Blocks, BarChart3, Settings,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { AppSidebar } from "@/components/app-sidebar";
 import type { CrmUser } from "@shared/schema";
 
 /** "/marketing/..." renders the standalone Marketing app chrome; the legacy
@@ -63,24 +64,16 @@ export function MarketingChrome({
         <span className="font-display text-[15px] font-semibold text-slate-900">Marketing</span>
       </header>
       <div className="flex min-h-0 flex-1">
-        <aside className="hidden w-56 shrink-0 flex-col gap-0.5 border-r border-black/[0.06] bg-white/60 p-3 sm:flex">
-          {MARKETING_TABS.map((t) => {
-            const Icon = t.icon;
-            return (
-              <button
-                key={t.key}
-                onClick={() => navigate(t.path)}
-                className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  active === t.key ? "bg-[#711419]/10 text-[#711419]" : "text-slate-600 hover:bg-slate-100"
-                }`}
-                data-testid={`mkt-nav-${t.key}`}
-              >
-                <Icon className="h-4 w-4" strokeWidth={1.75} />
-                {t.label}
-              </button>
-            );
-          })}
-        </aside>
+        {/* Sidebar — shared CRM-style dark collapsible panel */}
+        <AppSidebar
+          appKey="mkt"
+          activeKey={active}
+          onSelect={(k) => {
+            const t = MARKETING_TABS.find((x) => x.key === k);
+            if (t) navigate(t.path);
+          }}
+          groups={[{ items: MARKETING_TABS.map((t) => ({ key: t.key, label: t.label, icon: t.icon })) }]}
+        />
         <main className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">
           {/* Mobile tab strip */}
           <div className="-mx-1 mb-4 flex gap-1 overflow-x-auto px-1 pb-1 sm:hidden">

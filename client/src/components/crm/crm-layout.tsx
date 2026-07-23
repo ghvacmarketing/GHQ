@@ -465,7 +465,9 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
     <div className="h-screen overflow-hidden bg-background flex">
       <aside
         className={cn(
-          "hidden lg:block flex-shrink-0 fixed inset-y-0 left-0 z-40 overflow-hidden transition-[width]",
+          // The aside carries the same opaque backdrop as the interiors so the
+          // crossfade never lets the page behind bleed through (no flash).
+          "hidden lg:block flex-shrink-0 fixed inset-y-0 left-0 z-40 overflow-hidden bg-gradient-to-b from-[#0f172a] to-[#020617] transition-[width]",
           CHROME_MOTION,
           sidebarCollapsed ? "w-[64px]" : "w-56"
         )}

@@ -8,6 +8,7 @@ import {
   BarChart3, Printer,
 } from "lucide-react";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
+import { AppSidebar } from "@/components/app-sidebar";
 import { useToast } from "@/hooks/use-toast";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Button } from "@/components/ui/button";
@@ -172,11 +173,11 @@ export default function AccountingApp() {
     );
   }
 
-  const NAV: { key: Tab; label: string; icon: React.ReactNode }[] = [
-    { key: "dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
-    { key: "reports", label: "Reports", icon: <BarChart3 className="h-4 w-4" /> },
-    { key: "expenses", label: "Expenses", icon: <Receipt className="h-4 w-4" /> },
-    { key: "accounts", label: "Chart of Accounts", icon: <ListTree className="h-4 w-4" /> },
+  const NAV: { key: Tab; label: string; icon: typeof LayoutDashboard }[] = [
+    { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { key: "reports", label: "Reports", icon: BarChart3 },
+    { key: "expenses", label: "Expenses", icon: Receipt },
+    { key: "accounts", label: "Chart of Accounts", icon: ListTree },
   ];
 
   const grouped = ["income", "expense", "asset", "liability", "equity"]
@@ -207,22 +208,13 @@ export default function AccountingApp() {
       </header>
 
       <div className="flex min-h-0 flex-1">
-        {/* Sidebar */}
-        <aside className="hidden w-56 shrink-0 flex-col gap-0.5 border-r border-black/[0.06] bg-white/60 p-3 sm:flex">
-          {NAV.map((n) => (
-            <button
-              key={n.key}
-              onClick={() => setTab(n.key)}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                tab === n.key ? "bg-[#711419]/10 text-[#711419]" : "text-slate-600 hover:bg-slate-100"
-              }`}
-              data-testid={`acct-nav-${n.key}`}
-            >
-              {n.icon}
-              {n.label}
-            </button>
-          ))}
-        </aside>
+        {/* Sidebar — shared CRM-style dark collapsible panel */}
+        <AppSidebar
+          appKey="acct"
+          activeKey={tab}
+          onSelect={(k) => setTab(k as Tab)}
+          groups={[{ items: NAV }]}
+        />
 
         {/* Main */}
         <main className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">

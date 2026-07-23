@@ -1750,6 +1750,20 @@ interface TechnicianScheduleBoardProps {
 }
 
 function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, selectedDate, onResizeComplete, activeId, dragClickHourOffset = 0, onPreviewTimeChange, onOpenQuickStatus, activeDragDurationHours = 1, onRegisterTimelineNode, activeDragLabel, previewHourByTech = {}, blackouts = [], onPaintBlackout, onDeleteBlackout }: TechnicianScheduleBoardProps) {
+  // Current-time indicator — a vertical line across the board, only when
+  // viewing today and the clock is inside the visible 6am–10pm window.
+  const [nowTick, setNowTick] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(new Date()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  const nowPct = useMemo(() => {
+    if (getLocalDateString(nowTick) !== getLocalDateString(selectedDate)) return null;
+    const local = toLocalTime(nowTick);
+    const h = local.getHours() + local.getMinutes() / 60;
+    if (h < SCHEDULE_START_HOUR || h > SCHEDULE_END_HOUR) return null;
+    return (h - SCHEDULE_START_HOUR) / (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR);
+  }, [nowTick, selectedDate]);
   // One label per hour *block* (positioned between the gridlines). Compact
   // form (e.g. "6 AM", "12 PM") so all 16 hours fit any desktop width without
   // horizontal scroll.
@@ -1790,7 +1804,7 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
           Below lg the board keeps a wider floor (~80px/hour) so cards stay
           readable and you swipe sideways instead of squishing 16 hours in. */}
       <div className="overflow-x-auto dispatch-timeline-scroll">
-        <div className="w-full min-w-[900px] max-lg:min-w-[1450px]">
+        <div className="relative w-full min-w-[900px] max-lg:min-w-[1450px]">
           <div className="flex border-b border-slate-200 sticky top-0 bg-white z-20">
             <div className="w-44 flex-shrink-0 px-4 py-3 border-r border-slate-200 text-sm font-semibold text-slate-700 bg-white sticky left-0 z-30">
               Technicians
@@ -1888,6 +1902,15 @@ function TechnicianScheduleBoard({ technicians, workOrders, onWorkOrderClick, se
               </DroppableScheduleRow>
             );
           })}
+
+          {/* Current-time line — sits under the sticky tech column (z-10) and header (z-20) */}
+          {nowPct !== null && (
+            <div
+              className="pointer-events-none absolute inset-y-0 z-[6] w-[2px] -translate-x-1/2 bg-[#711419]"
+              style={{ left: `calc(176px + (100% - 176px) * ${nowPct})` }}
+              data-testid="dispatch-now-line"
+            />
+          )}
 
           {/* Empty-day hint — subtle, only when nothing is scheduled */}
           {workOrders.length === 0 && (
