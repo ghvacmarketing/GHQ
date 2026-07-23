@@ -571,7 +571,7 @@ export default function CrmMessaging() {
               </p>
             </div>
           ) : (
-            <div>
+            <div className="p-2">
               {searchQuery && (
                 <p className="px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   {visibleConversations.length} result{visibleConversations.length === 1 ? "" : "s"} for “{searchQuery}”
@@ -592,8 +592,8 @@ export default function CrmMessaging() {
                   <button
                     key={conv.id}
                     className={cn(
-                      "w-full text-left px-3 py-2.5 border-b border-border/60 border-l-2 transition-colors",
-                      isActive ? "border-l-primary bg-muted/70" : "border-l-transparent hover:bg-muted/40"
+                      "group mb-0.5 w-full rounded-lg px-3 py-2.5 text-left transition-colors",
+                      isActive ? "bg-[#711419]/[0.07]" : "hover:bg-slate-100"
                     )}
                     onClick={() => {
                       setSelectedConversationId(conv.id);
@@ -609,8 +609,8 @@ export default function CrmMessaging() {
                     <div className="flex min-w-0 items-center gap-3">
                       <span
                         className={cn(
-                          "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold",
-                          hasUnread ? "bg-primary text-primary-foreground" : "bg-slate-200 text-slate-600"
+                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold leading-none",
+                          hasUnread ? "bg-[#711419] text-white" : "bg-slate-200 text-slate-600"
                         )}
                       >
                         {/[a-zA-Z]/.test(name) ? getInitials(name) : (name.replace(/\D/g, "").slice(0, 2) || "#")}
