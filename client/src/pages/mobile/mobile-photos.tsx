@@ -479,7 +479,7 @@ export default function MobilePhotos() {
         {recentCustomers.length > 0 && (
           <div className="pt-1" data-testid="recent-customers">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Customers</p>
-            <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 scroll-pl-4">
+            <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 scroll-pl-4 scrollbar-hide">
               {recentCustomers.map((c) => (
                 <button
                   key={c.id}
@@ -506,7 +506,7 @@ export default function MobilePhotos() {
         {recentPhotos.length > 0 && (
           <div className="pt-1" data-testid="recent-photos">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Recent — all customers</p>
-            <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 scroll-pl-4">
+            <div className="-mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2 scroll-pl-4 scrollbar-hide">
               {recentPhotos.map((rp) => (
                 <button
                   key={rp.id}
