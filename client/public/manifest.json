@@ -1,7 +1,7 @@
 {
-  "name": "GHVAC Tools",
-  "short_name": "GHVAC Tools",
-  "description": "Professional HVAC service pricing and quote generation for field technicians",
+  "name": "GHQ",
+  "short_name": "GHQ",
+  "description": "Giesbrecht HVAC's operations platform — CRM, dispatch, quotes, and field tools",
   "id": "/",
   "start_url": "/",
   "scope": "/",

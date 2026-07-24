@@ -6,7 +6,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 // to satisfy Apple's guideline 4.2 (more than a repackaged website).
 const config: CapacitorConfig = {
   appId: "app.ghvac.tools",
-  appName: "GHVAC Tools",
+  appName: "GHQ",
   webDir: "dist/public",
   server: {
     url: "https://www.ghvac.app",
