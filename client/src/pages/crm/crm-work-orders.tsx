@@ -1250,19 +1250,25 @@ export default function CrmWorkOrders() {
             <p className="mt-0.5 text-sm text-muted-foreground">Schedule, dispatch, and track work orders</p>
           </div>
 
-          {/* Tabs live center-stage; search sits right, just before the filter */}
-          <div className="mx-auto min-w-0">
-            <IndustrialTabs
-              testidPrefix="tab"
-              activeKey={activeTab}
-              onSelect={(k) => setActiveTab(k as FilterTab)}
-              tabs={(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => ({
-                key: tab,
-                label: filterTabConfig[tab].label,
-              }))}
-            />
+          <div className="flex shrink-0 items-center gap-2 lg:ml-auto">
+            <Button onClick={() => setCreateDialogOpen(true)} size="sm" data-testid="button-create-work-order">
+              <Plus className="h-4 w-4 mr-1" />
+              New Work Order
+            </Button>
           </div>
+        </div>
 
+        {/* Status tabs left · search + filter right */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <IndustrialTabs
+            testidPrefix="tab"
+            activeKey={activeTab}
+            onSelect={(k) => setActiveTab(k as FilterTab)}
+            tabs={(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => ({
+              key: tab,
+              label: filterTabConfig[tab].label,
+            }))}
+          />
           <div className="flex shrink-0 items-center gap-2">
             <div className="relative w-56">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -1301,10 +1307,6 @@ export default function CrmWorkOrders() {
                 ))}
               </SelectContent>
             </Select>
-            <Button onClick={() => setCreateDialogOpen(true)} size="sm" data-testid="button-create-work-order">
-              <Plus className="h-4 w-4 mr-1" />
-              New Work Order
-            </Button>
           </div>
         </div>
 
@@ -1390,46 +1392,46 @@ export default function CrmWorkOrders() {
               return (
                 <div
                   key={wo.id}
-                  className="group cursor-pointer rounded-[4px] border border-slate-300/70 border-l-4 bg-white p-4 transition-colors hover:border-slate-400"
+                  className="group cursor-pointer rounded-[4px] border border-slate-300/70 border-l-2 bg-white p-3 transition-colors hover:border-slate-400"
                   style={{ borderLeftColor: statusAccent[wo.status] || "#94a3b8" }}
                   onMouseEnter={() => prefetchWorkOrder(wo.id)}
                   onTouchStart={() => prefetchWorkOrder(wo.id)}
                   onClick={() => handleOpenDetail(wo)}
                   data-testid={`card-work-order-${wo.id}`}
                 >
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1">
                     <StatusDot
-                      pill={`${badgeStyle.bg} ${badgeStyle.text} border ${badgeStyle.border} text-xs shrink-0`}
+                      pill={`${badgeStyle.bg} ${badgeStyle.text} border ${badgeStyle.border} h-4 px-1 text-[10px] shrink-0`}
                       data-testid={`badge-status-${wo.id}`}
                     >
                       {badgeLabel}
                     </StatusDot>
-                    <span className="rounded-[3px] bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600" data-testid={`badge-visit-type-${wo.id}`}>
+                    <span className="rounded-[3px] bg-slate-100 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-slate-500" data-testid={`badge-visit-type-${wo.id}`}>
                       {visitTypeLabels[wo.visitType || "SERVICE"]}
                     </span>
                   </div>
 
-                  <p className="mt-2.5 truncate text-base font-semibold leading-tight text-slate-900" data-testid={`text-wo-subtype-${wo.id}`}>
+                  <p className="mt-1.5 truncate text-sm font-semibold leading-tight text-slate-900" data-testid={`text-wo-subtype-${wo.id}`}>
                     {wo.title || (wo.workSubtype && wo.workSubtype !== "Other" ? wo.workSubtype : visitTypeLabels[wo.visitType || "SERVICE"])}
                   </p>
-                  <p className="truncate text-sm text-slate-500" data-testid={`text-wo-customer-${wo.id}`}>
+                  <p className="truncate text-xs text-slate-500" data-testid={`text-wo-customer-${wo.id}`}>
                     {wo.customer?.name || "—"}
                   </p>
 
-                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5">
-                    <span className="truncate text-xs text-slate-500">
-                      {wo.scheduledStart ? format(new Date(wo.scheduledStart), "MMM d, yyyy · h:mm a") : "Not scheduled"}
+                  <div className="mt-2 flex items-center justify-between gap-2 border-t border-slate-100 pt-1.5">
+                    <span className="truncate text-[11px] text-slate-500">
+                      {wo.scheduledStart ? format(new Date(wo.scheduledStart), "MMM d · h:mm a") : "Not scheduled"}
                     </span>
-                    <span className="flex shrink-0 items-center gap-1.5">
+                    <span className="flex shrink-0 items-center gap-1">
                       {techInitials && (
                         <>
-                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[9px] font-bold text-white">
+                          <span className="flex h-4.5 w-4.5 min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-slate-900 text-[8px] font-bold text-white">
                             {techInitials}
                           </span>
-                          <span className="max-w-[7rem] truncate text-xs text-slate-600">{techName}</span>
+                          <span className="max-w-[6rem] truncate text-[11px] text-slate-600">{techName}</span>
                         </>
                       )}
-                      <ArrowRight className="h-3.5 w-3.5 text-slate-300 transition-all group-hover:translate-x-0.5 group-hover:text-slate-900" />
+                      <ArrowRight className="h-3 w-3 text-slate-300 transition-all group-hover:translate-x-0.5 group-hover:text-slate-900" />
                     </span>
                   </div>
                 </div>
