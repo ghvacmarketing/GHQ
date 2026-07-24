@@ -101,7 +101,7 @@ function ToggleChip({ active, onClick, children }: { active: boolean; onClick: (
       type="button"
       onClick={onClick}
       className={cn(
-        "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+        "rounded-[3px] border px-2.5 py-1 text-xs font-medium transition-colors",
         active
           ? "border-[#711419] bg-[#711419] text-white"
           : "border-border bg-background text-foreground hover:bg-muted",
@@ -144,18 +144,18 @@ function Stepper({ current, maxVisited, onGo }: { current: number; maxVisited: n
             >
               <span
                 className={cn(
-                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-xs font-semibold transition-colors",
-                  done && "border-[#711419] bg-[#711419] text-white",
-                  active && "border-[#711419] bg-[#711419]/5 text-[#711419]",
-                  !done && !active && "border-border text-muted-foreground",
+                  "flex h-5 w-5 shrink-0 items-center justify-center rounded-[3px] text-[10px] font-bold transition-colors",
+                  done && "bg-slate-900 text-white",
+                  active && "bg-[#711419] text-white",
+                  !done && !active && "border border-slate-300 text-slate-400",
                 )}
               >
-                {done ? <Check className="h-3.5 w-3.5" /> : i + 1}
+                {done ? <Check className="h-3 w-3" /> : i + 1}
               </span>
               <span
                 className={cn(
-                  "hidden text-xs font-medium sm:block",
-                  active ? "text-foreground" : done ? "text-foreground/80" : "text-muted-foreground",
+                  "hidden text-xs font-semibold uppercase tracking-wider sm:block",
+                  active ? "text-slate-900" : done ? "text-slate-600" : "text-slate-400",
                 )}
               >
                 {label}
@@ -185,7 +185,7 @@ function stepPreviewChips(steps: Omit<CampaignStep, "id">[]) {
               </span>
             )}
             <span
-              className="flex h-5 w-5 items-center justify-center rounded-md"
+              className="flex h-5 w-5 items-center justify-center rounded-[3px]"
               style={{ background: `${M.color}18`, color: M.color }}
             >
               <M.icon className="h-3 w-3" />
@@ -438,8 +438,8 @@ export default function CrmCampaignWizard() {
     return (
       <MarketingChrome currentUser={currentUser ?? undefined}>
         <div className="mx-auto w-full max-w-3xl space-y-4 py-6">
-          <Skeleton className="h-10 rounded-xl" />
-          <Skeleton className="h-64 rounded-2xl" />
+          <Skeleton className="h-10 rounded-[4px]" />
+          <Skeleton className="h-64 rounded-[4px]" />
         </div>
       </MarketingChrome>
     );
@@ -486,12 +486,12 @@ export default function CrmCampaignWizard() {
                     type="button"
                     onClick={() => applyTemplate(t)}
                     className={cn(
-                      "group rounded-2xl border bg-card p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md",
+                      "group rounded-[4px] border border-slate-300/70 bg-white p-4 text-left transition-colors hover:border-slate-900",
                       active ? "border-[#711419] ring-1 ring-[#711419]" : "border-border",
                     )}
                   >
                     <span
-                      className="flex h-10 w-10 items-center justify-center rounded-xl"
+                      className="flex h-10 w-10 items-center justify-center rounded-[4px]"
                       style={{ background: `${t.accent}15`, color: t.accent }}
                     >
                       <TIcon className="h-5 w-5" />
@@ -549,7 +549,7 @@ export default function CrmCampaignWizard() {
                 <Plus className="mr-1.5 h-3.5 w-3.5" /> Add another audience
               </Button>
 
-              <Card className="rounded-2xl">
+              <Card className="rounded-[4px] border-slate-300/70 shadow-none">
                 <CardContent className="p-4">
                   <p className="text-xs font-semibold text-foreground">Protections</p>
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
@@ -603,10 +603,10 @@ export default function CrmCampaignWizard() {
               </p>
 
               {/* Reply behavior */}
-              <Card className="mt-4 rounded-2xl border-[#711419]/30 bg-[#711419]/[0.03]">
+              <Card className="mt-4 rounded-[4px] border-[#711419]/30 bg-[#711419]/[0.03] shadow-none">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#711419]/10 text-[#711419]">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-[3px] bg-[#711419]/10 text-[#711419]">
                       <Reply className="h-4 w-4" />
                     </span>
                     <div>
@@ -620,7 +620,7 @@ export default function CrmCampaignWizard() {
                       { key: "notifyTeam" as const, label: "Notify the team", desc: "In-app notification" },
                       { key: "createFollowUp" as const, label: "Create follow-up", desc: "Task on the customer" },
                     ].map((o) => (
-                      <label key={o.key} className="flex cursor-pointer items-start gap-2 rounded-lg border bg-card p-2.5">
+                      <label key={o.key} className="flex cursor-pointer items-start gap-2 rounded-[3px] border bg-card p-2.5">
                         <Switch
                           checked={settings.reply[o.key]}
                           onCheckedChange={(v) =>
@@ -640,7 +640,7 @@ export default function CrmCampaignWizard() {
               {/* Timeline */}
               <div className="mt-5">
                 <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#711419] text-white">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-[3px] bg-[#711419] text-white">
                     <Sparkles className="h-3 w-3" />
                   </span>
                   Campaign launches
@@ -762,7 +762,7 @@ export default function CrmCampaignWizard() {
               </DialogDescription>
             </DialogHeader>
             {warnings.length > 0 && (
-              <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
+              <div className="rounded-[3px] bg-amber-50 p-3 text-xs text-amber-800">
                 {warnings.map((w, i) => <p key={i} className="flex gap-1.5"><AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />{w}</p>)}
               </div>
             )}
@@ -806,11 +806,11 @@ function SegmentEditor({
   const [zipInput, setZipInput] = useState("");
 
   return (
-    <Card className="rounded-2xl">
+    <Card className="rounded-[4px] border-slate-300/70 shadow-none">
       <CardContent className="p-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#711419]/10 text-[11px] font-semibold text-[#711419]">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[3px] bg-[#711419]/10 text-[11px] font-semibold text-[#711419]">
               {index + 1}
             </span>
             <Input
@@ -939,7 +939,7 @@ function SegmentEditor({
           <FieldRow label="ZIP codes" hint="Press Enter to add">
             <div className="flex flex-wrap items-center gap-1.5">
               {f.zips.map((z) => (
-                <span key={z} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
+                <span key={z} className="inline-flex items-center gap-1 rounded-[3px] bg-slate-100 px-2 py-1 text-xs font-medium">
                   {z}
                   <button onClick={() => setF({ zips: f.zips.filter((x) => x !== z) })}><X className="h-3 w-3" /></button>
                 </span>
@@ -973,7 +973,7 @@ function SegmentEditor({
 
         <div className="mt-4 flex flex-wrap gap-1.5 border-t pt-3">
           {describeFilters(f).map((d, i) => (
-            <span key={i} className="rounded-lg bg-[#711419]/10 px-2 py-0.5 text-[11px] font-medium text-[#711419]">{d}</span>
+            <span key={i} className="rounded-[3px] bg-[#711419]/10 px-2 py-0.5 text-[11px] font-medium text-[#711419]">{d}</span>
           ))}
         </div>
       </CardContent>
@@ -992,10 +992,10 @@ function AudiencePreviewRail({
 }) {
   return (
     <div className="lg:sticky lg:top-20 lg:self-start">
-      <Card className="rounded-2xl">
+      <Card className="rounded-[4px] border-slate-300/70 shadow-none">
         <CardContent className="p-4">
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#711419]/10 text-[#711419]">
+            <span className="flex h-8 w-8 items-center justify-center rounded-[3px] bg-[#711419]/10 text-[#711419]">
               <Users className="h-4 w-4" />
             </span>
             <p className="text-sm font-semibold text-foreground">Live audience</p>
@@ -1025,15 +1025,15 @@ function AudiencePreviewRail({
           <div className="mt-4 border-t pt-3">
             <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Sample</p>
             {!preview && loading && (
-              <div className="space-y-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-9 rounded-lg" />)}</div>
+              <div className="space-y-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-9 rounded-[3px]" />)}</div>
             )}
             {preview && preview.sample.length === 0 && (
               <p className="text-xs text-muted-foreground">No one matches yet — loosen the filters.</p>
             )}
             <div className="max-h-[380px] space-y-1 overflow-y-auto pr-1">
               {preview?.sample.map((c) => (
-                <div key={c.id} className="group flex items-center gap-2.5 rounded-lg p-1.5 hover:bg-muted/60">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#711419] text-[10px] font-semibold leading-none text-white">
+                <div key={c.id} className="group flex items-center gap-2.5 rounded-[3px] p-1.5 hover:bg-muted/60">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[3px] bg-[#711419] text-[10px] font-semibold leading-none text-white">
                     {initials(c.name)}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -1113,7 +1113,7 @@ function StepEditor({
       </div>
 
       {/* Card */}
-      <div className="relative rounded-2xl border bg-card shadow-sm">
+      <div className="relative rounded-[4px] border bg-card shadow-sm">
         <span
           className="absolute -left-[31px] top-5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-background"
           style={{ background: M.color }}
@@ -1181,7 +1181,7 @@ function StepEditor({
                 key={m.token}
                 type="button"
                 onClick={() => insertToken(m.token)}
-                className="rounded-md bg-muted px-2 py-0.5 font-mono text-[11px] text-foreground hover:bg-[#711419]/10 hover:text-[#711419]"
+                className="rounded-[3px] bg-muted px-2 py-0.5 font-mono text-[11px] text-foreground hover:bg-[#711419]/10 hover:text-[#711419]"
               >
                 {m.token}
               </button>
@@ -1216,7 +1216,7 @@ function SequenceRail({
   const days = Math.round(totalMs / 864e5 * 10) / 10;
   return (
     <div className="lg:sticky lg:top-20 lg:self-start">
-      <Card className="rounded-2xl">
+      <Card className="rounded-[4px] border-slate-300/70 shadow-none">
         <CardContent className="space-y-4 p-4">
           <div>
             <p className="text-sm font-semibold text-foreground">Sequence summary</p>
@@ -1231,7 +1231,7 @@ function SequenceRail({
               const M = STEP_META[s.type];
               return (
                 <div key={s.id} className="flex items-center gap-2 text-xs">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md" style={{ background: `${M.color}18`, color: M.color }}>
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[3px]" style={{ background: `${M.color}18`, color: M.color }}>
                     <M.icon className="h-3 w-3" />
                   </span>
                   <span className="truncate text-foreground">
@@ -1301,7 +1301,7 @@ function ReviewStep({
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         {/* Audience */}
-        <Card className="rounded-2xl">
+        <Card className="rounded-[4px] border-slate-300/70 shadow-none">
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-[#711419]" />
@@ -1313,7 +1313,7 @@ function ReviewStep({
                 <div key={s.id} className="flex flex-wrap items-center gap-1.5">
                   {i > 0 && <span className="text-[10px] font-semibold uppercase text-muted-foreground">or</span>}
                   {describeFilters(s.filters).map((d, j) => (
-                    <span key={j} className="rounded-lg bg-[#711419]/10 px-2 py-0.5 text-[11px] font-medium text-[#711419]">{d}</span>
+                    <span key={j} className="rounded-[3px] bg-[#711419]/10 px-2 py-0.5 text-[11px] font-medium text-[#711419]">{d}</span>
                   ))}
                 </div>
               ))}
@@ -1326,7 +1326,7 @@ function ReviewStep({
         </Card>
 
         {/* Sequence */}
-        <Card className="rounded-2xl">
+        <Card className="rounded-[4px] border-slate-300/70 shadow-none">
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-[#711419]" />
@@ -1337,7 +1337,7 @@ function ReviewStep({
                 const M = STEP_META[s.type];
                 return (
                   <div key={s.id} className="flex items-center gap-2 text-xs">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md" style={{ background: `${M.color}18`, color: M.color }}>
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[3px]" style={{ background: `${M.color}18`, color: M.color }}>
                       <M.icon className="h-3 w-3" />
                     </span>
                     <span className="truncate">{s.type === "email" ? s.subject || "Email" : s.type === "sms" ? "Text message" : s.title || "Task"}</span>
@@ -1354,7 +1354,7 @@ function ReviewStep({
         </Card>
 
         {/* Schedule */}
-        <Card className="rounded-2xl">
+        <Card className="rounded-[4px] border-slate-300/70 shadow-none">
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
               <CalendarClock className="h-4 w-4 text-[#711419]" />
@@ -1368,7 +1368,7 @@ function ReviewStep({
                     type="button"
                     onClick={() => setSettings((s) => ({ ...s, schedule: { ...s.schedule, startMode: mode } }))}
                     className={cn(
-                      "rounded-lg border p-2.5 text-left text-xs font-medium transition-colors",
+                      "rounded-[3px] border p-2.5 text-left text-xs font-medium transition-colors",
                       settings.schedule.startMode === mode
                         ? "border-[#711419] bg-[#711419]/5 text-[#711419]"
                         : "border-border hover:bg-muted/50",
@@ -1416,7 +1416,7 @@ function ReviewStep({
         </Card>
 
         {/* Checks */}
-        <Card className={cn("rounded-2xl", blockers.length > 0 ? "border-red-200" : warnings.length > 0 ? "border-amber-200" : "border-green-200")}>
+        <Card className={cn("rounded-[4px]", blockers.length > 0 ? "border-red-200" : warnings.length > 0 ? "border-amber-200" : "border-green-200")}>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
               {blockers.length > 0
