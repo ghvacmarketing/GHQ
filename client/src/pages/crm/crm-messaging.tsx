@@ -704,7 +704,7 @@ export default function CrmMessaging() {
       {/* ───────────── Thread ───────────── */}
       <div className={cn("flex-1 flex flex-col bg-background min-w-0", !showMobileThread ? "hidden lg:flex" : "flex")}>
         {/* Switcher row — thread actions live up here, level with Messages | Mail */}
-        <div className="relative flex shrink-0 items-center justify-center px-4 pb-2.5 pt-3">
+        <div className="relative flex shrink-0 items-center justify-center border-b border-slate-200/80 px-4 pb-2.5 pt-3">
           <CommsSwitcher active="messages" bare />
           {selectedConversationId && !loadingDetail && (
             <div className="absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-1">
@@ -746,9 +746,9 @@ export default function CrmMessaging() {
           </div>
         ) : (
           <>
-            {/* Identity strip — blended background; the name/number live in a
-                subtle hairline container, actions + balance sit far right. */}
-            <div className="flex items-center gap-3 bg-background px-4 pb-2 pt-1 lg:px-6">
+            {/* Identity strip — open header row with a clean full-width divider
+                below it (reference style), actions + balance far right. */}
+            <div className="flex items-center gap-3 border-b border-slate-200/80 bg-background px-4 py-2.5 lg:px-6">
               <Button
                 variant="ghost"
                 size="sm"
@@ -757,7 +757,7 @@ export default function CrmMessaging() {
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-              <div className="min-w-0 rounded-[4px] border border-slate-200/80 px-3 py-1.5">
+              <div className="min-w-0">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   {headerCtx?.inCrm && headerCtx.customer ? (
                     <Link href={`/crm/customers/${headerCtx.customer.id}`}>
