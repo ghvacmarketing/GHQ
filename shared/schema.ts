@@ -6,6 +6,13 @@ import type {
   AutomationTiming,
   AutomationSafeguards,
 } from "./automation";
+import type {
+  CampaignStatus,
+  CampaignStep,
+  CampaignAudience,
+  CampaignSettings,
+  EnrollmentStatus,
+} from "./campaigns";
 
 import {
   pgTable,
@@ -3110,6 +3117,7 @@ export const smsNotificationTypeEnum = [
   "review_request",
   "quote_sent",
   "invoice_sent",
+  "campaign",
 ] as const;
 export type SmsNotificationType = typeof smsNotificationTypeEnum[number];
 
@@ -3220,6 +3228,95 @@ export const automationRuns = pgTable("automation_runs", {
   campaignCustomerIdx: index("automation_runs_campaign_customer_idx").on(table.campaignId, table.customerId),
 }));
 export type AutomationRun = typeof automationRuns.$inferSelect;
+
+// Outbound campaigns (wizard: template → audience → sequence → launch).
+// Audience/steps/settings shapes live in ./campaigns. Enrollments are the
+// per-customer sequence state machine processed by the campaign engine.
+export const crmCampaigns = pgTable("crm_campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  status: text("status").$type<CampaignStatus>().notNull().default("draft"),
+  templateKey: text("template_key"),
+  audience: json("audience").$type<CampaignAudience>().notNull(),
+  steps: json("steps").$type<CampaignStep[]>().notNull(),
+  settings: json("settings").$type<CampaignSettings>().notNull(),
+  startAt: timestamp("start_at"),
+  launchedAt: timestamp("launched_at"),
+  completedAt: timestamp("completed_at"),
+  audienceCount: integer("audience_count").notNull().default(0),
+  totalSent: integer("total_sent").notNull().default(0),
+  totalReplied: integer("total_replied").notNull().default(0),
+  totalCompleted: integer("total_completed").notNull().default(0),
+  totalFailed: integer("total_failed").notNull().default(0),
+  lastSendAt: timestamp("last_send_at"),
+  createdById: varchar("created_by_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  statusIdx: index("crm_campaigns_status_idx").on(table.status),
+}));
+
+export const insertCrmCampaignSchema = createInsertSchema(crmCampaigns).omit({
+  id: true,
+  startAt: true,
+  launchedAt: true,
+  completedAt: true,
+  audienceCount: true,
+  totalSent: true,
+  totalReplied: true,
+  totalCompleted: true,
+  totalFailed: true,
+  lastSendAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertCrmCampaign = z.infer<typeof insertCrmCampaignSchema>;
+export type CrmCampaign = typeof crmCampaigns.$inferSelect;
+
+export const crmCampaignEnrollments = pgTable("crm_campaign_enrollments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").notNull(),
+  customerId: varchar("customer_id").notNull(),
+  customerName: text("customer_name"),
+  email: text("email"),
+  phone: text("phone"),
+  status: text("status").$type<EnrollmentStatus>().notNull().default("active"),
+  currentStepIndex: integer("current_step_index").notNull().default(0),
+  nextActionAt: timestamp("next_action_at"),
+  firstSentAt: timestamp("first_sent_at"),
+  lastSentAt: timestamp("last_sent_at"),
+  repliedAt: timestamp("replied_at"),
+  replyChannel: text("reply_channel"), // sms | email
+  conversationId: varchar("conversation_id"), // messaging conversation used for SMS sends + reply detection
+  detail: text("detail"), // JSON array of step events
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  dueIdx: index("crm_campaign_enrollments_due_idx").on(table.status, table.nextActionAt),
+  campaignIdx: index("crm_campaign_enrollments_campaign_idx").on(table.campaignId, table.status),
+  customerIdx: index("crm_campaign_enrollments_customer_idx").on(table.customerId),
+  uniqueEnrollment: uniqueIndex("crm_campaign_enrollments_unique_idx").on(table.campaignId, table.customerId),
+}));
+export type CrmCampaignEnrollment = typeof crmCampaignEnrollments.$inferSelect;
+
+// Per-step send log — powers the per-step funnel on the campaign detail page.
+export const crmCampaignSends = pgTable("crm_campaign_sends", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").notNull(),
+  enrollmentId: varchar("enrollment_id").notNull(),
+  customerId: varchar("customer_id").notNull(),
+  stepId: text("step_id"),
+  stepIndex: integer("step_index").notNull(),
+  channel: text("channel").notNull(), // email | sms | task
+  status: text("status").notNull(), // sent | failed | skipped
+  detail: text("detail"),
+  sentAt: timestamp("sent_at").defaultNow(),
+}, (table) => ({
+  campaignStepIdx: index("crm_campaign_sends_campaign_step_idx").on(table.campaignId, table.stepIndex),
+  customerIdx: index("crm_campaign_sends_customer_idx").on(table.customerId, table.sentAt),
+}));
+export type CrmCampaignSend = typeof crmCampaignSends.$inferSelect;
 
 // =============================================
 // QUICKBOOKS INTEGRATION

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { MarketingChrome, MARKETING_TABS } from "@/components/marketing-shell";
-import { TemplatesTab, AudiencesTab, CampaignsTab, LeadSourcesTab } from "@/pages/marketing-tools";
+import { TemplatesTab, AudiencesTab, LeadSourcesTab } from "@/pages/marketing-tools";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -15,8 +15,8 @@ const PLACEHOLDERS: Record<string, { icon: typeof Send; title: string; blurb: st
   campaigns: {
     icon: Send,
     title: "Campaigns",
-    blurb: "One-off email and SMS blasts to a chosen audience — promotions, seasonal tune-up pushes, and announcements.",
-    points: ["Compose once, send by email and/or text", "Pick an audience or upload a list", "Schedule sends and track delivery"],
+    blurb: "Timed email + text sequences to a CRM audience — tune-up pushes, win-backs, review asks — that stop when someone replies.",
+    points: ["Template gallery with ready-to-send sequences", "Audience builder on live CRM data", "Reply detection stops the sequence automatically"],
   },
   audiences: {
     icon: Users,
@@ -72,8 +72,6 @@ export default function MarketingApp() {
         <TemplatesTab />
       ) : tab === "audiences" ? (
         <AudiencesTab />
-      ) : tab === "campaigns" ? (
-        <CampaignsTab />
       ) : tab === "lead-sources" ? (
         <LeadSourcesTab />
       ) : tab === "dashboard" || !known ? (
@@ -134,7 +132,7 @@ function MarketingDashboard() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {MARKETING_TABS.filter((t) => t.key !== "dashboard" && t.key !== "settings").map((t) => {
           const Icon = t.icon;
-          const live = t.key === "automations";
+          const live = t.key === "automations" || t.key === "campaigns";
           return (
             <button
               key={t.key}

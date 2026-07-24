@@ -65,6 +65,9 @@ const CrmAddProspect = lazy(() => import("@/pages/crm/crm-add-prospect"));
 const CrmMarketing = lazy(() => import("@/pages/crm/crm-marketing"));
 const MarketingApp = lazy(() => import("@/pages/marketing-app"));
 const CrmMarketingBuilder = lazy(() => import("@/pages/crm/crm-marketing-builder"));
+const MarketingCampaigns = lazy(() => import("@/pages/marketing-campaigns"));
+const MarketingCampaignWizard = lazy(() => import("@/pages/marketing-campaign-wizard"));
+const MarketingCampaignDetail = lazy(() => import("@/pages/marketing-campaign-detail"));
 const CrmAutomatedMessages = lazy(() => import("@/pages/crm/crm-automated-messages"));
 const CrmItems = lazy(() => import("@/pages/crm/crm-items"));
 const CrmInstallWorksheet = lazy(() => import("@/pages/crm/crm-install-worksheet"));
@@ -385,6 +388,10 @@ function Router() {
       <Route path="/marketing/automations/new">{() => <ProtectedCrmWrapper><CrmMarketingBuilder /></ProtectedCrmWrapper>}</Route>
       <Route path="/marketing/automations/edit/:id">{() => <ProtectedCrmWrapper><CrmMarketingBuilder /></ProtectedCrmWrapper>}</Route>
       <Route path="/marketing/automations">{() => <ProtectedCrmWrapper><CrmMarketing /></ProtectedCrmWrapper>}</Route>
+      <Route path="/marketing/campaigns/new">{() => <ProtectedCrmWrapper><MarketingCampaignWizard /></ProtectedCrmWrapper>}</Route>
+      <Route path="/marketing/campaigns/:id/edit">{() => <ProtectedCrmWrapper><MarketingCampaignWizard /></ProtectedCrmWrapper>}</Route>
+      <Route path="/marketing/campaigns/:id">{() => <ProtectedCrmWrapper><MarketingCampaignDetail /></ProtectedCrmWrapper>}</Route>
+      <Route path="/marketing/campaigns">{() => <ProtectedCrmWrapper><MarketingCampaigns /></ProtectedCrmWrapper>}</Route>
       <Route path="/marketing/:tab">{() => <ProtectedCrmWrapper><MarketingApp /></ProtectedCrmWrapper>}</Route>
       <Route path="/marketing">{() => <ProtectedCrmWrapper><MarketingApp /></ProtectedCrmWrapper>}</Route>
       <Route path="/crm/notifications">{() => <ProtectedCrmWrapper><CrmNotifications /></ProtectedCrmWrapper>}</Route>

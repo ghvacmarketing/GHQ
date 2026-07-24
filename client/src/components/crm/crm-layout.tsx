@@ -67,7 +67,8 @@ import { PinCommentsLayer, enterPinMode } from "./pin-comments";
 
 interface CrmLayoutProps {
   children: React.ReactNode;
-  currentUser: CrmUser;
+  /** Optional because pages render the shell while /api/crm/auth/me is loading. */
+  currentUser?: CrmUser;
   disableScroll?: boolean;
   hideGlobalSearch?: boolean;
   /** Render content edge-to-edge below the top bar (no gutter padding) — for app-shell pages like Messaging. */
@@ -196,7 +197,7 @@ function SidebarContent({
   collapsed = false,
   onToggleCollapse,
 }: {
-  currentUser: CrmUser;
+  currentUser?: CrmUser;
   onItemClick?: () => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
@@ -706,7 +707,7 @@ export function CrmLayout({ children, currentUser, disableScroll = false, hideGl
         )}
       </main>
       <GhqSearch showFab={!hideGlobalSearch} />
-      <PinCommentsLayer currentUser={currentUser} />
+      {currentUser && <PinCommentsLayer currentUser={currentUser} />}
       <Sheet open={notificationsOpen} onOpenChange={setNotificationsOpen}>
         <SheetContent side="right" className="w-full sm:w-96 p-0">
           <NotificationsDrawerContent onClose={() => setNotificationsOpen(false)} />

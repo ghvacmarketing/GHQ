@@ -53,7 +53,9 @@ import * as xlsx from "xlsx";
 import { goveeSensors, goveeSensorReadings, goveeSensorAlerts, type GoveeSensor } from "@shared/schema";
 import { dispatchBlackouts } from "@shared/schema";
 import { automationCampaigns, insertAutomationCampaignSchema } from "@shared/schema";
+import { crmCampaigns, crmCampaignEnrollments, crmCampaignSends, insertCrmCampaignSchema } from "@shared/schema";
 import { runAutomationTrigger, fireAutomationForCustomer, fireAutomationForLead } from "./services/automationEngine";
+import { previewAudience, launchCampaign, cancelCampaign, sendTestStepEmail, syncCampaignAudience, maybeCompleteCampaign } from "./services/campaignEngine";
 import { goveeService } from "./services/goveeService";
 import { riskStatus, recommendedActions } from "@shared/govee";
 import { nanoid } from "nanoid";
@@ -28776,6 +28778,260 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error) {
       console.error("Error fetching marketing campaigns:", error);
       res.status(500).json({ message: "Failed to fetch campaigns" });
+    }
+  });
+
+  // ============================================================================
+  // Outbound Campaigns (wizard: template → audience → sequence → launch)
+  // ============================================================================
+
+  // GET /api/crm/campaigns - List campaigns
+  app.get("/api/crm/campaigns", requireCrmAuth, async (_req, res) => {
+    try {
+      const rows = await db.select().from(crmCampaigns).orderBy(desc(crmCampaigns.createdAt));
+      res.json(rows);
+    } catch (error) {
+      console.error("Error fetching campaigns:", error);
+      res.status(500).json({ message: "Failed to fetch campaigns" });
+    }
+  });
+
+  // GET /api/crm/campaigns/meta - Audience filter options + channel readiness for the wizard
+  app.get("/api/crm/campaigns/meta", requireCrmAuth, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      const [tagRows, cityRows, sourceRows, countRows] = await Promise.all([
+        db.execute(sql`SELECT DISTINCT jsonb_array_elements_text(tags::jsonb) AS tag FROM crm_customers WHERE tags IS NOT NULL ORDER BY tag LIMIT 100`),
+        db.execute(sql`SELECT city, COUNT(DISTINCT customer_id)::int AS n FROM crm_properties WHERE city IS NOT NULL AND city <> '' GROUP BY city ORDER BY n DESC LIMIT 50`),
+        db.execute(sql`SELECT DISTINCT lead_source AS source FROM crm_customers WHERE lead_source IS NOT NULL AND lead_source <> '' ORDER BY source LIMIT 50`),
+        db.execute(sql`SELECT LOWER(customer_status) AS status, COUNT(*)::int AS n FROM crm_customers GROUP BY LOWER(customer_status)`),
+      ]);
+      const counts: Record<string, number> = {};
+      for (const r of (countRows as any).rows || []) counts[r.status] = r.n;
+      const smsKilled = (await storage.getSetting("automated_sms_enabled"))?.value === "false";
+      const emailKilled = (await storage.getSetting("automated_email_enabled"))?.value === "false";
+      res.json({
+        tags: ((tagRows as any).rows || []).map((r: any) => r.tag).filter(Boolean),
+        cities: ((cityRows as any).rows || []).map((r: any) => ({ city: r.city, count: r.n })),
+        leadSources: ((sourceRows as any).rows || []).map((r: any) => r.source).filter(Boolean),
+        customerCounts: { customers: counts["customer"] || 0, prospects: counts["prospect"] || 0 },
+        channels: {
+          smsConfigured: !!process.env.TEXTLINE_API_KEY,
+          smsKillSwitch: smsKilled,
+          emailKillSwitch: emailKilled,
+          gmailConnected: !!user?.gmailRefreshTokenEnc,
+          gmailAddress: user?.gmailAddress || null,
+          resendConfigured: !!(process.env.RESEND_API_KEY && process.env.FROM_EMAIL),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching campaign meta:", error);
+      res.status(500).json({ message: "Failed to fetch campaign meta" });
+    }
+  });
+
+  // POST /api/crm/campaigns/preview-audience - Live audience count + sample for the wizard
+  app.post("/api/crm/campaigns/preview-audience", requireCrmAuth, async (req, res) => {
+    try {
+      const { audience, steps } = req.body || {};
+      if (!audience?.segments?.length) {
+        return res.json({ total: 0, sendable: 0, missingEmail: 0, missingPhone: 0, sample: [] });
+      }
+      res.json(await previewAudience(audience, steps || []));
+    } catch (error) {
+      console.error("Error previewing audience:", error);
+      res.status(500).json({ message: "Failed to preview audience" });
+    }
+  });
+
+  // POST /api/crm/campaigns/test-step - Send a test of an email step to yourself
+  app.post("/api/crm/campaigns/test-step", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const { step } = req.body || {};
+      if (!step || step.type !== "email") {
+        return res.status(400).json({ message: "Only email steps support test sends" });
+      }
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+      const result = await sendTestStepEmail(user, step);
+      res.json({ result, ok: result === "sent" });
+    } catch (error) {
+      console.error("Error sending test step:", error);
+      res.status(500).json({ message: "Failed to send test" });
+    }
+  });
+
+  // POST /api/crm/campaigns - Create a campaign (draft)
+  app.post("/api/crm/campaigns", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      // status is server-owned: every campaign starts as a draft and only the
+      // launch/pause/cancel flows move it.
+      const parsed = insertCrmCampaignSchema.safeParse({ ...req.body, status: "draft", createdById: user?.id });
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid campaign", errors: parsed.error.errors });
+      }
+      const [created] = await db.insert(crmCampaigns).values(parsed.data as any).returning();
+      await logCrmAudit(user?.id || null, "campaign.created", "campaign", created.id, { name: created.name }, req.ip);
+      res.status(201).json(created);
+    } catch (error) {
+      console.error("Error creating campaign:", error);
+      res.status(500).json({ message: "Failed to create campaign" });
+    }
+  });
+
+  // GET /api/crm/campaigns/:id - Campaign detail with per-step stats + activity
+  app.get("/api/crm/campaigns/:id", requireCrmAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const [campaign] = await db.select().from(crmCampaigns).where(eq(crmCampaigns.id, id));
+      if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+
+      const [statusRows, stepRows, recentSends, recentReplies] = await Promise.all([
+        db.select({ status: crmCampaignEnrollments.status, n: sql<number>`count(*)::int` })
+          .from(crmCampaignEnrollments)
+          .where(eq(crmCampaignEnrollments.campaignId, id))
+          .groupBy(crmCampaignEnrollments.status),
+        db.select({ stepIndex: crmCampaignSends.stepIndex, status: crmCampaignSends.status, n: sql<number>`count(*)::int` })
+          .from(crmCampaignSends)
+          .where(eq(crmCampaignSends.campaignId, id))
+          .groupBy(crmCampaignSends.stepIndex, crmCampaignSends.status),
+        db.select({
+          id: crmCampaignSends.id,
+          customerId: crmCampaignSends.customerId,
+          stepIndex: crmCampaignSends.stepIndex,
+          channel: crmCampaignSends.channel,
+          status: crmCampaignSends.status,
+          detail: crmCampaignSends.detail,
+          sentAt: crmCampaignSends.sentAt,
+          customerName: crmCampaignEnrollments.customerName,
+        })
+          .from(crmCampaignSends)
+          .leftJoin(crmCampaignEnrollments, eq(crmCampaignSends.enrollmentId, crmCampaignEnrollments.id))
+          .where(eq(crmCampaignSends.campaignId, id))
+          .orderBy(desc(crmCampaignSends.sentAt))
+          .limit(25),
+        db.select({
+          customerId: crmCampaignEnrollments.customerId,
+          customerName: crmCampaignEnrollments.customerName,
+          replyChannel: crmCampaignEnrollments.replyChannel,
+          repliedAt: crmCampaignEnrollments.repliedAt,
+          conversationId: crmCampaignEnrollments.conversationId,
+        })
+          .from(crmCampaignEnrollments)
+          .where(and(eq(crmCampaignEnrollments.campaignId, id), isNotNull(crmCampaignEnrollments.repliedAt)))
+          .orderBy(desc(crmCampaignEnrollments.repliedAt))
+          .limit(15),
+      ]);
+
+      const enrollmentCounts: Record<string, number> = {};
+      for (const r of statusRows) enrollmentCounts[r.status] = r.n;
+      res.json({ campaign, enrollmentCounts, stepStats: stepRows, recentSends, recentReplies });
+    } catch (error) {
+      console.error("Error fetching campaign:", error);
+      res.status(500).json({ message: "Failed to fetch campaign" });
+    }
+  });
+
+  // PATCH /api/crm/campaigns/:id - Update a campaign (content edits only while not sending)
+  app.patch("/api/crm/campaigns/:id", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const [existing] = await db.select().from(crmCampaigns).where(eq(crmCampaigns.id, id));
+      if (!existing) return res.status(404).json({ message: "Campaign not found" });
+
+      const { name, description, audience, steps, settings, templateKey, status } = req.body;
+      const updates: Record<string, unknown> = { updatedAt: new Date() };
+      for (const [k, v] of Object.entries({ name, description, templateKey })) {
+        if (v !== undefined) updates[k] = v;
+      }
+      const editable = ["draft", "scheduled", "paused"].includes(existing.status);
+      for (const [k, v] of Object.entries({ audience, steps, settings })) {
+        if (v === undefined) continue;
+        if (!editable) return res.status(400).json({ message: "Pause the campaign before editing its audience or sequence" });
+        updates[k] = v;
+      }
+      let resumed = false;
+      if (status !== undefined) {
+        const allowed =
+          (status === "paused" && ["active", "scheduled"].includes(existing.status)) ||
+          (status === "active" && existing.status === "paused" && existing.launchedAt);
+        if (!allowed) return res.status(400).json({ message: `Can't change status from ${existing.status} to ${status}` });
+        // Resuming before a future start date goes back to "scheduled", not
+        // straight to actively sending.
+        const startsLater = existing.startAt && new Date(existing.startAt) > new Date();
+        updates.status = status === "active" && startsLater ? "scheduled" : status;
+        resumed = status === "active";
+      }
+      const [updated] = await db.update(crmCampaigns).set(updates as any).where(eq(crmCampaigns.id, id)).returning();
+      // Audience edits on an already-launched campaign must reach the
+      // enrollment rows, not just the JSON column (additive sync — see
+      // syncCampaignAudience). Skipped when the audience didn't change.
+      const audienceChanged = audience !== undefined && JSON.stringify(audience) !== JSON.stringify(existing.audience);
+      if (audienceChanged && existing.launchedAt) {
+        await syncCampaignAudience(id).catch((err) => console.error("Error syncing campaign audience:", err));
+      }
+      // Resuming a campaign whose enrollments already finished should land on
+      // "completed", not sit active forever.
+      if (resumed) {
+        await maybeCompleteCampaign(id).catch(() => {});
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating campaign:", error);
+      res.status(500).json({ message: "Failed to update campaign" });
+    }
+  });
+
+  // POST /api/crm/campaigns/:id/launch - Enroll the audience and start sending
+  app.post("/api/crm/campaigns/:id/launch", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const [existing] = await db.select({ id: crmCampaigns.id }).from(crmCampaigns).where(eq(crmCampaigns.id, req.params.id));
+      if (!existing) return res.status(404).json({ message: "Campaign not found" });
+      const user = await getCurrentCrmUser(req);
+      const result = await launchCampaign(req.params.id);
+      await logCrmAudit(user?.id || null, "campaign.launched", "campaign", req.params.id, result, req.ip);
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error("Error launching campaign:", error);
+      // launchCampaign throws user-facing validation messages; anything else
+      // is an internal failure.
+      const validation = /only drafts|no steps|audience is empty/i.test(error?.message || "");
+      res.status(validation ? 400 : 500).json({ message: validation ? error.message : "Failed to launch campaign" });
+    }
+  });
+
+  // POST /api/crm/campaigns/:id/cancel - Stop all in-flight enrollments and archive
+  app.post("/api/crm/campaigns/:id/cancel", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      await cancelCampaign(req.params.id);
+      await logCrmAudit(user?.id || null, "campaign.cancelled", "campaign", req.params.id, {}, req.ip);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error cancelling campaign:", error);
+      res.status(500).json({ message: "Failed to cancel campaign" });
+    }
+  });
+
+  // DELETE /api/crm/campaigns/:id - Delete a campaign (must not be sending)
+  app.delete("/api/crm/campaigns/:id", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const [existing] = await db.select().from(crmCampaigns).where(eq(crmCampaigns.id, id));
+      if (!existing) return res.status(404).json({ message: "Campaign not found" });
+      if (["active", "scheduled"].includes(existing.status)) {
+        return res.status(400).json({ message: "Cancel the campaign before deleting it" });
+      }
+      const user = await getCurrentCrmUser(req);
+      await db.delete(crmCampaignSends).where(eq(crmCampaignSends.campaignId, id));
+      await db.delete(crmCampaignEnrollments).where(eq(crmCampaignEnrollments.campaignId, id));
+      await db.delete(crmCampaigns).where(eq(crmCampaigns.id, id));
+      await logCrmAudit(user?.id || null, "campaign.deleted", "campaign", id, { name: existing.name }, req.ip);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting campaign:", error);
+      res.status(500).json({ message: "Failed to delete campaign" });
     }
   });
 

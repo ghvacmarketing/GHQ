@@ -490,6 +490,81 @@ async function runDocsAndAccountingMigrations() {
   }
 }
 
+async function runCampaignMigrations() {
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS crm_campaigns (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        name text NOT NULL,
+        description text,
+        status text NOT NULL DEFAULT 'draft',
+        template_key text,
+        audience json NOT NULL,
+        steps json NOT NULL,
+        settings json NOT NULL,
+        start_at timestamp,
+        launched_at timestamp,
+        completed_at timestamp,
+        audience_count integer NOT NULL DEFAULT 0,
+        total_sent integer NOT NULL DEFAULT 0,
+        total_replied integer NOT NULL DEFAULT 0,
+        total_completed integer NOT NULL DEFAULT 0,
+        total_failed integer NOT NULL DEFAULT 0,
+        last_send_at timestamp,
+        created_by_id varchar,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS crm_campaigns_status_idx ON crm_campaigns(status)`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS crm_campaign_enrollments (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        campaign_id varchar NOT NULL,
+        customer_id varchar NOT NULL,
+        customer_name text,
+        email text,
+        phone text,
+        status text NOT NULL DEFAULT 'active',
+        current_step_index integer NOT NULL DEFAULT 0,
+        next_action_at timestamp,
+        first_sent_at timestamp,
+        last_sent_at timestamp,
+        replied_at timestamp,
+        reply_channel text,
+        conversation_id varchar,
+        detail text,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS crm_campaign_enrollments_due_idx ON crm_campaign_enrollments(status, next_action_at)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS crm_campaign_enrollments_campaign_idx ON crm_campaign_enrollments(campaign_id, status)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS crm_campaign_enrollments_customer_idx ON crm_campaign_enrollments(customer_id)`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS crm_campaign_enrollments_unique_idx ON crm_campaign_enrollments(campaign_id, customer_id)`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS crm_campaign_sends (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        campaign_id varchar NOT NULL,
+        enrollment_id varchar NOT NULL,
+        customer_id varchar NOT NULL,
+        step_id text,
+        step_index integer NOT NULL,
+        channel text NOT NULL,
+        status text NOT NULL,
+        detail text,
+        sent_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS crm_campaign_sends_campaign_step_idx ON crm_campaign_sends(campaign_id, step_index)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS crm_campaign_sends_customer_idx ON crm_campaign_sends(customer_id, sent_at)`);
+  } catch (err) {
+    console.error("Campaign migration error (non-fatal):", err);
+  }
+}
+
 async function runSalesbookMigrations() {
   try {
     const { db } = await import("./db");
@@ -781,6 +856,7 @@ async function runWaterHeaterSeeds() {
   await runChecklistPhotoStepsMigration();
   await runGmailMigration();
   await runDocsAndAccountingMigrations();
+  await runCampaignMigrations();
   await runSalesbookMigrations();
   await runProposalTemplateMigrations();
   await runAgreementVisitFrequencyMigration();
@@ -869,5 +945,10 @@ async function runWaterHeaterSeeds() {
     import("./services/automationEngine")
       .then(({ startAutomationScheduler }) => startAutomationScheduler(60_000))
       .catch((err) => console.error("Automation scheduler failed to start:", err));
+
+    // Outbound campaign scheduler (drip sequences with reply detection).
+    import("./services/campaignEngine")
+      .then(({ startCampaignScheduler }) => startCampaignScheduler(60_000))
+      .catch((err) => console.error("Campaign scheduler failed to start:", err));
   });
 })();

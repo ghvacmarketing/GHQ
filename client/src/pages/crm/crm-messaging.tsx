@@ -152,6 +152,15 @@ export default function CrmMessaging() {
   useEffect(() => {
     localStorage.setItem("crm_msg_context_collapsed", contextCollapsed ? "1" : "0");
   }, [contextCollapsed]);
+  // Deep link: /crm/messaging?conversation=<id> (campaign reply rows, etc.)
+  useEffect(() => {
+    const c = new URLSearchParams(window.location.search).get("conversation");
+    if (c) {
+      setSelectedConversationId(c);
+      setShowMobileThread(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
