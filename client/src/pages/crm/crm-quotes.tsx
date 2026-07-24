@@ -63,6 +63,9 @@ import {
   MapPin,
   X,
   Filter,
+  ArrowRight,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
@@ -116,6 +119,17 @@ const statusColors: Record<string, string> = {
   expired: "bg-orange-100 text-orange-700 border-orange-200",
 };
 
+// Saturated left-edge accent per status (card view's colored spine)
+const quoteAccent: Record<string, string> = {
+  draft: "#94a3b8",
+  sent: "#3b82f6",
+  viewed: "#a855f7",
+  accepted: "#22c55e",
+  converted: "#10b981",
+  declined: "#ef4444",
+  expired: "#f97316",
+};
+
 const tabFilters = [
   { key: "all", label: "All" },
   { key: "draft", label: "Draft" },
@@ -142,6 +156,12 @@ export default function CrmQuotes() {
   const { toast } = useToast();
   const [searchInput, setSearchInput] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [view, setView] = useState<"list" | "cards">(
+    () => (typeof window !== "undefined" && (localStorage.getItem("crmQuotesView") as "list" | "cards")) || "list",
+  );
+  useEffect(() => {
+    localStorage.setItem("crmQuotesView", view);
+  }, [view]);
   const [page, setPage] = useState(1);
   const [selectedQuote, setSelectedQuote] = useState<CrmQuote | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -569,14 +589,16 @@ export default function CrmQuotes() {
             <p className="mt-0.5 text-sm text-muted-foreground">Create, send, and track customer quotes</p>
           </div>
 
-          <div className="relative w-full lg:flex-1 lg:max-w-md lg:mx-auto">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search quotes…"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="h-9 bg-white pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
-              data-testid="input-search"
+          {/* Tabs center-stage; search sits right, just before the filter */}
+          <div className="mx-auto min-w-0">
+            <IndustrialTabs
+              testidPrefix="tab"
+              activeKey={activeTab}
+              onSelect={(k) => setActiveTab(k as typeof activeTab)}
+              tabs={tabFilters.map((tab) => {
+                const count = tab.key !== "all" ? statusCounts[tab.key as keyof typeof statusCounts] : null;
+                return { key: tab.key, label: tab.label, count: count !== null && count > 0 ? count : null };
+              })}
             />
           </div>
 
@@ -587,30 +609,19 @@ export default function CrmQuotes() {
                 Reset
               </Button>
             )}
-            <Link href="/crm/quotes/new">
-              <Button size="sm" data-testid="button-create-quote">
-                <Plus className="h-4 w-4 mr-1" />
-                New Quote
-              </Button>
-            </Link>
-          </div>
-        </div>
-
-        {/* Tab Filters with Quote Type dropdown on right */}
-        <div className="flex items-center justify-between gap-2">
-          <IndustrialTabs
-            testidPrefix="tab"
-            activeKey={activeTab}
-            onSelect={(k) => setActiveTab(k as typeof activeTab)}
-            tabs={tabFilters.map((tab) => {
-              const count = tab.key !== "all" ? statusCounts[tab.key as keyof typeof statusCounts] : null;
-              return { key: tab.key, label: tab.label, count: count !== null && count > 0 ? count : null };
-            })}
-          />
-          <div className="shrink-0 pb-1">
+            <div className="relative w-56">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search quotes…"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="h-9 bg-white pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
+                data-testid="input-search"
+              />
+            </div>
             <Select value={quoteTypeFilter} onValueChange={setQuoteTypeFilter}>
               <SelectTrigger
-                className={`relative h-8 w-8 shrink-0 justify-center bg-white p-0 [&>svg]:hidden ${
+                className={`relative h-9 w-9 shrink-0 justify-center bg-white p-0 [&>svg]:hidden ${
                   quoteTypeFilter !== "all"
                     ? "border-[#711419] text-[#711419]"
                     : "border-input text-slate-600 hover:text-foreground"
@@ -627,8 +638,8 @@ export default function CrmQuotes() {
               </SelectTrigger>
               <SelectContent className="bg-white">
                 {quoteTypeFilters.map((type) => (
-                  <SelectItem 
-                    key={type.key} 
+                  <SelectItem
+                    key={type.key}
                     value={type.key}
                     className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]"
                   >
@@ -637,10 +648,118 @@ export default function CrmQuotes() {
                 ))}
               </SelectContent>
             </Select>
+            <div className="flex h-9 items-center rounded-md border border-input bg-white p-0.5">
+              <button
+                onClick={() => setView("cards")}
+                className={`flex h-7 w-7 items-center justify-center rounded-[4px] transition-colors ${view === "cards" ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-900"}`}
+                title="Card view"
+                data-testid="quotes-view-cards"
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => setView("list")}
+                className={`flex h-7 w-7 items-center justify-center rounded-[4px] transition-colors ${view === "list" ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-900"}`}
+                title="List view"
+                data-testid="quotes-view-list"
+              >
+                <List className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <Link href="/crm/quotes/new">
+              <Button size="sm" data-testid="button-create-quote">
+                <Plus className="h-4 w-4 mr-1" />
+                New Quote
+              </Button>
+            </Link>
           </div>
         </div>
 
-        {/* Table */}
+        {/* Cards view */}
+        {view === "cards" ? (
+          <>
+            {quotesLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-40 w-full rounded-[4px]" />
+                ))}
+              </div>
+            ) : filteredAndSortedQuotes.length === 0 ? (
+              <div className="rounded-[4px] border border-dashed border-slate-300 bg-white py-16 text-center">
+                <FileText className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+                <p className="font-medium text-slate-500">No quotes found</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" data-testid="quotes-card-grid">
+                {filteredAndSortedQuotes.map((quote) => {
+                  const typeLabel = quoteTypeFilters.find((t) => t.key === (quote as any).quoteType)?.label;
+                  return (
+                    <div
+                      key={quote.id}
+                      className="group cursor-pointer rounded-[4px] border border-slate-300/70 border-l-4 bg-white p-4 transition-colors hover:border-slate-400"
+                      style={{ borderLeftColor: quoteAccent[quote.status || "draft"] || "#94a3b8" }}
+                      onMouseEnter={() => prefetchQuote(quote.id)}
+                      onTouchStart={() => prefetchQuote(quote.id)}
+                      onClick={() => navigate(`/crm/quotes/${quote.id}`)}
+                      data-testid={`card-quote-${quote.id}`}
+                    >
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <StatusDot pill={statusColors[quote.status || "draft"] || statusColors.draft}>
+                          {statusLabels[quote.status || "draft"] || quote.status}
+                        </StatusDot>
+                        {typeLabel && typeLabel !== "All Types" && (
+                          <span className="rounded-[3px] bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                            {typeLabel}
+                          </span>
+                        )}
+                        {(quote.viewCount || 0) > 0 && (
+                          <span className="ml-auto flex items-center gap-1 text-xs text-purple-600" title={`Viewed ${quote.viewCount} times`}>
+                            <Eye className="h-3 w-3" />
+                            {quote.viewCount}
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="mt-2.5 truncate text-base font-semibold leading-tight text-slate-900">
+                        {quote.title || quote.quoteNumber}
+                      </p>
+                      <p className="truncate text-sm text-slate-500">{quote.customerName || "—"}</p>
+
+                      <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5">
+                        <span className="truncate text-xs text-slate-500">{formatDate(quote.createdAt)}</span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <span className="text-sm font-semibold tabular-nums text-slate-900">
+                            {formatCurrency(getDisplayAmount(quote))}
+                          </span>
+                          <ArrowRight className="h-3.5 w-3.5 text-slate-300 transition-all group-hover:translate-x-0.5 group-hover:text-slate-900" />
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="p-2 text-[#711419] transition-colors hover:text-[#5a1014] disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <p className="text-sm text-slate-600">Page {page} of {totalPages}</p>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="p-2 text-[#711419] transition-colors hover:text-[#5a1014] disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
         <Card className="bg-white border shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
@@ -816,6 +935,7 @@ export default function CrmQuotes() {
             </div>
           )}
         </Card>
+        )}
       </div>
 
       {/* Quote Detail Sheet */}

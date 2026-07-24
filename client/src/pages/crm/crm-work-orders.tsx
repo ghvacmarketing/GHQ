@@ -73,6 +73,7 @@ import {
   Clipboard,
   ClipboardCheck,
   Filter,
+  ArrowRight,
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -140,6 +141,16 @@ interface EnrichedWorkOrder extends CrmWorkOrder {
   project: CrmProject | null;
   tech: CrmUser | null;
 }
+
+// Saturated left-edge accent per status (the card's colored spine)
+const statusAccent: Record<string, string> = {
+  scheduled: "#3b82f6",
+  dispatched: "#f59e0b",
+  en_route: "#f59e0b",
+  on_site: "#22c55e",
+  completed: "#94a3b8",
+  cancelled: "#e2e8f0",
+};
 
 const statusColors: Record<string, { bg: string; text: string; border: string }> = {
   scheduled: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-200" },
@@ -1239,63 +1250,62 @@ export default function CrmWorkOrders() {
             <p className="mt-0.5 text-sm text-muted-foreground">Schedule, dispatch, and track work orders</p>
           </div>
 
-          <div className="relative w-full lg:flex-1 lg:max-w-md lg:mx-auto">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search work orders…"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="h-9 bg-white pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
-              data-testid="input-search-work-orders"
+          {/* Tabs live center-stage; search sits right, just before the filter */}
+          <div className="mx-auto min-w-0">
+            <IndustrialTabs
+              testidPrefix="tab"
+              activeKey={activeTab}
+              onSelect={(k) => setActiveTab(k as FilterTab)}
+              tabs={(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => ({
+                key: tab,
+                label: filterTabConfig[tab].label,
+              }))}
             />
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
+            <div className="relative w-56">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search work orders…"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="h-9 bg-white pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
+                data-testid="input-search-work-orders"
+              />
+            </div>
+            <Select
+              value={visitTypeFilter}
+              onValueChange={(v) => setVisitTypeFilter(v as WorkOrderVisitType | "all")}
+            >
+              <SelectTrigger
+                className={`relative h-9 w-9 shrink-0 justify-center bg-white p-0 [&>svg]:hidden ${
+                  visitTypeFilter !== "all"
+                    ? "border-[#711419] text-[#711419]"
+                    : "border-input text-slate-600 hover:text-foreground"
+                }`}
+                title="Filter by visit type"
+                data-testid="select-visit-type-filter"
+              >
+                <span className="flex items-center justify-center">
+                  <Filter className="h-4 w-4" />
+                </span>
+                {visitTypeFilter !== "all" && (
+                  <span className="absolute -right-1 -top-1 h-2 w-2 rounded-[2px] bg-[#711419]" />
+                )}
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {workOrderVisitTypeEnum.map((type) => (
+                  <SelectItem key={type} value={type}>{visitTypeLabels[type]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button onClick={() => setCreateDialogOpen(true)} size="sm" data-testid="button-create-work-order">
               <Plus className="h-4 w-4 mr-1" />
               New Work Order
             </Button>
           </div>
-        </div>
-
-        {/* Tabs left, visit-type filter icon right (below the New Work Order button) */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <IndustrialTabs
-            testidPrefix="tab"
-            activeKey={activeTab}
-            onSelect={(k) => setActiveTab(k as FilterTab)}
-            tabs={(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => ({
-              key: tab,
-              label: filterTabConfig[tab].label,
-            }))}
-          />
-          <Select
-            value={visitTypeFilter}
-            onValueChange={(v) => setVisitTypeFilter(v as WorkOrderVisitType | "all")}
-          >
-            <SelectTrigger
-              className={`relative h-8 w-8 shrink-0 justify-center bg-white p-0 [&>svg]:hidden ${
-                visitTypeFilter !== "all"
-                  ? "border-[#711419] text-[#711419]"
-                  : "border-input text-slate-600 hover:text-foreground"
-              }`}
-              title="Filter by visit type"
-              data-testid="select-visit-type-filter"
-            >
-              <span className="flex items-center justify-center">
-                <Filter className="h-4 w-4" />
-              </span>
-              {visitTypeFilter !== "all" && (
-                <span className="absolute -right-1 -top-1 h-2 w-2 rounded-[2px] bg-[#711419]" />
-              )}
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              {workOrderVisitTypeEnum.map((type) => (
-                <SelectItem key={type} value={type}>{visitTypeLabels[type]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
 
         {workOrdersLoading ? (
@@ -1373,41 +1383,56 @@ export default function CrmWorkOrders() {
                 : statusLabels[wo.status];
               const visitStyle = visitTypeColors[wo.visitType || "SERVICE"] || visitTypeColors.SERVICE;
               
+              const techName = wo.tech?.name || null;
+              const techInitials = techName
+                ? techName.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase()
+                : null;
               return (
-                <Card
+                <div
                   key={wo.id}
-                  className="bg-white border shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                  className="group cursor-pointer rounded-[4px] border border-slate-300/70 border-l-4 bg-white p-4 transition-colors hover:border-slate-400"
+                  style={{ borderLeftColor: statusAccent[wo.status] || "#94a3b8" }}
                   onMouseEnter={() => prefetchWorkOrder(wo.id)}
                   onTouchStart={() => prefetchWorkOrder(wo.id)}
                   onClick={() => handleOpenDetail(wo)}
                   data-testid={`card-work-order-${wo.id}`}
                 >
-                  <CardContent className="p-3">
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <p className="font-semibold text-slate-900 text-sm truncate flex-1" data-testid={`text-wo-customer-${wo.id}`}>
-                        {wo.customer?.name || "—"}
-                      </p>
-                      <StatusDot 
-                        pill={`${badgeStyle.bg} ${badgeStyle.text} border ${badgeStyle.border} text-xs shrink-0`}
-                        data-testid={`badge-status-${wo.id}`}
-                      >
-                        {badgeLabel}
-                      </StatusDot>
-                    </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <StatusDot
+                      pill={`${badgeStyle.bg} ${badgeStyle.text} border ${badgeStyle.border} text-xs shrink-0`}
+                      data-testid={`badge-status-${wo.id}`}
+                    >
+                      {badgeLabel}
+                    </StatusDot>
+                    <span className="rounded-[3px] bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600" data-testid={`badge-visit-type-${wo.id}`}>
+                      {visitTypeLabels[wo.visitType || "SERVICE"]}
+                    </span>
+                  </div>
 
-                    {wo.workSubtype && wo.workSubtype !== "Other" && (
-                      <p className="text-xs text-slate-600 truncate mb-2" data-testid={`text-wo-subtype-${wo.id}`}>
-                        {wo.workSubtype}
-                      </p>
-                    )}
+                  <p className="mt-2.5 truncate text-base font-semibold leading-tight text-slate-900" data-testid={`text-wo-subtype-${wo.id}`}>
+                    {wo.title || (wo.workSubtype && wo.workSubtype !== "Other" ? wo.workSubtype : visitTypeLabels[wo.visitType || "SERVICE"])}
+                  </p>
+                  <p className="truncate text-sm text-slate-500" data-testid={`text-wo-customer-${wo.id}`}>
+                    {wo.customer?.name || "—"}
+                  </p>
 
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <Badge className={`${visitStyle.bg} ${visitStyle.text} text-xs`} data-testid={`badge-visit-type-${wo.id}`}>
-                        {visitTypeLabels[wo.visitType || "SERVICE"]}
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
+                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5">
+                    <span className="truncate text-xs text-slate-500">
+                      {wo.scheduledStart ? format(new Date(wo.scheduledStart), "MMM d, yyyy · h:mm a") : "Not scheduled"}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      {techInitials && (
+                        <>
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[9px] font-bold text-white">
+                            {techInitials}
+                          </span>
+                          <span className="max-w-[7rem] truncate text-xs text-slate-600">{techName}</span>
+                        </>
+                      )}
+                      <ArrowRight className="h-3.5 w-3.5 text-slate-300 transition-all group-hover:translate-x-0.5 group-hover:text-slate-900" />
+                    </span>
+                  </div>
+                </div>
               );
             })}
           </div>
