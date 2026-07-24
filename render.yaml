@@ -24,7 +24,9 @@ services:
       - key: ANDROID_PACKAGE_NAME
         value: app.ghvac.tools
       - key: ANDROID_APP_FINGERPRINTS
-        value: "EA:9D:A0:1B:84:A4:00:AC:9A:59:E3:7C:41:72:79:77:7D:C4:8F:FC:C8:FA:BA:9F:C2:3E:CC:81:23:55:49:B7"
+        # Upload key + Google Play app-signing key (Play re-signs published
+        # builds, so BOTH must be served or the TWA falls back to Chrome UI).
+        value: "EA:9D:A0:1B:84:A4:00:AC:9A:59:E3:7C:41:72:79:77:7D:C4:8F:FC:C8:FA:BA:9F:C2:3E:CC:81:23:55:49:B7,01:AF:BE:33:F8:C3:13:3C:3A:5F:3F:A2:62:D2:29:C4:F4:5F:E8:D2:4C:12:80:E0:22:14:54:13:E4:EC:BB:8A"
 
       # ── Core (required) ──────────────────────────────────────────────
       - key: DATABASE_URL # Neon pooled connection string
