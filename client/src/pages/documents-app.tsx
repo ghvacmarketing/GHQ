@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { MoreIcon } from "@/components/crm/more-icon";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSmoothLoading } from "@/hooks/use-smooth-loading";
@@ -333,7 +334,7 @@ export default function DocumentsApp() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="rounded p-1 text-slate-400 opacity-0 hover:bg-slate-100 hover:text-slate-700 group-hover:opacity-100" data-testid={`file-menu-${f.id}`}>
-          <MoreHorizontal className="h-4 w-4" />
+          <MoreIcon direction="h" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
@@ -374,7 +375,7 @@ export default function DocumentsApp() {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="rounded p-1 text-slate-400 opacity-0 hover:bg-slate-100 hover:text-slate-700 group-hover:opacity-100" data-testid={`folder-menu-${f.id}`}>
-            <MoreHorizontal className="h-4 w-4" />
+            <MoreIcon direction="h" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">

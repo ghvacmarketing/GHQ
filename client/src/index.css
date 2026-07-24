@@ -477,6 +477,34 @@ input.rounded-full:focus {
   border-color: transparent !important;
 }
 
+/* GHQ "more" glyph — three squares that twist into diamonds on hover, in a
+   quick stagger. Works when hovering the glyph itself or any button/[role]
+   wrapping it. */
+.ghq-more { width: 1rem; height: 1rem; }
+.ghq-more-sq {
+  width: 3.5px;
+  height: 3.5px;
+  flex-shrink: 0;
+  border-radius: 1px;
+  background: currentColor;
+  transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+button:hover .ghq-more .ghq-more-sq,
+[role="button"]:hover .ghq-more .ghq-more-sq,
+.ghq-more:hover .ghq-more-sq {
+  transform: rotate(135deg);
+}
+button:hover .ghq-more .ghq-more-sq:nth-child(2),
+[role="button"]:hover .ghq-more .ghq-more-sq:nth-child(2),
+.ghq-more:hover .ghq-more-sq:nth-child(2) {
+  transition-delay: 45ms;
+}
+button:hover .ghq-more .ghq-more-sq:nth-child(3),
+[role="button"]:hover .ghq-more .ghq-more-sq:nth-child(3),
+.ghq-more:hover .ghq-more-sq:nth-child(3) {
+  transition-delay: 90ms;
+}
+
 /* Dark editor inputs (email template builder panels) */
 .dark-input {
   background: rgba(255, 255, 255, 0.06);

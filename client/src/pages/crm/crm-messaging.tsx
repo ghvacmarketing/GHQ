@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { MoreIcon } from "@/components/crm/more-icon";
 import { useLocation, Link } from "wouter";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -706,7 +707,7 @@ export default function CrmMessaging() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0" data-testid="thread-actions">
-                    <MoreVertical className="h-4 w-4" />
+                    <MoreIcon />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">

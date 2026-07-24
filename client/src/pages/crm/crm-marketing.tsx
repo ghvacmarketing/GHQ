@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MoreIcon } from "@/components/crm/more-icon";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -159,7 +160,7 @@ export default function CrmMarketing() {
                         <Switch checked={!!a.isActive} onCheckedChange={() => toggle.mutate(a)} />
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><MoreVertical className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><MoreIcon /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>

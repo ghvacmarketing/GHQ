@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { MoreIcon } from "@/components/crm/more-icon";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, useRoute } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -800,7 +801,7 @@ export default function CrmInvoiceDetail() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" data-testid="button-more-actions">
-                    <MoreHorizontal className="h-4 w-4" />
+                    <MoreIcon direction="h" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">

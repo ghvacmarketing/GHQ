@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { MoreIcon } from "@/components/crm/more-icon";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useLocation, useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -1555,7 +1556,7 @@ export default function CrmWorkOrderDetail() {
                                       data-testid={`button-quote-actions-${quote.id}`}
                                       onClick={(e) => e.stopPropagation()}
                                     >
-                                      <MoreVertical className="h-4 w-4" />
+                                      <MoreIcon />
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
@@ -1709,7 +1710,7 @@ export default function CrmWorkOrderDetail() {
                                   data-testid={`button-invoice-actions-${invoice.id}`}
                                   onClick={(e) => e.stopPropagation()}
                                 >
-                                  <MoreVertical className="h-4 w-4" />
+                                  <MoreIcon />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
