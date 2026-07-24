@@ -6,7 +6,9 @@ import {
   BarChart3, Briefcase, Landmark, TrendingUp, Receipt, Users2, HardHat, Route,
   UserRound, Boxes, Wrench, Megaphone, Truck, ShieldCheck, Sparkles, Hammer,
   Printer, Download, Save, Play, Trash2, Pin, PinOff, Share2, Plus, X, Loader2,
+  Search, ChevronUp, ChevronDown, Check,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -91,10 +93,100 @@ function fmtCell(v: unknown, type: string): string {
   return String(v);
 }
 
-/** The full reporting experience (catalog browser, viewer, builder, saved) —
- *  hosted inside the Accounting app's sidebar. `nav` is a category key,
- *  "builder", or "saved". */
-export function ReportsWorkspace({ nav }: { nav: string }) {
+// ── Report Composer: stack catalog data points into one QB-style breakdown ──
+type ComposerItem = { id: string; key: string; title: string; description?: string; spec: ReportSpec };
+
+/** One data point inside the composed report — runs its own spec and renders
+ *  a QuickBooks-style section: heading, table, and a bold total row. */
+function ComposerSectionCard({
+  item, period, onRemove, onMove, first, last,
+}: {
+  item: ComposerItem;
+  period: string;
+  onRemove: () => void;
+  onMove: (dir: -1 | 1) => void;
+  first: boolean;
+  last: boolean;
+}) {
+  const runSpec = useMemo(() => ({ ...item.spec, ...periodRange(period) }), [item.spec, period]);
+  const { data: result, isFetching, error } = useQuery<RunResult>({
+    queryKey: ["/api/reporting/run", runSpec],
+    queryFn: async () => {
+      const res = await apiRequest("POST", "/api/reporting/run", runSpec);
+      return res.json();
+    },
+  });
+
+  const lastCol = result?.columns[result.columns.length - 1];
+  const numericLast = lastCol && (lastCol.type === "currency" || lastCol.type === "number");
+  const total = numericLast && result
+    ? result.rows.reduce((s, r) => s + (Number(r[lastCol.key]) || 0), 0)
+    : null;
+
+  return (
+    <section data-testid={`composer-section-${item.key}`}>
+      <div className="flex items-center gap-1.5 border-b-2 border-slate-900 pb-1">
+        <h2 className="text-[13px] font-semibold uppercase tracking-wider text-slate-900">{item.title}</h2>
+        <div className="ml-auto flex items-center gap-0.5 print:hidden">
+          <button onClick={() => onMove(-1)} disabled={first} className="rounded p-1 text-slate-300 hover:text-slate-600 disabled:invisible" title="Move up">
+            <ChevronUp className="h-3.5 w-3.5" />
+          </button>
+          <button onClick={() => onMove(1)} disabled={last} className="rounded p-1 text-slate-300 hover:text-slate-600 disabled:invisible" title="Move down">
+            <ChevronDown className="h-3.5 w-3.5" />
+          </button>
+          <button onClick={onRemove} className="rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-600" title="Remove from report" data-testid={`composer-remove-${item.key}`}>
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+      {error ? (
+        <p className="py-3 text-sm text-red-600">{(error as any)?.message || "This section failed to run."}</p>
+      ) : !result ? (
+        <div className="space-y-1.5 py-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-6 rounded-[3px]" />)}</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-[11px] uppercase tracking-wide text-slate-400">
+                {result.columns.map((c) => (
+                  <th key={c.key} className={`py-1.5 pr-3 font-semibold ${c.type === "currency" || c.type === "number" ? "text-right" : ""}`}>
+                    {c.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className={isFetching ? "opacity-60" : ""}>
+              {result.rows.map((r, i) => (
+                <tr key={i} className="border-b border-slate-100 last:border-0">
+                  {result.columns.map((c) => (
+                    <td key={c.key} className={`py-1.5 pr-3 ${c.type === "currency" || c.type === "number" ? "text-right tabular-nums font-medium text-slate-900" : "text-slate-700"}`}>
+                      {fmtCell(r[c.key], c.type)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              {total !== null && result.rows.length > 0 && (
+                <tr className="border-t-2 border-slate-900">
+                  <td className="py-1.5 pr-3 font-semibold text-slate-900">Total</td>
+                  {result.columns.slice(1, -1).map((c) => <td key={c.key} />)}
+                  <td className="py-1.5 pr-3 text-right font-semibold tabular-nums text-slate-900">
+                    {fmtCell(total, lastCol!.type)}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          {result.rows.length === 0 && <p className="py-4 text-center text-sm text-slate-400">No data for this period.</p>}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** The full reporting experience (composer, viewer, builder, saved) —
+ *  hosted inside the Accounting app's sidebar. `nav` is "composer",
+ *  "builder", "saved", or a catalog category key. */
+export function ReportsWorkspace({ nav, onNav }: { nav: string; onNav?: (key: string) => void }) {
   const { toast } = useToast();
 
   const { data: catalog } = useQuery<{ categories: CatalogCategory[]; sources: SourceMeta[] }>({
@@ -185,6 +277,54 @@ export function ReportsWorkspace({ nav }: { nav: string }) {
   const [bMeasureFn, setBMeasureFn] = useState<string>("sum");
   const [bFilters, setBFilters] = useState<{ field: string; op: string; value: string }[]>([]);
   const srcMeta = catalog?.sources.find((s) => s.key === bSource);
+
+  // ── Composer state: an ordered stack of data points from any category ──
+  const [sections, setSections] = useState<ComposerItem[]>([]);
+  const [composerTitle, setComposerTitle] = useState("Company Breakdown");
+  const [addOpen, setAddOpen] = useState(false);
+  const [addSearch, setAddSearch] = useState("");
+  const [composerSaveOpen, setComposerSaveOpen] = useState(false);
+  const [composerSaveName, setComposerSaveName] = useState("");
+
+  const sectionKeys = new Set(sections.map((s) => s.key));
+  const addSection = (key: string, title: string, description: string | undefined, spec: ReportSpec) =>
+    setSections((prev) =>
+      prev.some((s) => s.key === key)
+        ? prev.filter((s) => s.key !== key)
+        : [...prev, { id: Math.random().toString(36).slice(2, 10), key, title, description, spec }],
+    );
+  const moveSection = (id: string, dir: -1 | 1) =>
+    setSections((prev) => {
+      const i = prev.findIndex((s) => s.id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+
+  const saveComposite = useMutation({
+    mutationFn: async () =>
+      apiRequest("POST", "/api/reporting/saved", {
+        name: composerSaveName,
+        spec: { composite: true, title: composerTitle, items: sections.map(({ id: _id, ...rest }) => rest) },
+        shared: true,
+        pinned: false,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/reporting/saved"] });
+      setComposerSaveOpen(false);
+      toast({ title: "Report saved" });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't save", variant: "destructive" }),
+  });
+
+  const loadComposite = (r: SavedReport) => {
+    const spec = r.spec as any;
+    setSections(((spec.items || []) as Omit<ComposerItem, "id">[]).map((it) => ({ ...it, id: Math.random().toString(36).slice(2, 10) })));
+    setComposerTitle(spec.title || r.name);
+    onNav?.("composer");
+  };
 
   const buildSpec = (): ReportSpec | null => {
     if (!srcMeta) return null;
@@ -312,6 +452,178 @@ export function ReportsWorkspace({ nav }: { nav: string }) {
                   ) : null}
                 </div>
               </>
+            ) : nav === "composer" ? (
+              /* ── Report Composer: pick data points, get one QB-style breakdown ── */
+              (() => {
+                const q = addSearch.trim().toLowerCase();
+                const groups = [
+                  ...categories.map((c) => ({
+                    label: c.label,
+                    items: c.reports
+                      .filter((r) => r.spec && !r.comingSoon)
+                      .map((r) => ({ key: r.key, title: r.title, description: r.description, spec: r.spec! })),
+                  })),
+                  {
+                    label: "Saved reports",
+                    items: saved
+                      .filter((r) => !(r.spec as any)?.composite)
+                      .map((r) => ({ key: `saved-${r.id}`, title: r.name, description: r.createdByName ? `Saved by ${r.createdByName}` : "Saved report", spec: r.spec })),
+                  },
+                ]
+                  .map((g) => ({
+                    ...g,
+                    items: q
+                      ? g.items.filter((it) => `${g.label} ${it.title} ${it.description ?? ""}`.toLowerCase().includes(q))
+                      : g.items,
+                  }))
+                  .filter((g) => g.items.length > 0);
+
+                return (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center gap-2 print:hidden">
+                      <div>
+                        <h1 className="font-display text-xl font-semibold tracking-tight text-slate-900">Report Builder</h1>
+                        <p className="mt-0.5 text-sm text-slate-500">Pull data points from any module into one breakdown.</p>
+                      </div>
+                      <div className="ml-auto flex flex-wrap items-center gap-2">
+                        <Popover open={addOpen} onOpenChange={setAddOpen}>
+                          <PopoverTrigger asChild>
+                            <Button size="sm" className="h-9 bg-[#711419] hover:bg-[#8a1a1f]" data-testid="composer-add-data">
+                              <Plus className="mr-1.5 h-4 w-4" /> Add data
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent align="end" className="w-[420px] p-0">
+                            <div className="border-b border-slate-100 p-2.5">
+                              <div className="relative">
+                                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                                <Input
+                                  autoFocus
+                                  value={addSearch}
+                                  onChange={(e) => setAddSearch(e.target.value)}
+                                  placeholder="Search data points — job costing, revenue, payroll…"
+                                  className="h-8 pl-8 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
+                                  data-testid="composer-add-search"
+                                />
+                              </div>
+                            </div>
+                            <div className="max-h-[55vh] overflow-y-auto p-1.5 scrollbar-minimal">
+                              {groups.length === 0 ? (
+                                <p className="py-8 text-center text-sm text-slate-400">Nothing matches “{addSearch}”.</p>
+                              ) : (
+                                groups.map((g) => (
+                                  <div key={g.label} className="mb-1">
+                                    <p className="px-2 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{g.label}</p>
+                                    {g.items.map((it) => {
+                                      const on = sectionKeys.has(it.key);
+                                      return (
+                                        <button
+                                          key={it.key}
+                                          onClick={() => addSection(it.key, it.title, it.description, it.spec)}
+                                          className={`flex w-full items-start gap-2 rounded-[4px] px-2 py-1.5 text-left hover:bg-slate-50 ${on ? "bg-[#711419]/[0.04]" : ""}`}
+                                          data-testid={`composer-add-${it.key}`}
+                                        >
+                                          <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-[3px] border ${on ? "border-[#711419] bg-[#711419] text-white" : "border-slate-300 text-transparent"}`}>
+                                            <Check className="h-3 w-3" />
+                                          </span>
+                                          <span className="min-w-0">
+                                            <span className="block text-sm font-medium text-slate-900">{it.title}</span>
+                                            {it.description && <span className="block truncate text-[11px] text-slate-400">{it.description}</span>}
+                                          </span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                        <Select value={period} onValueChange={(v) => setPeriod(v as typeof period)}>
+                          <SelectTrigger className="h-9 w-40" data-testid="composer-period"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {PERIODS.map((p) => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        {sections.length > 0 && (
+                          <>
+                            <Button size="sm" variant="outline" className="h-9" onClick={() => window.print()} data-testid="composer-print">
+                              <Printer className="mr-1.5 h-4 w-4" /> Print
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-9"
+                              onClick={() => { setComposerSaveName(composerTitle); setComposerSaveOpen(true); }}
+                              data-testid="composer-save"
+                            >
+                              <Save className="mr-1.5 h-4 w-4" /> Save
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {sections.length === 0 ? (
+                      <div className="rounded-[4px] border border-dashed border-slate-300 bg-white py-20 text-center">
+                        <BarChart3 className="mx-auto mb-3 h-9 w-9 text-slate-200" />
+                        <p className="text-sm font-medium text-slate-600">Build a breakdown from any data point in GHQ.</p>
+                        <p className="mx-auto mt-1 max-w-sm text-xs text-slate-400">
+                          Hit “Add data” and pick from job costing, revenue, payroll, dispatch, marketing — each one becomes
+                          a section of a single QuickBooks-style report.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="rounded-[4px] border border-slate-300/70 bg-white p-6 print:border-0 print:p-0">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Giesbrecht HVAC</p>
+                        <input
+                          value={composerTitle}
+                          onChange={(e) => setComposerTitle(e.target.value)}
+                          className="mt-0.5 w-full border-0 bg-transparent p-0 font-display text-xl font-semibold tracking-tight text-slate-900 outline-none focus:ring-0"
+                          data-testid="composer-title"
+                        />
+                        <p className="mt-0.5 text-sm text-slate-500">{PERIODS.find((p) => p.key === period)?.label}</p>
+                        <div className="mt-6 space-y-8">
+                          {sections.map((s, i) => (
+                            <ComposerSectionCard
+                              key={s.id}
+                              item={s}
+                              period={period}
+                              first={i === 0}
+                              last={i === sections.length - 1}
+                              onRemove={() => setSections((prev) => prev.filter((x) => x.id !== s.id))}
+                              onMove={(dir) => moveSection(s.id, dir)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <Dialog open={composerSaveOpen} onOpenChange={setComposerSaveOpen}>
+                      <DialogContent className="sm:max-w-sm">
+                        <DialogHeader><DialogTitle>Save this breakdown</DialogTitle></DialogHeader>
+                        <Input
+                          value={composerSaveName}
+                          onChange={(e) => setComposerSaveName(e.target.value)}
+                          placeholder="Report name"
+                          className="h-9"
+                          data-testid="composer-save-name"
+                        />
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setComposerSaveOpen(false)}>Cancel</Button>
+                          <Button
+                            className="bg-[#711419] hover:bg-[#8a1a1f]"
+                            disabled={!composerSaveName.trim() || saveComposite.isPending}
+                            onClick={() => saveComposite.mutate()}
+                            data-testid="composer-save-confirm"
+                          >
+                            Save
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                );
+              })()
             ) : nav === "builder" ? (
               /* ── Custom Report Builder ── */
               <div className="space-y-4">
@@ -461,17 +773,32 @@ export function ReportsWorkspace({ nav }: { nav: string }) {
                     )}
                   </div>
 
-                  <Button
-                    className="bg-[#711419] hover:bg-[#8a1a1f]"
-                    disabled={bMode === "summary" && !bGroupBy}
-                    onClick={() => {
-                      const spec = buildSpec();
-                      if (spec) setActive({ title: "Custom report", description: `${srcMeta?.label} — built just now`, spec });
-                    }}
-                    data-testid="builder-run"
-                  >
-                    <Play className="mr-1.5 h-4 w-4" /> Run report
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      className="bg-[#711419] hover:bg-[#8a1a1f]"
+                      disabled={bMode === "summary" && !bGroupBy}
+                      onClick={() => {
+                        const spec = buildSpec();
+                        if (spec) setActive({ title: "Custom report", description: `${srcMeta?.label} — built just now`, spec });
+                      }}
+                      data-testid="builder-run"
+                    >
+                      <Play className="mr-1.5 h-4 w-4" /> Run report
+                    </Button>
+                    <Button
+                      variant="outline"
+                      disabled={bMode === "summary" && !bGroupBy}
+                      onClick={() => {
+                        const spec = buildSpec();
+                        if (!spec) return;
+                        addSection(`custom-${Math.random().toString(36).slice(2, 8)}`, `${srcMeta?.label ?? "Custom"} — custom`, "Built in the custom builder", spec);
+                        onNav?.("composer");
+                      }}
+                      data-testid="builder-add-to-composer"
+                    >
+                      <Plus className="mr-1.5 h-4 w-4" /> Add to Report Builder
+                    </Button>
+                  </div>
                 </div>
               </div>
             ) : nav === "saved" ? (
@@ -491,12 +818,12 @@ export function ReportsWorkspace({ nav }: { nav: string }) {
                     {saved.map((r) => (
                       <div key={r.id} className="flex items-center gap-3 border-b border-slate-100 px-4 py-2.5 last:border-0 hover:bg-slate-50" data-testid={`saved-${r.id}`}>
                         <button
-                          onClick={() => setActive({ title: r.name, spec: r.spec, savedId: r.id })}
+                          onClick={() => ((r.spec as any)?.composite ? loadComposite(r) : setActive({ title: r.name, spec: r.spec, savedId: r.id }))}
                           className="min-w-0 flex-1 text-left"
                         >
                           <p className="truncate text-sm font-semibold text-slate-900">{r.name}</p>
                           <p className="text-[11px] text-slate-400">
-                            {r.spec.source}
+                            {(r.spec as any)?.composite ? `breakdown · ${((r.spec as any).items || []).length} sections` : r.spec.source}
                             {r.createdByName ? ` · ${r.createdByName}` : ""}
                             {r.shared ? " · shared" : " · private"}
                             {r.schedule_frequency ? ` · emails ${r.schedule_frequency}` : ""}

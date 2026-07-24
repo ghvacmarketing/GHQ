@@ -58,13 +58,6 @@ type ExpenseRow = {
   amount: string; paymentMethod: string | null; memo: string | null;
 };
 
-const REPORT_CATEGORY_ICONS: Record<string, typeof BarChart3> = {
-  executive: Briefcase, financial: Landmark, revenue: TrendingUp, "ar-ap": Receipt,
-  payroll: Users2, "job-costing": Hammer, dispatch: Route, customer: UserRound,
-  inventory: Boxes, equipment: Wrench, marketing: MegaphoneIcon, fleet: Truck,
-  compliance: ShieldCheck, ai: Sparkles,
-};
-
 const EMPTY_EXPENSE = {
   id: "" as string | "",
   expenseDate: format(new Date(), "yyyy-MM-dd"),
@@ -93,12 +86,6 @@ export default function AccountingApp() {
     if (!authLoading && !currentUser) navigate("/crm/login");
   }, [authLoading, currentUser, navigate]);
   const isAllowed = !!currentUser && ["owner", "admin", "supervisor"].includes(currentUser.role);
-
-  const { data: reportCatalog } = useQuery<{ categories: { key: string; label: string }[] }>({
-    queryKey: ["/api/reporting/catalog"],
-    enabled: isAllowed,
-    staleTime: 5 * 60 * 1000,
-  });
 
   const { data: summary, isLoading: summaryLoading } = useQuery<Summary>({
     queryKey: ["/api/accounting/summary"],
@@ -219,15 +206,8 @@ export default function AccountingApp() {
             { items: NAV },
             {
               label: "Reports",
-              items: (reportCatalog?.categories ?? []).map((c) => ({
-                key: c.key,
-                label: c.label,
-                icon: REPORT_CATEGORY_ICONS[c.key] || BarChart3,
-              })),
-            },
-            {
-              label: "Build",
               items: [
+                { key: "composer", label: "Report Builder", icon: BarChart3 },
                 { key: "builder", label: "Custom Builder", icon: Hammer },
                 { key: "saved", label: "Saved Reports", icon: SaveIcon },
               ],
@@ -357,7 +337,7 @@ export default function AccountingApp() {
 
           {tab === "reports" && <ReportsTab />}
 
-          {!["dashboard", "reports", "expenses", "accounts"].includes(tab) && <ReportsWorkspace nav={tab} />}
+          {!["dashboard", "reports", "expenses", "accounts"].includes(tab) && <ReportsWorkspace nav={tab} onNav={setTab} />}
 
           {tab === "expenses" && (
             <div className="space-y-3">
