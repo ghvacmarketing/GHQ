@@ -512,7 +512,7 @@ export default function CrmPhotoGallery() {
             </p>
           </div>
         ) : view === "list" ? (
-          <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-sm" data-testid="photo-feed-list">
+          <div key="view-list" className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card shadow-sm" data-testid="photo-feed-list">
             {filtered.map((p) => (
               <div
                 key={p.id}
@@ -577,7 +577,7 @@ export default function CrmPhotoGallery() {
             ))}
           </div>
         ) : (
-          <div className={GRID_CLASSES[size]} data-testid="photo-feed">
+          <div key="view-grid" className={GRID_CLASSES[size]} data-testid="photo-feed">
             {filtered.map((p) => (
               <div
                 key={p.id}

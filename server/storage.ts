@@ -2273,22 +2273,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMessagingConversationByPhone(phoneNumber: string): Promise<CrmMessagingConversation | undefined> {
+    // Match on DIGITS, not raw strings: "(478) 299-6838" and "4782996838" are
+    // the same conversation. Substring ILIKE on formatted strings missed these
+    // and spawned duplicate conversations for the same Textline thread.
     const normalizedPhone = phoneNumber.replace(/\D/g, '');
-    const phoneVariants = [
-      phoneNumber,
-      normalizedPhone,
-      `+${normalizedPhone}`,
-      `+1${normalizedPhone}`,
-      normalizedPhone.slice(-10),
-    ];
-    
+    const last10 = normalizedPhone.slice(-10);
+
     const [conversation] = await db.select().from(crmMessagingConversations)
-      .where(or(
-        ...phoneVariants.map(p => ilike(crmMessagingConversations.phoneNumber, `%${p}%`))
-      ))
+      .where(
+        last10.length === 10
+          ? sql`RIGHT(regexp_replace(${crmMessagingConversations.phoneNumber}, '[^0-9]', '', 'g'), 10) = ${last10}`
+          : sql`regexp_replace(${crmMessagingConversations.phoneNumber}, '[^0-9]', '', 'g') = ${normalizedPhone}`
+      )
       .orderBy(sql`${crmMessagingConversations.lastMessageAt} DESC NULLS LAST`)
       .limit(1);
-    
+
     return conversation || undefined;
   }
 
