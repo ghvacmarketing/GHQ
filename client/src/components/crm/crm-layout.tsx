@@ -102,7 +102,6 @@ const navSections: NavSection[] = [
         icon: Headset,
         activePaths: ["/crm/messaging", "/crm/mail"],
       },
-      { label: "Notifications", href: "/crm/notifications", icon: Bell },
     ],
   },
   {
@@ -121,7 +120,7 @@ const navSections: NavSection[] = [
       { label: "Work Orders", href: "/crm/work-orders", icon: ClipboardList },
       { label: "Environment Monitoring", href: "/crm/analytics", icon: Activity },
       { label: "Projects", href: "/crm/projects", icon: FolderKanban },
-      { label: "Tasks", href: "/crm/tasks/board", icon: ListTodo },
+      { label: "Activity", href: "/crm/tasks/board", icon: ListTodo },
       { label: "Rebate Programs", href: "/crm/rebate-programs", icon: Award },
       { label: "Signatures", href: "/crm/esign", icon: PenLine },
       { label: "Items", href: "/crm/items", icon: Package },
@@ -349,7 +348,7 @@ function SidebarContent({
                         let itemWithBadge = item;
                         if (item.label === "Inbox" && unreadData?.unreadCount) {
                           itemWithBadge = { ...item, badgeCount: unreadData.unreadCount };
-                        } else if (item.label === "Notifications" && notificationCount?.count && notificationCount.count > 0) {
+                        } else if (item.label === "Activity" && notificationCount?.count && notificationCount.count > 0) {
                           itemWithBadge = { ...item, badgeCount: notificationCount.count };
                         }
                         if (item.label === "Inbox") {

@@ -387,7 +387,7 @@ export function ReportsWorkspace({ nav, onNav }: { nav: string; onNav?: (key: st
                   </div>
                 </div>
 
-                <div className="rounded-[4px] border border-slate-300/70 bg-white p-5">
+                <div className="print-target rounded-[4px] border border-slate-300/70 bg-white p-5">
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Giesbrecht HVAC</p>
                   <h1 className="mt-0.5 font-display text-xl font-semibold tracking-tight text-slate-900">{active.title}</h1>
                   {active.description && <p className="mt-0.5 text-sm text-slate-500">{active.description}</p>}
@@ -573,7 +573,7 @@ export function ReportsWorkspace({ nav, onNav }: { nav: string; onNav?: (key: st
                         </p>
                       </div>
                     ) : (
-                      <div className="rounded-[4px] border border-slate-300/70 bg-white p-6 print:border-0 print:p-0">
+                      <div className="print-target rounded-[4px] border border-slate-300/70 bg-white p-6 print:border-0 print:p-0">
                         <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Giesbrecht HVAC</p>
                         <input
                           value={composerTitle}

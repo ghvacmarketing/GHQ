@@ -988,12 +988,12 @@ export default function CrmWorkOrderDetail() {
                   >
                     {visitTypeLabels[workOrder.visitType || "SERVICE"]}
                   </Badge>
-                  <StatusDot
-                    pill={`${priorityColor.bg} ${priorityColor.text}`}
+                  <span
+                    className={`text-sm font-medium ${priorityColor.text}`}
                     data-testid="badge-priority"
                   >
                     {(workOrder.priority || "normal").charAt(0).toUpperCase() + (workOrder.priority || "normal").slice(1)} Priority
-                  </StatusDot>
+                  </span>
                 </div>
                 {propertyAddress && (
                   <p className="text-sm text-slate-500 mt-1" data-testid="text-property-address">

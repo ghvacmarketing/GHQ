@@ -52,17 +52,13 @@ const typeFilters = [
 
 type TypeFilterKey = typeof typeFilters[number]["key"];
 
-export default function CrmNotifications() {
-  usePageTitle("Notifications");
+/** The notifications experience, embeddable — hosted inside the Activity page
+ *  (Tasks) as its Notifications tab. */
+export function NotificationsPanel({ currentUser }: { currentUser: CrmUser }) {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [tab, setTab] = useState<"unread" | "all">("unread");
   const [typeFilter, setTypeFilter] = useState<TypeFilterKey>("all");
-
-  const { data: currentUser, isLoading: authLoading } = useQuery<CrmUser | null>({
-    queryKey: ["/api/crm/auth/me"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
-  });
 
   const { data: notifications = [], isLoading } = useQuery<NotificationWithActor[]>({
     queryKey: ["/api/crm/notifications", tab, typeFilter],
@@ -123,19 +119,6 @@ export default function CrmNotifications() {
     onSuccess: invalidateAll,
   });
 
-  useEffect(() => {
-    if (!authLoading && !currentUser) navigate("/crm/login");
-  }, [authLoading, currentUser, navigate]);
-
-  if (authLoading) {
-    return (
-      <CrmLayout currentUser={currentUser as unknown as CrmUser}>
-        <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-64 w-full" /></div>
-      </CrmLayout>
-    );
-  }
-  if (!currentUser) return null;
-
   const hasUnread = notifications.some((n) => !n.isRead);
 
   const showTaggedNotesView = typeFilter === "tagged_comment" && tab === "all";
@@ -147,29 +130,8 @@ export default function CrmNotifications() {
   }
 
   return (
-    <CrmLayout currentUser={currentUser}>
       <div className="space-y-4">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-xl font-semibold text-slate-900">Notifications</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Task assignments, tagged notes, and updates</p>
-          </div>
-          {hasUnread && (
-            <Button
-              variant="ghost" size="sm"
-              onClick={() => markAllMut.mutate()}
-              disabled={markAllMut.isPending}
-              className="text-xs text-slate-500"
-            >
-              {markAllMut.isPending
-                ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                : <CheckCheck className="h-3.5 w-3.5 mr-1.5" />}
-              Mark all read
-            </Button>
-          )}
-        </div>
-
-        <div className="mb-6 flex flex-wrap items-center gap-2">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
           <IndustrialTabs
             testidPrefix="tab-read"
             activeKey={tab}
@@ -185,6 +147,19 @@ export default function CrmNotifications() {
             onSelect={(k) => setTypeFilter(k as typeof typeFilter)}
             tabs={typeFilters.map((tf) => ({ key: tf.key, label: tf.label }))}
           />
+          {hasUnread && (
+            <Button
+              variant="ghost" size="sm"
+              onClick={() => markAllMut.mutate()}
+              disabled={markAllMut.isPending}
+              className="ml-auto text-xs text-slate-500"
+            >
+              {markAllMut.isPending
+                ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                : <CheckCheck className="h-3.5 w-3.5 mr-1.5" />}
+              Mark all read
+            </Button>
+          )}
         </div>
 
         {showTaggedNotesView && (
@@ -265,8 +240,16 @@ export default function CrmNotifications() {
           </>
         )}
       </div>
-    </CrmLayout>
   );
+}
+
+/** The old /crm/notifications page now lives inside Activity (Tasks). */
+export default function CrmNotifications() {
+  const [, navigate] = useLocation();
+  useEffect(() => {
+    navigate("/crm/tasks/board?tab=notifications", { replace: true });
+  }, [navigate]);
+  return null;
 }
 
 function TaggedNoteHistoryRow({ item, currentUserId, buildUrl, onDismiss }: { item: TaggedCommentHistoryItem; currentUserId: string; buildUrl: (route: string, id: string) => string; onDismiss: () => void }) {

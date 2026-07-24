@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, isBefore, startOfDay } from "date-fns";
 import { Plus, Check, Trash2, ChevronDown, ChevronRight, CalendarDays, Circle, MapPin, ExternalLink } from "lucide-react";
@@ -7,6 +7,7 @@ import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useSmoothLoading } from "@/hooks/use-smooth-loading";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import { NotificationsPanel } from "@/pages/crm/crm-notifications";
 import { IndustrialTabs } from "@/components/crm/industrial-tabs";
 import { DatePickerField } from "@/components/crm/date-picker";
 import { Input } from "@/components/ui/input";
@@ -72,7 +73,7 @@ function describePinPath(path: string): string {
  * no types, no subtasks — just tasks.
  */
 export default function CrmTasksSimple() {
-  usePageTitle("Tasks");
+  usePageTitle("Activity");
   const { toast } = useToast();
 
   const { data: currentUser } = useQuery<CrmUser | null>({
@@ -85,7 +86,17 @@ export default function CrmTasksSimple() {
     enabled: !!currentUser,
   });
 
-  const [scope, setScope] = useState<"mine" | "everyone" | "comments">("mine");
+  const [scope, setScope] = useState<"mine" | "everyone" | "notifications" | "comments">("mine");
+  const searchString = useSearch();
+  useEffect(() => {
+    const t = new URLSearchParams(searchString).get("tab");
+    if (t === "notifications" || t === "comments" || t === "everyone") setScope(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const { data: notifCount } = useQuery<{ count: number }>({
+    queryKey: ["/api/crm/notifications/unread-count"],
+    refetchInterval: 30000,
+  });
   const [, navigate] = useLocation();
   const [completedOpen, setCompletedOpen] = useState(false);
 
@@ -262,9 +273,9 @@ export default function CrmTasksSimple() {
         {/* Title + scope tabs on one row */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-0 shrink-0">
-            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Tasks</h1>
+            <h1 className="font-display text-xl font-semibold tracking-tight text-foreground">Activity</h1>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              {open.length} open{done.length ? ` · ${done.length} done` : ""}
+              {scope === "notifications" ? "Everything that needs your attention" : scope === "comments" ? "Open pin comments across the CRM" : `${open.length} open${done.length ? ` · ${done.length} done` : ""}`}
             </p>
           </div>
           <div className="mx-auto">
@@ -275,6 +286,7 @@ export default function CrmTasksSimple() {
               tabs={[
                 { key: "mine", label: "My Tasks" },
                 { key: "everyone", label: "Everyone" },
+                { key: "notifications", label: "Notifications", count: notifCount?.count ? notifCount.count : null },
                 { key: "comments", label: "Comments", count: scope === "comments" && allPins.length ? allPins.length : null },
               ]}
             />
@@ -334,8 +346,11 @@ export default function CrmTasksSimple() {
           )
         )}
 
+        {/* Notifications — the old Notifications page lives here now */}
+        {scope === "notifications" && <NotificationsPanel currentUser={currentUser} />}
+
         {/* Quick add */}
-        {scope !== "comments" && (
+        {(scope === "mine" || scope === "everyone") && (
         <div className="flex items-center gap-2 rounded-[4px] border border-slate-300/70 bg-white px-3 py-2" data-testid="task-add-bar">
           <Plus className="h-4 w-4 shrink-0 text-[#711419]" />
           <Input
@@ -363,7 +378,7 @@ export default function CrmTasksSimple() {
         )}
 
         {/* Open tasks */}
-        {scope === "comments" ? null : tasksLoading ? (
+        {scope === "comments" || scope === "notifications" ? null : tasksLoading ? (
           <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 rounded-[4px]" />)}</div>
         ) : open.length === 0 ? (
           <div className="rounded-[4px] border border-dashed border-slate-300 bg-white py-14 text-center">
@@ -378,7 +393,7 @@ export default function CrmTasksSimple() {
         )}
 
         {/* Completed */}
-        {scope !== "comments" && done.length > 0 && (
+        {(scope === "mine" || scope === "everyone") && done.length > 0 && (
           <div>
             <button
               onClick={() => setCompletedOpen((v) => !v)}

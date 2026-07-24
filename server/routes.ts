@@ -23141,13 +23141,24 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(404).json({ message: "Conversation not found" });
       }
 
-      // Fire-and-forget Textline catch-up (throttled) — never blocks the response
+      // Fire-and-forget Textline catch-up (throttled) — never blocks the response.
+      // The user is VIEWING this thread, so anything the refresh pulls in is read:
+      // re-zero the unread count when the refresh finishes (it may have bumped it
+      // after the client's mark-read call — that race left threads stuck unread).
       if (conversation.externalSource === "textline" && textlineClient.isConfigured()) {
         const last = textlineRefreshAt.get(id) ?? 0;
         if (Date.now() - last > 20_000) {
           textlineRefreshAt.set(id, Date.now());
-          void refreshTextlineConversation(conversation, id);
+          void refreshTextlineConversation(conversation, id)
+            .then(() => storage.updateMessagingConversation(id, { unreadInboundCount: 0 } as any))
+            .catch(() => {});
         }
+      }
+
+      // Opening a thread reads it — clear the badge as part of serving it.
+      if ((conversation.unreadInboundCount || 0) > 0) {
+        await storage.updateMessagingConversation(id, { unreadInboundCount: 0 } as any);
+        (conversation as any).unreadInboundCount = 0;
       }
 
       const [rawMessages, tags, customer] = await Promise.all([

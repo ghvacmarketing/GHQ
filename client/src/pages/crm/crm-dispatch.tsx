@@ -2211,8 +2211,8 @@ function DraggableWorkOrderCard({ workOrder, onResize, isDragging, onClick }: Dr
         </div>
       )}
       {workOrder.priority && workOrder.priority !== "normal" && (
-        <div 
-          className={`absolute top-0.5 right-1 px-1 py-0 text-[9px] font-bold rounded ${priorityStyle.bg} ${priorityStyle.text}`}
+        <div
+          className={`absolute top-0.5 right-1 text-[9px] font-bold ${priorityStyle.text}`}
           data-testid={`priority-badge-${workOrder.id}`}
         >
           {workOrder.priority.toUpperCase()}
@@ -2382,8 +2382,8 @@ function MobileWorkOrderCard({ workOrder, technician, onClick }: { workOrder: Di
     >
       <CardContent className="p-3 relative">
         {workOrder.priority && workOrder.priority !== "normal" && (
-          <div 
-            className={`absolute top-2 right-2 px-1.5 py-0.5 text-[10px] font-bold rounded ${priorityStyle.bg} ${priorityStyle.text}`}
+          <div
+            className={`absolute top-2 right-2 text-[10px] font-bold ${priorityStyle.text}`}
             data-testid={`mobile-priority-badge-${workOrder.id}`}
           >
             {workOrder.priority.toUpperCase()}
@@ -4702,12 +4702,12 @@ export default function CrmDispatch() {
                     </div>
                   </PanelRow>
                   <PanelRow icon={AlertCircle} label="Priority">
-                    <Badge
-                      variant={selectedWorkOrder.priority === "high" ? "destructive" : "secondary"}
+                    <span
+                      className={selectedWorkOrder.priority === "high" ? "text-red-600" : selectedWorkOrder.priority === "low" ? "text-green-700" : ""}
                       data-testid="badge-priority"
                     >
-                      {selectedWorkOrder.priority || "normal"}
-                    </Badge>
+                      {((selectedWorkOrder.priority || "normal").charAt(0).toUpperCase()) + (selectedWorkOrder.priority || "normal").slice(1)}
+                    </span>
                   </PanelRow>
                   {selectedWorkOrder.bookingSource === "online" && (
                     <PanelRow icon={Info} label="Source">

@@ -384,13 +384,15 @@ export default function CrmMessaging() {
   }, []);
 
   // Fallback: also mark read when a conversation is opened programmatically
-  // (e.g. deep-link or after creating one), not just via a list click.
+  // (deep-link, after creating one) AND whenever the unread count re-appears
+  // while the thread is open (a background Textline pull can bump it after
+  // the click-time mark-read already ran).
   useEffect(() => {
     const conv = conversationDetail?.conversation;
     if (conv?.id && (conv.unreadInboundCount || 0) > 0) {
       markReadMutation.mutate(conv.id);
     }
-  }, [conversationDetail?.conversation?.id]);
+  }, [conversationDetail?.conversation?.id, conversationDetail?.conversation?.unreadInboundCount]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

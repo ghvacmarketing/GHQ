@@ -498,6 +498,21 @@ select.dark-input option {
   color: #f1f5f9;
 }
 
+/* Print isolation: only the .print-target (the report document) prints —
+   sidebars, top bars, and controls all disappear. */
+@media print {
+  body:has(.print-target) * { visibility: hidden; }
+  body:has(.print-target) .print-target,
+  body:has(.print-target) .print-target * { visibility: visible; }
+  body:has(.print-target) .print-target {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+}
+
 /* Minimal grey scrollbar — thin rounded thumb, invisible track */
 .scrollbar-minimal {
   scrollbar-width: thin;
