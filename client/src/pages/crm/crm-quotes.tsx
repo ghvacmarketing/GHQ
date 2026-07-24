@@ -589,21 +589,25 @@ export default function CrmQuotes() {
             <p className="mt-0.5 text-sm text-muted-foreground">Create, send, and track customer quotes</p>
           </div>
 
-          {/* View switcher center-stage, like the reference's Overview|List|Cards */}
-          <div className="mx-auto flex h-9 items-center rounded-md border border-input bg-white p-0.5">
+          {/* Center view switcher — same pill segmented control as the Inbox tabs */}
+          <div className="mx-auto inline-flex items-center gap-1 rounded-lg bg-slate-100 p-1">
             <button
               onClick={() => setView("list")}
-              className={`flex h-7 items-center gap-1.5 rounded-[4px] px-3 text-sm font-medium transition-colors ${view === "list" ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-900"}`}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-all ${
+                view === "list" ? "bg-white text-[#711419] shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
               data-testid="quotes-view-list"
             >
-              <List className="h-3.5 w-3.5" /> List
+              <List className="h-3.5 w-3.5" strokeWidth={1.75} /> List
             </button>
             <button
               onClick={() => setView("cards")}
-              className={`flex h-7 items-center gap-1.5 rounded-[4px] px-3 text-sm font-medium transition-colors ${view === "cards" ? "bg-slate-900 text-white" : "text-slate-500 hover:text-slate-900"}`}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-all ${
+                view === "cards" ? "bg-white text-[#711419] shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
               data-testid="quotes-view-cards"
             >
-              <LayoutGrid className="h-3.5 w-3.5" /> Cards
+              <LayoutGrid className="h-3.5 w-3.5" strokeWidth={1.75} /> Cards
             </button>
           </div>
 

@@ -74,11 +74,16 @@ import {
   ClipboardCheck,
   Filter,
   ArrowRight,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { workOrderVisitTypeEnum, type WorkOrderVisitType, type WorkOrderStatus, type WorkSubtype, type ChecklistQuestion, type WorkOrderSubtype } from "@shared/schema";
 import { CrmLayout } from "@/components/crm/crm-layout";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
 import { CommentComposer } from "@/components/crm/comment-composer";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, isToday, isThisWeek, addDays } from "date-fns";
@@ -345,6 +350,12 @@ export default function CrmWorkOrders() {
 
   const [searchInput, setSearchInput] = useState("");
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
+  const [view, setView] = useState<"cards" | "list">(
+    () => (typeof window !== "undefined" && (localStorage.getItem("crmWorkOrdersView") as "cards" | "list")) || "cards",
+  );
+  useEffect(() => {
+    localStorage.setItem("crmWorkOrdersView", view);
+  }, [view]);
   const [techFilter, setTechFilter] = useState<string>("all");
   const [visitTypeFilter, setVisitTypeFilter] = useState<WorkOrderVisitType | "all">("all");
   const debouncedSearch = useDebounce(searchInput, 300);
@@ -1250,7 +1261,29 @@ export default function CrmWorkOrders() {
             <p className="mt-0.5 text-sm text-muted-foreground">Schedule, dispatch, and track work orders</p>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2 lg:ml-auto">
+          {/* Center view switcher — same pill segmented control as the Inbox tabs */}
+          <div className="mx-auto inline-flex items-center gap-1 rounded-lg bg-slate-100 p-1">
+            <button
+              onClick={() => setView("list")}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-all ${
+                view === "list" ? "bg-white text-[#711419] shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+              data-testid="wo-view-list"
+            >
+              <List className="h-3.5 w-3.5" strokeWidth={1.75} /> List
+            </button>
+            <button
+              onClick={() => setView("cards")}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-all ${
+                view === "cards" ? "bg-white text-[#711419] shadow-sm" : "text-slate-500 hover:text-slate-700"
+              }`}
+              data-testid="wo-view-cards"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" strokeWidth={1.75} /> Cards
+            </button>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
             <Button onClick={() => setCreateDialogOpen(true)} size="sm" data-testid="button-create-work-order">
               <Plus className="h-4 w-4 mr-1" />
               New Work Order
@@ -1372,6 +1405,65 @@ export default function CrmWorkOrders() {
               </div>
             </div>
           </DndContext>
+        ) : view === "list" ? (
+          <Card className="bg-white border shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50">
+                    <TableHead className="font-semibold">Customer</TableHead>
+                    <TableHead className="font-semibold hidden lg:table-cell">Title</TableHead>
+                    <TableHead className="font-semibold">Type</TableHead>
+                    <TableHead className="font-semibold">Status</TableHead>
+                    <TableHead className="font-semibold">Scheduled</TableHead>
+                    <TableHead className="font-semibold hidden md:table-cell">Tech</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredWorkOrders.map((wo) => {
+                    const isUnassignedWithQueueStage = !wo.assignedTechId && wo.dispatchQueueStage && wo.dispatchQueueStage !== "Scheduled";
+                    const rowBadgeStyle = isUnassignedWithQueueStage
+                      ? (dispatchQueueStageColors[wo.dispatchQueueStage!] || statusColors.scheduled)
+                      : (statusColors[wo.status] || statusColors.scheduled);
+                    const rowBadgeLabel = isUnassignedWithQueueStage
+                      ? (dispatchQueueStageLabels[wo.dispatchQueueStage!] || statusLabels[wo.status])
+                      : statusLabels[wo.status];
+                    return (
+                      <TableRow
+                        key={wo.id}
+                        className="cursor-pointer hover:bg-slate-50 transition-colors"
+                        onMouseEnter={() => prefetchWorkOrder(wo.id)}
+                        onTouchStart={() => prefetchWorkOrder(wo.id)}
+                        onClick={() => handleOpenDetail(wo)}
+                        data-testid={`row-work-order-${wo.id}`}
+                      >
+                        <TableCell className="font-medium text-slate-900">{wo.customer?.name || "—"}</TableCell>
+                        <TableCell className="hidden lg:table-cell max-w-[220px] truncate text-sm text-slate-500">
+                          {wo.title || (wo.workSubtype && wo.workSubtype !== "Other" ? wo.workSubtype : "—")}
+                        </TableCell>
+                        <TableCell>
+                          <span className="rounded-[3px] bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                            {visitTypeLabels[wo.visitType || "SERVICE"]}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <StatusDot pill={`${rowBadgeStyle.bg} ${rowBadgeStyle.text} border ${rowBadgeStyle.border} text-xs`}>
+                            {rowBadgeLabel}
+                          </StatusDot>
+                        </TableCell>
+                        <TableCell className="text-sm text-slate-600">
+                          {wo.scheduledStart ? format(new Date(wo.scheduledStart), "MMM d · h:mm a") : "—"}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell text-sm text-slate-600">
+                          {wo.tech?.name || "Unassigned"}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {filteredWorkOrders.map((wo) => {
