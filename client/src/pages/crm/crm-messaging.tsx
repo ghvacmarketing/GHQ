@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
@@ -225,6 +225,26 @@ export default function CrmMessaging() {
     enabled: !!selectedConversationId,
     staleTime: 3000,
     refetchInterval: 6000,
+  });
+
+  // Same query the customer rail uses (deduped by key) — powers the header
+  // strip's at-a-glance chips: customer type, balance due, next appointment.
+  const { data: headerCtx } = useQuery<{
+    inCrm: boolean;
+    customer: { id: string; name: string; customerType: string | null; email: string | null } | null;
+    balanceDue: number;
+    nextAppointment: { scheduledStart: string | null } | null;
+  }>({
+    queryKey: ["/api/crm/messaging/conversations", selectedConversationId, "context"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/messaging/conversations/${selectedConversationId}/context`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch context");
+      return res.json();
+    },
+    enabled: !!selectedConversationId,
+    staleTime: 30000,
   });
 
   const sendMessageMutation = useMutation({
@@ -669,7 +689,60 @@ export default function CrmMessaging() {
 
       {/* ───────────── Thread ───────────── */}
       <div className={cn("flex-1 flex flex-col bg-background min-w-0", !showMobileThread ? "hidden lg:flex" : "flex")}>
-        <CommsSwitcher active="messages" />
+        {/* Switcher row — thread actions live up here, level with Messages | Mail */}
+        <div className="relative flex shrink-0 items-center justify-center px-4 pb-2.5 pt-3">
+          <CommsSwitcher active="messages" bare />
+          {selectedConversationId && !loadingDetail && (
+            <div className="absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 lg:hidden"
+                onClick={() => setContextSheetOpen(true)}
+                title="Customer details"
+              >
+                <PanelRight className="h-4 w-4" />
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" data-testid="thread-actions">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "open" })}>
+                    <MessageSquare className="h-4 w-4 mr-2" /> Reopen
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "resolved" })}>
+                    <Check className="h-4 w-4 mr-2" /> Resolve
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "snoozed" })}>
+                    <BellOff className="h-4 w-4 mr-2" /> Snooze
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "archived" })}>
+                    <Archive className="h-4 w-4 mr-2" /> Archive
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-red-600 focus:text-red-600"
+                    onClick={() => setDeleteDialogOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" /> Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 hidden lg:inline-flex"
+                onClick={() => setContextCollapsed((v) => !v)}
+                title={contextCollapsed ? "Show customer details" : "Hide customer details"}
+                data-testid="button-toggle-context"
+              >
+                <PanelRight className={cn("h-4 w-4 transition-colors", !contextCollapsed && "text-primary")} />
+              </Button>
+            </div>
+          )}
+        </div>
         {!selectedConversationId ? (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             <div className="text-center">
@@ -686,71 +759,51 @@ export default function CrmMessaging() {
           </div>
         ) : (
           <>
-            <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-card">
-              <div className="flex items-center gap-3 min-w-0">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="lg:hidden h-8 w-8 p-0 shrink-0"
-                  onClick={() => setShowMobileThread(false)}
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-                <div className="min-w-0">
-                  <h2 className="font-semibold text-foreground text-sm truncate">{headerName}</h2>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1 truncate">
-                    <Phone className="h-3 w-3" /> {headerPhone || "No phone"}
-                  </p>
+            {/* Identity strip — no border, same background as the messages
+                below so it reads as part of the thread, not a bar. */}
+            <div className="flex items-center gap-3 bg-background px-4 pb-2 pt-1 lg:px-6">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="lg:hidden h-8 w-8 p-0 shrink-0"
+                onClick={() => setShowMobileThread(false)}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div className="min-w-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  {headerCtx?.inCrm && headerCtx.customer ? (
+                    <Link href={`/crm/customers/${headerCtx.customer.id}`}>
+                      <a className="truncate text-sm font-semibold text-foreground hover:text-[#711419]">{headerName}</a>
+                    </Link>
+                  ) : (
+                    <h2 className="truncate text-sm font-semibold text-foreground">{headerName}</h2>
+                  )}
+                  {headerCtx && !headerCtx.inCrm && (
+                    <span className="rounded-[3px] bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                      Not in CRM
+                    </span>
+                  )}
+                  {headerCtx?.customer?.customerType && (
+                    <span className="rounded-[3px] bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                      {headerCtx.customer.customerType.replace(/_/g, " ")}
+                    </span>
+                  )}
+                  {(headerCtx?.balanceDue ?? 0) > 0 && (
+                    <span className="rounded-[3px] bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 tabular-nums">
+                      {(headerCtx!.balanceDue).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })} due
+                    </span>
+                  )}
+                  {headerCtx?.nextAppointment?.scheduledStart && (
+                    <span className="rounded-[3px] bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
+                      Next {format(new Date(headerCtx.nextAppointment.scheduledStart), "MMM d")}
+                    </span>
+                  )}
                 </div>
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {/* Context toggle — collapses the rail on lg+, opens a drawer below lg */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0 lg:hidden"
-                  onClick={() => setContextSheetOpen(true)}
-                  title="Customer details"
-                >
-                  <PanelRight className="h-4 w-4" />
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "open" })}>
-                      <MessageSquare className="h-4 w-4 mr-2" /> Reopen
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "resolved" })}>
-                      <Check className="h-4 w-4 mr-2" /> Resolve
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "snoozed" })}>
-                      <BellOff className="h-4 w-4 mr-2" /> Snooze
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "archived" })}>
-                      <Archive className="h-4 w-4 mr-2" /> Archive
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-red-600 focus:text-red-600"
-                      onClick={() => setDeleteDialogOpen(true)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" /> Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0 hidden lg:inline-flex"
-                  onClick={() => setContextCollapsed((v) => !v)}
-                  title={contextCollapsed ? "Show customer details" : "Hide customer details"}
-                  data-testid="button-toggle-context"
-                >
-                  <PanelRight className={cn("h-4 w-4 transition-colors", !contextCollapsed && "text-primary")} />
-                </Button>
+                <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
+                  <Phone className="h-3 w-3" /> {headerPhone || "No phone"}
+                  {headerCtx?.customer?.email && <span className="truncate"> · {headerCtx.customer.email}</span>}
+                </p>
               </div>
             </div>
 

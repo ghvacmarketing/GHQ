@@ -89,6 +89,7 @@ import {
   X,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { PanelSection, PanelRow } from "@/components/crm/panel-blocks";
 import { addDays, endOfMonth, endOfWeek, format, formatDistanceToNow, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
 import { FleetMap } from "@/components/fleet-map";
 import { createLocalDateTime, formatLocal, formatLocalDateTime, getLocalStartOfDay, getLocalEndOfDay, getLocalDateString, getTodayLocalDateString, APP_TIMEZONE, toLocalTime } from "@/lib/timezone";
@@ -2474,28 +2475,6 @@ function formatWeekRange(dates: Date[]): string {
     return `${startMonth} ${startDay} - ${endDay}, ${year}`;
   }
   return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${year}`;
-}
-
-// ── Detail-panel building blocks: grouped info cards with icon rows ──────────
-function PanelSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-[4px] border border-slate-300/70 bg-white p-3.5">
-      <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{title}</p>
-      <div className="space-y-3">{children}</div>
-    </section>
-  );
-}
-
-function PanelRow({ icon: Icon, label, children }: { icon: React.ComponentType<{ className?: string }>; label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-start gap-3">
-      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-      <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-medium text-slate-400">{label}</p>
-        <div className="mt-0.5 text-sm font-medium text-slate-900">{children}</div>
-      </div>
-    </div>
-  );
 }
 
 export default function CrmDispatch() {
