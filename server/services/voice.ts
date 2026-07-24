@@ -4,7 +4,7 @@ import path from "path";
 import { randomUUID } from "crypto";
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "sk-not-configured" });
 
 export class VoiceService {
   async transcribeWithContext(audioBuffer: Buffer, filename: string, context?: string): Promise<{ summary: string }> {

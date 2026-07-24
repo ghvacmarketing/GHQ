@@ -6,7 +6,7 @@ import { eq, gte, lte, and, or, sql, desc, isNull, isNotNull } from "drizzle-orm
 import { addDays, subDays, format, startOfDay, endOfDay } from "date-fns";
 
 const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "sk-not-configured",
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || undefined,
 });
 
