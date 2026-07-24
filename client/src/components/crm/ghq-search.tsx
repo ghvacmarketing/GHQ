@@ -177,6 +177,17 @@ type ConversationMessage = {
   relatedTopics?: string[];
 };
 
+/** The assistant answers in plain prose, but strip any markdown that slips
+ *  through so the chat never shows raw asterisks or hash signs. */
+function cleanAnswer(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/__(.+?)__/g, "$1")
+    .replace(/^#{1,4}\s+/gm, "")
+    .replace(/^\s*[*-]\s+/gm, "\u2022 ")
+    .replace(/`([^`]+)`/g, "$1");
+}
+
 // Top-nav triggers dispatch these so the global search/AI/comment dialogs can be
 // opened from anywhere without prop-drilling. GhqSearch listens for them.
 export const openGlobalSearch = () => window.dispatchEvent(new Event("ghq-open-search"));
@@ -262,9 +273,9 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversationMessages]);
 
-  const handleAskHelp = () => {
-    const question = searchQuery.trim();
-    if (question.length < 3) return;
+  const askQuestion = (raw: string) => {
+    const question = raw.trim();
+    if (question.length < 3 || helpMutation.isPending) return;
 
     // Capture history BEFORE appending the new user message
     const historyForApi = conversationMessages.map(m => ({ role: m.role, content: m.content }));
@@ -275,6 +286,8 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
 
     helpMutation.mutate({ question, conversationHistory: historyForApi });
   };
+
+  const handleAskHelp = () => askQuestion(searchQuery);
 
   const handleNewConversation = () => {
     setConversationMessages([]);
@@ -441,12 +454,29 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
   const renderHelpResults = () => {
     if (conversationMessages.length === 0 && !helpMutation.isPending) {
       return (
-        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+        <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
           <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <Sparkles className="h-6 w-6" />
           </span>
-          <p className="text-sm">Ask a question about the CRM</p>
-          <p className="text-xs mt-1 opacity-70">e.g., "What does auto pay mean for invoices?"</p>
+          <p className="text-sm font-semibold text-foreground">Hey — what can I help with?</p>
+          <p className="mx-auto mt-1 max-w-xs text-xs text-muted-foreground">
+            I know how GHQ works and can see live data — schedules, agreements, invoices, quotes.
+          </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            {[
+              "What's on the schedule today?",
+              "Which invoices are unpaid?",
+              "How do agreement renewals work?",
+            ].map((q) => (
+              <button
+                key={q}
+                onClick={() => askQuestion(q)}
+                className="rounded-full border border-border bg-white px-3 py-1.5 text-xs text-slate-700 transition-colors hover:border-[#711419] hover:text-[#711419]"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
         </div>
       );
     }
@@ -470,19 +500,15 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
               </div>
               <div className="flex-1 space-y-2">
                 <div className="bg-muted rounded-lg rounded-tl-sm p-4 text-foreground text-sm leading-relaxed whitespace-pre-wrap">
-                  {msg.content}
+                  {cleanAnswer(msg.content)}
                 </div>
                 {msg.relatedTopics && msg.relatedTopics.length > 0 && (
                   <div className="flex flex-wrap gap-2 pl-1">
-                    <span className="text-xs text-muted-foreground self-center">Ask about:</span>
                     {msg.relatedTopics.map((topic, j) => (
                       <button
                         key={j}
-                        onClick={() => {
-                          setSearchQuery(topic);
-                          setTimeout(() => inputRef.current?.focus(), 0);
-                        }}
-                        className="text-xs px-2 py-1 rounded-md bg-muted text-primary hover:bg-accent transition-colors border border-border"
+                        onClick={() => askQuestion(topic)}
+                        className="text-xs px-2.5 py-1 rounded-full bg-white text-slate-700 hover:border-[#711419] hover:text-[#711419] transition-colors border border-border"
                       >
                         {topic}
                       </button>
