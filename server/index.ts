@@ -395,6 +395,22 @@ async function runDocsAndAccountingMigrations() {
         created_at timestamp DEFAULT now()
       )
     `);
+    // Starter audiences — seeded once, only while the table is empty, so
+    // deleting one doesn't resurrect it on the next boot.
+    await db.execute(sql`
+      INSERT INTO mkt_audiences (name, filters)
+      SELECT v.name, v.filters::jsonb FROM (VALUES
+        ('All customers', '{"record":"customers","include":[],"exclude":[]}'),
+        ('Residential customers', '{"record":"customers","include":[{"field":"customerType","op":"eq","value":"residential"}],"exclude":[]}'),
+        ('Commercial customers', '{"record":"customers","include":[{"field":"customerType","op":"eq","value":"commercial"}],"exclude":[]}'),
+        ('Prospects (not yet customers)', '{"record":"customers","include":[{"field":"customerStatus","op":"eq","value":"prospect"}],"exclude":[]}'),
+        ('Agreement members', '{"record":"customers","include":[{"field":"hasAgreement","op":"eq","value":"yes"}],"exclude":[]}'),
+        ('No active agreement', '{"record":"customers","include":[{"field":"hasAgreement","op":"eq","value":"no"}],"exclude":[]}'),
+        ('Protection plan members', '{"record":"customers","include":[{"field":"protectionPlan","op":"eq","value":"yes"}],"exclude":[]}'),
+        ('Open quotes (sent, undecided)', '{"record":"quotes","include":[{"field":"status","op":"eq","value":"sent"}],"exclude":[]}')
+      ) AS v(name, filters)
+      WHERE NOT EXISTS (SELECT 1 FROM mkt_audiences)
+    `);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS mkt_campaigns (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -88,14 +88,26 @@ function MarketingDashboard() {
   const { data: automations, isLoading } = useQuery<AutomationCampaign[]>({
     queryKey: ["/api/crm/automations"],
   });
-  const { data: customersData } = useQuery<{ customers: unknown[] }>({
-    queryKey: ["/api/crm/customers"],
+  // "Reachable" = customers we can actually email — same filter audiences use
+  const { data: reachable } = useQuery<{ count: number }>({
+    queryKey: ["/api/marketing/audiences/preview", "reachable-kpi"],
+    queryFn: async () => {
+      const res = await fetch("/api/marketing/audiences/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ record: "customers", include: [], exclude: [] }),
+      });
+      if (!res.ok) return { count: 0 };
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
   });
 
   const active = (automations ?? []).filter((a) => a.isActive).length;
   const triggered = (automations ?? []).reduce((s, a) => s + (a.totalTriggered ?? 0), 0);
   const completed = (automations ?? []).reduce((s, a) => s + (a.totalCompleted ?? 0), 0);
-  const audience = customersData?.customers?.length ?? 0;
+  const audience = reachable?.count ?? 0;
 
   const kpis = [
     { label: "Active automations", value: active, icon: Zap },

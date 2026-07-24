@@ -965,8 +965,9 @@ function AudRuleList({
 
 export function AudiencesTab() {
   const { toast } = useToast();
-  const { data: audiences = [] } = useQuery<Audience[]>({ queryKey: ["/api/marketing/audiences"] });
+  const { data: audiences = [], isLoading: audiencesLoading } = useQuery<Audience[]>({ queryKey: ["/api/marketing/audiences"] });
 
+  const [view, setView] = useState<"list" | "build">("list");
   const [record, setRecord] = useState("customers");
   const [include, setInclude] = useState<AudFilter[]>([]);
   const [exclude, setExclude] = useState<AudFilter[]>([]);
@@ -987,6 +988,7 @@ export function AudiencesTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/marketing/audiences"] });
       setName("");
+      setView("list");
       toast({ title: "Audience saved" });
     },
     onError: (e: any) => toast({ title: e?.message || "Couldn't save", variant: "destructive" }),
@@ -1016,7 +1018,16 @@ export function AudiencesTab() {
       setExclude([]);
     }
     setName(a.name);
+    setView("build");
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const startNew = () => {
+    setRecord("customers");
+    setInclude([]);
+    setExclude([]);
+    setName("");
+    setView("build");
   };
 
   const describeAudience = (a: Audience): string => {
@@ -1033,10 +1044,57 @@ export function AudiencesTab() {
   const stepLabel = "flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400";
   const stepNum = "flex h-5 w-5 items-center justify-center rounded-[3px] bg-slate-900 text-[10px] font-bold text-white";
 
+  if (view === "list") {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-display text-xl font-semibold tracking-tight text-slate-900">Audiences</h1>
+            <p className="mt-0.5 text-sm text-slate-500">Saved segments stay live — counts update as the CRM changes.</p>
+          </div>
+          <Button className="bg-[#711419] hover:bg-[#8a1a1f]" onClick={startNew} data-testid="audience-new">
+            <Plus className="mr-1.5 h-4 w-4" /> New audience
+          </Button>
+        </div>
+
+        {audiencesLoading ? (
+          <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 rounded-[4px]" />)}</div>
+        ) : audiences.length === 0 ? (
+          <div className="rounded-[4px] border border-dashed border-slate-300 bg-white py-16 text-center">
+            <Users className="mx-auto mb-3 h-8 w-8 text-slate-300" />
+            <p className="text-sm font-medium text-slate-600">No audiences yet</p>
+            <p className="mt-0.5 text-xs text-slate-400">Build your first segment — it takes a minute.</p>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+            {audiences.map((a) => (
+              <div key={a.id} className="group flex items-center gap-3 border-b border-slate-100 px-4 py-2.5 last:border-0 hover:bg-slate-50" data-testid={`audience-${a.id}`}>
+                <Users className="h-4 w-4 shrink-0 text-[#711419]" strokeWidth={1.75} />
+                <button onClick={() => loadAudience(a)} className="min-w-0 flex-1 text-left" title="Open in the builder">
+                  <p className="text-sm font-semibold text-slate-900">{a.name}</p>
+                  <p className="text-[11px] text-slate-400">{describeAudience(a)}</p>
+                </button>
+                <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">{a.count ?? "—"}</span>
+                <button onClick={() => deleteAudience.mutate(a.id)} className="rounded p-1 text-slate-300 opacity-0 hover:bg-red-50 hover:text-red-600 group-hover:opacity-100" title="Delete">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-display text-xl font-semibold tracking-tight text-slate-900">Audiences</h1>
+        <button onClick={() => setView("list")} className="text-sm font-medium text-slate-500 hover:text-slate-900" data-testid="audience-back">
+          ← Audiences
+        </button>
+        <h1 className="mt-1 font-display text-xl font-semibold tracking-tight text-slate-900">
+          {name ? name : "New audience"}
+        </h1>
         <p className="mt-0.5 text-sm text-slate-500">Start from a record, say who's in and who's out — saved segments stay live.</p>
       </div>
 
@@ -1139,24 +1197,6 @@ export function AudiencesTab() {
         </div>
       </div>
 
-      {/* ── Saved audiences ── */}
-      {audiences.length > 0 && (
-        <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
-          {audiences.map((a) => (
-            <div key={a.id} className="group flex items-center gap-3 border-b border-slate-100 px-4 py-2.5 last:border-0 hover:bg-slate-50" data-testid={`audience-${a.id}`}>
-              <Users className="h-4 w-4 shrink-0 text-[#711419]" strokeWidth={1.75} />
-              <button onClick={() => loadAudience(a)} className="min-w-0 flex-1 text-left" title="Load into the builder">
-                <p className="text-sm font-semibold text-slate-900">{a.name}</p>
-                <p className="text-[11px] text-slate-400">{describeAudience(a)}</p>
-              </button>
-              <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">{a.count ?? "—"}</span>
-              <button onClick={() => deleteAudience.mutate(a.id)} className="rounded p-1 text-slate-300 opacity-0 hover:bg-red-50 hover:text-red-600 group-hover:opacity-100" title="Delete">
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
