@@ -122,60 +122,44 @@ type DragState =
 
 // Chip-style editor for select/multi-select choices: type, press Enter to
 // add; tap the x on a chip to remove. Replaces the comma-separated input.
+/** One row per option — each choice gets its own labeled text field (no chip
+ *  pile-up), Enter adds the next row. */
 function OptionsEditor({ options, onChange }: { options: string[]; onChange: (o: string[]) => void }) {
-  const [draft, setDraft] = useState("");
-  const add = () => {
-    const v = draft.trim();
-    if (!v) return;
-    if (!options.some((o) => o.toLowerCase() === v.toLowerCase())) onChange([...options, v]);
-    setDraft("");
-  };
   return (
-    <div className="rounded-lg border border-input bg-white p-2" data-testid="options-editor">
-      {options.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {options.map((o, i) => (
-            <span
-              key={`${o}-${i}`}
-              className="inline-flex items-center gap-1 rounded-full bg-[#711419]/[0.08] py-1 pl-2.5 pr-1.5 text-xs font-medium text-[#711419]"
-            >
-              {o}
-              <button
-                type="button"
-                onClick={() => onChange(options.filter((_, j) => j !== i))}
-                className="text-[#711419]/60 hover:text-[#711419]"
-                aria-label={`Remove ${o}`}
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
+    <div className="space-y-1.5" data-testid="options-editor">
+      {options.map((o, i) => (
+        <div key={i} className="flex items-center gap-1.5">
+          <span className="w-5 shrink-0 text-right text-[11px] font-medium tabular-nums text-slate-400">{i + 1}.</span>
+          <Input
+            value={o}
+            autoFocus={i === options.length - 1 && o === ""}
+            onChange={(e) => onChange(options.map((x, j) => (j === i ? e.target.value : x)))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); if (o.trim()) onChange([...options, ""]); }
+            }}
+            placeholder={`Option ${i + 1} — e.g. "Capacitor"`}
+            className="h-9 flex-1"
+            data-testid={`option-input-${i}`}
+          />
+          <button
+            type="button"
+            onClick={() => onChange(options.filter((_, j) => j !== i))}
+            className="p-1 text-slate-400 hover:text-red-600"
+            aria-label={`Remove option ${i + 1}`}
+            data-testid={`option-remove-${i}`}
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
-      )}
-      <div className="flex items-center gap-1.5">
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === ",") { e.preventDefault(); add(); }
-            else if (e.key === "Backspace" && !draft && options.length) onChange(options.slice(0, -1));
-          }}
-          onBlur={add}
-          placeholder={options.length ? "Add another option…" : "Type an option, press Enter"}
-          className="h-8 min-w-0 flex-1 border-0 bg-transparent px-1 text-sm outline-none placeholder:text-slate-400"
-          data-testid="input-question-options"
-        />
-        <button
-          type="button"
-          onClick={add}
-          disabled={!draft.trim()}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600 transition-colors hover:bg-slate-200 disabled:opacity-40"
-          aria-label="Add option"
-          data-testid="add-option"
-        >
-          <Plus className="h-4 w-4" />
-        </button>
-      </div>
+      ))}
+      <button
+        type="button"
+        onClick={() => onChange([...options, ""])}
+        className="flex items-center gap-1 text-xs font-medium text-[#711419] hover:underline"
+        data-testid="add-option"
+      >
+        <Plus className="h-3.5 w-3.5" /> Add option
+      </button>
     </div>
   );
 }
@@ -594,10 +578,11 @@ export default function CrmChecklists() {
         isRequired: stepForm.isRequired,
         helpText: stepForm.helpText || null,
         section: stepForm.section.trim() || null,
-        options:
-          (stepForm.questionType === "select" || stepForm.questionType === "multi_select") && stepForm.options.length > 0
-            ? stepForm.options
-            : null,
+        options: (() => {
+          if (stepForm.questionType !== "select" && stepForm.questionType !== "multi_select") return null;
+          const clean = stepForm.options.map((o) => o.trim()).filter(Boolean);
+          return clean.length > 0 ? clean : null;
+        })(),
         ...(editingStep ? {} : { sortOrder: (serverSteps[serverSteps.length - 1]?.sortOrder ?? 0) + 1 }),
       };
       if (editingStep) {
@@ -1847,16 +1832,23 @@ export default function CrmChecklists() {
               {/* Floating canvas controls */}
               <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex items-start justify-between px-4">
                 <div className="flex items-center gap-2">
-                  {!layersOpen && (
-                    <button
-                      onClick={() => setLayersOpen(true)}
-                      className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-600 shadow-sm backdrop-blur transition-colors hover:text-slate-900"
-                      title="Show layers"
-                      data-testid="layers-expand"
-                    >
-                      <PanelLeftOpen className="h-4 w-4" />
-                    </button>
-                  )}
+                  {/* Always mounted so it can FADE IN only after the panel's
+                      500ms width collapse finishes (delay), and vanish
+                      instantly the moment the panel starts reopening. */}
+                  <button
+                    onClick={() => setLayersOpen(true)}
+                    className={`flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-600 shadow-sm backdrop-blur transition-[opacity,transform] duration-200 hover:text-slate-900 ${
+                      layersOpen
+                        ? "pointer-events-none scale-75 opacity-0 delay-0"
+                        : "pointer-events-auto scale-100 opacity-100 delay-[450ms]"
+                    }`}
+                    title="Show layers"
+                    aria-hidden={layersOpen}
+                    tabIndex={layersOpen ? -1 : 0}
+                    data-testid="layers-expand"
+                  >
+                    <PanelLeftOpen className="h-4 w-4" />
+                  </button>
                 </div>
                 <Button
                   size="sm"
@@ -2078,9 +2070,20 @@ export default function CrmChecklists() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Step / question</Label>
+              <Label>
+                {stepForm.questionType === "select" || stepForm.questionType === "multi_select"
+                  ? "Question the choices answer"
+                  : "Step / question"}
+                <span className="ml-0.5 text-red-600">*</span>
+              </Label>
               <Input
-                placeholder="e.g., Check capacitor"
+                placeholder={
+                  stepForm.questionType === "multi_select"
+                    ? 'e.g., "Which parts were replaced?"'
+                    : stepForm.questionType === "select"
+                    ? 'e.g., "What is the system condition?"'
+                    : "e.g., Check capacitor"
+                }
                 value={stepForm.question}
                 onChange={(e) => setStepForm({ ...stepForm, question: e.target.value })}
                 data-testid="input-question-text"
@@ -2108,10 +2111,18 @@ export default function CrmChecklists() {
             {(stepForm.questionType === "select" || stepForm.questionType === "multi_select") && (
               <div className="space-y-2">
                 <Label>Options</Label>
-                <OptionsEditor options={stepForm.options} onChange={(o) => setStepForm({ ...stepForm, options: o })} />
-                <p className="text-xs text-muted-foreground">
-                  The choices the tech taps{stepForm.questionType === "multi_select" ? " — they can pick several" : ""}.
-                </p>
+                {stepForm.question.trim() ? (
+                  <>
+                    <OptionsEditor options={stepForm.options} onChange={(o) => setStepForm({ ...stepForm, options: o })} />
+                    <p className="text-xs text-muted-foreground">
+                      The choices the tech taps{stepForm.questionType === "multi_select" ? " — they can pick several" : ""}.
+                    </p>
+                  </>
+                ) : (
+                  <p className="rounded-[4px] border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-xs text-slate-500">
+                    Write the question above first — then add the options the tech can pick from.
+                  </p>
+                )}
               </div>
             )}
             <div className="space-y-2">
@@ -2155,7 +2166,12 @@ export default function CrmChecklists() {
             <Button variant="outline" onClick={() => { setStepDialogOpen(false); setEditingStep(null); }}>Cancel</Button>
             <Button
               onClick={() => saveStep.mutate()}
-              disabled={!stepForm.question || saveStep.isPending}
+              disabled={
+                !stepForm.question.trim() ||
+                ((stepForm.questionType === "select" || stepForm.questionType === "multi_select") &&
+                  stepForm.options.every((o) => !o.trim())) ||
+                saveStep.isPending
+              }
               className="bg-[#711419] hover:bg-[#8a1a1f]"
               data-testid="button-save-question"
             >
