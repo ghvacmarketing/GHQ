@@ -62,6 +62,7 @@ import {
   User,
   MapPin,
   X,
+  Filter,
 } from "lucide-react";
 import { CrmLayout } from "@/components/crm/crm-layout";
 import { format } from "date-fns";
@@ -608,8 +609,11 @@ export default function CrmQuotes() {
           />
           <div className="shrink-0 pb-1">
             <Select value={quoteTypeFilter} onValueChange={setQuoteTypeFilter}>
-              <SelectTrigger className="w-[160px] h-8 text-xs border-0 bg-transparent focus:ring-0 focus:ring-offset-0" data-testid="select-quote-type-filter">
-                <SelectValue placeholder="Quote Type" />
+              <SelectTrigger className="w-[170px] h-8 text-xs border-0 bg-transparent focus:ring-0 focus:ring-offset-0" data-testid="select-quote-type-filter">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <Filter className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                  <SelectValue placeholder="Quote Type" />
+                </span>
               </SelectTrigger>
               <SelectContent className="bg-white">
                 {quoteTypeFilters.map((type) => (

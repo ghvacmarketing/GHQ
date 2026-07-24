@@ -1504,8 +1504,11 @@ export default function CrmProspectFunnel() {
 
       <div className="flex flex-wrap items-center gap-3">
         <Select value={activeFilter} onValueChange={setActiveFilter}>
-          <SelectTrigger className="w-[140px] h-9 text-sm bg-white border-slate-300" data-testid="select-status-filter">
-            <SelectValue />
+          <SelectTrigger className="w-[150px] h-9 text-sm bg-white border-slate-300" data-testid="select-status-filter">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <Filter className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+              <SelectValue />
+            </span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All Active">All Active</SelectItem>
@@ -1519,8 +1522,11 @@ export default function CrmProspectFunnel() {
         </Select>
 
         <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-          <SelectTrigger className="w-[160px] h-9 text-sm bg-white border-slate-300" data-testid="select-employee-filter">
-            <SelectValue placeholder="All Sales People" />
+          <SelectTrigger className="w-[170px] h-9 text-sm bg-white border-slate-300" data-testid="select-employee-filter">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <Filter className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+              <SelectValue placeholder="All Sales People" />
+            </span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Sales People</SelectItem>
@@ -1533,8 +1539,11 @@ export default function CrmProspectFunnel() {
         </Select>
 
         <Select value={selectedLeadTypeId} onValueChange={setSelectedLeadTypeId}>
-          <SelectTrigger className="w-[180px] h-9 text-sm bg-white border-slate-300" data-testid="select-lead-type-filter">
-            <SelectValue placeholder="All Lead Types" />
+          <SelectTrigger className="w-[190px] h-9 text-sm bg-white border-slate-300" data-testid="select-lead-type-filter">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <Filter className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+              <SelectValue placeholder="All Lead Types" />
+            </span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Lead Types</SelectItem>

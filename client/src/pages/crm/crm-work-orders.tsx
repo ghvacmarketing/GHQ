@@ -72,6 +72,7 @@ import {
   ChevronDown,
   Clipboard,
   ClipboardCheck,
+  Filter,
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -1254,8 +1255,11 @@ export default function CrmWorkOrders() {
               value={visitTypeFilter}
               onValueChange={(v) => setVisitTypeFilter(v as WorkOrderVisitType | "all")}
             >
-              <SelectTrigger className="h-9 w-[150px] text-sm" data-testid="select-visit-type-filter">
-                <SelectValue placeholder="All Types" />
+              <SelectTrigger className="h-9 w-[160px] text-sm" data-testid="select-visit-type-filter">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <Filter className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                  <SelectValue placeholder="All Types" />
+                </span>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>

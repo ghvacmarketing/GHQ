@@ -247,8 +247,10 @@ export function PinCommentsLayer({ currentUser }: { currentUser: CrmUser }) {
           className="fixed inset-0 z-[95] cursor-crosshair"
           data-testid="pin-mode-overlay"
         >
-          <div className="pointer-events-none absolute inset-0 animate-in fade-in bg-slate-900/[0.05] duration-300" />
-          <div className="pointer-events-none absolute inset-2 animate-in fade-in rounded-lg border-2 border-[#711419]/60 duration-500" />
+          {/* Tint + frame must read over the dark sidebar too — full-opacity
+              maroon edge at the true viewport bounds with an inward vignette. */}
+          <div className="pointer-events-none absolute inset-0 animate-in fade-in bg-slate-900/10 duration-300" />
+          <div className="pointer-events-none absolute inset-0 animate-in fade-in duration-500 shadow-[inset_0_0_0_3px_#711419,inset_0_0_48px_rgba(113,20,25,0.28)]" />
           <div className="pointer-events-none absolute inset-x-0 top-4 flex justify-center animate-in fade-in slide-in-from-top-3 duration-300">
             <div className="pointer-events-auto flex items-center gap-2.5 rounded-[4px] bg-slate-900 py-1.5 pl-3 pr-1.5 text-white shadow-xl" data-testid="pin-mode-banner">
               <MapPin className="h-4 w-4 fill-[#e8704f] text-slate-900" />
