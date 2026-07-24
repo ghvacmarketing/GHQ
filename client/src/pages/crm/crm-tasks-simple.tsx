@@ -299,6 +299,18 @@ export default function CrmTasksSimple() {
                     <p className="mt-0.5 text-[11px] text-slate-400">
                       {p.createdByName || "Someone"} · {describePinPath(p.path)} · {format(new Date(p.created_at), "MMM d, h:mm a")}
                     </p>
+                    {(p.mentions?.length ?? 0) > 0 && (
+                      <span className="mt-1 flex flex-wrap items-center gap-1">
+                        {p.mentions.map((id) => {
+                          const name = users.find((u) => u.id === id)?.name;
+                          return name ? (
+                            <span key={id} className="rounded-[3px] bg-[#711419]/10 px-1.5 py-0.5 text-[10px] font-medium text-[#711419]">
+                              @{name}
+                            </span>
+                          ) : null;
+                        })}
+                      </span>
+                    )}
                   </button>
                   <button
                     onClick={() => navigate(`${p.path}?pin=${p.id}`)}

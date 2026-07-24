@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { MapPin, X, Check, Trash2, Loader2 } from "lucide-react";
+import { MapPin, X, Check, Trash2, Loader2, Pencil } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ type Pin = {
   createdByName: string | null;
   resolved: boolean;
   created_at: string;
+  edited_at: string | null;
 };
 
 /** Resolve a pin to viewport coordinates: prefer its data-testid anchor with
@@ -105,7 +106,8 @@ export function PinCommentsLayer({ currentUser }: { currentUser: CrmUser }) {
 
   const { data: users = [] } = useQuery<CrmUser[]>({
     queryKey: ["/api/crm/users"],
-    enabled: !!composer,
+    // Needed by the composer's tag list AND the open card's "Tagged" names
+    enabled: !!composer || !!openPinId,
   });
 
   // ── Keep pins glued to their anchors while anything scrolls or resizes ──
@@ -136,20 +138,43 @@ export function PinCommentsLayer({ currentUser }: { currentUser: CrmUser }) {
     };
   }, [recompute]);
 
-  // ── Deep link: ?pin=<id> scrolls to the anchor and pulses the pin ──
+  // ── Deep link: ?pin=<id> — wait for the anchor to actually mount (page
+  // queries render late), jump the scroll instantly, THEN place, open, and
+  // bounce the pin at its final position so nothing plays in the wrong spot.
+  const deepLinkedId = useRef<string | null>(null);
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("pin");
-    if (!id || pins.length === 0) return;
+    if (!id || pins.length === 0 || deepLinkedId.current === id) return;
     const pin = pins.find((p) => p.id === id);
     if (!pin) return;
-    const matches = pin.anchor_testid ? document.querySelectorAll(`[data-testid="${CSS.escape(pin.anchor_testid)}"]`) : null;
-    const el = matches ? ((matches[pin.anchor_index] || matches[0]) as HTMLElement | undefined) : undefined;
-    if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
-    setPulseId(id);
-    setOpenPinId(id);
-    const t = setTimeout(() => setPulseId(null), 3500);
-    return () => clearTimeout(t);
-  }, [pins]);
+    deepLinkedId.current = id;
+
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const attempt = () => {
+      tries++;
+      const matches = pin.anchor_testid
+        ? document.querySelectorAll(`[data-testid="${CSS.escape(pin.anchor_testid)}"]`)
+        : null;
+      const el = matches ? ((matches[pin.anchor_index] || matches[0]) as HTMLElement | undefined) : undefined;
+      if (!el && pin.anchor_testid && tries < 20) {
+        timer = setTimeout(attempt, 150);
+        return;
+      }
+      if (el) el.scrollIntoView({ block: "center", behavior: "auto" });
+      recompute();
+      // Open + pulse only after the post-scroll positions have painted
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          setOpenPinId(id);
+          setPulseId(id);
+          setTimeout(() => setPulseId(null), 2500);
+        }),
+      );
+    };
+    attempt();
+    return () => clearTimeout(timer);
+  }, [pins, recompute]);
 
   // ── Drop a pin ──
   const handleModeClick = (e: React.MouseEvent) => {
@@ -157,6 +182,12 @@ export function PinCommentsLayer({ currentUser }: { currentUser: CrmUser }) {
     const y = e.clientY;
     // Look through the overlay to what's underneath
     const stack = document.elementsFromPoint(x, y);
+    // Clicking the toolbar comment icon (which sits under the overlay) exits
+    // the mode instead of dropping a pin next to it.
+    if (stack.some((el) => (el as HTMLElement).closest?.('[data-testid="button-topnav-comment"]'))) {
+      setMode(false);
+      return;
+    }
     let anchor: HTMLElement | null = null;
     for (const el of stack) {
       if ((el as HTMLElement).dataset?.pinOverlay) continue;
@@ -222,6 +253,20 @@ export function PinCommentsLayer({ currentUser }: { currentUser: CrmUser }) {
       setOpenPinId(null);
     },
   });
+
+  // Edit an existing comment's text (author or owner/admin)
+  const [editDraft, setEditDraft] = useState<string | null>(null);
+  const editPin = useMutation({
+    mutationFn: async ({ id, body }: { id: string; body: string }) =>
+      apiRequest("PATCH", `/api/crm/pins/${id}`, { body }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/pins"] });
+      setEditDraft(null);
+      toast({ title: "Comment updated" });
+    },
+    onError: (e: any) => toast({ title: e?.message || "Couldn't update the comment", variant: "destructive" }),
+  });
+  useEffect(() => setEditDraft(null), [openPinId]);
 
   const filteredUsers = useMemo(() => {
     const q = tagSearch.trim().toLowerCase();
@@ -300,13 +345,41 @@ export function PinCommentsLayer({ currentUser }: { currentUser: CrmUser }) {
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-900">{openPin.createdByName || "Someone"}</p>
-              <p className="text-[11px] text-slate-400">{format(new Date(openPin.created_at), "MMM d, h:mm a")}</p>
+              <p className="text-[11px] text-slate-400">
+                {format(new Date(openPin.created_at), "MMM d, h:mm a")}
+                {openPin.edited_at ? " · edited" : ""}
+              </p>
             </div>
             <button onClick={() => setOpenPinId(null)} className="rounded p-1 text-slate-400 hover:bg-slate-100" aria-label="Close">
               <X className="h-4 w-4" />
             </button>
           </div>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{openPin.body}</p>
+          {editDraft !== null ? (
+            <>
+              <Textarea
+                autoFocus
+                value={editDraft}
+                onChange={(e) => setEditDraft(e.target.value)}
+                className="mt-2 min-h-[72px] resize-none text-sm"
+                data-testid="pin-edit-body"
+              />
+              <div className="mt-2 flex justify-end gap-2">
+                <Button size="sm" variant="outline" className="h-8" onClick={() => setEditDraft(null)}>Cancel</Button>
+                <Button
+                  size="sm"
+                  className="h-8 bg-[#711419] hover:bg-[#8a1a1f]"
+                  disabled={!editDraft.trim() || editPin.isPending}
+                  onClick={() => editPin.mutate({ id: openPin.id, body: editDraft.trim() })}
+                  data-testid="pin-edit-save"
+                >
+                  {editPin.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1 h-3.5 w-3.5" />}
+                  Save
+                </Button>
+              </div>
+            </>
+          ) : (
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{openPin.body}</p>
+          )}
           {openPin.mentions?.length > 0 && (
             <p className="mt-2 text-[11px] text-slate-400">
               Tagged: {openPin.mentions.map((id) => users.find((u) => u.id === id)?.name || "user").join(", ")}
@@ -314,14 +387,24 @@ export function PinCommentsLayer({ currentUser }: { currentUser: CrmUser }) {
           )}
           <div className="mt-3 flex items-center justify-end gap-1.5 border-t border-slate-100 pt-2.5">
             {(openPin.created_by === currentUser.id || ["owner", "admin"].includes(currentUser.role)) && (
-              <button
-                onClick={() => deletePin.mutate(openPin.id)}
-                className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                title="Delete"
-                data-testid="pin-delete"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <>
+                <button
+                  onClick={() => setEditDraft(openPin.body)}
+                  className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  title="Edit"
+                  data-testid="pin-edit"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => deletePin.mutate(openPin.id)}
+                  className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                  title="Delete"
+                  data-testid="pin-delete"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </>
             )}
             <Button size="sm" variant="outline" className="h-8" onClick={() => resolvePin.mutate(openPin.id)} data-testid="pin-resolve">
               <Check className="mr-1 h-3.5 w-3.5" /> Resolve

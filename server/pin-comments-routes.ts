@@ -18,7 +18,7 @@ export function registerPinCommentRoutes(app: Express): void {
       // No path → every open pin across the CRM (the Tasks "Comments" view)
       if (!p) {
         const r: any = await db.execute(sql`
-          SELECT pc.*, u.name AS "createdByName"
+          SELECT pc.*, u.name AS "createdByName", to_char(pc.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at
           FROM pin_comments pc LEFT JOIN crm_users u ON u.id = pc.created_by
           ${includeResolved ? sql`` : sql`WHERE pc.resolved = false`}
           ORDER BY pc.created_at DESC LIMIT 200`);
@@ -26,7 +26,7 @@ export function registerPinCommentRoutes(app: Express): void {
       }
       if (!p.startsWith("/")) return res.status(400).json({ message: "path is required" });
       const r: any = await db.execute(sql`
-        SELECT pc.*, u.name AS "createdByName"
+        SELECT pc.*, u.name AS "createdByName", to_char(pc.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at
         FROM pin_comments pc LEFT JOIN crm_users u ON u.id = pc.created_by
         WHERE pc.path = ${p} ${includeResolved ? sql`` : sql`AND pc.resolved = false`}
         ORDER BY pc.created_at ASC`);
@@ -40,7 +40,7 @@ export function registerPinCommentRoutes(app: Express): void {
   app.get("/api/crm/pins/:id", requireCrmAuth, async (req: Request, res: Response) => {
     try {
       const r: any = await db.execute(sql`
-        SELECT pc.*, u.name AS "createdByName"
+        SELECT pc.*, u.name AS "createdByName", to_char(pc.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at
         FROM pin_comments pc LEFT JOIN crm_users u ON u.id = pc.created_by
         WHERE pc.id = ${req.params.id}`);
       if (!r.rows?.length) return res.status(404).json({ message: "Not found" });
@@ -90,12 +90,27 @@ export function registerPinCommentRoutes(app: Express): void {
 
   app.patch("/api/crm/pins/:id", requireCrmAuth, async (req: Request, res: Response) => {
     try {
-      const { resolved } = req.body || {};
+      const { resolved, body } = req.body || {};
+
+      // Body edit — only the author (or owner/admin) may rewrite a comment.
+      if (typeof body === "string") {
+        if (!body.trim()) return res.status(400).json({ message: "Comment can't be empty" });
+        const user = await getCurrentCrmUser(req);
+        if (!user) return res.status(401).json({ message: "Unauthorized" });
+        const r: any = await db.execute(sql`
+          UPDATE pin_comments
+          SET body = ${String(body).trim().slice(0, 4000)}, edited_at = now()
+          WHERE id = ${req.params.id} AND (created_by = ${user.id} OR ${user.role} IN ('owner', 'admin'))
+          RETURNING *, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at`);
+        if (!r.rows?.length) return res.status(403).json({ message: "Only the author can edit this comment" });
+        return res.json(r.rows[0]);
+      }
+
       const r: any = await db.execute(sql`
         UPDATE pin_comments
         SET resolved = ${!!resolved}, resolved_at = ${resolved ? sql`now()` : null}
         WHERE id = ${req.params.id}
-        RETURNING *`);
+        RETURNING *, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at`);
       if (!r.rows?.length) return res.status(404).json({ message: "Not found" });
       res.json(r.rows[0]);
     } catch (e) {

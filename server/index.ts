@@ -371,6 +371,7 @@ async function runDocsAndAccountingMigrations() {
       )
     `);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS pin_comments_path_idx ON pin_comments(path)`);
+    await db.execute(sql`ALTER TABLE pin_comments ADD COLUMN IF NOT EXISTS edited_at timestamp`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS mkt_templates (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
