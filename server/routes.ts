@@ -2197,13 +2197,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Quick health probe for the AI stack — tells you exactly what's missing
+  // Quick health probe for the AI stack — tells you exactly what's missing.
+  // Does a live round-trip to OpenAI so a present-but-broken key (typo, no
+  // billing credit, model access) is reported with the real upstream error.
   app.get("/api/crm/ai/status", requireCrmAuth, async (_req, res) => {
     const replitKey = !!process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
     const openaiKey = !!process.env.OPENAI_API_KEY;
+    const configured = replitKey || openaiKey;
+    const rawKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "";
+    let live = false;
+    let error: string | null = null;
+    if (configured) {
+      try {
+        const OpenAI = (await import("openai")).default;
+        const client = new OpenAI({
+          apiKey: rawKey,
+          baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || undefined,
+        });
+        await client.models.retrieve("gpt-4o-mini");
+        live = true;
+      } catch (e: any) {
+        error = `${e?.status ? `HTTP ${e.status}: ` : ""}${e?.error?.message || e?.message || "unknown error"}`;
+      }
+    }
     res.json({
-      configured: replitKey || openaiKey,
+      configured,
       source: replitKey ? "replit-proxy" : openaiKey ? "openai" : null,
+      keyPrefix: rawKey ? rawKey.slice(0, 7) : null,
+      live,
+      error,
     });
   });
 

@@ -20,6 +20,52 @@ import {
 } from "@/components/ui/popover";
 import type { CrmUser, Task } from "@shared/schema";
 
+// Human-readable location for a pin path: "/crm/customers/8f2a…?tab=tasks"
+// reads as "CRM → Customers → Tasks". IDs are skipped; unknown segments are
+// title-cased so new pages still read sensibly without a mapping update.
+const PIN_PATH_LABELS: Record<string, string> = {
+  crm: "CRM",
+  dashboard: "Dashboard",
+  customers: "Customers",
+  "work-orders": "Work Orders",
+  invoices: "Invoices",
+  quotes: "Quotes",
+  agreements: "Agreements",
+  dispatch: "Dispatch Board",
+  messaging: "Messages",
+  mail: "Mail",
+  phone: "Phone",
+  projects: "Projects",
+  tasks: "Tasks",
+  "photo-gallery": "Media",
+  esign: "Signatures",
+  "env-monitoring": "Environment",
+  notifications: "Notifications",
+  settings: "Settings",
+  marketing: "Marketing",
+  items: "Items",
+  "prospect-funnel": "Lead Funnel",
+  "rebate-programs": "Rebate Programs",
+  reports: "Goals",
+  board: "",
+  mine: "",
+};
+
+function describePinPath(path: string): string {
+  const [pathname, query = ""] = String(path || "").split("?");
+  const parts: string[] = [];
+  for (const seg of pathname.split("/").filter(Boolean)) {
+    if (/^[0-9a-f]{8}-[0-9a-f-]{20,}$/i.test(seg) || /^\d+$/.test(seg)) continue; // record ids
+    const label = seg in PIN_PATH_LABELS
+      ? PIN_PATH_LABELS[seg]
+      : seg.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    if (label) parts.push(label);
+  }
+  const tab = /(?:^|&)tab=([^&]+)/.exec(query)?.[1];
+  if (tab) parts.push(tab.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()));
+  return parts.join(" → ") || path;
+}
+
 /**
  * Tasks, Google-Tasks style: one list, a quick-add bar, round check-off
  * circles, and a collapsible Completed section. No boards, no columns,
@@ -251,7 +297,7 @@ export default function CrmTasksSimple() {
                   <button onClick={() => navigate(`${p.path}?pin=${p.id}`)} className="min-w-0 flex-1 text-left">
                     <p className="line-clamp-2 text-sm text-slate-900">{p.body}</p>
                     <p className="mt-0.5 text-[11px] text-slate-400">
-                      {p.createdByName || "Someone"} · {p.path} · {format(new Date(p.created_at), "MMM d, h:mm a")}
+                      {p.createdByName || "Someone"} · {describePinPath(p.path)} · {format(new Date(p.created_at), "MMM d, h:mm a")}
                     </p>
                   </button>
                   <button

@@ -1128,12 +1128,18 @@ Return JSON with:
     helpCache.set(normalizedQuestion, { result, timestamp: Date.now(), hasLiveData: needsLiveData });
     
     return result;
-  } catch (error) {
+  } catch (error: any) {
     console.error("[CRM Help AI] Error:", error);
-    return {
-      answer: "I encountered an error processing your question. Please try again.",
-      relatedTopics: [],
-      confidence: "low"
-    };
+    // Surface the real upstream failure so the chat shows what's actually
+    // wrong (rejected key, no billing credit, model access) instead of a
+    // generic apology the user can't act on.
+    const status = error?.status ?? error?.response?.status;
+    const detail = error?.error?.message || error?.message || "unknown error";
+    const hint =
+      status === 401 ? "OpenAI rejected the API key — double-check OPENAI_API_KEY in Render (no quotes or spaces)."
+      : status === 429 ? "The OpenAI account has no available quota — add billing credits at platform.openai.com."
+      : status === 404 ? "This API key can't access the gpt-4o-mini model."
+      : null;
+    throw new Error(hint ? `${hint} (${detail})` : detail);
   }
 }
