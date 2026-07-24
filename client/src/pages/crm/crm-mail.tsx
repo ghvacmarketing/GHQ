@@ -53,9 +53,29 @@ type EmailMessage = {
   bodyHtml: string | null;
   bodyText: string | null;
   hasAttachments: boolean;
-  attachments: { filename: string; mimeType: string; size: number; attachmentId?: string }[] | null;
+  attachments: { filename: string; mimeType: string; size: number; attachmentId?: string; contentId?: string | null }[] | null;
   sentAt: string | null;
 };
+
+/** Inline email images arrive as attachments referenced by `src="cid:…"` in
+ *  the HTML — a scheme browsers can't load, so they rendered as broken images
+ *  at the top while the same file showed fine in the attachment list below.
+ *  Rewrite each cid ref to our attachment endpoint: match by Content-ID when
+ *  the sync captured one, otherwise fall back to the next unused image
+ *  attachment in order (covers messages synced before contentId existed). */
+function resolveInlineImages(html: string, msg: EmailMessage): string {
+  const atts = (msg.attachments || []).filter((a) => a.attachmentId);
+  if (!atts.length) return html;
+  const used = new Set<string>();
+  return html.replace(/(src\s*=\s*["'])cid:([^"']+)(["'])/gi, (match, pre, cid, post) => {
+    const wanted = String(cid).replace(/^<|>$/g, "");
+    let att = atts.find((a) => a.contentId && a.contentId.replace(/^<|>$/g, "") === wanted && !used.has(a.attachmentId!));
+    if (!att) att = atts.find((a) => (a.mimeType || "").startsWith("image/") && !used.has(a.attachmentId!));
+    if (!att) return match;
+    used.add(att.attachmentId!);
+    return `${pre}/api/crm/mail/messages/${msg.gmailMessageId}/attachments/${att.attachmentId}${post}`;
+  });
+}
 
 type Folder = "inbox" | "unread" | "sent";
 
@@ -646,7 +666,7 @@ export default function CrmMail() {
                         })()}
                         <div className="px-4 py-4">
                           {m.bodyHtml ? (
-                            <div className="email-body overflow-x-auto text-sm leading-relaxed text-slate-700 [&_a]:text-[#711419] [&_a]:underline [&_img]:max-w-full" dangerouslySetInnerHTML={{ __html: sanitizeHtml(m.bodyHtml) }} />
+                            <div className="email-body overflow-x-auto text-sm leading-relaxed text-slate-700 [&_a]:text-[#711419] [&_a]:underline [&_img]:max-w-full" dangerouslySetInnerHTML={{ __html: sanitizeHtml(resolveInlineImages(m.bodyHtml, m)) }} />
                           ) : (
                             <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{m.bodyText || m.snippet}</p>
                           )}

@@ -669,11 +669,21 @@ export default function CrmInvoices() {
           />
           <div className="shrink-0 pb-1">
             <Select value={sourceFilter} onValueChange={setSourceFilter}>
-              <SelectTrigger className="w-[150px] h-8 text-xs border-0 bg-transparent focus:ring-0 focus:ring-offset-0" data-testid="select-source-filter">
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <Filter className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                  <SelectValue placeholder="Source" />
+              <SelectTrigger
+                className={`relative h-8 w-8 shrink-0 justify-center bg-white p-0 [&>svg]:hidden ${
+                  sourceFilter !== "all"
+                    ? "border-[#711419] text-[#711419]"
+                    : "border-input text-slate-600 hover:text-foreground"
+                }`}
+                title="Filter by source"
+                data-testid="select-source-filter"
+              >
+                <span className="flex items-center justify-center">
+                  <Filter className="h-4 w-4" />
                 </span>
+                {sourceFilter !== "all" && (
+                  <span className="absolute -right-1 -top-1 h-2 w-2 rounded-[2px] bg-[#711419]" />
+                )}
               </SelectTrigger>
               <SelectContent className="bg-white">
                 <SelectItem value="all" className="text-xs focus:bg-[#711419]/10 focus:text-[#711419]">All Sources</SelectItem>

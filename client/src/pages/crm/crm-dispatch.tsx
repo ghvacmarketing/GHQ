@@ -2476,6 +2476,28 @@ function formatWeekRange(dates: Date[]): string {
   return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${year}`;
 }
 
+// ── Detail-panel building blocks: grouped info cards with icon rows ──────────
+function PanelSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-[4px] border border-slate-300/70 bg-white p-3.5">
+      <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{title}</p>
+      <div className="space-y-3">{children}</div>
+    </section>
+  );
+}
+
+function PanelRow({ icon: Icon, label, children }: { icon: React.ComponentType<{ className?: string }>; label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3">
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-medium text-slate-400">{label}</p>
+        <div className="mt-0.5 text-sm font-medium text-slate-900">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function CrmDispatch() {
   usePageTitle("Dispatch Board");
   const [, navigate] = useLocation();
@@ -4633,9 +4655,12 @@ export default function CrmDispatch() {
                 ? (selectedWorkOrder.priority === "high" ? "bg-red-600 text-white" : selectedWorkOrder.priority === "low" ? "bg-green-600 text-white" : "bg-yellow-500 text-white")
                 : (visitTypeHeaderColors[selectedWorkOrder.visitType || "SERVICE"] || "bg-slate-600 text-white")
             }`}>
-              <div>
-                <h2 className="text-sm font-semibold" data-testid="panel-workorder-title">Work Order: {selectedWorkOrder.workOrderNumber}</h2>
-                <p className="text-xs opacity-80">{visitTypeLabels[selectedWorkOrder.visitType || "SERVICE"] || selectedWorkOrder.visitType}</p>
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-wider opacity-80">Work Order · {selectedWorkOrder.workOrderNumber}</p>
+                <h2 className="truncate text-base font-semibold leading-tight" data-testid="panel-workorder-title">
+                  {visitTypeLabels[selectedWorkOrder.visitType || "SERVICE"] || selectedWorkOrder.visitType || "Service"}
+                </h2>
+                <p className="truncate text-xs opacity-80">{selectedWorkOrder.customerName}</p>
               </div>
               <div className="flex items-center gap-0.5">
                 <button
@@ -4648,120 +4673,101 @@ export default function CrmDispatch() {
               </div>
             </div>
 
-            {/* Panel Content - Scrollable */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide">
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-slate-900">Work Order Information</h3>
-                  
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-500">Customer</span>
-                      {selectedWorkOrder.job?.customerId ? (
-                        <Link 
-                          href={`/crm/customers/${selectedWorkOrder.job.customerId}`}
-                          className="text-sm font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                          data-testid="link-customer-detail"
-                        >
-                          {selectedWorkOrder.customerName}
-                          <ExternalLink className="h-3 w-3" />
-                        </Link>
-                      ) : (
-                        <span className="text-sm font-medium text-slate-900">{selectedWorkOrder.customerName}</span>
+            {/* Panel Content - Scrollable, organized as grouped info cards */}
+            <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-3 scrollbar-hide">
+                <PanelSection title="Appointment">
+                  <PanelRow icon={Clock} label="Scheduled">
+                    <span data-testid="text-scheduled-time">
+                      {selectedWorkOrder.scheduledStart && selectedWorkOrder.scheduledEnd ? (
+                        (() => {
+                          const { startHour, endHour } = getWorkOrderDisplayTimes(selectedWorkOrder);
+                          return `${formatDecimalHour(startHour)} – ${formatDecimalHour(endHour)}`;
+                        })()
+                      ) : "Not scheduled"}
+                    </span>
+                  </PanelRow>
+                  <PanelRow icon={Info} label="Status">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {selectedWorkOrder.isPending && (
+                        <StatusDot pill="bg-amber-100 text-amber-800 border border-amber-200">
+                          Waiting
+                        </StatusDot>
                       )}
-                    </div>
-
-                    <div className="flex items-start justify-between gap-3">
-                      <span className="text-sm text-slate-500 shrink-0">Address</span>
-                      {selectedWorkOrder.propertyAddress ? (
-                        <a
-                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedWorkOrder.propertyAddress)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm font-medium text-blue-600 hover:text-blue-700 text-right flex items-start justify-end gap-1"
-                          data-testid="text-property-address"
-                        >
-                          <span>{selectedWorkOrder.propertyAddress}</span>
-                          <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                        </a>
-                      ) : (
-                        <span className="text-sm font-medium text-slate-400">No address</span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-500">Visit Type</span>
-                      <span className="text-sm font-medium text-slate-900" data-testid="text-visit-type">{visitTypeLabels[selectedWorkOrder.visitType || "SERVICE"] || selectedWorkOrder.visitType || "Service"}</span>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-500">Priority</span>
-                      <Badge 
-                        variant={selectedWorkOrder.priority === "high" ? "destructive" : "secondary"}
-                        data-testid="badge-priority"
+                      <StatusDot
+                        pill={`${statusColors[selectedWorkOrder.status]?.bg} ${statusColors[selectedWorkOrder.status]?.text} ${statusColors[selectedWorkOrder.status]?.border} border`}
+                        data-testid="badge-status"
                       >
-                        {selectedWorkOrder.priority || "normal"}
-                      </Badge>
+                        {statusLabels[selectedWorkOrder.status] || selectedWorkOrder.status}
+                      </StatusDot>
                     </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-500">Scheduled</span>
-                      <span className="text-sm font-medium text-slate-900" data-testid="text-scheduled-time">
-                        {selectedWorkOrder.scheduledStart && selectedWorkOrder.scheduledEnd ? (
-                          (() => {
-                            const { startHour, endHour } = getWorkOrderDisplayTimes(selectedWorkOrder);
-                            return `${formatDecimalHour(startHour)} - ${formatDecimalHour(endHour)}`;
-                          })()
-                        ) : "Not scheduled"}
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-500">Status</span>
-                      <div className="flex items-center gap-2">
-                        {selectedWorkOrder.isPending && (
-                          <StatusDot pill="bg-amber-100 text-amber-800 border border-amber-200">
-                            Waiting
-                          </StatusDot>
-                        )}
-                        <StatusDot 
-                          pill={`${statusColors[selectedWorkOrder.status]?.bg} ${statusColors[selectedWorkOrder.status]?.text} ${statusColors[selectedWorkOrder.status]?.border} border`}
-                          data-testid="badge-status"
-                        >
-                          {statusLabels[selectedWorkOrder.status] || selectedWorkOrder.status}
-                        </StatusDot>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-500">Assigned Tech</span>
-                      <span className="text-sm font-medium text-slate-900" data-testid="text-assigned-tech">
-                        {technicians.find(t => t.id === selectedWorkOrder.assignedTechId)?.name || selectedWorkOrder.techName || "Unassigned"}
-                      </span>
-                    </div>
+                  </PanelRow>
+                  <PanelRow icon={AlertCircle} label="Priority">
+                    <Badge
+                      variant={selectedWorkOrder.priority === "high" ? "destructive" : "secondary"}
+                      data-testid="badge-priority"
+                    >
+                      {selectedWorkOrder.priority || "normal"}
+                    </Badge>
+                  </PanelRow>
+                  {selectedWorkOrder.bookingSource === "online" && (
+                    <PanelRow icon={Info} label="Source">
+                      <StatusDot pill="bg-purple-100 text-purple-700 border-purple-200">
+                        Online Booking
+                      </StatusDot>
+                    </PanelRow>
+                  )}
+                </PanelSection>
 
-                    {selectedWorkOrder.bookingSource === "online" && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-slate-500">Source</span>
-                        <StatusDot pill="bg-purple-100 text-purple-700 border-purple-200">
-                          Online Booking
-                        </StatusDot>
-                      </div>
+                <PanelSection title="Customer">
+                  <PanelRow icon={User} label="Name">
+                    {selectedWorkOrder.job?.customerId ? (
+                      <Link
+                        href={`/crm/customers/${selectedWorkOrder.job.customerId}`}
+                        className="flex items-center gap-1 text-[#711419] hover:underline"
+                        data-testid="link-customer-detail"
+                      >
+                        {selectedWorkOrder.customerName}
+                        <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    ) : (
+                      <span>{selectedWorkOrder.customerName}</span>
                     )}
-
-                    {selectedWorkOrder.customerPhone && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-slate-500">Phone</span>
-                        <span className="text-sm font-medium text-slate-900">{selectedWorkOrder.customerPhone}</span>
-                      </div>
+                  </PanelRow>
+                  {selectedWorkOrder.customerPhone && (
+                    <PanelRow icon={Phone} label="Phone">
+                      {selectedWorkOrder.customerPhone}
+                    </PanelRow>
+                  )}
+                  <PanelRow icon={MapPin} label="Address">
+                    {selectedWorkOrder.propertyAddress ? (
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedWorkOrder.propertyAddress)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#711419] hover:underline"
+                        data-testid="text-property-address"
+                      >
+                        {selectedWorkOrder.propertyAddress}
+                      </a>
+                    ) : (
+                      <span className="text-slate-400">No address</span>
                     )}
-                  </div>
-                </div>
+                  </PanelRow>
+                </PanelSection>
 
-                <Separator />
+                <PanelSection title="Technician & Visit">
+                  <PanelRow icon={Wrench} label="Assigned tech">
+                    <span data-testid="text-assigned-tech">
+                      {technicians.find(t => t.id === selectedWorkOrder.assignedTechId)?.name || selectedWorkOrder.techName || "Unassigned"}
+                    </span>
+                  </PanelRow>
+                  <PanelRow icon={Clipboard} label="Visit type">
+                    <span data-testid="text-visit-type">{visitTypeLabels[selectedWorkOrder.visitType || "SERVICE"] || selectedWorkOrder.visitType || "Service"}</span>
+                  </PanelRow>
+                </PanelSection>
 
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold text-slate-900">Update Status</h3>
-                  <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 overflow-hidden" data-testid="status-buttons">
+                <PanelSection title="Update Status">
+                  <div className="-mt-1 overflow-hidden rounded-[4px] border border-slate-200 divide-y divide-slate-100" data-testid="status-buttons">
                     {(["scheduled", "dispatched", "en_route", "on_site", "completed", "cancelled"] as WorkOrderStatus[]).map((status) => {
                       const isActive = selectedWorkOrder.status === status;
                       return (
@@ -4786,13 +4792,10 @@ export default function CrmDispatch() {
                       );
                     })}
                   </div>
-                </div>
+                </PanelSection>
 
-                <Separator />
-
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-900">Work Order Details</h3>
-                  <p className="text-xs text-slate-500">Description of the work to be performed.</p>
+                <PanelSection title="Work Details">
+                  <p className="-mt-1 text-xs text-slate-500">Description of the work to be performed.</p>
                   <Textarea
                     placeholder="Enter work order details..."
                     value={workOrderDescription}
@@ -4808,16 +4811,10 @@ export default function CrmDispatch() {
                   >
                     Save Details
                   </button>
-                </div>
+                </PanelSection>
 
-                <Separator />
-
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                    <Phone className="h-4 w-4" />
-                    Dispatch Notes
-                  </h3>
-                  <p className="text-xs text-slate-500">For client callbacks or technician reference. These notes will be visible to technicians in the mobile app.</p>
+                <PanelSection title="Dispatch Notes">
+                  <p className="-mt-1 text-xs text-slate-500">For client callbacks or technician reference. Visible to technicians in the mobile app.</p>
                   {selectedWorkOrder.dispatchNotes && (
                     <div className="bg-amber-50 border border-amber-200 rounded p-3 text-sm whitespace-pre-wrap" data-testid="dispatch-notes-display">
                       {selectedWorkOrder.dispatchNotes}
@@ -4838,13 +4835,10 @@ export default function CrmDispatch() {
                   >
                     Save Dispatch Notes
                   </button>
-                </div>
+                </PanelSection>
 
-                <Separator />
-
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-900">Technician Notes</h3>
-                  <p className="text-xs text-slate-500">Notes added by the technician during or after completion.</p>
+                <PanelSection title="Technician Notes">
+                  <p className="-mt-1 text-xs text-slate-500">Notes added by the technician during or after completion.</p>
                   {selectedWorkOrder.completionSummary && (
                     <div className="bg-green-50 border border-green-200 rounded p-3 text-sm" data-testid="completion-summary">
                       <div className="flex items-center gap-2 text-green-700 font-medium mb-1">
@@ -4874,13 +4868,10 @@ export default function CrmDispatch() {
                   >
                     Save Notes
                   </button>
-                </div>
+                </PanelSection>
 
-                <Separator />
-
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-slate-900">Comments</h3>
-                  <p className="text-xs text-slate-500">Add comments with @mentions to notify team members.</p>
+                <PanelSection title="Comments">
+                  <p className="-mt-1 text-xs text-slate-500">Add comments with @mentions to notify team members.</p>
                   <CommentComposer
                     entityType="work_order"
                     entityId={selectedWorkOrder.id}
@@ -4889,12 +4880,9 @@ export default function CrmDispatch() {
                       queryClient.invalidateQueries({ queryKey: ["/api/crm/comments", "work_order", selectedWorkOrder.id] });
                     }}
                   />
-                </div>
+                </PanelSection>
 
-                <Separator />
-
-                <div className="space-y-2">
-                  <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</h3>
+                <PanelSection title="Actions">
                   <div className="grid grid-cols-2 gap-1.5">
                     <Link href={`/crm/work-orders/${selectedWorkOrder.id}`}>
                       <Button
@@ -4972,7 +4960,7 @@ export default function CrmDispatch() {
                       </AlertDialogContent>
                     </AlertDialog>
                   </div>
-              </div>
+                </PanelSection>
             </div>
           </div>
           )}

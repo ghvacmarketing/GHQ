@@ -1251,23 +1251,6 @@ export default function CrmWorkOrders() {
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <Select
-              value={visitTypeFilter}
-              onValueChange={(v) => setVisitTypeFilter(v as WorkOrderVisitType | "all")}
-            >
-              <SelectTrigger className="h-9 w-[160px] text-sm" data-testid="select-visit-type-filter">
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <Filter className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                  <SelectValue placeholder="All Types" />
-                </span>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                {workOrderVisitTypeEnum.map((type) => (
-                  <SelectItem key={type} value={type}>{visitTypeLabels[type]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Button onClick={() => setCreateDialogOpen(true)} size="sm" data-testid="button-create-work-order">
               <Plus className="h-4 w-4 mr-1" />
               New Work Order
@@ -1275,16 +1258,45 @@ export default function CrmWorkOrders() {
           </div>
         </div>
 
-        {/* Tabs styled like projects/customers page - underline style */}
-        <IndustrialTabs
-          testidPrefix="tab"
-          activeKey={activeTab}
-          onSelect={(k) => setActiveTab(k as FilterTab)}
-          tabs={(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => ({
-            key: tab,
-            label: filterTabConfig[tab].label,
-          }))}
-        />
+        {/* Tabs left, visit-type filter icon right (below the New Work Order button) */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <IndustrialTabs
+            testidPrefix="tab"
+            activeKey={activeTab}
+            onSelect={(k) => setActiveTab(k as FilterTab)}
+            tabs={(Object.keys(filterTabConfig) as FilterTab[]).map((tab) => ({
+              key: tab,
+              label: filterTabConfig[tab].label,
+            }))}
+          />
+          <Select
+            value={visitTypeFilter}
+            onValueChange={(v) => setVisitTypeFilter(v as WorkOrderVisitType | "all")}
+          >
+            <SelectTrigger
+              className={`relative h-8 w-8 shrink-0 justify-center bg-white p-0 [&>svg]:hidden ${
+                visitTypeFilter !== "all"
+                  ? "border-[#711419] text-[#711419]"
+                  : "border-input text-slate-600 hover:text-foreground"
+              }`}
+              title="Filter by visit type"
+              data-testid="select-visit-type-filter"
+            >
+              <span className="flex items-center justify-center">
+                <Filter className="h-4 w-4" />
+              </span>
+              {visitTypeFilter !== "all" && (
+                <span className="absolute -right-1 -top-1 h-2 w-2 rounded-[2px] bg-[#711419]" />
+              )}
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              {workOrderVisitTypeEnum.map((type) => (
+                <SelectItem key={type} value={type}>{visitTypeLabels[type]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         {workOrdersLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

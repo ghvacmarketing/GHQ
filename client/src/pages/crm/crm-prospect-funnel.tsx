@@ -1475,6 +1475,13 @@ export default function CrmProspectFunnel() {
 
   const expandedLead = expandedLeadId ? filteredLeads.find(l => l.id === expandedLeadId) : null;
 
+  const funnelFiltersActive =
+    activeFilter !== "All Active" ||
+    selectedEmployeeId !== "all" ||
+    selectedLeadTypeId !== "all" ||
+    selectedTempIds.length > 0 ||
+    selectedDriverIds.length > 0;
+
   const searchFiltersContent = (
     <div className="space-y-4">
       <div className="flex justify-center">
@@ -1503,127 +1510,129 @@ export default function CrmProspectFunnel() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Select value={activeFilter} onValueChange={setActiveFilter}>
-          <SelectTrigger className="w-[150px] h-9 text-sm bg-white border-slate-300" data-testid="select-status-filter">
-            <span className="flex min-w-0 items-center gap-1.5">
-              <Filter className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-              <SelectValue />
-            </span>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All Active">All Active</SelectItem>
-            <SelectItem value="New">New</SelectItem>
-            <SelectItem value="Contacted">Contacted</SelectItem>
-            <SelectItem value="Quote Sent">Quote Sent</SelectItem>
-            <SelectItem value="Negotiating">Negotiating</SelectItem>
-            <SelectItem value="Won">Won</SelectItem>
-            <SelectItem value="Lost">Lost</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-          <SelectTrigger className="w-[170px] h-9 text-sm bg-white border-slate-300" data-testid="select-employee-filter">
-            <span className="flex min-w-0 items-center gap-1.5">
-              <Filter className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-              <SelectValue placeholder="All Sales People" />
-            </span>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Sales People</SelectItem>
-            {salesUsers.map((user) => (
-              <SelectItem key={user.id} value={user.id}>
-                {user.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={selectedLeadTypeId} onValueChange={setSelectedLeadTypeId}>
-          <SelectTrigger className="w-[190px] h-9 text-sm bg-white border-slate-300" data-testid="select-lead-type-filter">
-            <span className="flex min-w-0 items-center gap-1.5">
-              <Filter className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-              <SelectValue placeholder="All Lead Types" />
-            </span>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Lead Types</SelectItem>
-            {leadTypes.filter(lt => lt.isActive).map((type) => (
-              <SelectItem key={type.id} value={type.id}>
-                {type.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" className="h-9 text-sm bg-white border-slate-300 min-w-[120px]">
-              {selectedTempIds.length > 0 ? `Temp (${selectedTempIds.length})` : "All Temps"}
-              <ChevronDown className="ml-2 h-4 w-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[200px] p-2">
-            <div className="space-y-2">
-              {leadTempOptions.map((option) => (
-                <div key={option.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`temp-${option.id}`}
-                    checked={selectedTempIds.includes(option.id)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setSelectedTempIds([...selectedTempIds, option.id]);
-                      } else {
-                        setSelectedTempIds(selectedTempIds.filter(id => id !== option.id));
-                      }
-                    }}
-                  />
-                  <label htmlFor={`temp-${option.id}`} className="text-sm cursor-pointer">
-                    {option.numericValue} - {option.label}
-                  </label>
-                </div>
-              ))}
-              {selectedTempIds.length > 0 && (
-                <Button variant="ghost" size="sm" className="w-full mt-2" onClick={() => setSelectedTempIds([])}>
-                  Clear
-                </Button>
+            <button
+              className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-md border ${
+                funnelFiltersActive
+                  ? "border-[#711419] text-[#711419]"
+                  : "border-input bg-white text-slate-600 hover:text-foreground"
+              }`}
+              title="Filters"
+              data-testid="funnel-filters"
+            >
+              <Filter className="h-4 w-4" />
+              {funnelFiltersActive && (
+                <span className="absolute -right-1 -top-1 h-2 w-2 rounded-[2px] bg-[#711419]" />
               )}
-            </div>
-          </PopoverContent>
-        </Popover>
-
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="h-9 text-sm bg-white border-slate-300 min-w-[120px]">
-              {selectedDriverIds.length > 0 ? `Driver (${selectedDriverIds.length})` : "All Drivers"}
-              <ChevronDown className="ml-2 h-4 w-4" />
-            </Button>
+            </button>
           </PopoverTrigger>
-          <PopoverContent className="w-[220px] p-2">
-            <div className="space-y-2">
-              {leadDriverOptions.map((option) => (
-                <div key={option.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`driver-${option.id}`}
-                    checked={selectedDriverIds.includes(option.id)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setSelectedDriverIds([...selectedDriverIds, option.id]);
-                      } else {
-                        setSelectedDriverIds(selectedDriverIds.filter(id => id !== option.id));
-                      }
-                    }}
-                  />
-                  <label htmlFor={`driver-${option.id}`} className="text-sm cursor-pointer">
-                    {option.label}
-                  </label>
-                </div>
-              ))}
-              {selectedDriverIds.length > 0 && (
-                <Button variant="ghost" size="sm" className="w-full mt-2" onClick={() => setSelectedDriverIds([])}>
-                  Clear
-                </Button>
-              )}
+          <PopoverContent align="start" className="max-h-[70vh] w-80 space-y-3 overflow-y-auto scrollbar-minimal">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Filters</p>
+            <div>
+              <p className="mb-1 text-xs font-medium text-slate-500">Status</p>
+              <Select value={activeFilter} onValueChange={setActiveFilter}>
+                <SelectTrigger className="h-9 w-full bg-white text-sm" data-testid="select-status-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All Active">All Active</SelectItem>
+                  <SelectItem value="New">New</SelectItem>
+                  <SelectItem value="Contacted">Contacted</SelectItem>
+                  <SelectItem value="Quote Sent">Quote Sent</SelectItem>
+                  <SelectItem value="Negotiating">Negotiating</SelectItem>
+                  <SelectItem value="Won">Won</SelectItem>
+                  <SelectItem value="Lost">Lost</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+            <div>
+              <p className="mb-1 text-xs font-medium text-slate-500">Salesperson</p>
+              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+                <SelectTrigger className="h-9 w-full bg-white text-sm" data-testid="select-employee-filter"><SelectValue placeholder="All Sales People" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sales People</SelectItem>
+                  {salesUsers.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium text-slate-500">Lead type</p>
+              <Select value={selectedLeadTypeId} onValueChange={setSelectedLeadTypeId}>
+                <SelectTrigger className="h-9 w-full bg-white text-sm" data-testid="select-lead-type-filter"><SelectValue placeholder="All Lead Types" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Lead Types</SelectItem>
+                  {leadTypes.filter(lt => lt.isActive).map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      {type.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium text-slate-500">Lead temp</p>
+              <div className="space-y-1.5">
+                {leadTempOptions.map((option) => (
+                  <div key={option.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`temp-${option.id}`}
+                      checked={selectedTempIds.includes(option.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedTempIds([...selectedTempIds, option.id]);
+                        } else {
+                          setSelectedTempIds(selectedTempIds.filter(id => id !== option.id));
+                        }
+                      }}
+                    />
+                    <label htmlFor={`temp-${option.id}`} className="text-sm cursor-pointer">
+                      {option.numericValue} - {option.label}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium text-slate-500">Customer driver</p>
+              <div className="space-y-1.5">
+                {leadDriverOptions.map((option) => (
+                  <div key={option.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`driver-${option.id}`}
+                      checked={selectedDriverIds.includes(option.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedDriverIds([...selectedDriverIds, option.id]);
+                        } else {
+                          setSelectedDriverIds(selectedDriverIds.filter(id => id !== option.id));
+                        }
+                      }}
+                    />
+                    <label htmlFor={`driver-${option.id}`} className="text-sm cursor-pointer">
+                      {option.label}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {funnelFiltersActive && (
+              <button
+                onClick={() => {
+                  setActiveFilter("All Active");
+                  setSelectedEmployeeId("all");
+                  setSelectedLeadTypeId("all");
+                  setSelectedTempIds([]);
+                  setSelectedDriverIds([]);
+                }}
+                className="flex h-8 w-full items-center justify-center gap-1 rounded-md border border-slate-200 text-xs font-medium text-muted-foreground hover:text-foreground"
+                data-testid="funnel-clear-filters"
+              >
+                <X className="h-3.5 w-3.5" /> Clear all filters
+              </button>
+            )}
           </PopoverContent>
         </Popover>
       </div>

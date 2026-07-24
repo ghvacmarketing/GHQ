@@ -120,8 +120,20 @@ function extractBody(payload: any): { html: string | null; text: string | null; 
     if (!part) return;
     const mime = part.mimeType || "";
     const filename = part.filename || "";
-    if (filename && part.body?.attachmentId) {
-      attachments.push({ filename, mimeType: mime, size: part.body.size || 0, attachmentId: part.body.attachmentId });
+    if (part.body?.attachmentId) {
+      // Content-ID links an attachment part to <img src="cid:…"> references in
+      // the HTML body — capture it (angle brackets stripped) so the client can
+      // rewrite those refs to the attachment endpoint. Inline images often
+      // arrive with no filename, so don't require one.
+      const cidHeader = (part.headers || []).find((h: any) => (h.name || "").toLowerCase() === "content-id");
+      const contentId = cidHeader ? String(cidHeader.value || "").trim().replace(/^<|>$/g, "") : null;
+      attachments.push({
+        filename: filename || (mime.startsWith("image/") ? "inline-image" : "attachment"),
+        mimeType: mime,
+        size: part.body.size || 0,
+        attachmentId: part.body.attachmentId,
+        contentId,
+      });
     } else if (mime === "text/html" && part.body?.data) {
       html = (html || "") + b64urlDecode(part.body.data).toString("utf8");
     } else if (mime === "text/plain" && part.body?.data) {
