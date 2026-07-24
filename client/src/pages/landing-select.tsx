@@ -3,7 +3,7 @@ import { AppLoader } from "@/components/app-loader";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Monitor, Smartphone, FolderOpen, Calculator, Megaphone, Wrench, Loader2, ArrowUpRight, BarChart3,
+  Monitor, Smartphone, FolderOpen, Calculator, Megaphone, Wrench, Loader2, ArrowUpRight, BarChart3, UserRound,
 } from "lucide-react";
 import { crmFetch } from "@/lib/crmAuth";
 import type { CrmUser } from "@shared/schema";
@@ -60,6 +60,13 @@ const APPS: AppTile[] = [
     href: "/marketing",
     icon: <Megaphone className="h-6 w-6" strokeWidth={1.75} />,
     roles: ["owner", "admin", "supervisor", "sales"],
+  },
+  {
+    key: "portal",
+    label: "Customer Portal",
+    description: "What customers see — accounts, invoices & payments",
+    href: "/portal/login",
+    icon: <UserRound className="h-6 w-6" strokeWidth={1.75} />,
   },
 ];
 
