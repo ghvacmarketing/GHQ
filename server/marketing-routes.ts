@@ -125,6 +125,146 @@ function audienceWhere(filters: AudienceFilter[]): any {
   return where;
 }
 
+// ── Record-based audiences: base record → include/exclude → customers ───────
+// Every audience still resolves to CUSTOMERS (that's who gets emailed); the
+// record decides which rows qualify them. All fields are whitelisted per
+// record and values are always parameterized.
+type AudienceDef = { record: string; include: AudienceFilter[]; exclude: AudienceFilter[] };
+
+const dateOk = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
+const num = (v: string) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+// Each builder receives the filter and returns a SQL condition on alias `t`
+// (the record table) — or null when the value is invalid.
+const RECORD_DEFS: Record<string, { table: any; customerId: any; build: (f: AudienceFilter) => any | null }> = {
+  customers: {
+    table: sql`crm_customers t`,
+    customerId: sql`t.id`,
+    build: (f) => {
+      const v = String(f.value ?? "");
+      switch (f.field) {
+        case "customerType": return f.op === "neq" ? sql`COALESCE(t.customer_type,'residential') <> ${v}` : sql`COALESCE(t.customer_type,'residential') = ${v}`;
+        case "customerStatus": return f.op === "neq" ? sql`COALESCE(t.customer_status,'customer') <> ${v}` : sql`COALESCE(t.customer_status,'customer') = ${v}`;
+        case "leadSource": return sql`COALESCE(t.lead_source,'') ILIKE ${"%" + v + "%"}`;
+        case "city": return sql`COALESCE(t.full_address,'') ILIKE ${"%" + v + "%"}`;
+        case "hasAgreement": return v === "yes"
+          ? sql`EXISTS (SELECT 1 FROM crm_agreements ag WHERE ag.customer_id = t.id AND ag.status IN ('active','pending'))`
+          : sql`NOT EXISTS (SELECT 1 FROM crm_agreements ag WHERE ag.customer_id = t.id AND ag.status IN ('active','pending'))`;
+        case "protectionPlan": return v === "yes" ? sql`t.protection_plan_level IS NOT NULL` : sql`t.protection_plan_level IS NULL`;
+        case "createdAfter": return dateOk(v) ? sql`t.created_at >= ${v}::date` : null;
+        case "createdBefore": return dateOk(v) ? sql`t.created_at < ${v}::date + interval '1 day'` : null;
+        default: return null;
+      }
+    },
+  },
+  quotes: {
+    table: sql`crm_quotes t`,
+    customerId: sql`t.customer_id`,
+    build: (f) => {
+      const v = String(f.value ?? "");
+      switch (f.field) {
+        case "status": return f.op === "neq" ? sql`t.status <> ${v}` : sql`t.status = ${v}`;
+        case "totalGte": return sql`t.total::numeric >= ${num(v)}`;
+        case "totalLte": return sql`t.total::numeric <= ${num(v)}`;
+        case "createdAfter": return dateOk(v) ? sql`t.created_at >= ${v}::date` : null;
+        case "createdBefore": return dateOk(v) ? sql`t.created_at < ${v}::date + interval '1 day'` : null;
+        default: return null;
+      }
+    },
+  },
+  invoices: {
+    table: sql`crm_invoices t`,
+    customerId: sql`t.customer_id`,
+    build: (f) => {
+      const v = String(f.value ?? "");
+      switch (f.field) {
+        case "status": return f.op === "neq" ? sql`t.status <> ${v}` : sql`t.status = ${v}`;
+        case "totalGte": return sql`t.total::numeric >= ${num(v)}`;
+        case "totalLte": return sql`t.total::numeric <= ${num(v)}`;
+        case "balanceGte": return sql`t.balance_due::numeric >= ${num(v)}`;
+        case "paidAfter": return dateOk(v) ? sql`t.paid_at >= ${v}::date` : null;
+        case "paidBefore": return dateOk(v) ? sql`t.paid_at < ${v}::date + interval '1 day'` : null;
+        case "createdAfter": return dateOk(v) ? sql`t.created_at >= ${v}::date` : null;
+        case "createdBefore": return dateOk(v) ? sql`t.created_at < ${v}::date + interval '1 day'` : null;
+        default: return null;
+      }
+    },
+  },
+  agreements: {
+    table: sql`crm_agreements t`,
+    customerId: sql`t.customer_id`,
+    build: (f) => {
+      const v = String(f.value ?? "");
+      switch (f.field) {
+        case "status": return f.op === "neq" ? sql`t.status <> ${v}` : sql`t.status = ${v}`;
+        case "endingBefore": return dateOk(v) ? sql`t.end_date <= ${v}` : null;
+        case "endingAfter": return dateOk(v) ? sql`t.end_date >= ${v}` : null;
+        case "createdAfter": return dateOk(v) ? sql`t.created_at >= ${v}::date` : null;
+        case "createdBefore": return dateOk(v) ? sql`t.created_at < ${v}::date + interval '1 day'` : null;
+        default: return null;
+      }
+    },
+  },
+  workOrders: {
+    table: sql`crm_work_orders t`,
+    customerId: sql`t.customer_id`,
+    build: (f) => {
+      const v = String(f.value ?? "");
+      switch (f.field) {
+        case "status": return f.op === "neq" ? sql`t.status <> ${v}` : sql`t.status = ${v}`;
+        case "visitType": return f.op === "neq" ? sql`COALESCE(t.visit_type,'SERVICE') <> ${v}` : sql`COALESCE(t.visit_type,'SERVICE') = ${v}`;
+        case "scheduledAfter": return dateOk(v) ? sql`t.scheduled_start >= ${v}::date` : null;
+        case "scheduledBefore": return dateOk(v) ? sql`t.scheduled_start < ${v}::date + interval '1 day'` : null;
+        case "createdAfter": return dateOk(v) ? sql`t.created_at >= ${v}::date` : null;
+        case "createdBefore": return dateOk(v) ? sql`t.created_at < ${v}::date + interval '1 day'` : null;
+        default: return null;
+      }
+    },
+  },
+  projects: {
+    table: sql`crm_projects t`,
+    customerId: sql`t.customer_id`,
+    build: (f) => {
+      const v = String(f.value ?? "");
+      switch (f.field) {
+        case "status": return f.op === "neq" ? sql`t.status <> ${v}` : sql`t.status = ${v}`;
+        case "projectType": return f.op === "neq" ? sql`t.project_type <> ${v}` : sql`t.project_type = ${v}`;
+        case "createdAfter": return dateOk(v) ? sql`t.created_at >= ${v}::date` : null;
+        case "createdBefore": return dateOk(v) ? sql`t.created_at < ${v}::date + interval '1 day'` : null;
+        default: return null;
+      }
+    },
+  },
+};
+
+function recordSubquery(record: string, filters: AudienceFilter[]): any {
+  const def = RECORD_DEFS[record];
+  const conds: any[] = record === "customers" ? [] : [sql`t.customer_id IS NOT NULL`];
+  for (const f of filters || []) {
+    const c = def.build(f);
+    if (c) conds.push(c);
+  }
+  let where: any = sql`TRUE`;
+  for (const c of conds) where = sql`${where} AND ${c}`;
+  return sql`SELECT ${def.customerId} FROM ${def.table} WHERE ${where}`;
+}
+
+/** WHERE clause on `crm_customers c` for either audience shape: the legacy
+ *  flat filter array, or the new { record, include, exclude } definition. */
+function audienceWhereAny(stored: unknown): any {
+  const def = stored as AudienceDef | AudienceFilter[] | null;
+  if (def && !Array.isArray(def) && typeof def === "object" && "record" in def && RECORD_DEFS[(def as AudienceDef).record]) {
+    const d = def as AudienceDef;
+    let where: any = sql`c.email IS NOT NULL AND c.email <> ''`;
+    where = sql`${where} AND c.id IN (${recordSubquery(d.record, d.include || [])})`;
+    if ((d.exclude || []).length > 0) {
+      where = sql`${where} AND c.id NOT IN (${recordSubquery(d.record, d.exclude)})`;
+    }
+    return where;
+  }
+  return audienceWhere(Array.isArray(def) ? def : []);
+}
+
 export function registerMarketingRoutes(app: Express): void {
   // ── Templates ──
   app.get("/api/marketing/templates", requireCrmAuth, async (_req, res) => {
@@ -140,13 +280,15 @@ export function registerMarketingRoutes(app: Express): void {
   app.post("/api/marketing/templates", requireCrmAuth, async (req, res) => {
     try {
       const user = await getCurrentCrmUser(req);
-      const { name, subject, design } = req.body || {};
+      const { name, subject, design, kind, body } = req.body || {};
       if (!name?.trim()) return res.status(400).json({ message: "Name is required" });
-      const html = renderTemplateHtml(design || { blocks: [], styles: {} });
+      const cleanKind = ["email", "sms", "script"].includes(kind) ? kind : "email";
+      const html = cleanKind === "email" ? renderTemplateHtml(design || { blocks: [], styles: {} }) : null;
       const r: any = await db.execute(sql`
-        INSERT INTO mkt_templates (name, subject, design, html, created_by)
+        INSERT INTO mkt_templates (name, subject, design, html, kind, body, created_by)
         VALUES (${String(name).slice(0, 160)}, ${subject ? String(subject).slice(0, 300) : null},
-                ${JSON.stringify(design || {})}::jsonb, ${html}, ${user?.id ?? null})
+                ${JSON.stringify(design || {})}::jsonb, ${html}, ${cleanKind},
+                ${body ? String(body).slice(0, 10000) : null}, ${user?.id ?? null})
         RETURNING *`);
       res.status(201).json(r.rows?.[0]);
     } catch (e) { console.error("mkt templates POST", e); res.status(500).json({ message: "Failed to save template" }); }
@@ -154,7 +296,7 @@ export function registerMarketingRoutes(app: Express): void {
 
   app.patch("/api/marketing/templates/:id", requireCrmAuth, async (req, res) => {
     try {
-      const { name, subject, design } = req.body || {};
+      const { name, subject, design, body } = req.body || {};
       const html = design ? renderTemplateHtml(design) : null;
       const r: any = await db.execute(sql`
         UPDATE mkt_templates SET
@@ -162,6 +304,7 @@ export function registerMarketingRoutes(app: Express): void {
           subject = ${subject === undefined ? sql.raw("subject") : subject ? String(subject).slice(0, 300) : null},
           design = COALESCE(${design ? JSON.stringify(design) : null}::jsonb, design),
           html = COALESCE(${html}, html),
+          body = ${body === undefined ? sql.raw("body") : body ? String(body).slice(0, 10000) : null},
           updated_at = now()
         WHERE id = ${req.params.id} RETURNING *`);
       if (!r.rows?.length) return res.status(404).json({ message: "Not found" });
@@ -184,7 +327,7 @@ export function registerMarketingRoutes(app: Express): void {
       // live counts
       for (const row of rows) {
         try {
-          const c: any = await db.execute(sql`SELECT COUNT(*)::int AS n FROM crm_customers c WHERE ${audienceWhere(row.filters || [])}`);
+          const c: any = await db.execute(sql`SELECT COUNT(*)::int AS n FROM crm_customers c WHERE ${audienceWhereAny(row.filters)}`);
           row.count = c.rows?.[0]?.n ?? 0;
         } catch { row.count = null; }
       }
@@ -194,8 +337,9 @@ export function registerMarketingRoutes(app: Express): void {
 
   app.post("/api/marketing/audiences/preview", requireCrmAuth, async (req, res) => {
     try {
-      const filters = (req.body?.filters ?? []) as AudienceFilter[];
-      const where = audienceWhere(filters);
+      // Accepts either the legacy flat filter array or { record, include, exclude }
+      const def = req.body?.record ? req.body : (req.body?.filters ?? []);
+      const where = audienceWhereAny(def);
       const count: any = await db.execute(sql`SELECT COUNT(*)::int AS n FROM crm_customers c WHERE ${where}`);
       const sample: any = await db.execute(sql`SELECT c.name, c.email FROM crm_customers c WHERE ${where} ORDER BY c.created_at DESC LIMIT 8`);
       res.json({ count: count.rows?.[0]?.n ?? 0, sample: sample.rows ?? [] });
@@ -278,9 +422,8 @@ export function registerMarketingRoutes(app: Express): void {
         return res.status(400).json({ message: `Campaign is already ${campaign.status}.` });
       }
       const ar: any = await db.execute(sql`SELECT filters FROM mkt_audiences WHERE id = ${campaign.audience_id}`);
-      const filters = (ar.rows?.[0]?.filters ?? []) as AudienceFilter[];
       const rec: any = await db.execute(sql`
-        SELECT c.id, c.name, c.email FROM crm_customers c WHERE ${audienceWhere(filters)} LIMIT 2000`);
+        SELECT c.id, c.name, c.email FROM crm_customers c WHERE ${audienceWhereAny(ar.rows?.[0]?.filters)} LIMIT 2000`);
       const recipients = (rec.rows ?? []).filter((r2: any) => r2.email);
       if (recipients.length === 0) return res.status(400).json({ message: "The audience has no customers with email addresses." });
 

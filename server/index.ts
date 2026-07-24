@@ -384,6 +384,8 @@ async function runDocsAndAccountingMigrations() {
         updated_at timestamp DEFAULT now()
       )
     `);
+    await db.execute(sql`ALTER TABLE mkt_templates ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'email'`);
+    await db.execute(sql`ALTER TABLE mkt_templates ADD COLUMN IF NOT EXISTS body text`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS mkt_audiences (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
