@@ -70,6 +70,7 @@ import { CrmLayout } from "@/components/crm/crm-layout";
 import { CommsSwitcher } from "@/components/crm/comms-switcher";
 import { MessagingCustomerPanel } from "@/components/crm/messaging-customer-panel";
 import { cn } from "@/lib/utils";
+import { formatPhoneNumber } from "@/lib/form-utils";
 
 type ConversationWithCustomer = CrmMessagingConversation & {
   customer?: CrmCustomer | null;
@@ -105,6 +106,18 @@ const FILTER_TABS: { value: FilterTab; label: string }[] = [
   { value: "all", label: "All" },
   { value: "resolved", label: "Resolved" },
 ];
+
+/** "ryo martin" -> "Ryo Martin" — uppercase each word's first letter, leave
+ *  the rest untouched (so ABC, McDonald, "(Work Phone)" survive). */
+function titleCaseName(name: string): string {
+  return name.replace(/\S+/g, (w) => (w[0] ? w[0].toUpperCase() + w.slice(1) : w));
+}
+
+function prettyPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length < 10) return raw;
+  return formatPhoneNumber(digits.slice(-10));
+}
 
 function getInitials(name: string): string {
   return name
@@ -704,33 +717,6 @@ export default function CrmMessaging() {
               >
                 <PanelRight className="h-4 w-4" />
               </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" data-testid="thread-actions">
-                    <MoreIcon />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "open" })}>
-                    <MessageSquare className="h-4 w-4 mr-2" /> Reopen
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "resolved" })}>
-                    <Check className="h-4 w-4 mr-2" /> Resolve
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "snoozed" })}>
-                    <BellOff className="h-4 w-4 mr-2" /> Snooze
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "archived" })}>
-                    <Archive className="h-4 w-4 mr-2" /> Archive
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-red-600 focus:text-red-600"
-                    onClick={() => setDeleteDialogOpen(true)}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" /> Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
               <Button
                 variant="ghost"
                 size="sm"
@@ -760,8 +746,8 @@ export default function CrmMessaging() {
           </div>
         ) : (
           <>
-            {/* Identity strip — no border, same background as the messages
-                below so it reads as part of the thread, not a bar. */}
+            {/* Identity strip — blended background; the name/number live in a
+                subtle hairline container, actions + balance sit far right. */}
             <div className="flex items-center gap-3 bg-background px-4 pb-2 pt-1 lg:px-6">
               <Button
                 variant="ghost"
@@ -771,14 +757,14 @@ export default function CrmMessaging() {
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-              <div className="min-w-0">
+              <div className="min-w-0 rounded-[4px] border border-slate-200/80 px-3 py-1.5">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   {headerCtx?.inCrm && headerCtx.customer ? (
                     <Link href={`/crm/customers/${headerCtx.customer.id}`}>
-                      <a className="truncate text-sm font-semibold text-foreground hover:text-[#711419]">{headerName}</a>
+                      <a className="truncate text-sm font-semibold text-foreground hover:text-[#711419]">{titleCaseName(headerName)}</a>
                     </Link>
                   ) : (
-                    <h2 className="truncate text-sm font-semibold text-foreground">{headerName}</h2>
+                    <h2 className="truncate text-sm font-semibold text-foreground">{titleCaseName(headerName)}</h2>
                   )}
                   {headerCtx && !headerCtx.inCrm && (
                     <span className="rounded-[3px] bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
@@ -790,21 +776,51 @@ export default function CrmMessaging() {
                       {headerCtx.customer.customerType.replace(/_/g, " ")}
                     </span>
                   )}
-                  {(headerCtx?.balanceDue ?? 0) > 0 && (
-                    <span className="rounded-[3px] bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 tabular-nums">
-                      {(headerCtx!.balanceDue).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })} due
-                    </span>
-                  )}
                   {headerCtx?.nextAppointment?.scheduledStart && (
                     <span className="rounded-[3px] bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
                       Next {format(new Date(headerCtx.nextAppointment.scheduledStart), "MMM d")}
                     </span>
                   )}
                 </div>
-                <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
-                  <Phone className="h-3 w-3" /> {headerPhone || "No phone"}
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {headerPhone ? prettyPhone(headerPhone) : "No phone"}
                   {headerCtx?.customer?.email && <span className="truncate"> · {headerCtx.customer.email}</span>}
                 </p>
+              </div>
+
+              <div className="ml-auto flex shrink-0 items-center gap-2">
+                {(headerCtx?.balanceDue ?? 0) > 0 && (
+                  <span className="rounded-[3px] bg-red-100 px-2 py-1 text-xs font-semibold text-red-700 tabular-nums" data-testid="thread-balance-due">
+                    {(headerCtx!.balanceDue).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })} due
+                  </span>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" data-testid="thread-actions">
+                      <MoreIcon direction="h" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "open" })}>
+                      <MessageSquare className="h-4 w-4 mr-2" /> Reopen
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "resolved" })}>
+                      <Check className="h-4 w-4 mr-2" /> Resolve
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "snoozed" })}>
+                      <BellOff className="h-4 w-4 mr-2" /> Snooze
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => updateConversationMutation.mutate({ status: "archived" })}>
+                      <Archive className="h-4 w-4 mr-2" /> Archive
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-red-600 focus:text-red-600"
+                      onClick={() => setDeleteDialogOpen(true)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
 
