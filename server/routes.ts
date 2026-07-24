@@ -2203,13 +2203,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Does a live round-trip to OpenAI so a present-but-broken key (typo, no
   // billing credit, model access) is reported with the real upstream error.
   app.get("/api/crm/ai/status", requireCrmAuth, async (_req, res) => {
+    const anthropicKey = !!process.env.ANTHROPIC_API_KEY;
     const replitKey = !!process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
     const openaiKey = !!process.env.OPENAI_API_KEY;
-    const configured = replitKey || openaiKey;
-    const rawKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "";
+    const configured = anthropicKey || replitKey || openaiKey;
+    const rawKey = process.env.ANTHROPIC_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY || "";
     let live = false;
     let error: string | null = null;
-    if (configured) {
+    if (anthropicKey) {
+      const { claudeProbe } = await import("./services/claude");
+      error = await claudeProbe();
+      live = !error;
+    } else if (configured) {
       try {
         const OpenAI = (await import("openai")).default;
         const client = new OpenAI({
@@ -2224,8 +2229,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     res.json({
       configured,
-      source: replitKey ? "replit-proxy" : openaiKey ? "openai" : null,
-      keyPrefix: rawKey ? rawKey.slice(0, 7) : null,
+      source: anthropicKey ? "anthropic" : replitKey ? "replit-proxy" : openaiKey ? "openai" : null,
+      keyPrefix: rawKey ? rawKey.slice(0, 10) : null,
       live,
       error,
     });
@@ -2237,9 +2242,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!question || typeof question !== "string") {
         return res.status(400).json({ message: "Question is required" });
       }
-      if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY && !process.env.OPENAI_API_KEY) {
+      if (!process.env.ANTHROPIC_API_KEY && !process.env.AI_INTEGRATIONS_OPENAI_API_KEY && !process.env.OPENAI_API_KEY) {
         return res.status(503).json({
-          message: "AI isn't configured on this server — add OPENAI_API_KEY in the Render environment and redeploy.",
+          message: "AI isn't configured on this server — add ANTHROPIC_API_KEY in the Render environment and redeploy.",
         });
       }
 

@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { claudeConfigured, claudeChat, stripJsonFences } from "./claude";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
@@ -89,12 +90,7 @@ export async function interpretSearchIntent(query: string): Promise<SearchIntent
   }
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-5-mini",
-      messages: [
-        {
-          role: "system",
-          content: `You are a search assistant for GHVAC's CRM system. Given a user's search query, interpret their intent and expand it into relevant search terms using your knowledge of HVAC terminology and business operations.
+    const systemPrompt = `You are a search assistant for GHVAC's CRM system. Given a user's search query, interpret their intent and expand it into relevant search terms using your knowledge of HVAC terminology and business operations.
 
 ${CRM_SEARCH_KNOWLEDGE}
 
@@ -116,18 +112,29 @@ Use your HVAC knowledge to:
 Return a JSON object with:
 - expandedTerms: Array of 3-8 related search terms (synonyms, HVAC terms, abbreviations)
 - categoryWeights: Object with weights 0-1 for each category (higher = more likely to find relevant results)
-- intent: Brief description of what user is looking for`
-        },
-        {
-          role: "user",
-          content: `Search query: "${query}"`
-        }
-      ],
-      response_format: { type: "json_object" },
-      max_completion_tokens: 300,
-    });
+- intent: Brief description of what user is looking for`;
 
-    const content = response.choices[0]?.message?.content;
+    let content: string | null | undefined;
+    if (claudeConfigured()) {
+      content = stripJsonFences(
+        await claudeChat({
+          system: systemPrompt + "\n\nRespond with ONLY the JSON object.",
+          messages: [{ role: "user", content: `Search query: "${query}"` }],
+          maxTokens: 300,
+        }),
+      );
+    } else {
+      const response = await openai.chat.completions.create({
+        model: "gpt-5-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Search query: "${query}"` },
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 300,
+      });
+      content = response.choices[0]?.message?.content;
+    }
     if (!content) return null;
 
     const parsed = JSON.parse(content);

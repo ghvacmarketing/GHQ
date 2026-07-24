@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { claudeConfigured, claudeChat, claudeErrorHint, stripJsonFences } from "./claude";
 import { db } from "../db";
 import { crmWorkOrders, crmAgreements, crmCustomers, crmProjects, crmInvoices, crmQuotes } from "@shared/schema";
 import { eq, gte, lte, and, or, sql, desc, isNull, isNotNull } from "drizzle-orm";
@@ -1080,21 +1081,33 @@ Return JSON with:
 - relatedTopics: Array of 1-3 related feature areas the user might want to know about
 - confidence: "high" if directly from data/knowledge base, "medium" if inferred, "low" if uncertain`;
     
-    // Build message array: system + prior turns + current question
+    // Build message array: system + prior turns + current question.
+    // Claude is preferred when ANTHROPIC_API_KEY is set; OpenAI is the fallback.
     const priorTurns: Array<{role: 'user'|'assistant', content: string}> = conversationHistory ?? [];
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...priorTurns,
-        { role: "user", content: question }
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 2000,
-    });
-    
-    const finishReason = response.choices[0]?.finish_reason;
-    const content = response.choices[0]?.message?.content;
+    let content: string | null | undefined;
+    let finishReason: string | undefined;
+    if (claudeConfigured()) {
+      content = stripJsonFences(
+        await claudeChat({
+          system: systemPrompt + "\n\nRespond with ONLY the JSON object — no prose around it.",
+          messages: [...priorTurns, { role: "user", content: question }],
+          maxTokens: 2000,
+        }),
+      );
+    } else {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...priorTurns,
+          { role: "user", content: question }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 2000,
+      });
+      finishReason = response.choices[0]?.finish_reason;
+      content = response.choices[0]?.message?.content;
+    }
     if (!content) {
       console.log("[CRM Help AI] No content in response - finish_reason:", finishReason);
       return {
@@ -1135,8 +1148,9 @@ Return JSON with:
     // generic apology the user can't act on.
     const status = error?.status ?? error?.response?.status;
     const detail = error?.error?.message || error?.message || "unknown error";
-    const hint =
-      status === 401 ? "OpenAI rejected the API key — double-check OPENAI_API_KEY in Render (no quotes or spaces)."
+    const hint = claudeConfigured()
+      ? claudeErrorHint(status, detail)
+      : status === 401 ? "OpenAI rejected the API key — double-check OPENAI_API_KEY in Render (no quotes or spaces)."
       : status === 429 ? "The OpenAI account has no available quota — add billing credits at platform.openai.com."
       : status === 404 ? "This API key can't access the gpt-4o-mini model."
       : null;
