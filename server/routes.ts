@@ -2284,6 +2284,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             title: z.string().trim().min(1).max(200),
             description: z.string().trim().min(1).max(2000),
             visitType: z.enum(["SERVICE", "MAINTENANCE", "INSTALL", "SALES"]).optional(),
+            workSubtype: z.string().trim().max(60).optional(),
+            assignTo: z.string().trim().max(100).optional(),
             scheduledStart: z.string().max(40).optional(),
           }).strict(),
         }),
@@ -2342,21 +2344,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "The proposed schedule time isn't a valid date." });
       }
 
+      // work_subtype is NOT NULL — use the proposed one, else a sane default
+      // for the visit type.
+      const visitType = action.params.visitType || "SERVICE";
+      const subtypeDefaults: Record<string, string> = {
+        SERVICE: "Other",
+        MAINTENANCE: "Preventative Maintenance",
+        SALES: "Comfort Consultation",
+        INSTALL: "Full System",
+      };
+      const knownSubtypes = (workSubtypeByVisitType as any)[visitType] as readonly string[] | undefined;
+      const proposedSubtype = action.params.workSubtype?.trim();
+      const workSubtype =
+        (proposedSubtype && knownSubtypes?.find((s) => s.toLowerCase() === proposedSubtype.toLowerCase())) ||
+        proposedSubtype ||
+        subtypeDefaults[visitType];
+
+      // Optional technician assignment by name — only on a clean unique match;
+      // otherwise the work order is created unassigned.
+      let assignedTech: { id: string; name: string } | null = null;
+      if (action.params.assignTo) {
+        const tNeedle = action.params.assignTo.trim().toLowerCase();
+        const techMatches = await db
+          .select({ id: crmUsers.id, name: crmUsers.name })
+          .from(crmUsers)
+          .where(sql`LOWER(${crmUsers.name}) LIKE ${"%" + tNeedle + "%"}`)
+          .limit(2);
+        assignedTech = techMatches.length === 1 ? techMatches[0] : techMatches.find((t) => t.name.toLowerCase() === tNeedle) || null;
+      }
+
       const existingWorkOrders = await storage.getWorkOrdersByCustomerId(customer.id);
-      const checklistMatches = await checklistsForSubtype(action.params.visitType || "SERVICE", undefined as any);
+      const checklistMatches = await checklistsForSubtype(visitType, workSubtype);
       const workOrder = await storage.createWorkOrder({
         customerId: customer.id,
         propertyId: property.id,
         title: action.params.title,
         description: action.params.description,
-        visitType: (action.params.visitType || "SERVICE") as any,
-        status: scheduledStart ? "scheduled" : "new",
+        visitType: visitType as any,
+        workSubtype,
+        status: "scheduled",
         scheduledStart: scheduledStart || undefined,
+        assignedTechId: assignedTech?.id ?? null,
         workOrderNumber: existingWorkOrders.length + 1,
         assignedChecklistId: checklistMatches[0]?.id ?? null,
       } as any);
-      await logCrmAudit(user.id, "ai_action.create_work_order", "work_order", workOrder.id, { params: action.params, customerId: customer.id }, req.ip);
-      return res.status(201).json({ ok: true, entity: "work_order", id: workOrder.id, label: workOrder.title, url: `/crm/work-orders/${workOrder.id}` });
+
+      // Tell the assigned tech about their new job (mirrors the normal flow)
+      if (assignedTech && assignedTech.id !== user.id) {
+        try {
+          const when = scheduledStart
+            ? scheduledStart.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+            : "unscheduled";
+          await db.insert(crmNotifications).values({
+            userId: assignedTech.id,
+            type: "task_assigned" as any,
+            title: "New job assigned to you",
+            preview: `${workOrder.title || "Work order"} — ${when}`,
+            entityType: "work_order",
+            entityId: workOrder.id,
+            actorId: user.id,
+          });
+        } catch (e) {
+          console.error("AI action WO assignment notification failed:", e);
+        }
+      }
+
+      await logCrmAudit(user.id, "ai_action.create_work_order", "work_order", workOrder.id, { params: action.params, customerId: customer.id, assignedTechId: assignedTech?.id ?? null }, req.ip);
+      const label = assignedTech ? `${workOrder.title} (assigned to ${assignedTech.name})` : workOrder.title;
+      return res.status(201).json({ ok: true, entity: "work_order", id: workOrder.id, label, url: `/crm/work-orders/${workOrder.id}` });
     } catch (error: any) {
       console.error("Error executing AI action:", error);
       res.status(500).json({ message: error?.message || "Couldn't complete the action." });
