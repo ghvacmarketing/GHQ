@@ -233,13 +233,21 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
       width: body.style.width,
       overflow: body.style.overflow,
     };
+    const html = document.documentElement;
+    const prevOverscroll = { html: html.style.overscrollBehavior, body: body.style.overscrollBehavior };
     body.style.position = "fixed";
     body.style.top = `-${y}px`;
     body.style.left = "0";
     body.style.right = "0";
     body.style.width = "100%";
     body.style.overflow = "hidden";
+    // Kill the document-level rubber band so swiping past the sheet's edges
+    // can't bounce the whole view and flash the page behind it.
+    html.style.overscrollBehavior = "none";
+    body.style.overscrollBehavior = "none";
     return () => {
+      html.style.overscrollBehavior = prevOverscroll.html;
+      body.style.overscrollBehavior = prevOverscroll.body;
       body.style.position = prev.position;
       body.style.top = prev.top;
       body.style.left = prev.left;
@@ -542,8 +550,13 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   return (
     <div className="fixed inset-0 z-[70]" data-testid="assistant-overlay">
       {/* Backdrop — tap to dismiss; touch-action none so swipes here can't
-          scroll the app behind the sheet */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" style={{ touchAction: "none" }} onClick={onClose} />
+          scroll the app behind the sheet. Bleeds past the viewport so an iOS
+          rubber-band bounce never exposes bare page behind it. */}
+      <div className="absolute inset-x-0 -bottom-40 -top-40 bg-black/50 backdrop-blur-[2px]" style={{ touchAction: "none" }} onClick={onClose} />
+      {/* Bleed guard — a bounce lifts the whole view, including fixed
+          elements; this dark strip sits just below the viewport so what
+          slides up from under the sheet is sheet-colored, never white. */}
+      <div className="absolute inset-x-0 -bottom-40 h-40 bg-slate-950" aria-hidden="true" />
 
       {/* Sheet */}
       <div
