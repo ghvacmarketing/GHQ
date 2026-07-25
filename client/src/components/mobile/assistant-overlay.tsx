@@ -124,6 +124,129 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
     }
   };
 
+  // ChatGPT-style panel gesture: swipe right anywhere on the chat to drag the
+  // panel in (the chat page slides over with your finger), swipe left on the
+  // panel or scrim to push it back. Direction-locked so vertical scrolling in
+  // the message list is untouched.
+  const panelRef = useRef<HTMLElement>(null);
+  const mainTopRef = useRef<HTMLDivElement>(null);
+  const mainBottomRef = useRef<HTMLDivElement>(null);
+  const scrimRef = useRef<HTMLDivElement>(null);
+  const hDragRef = useRef<{ x: number; y: number; locked: boolean; opening: boolean; p: number; lastX: number; lastT: number; vx: number } | null>(null);
+  const suppressClickRef = useRef(false);
+
+  const applyPanelProgress = (p: number, animate: boolean) => {
+    const w = panelRef.current?.offsetWidth || 300;
+    const move = animate ? "transform 0.28s cubic-bezier(0.32, 0.72, 0.35, 1)" : "none";
+    if (panelRef.current) {
+      panelRef.current.style.transition = move;
+      panelRef.current.style.transform = `translateX(${(p - 1) * w}px)`;
+    }
+    for (const el of [mainTopRef.current, mainBottomRef.current]) {
+      if (!el) continue;
+      el.style.transition = move;
+      el.style.transform = `translateX(${p * w}px)`;
+    }
+    if (scrimRef.current) {
+      scrimRef.current.style.transition = animate ? "opacity 0.28s ease-out" : "none";
+      scrimRef.current.style.opacity = String(p);
+    }
+  };
+
+  const clearPanelDragStyles = () => {
+    for (const el of [panelRef.current, mainTopRef.current, mainBottomRef.current, scrimRef.current]) {
+      if (!el) continue;
+      el.style.transition = "";
+      el.style.transform = "";
+      el.style.opacity = "";
+    }
+  };
+
+  const onHStart = (e: React.PointerEvent, opening: boolean) => {
+    if ((e.target as HTMLElement).closest("[data-vdrag], textarea, input")) return;
+    hDragRef.current = { x: e.clientX, y: e.clientY, locked: false, opening, p: opening ? 0 : 1, lastX: e.clientX, lastT: performance.now(), vx: 0 };
+  };
+  const onHMove = (e: React.PointerEvent) => {
+    const st = hDragRef.current;
+    if (!st) return;
+    const dx = e.clientX - st.x;
+    const dy = e.clientY - st.y;
+    if (!st.locked) {
+      // Wait until the gesture is clearly horizontal; bail if it heads the
+      // wrong way so taps and vertical scrolls stay untouched.
+      if (Math.abs(dx) < 12 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+      if (st.opening ? dx < 0 : dx > 0) {
+        hDragRef.current = null;
+        return;
+      }
+      st.locked = true;
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      } catch {
+        // capture can fail if the pointer is already gone — drag still works
+      }
+    }
+    const w = panelRef.current?.offsetWidth || 300;
+    const p = Math.min(1, Math.max(0, (st.opening ? dx : w + dx) / w));
+    const now = performance.now();
+    st.vx = (e.clientX - st.lastX) / Math.max(1, now - st.lastT);
+    st.lastX = e.clientX;
+    st.lastT = now;
+    st.p = p;
+    applyPanelProgress(p, false);
+  };
+  const onHEnd = () => {
+    const st = hDragRef.current;
+    hDragRef.current = null;
+    if (!st?.locked) return;
+    // The finger moved — the release must not also count as a tap on
+    // whatever row it happens to land on.
+    suppressClickRef.current = true;
+    window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 200);
+    const target = Math.abs(st.vx) > 0.35 ? st.vx > 0 : st.p > 0.5;
+    applyPanelProgress(target ? 1 : 0, true);
+    setPanelOpen(target);
+    window.setTimeout(clearPanelDragStyles, 340);
+  };
+  const guardClick = (e: React.MouseEvent) => {
+    if (!suppressClickRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  // Freeze the app behind the sheet — otherwise scroll gestures inside Gibbs
+  // chain through and drag the page underneath (iOS PWAs especially).
+  useEffect(() => {
+    if (!open) return;
+    const body = document.body;
+    const y = window.scrollY;
+    const prev = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      overflow: body.style.overflow,
+    };
+    body.style.position = "fixed";
+    body.style.top = `-${y}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+    return () => {
+      body.style.position = prev.position;
+      body.style.top = prev.top;
+      body.style.left = prev.left;
+      body.style.right = prev.right;
+      body.style.width = prev.width;
+      body.style.overflow = prev.overflow;
+      window.scrollTo(0, y);
+    };
+  }, [open]);
+
   const { data: currentUser } = useQuery<CrmUser | null>({
     queryKey: ["/api/crm/auth/me"],
     queryFn: async () => {
@@ -413,8 +536,9 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
 
   return (
     <div className="fixed inset-0 z-[70]" data-testid="assistant-overlay">
-      {/* Backdrop — tap to dismiss */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
+      {/* Backdrop — tap to dismiss; touch-action none so swipes here can't
+          scroll the app behind the sheet */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" style={{ touchAction: "none" }} onClick={onClose} />
 
       {/* Sheet */}
       <div
@@ -422,6 +546,14 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         className="absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-2xl bg-slate-950 shadow-[0_-12px_48px_rgba(0,0,0,0.5)] animate-in slide-in-from-bottom duration-300"
         style={{ top: "calc(44px + env(safe-area-inset-top))" }}
       >
+        {/* Top strip — slides right with the chat when the panel pulls in */}
+        <div
+          ref={mainTopRef}
+          className={cn(
+            "shrink-0 transition-transform duration-300 ease-out",
+            panelOpen ? "translate-x-[min(86%,340px)]" : "translate-x-0",
+          )}
+        >
         {/* Drag handle — swipe down anywhere on the handle/header to dismiss */}
         <div
           className="flex shrink-0 justify-center pt-2"
@@ -430,6 +562,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           onPointerMove={onDragMove}
           onPointerUp={onDragEnd}
           onPointerCancel={onDragEnd}
+          data-vdrag=""
           data-testid="assistant-drag-handle"
         >
           <span className="h-1 w-10 rounded-full bg-slate-700" />
@@ -442,15 +575,16 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           onPointerMove={onDragMove}
           onPointerUp={onDragEnd}
           onPointerCancel={onDragEnd}
+          data-vdrag=""
         >
           <div className="flex items-center gap-2.5">
             <button
               onClick={() => setPanelOpen(true)}
-              className="flex h-8 w-8 items-center justify-center rounded-[4px] border border-slate-800 text-slate-400 transition-colors active:bg-slate-800"
+              className="flex h-8 w-8 items-center justify-center text-slate-400 transition-colors active:text-slate-200"
               aria-label="History and spaces"
               data-testid="assistant-panel-open"
             >
-              <PanelLeftOpen className="h-4 w-4" />
+              <PanelLeftOpen className="h-5 w-5" />
             </button>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">GHQ Intelligence</p>
@@ -478,22 +612,39 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
             </button>
           </div>
         </div>
+        </div>
 
-        {/* Side panel — history + Spaces, slides in from the left like the
-            desktop sidebar. Scrim closes it; the sheet's rounded corners clip
-            it cleanly. */}
+        {/* Side panel — history + Spaces. Feels like its own page: swipe
+            right on the chat to pull it in, swipe left (or tap the dimmed
+            chat) to push it away; the chat slides over in step. */}
         <div
+          ref={scrimRef}
           className={cn(
             "absolute inset-0 z-20 bg-black/50 transition-opacity duration-300",
             panelOpen ? "opacity-100" : "pointer-events-none opacity-0",
           )}
-          onClick={() => setPanelOpen(false)}
+          style={{ touchAction: "none" }}
+          onClick={() => {
+            if (suppressClickRef.current) return;
+            setPanelOpen(false);
+          }}
+          onPointerDown={(e) => onHStart(e, false)}
+          onPointerMove={onHMove}
+          onPointerUp={onHEnd}
+          onPointerCancel={onHEnd}
         />
         <aside
+          ref={panelRef}
           className={cn(
-            "absolute inset-y-0 left-0 z-30 flex w-72 max-w-[85%] flex-col border-r border-slate-800 bg-slate-950 shadow-[8px_0_32px_rgba(0,0,0,0.5)] transition-transform duration-300 ease-out",
+            "absolute inset-y-0 left-0 z-30 flex w-[86%] max-w-[340px] flex-col border-r border-slate-800 bg-slate-950 shadow-[8px_0_32px_rgba(0,0,0,0.5)] transition-transform duration-300 ease-out",
             panelOpen ? "translate-x-0" : "-translate-x-full",
           )}
+          style={{ touchAction: "pan-y" }}
+          onPointerDown={(e) => onHStart(e, false)}
+          onPointerMove={onHMove}
+          onPointerUp={onHEnd}
+          onPointerCancel={onHEnd}
+          onClickCapture={guardClick}
           data-testid="assistant-panel"
         >
           <div className="flex shrink-0 items-center justify-between border-b border-slate-800 px-4 py-3">
@@ -503,11 +654,11 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
             </div>
             <button
               onClick={() => setPanelOpen(false)}
-              className="flex h-8 w-8 items-center justify-center rounded-[4px] border border-slate-800 text-slate-400 transition-colors active:bg-slate-800"
+              className="flex h-8 w-8 items-center justify-center text-slate-400 transition-colors active:text-slate-200"
               aria-label="Close panel"
               data-testid="assistant-panel-close"
             >
-              <PanelLeftClose className="h-4 w-4" />
+              <PanelLeftClose className="h-5 w-5" />
             </button>
           </div>
 
@@ -596,7 +747,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
               <Plus className="h-3.5 w-3.5" />
             </button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3">
             {groupedConversations.length === 0 ? (
               <p className="px-2 py-6 text-center text-xs text-slate-600">
                 {activeSpace
@@ -643,8 +794,23 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           </div>
         </aside>
 
+        {/* Chat page — slides right with the panel; swipe right anywhere on
+            it to pull the panel in */}
+        <div
+          ref={mainBottomRef}
+          className={cn(
+            "flex min-h-0 flex-1 flex-col transition-transform duration-300 ease-out",
+            panelOpen ? "translate-x-[min(86%,340px)]" : "translate-x-0",
+          )}
+          style={{ touchAction: "pan-y" }}
+          onPointerDown={(e) => onHStart(e, true)}
+          onPointerMove={onHMove}
+          onPointerUp={onHEnd}
+          onPointerCancel={onHEnd}
+          onClickCapture={guardClick}
+        >
         {/* Conversation */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
           {messages.length === 0 && !pending ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
               <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor" className="h-10 w-10 rotate-45 text-[#711419]">
@@ -920,6 +1086,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
               )}
             </button>
           </div>
+        </div>
         </div>
       </div>
     </div>
