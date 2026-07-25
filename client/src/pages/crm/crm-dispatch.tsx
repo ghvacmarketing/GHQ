@@ -517,14 +517,71 @@ function DraggableQueueCard({ workOrder, onClick, onOpenQuickStatus, view = "lis
 
   const statusIcon = statusIconMap[workOrder.status] || statusIconMap.scheduled;
 
+  const statusButton = (
+    <button
+      className={`${iconColor} w-8 h-8 flex-shrink-0 rounded-md flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity`}
+      title={`Status: ${statusLabels[workOrder.status] || workOrder.status} — Click to change`}
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onOpenQuickStatus?.(workOrder.id, e);
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
+      data-testid={`status-icon-${workOrder.id}`}
+    >
+      {statusIcon}
+    </button>
+  );
+
+  if (view === "cards") {
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={`flex flex-col gap-2 rounded-lg border bg-white p-3 shadow-sm transition-all hover:border-slate-300 hover:shadow-md ${
+          needsSchedulingNow ? "border-red-200 bg-red-50" : "border-slate-200"
+        } ${isDragging ? "z-50 shadow-lg cursor-grabbing ring-2 ring-[#711419]/50" : "cursor-grab"}`}
+        data-testid={`queue-card-${workOrder.id}`}
+        {...attributes}
+        {...listeners}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick?.(workOrder.id);
+        }}
+      >
+        <div className="flex items-center gap-2">
+          {statusButton}
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">{workOrder.customerName}</span>
+          {workOrder.priority && workOrder.priority !== "normal" && (
+            <span className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${priorityStyle.bg} ${priorityStyle.text}`}>
+              {workOrder.priority.toUpperCase()}
+            </span>
+          )}
+        </div>
+        {workOrder.title && (
+          <p className="text-xs leading-snug text-slate-600 line-clamp-2">{workOrder.title}</p>
+        )}
+        <div className="mt-auto flex items-end justify-between gap-2">
+          {workOrder.propertyAddress ? (
+            <span className="flex min-w-0 items-center gap-1 text-xs text-slate-400">
+              <MapPin className="h-3 w-3 flex-shrink-0" />
+              <span className="truncate">{workOrder.propertyAddress}</span>
+            </span>
+          ) : <span />}
+          <StatusDot pill={`${visitTypeColor.bg} ${visitTypeColor.text} border-0 text-[10px] flex-shrink-0`}>
+            {visitTypeLabels[workOrder.visitType || "SERVICE"] || workOrder.visitType}
+          </StatusDot>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-2 px-2 py-2 transition-colors ${
-        view === "cards"
-          ? `rounded-[4px] border border-slate-200 bg-white hover:border-slate-400 ${needsSchedulingNow ? 'border-red-200 bg-red-50' : ''}`
-          : `border-b border-slate-100 hover:bg-slate-50 ${needsSchedulingNow ? 'bg-red-50 border-b-red-200' : ''}`
+      className={`flex items-center gap-2 px-2 py-2 transition-colors border-b border-slate-100 hover:bg-slate-50 ${
+        needsSchedulingNow ? 'bg-red-50 border-b-red-200' : ''
       } ${isDragging ? 'z-50 shadow-lg cursor-grabbing bg-white rounded-md ring-2 ring-[#711419]/50' : 'cursor-grab'}`}
       data-testid={`queue-card-${workOrder.id}`}
       {...attributes}
@@ -534,20 +591,7 @@ function DraggableQueueCard({ workOrder, onClick, onOpenQuickStatus, view = "lis
         onClick?.(workOrder.id);
       }}
     >
-      {/* Status Icon Button - Field Edge style */}
-      <button
-        className={`${iconColor} w-8 h-8 flex-shrink-0 rounded-md flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity`}
-        title={`Status: ${statusLabels[workOrder.status] || workOrder.status} — Click to change`}
-        onClick={(e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          onOpenQuickStatus?.(workOrder.id, e);
-        }}
-        onPointerDown={(e) => e.stopPropagation()}
-        data-testid={`status-icon-${workOrder.id}`}
-      >
-        {statusIcon}
-      </button>
+      {statusButton}
       <div className="flex flex-col min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="font-medium text-sm text-slate-900 truncate">{workOrder.customerName}</span>
