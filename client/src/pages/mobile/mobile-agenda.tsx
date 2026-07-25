@@ -350,6 +350,7 @@ function ProfileHeader({ user }: { user: CrmUser }) {
       <div>
         <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100" data-testid="text-greeting">
           {greetingForHour(now.getHours())}
+          {user.name ? `, ${user.name.trim().split(/\s+/)[0]}` : ""}
         </h2>
         <p className="text-sm text-slate-500 dark:text-slate-400">{format(now, "EEEE, MMM d")}</p>
       </div>

@@ -51,7 +51,7 @@ import { storage } from "./storage";
 import { insertQuoteSchema, insertPartSchema, insertTechnicianSchema, insertProcessSchema, insertAnnouncementSchema, insertPhoneWhitelistSchema, insertLeadSchema, announcements, categories, crmCustomers, crmProperties, crmJobs, crmJobAssignments, crmJobStatusEvents, crmJobNotes, crmUsers, crmCustomerNotes, crmAuditLog, insertCrmCustomerSchema, insertCrmJobSchema, crmAccounts, crmSites, crmContacts, residentialProfiles, propertyManagerProfiles, commercialProfiles, insertCrmAccountSchema, insertCrmSiteSchema, insertCrmContactSchema, insertResidentialProfileSchema, insertPropertyManagerProfileSchema, insertCommercialProfileSchema, type AccountType, type AccountStatus, type ContactRole, customers, crmWorkOrders, insertCrmWorkOrderSchema, type CrmWorkOrder, type InsertCrmWorkOrder, workOrderSubtypes, insertWorkOrderSubtypeSchema, crmInvoices, crmInvoiceLineItems, insertCrmInvoiceSchema, insertCrmInvoiceLineItemSchema, type CrmInvoice, type CrmInvoiceLineItem, type InsertCrmInvoice, type InsertCrmInvoiceLineItem, crmQuotes, crmQuoteLineItems, insertCrmQuoteSchema, insertCrmQuoteLineItemSchema, type CrmQuote, type InsertCrmQuote, type CrmQuoteLineItem, type InsertCrmQuoteLineItem, crmAgreements, insertCrmAgreementSchema, type CrmAgreement, type InsertCrmAgreement, crmProjects, insertCrmProjectSchema, type CrmProject, type InsertCrmProject, projectStatusEnum, quotes, leads, projectActivities, insertProjectActivitySchema, type ProjectActivity, type InsertProjectActivity, projectActivityTypeEnum, noteMetadataSchema, photoMetadataSchema, fileMetadataSchema, financialMetadataSchema, approvalMetadataSchema, type ActivityAttachment, crmItems, insertCrmItemSchema, type CrmItem, type InsertCrmItem, proposalSessions, insertProposalSessionSchema, type ProposalSession, type InsertProposalSession, quoteEmailLogs, type QuoteEmailLog, invoiceEmailLogs, type InvoiceEmailLog, crmFollowUps, insertCrmFollowUpSchema, type CrmFollowUp, type InsertCrmFollowUp, salesStageEnum, interestLevelEnum, crmNotifications, crmComments, crmCommentMentions, insertCrmNotificationSchema, insertCrmCommentSchema, insertCrmCommentMentionSchema, type CrmNotification, type InsertCrmNotification, type CrmComment, type InsertCrmComment, type CrmCommentMention, type InsertCrmCommentMention, maintenanceRegions, maintenanceVisits, type MaintenanceRegion, type MaintenanceVisit, maintenanceAgreementTasks, maintenanceTaskSchedules, maintenanceTaskEquipment, maintenanceTaskParts, insertMaintenanceAgreementTaskSchema, insertMaintenanceTaskScheduleSchema, insertMaintenanceTaskEquipmentSchema, insertMaintenanceTaskPartSchema, serviceCallChecklists, checklistQuestions, checklistPhotoSteps, insertChecklistPhotoStepSchema, workOrderChecklistResponses, insertServiceCallChecklistSchema, insertChecklistQuestionSchema, insertWorkOrderChecklistResponseSchema, type ServiceCallChecklist, type ChecklistQuestion, type WorkOrderChecklistResponse, type InsertServiceCallChecklist, type InsertChecklistQuestion, type InsertWorkOrderChecklistResponse, serviceCallTypeEnum, monthlyGoals, insertMonthlyGoalSchema, type MonthlyGoal, type InsertMonthlyGoal, customAgreementTypes, insertCustomAgreementTypeSchema, type CustomAgreementType, type InsertCustomAgreementType, workSubtypeByVisitType, attachments, customerPortalAccounts, customerPortalLoginTokens, customerPortalSessions, insertCrmMessagingConversationSchema, insertCrmMessagingMessageSchema, crmMessagingMessages, crmMessagingConversations, quickbooksClasses, quickbooksAccounts, quickbooksInvoiceSync, appSettings, DEFAULT_FINANCING_LINK, bouncieVehicles, insertBouncieVehicleSchema, type BouncieVehicle, type InsertBouncieVehicle, marketingCampaigns, pricebookPackages, insertPricebookPackageSchema, type PricebookPackage, type InsertPricebookPackage, crawlspaceTiers, insertCrawlspaceTierSchema, type CrawlspaceTier, packagePriceAdjustments, insertPackagePriceAdjustmentSchema, type PackagePriceAdjustment, crmProjectTasks, insertCrmProjectTaskSchema, type CrmProjectTask, type InsertCrmProjectTask, materialsCatalog, insertMaterialsCatalogSchema, type MaterialsCatalogItem, type InsertMaterialsCatalog, projectLaborEntries, insertProjectLaborEntrySchema, type ProjectLaborEntry, type InsertProjectLaborEntry, crmLeads, crmLeadTypes, insertCrmLeadSchema, insertCrmLeadTypeSchema, type CrmLead, type CrmLeadType, type InsertCrmLead, type InsertCrmLeadType, crmLeadTempOptions, crmLeadDriverOptions, insertCrmLeadTempOptionSchema, insertCrmLeadDriverOptionSchema, type CrmLeadTempOption, type CrmLeadDriverOption, type InsertCrmLeadTempOption, type InsertCrmLeadDriverOption, tasks, taskTypes, taskActivity, insertTaskSchema, insertTaskTypeSchema, insertTaskActivitySchema, type Task, type TaskType, type TaskActivity, type InsertTask, type InsertTaskType, type InsertTaskActivity, crmTaggedComments, crmTaggedCommentRecipients, salesbookBookmarks, insertSalesbookBookmarkSchema, customerFiles, insertCustomerFileSchema, type CustomerFile, rebateCases, insertRebateCaseSchema, type RebateCase, type InsertRebateCase, insertRebateCaseDocumentSchema, insertRebateCaseScopeChecklistSchema, rebateProgramTypeEnum, rebateApplicationStatusEnum, rebateWorkflowStepStatusEnum, rebateDocumentCategoryEnum } from "@shared/schema";
 import * as xlsx from "xlsx";
 import { goveeSensors, goveeSensorReadings, goveeSensorAlerts, type GoveeSensor } from "@shared/schema";
-import { dispatchBlackouts } from "@shared/schema";
+import { dispatchBlackouts, crmTimeEntries } from "@shared/schema";
 import { automationCampaigns, insertAutomationCampaignSchema } from "@shared/schema";
 import { crmCampaigns, crmCampaignEnrollments, crmCampaignSends, insertCrmCampaignSchema } from "@shared/schema";
 import { runAutomationTrigger, fireAutomationForCustomer, fireAutomationForLead } from "./services/automationEngine";
@@ -26256,8 +26256,10 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
         return res.status(400).json({ message: "Already clocked in" });
       }
 
-      const { workOrderId } = req.body || {};
-      const entry = await storage.clockIn(user.id, workOrderId, "mobile");
+      const { workOrderId, category } = req.body || {};
+      const TIME_CATEGORIES = ["job", "drive", "shop", "training", "meeting", "break", "other"];
+      const cleanCategory = TIME_CATEGORIES.includes(category) ? category : "job";
+      const entry = await storage.clockIn(user.id, workOrderId, "mobile", cleanCategory);
       return res.status(201).json(entry);
     } catch (error) {
       console.error("Error clocking in:", error);
@@ -26288,6 +26290,80 @@ Keep it under 100 words. No bullet points - just a flowing summary.`
     } catch (error) {
       console.error("Error clocking out:", error);
       return res.status(500).json({ message: "Failed to clock out" });
+    }
+  });
+
+  // POST /api/mobile/time/manual - Add a finished time block by hand
+  // (category + start/end), for time that wasn't captured with the clock.
+  app.post("/api/mobile/time/manual", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Not authenticated" });
+
+      const { category, clockInAt, clockOutAt, notes } = req.body || {};
+      const TIME_CATEGORIES = ["job", "drive", "shop", "training", "meeting", "break", "other"];
+      const cleanCategory = TIME_CATEGORIES.includes(category) ? category : "other";
+      const start = new Date(clockInAt);
+      const end = new Date(clockOutAt);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ message: "Start and end times are required" });
+      }
+      if (end <= start) {
+        return res.status(400).json({ message: "End time must be after the start time" });
+      }
+      if (end.getTime() - start.getTime() > 24 * 60 * 60 * 1000) {
+        return res.status(400).json({ message: "A single entry can't be longer than 24 hours" });
+      }
+      const [entry] = await db.insert(crmTimeEntries).values({
+        technicianId: user.id,
+        clockInAt: start,
+        clockOutAt: end,
+        durationMinutes: Math.round((end.getTime() - start.getTime()) / 60000),
+        category: cleanCategory,
+        notes: typeof notes === "string" && notes.trim() ? notes.trim() : null,
+        source: "manual" as any,
+        createdById: user.id,
+      }).returning();
+      return res.status(201).json(entry);
+    } catch (error) {
+      console.error("Error adding manual time entry:", error);
+      return res.status(500).json({ message: "Failed to add time entry" });
+    }
+  });
+
+  // GET /api/mobile/time/timesheet?from=yyyy-mm-dd&to=yyyy-mm-dd - Entries in
+  // a range for the logged-in tech, plus per-category and total minutes.
+  app.get("/api/mobile/time/timesheet", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Not authenticated" });
+
+      const from = String(req.query.from || "");
+      const to = String(req.query.to || "");
+      const dateOk = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
+      const startDate = dateOk(from) ? new Date(`${from}T00:00:00`) : new Date(new Date().setDate(new Date().getDate() - 7));
+      const endDate = dateOk(to) ? new Date(`${to}T23:59:59.999`) : new Date();
+
+      const entries = await storage.getTimeEntries({
+        technicianId: user.id,
+        startDate,
+        endDate,
+      });
+
+      const minutesOf = (e: typeof entries[number]) =>
+        e.durationMinutes ?? (e.clockOutAt ? Math.round((new Date(e.clockOutAt).getTime() - new Date(e.clockInAt).getTime()) / 60000) : 0);
+      const byCategory: Record<string, number> = {};
+      let totalMinutes = 0;
+      for (const e of entries) {
+        const m = minutesOf(e);
+        totalMinutes += m;
+        const cat = (e as any).category || "job";
+        byCategory[cat] = (byCategory[cat] || 0) + m;
+      }
+      return res.json({ entries, totalMinutes, byCategory });
+    } catch (error) {
+      console.error("Error fetching timesheet:", error);
+      return res.status(500).json({ message: "Failed to fetch timesheet" });
     }
   });
 

@@ -2325,7 +2325,7 @@ export class DatabaseStorage implements IStorage {
     return entry || null;
   }
 
-  async clockIn(technicianId: string, workOrderId?: string, source?: string): Promise<CrmTimeEntry> {
+  async clockIn(technicianId: string, workOrderId?: string, source?: string, category?: string): Promise<CrmTimeEntry> {
     const now = new Date();
     const [entry] = await db.insert(crmTimeEntries)
       .values({
@@ -2333,6 +2333,7 @@ export class DatabaseStorage implements IStorage {
         workOrderId: workOrderId || null,
         clockInAt: now,
         source: (source as any) || "mobile",
+        category: category || "job",
         createdById: technicianId,
       })
       .returning();

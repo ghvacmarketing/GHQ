@@ -3088,6 +3088,8 @@ export const crmTimeEntries = pgTable("crm_time_entries", {
   clockOutAt: timestamp("clock_out_at"),
   durationMinutes: integer("duration_minutes"),
   notes: text("notes"),
+  // What the time was for — "job" | "drive" | "shop" | "training" | "meeting" | "break" | "other"
+  category: text("category").default("job"),
   source: text("source").$type<TimeEntrySource>().default("mobile"),
   createdById: varchar("created_by_id").references(() => crmUsers.id),
   createdAt: timestamp("created_at").defaultNow(),
