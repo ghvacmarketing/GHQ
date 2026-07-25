@@ -2258,6 +2258,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Execute an AI-proposed action AFTER explicit user approval. The model can
+  // only propose; nothing runs until a signed-in user clicks Approve, and only
+  // these whitelisted action types exist. Everything is re-validated with zod
+  // here (the model's output is never trusted), runs under the approving
+  // user's own session/permissions, and lands in the CRM audit log.
+  app.post("/api/crm/ai/execute-action", requireCrmSalesOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const actionSchema = z.discriminatedUnion("type", [
+        z.object({
+          type: z.literal("create_task"),
+          params: z.object({
+            title: z.string().trim().min(1).max(200),
+            description: z.string().max(2000).optional(),
+            dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+          }).strict(),
+        }),
+        z.object({
+          type: z.literal("create_work_order"),
+          params: z.object({
+            customerName: z.string().trim().min(1).max(200),
+            title: z.string().trim().min(1).max(200),
+            description: z.string().trim().min(1).max(2000),
+            visitType: z.enum(["SERVICE", "MAINTENANCE", "INSTALL", "SALES"]).optional(),
+            scheduledStart: z.string().max(40).optional(),
+          }).strict(),
+        }),
+      ]);
+      const parsedAction = actionSchema.safeParse(req.body);
+      if (!parsedAction.success) {
+        return res.status(400).json({ message: "That action isn't allowed or is missing required details." });
+      }
+      const action = parsedAction.data;
+      console.log(`[AI Action] ${user.name} (${user.id}) approved ${action.type}:`, JSON.stringify(action.params));
+
+      if (action.type === "create_task") {
+        const taskParsed = insertTaskSchema.safeParse({
+          title: action.params.title,
+          description: action.params.description || null,
+          dueAt: action.params.dueDate ? `${action.params.dueDate}T12:00:00` : null,
+          createdByUserId: user.id,
+          assignedToUserId: user.id,
+        });
+        if (!taskParsed.success) {
+          return res.status(400).json({ message: "The proposed task details didn't validate." });
+        }
+        const task = await storage.createTask(taskParsed.data);
+        await storage.createTaskActivity({
+          taskId: task.id,
+          userId: user.id,
+          action: "created",
+          afterJson: JSON.stringify({ ...task, source: "ai_approved" }),
+        });
+        await logCrmAudit(user.id, "ai_action.create_task", "task", task.id, { params: action.params }, req.ip);
+        return res.status(201).json({ ok: true, entity: "task", id: task.id, label: task.title, url: "/crm/tasks/board" });
+      }
+
+      // create_work_order — resolve the customer by name, use their first property
+      const needle = action.params.customerName.trim().toLowerCase();
+      const matches = await db
+        .select({ id: crmCustomers.id, name: crmCustomers.name })
+        .from(crmCustomers)
+        .where(sql`LOWER(${crmCustomers.name}) LIKE ${"%" + needle + "%"}`)
+        .limit(5);
+      let customer = matches.length === 1 ? matches[0] : matches.find((m) => m.name.toLowerCase() === needle);
+      if (!customer) {
+        if (matches.length === 0) {
+          return res.status(422).json({ message: `No customer found matching "${action.params.customerName}".` });
+        }
+        return res.status(422).json({
+          message: `Multiple customers match "${action.params.customerName}": ${matches.map((m) => m.name).join(", ")}. Ask again with the exact name.`,
+        });
+      }
+      const [property] = await db.select().from(crmProperties).where(eq(crmProperties.customerId, customer.id)).limit(1);
+      if (!property) {
+        return res.status(422).json({ message: `${customer.name} has no property on file — add one on their customer page first.` });
+      }
+      const scheduledStart = action.params.scheduledStart ? new Date(action.params.scheduledStart) : null;
+      if (scheduledStart && isNaN(scheduledStart.getTime())) {
+        return res.status(400).json({ message: "The proposed schedule time isn't a valid date." });
+      }
+
+      const existingWorkOrders = await storage.getWorkOrdersByCustomerId(customer.id);
+      const checklistMatches = await checklistsForSubtype(action.params.visitType || "SERVICE", undefined as any);
+      const workOrder = await storage.createWorkOrder({
+        customerId: customer.id,
+        propertyId: property.id,
+        title: action.params.title,
+        description: action.params.description,
+        visitType: (action.params.visitType || "SERVICE") as any,
+        status: scheduledStart ? "scheduled" : "new",
+        scheduledStart: scheduledStart || undefined,
+        workOrderNumber: existingWorkOrders.length + 1,
+        assignedChecklistId: checklistMatches[0]?.id ?? null,
+      } as any);
+      await logCrmAudit(user.id, "ai_action.create_work_order", "work_order", workOrder.id, { params: action.params, customerId: customer.id }, req.ip);
+      return res.status(201).json({ ok: true, entity: "work_order", id: workOrder.id, label: workOrder.title, url: `/crm/work-orders/${workOrder.id}` });
+    } catch (error: any) {
+      console.error("Error executing AI action:", error);
+      res.status(500).json({ message: error?.message || "Couldn't complete the action." });
+    }
+  });
+
   // Optimized initial data endpoint - reduces 3 API calls to 1
   app.get("/api/initial-data", async (req, res) => {
     try {

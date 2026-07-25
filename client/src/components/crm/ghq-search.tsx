@@ -26,6 +26,7 @@ import {
   Wrench,
   X,
   MessageSquarePlus,
+  ShieldCheck,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -165,16 +166,30 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
+// An action the AI proposed. NOTHING runs until the user clicks Approve —
+// the server re-validates every proposal against a strict whitelist and
+// executes under the approving user's own session.
+type ProposedAction = {
+  type: "create_task" | "create_work_order";
+  summary: string;
+  params: Record<string, unknown>;
+};
+
 interface HelpResponse {
   answer: string;
   relatedTopics: string[];
   confidence: "high" | "medium" | "low";
+  proposedAction?: ProposedAction | null;
 }
 
 type ConversationMessage = {
   role: "user" | "assistant";
   content: string;
   relatedTopics?: string[];
+  proposedAction?: ProposedAction | null;
+  actionState?: "pending" | "executing" | "done" | "dismissed" | "error";
+  actionResult?: { label: string; url: string } | null;
+  actionError?: string | null;
 };
 
 /** The assistant answers in plain prose, but strip any markdown that slips
@@ -222,6 +237,8 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
         role: "assistant",
         content: data.answer,
         relatedTopics: data.relatedTopics,
+        proposedAction: data.proposedAction || null,
+        actionState: data.proposedAction ? "pending" : undefined,
       }]);
     },
     onError: (e: any) => {
@@ -288,6 +305,36 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
   };
 
   const handleAskHelp = () => askQuestion(searchQuery);
+
+  // Execute an AI-proposed action — only ever called from the Approve button.
+  const runProposedAction = (index: number) => {
+    const msg = conversationMessages[index];
+    if (!msg?.proposedAction || msg.actionState === "executing" || msg.actionState === "done") return;
+    setConversationMessages(prev => prev.map((m, j) => (j === index ? { ...m, actionState: "executing" as const, actionError: null } : m)));
+    apiRequest("POST", "/api/crm/ai/execute-action", {
+      type: msg.proposedAction.type,
+      params: msg.proposedAction.params,
+    })
+      .then(async (r) => {
+        const data = await r.json();
+        setConversationMessages(prev => prev.map((m, j) => (
+          j === index
+            ? { ...m, actionState: "done" as const, actionResult: { label: data.label || "Created", url: data.url || "/crm/dashboard" } }
+            : m
+        )));
+        queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/work-orders"] });
+      })
+      .catch((e: any) => {
+        setConversationMessages(prev => prev.map((m, j) => (
+          j === index ? { ...m, actionState: "error" as const, actionError: e?.message || "Couldn't complete the action." } : m
+        )));
+      });
+  };
+
+  const dismissProposedAction = (index: number) => {
+    setConversationMessages(prev => prev.map((m, j) => (j === index ? { ...m, actionState: "dismissed" as const } : m)));
+  };
 
   const handleNewConversation = () => {
     setConversationMessages([]);
@@ -502,6 +549,66 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
                 <div className="bg-muted rounded-lg rounded-tl-sm p-4 text-foreground text-sm leading-relaxed whitespace-pre-wrap">
                   {cleanAnswer(msg.content)}
                 </div>
+                {msg.proposedAction && msg.actionState !== "dismissed" && (
+                  <div className="rounded-[4px] border border-[#711419]/25 bg-[#711419]/[0.03] p-3" data-testid={`ai-action-card-${i}`}>
+                    <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#711419]">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      {msg.proposedAction.type === "create_task" ? "New task" : "New work order"} — needs your approval
+                    </p>
+                    <p className="mt-1.5 text-sm text-slate-800">{msg.proposedAction.summary}</p>
+                    <div className="mt-1.5 space-y-0.5">
+                      {Object.entries(msg.proposedAction.params).map(([k, v]) => (
+                        <p key={k} className="text-xs text-slate-500">
+                          <span className="font-semibold capitalize text-slate-600">{k.replace(/([A-Z])/g, " $1").toLowerCase()}:</span>{" "}
+                          {String(v)}
+                        </p>
+                      ))}
+                    </div>
+                    {(msg.actionState === "pending" || msg.actionState === "error") && (
+                      <>
+                        {msg.actionState === "error" && (
+                          <p className="mt-2 text-xs font-medium text-red-600">{msg.actionError}</p>
+                        )}
+                        <div className="mt-2.5 flex gap-2">
+                          <button
+                            onClick={() => runProposedAction(i)}
+                            className="rounded-[3px] bg-[#711419] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#8a1a1f]"
+                            data-testid={`ai-action-approve-${i}`}
+                          >
+                            {msg.actionState === "error" ? "Try again" : "Approve & run"}
+                          </button>
+                          <button
+                            onClick={() => dismissProposedAction(i)}
+                            className="rounded-[3px] border border-slate-300/70 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                            data-testid={`ai-action-dismiss-${i}`}
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </>
+                    )}
+                    {msg.actionState === "executing" && (
+                      <p className="mt-2.5 flex items-center gap-1.5 text-xs text-slate-500">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Running with your approval...
+                      </p>
+                    )}
+                    {msg.actionState === "done" && msg.actionResult && (
+                      <div className="mt-2.5 flex items-center gap-2 text-xs font-semibold text-emerald-700">
+                        <span>Done — {msg.actionResult.label}</span>
+                        <button
+                          onClick={() => {
+                            navigate(msg.actionResult!.url);
+                            setOpen(false);
+                          }}
+                          className="text-[#711419] hover:underline"
+                          data-testid={`ai-action-open-${i}`}
+                        >
+                          Open it
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {msg.relatedTopics && msg.relatedTopics.length > 0 && (
                   <div className="flex flex-wrap gap-2 pl-1">
                     {msg.relatedTopics.map((topic, j) => (

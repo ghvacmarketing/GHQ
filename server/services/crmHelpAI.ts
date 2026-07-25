@@ -1021,11 +1021,22 @@ The Settings page at /crm/settings contains these sub-sections:
 `;
 
 
+// An action the AI PROPOSES but can never execute itself. The client renders
+// an approval card; only an explicit user click on Approve sends it to
+// /api/crm/ai/execute-action, which re-validates against a strict whitelist
+// and runs under the approving user's session with an audit log.
+export interface ProposedAction {
+  type: "create_task" | "create_work_order";
+  summary: string;
+  params: Record<string, unknown>;
+}
+
 export interface CrmHelpResponse {
   answer: string;
   relatedTopics: string[];
   confidence: "high" | "medium" | "low";
   hasLiveData?: boolean;
+  proposedAction?: ProposedAction | null;
 }
 
 const helpCache = new Map<string, { result: CrmHelpResponse; timestamp: number; hasLiveData: boolean }>();
@@ -1075,10 +1086,17 @@ Voice and formatting — these matter as much as accuracy:
 
 CRITICAL ACCURACY RULE: Only describe features, settings pages, navigation paths, and URLs that are explicitly documented in the knowledge base above. If something is not listed there — especially settings pages, admin panels, or configuration screens — do NOT invent or assume it exists. Respond with: "I don't have specific information about that in this CRM — it may not exist or may not be documented." NEVER invent settings pages, URLs, configuration screens, or features that are not documented above. Pay special attention to the "FEATURES THAT DO NOT EXIST" section — if a user asks about one of those items, clearly state it does not exist in this system.
 
+PROPOSING ACTIONS (strict rules):
+You can PREPARE two kinds of actions for the user to approve, but you can NEVER execute anything yourself. Only include a proposedAction when the user EXPLICITLY asks you to create something ("create a task to...", "make a work order for..."). Never propose an action for informational questions. In your answer, say the action is prepared and waiting for their approval — never say it's done. If details are missing (like which customer), ask for them instead of proposing.
+Action types and their params:
+1. create_task — params: { "title": string (required), "description": string (optional), "dueDate": "YYYY-MM-DD" (optional) }
+2. create_work_order — params: { "customerName": string (required, the customer's name as it appears in LIVE DATA or as the user gave it), "title": string (required), "description": string (required), "visitType": "SERVICE" | "MAINTENANCE" | "INSTALL" | "SALES" (optional, default SERVICE), "scheduledStart": ISO datetime (optional) }
+
 Return JSON with:
 - answer: Your response as PLAIN conversational text (no markdown characters at all)
 - relatedTopics: Array of 1-3 short natural follow-up QUESTIONS the user might tap next (e.g. "How do renewals work?", "Who hasn't paid yet?") — phrased as questions, max ~6 words each
-- confidence: "high" if directly from data/knowledge base, "medium" if inferred, "low" if uncertain`;
+- confidence: "high" if directly from data/knowledge base, "medium" if inferred, "low" if uncertain
+- proposedAction: OMIT this field entirely unless the user explicitly asked you to create something. When present: { "type": "create_task" | "create_work_order", "summary": one plain sentence describing exactly what will be created, "params": {...} }`;
     
     // Build message array: system + prior turns + current question.
     // Claude is preferred when ANTHROPIC_API_KEY is set; OpenAI is the fallback.
@@ -1130,15 +1148,36 @@ Return JSON with:
       };
     }
     
+    // Whitelist-check any proposed action shape here too — anything that isn't
+    // exactly a known type with an object params is dropped on the floor.
+    let proposedAction: ProposedAction | null = null;
+    const pa = parsed.proposedAction;
+    if (
+      pa &&
+      typeof pa === "object" &&
+      (pa.type === "create_task" || pa.type === "create_work_order") &&
+      typeof pa.summary === "string" &&
+      pa.params &&
+      typeof pa.params === "object" &&
+      !Array.isArray(pa.params)
+    ) {
+      proposedAction = { type: pa.type, summary: pa.summary.slice(0, 300), params: pa.params };
+    }
+
     const result: CrmHelpResponse = {
       answer: parsed.answer || "I don't have information about that feature.",
       relatedTopics: Array.isArray(parsed.relatedTopics) ? parsed.relatedTopics.slice(0, 3) : [],
       confidence: parsed.confidence || "medium",
       hasLiveData: needsLiveData,
+      proposedAction,
     };
 
-    helpCache.set(normalizedQuestion, { result, timestamp: Date.now(), hasLiveData: needsLiveData });
-    
+    // Never cache responses that carry a proposed action — each ask should be
+    // freshly generated, and a stale cached proposal must not resurface.
+    if (!proposedAction) {
+      helpCache.set(normalizedQuestion, { result, timestamp: Date.now(), hasLiveData: needsLiveData });
+    }
+
     return result;
   } catch (error: any) {
     console.error("[CRM Help AI] Error:", error);
