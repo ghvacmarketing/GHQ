@@ -66,6 +66,84 @@ function formatSubtype(subtype: string | null | undefined): string {
   return subtype.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 }
 
+// One industrial job card used by every Jobs view (Today / Upcoming / History).
+// showDate adds the calendar date to the time line — used where the list spans
+// more than one day.
+function JobCard({
+  job, onOpen, showDate = false,
+}: { job: WorkOrderWithDetails; onOpen: () => void; showDate?: boolean }) {
+  const colors = statusColors[job.status] || statusColors.scheduled;
+  const jobTypeStyle = getJobTypeColor(job.visitType);
+  const address = job.property?.address1 || "";
+  const cityState = [job.property?.city, job.property?.state].filter(Boolean).join(", ");
+  const isCompleted = job.status === "completed";
+
+  return (
+    <Card
+      className={`cursor-pointer rounded-[4px] border border-slate-300/70 border-l-4 bg-white shadow-none transition-transform active:scale-[0.99] ${colors.stripe} ${isCompleted ? "opacity-75" : ""}`}
+      onClick={onOpen}
+      data-testid={`job-card-${job.id}`}
+    >
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0 mt-0.5">
+            {isCompleted ? (
+              <CheckCircle2 className="h-6 w-6 text-green-600" />
+            ) : (
+              <Circle className="h-6 w-6 text-slate-300" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className={`font-semibold ${isCompleted ? "text-slate-500 line-through" : "text-slate-900"}`}>
+                {job.customer?.name || "Unknown Customer"}
+              </h3>
+              <span className={`px-2 py-0.5 rounded-[3px] text-xs font-medium border ${colors.bg} ${colors.text} ${colors.border}`}>
+                {statusLabels[job.status] || job.status}
+              </span>
+            </div>
+
+            {(address || cityState) && (
+              <div className="flex items-start gap-1.5 text-sm text-slate-600">
+                <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5 text-slate-400" />
+                <span className="line-clamp-2">
+                  {address}{address && cityState ? ", " : ""}{cityState}
+                </span>
+              </div>
+            )}
+
+            {job.scheduledStart && (
+              <div className="flex items-center gap-1.5 text-sm text-slate-600">
+                <Clock className="h-4 w-4 text-slate-400" />
+                <span>
+                  {showDate && `${format(toLocalTime(job.scheduledStart), "MMM d")} · `}
+                  {format(toLocalTime(job.scheduledStart), "h:mm a")}
+                  {job.scheduledEnd && ` - ${format(toLocalTime(job.scheduledEnd), "h:mm a")}`}
+                </span>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {job.visitType && (
+                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${jobTypeStyle.bg} ${jobTypeStyle.text} ${jobTypeStyle.border}`}>
+                  {job.visitType}
+                  {job.workSubtype && ` - ${formatSubtype(job.workSubtype)}`}
+                </span>
+              )}
+              {job.priority === "high" && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500 text-white border border-red-600">
+                  High Priority
+                </span>
+              )}
+            </div>
+          </div>
+          <ChevronRight className="h-5 w-5 text-slate-400 flex-shrink-0 mt-1" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function MobileJob() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -77,6 +155,10 @@ export default function MobileJob() {
   const futureEnd = new Date();
   futureEnd.setDate(futureEnd.getDate() + 30);
   const futureEndStr = getLocalEndOfDay(futureEnd).toISOString();
+
+  // Today | Upcoming | History
+  const [jobsView, setJobsView] = useState<"today" | "upcoming" | "history">("today");
+  const [historySearch, setHistorySearch] = useState("");
 
   // Create Work Order Dialog State
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -342,6 +424,54 @@ export default function MobileJob() {
       });
   }, [myJobs, canViewFutureJobs]);
 
+  // My past jobs — fetched only when the History view opens (last 12 months)
+  const historyStart = useMemo(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 12);
+    return getLocalStartOfDay(d).toISOString();
+  }, []);
+  const { data: historyOrders = [], isLoading: historyLoading } = useQuery<WorkOrderWithDetails[]>({
+    queryKey: ["/api/crm/work-orders", "history", currentUser?.id],
+    queryFn: async () => {
+      const params = new URLSearchParams({ dateFrom: historyStart, dateTo: todayStart });
+      if (currentUser?.id) params.set("techId", currentUser.id);
+      const res = await fetch(`/api/crm/work-orders?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch job history");
+      const data = await res.json();
+      return data.workOrders || [];
+    },
+    enabled: jobsView === "history" && !!currentUser,
+  });
+
+  // History grouped by month (newest first), filtered by the search box
+  const historyGroups = useMemo(() => {
+    const needle = historySearch.trim().toLowerCase();
+    const filtered = historyOrders.filter((j) => {
+      if (!needle) return true;
+      return [j.customer?.name, j.title, j.workSubtype, j.property?.address1, j.property?.city]
+        .filter(Boolean)
+        .some((s) => String(s).toLowerCase().includes(needle));
+    });
+    const map = new Map<string, WorkOrderWithDetails[]>();
+    for (const j of filtered) {
+      const d = j.scheduledStart ? toLocalTime(j.scheduledStart) : j.createdAt ? new Date(j.createdAt) : null;
+      const key = d ? format(d, "yyyy-MM") : "0000-00";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(j);
+    }
+    return Array.from(map.entries())
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([key, jobs]) => ({
+        key,
+        label: key === "0000-00" ? "Undated" : format(new Date(`${key}-15T12:00:00`), "MMMM yyyy"),
+        jobs: jobs.sort(
+          (a, b) =>
+            new Date(b.scheduledStart || b.createdAt || 0).getTime() -
+            new Date(a.scheduledStart || a.createdAt || 0).getTime(),
+        ),
+      }));
+  }, [historyOrders, historySearch]);
+
   // Group jobs by date for users who can view future jobs
   const groupedJobsByDate = useMemo(() => {
     if (!canViewFutureJobs) return null;
@@ -386,6 +516,12 @@ export default function MobileJob() {
     return groups;
   }, [displayedJobs, canViewFutureJobs]);
 
+  const todayKey = format(new Date(), "yyyy-MM-dd");
+  const todayJobs = displayedJobs.filter(
+    (j) => j.scheduledStart && format(toLocalTime(j.scheduledStart), "yyyy-MM-dd") === todayKey,
+  );
+  const upcomingGroups = (groupedJobsByDate || []).filter((g) => g.dateKey > todayKey);
+
   if (userLoading || ordersLoading) {
     return (
       <MobileShell>
@@ -411,9 +547,7 @@ export default function MobileJob() {
       <div className="p-4 space-y-4" data-testid="mobile-job-page">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-semibold text-slate-800">
-              {canViewFutureJobs ? "My Jobs" : "Today's Jobs"}
-            </h1>
+            <h1 className="text-xl font-semibold text-slate-800">My Jobs</h1>
           </div>
           {isSupervisorPlus && (
             <Button
@@ -427,190 +561,117 @@ export default function MobileJob() {
           )}
         </div>
 
-        {displayedJobs.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center">
-              <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-3" />
-              <p className="text-slate-600 font-medium">No jobs scheduled</p>
-              <p className="text-sm text-slate-500 mt-1">Check your agenda for upcoming work</p>
-              <Button 
-                variant="outline" 
-                className="mt-4"
-                onClick={() => navigate("/mobile")}
-                data-testid="button-view-agenda"
+        {/* Today | Upcoming | History — same pill switcher as everywhere else */}
+        <div className="flex justify-center">
+          <div className="inline-flex items-center gap-1 rounded-lg bg-slate-200/70 p-1">
+            {(["today", "upcoming", "history"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setJobsView(v)}
+                className={`rounded-md px-4 py-1.5 text-sm font-medium capitalize transition-all ${
+                  jobsView === v ? "bg-white text-[#711419] shadow-sm" : "text-slate-500"
+                }`}
+                data-testid={`jobs-view-${v}`}
               >
-                View Agenda
-              </Button>
-            </CardContent>
-          </Card>
-        ) : canViewFutureJobs && groupedJobsByDate ? (
-          <div className="space-y-4">
-            {groupedJobsByDate.map((group) => (
-              <div key={group.dateKey} data-testid={`date-group-${group.dateKey}`}>
-                <div className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200 px-3 py-2 -mx-4 mb-3">
-                  <h2 className="font-semibold text-sm text-slate-700 uppercase tracking-wide">
-                    {group.dateLabel}
-                  </h2>
-                </div>
-                <div className="space-y-3">
-                  {group.jobs.map((job) => {
-                    const colors = statusColors[job.status] || statusColors.scheduled;
-                    const jobTypeStyle = getJobTypeColor(job.visitType);
-                    const address = job.property?.address1 || "";
-                    const cityState = [job.property?.city, job.property?.state]
-                      .filter(Boolean).join(", ");
-                    const isCompleted = job.status === "completed";
-                    
-                    return (
-                      <Card 
-                        key={job.id} 
-                        className={`cursor-pointer rounded-[4px] border border-slate-300/70 border-l-4 bg-white shadow-none transition-transform active:scale-[0.99] ${colors.stripe} ${isCompleted ? "opacity-75" : ""}`}
-                        onClick={() => navigate(`/mobile/job/${job.id}`)}
-                        data-testid={`job-card-${job.id}`}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="flex-shrink-0 mt-0.5">
-                              {isCompleted ? (
-                                <CheckCircle2 className="h-6 w-6 text-green-600" />
-                              ) : (
-                                <Circle className="h-6 w-6 text-slate-300" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0 space-y-2">
-                              <div className="flex items-center justify-between gap-2">
-                                <h3 className={`font-semibold ${isCompleted ? "text-slate-500 line-through" : "text-slate-900"}`}>
-                                  {job.customer?.name || "Unknown Customer"}
-                                </h3>
-                                <span className={`px-2 py-0.5 rounded-[3px] text-xs font-medium border ${colors.bg} ${colors.text} ${colors.border}`}>
-                                  {statusLabels[job.status] || job.status}
-                                </span>
-                              </div>
-                              
-                              {(address || cityState) && (
-                                <div className="flex items-start gap-1.5 text-sm text-slate-600">
-                                  <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5 text-slate-400" />
-                                  <span className="line-clamp-2">
-                                    {address}{address && cityState ? ", " : ""}{cityState}
-                                  </span>
-                                </div>
-                              )}
-                              
-                              {job.scheduledStart && (
-                                <div className="flex items-center gap-1.5 text-sm text-slate-600">
-                                  <Clock className="h-4 w-4 text-slate-400" />
-                                  <span>
-                                    {format(toLocalTime(job.scheduledStart), "h:mm a")}
-                                    {job.scheduledEnd && ` - ${format(toLocalTime(job.scheduledEnd), "h:mm a")}`}
-                                  </span>
-                                </div>
-                              )}
-                              
-                              <div className="flex flex-wrap gap-1.5 pt-1">
-                                {job.visitType && (
-                                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${jobTypeStyle.bg} ${jobTypeStyle.text} ${jobTypeStyle.border}`}>
-                                    {job.visitType}
-                                    {job.workSubtype && ` - ${formatSubtype(job.workSubtype)}`}
-                                  </span>
-                                )}
-                                {job.priority === "high" && (
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500 text-white border border-red-600">
-                                    High Priority
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <ChevronRight className="h-5 w-5 text-slate-400 flex-shrink-0 mt-1" />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              </div>
+                {v}
+              </button>
             ))}
           </div>
-        ) : (
-          <div className="space-y-3">
-            {displayedJobs.map((job) => {
-              const colors = statusColors[job.status] || statusColors.scheduled;
-              const jobTypeStyle = getJobTypeColor(job.visitType);
-              const address = job.property?.address1 || "";
-              const cityState = [job.property?.city, job.property?.state]
-                .filter(Boolean).join(", ");
-              
-              const isCompleted = job.status === "completed";
-              
-              return (
-                <Card 
-                  key={job.id} 
-                  className={`cursor-pointer rounded-[4px] border border-slate-300/70 border-l-4 bg-white shadow-none transition-transform active:scale-[0.99] ${colors.stripe} ${isCompleted ? "opacity-75" : ""}`}
-                  onClick={() => navigate(`/mobile/job/${job.id}`)}
-                  data-testid={`job-card-${job.id}`}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 mt-0.5">
-                        {isCompleted ? (
-                          <CheckCircle2 className="h-6 w-6 text-green-600" />
-                        ) : (
-                          <Circle className="h-6 w-6 text-slate-300" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <h3 className={`font-semibold ${isCompleted ? "text-slate-500 line-through" : "text-slate-900"}`}>
-                            {job.customer?.name || "Unknown Customer"}
-                          </h3>
-                          <span className={`px-2 py-0.5 rounded-[3px] text-xs font-medium border ${colors.bg} ${colors.text} ${colors.border}`}>
-                            {statusLabels[job.status] || job.status}
-                          </span>
-                        </div>
-                        
-                        {(address || cityState) && (
-                          <div className="flex items-start gap-1.5 text-sm text-slate-600">
-                            <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5 text-slate-400" />
-                            <span className="line-clamp-2">
-                              {address}{address && cityState ? ", " : ""}{cityState}
-                            </span>
-                          </div>
-                        )}
-                        
-                        {job.scheduledStart && (
-                          <div className="flex items-center gap-1.5 text-sm text-slate-600">
-                            <Clock className="h-4 w-4 text-slate-400" />
-                            <span>
-                              {format(toLocalTime(job.scheduledStart), "h:mm a")}
-                              {job.scheduledEnd && ` - ${format(toLocalTime(job.scheduledEnd), "h:mm a")}`}
-                            </span>
-                          </div>
-                        )}
-                        
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {job.visitType && (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${jobTypeStyle.bg} ${jobTypeStyle.text} ${jobTypeStyle.border}`}>
-                              {job.visitType}
-                              {job.workSubtype && ` - ${formatSubtype(job.workSubtype)}`}
-                            </span>
-                          )}
-                          {job.priority === "high" && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500 text-white border border-red-600">
-                              High Priority
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-slate-400 flex-shrink-0 mt-1" />
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+        </div>
+
+        {jobsView === "today" && (
+          todayJobs.length === 0 ? (
+            <Card className="rounded-[4px] border-slate-300/70 shadow-none">
+              <CardContent className="py-8 text-center">
+                <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-3" />
+                <p className="text-slate-600 font-medium">No jobs scheduled today</p>
+                <p className="text-sm text-slate-500 mt-1">Check Upcoming for what's ahead</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {todayJobs.map((job) => (
+                <JobCard key={job.id} job={job} onOpen={() => navigate(`/mobile/job/${job.id}`)} />
+              ))}
+            </div>
+          )
+        )}
+
+        {jobsView === "upcoming" && (
+          upcomingGroups.length === 0 ? (
+            <Card className="rounded-[4px] border-slate-300/70 shadow-none">
+              <CardContent className="py-8 text-center">
+                <CalendarIcon className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-600 font-medium">Nothing scheduled ahead</p>
+                <p className="text-sm text-slate-500 mt-1">Jobs booked for the next 30 days land here</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {upcomingGroups.map((group) => (
+                <div key={group.dateKey} data-testid={`date-group-${group.dateKey}`}>
+                  <div className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200 px-3 py-2 -mx-4 mb-3">
+                    <h2 className="font-semibold text-sm text-slate-700 uppercase tracking-wide">
+                      {group.dateLabel}
+                    </h2>
+                  </div>
+                  <div className="space-y-3">
+                    {group.jobs.map((job) => (
+                      <JobCard key={job.id} job={job} onOpen={() => navigate(`/mobile/job/${job.id}`)} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+
+        {jobsView === "history" && (
+          <div className="space-y-4" data-testid="jobs-history">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                placeholder="Search past jobs..."
+                className="h-10 w-full rounded-lg border border-slate-200 bg-slate-100 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:outline-none"
+                data-testid="history-search"
+              />
+            </div>
+            {historyLoading ? (
+              <div className="flex justify-center py-10">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#711419]" />
+              </div>
+            ) : historyGroups.length === 0 ? (
+              <Card className="rounded-[4px] border-slate-300/70 shadow-none">
+                <CardContent className="py-8 text-center">
+                  <Clock className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-600 font-medium">
+                    {historySearch.trim() ? "No past jobs match that search" : "No past jobs yet"}
+                  </p>
+                  <p className="text-sm text-slate-500 mt-1">Your last 12 months of jobs show here</p>
+                </CardContent>
+              </Card>
+            ) : (
+              historyGroups.map((group) => (
+                <div key={group.key} data-testid={`history-group-${group.key}`}>
+                  <div className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200 px-3 py-2 -mx-4 mb-3">
+                    <h2 className="font-semibold text-sm text-slate-700 uppercase tracking-wide">{group.label}</h2>
+                  </div>
+                  <div className="space-y-3">
+                    {group.jobs.map((job) => (
+                      <JobCard key={job.id} job={job} showDate onOpen={() => navigate(`/mobile/job/${job.id}`)} />
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         )}
 
-        {/* All technicians — supervisor & owner: tap a card to see their day */}
-        {isSupervisorPlus && (
+        {/* All technicians — supervisor & owner: tap a card to see their day (Today view only) */}
+        {jobsView === "today" && isSupervisorPlus && (
           <div className="space-y-3 border-t border-slate-200 pt-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">All Technicians</h3>

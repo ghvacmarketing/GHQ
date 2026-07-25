@@ -115,14 +115,16 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
       .finally(() => setPending(false));
   };
 
-  // Voice capture: interim results stream into the input; when recognition
-  // ends, the final transcript sends automatically for a hands-free flow.
+  // Voice capture: YOU control how long the mic listens — continuous mode
+  // keeps it open through pauses until you tap the mic again, and only then
+  // does the accumulated transcript send. Interim words stream into the input
+  // so you can see what it heard as you talk.
   const startVoice = () => {
     if (!SpeechRecognitionImpl || listening) return;
     const rec = new SpeechRecognitionImpl();
     rec.lang = "en-US";
     rec.interimResults = true;
-    rec.continuous = false;
+    rec.continuous = true;
     let finalText = "";
     rec.onresult = (e: any) => {
       let interim = "";
@@ -379,7 +381,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#711419] opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-[#711419]" />
               </span>
-              Listening — just talk, I'll send it when you stop
+              Listening — tap the mic again when you're done
             </p>
           )}
           <div className="flex items-center gap-2">
