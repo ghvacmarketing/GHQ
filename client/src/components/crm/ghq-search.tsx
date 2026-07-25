@@ -432,7 +432,7 @@ export function GhqSearch({ showFab = true }: { showFab?: boolean } = {}) {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
-          className="max-w-2xl p-0 bg-popover text-popover-foreground border-border overflow-hidden"
+          className="max-w-2xl gap-0 p-0 bg-popover text-popover-foreground border-border overflow-hidden"
           data-testid="dialog-ghq-search"
           onKeyDown={handleKeyDown}
         >

@@ -246,8 +246,16 @@ export default function AiAssistantModal() {
         queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
         const extras = (data.extraActions || []).filter((e) => e.proposedAction);
         setFreshIndex(assistantIndex);
-        // No text to type out (action-only reply) → show cards right away.
-        setTypedOut(!String(data.answer ?? "").trim());
+        // Hold approval cards until the answer finishes typing. The reveal is
+        // guaranteed by a timer sized to the typewriter's duration — the
+        // animation's onComplete also fires it, but must never be the only
+        // path (a missed callback would strand the cards forever).
+        const answerText = String(data.answer ?? "").trim();
+        setTypedOut(!answerText);
+        if (answerText) {
+          const steps = Math.ceil(answerText.length / Math.max(2, Math.ceil(answerText.length / 150)));
+          window.setTimeout(() => setTypedOut(true), steps * 16 + 400);
+        }
         setMessages((prev) => [
           ...prev,
           {

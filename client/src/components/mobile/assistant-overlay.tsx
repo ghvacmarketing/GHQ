@@ -64,6 +64,13 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
   // Approval cards and topic chips wait until the fresh answer finishes
   // typing — Gibbs shouldn't drop a card mid-sentence.
   const [typedOut, setTypedOut] = useState(true);
+  // Live message count — voice sends go through callbacks that can hold a
+  // stale `messages`, so the answer's landing index must come from here, not
+  // the closure (a wrong freshIndex strands the approval cards unrevealed).
+  const messagesLenRef = useRef(0);
+  useEffect(() => {
+    messagesLenRef.current = messages.length;
+  }, [messages]);
   const composerRef = useRef<HTMLTextAreaElement>(null);
 
   // Long questions (typed or dictated) wrap onto new lines: grow the box up
@@ -413,9 +420,17 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
         const data = await r.json();
         if (data.conversationId) setConversationId(data.conversationId);
         queryClient.invalidateQueries({ queryKey: ["/api/crm/ai/conversations"] });
-        setFreshIndex(assistantIndex);
-        // No text to type out (action-only reply) → show cards right away.
-        setTypedOut(!String(data.answer ?? "").trim());
+        setFreshIndex(messagesLenRef.current);
+        // Hold approval cards until the answer finishes typing. The reveal is
+        // guaranteed by a timer sized to the typewriter's duration — the
+        // animation's onComplete also fires it, but must never be the only
+        // path (a missed callback would strand the cards forever).
+        const answerText = String(data.answer ?? "").trim();
+        setTypedOut(!answerText);
+        if (answerText) {
+          const steps = Math.ceil(answerText.length / Math.max(2, Math.ceil(answerText.length / 150)));
+          window.setTimeout(() => setTypedOut(true), steps * 16 + 400);
+        }
         // One spoken message can carry several creation requests — each extra
         // action renders as its own approval card.
         const extras = (Array.isArray(data.extraActions) ? data.extraActions : []).filter((e: any) => e.proposedAction);
@@ -677,7 +692,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
               )}
             </div>
           ) : (
-            <div className="space-y-4 pb-2">
+            <div className="mx-auto w-full max-w-2xl space-y-4 pb-2">
               {messages.map((msg, i) => {
                 if (msg.role === "user") {
                   return (
@@ -838,6 +853,9 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
           className="shrink-0 border-t border-slate-800 bg-slate-950/95 px-3 pt-2.5 backdrop-blur-xl"
           style={{ paddingBottom: "calc(10px + env(safe-area-inset-bottom))" }}
         >
+          {/* Same centered column as the thread so the bar lines up with the
+              messages on wide screens */}
+          <div className="mx-auto w-full max-w-2xl">
           {listening && (
             <p className="mb-1.5 flex items-center justify-center gap-1.5 text-xs font-semibold text-[#e8b4b8]">
               <span className="relative flex h-2 w-2">
@@ -935,6 +953,7 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                 <Send className="h-4 w-4 transition-transform duration-200 ease-out group-active:-translate-y-0.5 group-active:translate-x-0.5" />
               )}
             </button>
+          </div>
           </div>
         </div>
         </div>
