@@ -383,9 +383,16 @@ export default function AiAssistantModal() {
       <div className="absolute inset-0" onClick={() => setOpen(false)} />
       <div className="relative flex h-[min(780px,92vh)] w-[min(1150px,96vw)] overflow-hidden rounded-xl bg-white shadow-2xl">
 
-        {/* ── Sidebar: grouped conversation history ── */}
-        {sidebarOpen && (
-          <aside className="flex w-64 shrink-0 flex-col border-r border-slate-200 bg-slate-50" data-testid="ai-sidebar">
+        {/* ── Sidebar: grouped conversation history. Always mounted; width
+            animates for a smooth ease-out collapse. Inner wrapper stays w-64
+            so content doesn't squish during the slide. ── */}
+        <aside
+          className={`flex shrink-0 flex-col overflow-hidden border-slate-200 bg-slate-50 transition-[width] duration-300 ease-in-out ${
+            sidebarOpen ? "w-64 border-r" : "w-0"
+          }`}
+          data-testid="ai-sidebar"
+        >
+          <div className="flex h-full w-64 shrink-0 flex-col">
             <div className="flex items-center justify-between px-3 pb-2 pt-3">
               <div>
                 <p className="text-[10px] font-bold uppercase leading-tight tracking-[0.14em] text-slate-400">GHQ Intelligence</p>
@@ -554,8 +561,8 @@ export default function AiAssistantModal() {
                 ))
               )}
             </div>
-          </aside>
-        )}
+          </div>
+        </aside>
 
         {/* ── Main pane: active thread ── */}
         <div className="flex min-w-0 flex-1 flex-col">

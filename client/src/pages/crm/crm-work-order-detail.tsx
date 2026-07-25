@@ -1077,137 +1077,185 @@ export default function CrmWorkOrderDetail() {
           </TabsList>
 
           <TabsContent value="details" className="mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-              <Card className="shadow-sm">
-                <CardHeader className="pb-3 border-b bg-slate-50/50">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                    <User className="h-4 w-4 text-[#711419]" />
-                    Customer & Location
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4 space-y-3">
-                  {workOrder.customer && (
+            {/* Overview — same hero-card style as the customer detail overview,
+                with work-order data */}
+            <Card className="border shadow-sm mb-6" data-testid="card-wo-overview">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="p-3 bg-[#711419]/10 rounded-full">
+                    <Wrench className="h-6 w-6 text-[#711419]" />
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="text-lg font-semibold text-slate-900">
+                      {workOrder.title || `Work Order #${workOrder.workOrderNumber}`}
+                    </h2>
+                    <p className="text-sm text-slate-500 mt-0.5">
+                      {visitTypeLabels[workOrder.visitType || "SERVICE"]}
+                      {workOrder.workSubtype ? ` · ${workOrder.workSubtype}` : ""}
+                      {workOrder.workOrderNumber ? ` · #${workOrder.workOrderNumber}` : ""}
+                    </p>
+                  </div>
+                  <StatusDot pill={`${statusColor.bg} ${statusColor.text} border ${statusColor.border}`}>
+                    {statusLabels[workOrder.status] || workOrder.status}
+                  </StatusDot>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
                     <div>
-                      <Button
-                        variant="link"
-                        className="p-0 h-auto text-base font-semibold text-slate-900 hover:text-[#711419]"
-                        onClick={() => navigate(`/crm/customers/${workOrder.customer!.id}`)}
-                        data-testid="link-customer"
-                      >
-                        {workOrder.customer.name}
-                        <ExternalLink className="h-3 w-3 ml-1" />
-                      </Button>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Customer</p>
+                      {workOrder.customer ? (
+                        <Button
+                          variant="link"
+                          className="p-0 h-auto text-sm font-medium text-slate-900 hover:text-[#711419]"
+                          onClick={() => navigate(`/crm/customers/${workOrder.customer!.id}`)}
+                          data-testid="link-customer"
+                        >
+                          {workOrder.customer.name}
+                          <ExternalLink className="h-3 w-3 ml-1" />
+                        </Button>
+                      ) : (
+                        <p className="text-sm text-slate-400">No customer</p>
+                      )}
                     </div>
-                  )}
-                  {workOrder.customer?.phone && (
-                    <div className="flex items-center gap-2 text-sm text-slate-600">
-                      <Phone className="h-4 w-4 text-slate-400" />
-                      <a href={`tel:${workOrder.customer.phone}`} className="hover:text-[#711419]" data-testid="link-phone">
-                        {workOrder.customer.phone}
-                      </a>
-                    </div>
-                  )}
-                  {workOrder.customer?.email && (
-                    <div className="flex items-center gap-2 text-sm text-slate-600">
-                      <Mail className="h-4 w-4 text-slate-400" />
-                      <a href={`mailto:${workOrder.customer.email}`} className="hover:text-[#711419] truncate" data-testid="link-email">
-                        {workOrder.customer.email}
-                      </a>
-                    </div>
-                  )}
-                  {workOrder.property && (
-                    <div className="pt-3 border-t">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Property</p>
-                          <p className="font-medium text-sm text-slate-900" data-testid="text-address-line1">
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Service Address</p>
+                      {workOrder.property ? (
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm text-slate-700" data-testid="text-address-line1">
                             {workOrder.property.address1}
-                          </p>
-                          <p className="text-slate-600 text-sm" data-testid="text-address-city">
+                            <br />
                             {workOrder.property.city}, {workOrder.property.state} {workOrder.property.zip}
                           </p>
+                          <Button variant="ghost" size="sm" asChild data-testid="button-directions">
+                            <a href={getGoogleMapsUrl(workOrder.property)} target="_blank" rel="noopener noreferrer">
+                              <Navigation className="h-4 w-4" />
+                            </a>
+                          </Button>
                         </div>
-                        <Button variant="ghost" size="sm" asChild data-testid="button-directions">
-                          <a href={getGoogleMapsUrl(workOrder.property)} target="_blank" rel="noopener noreferrer">
-                            <Navigation className="h-4 w-4" />
-                          </a>
-                        </Button>
-                      </div>
+                      ) : (
+                        <p className="text-sm text-slate-400">No address on file</p>
+                      )}
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-sm">
-                <CardHeader className="pb-3 border-b bg-slate-50/50">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                    <Wrench className="h-4 w-4 text-[#711419]" />
-                    Assignment
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4 space-y-3">
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Technician</p>
-                    <p className="font-medium text-sm text-slate-900" data-testid="text-tech-name">
-                      {workOrder.tech?.name || "Unassigned"}
-                    </p>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Phone</p>
+                      {workOrder.customer?.phone ? (
+                        <a href={`tel:${workOrder.customer.phone}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1" data-testid="link-phone">
+                          <Phone className="h-3.5 w-3.5" />
+                          {workOrder.customer.phone}
+                        </a>
+                      ) : (
+                        <p className="text-sm text-slate-400">No phone</p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Email</p>
+                      {workOrder.customer?.email ? (
+                        <a href={`mailto:${workOrder.customer.email}`} className="text-sm text-blue-600 hover:underline flex items-center gap-1" data-testid="link-email">
+                          <Mail className="h-3.5 w-3.5" />
+                          {workOrder.customer.email}
+                        </a>
+                      ) : (
+                        <p className="text-sm text-slate-400">No email</p>
+                      )}
+                    </div>
                   </div>
-                  {workOrder.job && (
-                    <div className="pt-3 border-t">
-                      <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Linked Job</p>
-                      <Button
-                        variant="link"
-                        className="p-0 h-auto text-sm font-medium text-slate-900 hover:text-[#711419]"
-                        onClick={() => navigate(`/crm/jobs/${workOrder.job!.id}`)}
-                        data-testid="link-job"
-                      >
-                        {workOrder.job.jobType} - #{workOrder.job.id.slice(-6)}
-                        <ExternalLink className="h-3 w-3 ml-1" />
-                      </Button>
-                    </div>
-                  )}
-                  {workOrder.project && (
-                    <div className="pt-3 border-t">
-                      <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Linked Project</p>
-                      <p className="font-medium text-sm text-slate-900" data-testid="text-project-name">
-                        {workOrder.project.title || workOrder.project.projectType}
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Scheduled</p>
+                      <p className="text-sm text-slate-700">
+                        {workOrder.scheduledStart
+                          ? `${formatShortDate(workOrder.scheduledStart)} · ${formatTimeRange(workOrder.scheduledStart, workOrder.scheduledEnd)}`
+                          : "Not scheduled"}
                       </p>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-sm">
-                <CardHeader className="pb-3 border-b bg-slate-50/50">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                    <DollarSign className="h-4 w-4 text-[#711419]" />
-                    Billing
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4 space-y-3">
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Disposition</p>
-                    <p className="font-medium text-sm text-slate-900" data-testid="text-billing-disposition">
-                      {workOrder.billingDisposition || "Not set"}
-                    </p>
-                  </div>
-                  {workOrder.billingNotes && (
                     <div>
-                      <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Notes</p>
-                      <p className="text-sm text-slate-600">{workOrder.billingNotes}</p>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Technician</p>
+                      <p className="text-sm font-medium text-slate-900" data-testid="text-tech-name">
+                        {workOrder.tech?.name || "Unassigned"}
+                      </p>
                     </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Priority</p>
+                      <span className={`inline-flex rounded px-2 py-0.5 text-xs font-semibold ${priorityColor.bg} ${priorityColor.text}`}>
+                        {(workOrder.priority || "normal").charAt(0).toUpperCase() + (workOrder.priority || "normal").slice(1)}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Billing</p>
+                      <p className="text-sm text-slate-700" data-testid="text-billing-disposition">
+                        {workOrder.billingDisposition || "Not set"}
+                        {` · ${quotes?.length || 0} quote(s) · ${invoices?.length || 0} invoice(s)`}
+                      </p>
+                      {workOrder.billingNotes && (
+                        <p className="mt-0.5 text-sm text-slate-500">{workOrder.billingNotes}</p>
+                      )}
+                    </div>
+                    {workOrder.project && (
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Linked Project</p>
+                        <p className="text-sm font-medium text-slate-900" data-testid="text-project-name">
+                          {workOrder.project.title || workOrder.project.projectType}
+                        </p>
+                      </div>
+                    )}
+                    {workOrder.job && (
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Linked Job</p>
+                        <Button
+                          variant="link"
+                          className="p-0 h-auto text-sm font-medium text-slate-900 hover:text-[#711419]"
+                          onClick={() => navigate(`/crm/jobs/${workOrder.job!.id}`)}
+                          data-testid="link-job"
+                        >
+                          {workOrder.job.jobType} - #{workOrder.job.id.slice(-6)}
+                          <ExternalLink className="h-3 w-3 ml-1" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border shadow-sm mb-6" data-testid="card-wo-quick-actions">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-medium text-slate-800">Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    size="sm"
+                    onClick={handleCreateQuote}
+                    className="bg-[#711419] hover:bg-[#5a1014] text-white"
+                    data-testid="button-quick-create-quote"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    New Quote
+                  </Button>
+                  {workOrder.customer && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-[#711419] text-[#711419] hover:bg-[#711419]/10"
+                      onClick={() => navigate(`/crm/customers/${workOrder.customer!.id}`)}
+                      data-testid="button-quick-view-customer"
+                    >
+                      <User className="h-4 w-4 mr-1" />
+                      View Customer
+                    </Button>
                   )}
-                  <div className="pt-3 border-t">
-                    <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Quotes</p>
-                    <p className="font-medium text-sm text-slate-900">{quotes?.length || 0} quote(s)</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1 uppercase tracking-wide">Invoices</p>
-                    <p className="font-medium text-sm text-slate-900">{invoices?.length || 0} invoice(s)</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                  {workOrder.property && (
+                    <Button size="sm" variant="outline" asChild data-testid="button-quick-directions">
+                      <a href={getGoogleMapsUrl(workOrder.property)} target="_blank" rel="noopener noreferrer">
+                        <Navigation className="h-4 w-4 mr-1" />
+                        Directions
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Pending Status Toggle */}
             <Card className={`shadow-sm mb-6 ${workOrder.isPending ? 'border-amber-300 bg-amber-50/30' : ''}`}>
