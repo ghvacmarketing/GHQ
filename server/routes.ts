@@ -2676,11 +2676,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }),
         z.object({
           type: z.literal("send_email"),
+          // Recipient is EITHER a customer (email looked up on file) or a
+          // literal address the user gave Gibbs.
           params: z.object({
-            customerName: z.string().trim().min(1).max(200),
+            customerName: z.string().trim().min(1).max(200).optional(),
             customerId: z.string().trim().min(1).max(64).optional(),
+            toEmail: z.string().trim().email().max(200).optional(),
             subject: z.string().trim().min(1).max(200),
             body: z.string().trim().min(1).max(5000),
+          }).strict().refine((p) => p.toEmail || p.customerName || p.customerId, {
+            message: "The email needs a recipient — a customer or an email address.",
+          }),
+        }),
+        z.object({
+          type: z.literal("create_customer"),
+          params: z.object({
+            name: z.string().trim().min(1).max(200),
+            phone: z.string().trim().max(40).optional(),
+            email: z.string().trim().email().max(200).optional(),
+            fullAddress: z.string().trim().max(300).optional(),
+            customerType: z.enum(["residential", "commercial"]).optional(),
+            leadSource: z.string().trim().max(100).optional(),
+            notes: z.string().trim().max(2000).optional(),
           }).strict(),
         }),
       ]);
@@ -2775,33 +2792,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(201).json({ ok: true, entity: "sms", id: conversation.id, label: smsLabel, url: smsUrl });
       }
 
-      // send_email — email a customer from the APPROVING USER'S own connected
+      // send_email — email someone from the APPROVING USER'S own connected
       // Gmail, so it lands in their sent mail like anything else they send.
+      // Recipient: a literal address the user gave wins; otherwise the
+      // customer is resolved and the email on their file is used.
       if (action.type === "send_email") {
-        const resolved = await resolveAiCustomer(action.params);
-        if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
-        const emailCustomer = resolved.customer;
-        if (!emailCustomer.email) {
-          return res.status(422).json({ message: `${emailCustomer.name} has no email address on file.` });
-        }
         if (!user.gmailRefreshTokenEnc) {
           return res.status(400).json({ message: "Connect your Gmail on the Mail page first — Gibbs sends email through your own account." });
+        }
+        let toAddress: string;
+        let emailEntityId: string;
+        let emailLabel: string;
+        if (action.params.toEmail) {
+          toAddress = action.params.toEmail;
+          emailEntityId = toAddress;
+          emailLabel = `Email sent to ${toAddress}`;
+        } else {
+          const resolved = await resolveAiCustomer(action.params as { customerName: string; customerId?: string });
+          if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
+          const emailCustomer = resolved.customer;
+          if (!emailCustomer.email) {
+            return res.status(422).json({ message: `${emailCustomer.name} has no email address on file.` });
+          }
+          toAddress = emailCustomer.email;
+          emailEntityId = emailCustomer.id;
+          emailLabel = `Email sent to ${emailCustomer.name}`;
         }
         const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#1e293b;">${esc(action.params.body).replace(/\n/g, "<br>")}</div>`;
         try {
           const { sendEmail } = await import("./services/gmailService");
-          await sendEmail(user, { to: [emailCustomer.email], subject: action.params.subject, html });
+          await sendEmail(user, { to: [toAddress], subject: action.params.subject, html });
         } catch (e: any) {
           const detail = e?.message === "gmail_not_connected"
             ? "Connect your Gmail on the Mail page first — Gibbs sends email through your own account."
             : e?.message || "Failed to send the email.";
           return res.status(500).json({ message: detail });
         }
-        await logCrmAudit(user.id, "ai_action.send_email", "crm_customer", emailCustomer.id, { subject: action.params.subject }, req.ip);
-        const emailLabel = `Email sent to ${emailCustomer.name}`;
-        await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "email", id: emailCustomer.id, label: emailLabel, url: "/crm/mail" });
-        return res.status(201).json({ ok: true, entity: "email", id: emailCustomer.id, label: emailLabel, url: "/crm/mail" });
+        await logCrmAudit(user.id, "ai_action.send_email", "crm_customer", emailEntityId, { subject: action.params.subject, to: toAddress }, req.ip);
+        await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "email", id: emailEntityId, label: emailLabel, url: "/crm/mail" });
+        return res.status(201).json({ ok: true, entity: "email", id: emailEntityId, label: emailLabel, url: "/crm/mail" });
+      }
+
+      // create_customer — adds the customer to the CRM after approval. Exact
+      // name matches are refused so a voice slip can't create a duplicate.
+      if (action.type === "create_customer") {
+        const [existing] = await db
+          .select({ id: crmCustomers.id, name: crmCustomers.name })
+          .from(crmCustomers)
+          .where(sql`LOWER(${crmCustomers.name}) = ${action.params.name.toLowerCase()}`)
+          .limit(1);
+        if (existing) {
+          return res.status(409).json({ message: `${existing.name} is already in the CRM — open their customer page instead of creating a duplicate.` });
+        }
+        const [newCustomer] = await db
+          .insert(crmCustomers)
+          .values({
+            name: action.params.name,
+            phone: action.params.phone || null,
+            email: action.params.email || null,
+            fullAddress: action.params.fullAddress || null,
+            customerType: (action.params.customerType as any) || "residential",
+            customerStatus: "customer" as any,
+            leadSource: action.params.leadSource || null,
+            notes: action.params.notes || null,
+          })
+          .returning();
+        autoSyncCustomer(newCustomer.id);
+        fireAutomationForCustomer("customer.created", newCustomer.id, { type: "customer", id: newCustomer.id });
+        await logCrmAudit(user.id, "ai_action.create_customer", "customer", newCustomer.id, { params: action.params }, req.ip);
+        const customerUrl = `/crm/customers/${newCustomer.id}`;
+        await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "customer", id: newCustomer.id, label: newCustomer.name, url: customerUrl });
+        return res.status(201).json({ ok: true, entity: "customer", id: newCustomer.id, label: `Customer ${newCustomer.name}`, url: customerUrl });
       }
 
       // create_work_order — resolve the customer via the shared helper.
