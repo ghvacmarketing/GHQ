@@ -16,13 +16,17 @@ services:
       - key: NODE_ENV
         value: production
 
-      # ── Weather import (NWS api.weather.gov) ────────────────────────
-      # Coordinates the forecast/alerts are fetched for. Defaults in code
-      # to Wrens, GA (the shop's home base); override here if needed.
+      # ── Weather import (weatherapi.com) ─────────────────────────────
+      # Coordinates the current conditions/forecast/alerts are fetched
+      # for. Defaults in code to Wrens, GA (the shop's home base).
       - key: WEATHER_LAT
         value: "33.2071"
       - key: WEATHER_LON
         value: "-82.3915"
+      # weatherapi.com API key — set the value in the Render dashboard
+      # (a code default exists, but the dashboard copy wins).
+      - key: WEATHERAPI_KEY
+        sync: false
 
       # ── Android app (Play Store / sideload) ─────────────────────────
       # Cert fingerprints are public info, safe to commit. First entry is

@@ -1936,7 +1936,7 @@ interface WeatherAlert {
 interface WeatherData {
   lat: string;
   lon: string;
-  forecast: { properties: { periods: WeatherPeriod[] } };
+  forecast: { properties: { periods: WeatherPeriod[] }; current?: WeatherPeriod | null };
   hourly: { properties: { periods: WeatherPeriod[] } };
   alerts: { features: WeatherAlert[] };
   fetchedAt: string;
@@ -2911,7 +2911,9 @@ function WeatherWidget() {
   }
 
   const periods = weather.forecast.properties.periods;
-  const currentPeriod = periods[0];
+  // Prefer the true current reading; periods[0] is today's forecast high,
+  // which used to masquerade as "the temperature right now".
+  const currentPeriod = weather.forecast.current || periods[0];
   const activeAlerts = weather.alerts?.features || [];
 
   let highTemp: number | null = null;

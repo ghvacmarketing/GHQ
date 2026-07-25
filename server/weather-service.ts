@@ -1,61 +1,107 @@
 import { storage } from "./storage";
 import { isAppActive } from "./activity-tracker";
 
-// Default to the shop's home base — Wrens, GA (PO Box 917, Wrens, GA 30833) —
-// so weather imports work out of the box; WEATHER_LAT/LON env vars override.
+// Weather source: weatherapi.com (swapped from the National Weather Service).
+// The fetched payload is adapted into the NWS-like shape the dashboard widgets
+// and the weather-impact job already consume, so only this file knows the
+// provider. Override the key/coords via env; defaults keep it working out of
+// the box (coords = the shop's home base in Wrens, GA).
+const WEATHERAPI_KEY = process.env.WEATHERAPI_KEY || "bf49aa77a7794369be0143857262507";
 const WEATHER_LAT = process.env.WEATHER_LAT || "33.2071";
 const WEATHER_LON = process.env.WEATHER_LON || "-82.3915";
-const WEATHER_UA = process.env.WEATHER_UA || "GiesbrechHVAC-CRM/1.0 (contact@ghvac.com)";
 
-async function fetchWithUA(url: string): Promise<Response> {
-  return fetch(url, {
-    headers: {
-      "User-Agent": WEATHER_UA,
-      "Accept": "application/geo+json",
-    },
-  });
-}
+type AdaptedPeriod = {
+  name: string;
+  isDaytime: boolean;
+  temperature: number;
+  shortForecast: string;
+  startTime?: string;
+};
 
 export async function refreshWeather(): Promise<{ success: boolean; error?: string }> {
   try {
-    const pointsUrl = `https://api.weather.gov/points/${WEATHER_LAT},${WEATHER_LON}`;
-    const pointsResponse = await fetchWithUA(pointsUrl);
-    
-    if (!pointsResponse.ok) {
-      return { success: false, error: `Points API failed: ${pointsResponse.status}` };
+    const q = `${WEATHER_LAT},${WEATHER_LON}`;
+    const url = `https://api.weatherapi.com/v1/forecast.json?key=${WEATHERAPI_KEY}&q=${encodeURIComponent(q)}&days=7&aqi=no&alerts=yes`;
+    const res = await fetch(url);
+    const data: any = await res.json().catch(() => null);
+    if (!res.ok || !data?.forecast?.forecastday?.length) {
+      const detail = data?.error?.message || `WeatherAPI HTTP ${res.status}`;
+      console.error("[Weather] Refresh failed:", detail);
+      return { success: false, error: detail };
     }
 
-    const pointsData = await pointsResponse.json();
-    const forecastUrl = pointsData.properties?.forecast;
-    const hourlyUrl = pointsData.properties?.forecastHourly;
+    // Day/night forecast periods (the weekly strip merges them by day name).
+    const periods: AdaptedPeriod[] = [];
+    data.forecast.forecastday.forEach((fd: any, idx: number) => {
+      const name =
+        idx === 0
+          ? "Today"
+          : new Date(`${fd.date}T12:00:00`).toLocaleDateString("en-US", { weekday: "long" });
+      const condition = fd.day?.condition?.text || "";
+      periods.push({
+        name,
+        isDaytime: true,
+        temperature: Math.round(fd.day?.maxtemp_f ?? 0),
+        shortForecast: condition,
+        startTime: `${fd.date}T12:00:00`,
+      });
+      periods.push({
+        name: idx === 0 ? "Tonight" : `${name} Night`,
+        isDaytime: false,
+        temperature: Math.round(fd.day?.mintemp_f ?? 0),
+        shortForecast: condition,
+        startTime: `${fd.date}T20:00:00`,
+      });
+    });
 
-    if (!forecastUrl || !hourlyUrl) {
-      return { success: false, error: "Could not get forecast URLs from points response" };
-    }
+    // True current conditions — the dashboard's big number should be the
+    // temperature right now, not today's forecast high.
+    const current: AdaptedPeriod | null = data.current
+      ? {
+          name: "Now",
+          isDaytime: data.current.is_day === 1,
+          temperature: Math.round(data.current.temp_f ?? 0),
+          shortForecast: data.current.condition?.text || "",
+          startTime: (data.current.last_updated || "").replace(" ", "T") || undefined,
+        }
+      : null;
 
-    const [forecastResponse, hourlyResponse, alertsResponse] = await Promise.all([
-      fetchWithUA(forecastUrl),
-      fetchWithUA(hourlyUrl),
-      fetchWithUA(`https://api.weather.gov/alerts/active?point=${WEATHER_LAT},${WEATHER_LON}`),
-    ]);
+    // Hourly periods feed the weather-impact daily aggregation. forecastday[0]
+    // includes all 24 hours of today (past hours included), so daily
+    // avg/min/max are real, not forecast-only.
+    const hourlyPeriods = data.forecast.forecastday.flatMap((fd: any) =>
+      (fd.hour || []).map((h: any) => ({
+        startTime: (h.time || "").replace(" ", "T"),
+        temperature: Math.round(h.temp_f ?? 0),
+        isDaytime: h.is_day === 1,
+        shortForecast: h.condition?.text || "",
+      })),
+    );
 
-    const forecastJson = forecastResponse.ok ? await forecastResponse.json() : null;
-    const hourlyJson = hourlyResponse.ok ? await hourlyResponse.json() : null;
-    const alertsJson = alertsResponse.ok ? await alertsResponse.json() : null;
+    const rawAlerts = Array.isArray(data.alerts?.alert) ? data.alerts.alert : [];
+    const alertFeatures = rawAlerts.map((a: any) => ({
+      properties: {
+        headline: a.headline || a.event || "Weather alert",
+        severity: a.severity || "",
+        event: a.event || "",
+        description: a.desc || "",
+        expires: a.expires || "",
+      },
+    }));
 
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + 6 * 60 * 60 * 1000);
 
     await storage.upsertWeatherCache({
       id: 1,
       lat: WEATHER_LAT,
       lon: WEATHER_LON,
-      forecastJson,
-      hourlyJson,
-      alertsJson,
+      forecastJson: { properties: { periods }, current },
+      hourlyJson: { properties: { periods: hourlyPeriods } },
+      alertsJson: { features: alertFeatures },
       expiresAt,
     });
 
-    console.log(`[Weather] Cache refreshed for ${WEATHER_LAT},${WEATHER_LON} at ${new Date().toISOString()}`);
+    console.log(`[Weather] WeatherAPI cache refreshed for ${q} at ${new Date().toISOString()}`);
     return { success: true };
   } catch (error) {
     console.error("[Weather] Refresh failed:", error);
@@ -72,16 +118,32 @@ export function scheduleWeatherRefresh(): void {
 
   refreshWeather().catch(console.error);
 
-  // Forecasts shift during the day — refresh every 6 hours, not daily.
+  // Current conditions + forecast shift during the day — refresh every hour.
   weatherRefreshInterval = setInterval(() => {
     if (!isAppActive()) {
       console.log("[Weather] App idle, skipping refresh");
       return;
     }
     refreshWeather().catch(console.error);
-  }, 6 * 60 * 60 * 1000);
+  }, 60 * 60 * 1000);
 
-  console.log("[Weather] Refresh scheduled (every 6 hours)");
+  console.log("[Weather] Refresh scheduled (hourly, via weatherapi.com)");
+}
+
+export async function getWeatherData() {
+  const cache = await storage.getWeatherCache();
+  if (!cache) return null;
+
+  // Transform to match frontend expectations
+  return {
+    lat: cache.lat,
+    lon: cache.lon,
+    forecast: cache.forecastJson,
+    hourly: cache.hourlyJson,
+    alerts: cache.alertsJson,
+    fetchedAt: cache.fetchedAt?.toISOString(),
+    stale: cache.expiresAt ? new Date() > cache.expiresAt : false,
+  };
 }
 
 let refreshInFlight = false;
@@ -100,20 +162,4 @@ export async function getWeatherDataSelfHealing() {
       });
   }
   return data;
-}
-
-export async function getWeatherData() {
-  const cache = await storage.getWeatherCache();
-  if (!cache) return null;
-  
-  // Transform to match frontend expectations
-  return {
-    lat: cache.lat,
-    lon: cache.lon,
-    forecast: cache.forecastJson,
-    hourly: cache.hourlyJson,
-    alerts: cache.alertsJson,
-    fetchedAt: cache.fetchedAt?.toISOString(),
-    stale: cache.expiresAt ? new Date() > cache.expiresAt : false,
-  };
 }

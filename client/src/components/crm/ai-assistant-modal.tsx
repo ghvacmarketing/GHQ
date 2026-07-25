@@ -789,85 +789,88 @@ export default function AiAssistantModal() {
                 )}
               </p>
             )}
-            {attachments.length > 0 && (
-              <div className="mx-auto mb-2 flex max-w-3xl flex-wrap gap-2">
-                {attachments.map((src, i) => (
-                  <div key={i} className="relative">
-                    <img src={src} alt="" className="h-16 w-16 rounded-lg border border-slate-200 object-cover" />
-                    <button
-                      onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
-                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-white transition-colors hover:bg-red-600"
-                      aria-label="Remove photo"
-                      data-testid={`ai-attachment-remove-${i}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="mx-auto flex max-w-3xl items-center gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                hidden
-                onChange={(e) => {
-                  pickImages(e.target.files);
-                  e.target.value = "";
-                }}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={attachments.length >= 4 || pending}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-[#711419]/50 hover:text-[#711419] disabled:opacity-40"
-                aria-label="Attach photos"
-                title="Attach photos (up to 4)"
-                data-testid="ai-attach"
-              >
-                <ImagePlus className="h-5 w-5" />
-              </button>
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    sendQuestion(input);
-                  }
-                }}
-                placeholder={listening ? "Listening..." : transcribing ? "Transcribing..." : "Ask about the business, or tell me what to create..."}
-                className="h-11 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-4 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus-visible:outline-none"
-                data-testid="ai-input"
-              />
-              {voiceSupported && (
-                <button
-                  onClick={listening ? stopVoice : startVoice}
-                  disabled={transcribing}
-                  className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border transition-colors ${
-                    listening
-                      ? "border-[#711419] bg-[#711419] text-white"
-                      : "border-slate-200 bg-white text-slate-500 hover:border-[#711419]/50 hover:text-[#711419]"
-                  }`}
-                  aria-label={listening ? "Stop listening" : "Speak your question"}
-                  data-testid="ai-mic"
-                >
-                  {listening && <span className="absolute inset-0 animate-ping rounded-lg border border-[#711419]" />}
-                  {transcribing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mic className="h-5 w-5" />}
-                </button>
+            {/* One unified bar: photos, typing, voice, and send live together */}
+            <div className="mx-auto max-w-3xl rounded-xl border border-slate-200 bg-white px-2 py-1.5">
+              {attachments.length > 0 && (
+                <div className="mb-1.5 flex flex-wrap gap-2 px-1 pt-1">
+                  {attachments.map((src, i) => (
+                    <div key={i} className="relative">
+                      <img src={src} alt="" className="h-14 w-14 rounded-lg border border-slate-200 object-cover" />
+                      <button
+                        onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+                        className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-white transition-colors hover:bg-red-600"
+                        aria-label="Remove photo"
+                        data-testid={`ai-attachment-remove-${i}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
-              <button
-                onClick={() => sendQuestion(input)}
-                disabled={(input.trim().length < 3 && attachments.length === 0) || pending}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#711419] text-white transition-colors hover:bg-[#8a1a1f] disabled:opacity-40"
-                aria-label="Send"
-                data-testid="ai-send"
-              >
-                <Send className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  hidden
+                  onChange={(e) => {
+                    pickImages(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={attachments.length >= 4 || pending}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-[#711419] disabled:opacity-40"
+                  aria-label="Attach photos"
+                  title="Attach photos (up to 4)"
+                  data-testid="ai-attach"
+                >
+                  <ImagePlus className="h-5 w-5" />
+                </button>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      sendQuestion(input);
+                    }
+                  }}
+                  placeholder={listening ? "Listening..." : transcribing ? "Transcribing..." : "Ask about the business, or tell me what to create..."}
+                  className="h-9 min-w-0 flex-1 border-0 bg-transparent px-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus-visible:outline-none"
+                  data-testid="ai-input"
+                />
+                {voiceSupported && (
+                  <button
+                    onClick={listening ? stopVoice : startVoice}
+                    disabled={transcribing}
+                    className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                      listening
+                        ? "bg-[#711419] text-white"
+                        : "text-slate-400 hover:bg-slate-100 hover:text-[#711419]"
+                    }`}
+                    aria-label={listening ? "Stop listening" : "Speak your question"}
+                    data-testid="ai-mic"
+                  >
+                    {listening && <span className="absolute inset-0 animate-ping rounded-lg border border-[#711419]" />}
+                    {transcribing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Mic className="h-5 w-5" />}
+                  </button>
+                )}
+                <button
+                  onClick={() => sendQuestion(input)}
+                  disabled={(input.trim().length < 3 && attachments.length === 0) || pending}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#711419] text-white transition-colors hover:bg-[#8a1a1f] disabled:opacity-40"
+                  aria-label="Send"
+                  data-testid="ai-send"
+                >
+                  <Send className="h-4.5 w-4.5" />
+                </button>
+              </div>
             </div>
             <p className="mx-auto mt-1.5 max-w-3xl text-center text-[11px] text-slate-400">
               Conversations are saved to your account and shared with the mobile app.
