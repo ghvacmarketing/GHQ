@@ -14,6 +14,7 @@ import {
   type AiSpace,
   compressImageForAi,
   createAiSpace,
+  customerUpdateRows,
   deleteAiConversation,
   deleteAiSpace,
   dismissAiAction,
@@ -779,12 +780,27 @@ export default function AssistantOverlay({ open, onClose }: { open: boolean; onC
                         </p>
                         <p className="mt-1.5 text-sm text-slate-200">{msg.proposedAction.summary}</p>
                         <div className="mt-1.5 space-y-0.5">
-                          {Object.entries(msg.proposedAction.params).filter(([k]) => k !== "customerId").map(([k, v]) => (
-                            <p key={k} className="text-xs text-slate-400">
-                              <span className="font-semibold capitalize text-slate-300">{k.replace(/([A-Z])/g, " $1").toLowerCase()}:</span>{" "}
-                              {String(v)}
-                            </p>
-                          ))}
+                          {msg.proposedAction.type === "update_customer"
+                            ? customerUpdateRows(msg.proposedAction.params).map((row) => (
+                                <p key={row.label} className="text-xs text-slate-400">
+                                  <span className="font-semibold capitalize text-slate-300">{row.label}:</span>{" "}
+                                  {row.changed ? (
+                                    <>
+                                      <span className="line-through opacity-60">{row.before ?? "—"}</span>
+                                      <span className="mx-1 text-[#e8b4b8]">→</span>
+                                      <span className="font-semibold text-slate-200">{row.after ?? "—"}</span>
+                                    </>
+                                  ) : (
+                                    <span>{row.before ?? "—"}</span>
+                                  )}
+                                </p>
+                              ))
+                            : Object.entries(msg.proposedAction.params).filter(([k]) => k !== "customerId").map(([k, v]) => (
+                                <p key={k} className="text-xs text-slate-400">
+                                  <span className="font-semibold capitalize text-slate-300">{k.replace(/([A-Z])/g, " $1").toLowerCase()}:</span>{" "}
+                                  {String(v)}
+                                </p>
+                              ))}
                         </div>
                         {(msg.actionState === "pending" || msg.actionState === "error") && (
                           <>

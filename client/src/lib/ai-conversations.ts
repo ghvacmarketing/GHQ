@@ -3,7 +3,7 @@
 // conversation started on one surface resumes on the other.
 
 export type AiProposedAction = {
-  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer";
+  type: "create_task" | "create_work_order" | "send_sms" | "send_email" | "create_customer" | "update_customer";
   summary: string;
   params: Record<string, unknown>;
 };
@@ -15,7 +15,25 @@ export const AI_ACTION_LABELS: Record<string, string> = {
   send_sms: "Text message",
   send_email: "Email",
   create_customer: "New customer",
+  update_customer: "Update customer",
 };
+
+/** Field rows for an update_customer approval card: the FULL record with the
+ *  edited fields shown as before → after, so the user sees exactly what Gibbs
+ *  will touch — and what it won't. */
+export function customerUpdateRows(params: Record<string, unknown>): { label: string; before: string | null; after: string | null; changed: boolean }[] {
+  const changes = (params.changes ?? {}) as Record<string, unknown>;
+  const current = (params.current ?? {}) as Record<string, unknown>;
+  const label = (k: string) => k.replace(/([A-Z])/g, " $1").toLowerCase();
+  const val = (v: unknown) => (v === null || v === undefined || v === "" ? null : String(v));
+  const keys = Array.from(new Set([...Object.keys(current), ...Object.keys(changes)]));
+  return keys.map((k) => ({
+    label: label(k),
+    before: val(current[k]),
+    after: k in changes ? val(changes[k]) : null,
+    changed: k in changes,
+  }));
+}
 
 export type AiChatMessage = {
   role: "user" | "assistant";

@@ -2708,6 +2708,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
             notes: z.string().trim().max(2000).optional(),
           }).strict(),
         }),
+        z.object({
+          type: z.literal("update_customer"),
+          params: z.object({
+            customerName: z.string().trim().min(1).max(200),
+            customerId: z.string().trim().min(1).max(64).optional(),
+            // Only these fields are editable through Gibbs, and only the ones
+            // present in `changes` are touched.
+            changes: z.object({
+              name: z.string().trim().min(1).max(200).optional(),
+              phone: z.string().trim().max(40).optional(),
+              email: z.string().trim().max(200).optional(),
+              fullAddress: z.string().trim().max(300).optional(),
+              customerType: z.enum(["residential", "commercial"]).optional(),
+              leadSource: z.string().trim().max(100).optional(),
+              notes: z.string().trim().max(2000).optional(),
+            }).strict().refine((c) => Object.keys(c).length > 0, { message: "No changes given." }),
+            // Display-only: the model's snapshot of the record so the card
+            // shows before-and-after. The DB row is re-read at execute time.
+            current: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+          }).strict(),
+        }),
       ]);
       const parsedAction = actionSchema.safeParse(req.body);
       if (!parsedAction.success) {
@@ -2872,6 +2893,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const customerUrl = `/crm/customers/${newCustomer.id}`;
         await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "customer", id: newCustomer.id, label: newCustomer.name, url: customerUrl });
         return res.status(201).json({ ok: true, entity: "customer", id: newCustomer.id, label: `Customer ${newCustomer.name}`, url: customerUrl });
+      }
+
+      // update_customer — edits only the approved fields. The audit log keeps
+      // the authoritative before/after straight from the DB row, not the
+      // model's snapshot.
+      if (action.type === "update_customer") {
+        const resolved = await resolveAiCustomer(action.params);
+        if (!resolved.ok) return res.status(resolved.status).json(resolved.body);
+        const [row] = await db.select().from(crmCustomers).where(eq(crmCustomers.id, resolved.customer.id));
+        if (!row) return res.status(422).json({ message: "That customer no longer exists." });
+        const changes = action.params.changes;
+        const before: Record<string, unknown> = {};
+        const after: Record<string, unknown> = {};
+        for (const key of Object.keys(changes) as Array<keyof typeof changes>) {
+          before[key] = (row as any)[key] ?? null;
+          after[key] = changes[key];
+        }
+        await db
+          .update(crmCustomers)
+          .set({ ...(changes as any), updatedAt: new Date() })
+          .where(eq(crmCustomers.id, row.id));
+        autoSyncCustomer(row.id);
+        await logCrmAudit(user.id, "ai_action.update_customer", "customer", row.id, { before, after }, req.ip);
+        const updatedName = changes.name || row.name;
+        const updatedUrl = `/crm/customers/${row.id}`;
+        await recordAiActionOutcome(user.id, req.body?.messageId, "approved", { entity: "customer", id: row.id, label: `${updatedName} updated`, url: updatedUrl });
+        return res.status(201).json({ ok: true, entity: "customer", id: row.id, label: `Customer ${updatedName} updated`, url: updatedUrl });
       }
 
       // create_work_order — resolve the customer via the shared helper.
