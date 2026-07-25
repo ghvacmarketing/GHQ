@@ -900,25 +900,25 @@ export default function MobileAgenda() {
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Up Next</h3>
                     <div
                       onClick={() => navigateMain(`/mobile/job/${upNext.id}`)}
-                      className="cursor-pointer rounded-lg bg-gradient-to-b from-[#7d1720] to-[#5e1015] p-4 text-white shadow-[0_12px_32px_rgba(113,20,25,0.35)] transition-transform active:scale-[0.99]"
+                      className="cursor-pointer rounded-[4px] border border-slate-300/70 border-l-4 border-l-[#711419] bg-white p-4 transition-transform active:scale-[0.99]"
                       data-testid="agenda-up-next"
                     >
                       <div className="flex items-start justify-between">
-                        <p className="text-3xl font-bold tracking-tight">
+                        <p className="text-3xl font-bold tracking-tight text-slate-900">
                           {upNext.scheduledStart ? formatLocal(upNext.scheduledStart, "h:mm") : "—"}
-                          <span className="ml-1 text-base font-semibold text-white/70">
+                          <span className="ml-1 text-base font-semibold text-slate-400">
                             {upNext.scheduledStart ? formatLocal(upNext.scheduledStart, "a") : ""}
                           </span>
                         </p>
-                        <span className="flex items-center gap-1.5 text-sm font-semibold text-white/90">
-                          <span className={`h-2 w-2 rounded-full ${statusDotColor(statusConfig[upNext.status]?.className)}`} />
+                        <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-600">
+                          <span className={`h-2 w-2 rounded-[2px] ${statusDotColor(statusConfig[upNext.status]?.className)}`} />
                           {statusConfig[upNext.status]?.label || upNext.status}
                         </span>
                       </div>
-                      <p className="mt-2 text-xl font-bold" data-testid="up-next-name">
+                      <p className="mt-2 text-xl font-bold text-slate-900" data-testid="up-next-name">
                         {upNext.customer?.name || upNext.title || "Job"}
                       </p>
-                      <p className="mt-0.5 text-sm text-white/70">
+                      <p className="mt-0.5 text-sm text-slate-500">
                         {upNext.property?.address1 || getPropertyAddress(upNext.property)}
                         {upNext.title && upNext.customer?.name ? ` — ${upNext.title}` : ""}
                       </p>
@@ -928,7 +928,7 @@ export default function MobileAgenda() {
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="flex items-center justify-center gap-1.5 rounded-lg bg-white py-3 text-sm font-bold text-[#711419] transition-transform active:scale-[0.97]"
+                          className="flex items-center justify-center gap-1.5 rounded-[4px] bg-[#711419] py-3 text-sm font-bold text-white transition-transform active:scale-[0.97]"
                           data-testid="up-next-navigate"
                         >
                           <Navigation className="h-4 w-4" /> Navigate
@@ -937,13 +937,13 @@ export default function MobileAgenda() {
                           <a
                             href={`tel:${upNext.customer.phone}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="flex items-center justify-center gap-1.5 rounded-lg border border-white/30 py-3 text-sm font-semibold text-white transition-transform active:scale-[0.97]"
+                            className="flex items-center justify-center gap-1.5 rounded-[4px] border border-slate-300 py-3 text-sm font-semibold text-slate-700 transition-transform active:scale-[0.97]"
                             data-testid="up-next-call"
                           >
                             <Phone className="h-4 w-4" /> Call
                           </a>
                         ) : (
-                          <span className="flex items-center justify-center gap-1.5 rounded-lg border border-white/20 py-3 text-sm font-semibold text-white/40">
+                          <span className="flex items-center justify-center gap-1.5 rounded-[4px] border border-slate-200 py-3 text-sm font-semibold text-slate-300">
                             <Phone className="h-4 w-4" /> Call
                           </span>
                         )}
