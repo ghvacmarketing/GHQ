@@ -71,6 +71,9 @@ import {
   ImageIcon,
   ShieldCheck,
   Droplets,
+  Check,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -713,15 +716,58 @@ interface CustomerFileData {
   contentType?: string | null;
   size?: number | null;
   uploadedBy?: string | null;
+  uploadedByName?: string | null;
   createdAt?: string | null;
+}
+
+// Same density steps as the Media page grid (0 = large … 2 = small)
+const FILES_GRID: Record<number, string> = {
+  0: "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3",
+  1: "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4",
+  2: "grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6",
+};
+
+// External hosts (CompanyCam CDN) block cross-origin fetches — proxy those
+const fileDownloadHref = (f: CustomerFileData) =>
+  f.url.startsWith("http") ? `/api/crm/files/${f.id}/download` : f.url;
+
+async function downloadCustomerFile(f: CustomerFileData) {
+  try {
+    const res = await fetch(fileDownloadHref(f), { credentials: "include" });
+    if (!res.ok) throw new Error("fetch failed");
+    const blob = await res.blob();
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = f.name || "photo";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(href);
+  } catch {
+    window.open(f.url, "_blank");
+  }
 }
 
 function CustomerFilesTab({ customerId }: { customerId: string }) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [viewImage, setViewImage] = useState<string | null>(null);
   const [deleteFileId, setDeleteFileId] = useState<string | null>(null);
+
+  // Media-page structure: lightbox, thumbnail density, multi-select + bulk bar
+  const [lightbox, setLightbox] = useState<CustomerFileData | null>(null);
+  const [photoSize, setPhotoSize] = useState(1);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDownloading, setBulkDownloading] = useState(false);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setLightbox(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightbox]);
 
   const { data: files = [], isLoading } = useQuery<CustomerFileData[]>({
     queryKey: ['/api/crm/customers', customerId, 'files'],
@@ -790,6 +836,48 @@ function CustomerFilesTab({ customerId }: { customerId: string }) {
   const images = files.filter(f => f.contentType?.startsWith('image/'));
   const docs = files.filter(f => !f.contentType?.startsWith('image/'));
 
+  const selectionActive = selected.size > 0;
+  const toggleSelect = (id: string) =>
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+
+  const bulkDownload = async () => {
+    setBulkDownloading(true);
+    try {
+      for (const f of images.filter((x) => selected.has(x.id))) {
+        await downloadCustomerFile(f);
+        await new Promise((r) => setTimeout(r, 350)); // stagger so the browser doesn't block
+      }
+    } finally {
+      setBulkDownloading(false);
+    }
+  };
+
+  const bulkDelete = useMutation({
+    mutationFn: async () => {
+      let ok = 0, fail = 0;
+      for (const f of images.filter((x) => selected.has(x.id))) {
+        try {
+          await apiRequest("DELETE", `/api/crm/customers/${customerId}/files/${f.id}`);
+          ok++;
+        } catch {
+          fail++;
+        }
+      }
+      return { ok, fail };
+    },
+    onSuccess: ({ ok, fail }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/customers', customerId, 'files'] });
+      setConfirmBulkDelete(false);
+      setSelected(new Set());
+      toast({ title: `${ok} photo${ok !== 1 ? "s" : ""} deleted${fail ? `, ${fail} failed` : ""}` });
+    },
+    onError: () => toast({ title: "Bulk delete failed", variant: "destructive" }),
+  });
+
   const formatSize = (bytes?: number | null) => {
     if (!bytes) return '';
     if (bytes < 1024) return `${bytes} B`;
@@ -851,52 +939,117 @@ function CustomerFilesTab({ customerId }: { customerId: string }) {
             <div className="space-y-6">
               {images.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-1.5">
-                    <ImageIcon className="h-4 w-4" />
-                    Photos {images.length}
-                  </h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  <div className="mb-3 flex items-center gap-2">
+                    <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                      <ImageIcon className="h-4 w-4" />
+                      Photos {images.length}
+                    </h3>
+                    <div className="ml-auto flex items-center rounded-md border border-input bg-white">
+                      <button
+                        onClick={() => setPhotoSize((s) => Math.min(2, s + 1))}
+                        disabled={photoSize === 2}
+                        className="flex h-8 w-8 items-center justify-center text-slate-600 hover:text-foreground disabled:opacity-35"
+                        title="Smaller thumbnails"
+                        data-testid="files-size-smaller"
+                      >
+                        <ZoomOut className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setPhotoSize((s) => Math.max(0, s - 1))}
+                        disabled={photoSize === 0}
+                        className="flex h-8 w-8 items-center justify-center border-l border-input text-slate-600 hover:text-foreground disabled:opacity-35"
+                        title="Larger thumbnails"
+                        data-testid="files-size-larger"
+                      >
+                        <ZoomIn className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {selectionActive && (
+                    <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-[#711419]/25 bg-[#711419]/[0.06] px-3 py-2" data-testid="files-selection-bar">
+                      <button onClick={() => setSelected(new Set())} className="rounded-md p-1 text-slate-500 hover:bg-white hover:text-slate-800" title="Clear selection">
+                        <X className="h-4 w-4" />
+                      </button>
+                      <span className="text-sm font-semibold text-slate-800">{selected.size} selected</span>
+                      <button onClick={() => setSelected(new Set(images.map((f) => f.id)))} className="text-xs font-medium text-[#711419] hover:underline">
+                        Select all {images.length}
+                      </button>
+                      <div className="ml-auto flex items-center gap-2">
+                        <Button size="sm" variant="outline" disabled={bulkDownloading} onClick={bulkDownload} data-testid="files-bulk-download">
+                          {bulkDownloading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}
+                          Download ({selected.size})
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => setConfirmBulkDelete(true)} data-testid="files-bulk-delete">
+                          <Trash2 className="mr-1.5 h-4 w-4" /> Delete ({selected.size})
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className={FILES_GRID[photoSize]} data-testid="customer-photo-grid">
                     {images.map(file => (
-                      <div key={file.id} className="group relative rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
-                        <img
-                          src={file.url}
-                          alt={file.name}
-                          className="w-full h-32 object-cover cursor-pointer"
-                          onClick={() => setViewImage(file.url)}
-                        />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                          <button
-                            className="p-1.5 bg-white rounded-full shadow"
-                            onClick={() => setViewImage(file.url)}
-                          >
-                            <Eye className="h-4 w-4 text-slate-700" />
-                          </button>
-                          <a
-                            href={file.url.startsWith("http") ? `/api/crm/files/${file.id}/download` : file.url}
-                            download={file.name}
-                            className="p-1.5 bg-white rounded-full shadow"
-                          >
-                            <Download className="h-4 w-4 text-slate-700" />
-                          </a>
-                          <button
-                            className="p-1.5 bg-white rounded-full shadow"
-                            onClick={() => setDeleteFileId(file.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-600" />
-                          </button>
-                        </div>
-                        <div className="p-2">
-                          <p className="text-xs text-slate-600 truncate">{file.name}</p>
-                          {file.size && (
-                            <p className="text-xs text-slate-400">{formatSize(file.size)}</p>
-                          )}
+                      <div
+                        key={file.id}
+                        className={`group relative overflow-hidden rounded-lg border bg-card shadow-sm ${selected.has(file.id) ? "border-[#711419] ring-2 ring-[#711419]" : "border-border"}`}
+                        data-testid={`customer-photo-${file.id}`}
+                      >
+                        <button
+                          onClick={() => (selectionActive ? toggleSelect(file.id) : setLightbox(file))}
+                          className="block w-full overflow-hidden"
+                        >
+                          <img
+                            src={file.url}
+                            alt={file.name}
+                            loading="lazy"
+                            className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                          />
+                        </button>
+                        <button
+                          onClick={() => toggleSelect(file.id)}
+                          className={`absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 shadow transition-opacity ${
+                            selected.has(file.id)
+                              ? "border-white bg-[#711419] text-white opacity-100"
+                              : `border-white bg-black/35 text-white/70 hover:text-white ${selectionActive ? "opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"}`
+                          }`}
+                          aria-label="Select photo"
+                          data-testid={`select-customer-photo-${file.id}`}
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </button>
+                        {!selectionActive && (
+                          <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); downloadCustomerFile(file); }}
+                              className="rounded-md bg-black/55 p-1.5 text-white hover:bg-black/80"
+                              title="Download"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setDeleteFileId(file.id); }}
+                              className="rounded-md bg-black/55 p-1.5 text-white hover:bg-red-600"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
+                        <div className={photoSize === 2 ? "space-y-0.5 p-1.5" : "space-y-0.5 p-2.5"}>
+                          <p className={`truncate font-semibold text-foreground ${photoSize === 2 ? "text-[10px]" : "text-xs"}`} title={file.name}>
+                            {file.name}
+                          </p>
+                          <p className={`flex items-center gap-1 truncate text-muted-foreground ${photoSize === 2 ? "text-[9px]" : "text-[11px]"}`}>
+                            <User className="h-3 w-3 shrink-0" />
+                            {file.uploadedByName || "Unknown"}
+                            {file.createdAt && <> · {format(new Date(file.createdAt), "MMM d, h:mm a")}</>}
+                          </p>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-
               {docs.length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-1.5">
@@ -941,16 +1094,70 @@ function CustomerFilesTab({ customerId }: { customerId: string }) {
         </CardContent>
       </Card>
 
-      {viewImage && (
-        <Dialog open={!!viewImage} onOpenChange={() => setViewImage(null)}>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>Photo Preview</DialogTitle>
-            </DialogHeader>
-            <img src={viewImage} alt="Preview" className="w-full h-auto rounded-lg" />
-          </DialogContent>
-        </Dialog>
+      {/* Lightbox — same treatment as the Media page */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-black/90 p-6"
+          onClick={() => setLightbox(null)}
+          data-testid="customer-files-lightbox"
+        >
+          <img
+            src={lightbox.url}
+            alt={lightbox.name}
+            className="max-h-[80vh] max-w-full rounded-lg object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center">
+              <p className="text-sm font-semibold text-white">{lightbox.name}</p>
+              <p className="text-xs text-white/60">
+                {lightbox.uploadedByName || "Unknown"}
+                {lightbox.createdAt && ` · ${format(new Date(lightbox.createdAt), "EEE, MMM d · h:mm a")}`}
+              </p>
+            </div>
+            <button
+              onClick={() => downloadCustomerFile(lightbox)}
+              className="rounded-md bg-white/15 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/25"
+              data-testid="lightbox-download"
+            >
+              <Download className="mr-1.5 inline h-4 w-4" /> Download
+            </button>
+            <button
+              onClick={() => { setDeleteFileId(lightbox.id); setLightbox(null); }}
+              className="rounded-md bg-white/15 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-600"
+              data-testid="lightbox-delete"
+            >
+              <Trash2 className="mr-1.5 inline h-4 w-4" /> Delete
+            </button>
+          </div>
+        </div>
       )}
+
+      {/* Bulk delete confirm */}
+      <Dialog open={confirmBulkDelete} onOpenChange={setConfirmBulkDelete}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {selected.size} photo{selected.size !== 1 ? "s" : ""}?</DialogTitle>
+            <DialogDescription>
+              These photos will be removed from this customer's files. This can't be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmBulkDelete(false)} disabled={bulkDelete.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => bulkDelete.mutate()}
+              disabled={bulkDelete.isPending}
+              data-testid="confirm-bulk-delete-files"
+            >
+              {bulkDelete.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1.5 h-4 w-4" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!deleteFileId} onOpenChange={() => setDeleteFileId(null)}>
         <DialogContent>

@@ -13164,9 +13164,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/crm/customers/:id/files - Get all files for a customer
+  // (uploader name joined in so the Files tab can credit like the Media page)
   app.get("/api/crm/customers/:id/files", requireCrmAuth, async (req, res) => {
     try {
-      const files = await storage.getCustomerFiles(req.params.id);
+      const files = await db
+        .select({
+          id: customerFiles.id,
+          customerId: customerFiles.customerId,
+          name: customerFiles.name,
+          url: customerFiles.url,
+          objectPath: customerFiles.objectPath,
+          contentType: customerFiles.contentType,
+          size: customerFiles.size,
+          uploadedBy: customerFiles.uploadedBy,
+          uploadedByName: crmUsers.name,
+          createdAt: customerFiles.createdAt,
+        })
+        .from(customerFiles)
+        .leftJoin(crmUsers, eq(customerFiles.uploadedBy, crmUsers.id))
+        .where(eq(customerFiles.customerId, req.params.id))
+        .orderBy(desc(customerFiles.createdAt));
       return res.json(files);
     } catch (error) {
       console.error("Error fetching customer files:", error);
