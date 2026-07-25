@@ -6,7 +6,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { z } from "zod";
-import { fromZonedTime } from "date-fns-tz";
+import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 
 const APP_TIMEZONE = "America/New_York";
 
@@ -13224,6 +13224,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching mobile photo feed:", error);
       res.status(500).json({ message: "Failed to load photo feed" });
+    }
+  });
+
+  // Today's jobs photo status — powers the Photos page "Required photos"
+  // tracker and the missing-photos nudge. Photos attach to customers, so a
+  // job's "photos today" = image files created today for that job's customer.
+  app.get("/api/mobile/photos/status", requireCrmTechOrAbove, async (req, res) => {
+    try {
+      const user = await getCurrentCrmUser(req);
+      if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+      const dayKey = formatInTimeZone(new Date(), APP_TIMEZONE, "yyyy-MM-dd");
+      const dayStart = fromZonedTime(`${dayKey}T00:00:00`, APP_TIMEZONE);
+      const dayEnd = fromZonedTime(`${dayKey}T23:59:59.999`, APP_TIMEZONE);
+
+      const mineOnly = user.role === "tech" || user.role === "sales";
+      const conditions = [
+        gte(crmWorkOrders.scheduledStart, dayStart),
+        lte(crmWorkOrders.scheduledStart, dayEnd),
+        ne(crmWorkOrders.status, "cancelled"),
+      ];
+      if (mineOnly) conditions.push(eq(crmWorkOrders.assignedTechId, user.id));
+
+      const jobs = await db
+        .select({
+          id: crmWorkOrders.id,
+          title: crmWorkOrders.title,
+          status: crmWorkOrders.status,
+          scheduledStart: crmWorkOrders.scheduledStart,
+          customerId: crmWorkOrders.customerId,
+          customerName: crmCustomers.name,
+          assignedChecklistId: crmWorkOrders.assignedChecklistId,
+        })
+        .from(crmWorkOrders)
+        .leftJoin(crmCustomers, eq(crmWorkOrders.customerId, crmCustomers.id))
+        .where(and(...conditions))
+        .orderBy(crmWorkOrders.scheduledStart)
+        .limit(30);
+
+      const checklistIds = Array.from(new Set(jobs.map((j) => j.assignedChecklistId).filter(Boolean))) as string[];
+      const requiredByChecklist = new Map<string, number>();
+      if (checklistIds.length > 0) {
+        const stepCounts = await db
+          .select({ checklistId: checklistPhotoSteps.checklistId, n: count() })
+          .from(checklistPhotoSteps)
+          .where(and(inArray(checklistPhotoSteps.checklistId, checklistIds), eq(checklistPhotoSteps.isRequired, true)))
+          .groupBy(checklistPhotoSteps.checklistId);
+        for (const r of stepCounts) requiredByChecklist.set(r.checklistId, Number(r.n));
+      }
+
+      const customerIds = Array.from(new Set(jobs.map((j) => j.customerId).filter(Boolean))) as string[];
+      const photosByCustomer = new Map<string, number>();
+      if (customerIds.length > 0) {
+        const photoCounts = await db
+          .select({ customerId: customerFiles.customerId, n: count() })
+          .from(customerFiles)
+          .where(
+            and(
+              inArray(customerFiles.customerId, customerIds),
+              sql`${customerFiles.contentType} LIKE 'image/%'`,
+              gte(customerFiles.createdAt, dayStart),
+            ),
+          )
+          .groupBy(customerFiles.customerId);
+        for (const r of photoCounts) photosByCustomer.set(r.customerId as string, Number(r.n));
+      }
+
+      res.json({
+        jobs: jobs.map((j) => ({
+          id: j.id,
+          title: j.title,
+          status: j.status,
+          scheduledStart: j.scheduledStart,
+          customerId: j.customerId,
+          customerName: j.customerName,
+          requiredPhotos: j.assignedChecklistId ? requiredByChecklist.get(j.assignedChecklistId) || 0 : 0,
+          photosToday: j.customerId ? photosByCustomer.get(j.customerId) || 0 : 0,
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching mobile photo status:", error);
+      res.status(500).json({ message: "Failed to load photo status" });
     }
   });
 

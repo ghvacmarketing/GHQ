@@ -60,6 +60,27 @@ export default function MobilePhotos() {
     searchInputRef.current?.blur();
   };
 
+  // Today's jobs with their photo coverage — powers the required-photos
+  // tracker and the missing-photos nudge. Tapping a job targets its customer
+  // for capture in one tap.
+  type JobPhotoStatus = {
+    id: string; title: string | null; status: string; scheduledStart: string | null;
+    customerId: string | null; customerName: string | null;
+    requiredPhotos: number; photosToday: number;
+  };
+  const { data: photoStatus } = useQuery<{ jobs: JobPhotoStatus[] }>({
+    queryKey: ["/api/mobile/photos/status"],
+    queryFn: async () => {
+      const res = await fetch("/api/mobile/photos/status", { credentials: "include" });
+      if (!res.ok) return { jobs: [] };
+      return res.json();
+    },
+    enabled: !!currentUser,
+    refetchInterval: 60 * 1000,
+  });
+  const todayJobs = photoStatus?.jobs ?? [];
+  const missingPhotoJobs = todayJobs.filter((j) => j.status === "completed" && j.photosToday === 0);
+
   // Recent company-wide photos for the horizontal gallery strip. Tapping one
   // jumps to the customer it's attached to.
   type FeedPhoto = {
@@ -411,6 +432,64 @@ export default function MobilePhotos() {
         )}
 
         <div className={searchActive ? "hidden" : "contents"}>
+
+        {/* Missing-photos nudge: finished jobs with zero shots on record */}
+        {missingPhotoJobs.length > 0 && (
+          <div className="rounded-[4px] border border-amber-300 bg-amber-50 px-3.5 py-2.5" data-testid="missing-photos-nudge">
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-amber-800">
+              <Camera className="h-4 w-4" />
+              {missingPhotoJobs.length} finished job{missingPhotoJobs.length !== 1 ? "s" : ""} today {missingPhotoJobs.length !== 1 ? "have" : "has"} no photos
+            </p>
+            <p className="mt-0.5 text-xs text-amber-700">Tap the job below to add shots before it slips.</p>
+          </div>
+        )}
+
+        {/* Today's jobs — photo coverage per job; tap to target that customer */}
+        {todayJobs.length > 0 && (
+          <div data-testid="today-photo-jobs">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Today's jobs</p>
+            <div className="overflow-hidden rounded-[4px] border border-slate-300/70 bg-white">
+              {todayJobs.map((job, ji) => {
+                const needsMore = job.requiredPhotos > 0 && job.photosToday < job.requiredPhotos;
+                const missing = job.status === "completed" && job.photosToday === 0;
+                return (
+                  <button
+                    key={job.id}
+                    onClick={() => job.customerId && chooseCustomer({ id: job.customerId, name: job.customerName || "Customer" })}
+                    className={`flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-slate-50 ${ji > 0 ? "border-t border-slate-200/80" : ""}`}
+                    data-testid={`photo-job-${job.id}`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-900">{job.customerName || "Unknown customer"}</p>
+                      <p className="truncate text-xs text-slate-500">
+                        {job.title || "Job"}
+                        {job.scheduledStart ? ` · ${format(new Date(job.scheduledStart), "h:mm a")}` : ""}
+                      </p>
+                    </div>
+                    {missing ? (
+                      <span className="shrink-0 rounded-[3px] bg-amber-100 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-amber-800">
+                        No photos
+                      </span>
+                    ) : job.requiredPhotos > 0 ? (
+                      <span
+                        className={`shrink-0 rounded-[3px] px-2 py-1 text-[11px] font-bold tabular-nums ${
+                          needsMore ? "bg-[#711419]/10 text-[#711419]" : "bg-emerald-100 text-emerald-700"
+                        }`}
+                      >
+                        {Math.min(job.photosToday, job.requiredPhotos)} of {job.requiredPhotos} photos
+                      </span>
+                    ) : (
+                      <span className="shrink-0 rounded-[3px] bg-slate-100 px-2 py-1 text-[11px] font-semibold tabular-nums text-slate-600">
+                        {job.photosToday} photo{job.photosToday !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                    <Camera className="h-4 w-4 shrink-0 text-slate-400" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Active target: the customer photos will be saved to */}
         {activeCustomer ? (
